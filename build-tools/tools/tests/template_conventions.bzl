@@ -78,6 +78,10 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
         "classification": "template:contract",
     },
+    "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-reload.wasm-producer.test.ts": {
+        "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
+        "classification": "template:contract",
+    },
     "build-tools/tools/tests/scaffolding/webapp-ssr-vite.baseline-contract.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
         "classification": "template:contract",
@@ -97,6 +101,14 @@ _TEMPLATE_TEST_CONVENTIONS = {
     "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-reload.wasm-producer.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
         "classification": "template:contract",
+    },
+    "build-tools/tools/tests/scaffolding/webapp.phase2-wasm-producer-policy.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
     },
     "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/python/lib"],

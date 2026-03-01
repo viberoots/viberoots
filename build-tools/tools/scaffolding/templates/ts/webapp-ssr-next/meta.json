@@ -8,10 +8,13 @@
     "notes": [
       "Generates a Next.js app-router SSR webapp and an explicit Node server wrapper.",
       "Production startup is direct Node execution of server/index.ts output.",
-      "Scripts include dev:ssr, build:ssr, and start:ssr.",
+      "Scripts include dev, dev:ssr, dev:ssr:only, dev:wasm, dev:wasm:watch, build:ssr, and start:ssr.",
       "TARGETS keeps SSR intent explicit with framework labels for later planner wiring.",
       "Workspace-linked local dependencies (workspace:/link:/file:) are transpiled from source in dev mode for live updates in client and SSR render paths.",
-      "If local dependency edits do not refresh, verify next.config.mjs keeps transpilePackages derived from package.json and keeps experimental.externalDir enabled."
+      "The dev loop composes Next dev and a wasm producer watcher that rebuilds app/wasm-producer/payload.txt into app/wasm-contract/top.wasm.",
+      "Wasm watcher logs are deterministic for tests: [wasm-watch] rebuild:start, [wasm-watch] sync:ok, [wasm-watch] rebuild:fail, and a manual recovery command.",
+      "If local dependency edits do not refresh, verify next.config.mjs keeps transpilePackages derived from package.json and keeps experimental.externalDir enabled.",
+      "If producer edits do not refresh wasm output, run pnpm run dev:wasm:watch and verify [wasm-watch] sync:ok appears after payload changes."
     ],
     "examples": [
       "scaf new ts webapp-ssr-next demo-next --yes",

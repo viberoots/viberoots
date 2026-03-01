@@ -63,7 +63,7 @@ For `scaf new ts webapp-static <name>` and `scaf new ts webapp-ssr-vite <name>`,
 - `optimizeDeps.exclude` is derived from `workspace:`, `link:`, and `file:` dependency specs in the app importer `package.json`.
 - `webapp-ssr-vite` additionally sets `ssr.noExternal` from that same package list.
 
-For `scaf new ts webapp-static <name>` and `scaf new ts webapp-ssr-vite <name>`, the generated app also includes a Phase-2 wasm producer bridge loop:
+For `scaf new ts webapp-static <name>`, `scaf new ts webapp-ssr-vite <name>`, and `scaf new ts webapp-ssr-next <name>`, the generated app also includes a Phase-2 wasm producer bridge loop:
 
 - `pnpm run dev` composes Vite and a wasm producer watcher with clean shutdown.
 - `pnpm run dev:wasm:watch` watches producer inputs, runs a producer build command, and syncs output to `src/wasm-contract/top.wasm`.
@@ -78,6 +78,8 @@ For `scaf new ts webapp-ssr-next <name>`, the generated `next.config.mjs` includ
 
 - `transpilePackages` derived from the same `workspace:`, `link:`, and `file:` dependency specs.
 - `experimental.externalDir = true` so workspace-linked source outside the app directory is resolvable in dev mode.
+- `dev` and `dev:ssr` compose `next dev` with a wasm producer watcher.
+- `dev:wasm:watch` rebuilds from `app/wasm-producer/payload.txt` and syncs `app/wasm-contract/top.wasm`.
 
 Troubleshooting when local dependency edits do not refresh:
 

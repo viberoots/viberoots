@@ -50,6 +50,18 @@ pnpm run dev:ssr
 
 Local workspace TypeScript dependencies update in the same dev session when they are workspace-linked (`workspace:`, `link:`, or `file:`) and imported from app code used by client or SSR render paths.
 
+Wasm producer bridge loop (watch producer source -> rebuild -> sync into app path):
+
+```bash
+pnpm run dev:wasm
+```
+
+Expected watcher markers:
+
+- `[wasm-watch] rebuild:start`
+- `[wasm-watch] sync:ok`
+- `[wasm-watch] rebuild:fail` with a manual recovery command
+
 Production build and startup:
 
 ```bash
@@ -99,6 +111,8 @@ Local dependency troubleshooting:
 - If local dependency edits do not apply, verify `next.config.mjs` includes `transpilePackages` entries for workspace-linked dependency package names.
 - If local dependency source resolves outside the app root, verify `next.config.mjs` keeps `experimental.externalDir = true`.
 - If local dependency edits stay stale after `package.json` changes, restart `pnpm run dev:ssr`.
+- If producer edits do not update wasm output, check `app/wasm-producer/payload.txt`, then run `pnpm run dev:wasm:watch` and verify `[wasm-watch] sync:ok`.
+- If server-rendered wasm probes fail in dev, confirm `app/wasm-contract/top.wasm` exists and rerun the logged watcher recovery command.
 {% endif %}
 {% if template == "webapp-ssr-vite" %}
 This is a Vite-first SSR scaffold that runs development SSR through Vite middleware mode.

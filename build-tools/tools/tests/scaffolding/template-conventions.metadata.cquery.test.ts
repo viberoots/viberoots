@@ -105,6 +105,11 @@ const EXPECTATIONS: TemplateExpectation[] = [
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
   },
   {
+    script: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-reload.wasm-producer.test.ts",
+    requiredLabels: ["template:ts/webapp-ssr-next", "template:contract"],
+    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
+  },
+  {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.baseline-contract.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],
@@ -123,6 +128,21 @@ const EXPECTATIONS: TemplateExpectation[] = [
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-reload.wasm-producer.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],
+  },
+  {
+    script:
+      "build-tools/tools/tests/scaffolding/webapp.phase2-wasm-producer-policy.contract.test.ts",
+    requiredLabels: [
+      "template:ts/webapp-static",
+      "template:ts/webapp-ssr-vite",
+      "template:ts/webapp-ssr-next",
+      "template:shared",
+    ],
+    requiredTemplateRoots: [
+      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+    ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts",

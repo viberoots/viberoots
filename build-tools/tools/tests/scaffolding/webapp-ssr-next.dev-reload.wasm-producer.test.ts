@@ -5,50 +5,23 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { clientAssetsContain, writeLibSource } from "./lib/next-dev";
+import {
+  clientAssetsContain,
+  nextWasmClientProbeSource,
+  nextWasmPageSource,
+  writeLibSource,
+} from "./lib/next-dev";
+import { assertSingleQueueInvariant, producerByteLength, waitForValue } from "./lib/wasm-watch";
 import { httpGet, pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
+
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
-async function waitForValue<T>(
-  getter: () => Promise<T>,
-  check: (value: T) => boolean,
-  timeoutMs = 90000,
-  pollMs = 300,
-): Promise<T> {
-  const start = Date.now();
-  let last: T | undefined;
-  while (Date.now() - start < timeoutMs) {
-    last = await getter();
-    if (check(last)) return last;
-    await new Promise((resolve) => setTimeout(resolve, pollMs));
-  }
-  throw new Error(`timed out waiting for expected value after ${timeoutMs}ms`);
-}
-
 test(
-  "webapp-ssr-next scaffolds Phase-1 local dependency dev contract",
+  "webapp-ssr-next dev applies local TS edits and wasm producer edits in one session",
   { timeout: TEST_TIMEOUT_MS },
   async () => {
-    await runInTemp("webapp-ssr-next-hmr-config", async (tmp, _$) => {
-      const $ = _$({ cwd: tmp, stdio: "pipe" });
-      await $`scaf new ts webapp-ssr-next demo-next-ssr --yes --no-tests`;
-      const configPath = path.join(tmp, "projects", "apps", "demo-next-ssr", "next.config.mjs");
-      const config = await fsp.readFile(configPath, "utf8");
-      assert.match(config, /spec\.startsWith\("workspace:"\)/);
-      assert.match(config, /spec\.startsWith\("link:"\)/);
-      assert.match(config, /spec\.startsWith\("file:"\)/);
-      assert.match(config, /transpilePackages/);
-      assert.match(config, /externalDir:\s*true/);
-    });
-  },
-);
-
-test(
-  "webapp-ssr-next dev applies local TS dependency edits for client and server paths",
-  { timeout: TEST_TIMEOUT_MS },
-  async () => {
-    await runInTemp("webapp-ssr-next-hmr-local-dep", async (tmp, _$) => {
+    await runInTemp("webapp-ssr-next-wasm-producer", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
       await $`scaf new ts webapp-ssr-next demo-next-ssr --yes --no-tests`;
       await $`scaf new ts lib demo-lib --yes --no-tests`;
@@ -57,33 +30,12 @@ test(
       const appPagePath = path.join(appAbs, "app", "page.tsx");
       const appClientProbePath = path.join(appAbs, "app", "client-probe.tsx");
       const appPackageJsonPath = path.join(appAbs, "package.json");
+      const payloadPath = path.join(appAbs, "app", "wasm-producer", "payload.txt");
       const libPackageJsonPath = path.join(tmp, "projects", "libs", "demo-lib", "package.json");
       const libSourcePath = path.join(tmp, "projects", "libs", "demo-lib", "src", "index.ts");
-      const pageSource = [
-        'import { depServerMessage } from "@libs/demo-lib";',
-        'import { ClientProbe } from "./client-probe";',
-        "",
-        "export default function HomePage() {",
-        "  return (",
-        '    <main data-ssr-marker="next">',
-        "      <h1>Hello from Next SSR</h1>",
-        "      <ClientProbe />",
-        '      <p id="server-probe">{`server:${depServerMessage()}`}</p>',
-        "    </main>",
-        "  );",
-        "}",
-        "",
-      ].join("\n");
-      const clientProbeSource = [
-        '"use client";',
-        "",
-        'import { depClientMessage } from "@libs/demo-lib";',
-        "",
-        "export function ClientProbe() {",
-        '  return <p id="client-probe">{`client:${depClientMessage()}`}</p>;',
-        "}",
-        "",
-      ].join("\n");
+
+      const pageSource = nextWasmPageSource();
+      const clientProbeSource = nextWasmClientProbeSource();
 
       const appPackageJson = JSON.parse(await fsp.readFile(appPackageJsonPath, "utf8")) as {
         dependencies?: Record<string, string>;
@@ -121,6 +73,7 @@ test(
         "utf8",
       );
       await fsp.writeFile(libSourcePath, writeLibSource("client-a", "server-a"), "utf8");
+      await fsp.writeFile(payloadPath, "phase2-a", "utf8");
 
       await _$({
         cwd: tmp,
@@ -135,36 +88,51 @@ test(
       const port = await pickFreePort();
       const serverStdout: string[] = [];
       const serverStderr: string[] = [];
-      const devServer: ChildProcess = spawn(
-        "pnpm",
-        ["exec", "next", "dev", "-H", "127.0.0.1", "-p", String(port)],
-        {
-          cwd: appAbs,
-          stdio: "pipe",
-          env: {
-            ...process.env,
-            PORT: String(port),
-            NODE_OPTIONS: "",
-            NEXT_TELEMETRY_DISABLED: "1",
-          },
+      const pageUrl = `http://127.0.0.1:${port}/`;
+      const readClientWasmLength = async (): Promise<number | null> => {
+        const candidates = ["/top.wasm", "/app/wasm-contract/top.wasm", "/wasm-contract/top.wasm"];
+        for (const candidate of candidates) {
+          const res = await httpGet(`http://127.0.0.1:${port}${candidate}`);
+          if (res.status === 200) return Buffer.byteLength(res.body, "utf8");
+        }
+        try {
+          const bytes = await fsp.readFile(path.join(appAbs, "app", "wasm-contract", "top.wasm"));
+          return bytes.byteLength;
+        } catch {
+          return null;
+        }
+      };
+      const devServer: ChildProcess = spawn("pnpm", ["run", "dev:ssr"], {
+        cwd: appAbs,
+        stdio: "pipe",
+        env: {
+          ...process.env,
+          PORT: String(port),
+          NODE_OPTIONS: "",
+          NEXT_TELEMETRY_DISABLED: "1",
         },
-      );
+      });
       devServer.stdout?.on("data", (chunk) => {
         serverStdout.push(String(chunk || ""));
-        if (serverStdout.length > 100) serverStdout.shift();
+        if (serverStdout.length > 300) serverStdout.shift();
       });
       devServer.stderr?.on("data", (chunk) => {
         serverStderr.push(String(chunk || ""));
-        if (serverStderr.length > 100) serverStderr.shift();
+        if (serverStderr.length > 300) serverStderr.shift();
       });
 
-      const pageUrl = `http://127.0.0.1:${port}/`;
       try {
         await waitForHttpOk(pageUrl, 90000);
-        const initialPage = await httpGet(pageUrl);
-        assert.equal(initialPage.status, 200);
-        assert.match(initialPage.body, /server:server-a/);
-
+        const expectedA = producerByteLength("phase2-a");
+        await waitForValue(readClientWasmLength, (v) => v === expectedA, 90000);
+        await waitForValue(
+          async () => await httpGet(pageUrl),
+          (res) =>
+            res.status === 200 &&
+            res.body.includes("server:server-a") &&
+            res.body.includes(`server-wasm:${expectedA}`),
+          90000,
+        );
         const initialClientProbe = await clientAssetsContain(pageUrl, "client-a");
         assert.equal(initialClientProbe, true);
 
@@ -172,12 +140,10 @@ test(
         await fsp.writeFile(libSourcePath, writeLibSource("client-b", "server-a"), "utf8");
         const now = new Date();
         await fsp.utimes(libSourcePath, now, now);
-
         const clientProbeUpdated = await waitForValue(
           async () => await clientAssetsContain(pageUrl, "client-b"),
           (value) => value,
           90000,
-          1000,
         );
         assert.equal(clientProbeUpdated, true);
         assert.equal(devServer.exitCode, null);
@@ -186,18 +152,57 @@ test(
         await fsp.writeFile(libSourcePath, writeLibSource("client-b", "server-b"), "utf8");
         const later = new Date();
         await fsp.utimes(libSourcePath, later, later);
-
-        const serverUpdated = await waitForValue(
+        await waitForValue(
           async () => await httpGet(pageUrl),
           (res) => res.status === 200 && res.body.includes("server:server-b"),
+          90000,
         );
-        assert.equal(serverUpdated.status, 200);
-        assert.match(serverUpdated.body, /server:server-b/);
         assert.equal(devServer.exitCode, null);
         assert.equal(devServer.pid, serverPid);
+
+        await fsp.writeFile(payloadPath, "phase2-bbb", "utf8");
+        const payloadNow = new Date();
+        await fsp.utimes(payloadPath, payloadNow, payloadNow);
+        const expectedB = producerByteLength("phase2-bbb");
+        await waitForValue(readClientWasmLength, (v) => v === expectedB, 90000);
+        await waitForValue(
+          async () => await httpGet(pageUrl),
+          (res) => res.status === 200 && res.body.includes(`server-wasm:${expectedB}`),
+          90000,
+        );
+        assert.equal(devServer.exitCode, null);
+        assert.equal(devServer.pid, serverPid);
+
+        await fsp.writeFile(payloadPath, "FAIL", "utf8");
+        const sawFailureLog = await waitForValue(
+          async () => `${serverStdout.join("")}\n${serverStderr.join("")}`,
+          (logs) =>
+            logs.includes("[wasm-watch] rebuild:fail") &&
+            logs.includes("[wasm-watch] recovery: run this command manually:"),
+          30000,
+        );
+        assert.match(sawFailureLog, /\[wasm-watch\] rebuild:fail/);
+
+        await fsp.writeFile(payloadPath, "phase2-c1", "utf8");
+        await fsp.writeFile(payloadPath, "phase2-c22", "utf8");
+        const burstNow = new Date();
+        await fsp.utimes(payloadPath, burstNow, burstNow);
+        const expectedC = producerByteLength("phase2-c22");
+        await waitForValue(readClientWasmLength, (v) => v === expectedC, 90000);
+        await waitForValue(
+          async () => await httpGet(pageUrl),
+          (res) => res.status === 200 && res.body.includes(`server-wasm:${expectedC}`),
+          90000,
+        );
+
+        const mergedLogs = `${serverStdout.join("")}\n${serverStderr.join("")}`;
+        assert.match(mergedLogs, /\[wasm-watch\] rebuild:start/);
+        assert.match(mergedLogs, /\[wasm-watch\] sync:ok/);
+        assert.doesNotMatch(mergedLogs, /\bfull-reload\b/);
+        assertSingleQueueInvariant(mergedLogs);
       } catch (error) {
-        const tailOut = serverStdout.join("").slice(-6000);
-        const tailErr = serverStderr.join("").slice(-6000);
+        const tailOut = serverStdout.join("").slice(-8000);
+        const tailErr = serverStderr.join("").slice(-8000);
         throw new Error(
           [
             error instanceof Error ? error.message : String(error),
