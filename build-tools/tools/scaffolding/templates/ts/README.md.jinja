@@ -11,6 +11,18 @@ pnpm dev
 
 Local workspace TypeScript dependencies update in the same dev session when they are workspace-linked (`workspace:`, `link:`, or `file:`) and imported from app code.
 
+Wasm producer bridge loop (watch producer source -> rebuild -> sync into app path):
+
+```bash
+pnpm run dev:wasm
+```
+
+Expected watcher markers:
+
+- `[wasm-watch] rebuild:start`
+- `[wasm-watch] sync:ok`
+- `[wasm-watch] rebuild:fail` with a manual recovery command
+
 Production build via Buck (Nix under the hood):
 
 ```bash
@@ -22,6 +34,8 @@ Local dependency troubleshooting:
 - If local dependency edits do not apply, verify the dependency spec in `package.json` is `workspace:`, `link:`, or `file:`.
 - If local dependency source resolves outside the app root, verify `vite.config.ts` keeps `server.fs.allow` scoped to the workspace root.
 - If local dependency edits stay stale after `package.json` changes, restart `pnpm dev`.
+- If producer edits do not update wasm output, check `src/wasm-producer/payload.txt`, then run `pnpm run dev:wasm:watch` and verify `[wasm-watch] sync:ok`.
+- If watcher failures persist, run the logged recovery command and confirm `src/wasm-contract/top.wasm` exists.
 {% endif %}
 {% if template == "webapp-ssr-express" %}
 This is an Express SSR scaffold with explicit production startup via a Node server entrypoint.

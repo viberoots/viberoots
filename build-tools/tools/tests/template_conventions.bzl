@@ -48,6 +48,10 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static"],
         "classification": "template:contract",
     },
+    "build-tools/tools/tests/scaffolding/webapp-static.dev-reload.wasm-producer.test.ts": {
+        "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static"],
+        "classification": "template:contract",
+    },
     "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-contract-and-runtime-smoke.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/webapp-ssr-express",

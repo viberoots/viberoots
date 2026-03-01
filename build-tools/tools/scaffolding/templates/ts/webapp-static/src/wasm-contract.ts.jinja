@@ -1,6 +1,7 @@
+import wasmContractUrl from "./wasm-contract/top.wasm?url";
+
 export async function readWasmContractBytes(): Promise<Uint8Array> {
-  const wasmUrl = new URL("/top.wasm", window.location.href).toString();
-  const res = await fetch(wasmUrl);
+  const res = await fetch(wasmContractUrl);
   if (!res.ok) {
     throw new Error(`failed to load wasm contract asset: ${res.status}`);
   }

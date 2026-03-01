@@ -29,6 +29,23 @@ function esbuildPackageName(): string {
   return "";
 }
 
+async function waitForValue<T>(
+  getter: () => Promise<T>,
+  check: (value: T) => boolean,
+  timeoutMs = 120000,
+): Promise<T> {
+  const start = Date.now();
+  let last: T | undefined;
+  while (Date.now() - start < timeoutMs) {
+    last = await getter();
+    if (check(last)) return last;
+    await sleep(300);
+  }
+  throw new Error(
+    `timed out waiting for expected value after ${timeoutMs}ms (last=${String(last ?? "")})`,
+  );
+}
+
 test(
   "webapp-static scaffolds Phase-1 local dependency Vite contract",
   { timeout: TEST_TIMEOUT_MS },
@@ -37,13 +54,28 @@ test(
       const $ = _$({ cwd: tmp, stdio: "pipe" });
       await $`scaf new ts webapp-static demo-web --yes --no-tests`;
       const configPath = path.join(tmp, "projects", "apps", "demo-web", "vite.config.ts");
+      const packageJsonPath = path.join(tmp, "projects", "apps", "demo-web", "package.json");
+      const wasmContractPath = path.join(
+        tmp,
+        "projects",
+        "apps",
+        "demo-web",
+        "src",
+        "wasm-contract.ts",
+      );
       const config = await fsp.readFile(configPath, "utf8");
+      const packageJson = await fsp.readFile(packageJsonPath, "utf8");
+      const wasmContract = await fsp.readFile(wasmContractPath, "utf8");
       assert.match(config, /const workspaceRoot = path\.resolve\(appRoot, "\.\.\/\.\.\/\.\."\);/);
       assert.match(config, /server:\s*\{[\s\S]*fs:\s*\{[\s\S]*allow:\s*\[workspaceRoot\]/m);
       assert.match(config, /spec\.startsWith\("workspace:"\)/);
       assert.match(config, /spec\.startsWith\("link:"\)/);
       assert.match(config, /spec\.startsWith\("file:"\)/);
       assert.match(config, /optimizeDeps:\s*\{[\s\S]*exclude:\s*optimizeDepsExclude/m);
+      assert.match(packageJson, /"dev:wasm:watch"/);
+      assert.match(packageJson, /watch-wasm-producer\.ts/);
+      assert.match(packageJson, /"dev":\s*"zx-wrapper .*dev-with-wasm-watch\.ts/);
+      assert.match(wasmContract, /\.\/wasm-contract\/top\.wasm/);
     });
   },
 );
@@ -170,45 +202,27 @@ test(
         const now = new Date();
         await fsp.utimes(libSourcePath, now, now);
 
-        const start = Date.now();
-        let observed = "";
-        while (Date.now() - start < 60000) {
-          if (devServer.exitCode != null) {
-            throw new Error(
-              `vite exited unexpectedly during dependency update (code=${devServer.exitCode})`,
-            );
-          }
-          const currentMainModule = await httpGet(mainModuleUrl);
-          if (currentMainModule.status !== 200) {
-            await sleep(300);
-            continue;
-          }
-          const currentDepSpec = extractImportedUrl(currentMainModule.body, "/demo-lib/src/index");
-          const currentDepModuleUrl = toAbsoluteModuleUrl(mainModuleUrl, currentDepSpec);
-          const nextModule = await httpGet(currentDepModuleUrl);
-          if (nextModule.status !== 200 || !nextModule.body.includes("phase1-b")) {
-            await sleep(300);
-            continue;
-          }
-          const renderedText = await evaluateRenderedAppText(mainModuleUrl);
-          if (renderedText === "dep:phase1-b") {
-            observed = renderedText;
-            break;
-          }
-          await sleep(300);
-        }
-        if (observed !== "dep:phase1-b") {
-          const tailOut = serverStdout.join("").slice(-6000);
-          const tailErr = serverStderr.join("").slice(-6000);
-          throw new Error(
-            [
-              "expected updated local dependency source to be served in the same dev session",
-              "expected rendered app text to update from dep:phase1-a to dep:phase1-b",
-              `vite stdout tail:\n${tailOut}`,
-              `vite stderr tail:\n${tailErr}`,
-            ].join("\n\n"),
-          );
-        }
+        const observed = await waitForValue(
+          async () => {
+            if (devServer.exitCode != null) {
+              throw new Error(
+                `vite exited unexpectedly during dependency update (code=${devServer.exitCode})`,
+              );
+            }
+            return await evaluateRenderedAppText(mainModuleUrl);
+          },
+          (v) => v === "dep:phase1-b",
+        );
+        assert.equal(observed, "dep:phase1-b");
+
+        // Verify the served dependency module source also advanced, not just DOM text.
+        const currentMainModule = await httpGet(mainModuleUrl);
+        assert.equal(currentMainModule.status, 200);
+        const currentDepSpec = extractImportedUrl(currentMainModule.body, "/demo-lib/src/index");
+        const currentDepModuleUrl = toAbsoluteModuleUrl(mainModuleUrl, currentDepSpec);
+        const nextModule = await httpGet(currentDepModuleUrl);
+        assert.equal(nextModule.status, 200);
+        assert.match(nextModule.body, /phase1-b/);
       } finally {
         await stopServer(devServer);
       }

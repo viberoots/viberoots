@@ -1,0 +1,25 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+
+const cwd = process.cwd();
+const payloadPath = process.env.WASM_PRODUCER_PAYLOAD_PATH
+  ? path.resolve(cwd, process.env.WASM_PRODUCER_PAYLOAD_PATH)
+  : path.join(cwd, "src", "wasm-producer", "payload.txt");
+const outPath = process.env.WASM_PRODUCER_OUT_PATH
+  ? path.resolve(cwd, process.env.WASM_PRODUCER_OUT_PATH)
+  : path.join(cwd, ".wasm-producer", "top.wasm");
+
+const payload = (await fs.readFile(payloadPath, "utf8")).trim();
+if (!payload) {
+  throw new Error(
+    `wasm producer payload is empty; write a non-empty value to ${payloadPath}`,
+  );
+}
+if (payload.includes("FAIL")) {
+  throw new Error(
+    "wasm producer payload includes FAIL marker; remove FAIL and rerun pnpm run dev:wasm:watch",
+  );
+}
+const bytes = new TextEncoder().encode(`wasm-producer:${payload}`);
+await fs.mkdir(path.dirname(outPath), { recursive: true });
+await fs.writeFile(outPath, bytes);
