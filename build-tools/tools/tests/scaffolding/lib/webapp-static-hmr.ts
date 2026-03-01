@@ -123,25 +123,36 @@ export async function moduleUrlResolvesToFile(
 function transformEsmForEval(
   code: string,
   moduleUrl: string,
-): { code: string; exportNames: string[] } {
-  const exportNames: string[] = [];
+): { code: string; exportEntries: Array<{ exportName: string; localName: string }> } {
+  const exportEntries: Array<{ exportName: string; localName: string }> = [];
   let out = code;
+  out = out.replace(
+    /import\s+([A-Za-z_$][\w$]*)\s+from\s+["']([^"']+)["'];?/g,
+    (_, local, spec) => {
+      const depUrl = toAbsoluteModuleUrl(moduleUrl, String(spec));
+      return `const { default: ${String(local)} } = await __import("${depUrl}");`;
+    },
+  );
   out = out.replace(/import\s+\{([^}]+)\}\s+from\s+["']([^"']+)["'];?/g, (_, imports, spec) => {
     const depUrl = toAbsoluteModuleUrl(moduleUrl, String(spec));
     return `const {${String(imports)}} = await __import("${depUrl}");`;
   });
   out = out.replace(/export\s+const\s+([A-Za-z_$][\w$]*)\s*=/g, (_, name) => {
-    exportNames.push(String(name));
+    exportEntries.push({ exportName: String(name), localName: String(name) });
     return `const ${String(name)} =`;
   });
   out = out.replace(/export\s+function\s+([A-Za-z_$][\w$]*)\s*\(/g, (_, name) => {
-    exportNames.push(String(name));
+    exportEntries.push({ exportName: String(name), localName: String(name) });
     return `function ${String(name)}(`;
   });
+  if (/export\s+default\b/.test(out)) {
+    out = out.replace(/export\s+default\b/g, "const __default_export__ =");
+    exportEntries.push({ exportName: "default", localName: "__default_export__" });
+  }
   out = out.replace(/if\s*\(\s*import\.meta\.hot\s*\)\s*\{[\s\S]*?\}\s*$/gm, "");
   out = out.replace(/import\.meta\.hot\.[^\n;]+;?/g, "");
   out = out.replace(/export\s*\{[^}]*\};?/g, "");
-  return { code: out, exportNames };
+  return { code: out, exportEntries };
 }
 
 export async function evaluateRenderedAppText(mainModuleUrl: string): Promise<string> {
@@ -162,9 +173,9 @@ export async function evaluateRenderedAppText(mainModuleUrl: string): Promise<st
     }
     const transformed = transformEsmForEval(res.body, moduleUrl);
     const exportObjectSrc =
-      transformed.exportNames.length === 0
+      transformed.exportEntries.length === 0
         ? "{}"
-        : `{ ${transformed.exportNames.map((name) => `${name}: ${name}`).join(", ")} }`;
+        : `{ ${transformed.exportEntries.map(({ exportName, localName }) => `"${exportName}": ${localName}`).join(", ")} }`;
     const runnerBody =
       '"use strict"; return (async () => {\n' +
       transformed.code +

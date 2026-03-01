@@ -10,10 +10,13 @@
       "Production startup stays a direct Node server entrypoint via server/index.ts.",
       "Packaged SSR artifacts are deterministic: dist/server/index.js and dist/client/.",
       "Canonical production startup is node dist/server/index.js.",
-      "dev:ssr runs on http://127.0.0.1:5173 and renders / through Vite ssrLoadModule + transformIndexHtml.",
+      "dev and dev:ssr compose Vite SSR dev and a wasm producer watcher with deterministic logs.",
+      "dev:ssr:only runs only the Vite SSR middleware server path.",
+      "dev:wasm:watch rebuilds producer input and syncs src/wasm-contract/top.wasm in place.",
+      "SSR dev runs on http://127.0.0.1:5173 and renders / through Vite ssrLoadModule + transformIndexHtml.",
       "Broken SSR wiring fails deterministically with SSR contract error messages.",
       "Missing packaged SSR paths fail fast with deterministic contract errors for serverEntry/clientDir.",
-      "Scripts include dev:ssr, build:ssr, and start:ssr for template-local iteration.",
+      "Scripts include dev, dev:ssr, build:ssr, and start:ssr for template-local iteration.",
       "TARGETS keeps SSR intent explicit with framework:vite for later planner wiring."
     ],
     "examples": [

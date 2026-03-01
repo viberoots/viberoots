@@ -108,7 +108,7 @@ Use this when you want Vite-native SSR hooks in development and an explicit Node
 Dev mode:
 
 ```bash
-pnpm run dev:ssr
+pnpm run dev
 ```
 
 Production build and startup:
@@ -126,6 +126,18 @@ http://127.0.0.1:5173
 
 Local workspace TypeScript dependencies update in the same dev session when they are workspace-linked (`workspace:`, `link:`, or `file:`) and imported from app code used by client or SSR render paths.
 
+Wasm producer bridge loop (watch producer source -> rebuild -> sync into app path):
+
+```bash
+pnpm run dev:wasm
+```
+
+Expected watcher markers:
+
+- `[wasm-watch] rebuild:start`
+- `[wasm-watch] sync:ok`
+- `[wasm-watch] rebuild:fail` with a manual recovery command
+
 Expected SSR contract failures:
 
 - Missing SSR entry module: `SSR contract error: failed to load /src/entry-server.ts: ...`
@@ -135,6 +147,8 @@ Local dependency troubleshooting:
 
 - If local dependency edits do not apply on SSR paths, verify `vite.config.ts` includes `ssr.noExternal` for workspace-linked dependency package names.
 - If local dependency source resolves outside the app root, verify `vite.config.ts` keeps `server.fs.allow` scoped to the workspace root.
+- If producer edits do not update wasm output, check `src/wasm-producer/payload.txt`, then run `pnpm run dev:wasm:watch` and verify `[wasm-watch] sync:ok`.
+- If server-rendered wasm probes fail in dev, confirm `src/wasm-contract/top.wasm` exists and rerun the logged watcher recovery command.
 {% endif %}
 
 ## Node tests (nix_node_test)

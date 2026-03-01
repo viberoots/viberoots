@@ -63,7 +63,7 @@ For `scaf new ts webapp-static <name>` and `scaf new ts webapp-ssr-vite <name>`,
 - `optimizeDeps.exclude` is derived from `workspace:`, `link:`, and `file:` dependency specs in the app importer `package.json`.
 - `webapp-ssr-vite` additionally sets `ssr.noExternal` from that same package list.
 
-For `scaf new ts webapp-static <name>`, the generated app also includes a Phase-2 wasm producer bridge loop:
+For `scaf new ts webapp-static <name>` and `scaf new ts webapp-ssr-vite <name>`, the generated app also includes a Phase-2 wasm producer bridge loop:
 
 - `pnpm run dev` composes Vite and a wasm producer watcher with clean shutdown.
 - `pnpm run dev:wasm:watch` watches producer inputs, runs a producer build command, and syncs output to `src/wasm-contract/top.wasm`.
@@ -71,6 +71,8 @@ For `scaf new ts webapp-static <name>`, the generated app also includes a Phase-
   - `[wasm-watch] rebuild:start`
   - `[wasm-watch] sync:ok`
   - `[wasm-watch] rebuild:fail` with a recovery command.
+
+For `webapp-ssr-vite`, server-side dev probes can read wasm from `src/wasm-contract/top.wasm` and packaged builds continue to read `dist/server/wasm-contract/top.wasm`.
 
 For `scaf new ts webapp-ssr-next <name>`, the generated `next.config.mjs` includes:
 

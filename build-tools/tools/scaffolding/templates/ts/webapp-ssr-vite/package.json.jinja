@@ -4,7 +4,11 @@
   "type": "module",
   "version": "0.1.0",
   "scripts": {
-    "dev:ssr": "node server/dev.mjs",
+    "dev": "zx-wrapper ../../../build-tools/tools/dev/dev-with-wasm-watch.ts --vite-cmd \"pnpm run dev:ssr:only\" --watch-cmd \"pnpm run dev:wasm:watch\"",
+    "dev:ssr": "pnpm run dev",
+    "dev:ssr:only": "node server/dev.mjs",
+    "dev:wasm": "pnpm run dev",
+    "dev:wasm:watch": "zx-wrapper ../../../build-tools/tools/dev/watch-wasm-producer.ts --watch src/wasm-producer/payload.txt --build-cmd \"node ./scripts/build-wasm-producer.mjs\" --build-out .wasm-producer/top.wasm --sync-out src/wasm-contract/top.wasm",
     "build:ssr": "vite build --outDir dist/client && vite build --ssr src/entry-server.ts --outDir dist/server && tsc -p tsconfig.server.json && mkdir -p dist/server/wasm-contract && cp src/wasm-contract/top.wasm dist/server/wasm-contract/top.wasm",
     "start:ssr": "node dist/server/index.js",
     {% if includeNodeTests %}
