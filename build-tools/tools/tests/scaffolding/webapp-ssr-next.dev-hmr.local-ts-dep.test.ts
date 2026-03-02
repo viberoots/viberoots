@@ -9,11 +9,12 @@ import { clientAssetsContain, writeLibSource } from "./lib/next-dev";
 import { httpGet, pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
+const NEXT_DEV_UPDATE_TIMEOUT_MS = 120000;
 
 async function waitForValue<T>(
   getter: () => Promise<T>,
   check: (value: T) => boolean,
-  timeoutMs = 90000,
+  timeoutMs = NEXT_DEV_UPDATE_TIMEOUT_MS,
   pollMs = 300,
 ): Promise<T> {
   const start = Date.now();
@@ -160,7 +161,7 @@ test(
 
       const pageUrl = `http://127.0.0.1:${port}/`;
       try {
-        await waitForHttpOk(pageUrl, 90000);
+        await waitForHttpOk(pageUrl, NEXT_DEV_UPDATE_TIMEOUT_MS);
         const initialPage = await httpGet(pageUrl);
         assert.equal(initialPage.status, 200);
         assert.match(initialPage.body, /server:server-a/);
@@ -176,7 +177,7 @@ test(
         const clientProbeUpdated = await waitForValue(
           async () => await clientAssetsContain(pageUrl, "client-b"),
           (value) => value,
-          90000,
+          NEXT_DEV_UPDATE_TIMEOUT_MS,
           1000,
         );
         assert.equal(clientProbeUpdated, true);

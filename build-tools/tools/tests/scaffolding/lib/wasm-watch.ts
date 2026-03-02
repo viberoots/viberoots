@@ -33,13 +33,14 @@ export async function waitForValue<T>(
   getter: () => Promise<T>,
   check: (value: T) => boolean,
   timeoutMs = 60000,
+  pollMs = 250,
 ): Promise<T> {
   const start = Date.now();
   let last: T | undefined;
   while (Date.now() - start < timeoutMs) {
     last = await getter();
     if (check(last)) return last;
-    await sleep(250);
+    await sleep(pollMs);
   }
   throw new Error(`timed out waiting for expected value after ${timeoutMs}ms`);
 }
