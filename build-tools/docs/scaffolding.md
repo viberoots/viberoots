@@ -76,6 +76,17 @@ For `scaf new ts webapp-static <name>`, `scaf new ts webapp-ssr-vite <name>`, an
 
 For `webapp-ssr-vite`, server-side dev probes can read wasm from `src/wasm-contract/top.wasm` and packaged builds continue to read `dist/server/wasm-contract/top.wasm`.
 
+Phase-3 runtime consistency checks for `webapp-ssr-vite` in one `pnpm run dev` session:
+
+- Client module edits update client-visible output without restarting the dev process.
+- Server module edits update SSR output without restarting the dev process.
+- Wasm producer edits update both client and SSR-visible wasm-dependent output without restarting the dev process.
+- Repeated mixed edit cycles stay deterministic and keep the dev process PID stable.
+- Startup must be non-blocking. If startup or updates stall, capture `pnpm run dev` stdout/stderr and run these checks:
+  - `pnpm run dev:ssr:only` to isolate the Vite SSR server path.
+  - `pnpm run dev:wasm:watch` to isolate the wasm producer bridge path.
+  - Verify watcher logs include deterministic markers (`[wasm-watch] rebuild:start`, `[wasm-watch] sync:ok`) and recovery guidance on failure.
+
 For `scaf new ts webapp-ssr-next <name>`, the generated `next.config.mjs` includes:
 
 - `transpilePackages` derived from the same `workspace:`, `link:`, and `file:` dependency specs.
