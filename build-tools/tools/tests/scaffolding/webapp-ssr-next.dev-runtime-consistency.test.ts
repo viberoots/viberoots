@@ -5,7 +5,12 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { nextWasmClientProbeSource, nextWasmPageSource, writeLibSource } from "./lib/next-dev";
+import {
+  clientAssetsContain,
+  nextWasmClientProbeSource,
+  nextWasmPageSource,
+  writeLibSource,
+} from "./lib/next-dev";
 import { assertSingleQueueInvariant, producerByteLength, waitForValue } from "./lib/wasm-watch";
 import { httpGet, pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
 
@@ -16,11 +21,26 @@ const STARTUP_TIMEOUT_MS = 45000,
   STEP_TIMEOUT_MS = 120000,
   NEXT_DEV_POLL_MS = 1000;
 
+let fileTouchStep = 0;
+let requestStep = 0;
+
+async function writeAndBumpMtime(filePath: string, contents: string): Promise<void> {
+  await fsp.writeFile(filePath, contents, "utf8");
+  fileTouchStep += 1;
+  const stamp = new Date(Date.now() + fileTouchStep * 1100);
+  await fsp.utimes(filePath, stamp, stamp);
+}
+
+async function readServerPage(baseUrl: string): Promise<{ status: number; body: string }> {
+  requestStep += 1;
+  return await httpGet(`${baseUrl}?v=${requestStep}`);
+}
+
 test(
-  "webapp-ssr-next Phase 3 runtime consistency is deterministic across repeated mixed cycles without restart or hang",
+  "webapp-ssr-next runtime consistency stays deterministic across repeated mixed cycles without restart or hang",
   { timeout: TEST_TIMEOUT_MS },
   async () => {
-    await runInTemp("webapp-ssr-next-phase3-runtime-consistency", async (tmp, _$) => {
+    await runInTemp("webapp-ssr-next-runtime-consistency", async (tmp, _$) => {
       process.env.NIX_PNPM_ALLOW_GENERATE = "1";
       process.env.NIX_PNPM_FETCH_TIMEOUT = process.env.NIX_PNPM_FETCH_TIMEOUT || "240";
 
@@ -52,11 +72,7 @@ test(
       };
       const nextLibPackageJson = {
         ...libPackageJson,
-        exports: {
-          ".": {
-            default: "./src/index.ts",
-          },
-        },
+        exports: { ".": { default: "./src/index.ts" } },
         types: "./src/index.ts",
       };
       await fsp.writeFile(appPagePath, nextWasmPageSource(), "utf8");
@@ -71,8 +87,8 @@ test(
         JSON.stringify(nextLibPackageJson, null, 2) + "\n",
         "utf8",
       );
-      await fsp.writeFile(libSourcePath, writeLibSource("client-a", "server-a"), "utf8");
-      await fsp.writeFile(payloadPath, "phase3-a", "utf8");
+      await writeAndBumpMtime(libSourcePath, writeLibSource("client-a", "server-a"));
+      await writeAndBumpMtime(payloadPath, "runtime-a");
 
       await _$({
         cwd: tmp,
@@ -129,7 +145,7 @@ test(
         );
         await waitForHttpOk(pageUrl, STEP_TIMEOUT_MS);
 
-        const expectedA = producerByteLength("phase3-a");
+        const expectedA = producerByteLength("runtime-a");
         await waitForValue(
           readClientWasmLength,
           (v) => v === expectedA,
@@ -137,7 +153,7 @@ test(
           NEXT_DEV_POLL_MS,
         );
         await waitForValue(
-          async () => await httpGet(pageUrl),
+          async () => await readServerPage(pageUrl),
           (res) =>
             res.status === 200 &&
             res.body.includes("server:server-a") &&
@@ -146,44 +162,39 @@ test(
           NEXT_DEV_POLL_MS,
         );
         const initialClientProbe = await waitForValue(
-          async () => await httpGet(pageUrl),
-          (res) => res.status === 200 && res.body.includes("client:client-a"),
+          async () => await clientAssetsContain(pageUrl, "client-a"),
+          (value) => value,
           STEP_TIMEOUT_MS,
           NEXT_DEV_POLL_MS,
         );
-        assert.equal(initialClientProbe.status, 200);
+        assert.equal(initialClientProbe, true);
 
         const serverPid = devServer.pid;
         assert.ok(serverPid && serverPid > 0, "dev server pid must be available");
 
         const cycles = [
-          { tag: "b", client: "client-b", server: "server-b", payload: "phase3-bbb" },
-          { tag: "c", client: "client-c", server: "server-c", payload: "phase3-cccc" },
-          { tag: "d", client: "client-d", server: "server-d", payload: "phase3-ddddd" },
+          { tag: "b", client: "client-b", server: "server-b", payload: "runtime-bbb" },
+          { tag: "c", client: "client-c", server: "server-c", payload: "runtime-cccc" },
+          { tag: "d", client: "client-d", server: "server-d", payload: "runtime-ddddd" },
         ];
 
         for (const cycle of cycles) {
-          await fsp.writeFile(
+          await writeAndBumpMtime(
             libSourcePath,
             writeLibSource(cycle.client, `server-${cycle.tag}-prev`),
-            "utf8",
           );
-          const clientNow = new Date();
-          await fsp.utimes(libSourcePath, clientNow, clientNow);
           await waitForValue(
-            async () => await httpGet(pageUrl),
-            (res) => res.status === 200 && res.body.includes(`client:${cycle.client}`),
+            async () => await clientAssetsContain(pageUrl, cycle.client),
+            (value) => value,
             STEP_TIMEOUT_MS,
             NEXT_DEV_POLL_MS,
           );
           assert.equal(devServer.exitCode, null);
           assert.equal(devServer.pid, serverPid);
 
-          await fsp.writeFile(libSourcePath, writeLibSource(cycle.client, cycle.server), "utf8");
-          const serverNow = new Date();
-          await fsp.utimes(libSourcePath, serverNow, serverNow);
+          await writeAndBumpMtime(libSourcePath, writeLibSource(cycle.client, cycle.server));
           await waitForValue(
-            async () => await httpGet(pageUrl),
+            async () => await readServerPage(pageUrl),
             (res) => res.status === 200 && res.body.includes(`server:${cycle.server}`),
             STEP_TIMEOUT_MS,
             NEXT_DEV_POLL_MS,
@@ -191,9 +202,7 @@ test(
           assert.equal(devServer.exitCode, null);
           assert.equal(devServer.pid, serverPid);
 
-          await fsp.writeFile(payloadPath, cycle.payload, "utf8");
-          const payloadNow = new Date();
-          await fsp.utimes(payloadPath, payloadNow, payloadNow);
+          await writeAndBumpMtime(payloadPath, cycle.payload);
           const expectedWasm = producerByteLength(cycle.payload);
           await waitForValue(
             readClientWasmLength,
@@ -202,7 +211,7 @@ test(
             NEXT_DEV_POLL_MS,
           );
           await waitForValue(
-            async () => await httpGet(pageUrl),
+            async () => await readServerPage(pageUrl),
             (res) => res.status === 200 && res.body.includes(`server-wasm:${expectedWasm}`),
             STEP_TIMEOUT_MS,
             NEXT_DEV_POLL_MS,

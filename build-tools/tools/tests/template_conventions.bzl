@@ -82,7 +82,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
         "classification": "template:contract",
     },
-    "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-runtime-consistency.phase3.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-runtime-consistency.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
         "classification": "template:contract",
     },

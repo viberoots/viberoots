@@ -133,4 +133,30 @@ test("Phase-3 policy docs: SSR runtime consistency and startup guidance stay exp
   assert.match(hmrPlan, /### Phase 3 Closeout Status/);
   assert.match(hmrPlan, /Checkpoint: `COMPLETED` for Phase 3/);
   assert.match(hmrPlan, /Begin Phase 4 regression coverage and docs lock-in/);
+  assert.match(hmrPlan, /## Dev Update Contract Matrix \(Phase 0 through Phase 3\)/);
+  assert.match(
+    hmrPlan,
+    /\|\s*Change class\s*\|\s*`ts\/webapp-static`\s*\|\s*`ts\/webapp-ssr-vite`\s*\|\s*`ts\/webapp-ssr-next`\s*\|/,
+  );
+  assert.match(hmrPlan, /Deterministic failure signatures and recovery commands by change class/);
+  assert.match(hmrPlan, /## E2E Runner Policy/);
+  assert.match(hmrPlan, /Current selected runner contract for this suite/);
+  assert.match(hmrPlan, /Escalation triggers to adopt Playwright coverage in a future phase/);
+
+  const scaffoldingDoc = await fsp.readFile(
+    path.join(REPO_ROOT, "build-tools", "docs", "scaffolding.md"),
+    "utf8",
+  );
+  assert.match(scaffoldingDoc, /Dev-update contract matrix for in-scope templates/);
+  assert.match(
+    scaffoldingDoc,
+    /\|\s*Change class\s*\|\s*`ts\/webapp-static`\s*\|\s*`ts\/webapp-ssr-vite`\s*\|\s*`ts\/webapp-ssr-next`\s*\|/,
+  );
+  assert.match(scaffoldingDoc, /Deterministic failure signatures and recovery commands/);
+  assert.match(scaffoldingDoc, /E2E runner policy contract for this suite/);
+  assert.match(
+    scaffoldingDoc,
+    /selected runner is Node `zx-wrapper` tests with deterministic process, HTTP, and filesystem probes/,
+  );
+  assert.match(scaffoldingDoc, /escalation triggers for Playwright adoption/);
 });

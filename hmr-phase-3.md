@@ -144,7 +144,7 @@ I will harden `ts/webapp-ssr-next` runtime consistency with explicit no-hang and
 
 ### Verification Commands
 
-- `buck2 test //:scaffolding_webapp_ssr_next_dev_runtime_consistency_phase3`
+- `buck2 test //:scaffolding_webapp_ssr_next_dev_runtime_consistency`
 - `buck2 test //:scaffolding_webapp_ssr_next_dev_hmr_local_ts_dep`
 - `buck2 test //:scaffolding_webapp_ssr_next_dev_reload_wasm_producer`
 - `buck2 test //:scaffolding_webapp_ssr_next_contracts`
@@ -217,7 +217,7 @@ I will close Phase 3 by locking cross-template runtime consistency requirements 
 
 - `buck2 test //:scaffolding_webapp_phase3_runtime_consistency_policy_contract`
 - `buck2 test //:scaffolding_webapp_ssr_vite_dev_runtime_consistency_phase3`
-- `buck2 test //:scaffolding_webapp_ssr_next_dev_runtime_consistency_phase3`
+- `buck2 test //:scaffolding_webapp_ssr_next_dev_runtime_consistency`
 - `buck2 test //:scaffolding_webapp_static_dev_hmr_local_ts_dep`
 - `buck2 test //:scaffolding_webapp_static_dev_reload_wasm_producer`
 - `buck2 test //:scaffolding_webapp_ssr_vite_dev_hmr_local_ts_dep`
@@ -298,7 +298,7 @@ I will close the remaining Phase 3 planning gaps by making the dev-update contra
   - `//:scaffolding_webapp_ssr_vite_dev_runtime_consistency_phase3`
   - `//:scaffolding_webapp_ssr_next_dev_hmr_local_ts_dep`
   - `//:scaffolding_webapp_ssr_next_dev_reload_wasm_producer`
-  - `//:scaffolding_webapp_ssr_next_dev_runtime_consistency_phase3`
+  - `//:scaffolding_webapp_ssr_next_dev_runtime_consistency`
 - Add file-size gate checks for touched test modules:
   - enforce <= 250-line decomposition policy for SSR and related scaffolding test modules
 
@@ -322,7 +322,7 @@ I will close the remaining Phase 3 planning gaps by making the dev-update contra
 - `buck2 test //:scaffolding_webapp_ssr_vite_dev_runtime_consistency_phase3`
 - `buck2 test //:scaffolding_webapp_ssr_next_dev_hmr_local_ts_dep`
 - `buck2 test //:scaffolding_webapp_ssr_next_dev_reload_wasm_producer`
-- `buck2 test //:scaffolding_webapp_ssr_next_dev_runtime_consistency_phase3`
+- `buck2 test //:scaffolding_webapp_ssr_next_dev_runtime_consistency`
 - `buck2 test //:scaffolding_template_conventions_metadata_cquery`
 - `node build-tools/tools/dev/file-size-lint.ts --scope=ssr-tests --fail=true`
 - `node build-tools/tools/dev/file-size-lint.ts --scope=source --fail=true`

@@ -110,8 +110,7 @@ const EXPECTATIONS: TemplateExpectation[] = [
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
   },
   {
-    script:
-      "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-runtime-consistency.phase3.test.ts",
+    script: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-runtime-consistency.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-next", "template:contract"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
   },

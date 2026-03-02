@@ -19,6 +19,15 @@ const TEST_TIMEOUT_MS =
 const NEXT_DEV_UPDATE_TIMEOUT_MS = 120000;
 const NEXT_DEV_POLL_MS = 1000;
 
+let fileTouchStep = 0;
+
+async function writeAndBumpMtime(filePath: string, contents: string): Promise<void> {
+  await fsp.writeFile(filePath, contents, "utf8");
+  fileTouchStep += 1;
+  const stamp = new Date(Date.now() + fileTouchStep * 1100);
+  await fsp.utimes(filePath, stamp, stamp);
+}
+
 test(
   "webapp-ssr-next dev applies local TS edits and wasm producer edits in one session",
   { timeout: TEST_TIMEOUT_MS },
@@ -145,9 +154,7 @@ test(
         assert.equal(initialClientProbe, true);
 
         const serverPid = devServer.pid;
-        await fsp.writeFile(libSourcePath, writeLibSource("client-b", "server-a"), "utf8");
-        const now = new Date();
-        await fsp.utimes(libSourcePath, now, now);
+        await writeAndBumpMtime(libSourcePath, writeLibSource("client-b", "server-a"));
         const clientProbeUpdated = await waitForValue(
           async () => await clientAssetsContain(pageUrl, "client-b"),
           (value) => value,
@@ -158,9 +165,7 @@ test(
         assert.equal(devServer.exitCode, null);
         assert.equal(devServer.pid, serverPid);
 
-        await fsp.writeFile(libSourcePath, writeLibSource("client-b", "server-b"), "utf8");
-        const later = new Date();
-        await fsp.utimes(libSourcePath, later, later);
+        await writeAndBumpMtime(libSourcePath, writeLibSource("client-b", "server-b"));
         await waitForValue(
           async () => await httpGet(pageUrl),
           (res) => res.status === 200 && res.body.includes("server:server-b"),
@@ -170,9 +175,7 @@ test(
         assert.equal(devServer.exitCode, null);
         assert.equal(devServer.pid, serverPid);
 
-        await fsp.writeFile(payloadPath, "phase2-bbb", "utf8");
-        const payloadNow = new Date();
-        await fsp.utimes(payloadPath, payloadNow, payloadNow);
+        await writeAndBumpMtime(payloadPath, "phase2-bbb");
         const expectedB = producerByteLength("phase2-bbb");
         await waitForValue(
           readClientWasmLength,
@@ -189,7 +192,7 @@ test(
         assert.equal(devServer.exitCode, null);
         assert.equal(devServer.pid, serverPid);
 
-        await fsp.writeFile(payloadPath, "FAIL", "utf8");
+        await writeAndBumpMtime(payloadPath, "FAIL");
         const sawFailureLog = await waitForValue(
           async () => `${serverStdout.join("")}\n${serverStderr.join("")}`,
           (logs) =>
@@ -199,10 +202,8 @@ test(
         );
         assert.match(sawFailureLog, /\[wasm-watch\] rebuild:fail/);
 
-        await fsp.writeFile(payloadPath, "phase2-c1", "utf8");
-        await fsp.writeFile(payloadPath, "phase2-c22", "utf8");
-        const burstNow = new Date();
-        await fsp.utimes(payloadPath, burstNow, burstNow);
+        await writeAndBumpMtime(payloadPath, "phase2-c1");
+        await writeAndBumpMtime(payloadPath, "phase2-c22");
         const expectedC = producerByteLength("phase2-c22");
         await waitForValue(
           readClientWasmLength,

@@ -57,6 +57,41 @@ Both examples create the destination under the canonical location for the chosen
 
 ### Local workspace TS dependency live updates (`ts/webapp-static`, `ts/webapp-ssr-vite`, `ts/webapp-ssr-next`)
 
+Dev-update contract matrix for in-scope templates:
+
+| Change class                                | `ts/webapp-static`                                                 | `ts/webapp-ssr-vite`                                                                                    | `ts/webapp-ssr-next`                                                                                    |
+| ------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| App-local TypeScript edit                   | HMR or module invalidation in one dev session. No restart.         | Client and server module updates apply in one dev session. No restart.                                  | Client and server module updates apply in one dev session. No restart.                                  |
+| Workspace-linked TypeScript dependency edit | HMR or module invalidation in one dev session. No restart.         | Client and SSR render paths update in one dev session. No restart.                                      | Client and SSR render paths update in one dev session. No restart.                                      |
+| Non-TS wasm producer edit                   | Strict producer rebuild and contract sync without process restart. | Strict producer rebuild and contract sync visible to client and SSR entry path without process restart. | Strict producer rebuild and contract sync visible to client and SSR entry path without process restart. |
+
+Primary path constraints:
+
+- full reload is not the primary behavior
+- no dev-process restart for change propagation
+- deterministic watcher markers remain required (`[wasm-watch] rebuild:start`, `[wasm-watch] sync:ok`)
+
+Deterministic failure signatures and recovery commands:
+
+- app-local TypeScript edit failure:
+  - signature: output does not update after source edit while dev process is still alive
+  - recovery: run `pnpm run dev:ssr:only` and retry one deterministic edit
+- workspace-linked TypeScript dependency failure:
+  - signature: workspace dependency edit is ignored until a restart
+  - recovery: verify dependency spec uses `workspace:`, `link:`, or `file:`, then restart `pnpm run dev`
+- non-TS wasm producer failure:
+  - signature: watcher logs miss `[wasm-watch] rebuild:start` or `[wasm-watch] sync:ok`
+  - recovery: run `pnpm run dev:wasm:watch` and fix the reported producer command/path issue
+
+E2E runner policy contract for this suite:
+
+- selected runner is Node `zx-wrapper` tests with deterministic process, HTTP, and filesystem probes
+- this runner is preferred for deterministic CI in this repo because probes and logs map directly to script-level contracts
+- escalation triggers for Playwright adoption:
+  - a required assertion cannot be validated deterministically via process, HTTP, or filesystem probes
+  - repeated CI flakes show timing ambiguity that current probes cannot disambiguate
+  - a required check depends on browser-only behavior that current harness cannot assert directly
+
 For `scaf new ts webapp-static <name>` and `scaf new ts webapp-ssr-vite <name>`, the generated `vite.config.ts` includes a Phase-1 local-dependency contract:
 
 - `server.fs.allow` includes the workspace root so source imports from sibling workspace packages resolve in dev mode.

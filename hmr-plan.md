@@ -35,6 +35,48 @@ Done means all pass:
 4. SSR behavior is correct for client and server module updates in `ts/webapp-ssr-vite` and `ts/webapp-ssr-next`.
 5. E2E tests prove all of the above in CI with deterministic checks.
 
+## Dev Update Contract Matrix (Phase 0 through Phase 3)
+
+The expected dev behavior by change class is explicit:
+
+| Change class                                | `ts/webapp-static`                                                   | `ts/webapp-ssr-vite`                                                                                      | `ts/webapp-ssr-next`                                                                                      |
+| ------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| App-local TypeScript edit                   | HMR or module invalidation in one dev session. No restart.           | Client or server module updates apply in one dev session. No restart.                                     | Client or server module updates apply in one dev session. No restart.                                     |
+| Workspace-linked TypeScript dependency edit | HMR or module invalidation in one dev session. No restart.           | Client and SSR paths update in one dev session. No restart.                                               | Client and SSR paths update in one dev session. No restart.                                               |
+| Non-TS wasm producer edit                   | Strict deterministic producer rebuild and contract sync. No restart. | Strict deterministic producer rebuild and contract sync visible to client and SSR entry path. No restart. | Strict deterministic producer rebuild and contract sync visible to client and SSR entry path. No restart. |
+
+Primary-path policy for all rows:
+
+- Full-page reload is not the primary behavior target.
+- Dev-process restart is always a failure condition.
+- Missing deterministic watcher markers is a failure condition.
+
+Deterministic failure signatures and recovery commands by change class:
+
+- App-local TypeScript edits:
+  - signature: rendered output does not update while dev process remains alive
+  - recovery: run `pnpm run dev:ssr:only`, then retry one deterministic edit
+- Workspace-linked TypeScript dependency edits:
+  - signature: dependency edit is ignored until process restart
+  - recovery: verify importer dependency uses `workspace:`, `link:`, or `file:`, then restart `pnpm run dev`
+- Non-TS wasm producer edits:
+  - signature: watcher logs miss `[wasm-watch] rebuild:start` or `[wasm-watch] sync:ok`
+  - recovery: run `pnpm run dev:wasm:watch` directly and fix the reported producer command/path issue
+
+## E2E Runner Policy
+
+Current selected runner contract for this suite:
+
+1. Canonical runner is Node `zx-wrapper` tests with deterministic HTTP, process, and filesystem probes.
+2. Browser-level checks are limited to deterministic transport signals already used in this harness.
+3. CI determinism is enforced by stable logs, stable command paths, and explicit timeout boundaries.
+
+Escalation triggers to adopt Playwright coverage in a future phase:
+
+1. A required contract cannot be asserted with deterministic HTTP/process/filesystem probes.
+2. Repeated CI flakes show the current probes cannot distinguish true regressions from timing noise.
+3. A required check depends on browser-only behavior (for example rendering or navigation state) that the current harness cannot assert directly.
+
 ## Current Observations
 
 1. Templates already use Vite dev scripts (`dev`, `dev:ssr`).
