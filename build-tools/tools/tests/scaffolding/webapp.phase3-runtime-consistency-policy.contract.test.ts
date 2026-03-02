@@ -139,6 +139,8 @@ test("Phase-3 policy docs: SSR runtime consistency and startup guidance stay exp
     /\|\s*Change class\s*\|\s*`ts\/webapp-static`\s*\|\s*`ts\/webapp-ssr-vite`\s*\|\s*`ts\/webapp-ssr-next`\s*\|/,
   );
   assert.match(hmrPlan, /Deterministic failure signatures and recovery commands by change class/);
+  assert.match(hmrPlan, /Stale install lock state during dependency\/bootstrap steps/);
+  assert.match(hmrPlan, /inspect `\/tmp\/bucknix-locks\/` for orphaned lock directories and retry/);
   assert.match(hmrPlan, /## E2E Runner Policy/);
   assert.match(hmrPlan, /Current selected runner contract for this suite/);
   assert.match(hmrPlan, /Escalation triggers to adopt Playwright coverage in a future phase/);
@@ -153,10 +155,61 @@ test("Phase-3 policy docs: SSR runtime consistency and startup guidance stay exp
     /\|\s*Change class\s*\|\s*`ts\/webapp-static`\s*\|\s*`ts\/webapp-ssr-vite`\s*\|\s*`ts\/webapp-ssr-next`\s*\|/,
   );
   assert.match(scaffoldingDoc, /Deterministic failure signatures and recovery commands/);
+  assert.match(scaffoldingDoc, /stale install lock state during dependency\/bootstrap/);
+  assert.match(
+    scaffoldingDoc,
+    /inspect `\/tmp\/bucknix-locks\/` for orphaned lock directories and retry/,
+  );
+  assert.match(scaffoldingDoc, /Shared Phase-4 regression helper contract/);
+  assert.match(scaffoldingDoc, /lib\/wasm-watch\.ts/);
   assert.match(scaffoldingDoc, /E2E runner policy contract for this suite/);
   assert.match(
     scaffoldingDoc,
     /selected runner is Node `zx-wrapper` tests with deterministic process, HTTP, and filesystem probes/,
   );
   assert.match(scaffoldingDoc, /escalation triggers for Playwright adoption/);
+});
+
+test("Phase-4 PR-1 shared helper reuse: representative template local-dep tests import shared helpers", async () => {
+  const staticLocalDep = await fsp.readFile(
+    path.join(
+      REPO_ROOT,
+      "build-tools",
+      "tools",
+      "tests",
+      "scaffolding",
+      "webapp-static.dev-hmr.local-ts-dep.test.ts",
+    ),
+    "utf8",
+  );
+  assert.match(staticLocalDep, /from "\.\/lib\/wasm-watch"/);
+  assert.match(staticLocalDep, /assertWorkspaceLinkedDependency/);
+
+  const viteLocalDep = await fsp.readFile(
+    path.join(
+      REPO_ROOT,
+      "build-tools",
+      "tools",
+      "tests",
+      "scaffolding",
+      "webapp-ssr-vite.dev-hmr.local-ts-dep.test.ts",
+    ),
+    "utf8",
+  );
+  assert.match(viteLocalDep, /from "\.\/lib\/wasm-watch"/);
+  assert.match(viteLocalDep, /writeAndBumpMtime/);
+
+  const nextLocalDep = await fsp.readFile(
+    path.join(
+      REPO_ROOT,
+      "build-tools",
+      "tools",
+      "tests",
+      "scaffolding",
+      "webapp-ssr-next.dev-hmr.local-ts-dep.test.ts",
+    ),
+    "utf8",
+  );
+  assert.match(nextLocalDep, /from "\.\/lib\/wasm-watch"/);
+  assert.match(nextLocalDep, /assertNoProcessRestart/);
 });

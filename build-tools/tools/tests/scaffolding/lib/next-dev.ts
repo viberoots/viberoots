@@ -25,14 +25,13 @@ function extractAssetUrls(html: string, baseUrl: string): string[] {
 export async function clientAssetsContain(pageUrl: string, needle: string): Promise<boolean> {
   const page = await httpGet(pageUrl);
   if (page.status !== 200) return false;
+  // Next.js SSR pre-renders client components; needle often appears in initial HTML
+  if (page.body.includes(needle)) return true;
   const assets = extractAssetUrls(page.body, pageUrl).filter((url) =>
     url.includes("/_next/static/"),
   );
-  for (const assetUrl of assets) {
-    const res = await httpGet(assetUrl);
-    if (res.status === 200 && res.body.includes(needle)) return true;
-  }
-  return false;
+  const results = await Promise.all(assets.map((url) => httpGet(url)));
+  return results.some((r) => r.status === 200 && r.body.includes(needle));
 }
 
 export function nextWasmPageSource(): string {

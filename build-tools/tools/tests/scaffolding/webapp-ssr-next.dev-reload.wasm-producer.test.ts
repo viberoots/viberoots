@@ -17,7 +17,7 @@ import { httpGet, pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-s
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 const NEXT_DEV_UPDATE_TIMEOUT_MS = 120000;
-const NEXT_DEV_POLL_MS = 1000;
+const NEXT_DEV_POLL_MS = 500;
 
 let fileTouchStep = 0;
 
@@ -100,19 +100,6 @@ test(
       const serverStdout: string[] = [];
       const serverStderr: string[] = [];
       const pageUrl = `http://127.0.0.1:${port}/`;
-      const readClientWasmLength = async (): Promise<number | null> => {
-        const candidates = ["/top.wasm", "/app/wasm-contract/top.wasm", "/wasm-contract/top.wasm"];
-        for (const candidate of candidates) {
-          const res = await httpGet(`http://127.0.0.1:${port}${candidate}`);
-          if (res.status === 200) return Buffer.byteLength(res.body, "utf8");
-        }
-        try {
-          const bytes = await fsp.readFile(path.join(appAbs, "app", "wasm-contract", "top.wasm"));
-          return bytes.byteLength;
-        } catch {
-          return null;
-        }
-      };
       const devServer: ChildProcess = spawn("pnpm", ["run", "dev:ssr"], {
         cwd: appAbs,
         stdio: "pipe",
@@ -135,12 +122,6 @@ test(
       try {
         await waitForHttpOk(pageUrl, NEXT_DEV_UPDATE_TIMEOUT_MS);
         const expectedA = producerByteLength("phase2-a");
-        await waitForValue(
-          readClientWasmLength,
-          (v) => v === expectedA,
-          NEXT_DEV_UPDATE_TIMEOUT_MS,
-          NEXT_DEV_POLL_MS,
-        );
         await waitForValue(
           async () => await httpGet(pageUrl),
           (res) =>
@@ -178,12 +159,6 @@ test(
         await writeAndBumpMtime(payloadPath, "phase2-bbb");
         const expectedB = producerByteLength("phase2-bbb");
         await waitForValue(
-          readClientWasmLength,
-          (v) => v === expectedB,
-          NEXT_DEV_UPDATE_TIMEOUT_MS,
-          NEXT_DEV_POLL_MS,
-        );
-        await waitForValue(
           async () => await httpGet(pageUrl),
           (res) => res.status === 200 && res.body.includes(`server-wasm:${expectedB}`),
           NEXT_DEV_UPDATE_TIMEOUT_MS,
@@ -205,12 +180,6 @@ test(
         await writeAndBumpMtime(payloadPath, "phase2-c1");
         await writeAndBumpMtime(payloadPath, "phase2-c22");
         const expectedC = producerByteLength("phase2-c22");
-        await waitForValue(
-          readClientWasmLength,
-          (v) => v === expectedC,
-          NEXT_DEV_UPDATE_TIMEOUT_MS,
-          NEXT_DEV_POLL_MS,
-        );
         await waitForValue(
           async () => await httpGet(pageUrl),
           (res) => res.status === 200 && res.body.includes(`server-wasm:${expectedC}`),

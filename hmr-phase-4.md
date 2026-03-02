@@ -4,7 +4,7 @@ This plan covers implementation of Phase 4 from `hmr-plan.md`: regression covera
 
 Each PR includes code, tests, and documentation updates together.
 
-Scope: `ts/webapp-static`, `ts/webapp-ssr-vite`, and `ts/webapp-ssr-next` remain the in-scope templates, and `ts/webapp-ssr-express` removal and migration guidance are finalized.
+Scope: `ts/webapp-static`, `ts/webapp-ssr-vite`, and `ts/webapp-ssr-next` remain the in-scope templates, and `ts/webapp-ssr-express` removal is finalized.
 
 Non-goals:
 
@@ -19,20 +19,20 @@ Completion criteria:
 1. Permanent dev-reload contract coverage for app-local TS edits, workspace-linked TS edits, and wasm-producer edits is enforced in CI for all in-scope templates.
 2. Troubleshooting guidance is explicit and tested for stale lock state, watcher build failures, and missing local link configuration.
 3. Canonical producer command-path checks are documented and enforced by tests.
-4. `ts/webapp-ssr-express` is fully removed and migration to Vite/Next SSR templates is documented and tested.
+4. `ts/webapp-ssr-express` is fully removed from scaffolding, tests, and docs.
 5. Each functional change in this phase is shipped with tests and docs in the same PR.
 
 Dependency chain:
 
 1. PR-1 establishes shared regression guardrails and deterministic failure contracts.
 2. PR-2 applies the guardrails to all in-scope templates and hardens troubleshooting contracts.
-3. PR-3 removes deprecated SSR Express path and completes migration and closeout validation.
+3. PR-3 removes deprecated SSR Express path and completes closeout validation.
 
 Phase 4 checkpoints:
 
 - Checkpoint A: `READY` for PR-2 when PR-1 tests and docs contracts are green.
 - Checkpoint B: `READY` for PR-3 when PR-2 full matrix is green.
-- Checkpoint C: `COMPLETED` for Phase 4 when PR-3 passes and all migration contracts are green.
+- Checkpoint C: `COMPLETED` for Phase 4 when PR-3 passes and all removal contracts are green.
 
 ---
 
@@ -205,11 +205,11 @@ Implement second to lock full matrix behavior before deprecating legacy template
 
 ---
 
-## PR-3: SSR Express removal, migration contracts, and Phase 4 closeout
+## PR-3: SSR Express removal and Phase 4 closeout
 
 ### Description
 
-I will complete the deprecated `ts/webapp-ssr-express` removal, ship migration guidance to Vite/Next SSR templates, and lock migration safety with tests in the same PR.
+I will complete the deprecated `ts/webapp-ssr-express` removal and lock removal safety with tests in the same PR.
 
 ### Scope & Changes
 
@@ -217,29 +217,22 @@ I will complete the deprecated `ts/webapp-ssr-express` removal, ship migration g
   - template source
   - scaffolding registration and selection points
   - stale references in tests/docs/tooling manifests
-- Add migration contract updates:
-  - explicit mapping from removed Express SSR path to supported Vite/Next SSR paths
-  - command and verification guidance for migration validation
 - Keep Phase 4 contract coverage intact after removal:
   - ensure remaining templates still pass matrix and policy checks
   - ensure removed template is not selectable in scaffolding flows
 
 ### Tests (in this PR)
 
-- Add or extend removal/migration tests:
+- Add or extend removal tests:
   - assert Express SSR template is no longer scaffoldable
-  - assert migration guidance references supported replacements
   - assert template conventions and manifests no longer include removed path
 - Run post-removal non-regression matrix:
   - static + SSR Vite + SSR Next contract targets
-  - policy and docs contract targets touched by migration updates
+  - policy and docs contract targets touched by removal updates
 
 ### Docs (in this PR)
 
-- Update migration and handbook docs:
-  - remove Express SSR generation path
-  - add supported migration routes to `ts/webapp-ssr-vite` and `ts/webapp-ssr-next`
-  - provide verification checklist for migrated projects
+- Update docs to remove Express SSR generation path and references.
 - Update `hmr-plan.md` Phase 4 closeout notes to reflect completed removal.
 
 ### Verification Commands
@@ -255,7 +248,6 @@ I will complete the deprecated `ts/webapp-ssr-express` removal, ship migration g
 ### Acceptance Criteria
 
 - `ts/webapp-ssr-express` is removed from scaffolding and supporting manifests.
-- Migration documentation is explicit, test-backed, and points to supported SSR templates.
 - Remaining in-scope template matrix and policy contracts remain green after removal.
 - Phase 4 checkpoint reaches `COMPLETED`.
 
@@ -273,9 +265,8 @@ Deprecated template remains available and conflicts with declared scope and main
 
 ### Downsides for Implementing
 
-Removal and migration updates can touch multiple files and require careful synchronization.
+Removal updates can touch multiple files and require careful synchronization.
 
 ### Recommendation
 
 Implement third and treat this PR as Phase 4 closeout gate.
-

@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { setTimeout as sleep } from "node:timers/promises";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import {
@@ -16,35 +15,15 @@ import {
   toAbsoluteModuleUrl,
   waitForHttpOk,
 } from "./lib/webapp-static-hmr";
+import {
+  assertNoProcessRestart,
+  assertWorkspaceLinkedDependency,
+  esbuildPackageName,
+  waitForValue,
+} from "./lib/wasm-watch";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
-
-function esbuildPackageName(): string {
-  const { platform, arch } = process;
-  if (platform === "darwin")
-    return arch === "arm64" ? "@esbuild/darwin-arm64" : "@esbuild/darwin-x64";
-  if (platform === "linux") return arch === "arm64" ? "@esbuild/linux-arm64" : "@esbuild/linux-x64";
-  if (platform === "win32") return arch === "arm64" ? "@esbuild/win32-arm64" : "@esbuild/win32-x64";
-  return "";
-}
-
-async function waitForValue<T>(
-  getter: () => Promise<T>,
-  check: (value: T) => boolean,
-  timeoutMs = 120000,
-): Promise<T> {
-  const start = Date.now();
-  let last: T | undefined;
-  while (Date.now() - start < timeoutMs) {
-    last = await getter();
-    if (check(last)) return last;
-    await sleep(300);
-  }
-  throw new Error(
-    `timed out waiting for expected value after ${timeoutMs}ms (last=${String(last ?? "")})`,
-  );
-}
 
 test(
   "webapp-static scaffolds Phase-1 local dependency Vite contract",
@@ -138,6 +117,7 @@ test(
         JSON.stringify(nextLibPackageJson, null, 2) + "\n",
         "utf8",
       );
+      assertWorkspaceLinkedDependency(nextAppPackageJson.dependencies, "@libs/demo-lib");
       await fsp.writeFile(appMainPath, appMainSource, "utf8");
       await fsp.writeFile(
         libSourcePath,
@@ -223,6 +203,7 @@ test(
         );
         const firstRenderedText = await evaluateRenderedAppText(mainModuleUrl);
         assert.equal(firstRenderedText, "dep:phase1-a");
+        const serverPid = devServer.pid;
 
         await fsp.writeFile(
           libSourcePath,
@@ -234,14 +215,11 @@ test(
 
         const observed = await waitForValue(
           async () => {
-            if (devServer.exitCode != null) {
-              throw new Error(
-                `vite exited unexpectedly during dependency update (code=${devServer.exitCode})`,
-              );
-            }
+            assertNoProcessRestart(devServer, serverPid);
             return await evaluateRenderedAppText(mainModuleUrl);
           },
           (v) => v === "dep:phase1-b",
+          120000,
         );
         assert.equal(observed, "dep:phase1-b");
 

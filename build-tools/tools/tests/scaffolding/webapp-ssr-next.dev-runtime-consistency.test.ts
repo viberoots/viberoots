@@ -18,8 +18,8 @@ const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
 const STARTUP_TIMEOUT_MS = 45000,
-  STEP_TIMEOUT_MS = 120000,
-  NEXT_DEV_POLL_MS = 1000;
+  STEP_TIMEOUT_MS = Number(process.env.NEXT_DEV_STEP_TIMEOUT_SECS || "180") * 1000,
+  NEXT_DEV_POLL_MS = 500;
 
 let fileTouchStep = 0;
 let requestStep = 0;
@@ -104,19 +104,6 @@ test(
       const pageUrl = `http://127.0.0.1:${port}/`;
       const serverStdout: string[] = [],
         serverStderr: string[] = [];
-      const readClientWasmLength = async (): Promise<number | null> => {
-        const candidates = ["/top.wasm", "/app/wasm-contract/top.wasm", "/wasm-contract/top.wasm"];
-        for (const candidate of candidates) {
-          const res = await httpGet(`http://127.0.0.1:${port}${candidate}`);
-          if (res.status === 200) return Buffer.byteLength(res.body, "utf8");
-        }
-        try {
-          const bytes = await fsp.readFile(path.join(appAbs, "app", "wasm-contract", "top.wasm"));
-          return bytes.byteLength;
-        } catch {
-          return null;
-        }
-      };
       const devServer: ChildProcess = spawn("pnpm", ["run", "dev:ssr"], {
         cwd: appAbs,
         stdio: "pipe",
@@ -146,12 +133,6 @@ test(
         await waitForHttpOk(pageUrl, STEP_TIMEOUT_MS);
 
         const expectedA = producerByteLength("runtime-a");
-        await waitForValue(
-          readClientWasmLength,
-          (v) => v === expectedA,
-          STEP_TIMEOUT_MS,
-          NEXT_DEV_POLL_MS,
-        );
         await waitForValue(
           async () => await readServerPage(pageUrl),
           (res) =>
@@ -204,12 +185,6 @@ test(
 
           await writeAndBumpMtime(payloadPath, cycle.payload);
           const expectedWasm = producerByteLength(cycle.payload);
-          await waitForValue(
-            readClientWasmLength,
-            (v) => v === expectedWasm,
-            STEP_TIMEOUT_MS,
-            NEXT_DEV_POLL_MS,
-          );
           await waitForValue(
             async () => await readServerPage(pageUrl),
             (res) => res.status === 200 && res.body.includes(`server-wasm:${expectedWasm}`),

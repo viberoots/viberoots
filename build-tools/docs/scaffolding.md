@@ -82,6 +82,9 @@ Deterministic failure signatures and recovery commands:
 - non-TS wasm producer failure:
   - signature: watcher logs miss `[wasm-watch] rebuild:start` or `[wasm-watch] sync:ok`
   - recovery: run `pnpm run dev:wasm:watch` and fix the reported producer command/path issue
+- stale install lock state during dependency/bootstrap:
+  - signature: install/dependency commands block or fail on install-lock acquisition
+  - recovery: rerun `i`; if lock state remains stale, inspect `/tmp/bucknix-locks/` for orphaned lock directories and retry
 
 E2E runner policy contract for this suite:
 
@@ -136,6 +139,11 @@ Troubleshooting when local dependency edits do not refresh:
 - For Vite SSR templates, verify `ssr.noExternal` still includes local workspace package names.
 - For Next SSR templates, verify `transpilePackages` includes local workspace package names and `experimental.externalDir` remains enabled.
 - If wasm producer updates do not apply, run `pnpm run dev:wasm:watch` and verify the logged build command uses `build-tools/tools/dev/build-wasm-producer.ts`.
+
+Shared Phase-4 regression helper contract:
+
+- Reuse `build-tools/tools/tests/scaffolding/lib/wasm-watch.ts` helpers for deterministic file mutation (`writeAndBumpMtime`), process no-restart assertions, watcher failure-signature checks, and local-link validation.
+- Keep template-specific behavior assertions in template tests; keep deterministic probe/mutation primitives in the shared helper module.
 
 #### Subcommands and semantics
 

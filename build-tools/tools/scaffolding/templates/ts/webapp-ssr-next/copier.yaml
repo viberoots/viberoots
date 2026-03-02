@@ -25,5 +25,7 @@ _tasks:
   - mkdir -p app
   - mkdir -p server
   - mkdir -p test
+  - mkdir -p public
+  - mkdir -p public/wasm-inline
 _templates_suffix: ".jinja"
 _answers_file: ".copier-answers.yml"

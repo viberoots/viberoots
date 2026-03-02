@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { setTimeout as sleep } from "node:timers/promises";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { writeLibSource } from "./lib/next-dev";
 import {
   evaluateRenderedAppText,
   httpGet,
@@ -13,32 +13,15 @@ import {
   stopServer,
   waitForHttpOk,
 } from "./lib/webapp-static-hmr";
+import {
+  assertNoProcessRestart,
+  assertWorkspaceLinkedDependency,
+  waitForValue,
+  writeAndBumpMtime,
+} from "./lib/wasm-watch";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
-
-function writeLibSource(clientValue: string, serverValue: string): string {
-  return [
-    `export const depClientMessage = (): string => "${clientValue}";`,
-    `export const depServerMessage = (): string => "${serverValue}";`,
-    "",
-  ].join("\n");
-}
-
-async function waitForValue<T>(
-  getter: () => Promise<T>,
-  check: (value: T) => boolean,
-  timeoutMs = 60000,
-): Promise<T> {
-  const start = Date.now();
-  let last: T | undefined;
-  while (Date.now() - start < timeoutMs) {
-    last = await getter();
-    if (check(last)) return last;
-    await sleep(300);
-  }
-  throw new Error(`timed out waiting for expected value after ${timeoutMs}ms`);
-}
 
 test(
   "webapp-ssr-vite scaffolds Phase-1 local dependency Vite contract",
@@ -142,6 +125,7 @@ test(
         JSON.stringify(nextLibPackageJson, null, 2) + "\n",
         "utf8",
       );
+      assertWorkspaceLinkedDependency(nextAppPackageJson.dependencies, "@libs/demo-lib");
 
       await fsp.writeFile(appEntryClientPath, clientEntrySource, "utf8");
       await fsp.writeFile(appEntryServerPath, serverEntrySource, "utf8");
@@ -191,21 +175,16 @@ test(
 
         const serverPid = devServer.pid;
 
-        await fsp.writeFile(libSourcePath, writeLibSource("client-b", "server-a"), "utf8");
-        const now = new Date();
-        await fsp.utimes(libSourcePath, now, now);
+        await writeAndBumpMtime(libSourcePath, writeLibSource("client-b", "server-a"));
 
         const clientUpdated = await waitForValue(
           async () => await evaluateRenderedAppText(mainModuleUrl),
           (v) => v === "client:client-b",
         );
         assert.equal(clientUpdated, "client:client-b");
-        assert.equal(devServer.exitCode, null);
-        assert.equal(devServer.pid, serverPid);
+        assertNoProcessRestart(devServer, serverPid);
 
-        await fsp.writeFile(libSourcePath, writeLibSource("client-b", "server-b"), "utf8");
-        const later = new Date();
-        await fsp.utimes(libSourcePath, later, later);
+        await writeAndBumpMtime(libSourcePath, writeLibSource("client-b", "server-b"));
 
         const serverUpdated = await waitForValue(
           async () => await httpGet(`http://127.0.0.1:${port}/`),
@@ -213,8 +192,7 @@ test(
         );
         assert.equal(serverUpdated.status, 200);
         assert.match(serverUpdated.body, /server:server-b at \//);
-        assert.equal(devServer.exitCode, null);
-        assert.equal(devServer.pid, serverPid);
+        assertNoProcessRestart(devServer, serverPid);
       } catch (error) {
         const tailOut = serverStdout.join("").slice(-6000);
         const tailErr = serverStderr.join("").slice(-6000);

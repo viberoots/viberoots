@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 
 export function esbuildPackageName(): string {
@@ -12,6 +13,30 @@ export function esbuildPackageName(): string {
 
 export function producerByteLength(payload: string): number {
   return Buffer.byteLength(`wasm-producer:${payload}`, "utf8");
+}
+
+const WORKSPACE_LINK_PREFIXES = ["workspace:", "link:", "file:"];
+let deterministicTouchStep = 0;
+
+export function isWorkspaceLinkedSpec(spec: string): boolean {
+  const normalized = String(spec || "").trim();
+  return WORKSPACE_LINK_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+}
+
+export function assertWorkspaceLinkedDependency(
+  deps: Record<string, string> | undefined,
+  depName: string,
+): void {
+  const spec = String(deps?.[depName] || "").trim();
+  if (!isWorkspaceLinkedSpec(spec)) {
+    throw new Error(
+      [
+        `[hmr-contract] missing local-link for '${depName}'`,
+        "expected dependency spec to use workspace:, link:, or file:",
+        "recovery: verify importer dependency uses workspace:, link:, or file:, then restart `pnpm run dev`",
+      ].join("\n"),
+    );
+  }
 }
 
 export function assertSingleQueueInvariant(logs: string): void {
@@ -43,6 +68,38 @@ export async function waitForValue<T>(
     await sleep(pollMs);
   }
   throw new Error(`timed out waiting for expected value after ${timeoutMs}ms`);
+}
+
+export async function writeAndBumpMtime(filePath: string, contents: string): Promise<void> {
+  await fsp.writeFile(filePath, contents, "utf8");
+  deterministicTouchStep += 1;
+  const stamp = new Date(Date.now() + deterministicTouchStep * 1100);
+  await fsp.utimes(filePath, stamp, stamp);
+}
+
+export function assertNoProcessRestart(
+  child: { pid?: number; exitCode?: number | null },
+  expectedPid: number | undefined,
+): void {
+  if (child.exitCode != null) {
+    throw new Error(`[hmr-contract] dev process exited unexpectedly (code=${child.exitCode})`);
+  }
+  if (expectedPid !== undefined && child.pid !== expectedPid) {
+    throw new Error(
+      `[hmr-contract] dev process restarted unexpectedly (expected pid ${expectedPid}, got ${String(child.pid)})`,
+    );
+  }
+}
+
+export function assertWatcherFailureContract(logs: string): void {
+  if (!logs.includes("[wasm-watch] rebuild:fail")) {
+    throw new Error("[hmr-contract] missing watcher failure marker: [wasm-watch] rebuild:fail");
+  }
+  if (!logs.includes("[wasm-watch] recovery: run this command manually:")) {
+    throw new Error(
+      "[hmr-contract] missing watcher recovery marker: [wasm-watch] recovery: run this command manually:",
+    );
+  }
 }
 
 export async function waitForHmrConnected(ws: WebSocket, timeoutMs: number): Promise<void> {
