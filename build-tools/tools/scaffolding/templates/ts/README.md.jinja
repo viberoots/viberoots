@@ -169,6 +169,9 @@ Local dependency troubleshooting:
 - If producer edits do not update wasm output, check `src/wasm-producer/payload.txt`, then run `pnpm run dev:wasm:watch` and verify `[wasm-watch] sync:ok`.
 - Confirm `pnpm run dev:wasm:watch` resolves to `build-tools/tools/dev/build-wasm-producer.ts`.
 - If server-rendered wasm probes fail in dev, confirm `src/wasm-contract/top.wasm` exists and rerun the logged watcher recovery command.
+- For deterministic Phase 3 checks, run repeated client/server/wasm edit cycles in one `dev` session and verify process PID stays stable.
+- If updates appear stalled, check for a recent `[wasm-watch] rebuild:start` without a matching `sync:ok` or `rebuild:fail`, then run the logged recovery command.
+- If startup appears blocked, verify `/` responds on `http://127.0.0.1:${PORT:-5173}` before making edits.
 {% endif %}
 
 ## Node tests (nix_node_test)

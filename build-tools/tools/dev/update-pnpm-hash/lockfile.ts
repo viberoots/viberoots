@@ -5,6 +5,11 @@ import { gcWaitConfig, waitForNoActiveNixGc } from "../../lib/nix-gc-lock.ts";
 import { importerLockfileNeedsRegen } from "../../lib/pnpm-importer-lockfile.ts";
 
 async function waitForNixGcToClearForLockfile(): Promise<void> {
+  // Verify preflight already enforces "no active nix gc" and safety rails monitor for
+  // mid-run GC. Skip redundant per-lockfile polling in that execution path.
+  if (String(process.env.BNX_VERIFY_NIX_GC_PRECHECK_OK || "").trim() === "1") {
+    return;
+  }
   const cfg = gcWaitConfig();
   let lastLogAt = 0;
   const stillActive = await waitForNoActiveNixGc({
@@ -138,6 +143,24 @@ export async function ensureImporterLockfileFreshIfAllowed(opts: {
 }): Promise<void> {
   const allowGenerate = String(process.env.NIX_PNPM_ALLOW_GENERATE || "").trim() === "1";
   if (!allowGenerate) return;
+  const importerAbs = path.resolve(opts.repoRoot, opts.importer);
+  const importerLock = path.join(importerAbs, "pnpm-lock.yaml");
+  const missing = !fs.existsSync(importerLock);
+  const stale = !missing
+    ? await importerLockfileNeedsRegen({
+        repoRootAbs: opts.repoRoot,
+        importerRel: opts.importer,
+      }).catch(() => true)
+    : true;
+  if (missing || stale) {
+    await generateImporterLockfile(opts);
+  }
+}
+
+export async function ensureImporterLockfileFresh(opts: {
+  repoRoot: string;
+  importer: string;
+}): Promise<void> {
   const importerAbs = path.resolve(opts.repoRoot, opts.importer);
   const importerLock = path.join(importerAbs, "pnpm-lock.yaml");
   const missing = !fs.existsSync(importerLock);

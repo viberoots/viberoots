@@ -126,6 +126,7 @@ export async function runVerify(): Promise<void> {
     );
   }
   await appendVerifyLogLine(lock.logFile, "[verify] nix gc preflight: ok");
+  process.env.BNX_VERIFY_NIX_GC_PRECHECK_OK = "1";
   await logVerifyRevision(root, lock.logFile);
   const stateFile = path.join(process.env.TMPDIR || "/tmp", `bucknix-buck-reaper-${iso}.txt`);
   process.env.BNX_BUCK_REAPER_STATE_FILE = stateFile;

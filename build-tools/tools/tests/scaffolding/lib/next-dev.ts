@@ -42,6 +42,8 @@ export function nextWasmPageSource(): string {
     'import * as fsp from "node:fs/promises";',
     'import path from "node:path";',
     "",
+    'export const dynamic = "force-dynamic";',
+    "",
     "async function readDevWasmByteLength(): Promise<number> {",
     '  const wasmPath = path.join(process.cwd(), "app", "wasm-contract", "top.wasm");',
     "  const bytes = await fsp.readFile(wasmPath);",

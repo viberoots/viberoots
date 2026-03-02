@@ -4,7 +4,7 @@ import path from "node:path";
 
 import * as fsp from "node:fs/promises";
 
-import { generateImporterLockfile } from "../../../dev/update-pnpm-hash/lockfile.ts";
+import { ensureImporterLockfileFresh } from "../../../dev/update-pnpm-hash/lockfile.ts";
 import {
   copierRecopyOrUpdate,
   copierUpdate,
@@ -40,7 +40,7 @@ async function maybeRegenerateTsImporterLockfile(scaffoldDir: string): Promise<v
   const fallbackImporter = path.relative(repoRoot, path.resolve(scaffoldDir)).replace(/\\/g, "/");
   const importer = importerFromAnswers || fallbackImporter;
   if (!importer || importer.startsWith("..") || path.isAbsolute(importer)) return;
-  await generateImporterLockfile({ repoRoot, importer });
+  await ensureImporterLockfileFresh({ repoRoot, importer });
 }
 
 export async function cmdUpdateOrRegen(mode: "update" | "regen", args: string[], flags: ScafFlags) {

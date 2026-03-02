@@ -136,7 +136,16 @@ Tasks:
 
 Completion criteria: SSR E2E passes for client module change, server module change, and wasm producer change, while all Phase 1 and Phase 2 non-regression targets remain green.
 Dependencies: Phase 2.
-Checkpoint: `READY` for Phase 4 when static, SSR vite, and SSR next pass target scenarios.
+Checkpoint: `COMPLETED` for Phase 3 when static, SSR vite, and SSR next pass target scenarios.
+
+### Phase 3 Closeout Status
+
+Phase 3 is closed after these checks:
+
+1. SSR-vite and SSR-next runtime consistency tests pass for client edit, server edit, and wasm producer edit in one dev session.
+2. Repeated edit-cycle checks prove no restart and no hang behavior.
+3. Startup remains non-blocking and troubleshooting guidance includes deterministic watcher markers and recovery commands.
+4. Phase 1 and Phase 2 non-regression tests for static, SSR-vite, and SSR-next remain green.
 
 ### Phase 4: Regression Coverage and Docs
 
@@ -210,4 +219,4 @@ Escalation trigger from strict HMR to hybrid:
 
 ## Immediate Next Step
 
-Start Phase 3 SSR consistency and runtime hardening on top of the locked Phase 2 baseline.
+Begin Phase 4 regression coverage and docs lock-in.

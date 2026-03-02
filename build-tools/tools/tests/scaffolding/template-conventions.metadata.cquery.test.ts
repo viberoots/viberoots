@@ -151,6 +151,19 @@ const EXPECTATIONS: TemplateExpectation[] = [
     ],
   },
   {
+    script:
+      "build-tools/tools/tests/scaffolding/webapp.phase3-runtime-consistency-policy.contract.test.ts",
+    requiredLabels: [
+      "template:ts/webapp-ssr-vite",
+      "template:ts/webapp-ssr-next",
+      "template:shared",
+    ],
+    requiredTemplateRoots: [
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+    ],
+  },
+  {
     script: "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts",
     requiredLabels: ["template:python/lib", "template:smoke"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/python/lib/"],

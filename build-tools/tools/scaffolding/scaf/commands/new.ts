@@ -4,7 +4,7 @@ import path from "node:path";
 
 import * as fsp from "node:fs/promises";
 
-import { generateImporterLockfile } from "../../../dev/update-pnpm-hash/lockfile.ts";
+import { ensureImporterLockfileFresh } from "../../../dev/update-pnpm-hash/lockfile.ts";
 import { printSkip } from "../../../lib/errors.ts";
 import { confirmOrExit } from "../confirm.ts";
 import { runCopierCopy } from "../copier/copy.ts";
@@ -164,7 +164,7 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
         if (template === "go-cpp-lib") return path.join("libs", `${name}-ts`);
         return destInfo.path;
       })();
-      await generateImporterLockfile({ repoRoot, importer });
+      await ensureImporterLockfileFresh({ repoRoot, importer });
     }
   }
 

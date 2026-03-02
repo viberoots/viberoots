@@ -114,6 +114,13 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
+    "build-tools/tools/tests/scaffolding/webapp.phase3-runtime-consistency-policy.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
+    },
     "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/python/lib"],
         "classification": "template:smoke",

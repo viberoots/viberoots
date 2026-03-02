@@ -254,3 +254,102 @@ Adds one closeout PR with additional policy assertions and maintenance overhead.
 ### Recommendation
 
 Implement as final Phase 3 closeout after SSR-vite and SSR-next runtime consistency PRs are green.
+
+---
+
+## PR-4: Phase 3 gap-closure hardening for contract docs, runner policy, and methodology compliance
+
+### Description
+
+I will close the remaining Phase 3 planning gaps by making the dev-update contract explicit in docs (HMR vs full reload per change type), locking the E2E runner contract with rationale and guardrails, and restoring file-size methodology compliance for the Phase 0 through Phase 3 test surface.
+
+### Scope & Changes
+
+- Close dev-contract documentation gap:
+  - add an explicit change-type matrix for in-scope templates covering expected behavior for:
+    - app-local TypeScript edits
+    - workspace-linked TypeScript dependency edits
+    - non-TS wasm producer edits
+  - include deterministic failure signatures and recovery commands for each class
+- Close runner-policy ambiguity:
+  - document the selected E2E runner contract for this suite and why it is selected for deterministic CI in this repo
+  - document what would trigger escalation to Playwright-based coverage in a future phase
+- Close methodology file-size gap in touched tests:
+  - split oversized Phase-0-through-Phase-3 scaffolding test modules into focused helpers/modules
+  - preserve behavior and assertions while keeping responsibilities isolated and readable
+- Keep implementation constraints unchanged:
+  - no runtime behavior changes beyond contract clarity and test decomposition
+  - no producer automation path changes
+  - no template scope expansion beyond `ts/webapp-static`, `ts/webapp-ssr-vite`, `ts/webapp-ssr-next`
+
+### Tests (in this PR)
+
+- Add/extend contract tests to lock the explicit dev behavior matrix:
+  - verify docs include explicit HMR/full-reload expectation text per change type
+  - verify deterministic failure/recovery markers remain documented
+- Add/extend policy tests for runner contract:
+  - assert runner policy text stays present and consistent with current test harness shape
+  - assert escalation criteria for alternate runner path are documented and deterministic
+- Preserve existing Phase 1 through Phase 3 non-regression coverage:
+  - `//:scaffolding_webapp_static_dev_hmr_local_ts_dep`
+  - `//:scaffolding_webapp_static_dev_reload_wasm_producer`
+  - `//:scaffolding_webapp_ssr_vite_dev_hmr_local_ts_dep`
+  - `//:scaffolding_webapp_ssr_vite_dev_reload_wasm_producer`
+  - `//:scaffolding_webapp_ssr_vite_dev_runtime_consistency_phase3`
+  - `//:scaffolding_webapp_ssr_next_dev_hmr_local_ts_dep`
+  - `//:scaffolding_webapp_ssr_next_dev_reload_wasm_producer`
+  - `//:scaffolding_webapp_ssr_next_dev_runtime_consistency_phase3`
+- Add file-size gate checks for touched test modules:
+  - enforce <= 250-line decomposition policy for SSR and related scaffolding test modules
+
+### Docs (in this PR)
+
+- Update `hmr-plan.md` to include an explicit contract table for expected dev behavior by change type.
+- Update `build-tools/docs/scaffolding.md` and template-facing guidance to mirror the same matrix and failure/recovery signatures.
+- Add a concise runner-policy section documenting:
+  - current selected runner contract for this suite
+  - escalation triggers for adopting an alternate runner path
+- Add maintainer notes on methodology compliance for test-module decomposition and ownership boundaries.
+
+### Verification Commands
+
+- `buck2 test //:scaffolding_webapp_phase3_runtime_consistency_policy_contract`
+- `buck2 test //:scaffolding_webapp_phase2_wasm_producer_policy_contract`
+- `buck2 test //:scaffolding_webapp_static_dev_hmr_local_ts_dep`
+- `buck2 test //:scaffolding_webapp_static_dev_reload_wasm_producer`
+- `buck2 test //:scaffolding_webapp_ssr_vite_dev_hmr_local_ts_dep`
+- `buck2 test //:scaffolding_webapp_ssr_vite_dev_reload_wasm_producer`
+- `buck2 test //:scaffolding_webapp_ssr_vite_dev_runtime_consistency_phase3`
+- `buck2 test //:scaffolding_webapp_ssr_next_dev_hmr_local_ts_dep`
+- `buck2 test //:scaffolding_webapp_ssr_next_dev_reload_wasm_producer`
+- `buck2 test //:scaffolding_webapp_ssr_next_dev_runtime_consistency_phase3`
+- `buck2 test //:scaffolding_template_conventions_metadata_cquery`
+- `node build-tools/tools/dev/file-size-lint.ts --scope=ssr-tests --fail=true`
+- `node build-tools/tools/dev/file-size-lint.ts --scope=source --fail=true`
+
+### Acceptance Criteria
+
+- Dev-update behavior is explicitly documented per change type, including expected HMR/full-reload semantics and recovery paths.
+- Runner-policy contract is explicit, deterministic, and enforced by tests/docs checks.
+- Oversized Phase 0 through Phase 3 test modules in scope are decomposed to comply with methodology file-size limits without behavior regression.
+- Existing Phase 1 through Phase 3 runtime and policy non-regression targets remain green.
+
+### Risks
+
+Doc and policy contracts can drift from runtime behavior if wording is updated without matching test assertions.
+
+### Mitigation
+
+Lock contract text with targeted policy tests and keep behavior-backed E2E targets in the same verification set.
+
+### Consequence of Not Implementing
+
+Phase 3 remains partially open with unresolved documentation and methodology compliance gaps, increasing regression and onboarding ambiguity.
+
+### Downsides for Implementing
+
+Adds maintenance overhead for contract-doc tests and requires module decomposition work in test code.
+
+### Recommendation
+
+Implement immediately after PR-3 to close all identified Phase 3 gaps before Phase 4 regression/docs lock-in.
