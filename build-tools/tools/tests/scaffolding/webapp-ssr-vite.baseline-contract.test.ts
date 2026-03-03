@@ -89,10 +89,25 @@ test("Vite SSR template metadata and scaffold baseline are present", async () =>
     ) as {
       scripts?: Record<string, string>;
     };
-    assert.match(String(packageJson.scripts?.["dev:wasm:watch"] || ""), /build-wasm-producer\.ts/);
-    assert.doesNotMatch(
+    assert.equal(String(packageJson.scripts?.dev || ""), "node scripts/dev.mjs");
+    assert.equal(
       String(packageJson.scripts?.["dev:wasm:watch"] || ""),
-      /build-wasm-producer\.mjs/,
+      "node scripts/dev-wasm-watch.mjs",
     );
+    assert.equal(String(packageJson.scripts?.["build:ssr"] || ""), "node scripts/build-ssr.mjs");
+    const devScript = await fsp.readFile(path.join(appRoot, "scripts", "dev.mjs"), "utf8");
+    assert.match(devScript, /dev-with-wasm-watch\.ts/);
+    const devWasmWatchScript = await fsp.readFile(
+      path.join(appRoot, "scripts", "dev-wasm-watch.mjs"),
+      "utf8",
+    );
+    assert.match(devWasmWatchScript, /build-wasm-producer\.ts/);
+    assert.doesNotMatch(devWasmWatchScript, /build-wasm-producer\.mjs/);
+    const buildSsrScript = await fsp.readFile(
+      path.join(appRoot, "scripts", "build-ssr.mjs"),
+      "utf8",
+    );
+    assert.match(buildSsrScript, /vite build --outDir dist\/client/);
+    assert.match(buildSsrScript, /vite build --ssr src\/entry-server\.ts --outDir dist\/server/);
   });
 });

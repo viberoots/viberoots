@@ -44,6 +44,14 @@ test(
       const config = await fsp.readFile(configPath, "utf8");
       const packageJson = await fsp.readFile(packageJsonPath, "utf8");
       const wasmContract = await fsp.readFile(wasmContractPath, "utf8");
+      const devScript = await fsp.readFile(
+        path.join(tmp, "projects", "apps", "demo-vite-ssr", "scripts", "dev.mjs"),
+        "utf8",
+      );
+      const watchScript = await fsp.readFile(
+        path.join(tmp, "projects", "apps", "demo-vite-ssr", "scripts", "dev-wasm-watch.mjs"),
+        "utf8",
+      );
       assert.match(config, /const workspaceRoot = path\.resolve\(appRoot, "\.\.\/\.\.\/\.\."\);/);
       assert.match(config, /server:\s*\{[\s\S]*fs:\s*\{[\s\S]*allow:\s*\[workspaceRoot\]/m);
       assert.match(config, /spec\.startsWith\("workspace:"\)/);
@@ -51,9 +59,10 @@ test(
       assert.match(config, /spec\.startsWith\("file:"\)/);
       assert.match(config, /optimizeDeps:\s*\{[\s\S]*exclude:\s*optimizeDepsExclude/m);
       assert.match(config, /ssr:\s*\{[\s\S]*noExternal:\s*optimizeDepsExclude/m);
-      assert.match(packageJson, /"dev:wasm:watch"/);
-      assert.match(packageJson, /watch-wasm-producer\.ts/);
-      assert.match(packageJson, /"dev":\s*"zx-wrapper .*dev-with-wasm-watch\.ts/);
+      assert.match(packageJson, /"dev":\s*"node scripts\/dev\.mjs"/);
+      assert.match(packageJson, /"dev:wasm:watch":\s*"node scripts\/dev-wasm-watch\.mjs"/);
+      assert.match(devScript, /dev-with-wasm-watch\.ts/);
+      assert.match(watchScript, /watch-wasm-producer\.ts/);
       assert.match(wasmContract, /\?url/);
     });
   },

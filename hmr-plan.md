@@ -265,3 +265,17 @@ Escalation trigger from strict HMR to hybrid:
 ## Immediate Next Step
 
 Phase 4 is complete. Keep the regression matrix and troubleshooting contracts stable as baseline maintenance.
+
+## Phase 5 Module Contract Terms
+
+These terms are locked for Phase 5 implementation work:
+
+1. App scaffolds generate manifest contracts for wasm and TypeScript modules:
+   - `wasm-modules.manifest.json`
+   - `ts-modules.manifest.json`
+2. Generated runtime helpers expose module-key APIs:
+   - `readWasmModuleBytes(moduleKey)` and `listWasmModules()`
+   - `loadTsModule(moduleKey)` and `listTsModules()`
+3. Wasm manifest rows declare client/server runtime destination parity paths.
+4. TS manifest rows declare source entry paths and runtime import contract paths.
+5. Module-key additions in manifests are the only required app-level change for enabling new module contracts in follow-up Phase 5 PRs.

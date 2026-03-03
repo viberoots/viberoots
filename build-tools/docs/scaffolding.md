@@ -113,6 +113,19 @@ For `scaf new ts webapp-static <name>`, `scaf new ts webapp-ssr-vite <name>`, an
 
 For `webapp-ssr-vite`, server-side dev probes can read wasm from `src/wasm-contract/top.wasm` and packaged builds continue to read `dist/server/wasm-contract/top.wasm`.
 
+Phase 5 module contract terms (PR-1 baseline):
+
+- Generated per-app manifests define module-key contracts for wasm and TypeScript modules:
+  - `wasm-modules.manifest.json`
+  - `ts-modules.manifest.json`
+- Generated helper surfaces expose module-key APIs and remove single-module runtime assumptions:
+  - `readWasmModuleBytes(moduleKey)`
+  - `listWasmModules()`
+  - `loadTsModule(moduleKey)`
+  - `listTsModules()`
+- Wasm manifest entries include runtime destination paths for client and server parity.
+- TS manifest entries include source entry paths and runtime import contract paths.
+
 Phase-3 runtime consistency checks for `webapp-ssr-vite` in one `pnpm run dev` session:
 
 - Client module edits update client-visible output without restarting the dev process.
@@ -159,6 +172,7 @@ buck2 test //:scaffolding_webapp_ssr_next_dev_reload_wasm_producer
 buck2 test //:scaffolding_webapp_ssr_next_dev_runtime_consistency
 buck2 test //:scaffolding_template_conventions_metadata_cquery
 buck2 test //:scaffolding_ts_command_path_docs_contract
+buck2 test //:scaffolding_webapp_multi_module_manifest_contract
 ```
 
 #### Subcommands and semantics

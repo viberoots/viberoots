@@ -1,9 +1,45 @@
-import wasmContractUrl from "./wasm-contract/top.wasm?url";
+import wasmManifest from "./wasm-modules.manifest.json";
+import topWasmUrl from "./wasm-contract/top.wasm?url";
 
-export async function readWasmContractBytes(): Promise<Uint8Array> {
-  const res = await fetch(wasmContractUrl);
+type WasmModuleManifest = {
+  defaultModuleKey: string;
+  modules: Array<{
+    moduleKey: string;
+    sourcePath: string;
+    runtimeDestinations: { client: string; server: string };
+  }>;
+};
+
+const manifest = wasmManifest as WasmModuleManifest;
+const wasmModuleUrls: Record<string, string> = {
+  "top-contract": topWasmUrl,
+};
+
+function manifestEntryFor(moduleKey: string) {
+  const entry = manifest.modules.find((mod) => mod.moduleKey === moduleKey);
+  if (!entry) {
+    throw new Error(`unknown wasm module key '${moduleKey}'`);
+  }
+  return entry;
+}
+
+export function listWasmModules(): string[] {
+  return manifest.modules.map((mod) => mod.moduleKey);
+}
+
+export function defaultWasmModuleKey(): string {
+  return manifest.defaultModuleKey;
+}
+
+export async function readWasmModuleBytes(moduleKey: string): Promise<Uint8Array> {
+  const entry = manifestEntryFor(moduleKey);
+  const wasmUrl = wasmModuleUrls[entry.moduleKey];
+  if (!wasmUrl) {
+    throw new Error(`missing wasm module URL mapping for '${entry.moduleKey}'`);
+  }
+  const res = await fetch(wasmUrl);
   if (!res.ok) {
-    throw new Error(`failed to load wasm contract asset: ${res.status}`);
+    throw new Error(`failed to load wasm module '${moduleKey}': ${res.status}`);
   }
   const bytes = new Uint8Array(await res.arrayBuffer());
   const inlineUrl = new URL("/wasm-inline/index.js", window.location.href).toString();
@@ -16,4 +52,8 @@ export async function readWasmContractBytes(): Promise<Uint8Array> {
     throw new Error("inline wasm contract module shape mismatch");
   }
   return bytes;
+}
+
+export async function readWasmContractBytes(): Promise<Uint8Array> {
+  return readWasmModuleBytes(defaultWasmModuleKey());
 }

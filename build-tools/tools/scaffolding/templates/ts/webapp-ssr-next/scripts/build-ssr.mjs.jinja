@@ -1,0 +1,10 @@
+import { execSync } from "node:child_process";
+import { cpSync, mkdirSync } from "node:fs";
+
+execSync("next build", { stdio: "inherit" });
+execSync("tsc -p tsconfig.server.json", { stdio: "inherit" });
+
+mkdirSync("dist/server/wasm-contract", { recursive: true });
+cpSync("app/wasm-contract/top.wasm", "dist/server/wasm-contract/top.wasm");
+cpSync("app/wasm-modules.manifest.json", "dist/server/wasm-modules.manifest.json");
+cpSync("app/ts-modules.manifest.json", "dist/server/ts-modules.manifest.json");

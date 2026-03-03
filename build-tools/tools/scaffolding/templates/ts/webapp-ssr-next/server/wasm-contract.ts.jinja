@@ -1,10 +1,45 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as fsp from "node:fs/promises";
+import { readFileSync } from "node:fs";
+
+type WasmModuleManifest = {
+  defaultModuleKey: string;
+  modules: Array<{
+    moduleKey: string;
+    sourcePath: string;
+    runtimeDestinations: { client: string; server: string };
+  }>;
+};
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+function readManifestJson(): WasmModuleManifest {
+  const candidates = [
+    path.resolve(__dirname, "wasm-modules.manifest.json"),
+    path.resolve(__dirname, "../app/wasm-modules.manifest.json"),
+    path.resolve(__dirname, "../../app/wasm-modules.manifest.json"),
+  ];
+  for (const p of candidates) {
+    try {
+      const text = readFileSync(p, "utf8");
+      return JSON.parse(text) as WasmModuleManifest;
+    } catch {}
+  }
+  throw new Error(
+    `WASM module manifest is missing at expected paths: ${candidates.join(", ")}`,
+  );
+}
+
+const manifest = readManifestJson();
+const defaultWasm = manifest.modules.find((mod) => mod.moduleKey === manifest.defaultModuleKey);
+if (!defaultWasm) {
+  throw new Error(`WASM manifest default module key '${manifest.defaultModuleKey}' is not declared`);
+}
+const serverRuntimeDest = defaultWasm.runtimeDestinations.server;
 const wasmCandidates = [
+  path.resolve(__dirname, "..", serverRuntimeDest),
   path.resolve(__dirname, "wasm-contract", "top.wasm"),
   path.resolve(__dirname, "../client/public/top.wasm"),
   path.resolve(__dirname, "../client/top.wasm"),

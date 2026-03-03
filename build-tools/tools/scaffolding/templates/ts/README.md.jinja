@@ -11,6 +11,12 @@ pnpm dev
 
 Local workspace TypeScript dependencies update in the same dev session when they are workspace-linked (`workspace:`, `link:`, or `file:`) and imported from app code.
 
+Generated module manifests and loaders:
+
+- `src/wasm-modules.manifest.json` + `src/wasm-contract.ts`
+- `src/ts-modules.manifest.json` + `src/ts-modules.ts`
+- consume through module-key APIs: `listWasmModules()`, `readWasmModuleBytes(moduleKey)`, `listTsModules()`, and `loadTsModule(moduleKey)`
+
 Wasm producer bridge loop (watch producer source -> rebuild -> sync into app path):
 
 ```bash
@@ -50,6 +56,13 @@ pnpm run dev:ssr
 ```
 
 Local workspace TypeScript dependencies update in the same dev session when they are workspace-linked (`workspace:`, `link:`, or `file:`) and imported from app code used by client or SSR render paths.
+
+Generated module manifests and loaders:
+
+- `app/wasm-modules.manifest.json` + `app/wasm-contract.ts`
+- `app/ts-modules.manifest.json` + `app/ts-modules.ts`
+- server parity helpers: `server/wasm-contract.ts` and `server/ts-modules.ts`
+- consume through module-key APIs only
 
 Production build and startup:
 
@@ -101,6 +114,13 @@ http://127.0.0.1:5173
 ```
 
 Local workspace TypeScript dependencies update in the same dev session when they are workspace-linked (`workspace:`, `link:`, or `file:`) and imported from app code used by client or SSR render paths.
+
+Generated module manifests and loaders:
+
+- `src/wasm-modules.manifest.json` + `src/wasm-contract.ts`
+- `src/ts-modules.manifest.json` + `src/ts-modules.ts`
+- server parity helpers: `server/wasm-contract.ts` and `server/ts-modules.ts`
+- consume through module-key APIs only
 
 Wasm producer bridge loop (watch producer source -> rebuild -> sync into app path):
 

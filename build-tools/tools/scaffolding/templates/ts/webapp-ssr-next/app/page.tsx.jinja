@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { listTsModules } from "./ts-modules";
 import { readWasmContractBytes } from "./wasm-contract";
 
 export default function HomePage() {
   const [wasmBytes, setWasmBytes] = useState<number | null>(null);
+  const moduleKeys = listTsModules();
 
   useEffect(() => {
     let mounted = true;
@@ -17,7 +19,11 @@ export default function HomePage() {
   }, []);
 
   return (
-    <main data-ssr-marker="next" data-wasm-bytes={wasmBytes == null ? "pending" : String(wasmBytes)}>
+    <main
+      data-ssr-marker="next"
+      data-wasm-bytes={wasmBytes == null ? "pending" : String(wasmBytes)}
+      data-ts-modules={moduleKeys.join(",")}
+    >
       <h1>Hello from Next SSR</h1>
     </main>
   );

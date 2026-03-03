@@ -1,0 +1,21 @@
+const moduleKeys = ["client-entry", "server-entry"] as const;
+const defaultModuleKey = "client-entry";
+
+export type TsModuleNamespace = Record<string, unknown>;
+
+export function listTsModules(): string[] {
+  return [...moduleKeys];
+}
+
+export function defaultTsModuleKey(): string {
+  return defaultModuleKey;
+}
+
+export async function loadTsModule(moduleKey: string): Promise<TsModuleNamespace> {
+  if (moduleKey === "server-entry") {
+    const runtimeImportUrl = new URL("./entry-server.js", import.meta.url).href;
+    return (await import(runtimeImportUrl)) as TsModuleNamespace;
+  }
+  throw new Error(`TS module '${moduleKey}' is not available in server runtime`);
+}
+

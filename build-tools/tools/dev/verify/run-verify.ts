@@ -194,7 +194,6 @@ export async function runVerify(): Promise<void> {
       process.once(sig, () => signalHandler(sig));
     } catch {}
   }
-
   const zxNodeModulesOut = await computeZxTestNodeModulesOut(root, zxInitPath);
   const spawned = spawnVerifyBuck2Tests({
     root,
@@ -209,9 +208,13 @@ export async function runVerify(): Promise<void> {
     root,
     analysisDir,
     processGroupIdToKill: pgid,
-    onTrigger: async (reason) => {
-      await appendVerifyLogLine(lock.logFile, `[verify] safety-rails stop: ${reason}`);
-    },
+    onTrigger: async (reason) =>
+      appendVerifyLogLine(
+        lock.logFile,
+        reason.startsWith("[notice] ")
+          ? `[verify] safety-rails notice: ${reason.slice(9)}`
+          : `[verify] safety-rails stop: ${reason}`,
+      ),
   });
   const status = await spawned.wait();
   if (shutdownPromise) await shutdownPromise;

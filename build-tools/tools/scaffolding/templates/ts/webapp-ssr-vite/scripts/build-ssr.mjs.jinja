@@ -1,0 +1,11 @@
+import { execSync } from "node:child_process";
+import { cpSync, mkdirSync } from "node:fs";
+
+execSync("vite build --outDir dist/client", { stdio: "inherit" });
+execSync("vite build --ssr src/entry-server.ts --outDir dist/server", { stdio: "inherit" });
+execSync("tsc -p tsconfig.server.json", { stdio: "inherit" });
+
+mkdirSync("dist/server/wasm-contract", { recursive: true });
+cpSync("src/wasm-contract/top.wasm", "dist/server/wasm-contract/top.wasm");
+cpSync("src/wasm-modules.manifest.json", "dist/server/wasm-modules.manifest.json");
+cpSync("src/ts-modules.manifest.json", "dist/server/ts-modules.manifest.json");

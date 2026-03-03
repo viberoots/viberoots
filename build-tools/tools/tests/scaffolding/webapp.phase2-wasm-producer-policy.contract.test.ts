@@ -73,37 +73,54 @@ test("Phase-2 template policy: wasm producer contract keys exist across template
       /"dev:wasm:watch":\s*"/,
       `${contract.id}: missing scripts.dev:wasm:watch`,
     );
-    assert.match(packageJson, /dev-with-wasm-watch\.ts/, `${contract.id}: dev not composed`);
-    assert.match(packageJson, /dev:wasm:watch/, `${contract.id}: dev missing watch wiring`);
     assert.match(
       packageJson,
+      /"dev":\s*"node scripts\/dev\.mjs"/,
+      `${contract.id}: dev script mismatch`,
+    );
+    assert.match(
+      packageJson,
+      /"dev:wasm:watch":\s*"node scripts\/dev-wasm-watch\.mjs"/,
+      `${contract.id}: watcher script mismatch`,
+    );
+    const devScript = await fsp.readFile(path.join(root, "scripts", "dev.mjs.jinja"), "utf8");
+    assert.match(devScript, /dev-with-wasm-watch\.ts/, `${contract.id}: dev wrapper mismatch`);
+    assert.match(devScript, /dev:wasm:watch/, `${contract.id}: dev missing watch wiring`);
+    const watchScript = await fsp.readFile(
+      path.join(root, "scripts", "dev-wasm-watch.mjs.jinja"),
+      "utf8",
+    );
+    assert.match(
+      watchScript,
       /watch-wasm-producer\.ts/,
       `${contract.id}: watcher command mismatch`,
     );
-    assert.match(packageJson, /--build-cmd/, `${contract.id}: watcher build command flag missing`);
+    assert.match(watchScript, /--build-cmd/, `${contract.id}: watcher build command flag missing`);
     assert.match(
-      packageJson,
+      watchScript,
       /build-wasm-producer\.ts/,
       `${contract.id}: watcher build command must use zx-wrapper TypeScript producer script`,
     );
     assert.doesNotMatch(
-      packageJson,
+      watchScript,
       /build-wasm-producer\.mjs/,
       `${contract.id}: watcher build command must not rely on legacy .mjs producer logic`,
     );
+    assert.match(watchScript, /--build-out/, `${contract.id}: watcher build output flag missing`);
+    assert.match(watchScript, /--watch/, `${contract.id}: watcher source flag missing`);
     assert.match(
-      packageJson,
-      /--build-out \.wasm-producer\/top\.wasm/,
-      `${contract.id}: watcher build output mismatch`,
-    );
-    assert.match(
-      packageJson,
-      new RegExp(contract.watchPathFragment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      watchScript,
+      new RegExp(
+        contract.watchPathFragment.replace("--watch ", "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+      ),
       `${contract.id}: watcher source path mismatch`,
     );
+    assert.match(watchScript, /--sync-out/, `${contract.id}: watcher sync flag missing`);
     assert.match(
-      packageJson,
-      new RegExp(contract.syncPathFragment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      watchScript,
+      new RegExp(
+        contract.syncPathFragment.replace("--sync-out ", "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+      ),
       `${contract.id}: watcher sync path mismatch`,
     );
 

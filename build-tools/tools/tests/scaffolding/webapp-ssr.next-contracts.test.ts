@@ -33,10 +33,24 @@ test(
         assert.equal(typeof scripts["dev:ssr:only"], "string");
         assert.equal(typeof scripts["dev:wasm"], "string");
         assert.equal(typeof scripts["dev:wasm:watch"], "string");
-        assert.match(String(scripts.dev), /dev-with-wasm-watch\.ts/);
-        assert.match(String(scripts["dev:wasm:watch"]), /watch-wasm-producer\.ts/);
-        assert.match(String(scripts["dev:wasm:watch"]), /build-wasm-producer\.ts/);
-        assert.doesNotMatch(String(scripts["dev:wasm:watch"]), /build-wasm-producer\.mjs/);
+        assert.equal(String(scripts.dev), "node scripts/dev.mjs");
+        assert.equal(String(scripts["dev:wasm:watch"]), "node scripts/dev-wasm-watch.mjs");
+        assert.equal(String(scripts["build:ssr"]), "node scripts/build-ssr.mjs");
+        const devScript = await fsp.readFile(path.join(appRoot, "scripts", "dev.mjs"), "utf8");
+        assert.match(devScript, /dev-with-wasm-watch\.ts/);
+        const devWasmWatchScript = await fsp.readFile(
+          path.join(appRoot, "scripts", "dev-wasm-watch.mjs"),
+          "utf8",
+        );
+        assert.match(devWasmWatchScript, /watch-wasm-producer\.ts/);
+        assert.match(devWasmWatchScript, /build-wasm-producer\.ts/);
+        assert.doesNotMatch(devWasmWatchScript, /build-wasm-producer\.mjs/);
+        const buildSsrScript = await fsp.readFile(
+          path.join(appRoot, "scripts", "build-ssr.mjs"),
+          "utf8",
+        );
+        assert.match(buildSsrScript, /next build/);
+        assert.match(buildSsrScript, /tsc -p tsconfig\.server\.json/);
         await fsp.access(path.join(appRoot, "app", "wasm-producer", "payload.txt"));
         const { outPath, importer } = await buildSelectedSsr(tmp, _$, label, "next");
         await assertSsrAdapterConformance({ label, outPath, importer, framework: "next" });
