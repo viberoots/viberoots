@@ -204,7 +204,7 @@ Tasks:
    - TS edits: HMR or module invalidation
    - wasm edits: strict deterministic update path is primary; fallback policy only by explicit escalation trigger
 4. Document canonical producer command-path checks (`build-tools/tools/dev/build-wasm-producer.ts`) for generated templates.
-5. Remove `ts/webapp-ssr-express` and document migration to next/vite SSR templates.
+5. ~~Remove `ts/webapp-ssr-express` and document migration to next/vite SSR templates.~~ Completed (PR-3).
 
 Completion criteria: E2E in CI and docs include clear recovery commands.
 Dependencies: Phase 3.

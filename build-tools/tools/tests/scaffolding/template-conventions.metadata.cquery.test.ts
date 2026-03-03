@@ -67,32 +67,8 @@ const EXPECTATIONS: TemplateExpectation[] = [
   {
     script:
       "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-contract-and-runtime-smoke.test.ts",
-    requiredLabels: [
-      "template:ts/webapp-ssr-express",
-      "template:ts/webapp-ssr-next",
-      "template:shared",
-    ],
-    requiredTemplateRoots: [
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-express/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
-    ],
-  },
-  {
-    script: "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-and-build.test.ts",
-    requiredLabels: [
-      "template:ts/webapp-ssr-express",
-      "template:ts/webapp-ssr-next",
-      "template:shared",
-    ],
-    requiredTemplateRoots: [
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-express/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
-    ],
-  },
-  {
-    script: "build-tools/tools/tests/scaffolding/webapp-ssr.express-contracts.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-express", "template:contract"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-express/"],
+    requiredLabels: ["template:ts/webapp-ssr-next", "template:shared"],
+    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr.next-contracts.test.ts",

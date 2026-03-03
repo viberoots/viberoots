@@ -270,3 +270,97 @@ Removal updates can touch multiple files and require careful synchronization.
 ### Recommendation
 
 Implement third and treat this PR as Phase 4 closeout gate.
+
+---
+
+## PR-4: Phase 4 gap closure for static app-local coverage, docs removal completeness, and execution guardrails
+
+### Description
+
+I will close the remaining Phase 4 contract gaps found in review by adding missing permanent app-local TypeScript regression coverage for `ts/webapp-static`, completing Express-template removal in active docs, and aligning HMR temp-repo tests with execution-time guardrails.
+
+### Scope & Changes
+
+- Add explicit permanent app-local TypeScript edit coverage for `ts/webapp-static`:
+  - mutate `src/main.ts` (or equivalent app-local module) in one dev session
+  - assert updated output is observed without dev-process restart
+  - preserve deterministic checks and existing no-restart invariants
+- Keep coverage model aligned with current in-scope templates:
+  - no expansion beyond `ts/webapp-static`, `ts/webapp-ssr-vite`, and `ts/webapp-ssr-next`
+  - no fallback-first behavior
+  - no producer automation redesign
+- Complete deprecated `webapp-ssr-express` removal in active implementation docs:
+  - remove or reclassify stale command-path guidance that still implies Express SSR scaffold availability
+  - preserve historical references only where explicitly archival and not implementation guidance
+- Align HMR temp-repo test flows with execution-time guardrails:
+  - avoid unnecessary lockfile regeneration in hot test paths when scaffolded lockfiles are already fresh
+  - keep deterministic install/build behavior and avoid broad runtime-cost increases
+
+### Tests (in this PR)
+
+- Add or extend static app-local TypeScript dev-reload regression coverage:
+  - deterministic app-local edit mutation
+  - deterministic output-update assertion
+  - deterministic no-restart assertion
+- Keep and extend policy contracts where touched:
+  - `//:scaffolding_webapp_static_dev_hmr_local_ts_dep`
+  - `//:scaffolding_template_conventions_metadata_cquery`
+  - `//:scaffolding_ts_command_path_docs_contract`
+- Add or extend docs contract checks for active-vs-archival handling when Express references are moved/removed:
+  - active docs must not claim scaffold support for removed `webapp-ssr-express`
+  - archival docs may retain historical context only when explicitly classified
+- Add or extend guardrail-oriented assertions in touched HMR tests:
+  - lockfile/install path remains deterministic and bounded for temp-repo runs
+  - no new broad install path introduced in template-focused contract tests
+
+### Docs (in this PR)
+
+- Update `hmr-plan.md` and `build-tools/docs/scaffolding.md` to reflect final Phase 4 completeness:
+  - explicit static app-local edit coverage as permanent CI contract
+  - explicit statement that deprecated Express SSR scaffold path remains removed
+- Update active docs still implying Express template scaffolding:
+  - migrate guidance to `webapp-ssr-vite` and `webapp-ssr-next` only
+  - preserve historical references only in explicitly archival docs
+- Update `docs/handbook/getting-started-on-a-pr.md` references where needed to keep execution-time guardrails and test-path recommendations consistent with actual Phase 4 HMR test practice
+
+### Verification Commands
+
+- `buck2 test //:scaffolding_webapp_static_dev_hmr_local_ts_dep`
+- `buck2 test //:scaffolding_webapp_static_dev_reload_wasm_producer`
+- `buck2 test //:scaffolding_webapp_ssr_vite_dev_hmr_local_ts_dep`
+- `buck2 test //:scaffolding_webapp_ssr_vite_dev_reload_wasm_producer`
+- `buck2 test //:scaffolding_webapp_ssr_vite_dev_runtime_consistency_phase3`
+- `buck2 test //:scaffolding_webapp_ssr_next_dev_hmr_local_ts_dep`
+- `buck2 test //:scaffolding_webapp_ssr_next_dev_reload_wasm_producer`
+- `buck2 test //:scaffolding_webapp_ssr_next_dev_runtime_consistency`
+- `buck2 test //:scaffolding_webapp_ssr_express_contracts`
+- `buck2 test //:scaffolding_template_conventions_metadata_cquery`
+- `buck2 test //:scaffolding_ts_command_path_docs_contract`
+
+### Acceptance Criteria
+
+- `ts/webapp-static` has deterministic permanent app-local TypeScript edit coverage in CI, including no-restart assertion.
+- Active implementation docs do not advertise `webapp-ssr-express` scaffold usage.
+- Historical Express references are either removed or explicitly classified as archival.
+- Touched HMR temp-repo tests align with execution-time guardrails and avoid unnecessary lockfile-regeneration overhead.
+- Phase 4 closeout criteria in docs, tests, and troubleshooting contracts are consistent.
+
+### Risks
+
+Additional static app-local coverage can increase test runtime if implemented with non-minimal setup work.
+
+### Mitigation
+
+Reuse existing shared helpers and existing scaffold setup flow, keep mutations narrow and deterministic, and avoid introducing extra install/regeneration phases in hot-path tests.
+
+### Consequence of Not Implementing
+
+Phase 4 remains partially complete against its own completion criteria, leaving avoidable regression and documentation drift risk in an area intended to be locked.
+
+### Downsides for Implementing
+
+This adds another closeout PR and maintenance surface for one more permanent contract test path.
+
+### Recommendation
+
+Implement as the final Phase 4 contract-closure PR before treating Phase 4 as fully complete.

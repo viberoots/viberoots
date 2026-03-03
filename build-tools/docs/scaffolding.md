@@ -47,10 +47,9 @@ scaf new go cli-app greeter-cli
 scaf new ts webapp-ssr-vite demo-vite-ssr --yes
 ```
 
-For TypeScript SSR templates, I keep framework-specific names explicit:
+For TypeScript SSR templates, framework-specific names are explicit:
 
-- `webapp-ssr-express` for Express SSR.
-- `webapp-ssr-next` for Next SSR.
+- `webapp-ssr-next` for Next app-router SSR.
 - `webapp-ssr-vite` for the Vite-first SSR scaffold baseline.
 
 Both examples create the destination under the canonical location for the chosen language/template. The CLI resolves synonyms (e.g., `lib`/`library`) and normalizes names.
@@ -386,14 +385,12 @@ I stage runtime Wasm artifacts explicitly so the built `dist/` includes them wit
 Shared client-side contract paths:
 
 - `webapp-static`: `dist/top.wasm` and `dist/wasm-inline/index.js`
-- `webapp-ssr-express`: `dist/client/top.wasm` and `dist/client/wasm-inline/index.js`
 - `webapp-ssr-next`: `dist/client/public/top.wasm` and `dist/client/public/wasm-inline/index.js`
 - `webapp-ssr-vite`: `dist/client/top.wasm` and `dist/client/wasm-inline/index.js`
 
 Shared server-side parity contract path:
 
 - `webapp-static`: `dist/server/wasm-contract/top.wasm`
-- `webapp-ssr-express`: `dist/server/wasm-contract/top.wasm`
 - `webapp-ssr-next`: `dist/server/wasm-contract/top.wasm`
 - `webapp-ssr-vite`: `dist/server/wasm-contract/top.wasm`
 

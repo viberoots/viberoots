@@ -38,49 +38,6 @@ Local dependency troubleshooting:
 - Confirm `pnpm run dev:wasm:watch` resolves to `build-tools/tools/dev/build-wasm-producer.ts`.
 - If watcher failures persist, run the logged recovery command and confirm `src/wasm-contract/top.wasm` exists.
 {% endif %}
-{% if template == "webapp-ssr-express" %}
-This is an Express SSR scaffold with explicit production startup via a Node server entrypoint.
-
-Use this when you want framework-neutral SSR behavior with a small server layer and Vite-managed client/server bundles.
-
-Dev mode:
-
-```bash
-pnpm run dev:ssr
-```
-
-Local workspace TypeScript dependencies update in the same dev session when they are workspace-linked (`workspace:`, `link:`, or `file:`) and imported from app code used by client or SSR render paths.
-
-Wasm producer bridge loop (watch producer source -> rebuild -> sync into app path):
-
-```bash
-pnpm run dev:wasm
-```
-
-Expected watcher markers:
-
-- `[wasm-watch] rebuild:start`
-- `[wasm-watch] sync:ok`
-- `[wasm-watch] rebuild:fail` with a manual recovery command
-
-Production build and startup:
-
-```bash
-pnpm run build:ssr
-pnpm run start:ssr
-```
-
-Server-side Wasm contract artifact:
-
-```text
-dist/server/wasm-contract/top.wasm
-```
-
-Local dependency troubleshooting:
-
-- If local dependency edits do not apply, verify `next.config.mjs` includes `transpilePackages` entries for workspace-linked dependency package names.
-- If local dependency source resolves outside the app root, verify `next.config.mjs` keeps `experimental.externalDir = true`.
-{% endif %}
 {% if template == "webapp-ssr-next" %}
 This is a Next.js SSR scaffold with an explicit Node server wrapper for production startup.
 

@@ -759,9 +759,9 @@ node_asset_stage(
 TypeScript usage examples:
 
 ```ts
-// client-side usage (static, SSR express, and SSR next)
+// client-side usage (static, SSR vite, and SSR next)
 // For SSR next, these URLs resolve from dist/client/public.
-// For static and SSR express, they resolve from dist/ and dist/client.
+// For static and SSR vite, they resolve from dist/ and dist/client.
 export async function readWasmContractBytes(): Promise<Uint8Array> {
   const wasmUrl = new URL("/top.wasm", window.location.href).toString();
   const wasmRes = await fetch(wasmUrl);
@@ -776,7 +776,7 @@ export async function readWasmContractBytes(): Promise<Uint8Array> {
 ```
 
 ```ts
-// server-side usage (SSR express and SSR next)
+// server-side usage (SSR vite and SSR next)
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as fsp from "node:fs/promises";

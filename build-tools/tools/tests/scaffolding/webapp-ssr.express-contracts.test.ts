@@ -1,47 +1,41 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { assertSsrAdapterConformance } from "../lib/ssr-adapter-conformance.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
-import {
-  TEST_TIMEOUT_MS,
-  buildSelectedSsr,
-  runExpressDockerSmoke,
-  scaffoldAndPrepareWorkspace,
-  withTempRoots,
-} from "./lib/webapp-ssr.ts";
+import { CANONICAL_TS_TEMPLATE_IDS } from "../../scaffolding/scaf/templates/taxonomy.ts";
 
-test(
-  "SSR express contracts: materialize listing, adapter conformance, and Docker startup shape",
-  { timeout: TEST_TIMEOUT_MS },
-  async () => {
-    await withTempRoots(async () => {
-      await runInTemp("node-webapp-ssr-express-contracts", async (tmp, _$) => {
-        const appName = "demo-ssr-express";
-        const label = `//projects/apps/${appName}:app`;
-        await scaffoldAndPrepareWorkspace(tmp, _$, "webapp-ssr-express", appName);
-        const { outPath, importer } = await buildSelectedSsr(tmp, _$, label, "express");
-        await assertSsrAdapterConformance({ label, outPath, importer, framework: "express" });
+test("webapp-ssr-express is no longer scaffoldable", async () => {
+  await runInTemp("webapp-ssr-express-removal-contract", async (tmp, _$) => {
+    const $ = _$({ cwd: tmp, stdio: "pipe" });
+    const res = await $`scaf new ts webapp-ssr-express demo-removed --yes --no-tests`
+      .quiet()
+      .nothrow();
+    assert.notEqual(
+      res.exitCode,
+      0,
+      `expected scaf to fail for removed template, got exit ${res.exitCode}`,
+    );
+    const err = String(res.stderr || res.stdout || "");
+    assert.ok(
+      err.includes("webapp-ssr-express") || err.includes("unknown") || err.includes("not found"),
+      `expected error about unknown/removed template, got: ${err.slice(0, 300)}`,
+    );
+  });
+});
 
-        const appAbs = path.join(tmp, importer);
-        await _$({
-          cwd: appAbs,
-          stdio: "inherit",
-          env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-        })`pnpm install --prod --frozen-lockfile --ignore-scripts --ignore-workspace --reporter=append-only`;
+test("template conventions and manifests exclude webapp-ssr-express", async () => {
+  assert.ok(
+    !CANONICAL_TS_TEMPLATE_IDS.includes("ts/webapp-ssr-express"),
+    "canonical taxonomy must not include ts/webapp-ssr-express",
+  );
 
-        const runtimeRoot = path.join(tmp, "docker-runtime-express");
-        await fsp.mkdir(runtimeRoot, { recursive: true });
-        await fsp.cp(path.join(outPath, "dist"), path.join(runtimeRoot, "dist"), {
-          recursive: true,
-        });
-        await fsp.symlink(
-          path.join(appAbs, "node_modules"),
-          path.join(runtimeRoot, "node_modules"),
-        );
-        await runExpressDockerSmoke(runtimeRoot, 'data-ssr-marker="express"');
-      });
-    });
-  },
-);
+  const tsRoot = path.join("build-tools", "tools", "scaffolding", "templates", "ts");
+  const entries = await fsp.readdir(tsRoot, { withFileTypes: true });
+  const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
+  assert.ok(
+    !dirs.includes("webapp-ssr-express"),
+    `templates/ts must not contain webapp-ssr-express dir, got: ${dirs.join(", ")}`,
+  );
+});

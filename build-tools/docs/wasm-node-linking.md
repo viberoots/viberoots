@@ -86,7 +86,7 @@ The app continues to fetch `/top.wasm` and can import `/wasm-inline/index.js`. T
 Variant-specific destination contract:
 
 - static webapp: stage to `dist/top.wasm` and `dist/wasm-inline/index.js`
-- express SSR webapp: stage to `dist/client/top.wasm` and `dist/client/wasm-inline/index.js`
+- Vite SSR webapp: stage to `dist/client/top.wasm` and `dist/client/wasm-inline/index.js`
 - next SSR webapp: stage to `dist/client/public/top.wasm` and `dist/client/public/wasm-inline/index.js`
 
 ### 3) Template pattern for other Node and TypeScript apps

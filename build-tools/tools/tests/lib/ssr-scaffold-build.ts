@@ -131,8 +131,8 @@ async function runNodeServerSmoke(
 export async function scaffoldBuildAndSmoke(
   tmp: string,
   appName: string,
-  template: "webapp-ssr-express" | "webapp-ssr-next" | "webapp-ssr-vite",
-  framework: "express" | "next" | "vite",
+  template: "webapp-ssr-next" | "webapp-ssr-vite",
+  framework: "next" | "vite",
   marker: string,
   runRuntimeSmoke: boolean,
   _$: any,
@@ -188,12 +188,6 @@ export async function scaffoldBuildAndSmoke(
   if (!(await exists(inlineModule))) {
     throw new Error(`missing staged client inline wasm module: ${inlineModule}`);
   }
-  if (template == "webapp-ssr-express") {
-    const clientSource = await fsp.readFile(path.join(appAbs, "src", "wasm-contract.ts"), "utf8");
-    assert.match(clientSource, /\/top\.wasm/);
-    assert.match(clientSource, /\/wasm-inline\/index\.js/);
-  }
-
   const runnable = await inferRunnableFromOutPath({
     label: "//projects/apps/demo-ssr:app",
     outPath,

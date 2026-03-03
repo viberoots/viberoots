@@ -26,7 +26,6 @@ export const TEMPLATE_TAXONOMY = {
     "wasm-app",
     "wasm-inline",
     "wasm-linking-app",
-    "webapp-ssr-express",
     "webapp-ssr-next",
     "webapp-ssr-vite",
     "webapp-static",

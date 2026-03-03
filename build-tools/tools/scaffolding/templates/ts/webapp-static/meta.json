@@ -14,7 +14,7 @@
       "Wasm producer bridge loop is wired via pnpm run dev:wasm and pnpm run dev:wasm:watch with deterministic [wasm-watch] logs.",
       "The watcher sync contract path is src/wasm-contract/top.wasm and uses a serialized rebuild queue.",
       "If local dependency edits do not refresh, confirm the dependency spec is workspace:/link:/file: and restart dev after any package.json change.",
-      "SSR alternatives: webapp-ssr-express for framework-neutral SSR, webapp-ssr-next for Next app-router SSR.",
+      "SSR alternatives: webapp-ssr-vite for Vite-first SSR, webapp-ssr-next for Next app-router SSR.",
       "Labels include lockfile:projects/apps/<name>/pnpm-lock.yaml#projects/apps/<name> to auto-wire providers."
     ],
     "examples": [

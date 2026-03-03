@@ -30,7 +30,7 @@ I want a single TypeScript template family and a tighter naming contract.
 
 Current split:
 
-- **`node/*`**: `cli`, `lib`, `webapp-static`, `webapp-ssr-express`, `webapp-ssr-next`, `cpp-addon`, `go-addon`, `wasm-inline`
+- **`node/*`**: `cli`, `lib`, `webapp-static`, `webapp-ssr-next`, `cpp-addon`, `go-addon`, `wasm-inline` (historical: `webapp-ssr-express` was removed in HMR Phase 4 PR-3)
 - **`ts/*`**: `wasm-app`, `wasm-linking-app`, `go-cpp-lib`
 
 Problem:
@@ -65,7 +65,7 @@ Canonical TypeScript template set:
 - `ts/lib` (from `node/lib`)
 - `ts/cli` (from `node/cli`)
 - `ts/webapp-static` (from `node/webapp-static`)
-- `ts/webapp-ssr-express` (from `node/webapp-ssr-express`)
+- `ts/webapp-ssr-express` (from `node/webapp-ssr-express`; removed in HMR Phase 4 PR-3)
 - `ts/webapp-ssr-next` (from `node/webapp-ssr-next`)
 - `ts/cpp-addon` (from `node/cpp-addon`)
 - `ts/go-addon` (from `node/go-addon`)

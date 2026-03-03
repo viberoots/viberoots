@@ -70,34 +70,19 @@ async function installNodeModules(appAbs: string, _$: any): Promise<void> {
   })`pnpm install --frozen-lockfile --ignore-scripts --ignore-workspace --prefer-offline --reporter=append-only`;
 }
 
-async function assertContractFiles(tmp: string, template: string, appName: string): Promise<void> {
+async function assertNextContractFiles(tmp: string, appName: string): Promise<void> {
   const appAbs = path.join(tmp, "projects", "apps", appName);
-  const expectedCommon = [
+  const expected = [
     path.join(appAbs, "TARGETS"),
     path.join(appAbs, "package.json"),
     path.join(appAbs, "server", "index.ts"),
     path.join(appAbs, "pnpm-lock.yaml"),
+    path.join(appAbs, "app", "layout.tsx"),
+    path.join(appAbs, "app", "page.tsx"),
+    path.join(appAbs, "next.config.mjs"),
   ];
-  for (const p of expectedCommon) {
+  for (const p of expected) {
     if (!(await exists(p))) throw new Error(`expected scaffold file missing: ${p}`);
-  }
-
-  if (template === "webapp-ssr-express") {
-    for (const p of [
-      path.join(appAbs, "src", "entry-client.ts"),
-      path.join(appAbs, "src", "entry-server.ts"),
-      path.join(appAbs, "vite.config.ts"),
-    ]) {
-      if (!(await exists(p))) throw new Error(`expected Express SSR file missing: ${p}`);
-    }
-  } else {
-    for (const p of [
-      path.join(appAbs, "app", "layout.tsx"),
-      path.join(appAbs, "app", "page.tsx"),
-      path.join(appAbs, "next.config.mjs"),
-    ]) {
-      if (!(await exists(p))) throw new Error(`expected Next SSR file missing: ${p}`);
-    }
   }
 }
 
@@ -126,47 +111,6 @@ async function assertPackageScriptsAndLabels(
     targetsText.includes(`framework:${framework}`),
     `${template} TARGETS must include framework:${framework} label`,
   );
-}
-
-async function runExpressRuntimeSmoke(
-  tmp: string,
-  marker: string,
-  _$: any,
-  appName: string,
-): Promise<void> {
-  const appAbs = path.join(tmp, "projects", "apps", appName);
-  await installNodeModules(appAbs, _$);
-  await _$({
-    cwd: appAbs,
-    stdio: "inherit",
-    env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" },
-  })`pnpm run build:ssr`;
-
-  const port = await pickFreePort();
-  const child = spawn("node", ["dist/server/index.js"], {
-    cwd: appAbs,
-    stdio: "pipe",
-    detached: true,
-    env: { ...process.env, PORT: String(port), NEXT_TELEMETRY_DISABLED: "1" },
-  });
-  try {
-    const res = await waitForServer(`http://127.0.0.1:${port}/`, marker);
-    assert.equal(res.status, 200);
-    const serverWasmHeader = Number(String(res.headers["x-server-wasm-bytes"] || "0"));
-    assert.ok(serverWasmHeader > 0, "expected x-server-wasm-bytes header from server wasm path");
-  } finally {
-    try {
-      if (child.pid) process.kill(-child.pid, "SIGINT");
-    } catch {}
-    try {
-      await Promise.race([once(child, "exit"), sleep(5000)]);
-    } catch {}
-    if (child.exitCode == null) {
-      try {
-        if (child.pid) process.kill(-child.pid, "SIGKILL");
-      } catch {}
-    }
-  }
 }
 
 async function runNextRuntimeSmoke(
@@ -210,22 +154,15 @@ async function runNextRuntimeSmoke(
 }
 
 test(
-  "node SSR templates: scaffold contract + runtime smoke",
+  "node SSR Next template: scaffold contract + runtime smoke",
   { timeout: TEST_TIMEOUT_MS },
   async () => {
     process.env.NIX_PNPM_ALLOW_GENERATE = "1";
     await runInTemp("node-webapp-ssr-scaffold-smoke", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      const expressApp = "scaf-smoke-ssr-express";
       const nextApp = "scaf-smoke-ssr-next";
-      // Runtime smoke validates SSR startup contracts, so skip template test deps to reduce install cost.
-      await $`scaf new ts webapp-ssr-express ${expressApp} --yes --no-tests`;
-      await assertContractFiles(tmp, "webapp-ssr-express", expressApp);
-      await assertPackageScriptsAndLabels(tmp, "webapp-ssr-express", "express", expressApp);
-      await runExpressRuntimeSmoke(tmp, 'data-ssr-marker="express"', _$, expressApp);
-
       await $`scaf new ts webapp-ssr-next ${nextApp} --yes --no-tests`;
-      await assertContractFiles(tmp, "webapp-ssr-next", nextApp);
+      await assertNextContractFiles(tmp, nextApp);
       await assertPackageScriptsAndLabels(tmp, "webapp-ssr-next", "next", nextApp);
       await runNextRuntimeSmoke(tmp, 'data-ssr-marker="next"', _$, nextApp);
     });

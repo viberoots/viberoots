@@ -55,7 +55,7 @@ export async function withTempRoots<T>(run: () => Promise<T>): Promise<T> {
 export async function scaffoldAndPrepareWorkspace(
   tmp: string,
   _$: any,
-  template: "webapp-ssr-express" | "webapp-ssr-next" | "webapp-ssr-vite",
+  template: "webapp-ssr-next" | "webapp-ssr-vite",
   name: string,
 ): Promise<void> {
   const appRel = path.join("projects", "apps", name).replace(/\\/g, "/");
