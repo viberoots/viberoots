@@ -136,6 +136,12 @@ const EXPECTATIONS: TemplateExpectation[] = [
   },
   {
     script:
+      "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-consistency.phase3.test.ts",
+    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract"],
+    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],
+  },
+  {
+    script:
       "build-tools/tools/tests/scaffolding/webapp.phase2-wasm-producer-policy.contract.test.ts",
     requiredLabels: [
       "template:ts/webapp-static",
@@ -225,6 +231,8 @@ const EXPECTATIONS: TemplateExpectation[] = [
       "template:ts/lib",
       "template:ts/cli",
       "template:ts/webapp-static",
+      "template:ts/webapp-ssr-vite",
+      "template:ts/webapp-ssr-next",
       "template:ts/cpp-addon",
       "template:shared",
     ],
@@ -232,6 +240,8 @@ const EXPECTATIONS: TemplateExpectation[] = [
       "build-tools/tools/scaffolding/templates/ts/lib/",
       "build-tools/tools/scaffolding/templates/ts/cli/",
       "build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
       "build-tools/tools/scaffolding/templates/ts/cpp-addon/",
     ],
   },

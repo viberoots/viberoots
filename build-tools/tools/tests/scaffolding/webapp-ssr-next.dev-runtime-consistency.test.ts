@@ -11,7 +11,12 @@ import {
   nextWasmPageSource,
   writeLibSource,
 } from "./lib/next-dev";
-import { assertSingleQueueInvariant, producerByteLength, waitForValue } from "./lib/wasm-watch";
+import {
+  assertSingleQueueInvariant,
+  producerByteLength,
+  waitForConsecutive,
+  waitForValue,
+} from "./lib/wasm-watch";
 import { httpGet, pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
 
 const TEST_TIMEOUT_MS =
@@ -172,6 +177,13 @@ test(
           );
           assert.equal(devServer.exitCode, null);
           assert.equal(devServer.pid, serverPid);
+
+          await waitForConsecutive(
+            () => clientAssetsContain(pageUrl, cycle.client),
+            2,
+            STEP_TIMEOUT_MS,
+            NEXT_DEV_POLL_MS,
+          );
 
           await writeAndBumpMtime(libSourcePath, writeLibSource(cycle.client, cycle.server));
           await waitForValue(

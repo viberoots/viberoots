@@ -145,6 +145,23 @@ Shared Phase-4 regression helper contract:
 - Reuse `build-tools/tools/tests/scaffolding/lib/wasm-watch.ts` helpers for deterministic file mutation (`writeAndBumpMtime`), process no-restart assertions, watcher failure-signature checks, and local-link validation.
 - Keep template-specific behavior assertions in template tests; keep deterministic probe/mutation primitives in the shared helper module.
 
+Phase 4 matrix verification (maintainer guidance):
+
+To verify the permanent regression matrix is complete in CI, run the following targets:
+
+```bash
+buck2 test //:scaffolding_webapp_static_dev_hmr_local_ts_dep
+buck2 test //:scaffolding_webapp_static_dev_reload_wasm_producer
+buck2 test //:scaffolding_webapp_ssr_vite_dev_hmr_local_ts_dep
+buck2 test //:scaffolding_webapp_ssr_vite_dev_reload_wasm_producer
+buck2 test //:scaffolding_webapp_ssr_vite_dev_runtime_consistency_phase3
+buck2 test //:scaffolding_webapp_ssr_next_dev_hmr_local_ts_dep
+buck2 test //:scaffolding_webapp_ssr_next_dev_reload_wasm_producer
+buck2 test //:scaffolding_webapp_ssr_next_dev_runtime_consistency
+buck2 test //:scaffolding_template_conventions_metadata_cquery
+buck2 test //:scaffolding_ts_command_path_docs_contract
+```
+
 #### Subcommands and semantics
 
 - new: Create a new scaffold at the resolved destination using `copier copy`.

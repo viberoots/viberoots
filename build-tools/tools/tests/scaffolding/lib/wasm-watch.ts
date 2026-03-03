@@ -70,6 +70,29 @@ export async function waitForValue<T>(
   throw new Error(`timed out waiting for expected value after ${timeoutMs}ms`);
 }
 
+export async function waitForConsecutive(
+  getter: () => Promise<boolean>,
+  requiredCount: number,
+  timeoutMs = 60000,
+  pollMs = 250,
+): Promise<void> {
+  const start = Date.now();
+  let consecutive = 0;
+  while (Date.now() - start < timeoutMs) {
+    const ok = await getter();
+    if (ok) {
+      consecutive += 1;
+      if (consecutive >= requiredCount) return;
+    } else {
+      consecutive = 0;
+    }
+    await sleep(pollMs);
+  }
+  throw new Error(
+    `timed out waiting for ${requiredCount} consecutive successes after ${timeoutMs}ms`,
+  );
+}
+
 export async function writeAndBumpMtime(filePath: string, contents: string): Promise<void> {
   await fsp.writeFile(filePath, contents, "utf8");
   deterministicTouchStep += 1;

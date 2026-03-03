@@ -32,7 +32,10 @@ export const ACTIVE_DOC_COMMAND_CONTRACT: DocCommandContractEntry[] = [
   },
   {
     path: "build-tools/docs/scaffolding.md",
-    requiredFragments: ["scaf new ts webapp-ssr-vite demo-vite-ssr --yes"],
+    requiredFragments: [
+      "scaf new ts webapp-ssr-vite demo-vite-ssr --yes",
+      "build-tools/tools/dev/build-wasm-producer.ts",
+    ],
   },
 ];
 

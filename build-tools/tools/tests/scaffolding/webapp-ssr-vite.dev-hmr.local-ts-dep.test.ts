@@ -16,6 +16,7 @@ import {
 import {
   assertNoProcessRestart,
   assertWorkspaceLinkedDependency,
+  waitForConsecutive,
   waitForValue,
   writeAndBumpMtime,
 } from "./lib/wasm-watch";
@@ -183,6 +184,13 @@ test(
         );
         assert.equal(clientUpdated, "client:client-b");
         assertNoProcessRestart(devServer, serverPid);
+
+        await waitForConsecutive(
+          () => evaluateRenderedAppText(mainModuleUrl).then((v) => v === "client:client-b"),
+          2,
+          60000,
+          250,
+        );
 
         await writeAndBumpMtime(libSourcePath, writeLibSource("client-b", "server-b"));
 

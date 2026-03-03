@@ -25,6 +25,13 @@ const DOCS_WITH_REQUIRED_TS_EXAMPLES: Array<{ path: string; requiredFragments: s
     path: "docs/design-history/nix-node-test.md",
     requiredFragments: ["scaf new ts lib", "scaf new ts cli"],
   },
+  {
+    path: "build-tools/docs/scaffolding.md",
+    requiredFragments: [
+      "scaf new ts webapp-ssr-vite demo-vite-ssr --yes",
+      "build-tools/tools/dev/build-wasm-producer.ts",
+    ],
+  },
 ];
 
 function canonicalTsTemplatesPattern(): RegExp {

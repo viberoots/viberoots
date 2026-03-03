@@ -169,6 +169,8 @@ _TEMPLATE_TEST_CONVENTIONS = {
             "build-tools/tools/scaffolding/templates/ts/lib",
             "build-tools/tools/scaffolding/templates/ts/cli",
             "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
             "build-tools/tools/scaffolding/templates/ts/cpp-addon",
         ],
         "classification": "template:shared",

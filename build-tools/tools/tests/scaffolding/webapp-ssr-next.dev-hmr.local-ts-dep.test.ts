@@ -9,14 +9,15 @@ import { clientAssetsContain, writeLibSource } from "./lib/next-dev";
 import {
   assertNoProcessRestart,
   assertWorkspaceLinkedDependency,
+  waitForConsecutive,
   waitForValue,
   writeAndBumpMtime,
 } from "./lib/wasm-watch";
 import { httpGet, pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
-const NEXT_DEV_UPDATE_TIMEOUT_MS = 120000;
-const NEXT_DEV_POLL_MS = 500;
+const NEXT_DEV_UPDATE_TIMEOUT_MS = Number(process.env.NEXT_DEV_UPDATE_TIMEOUT_MS || "240000");
+const NEXT_DEV_POLL_MS = 300;
 
 test(
   "webapp-ssr-next scaffolds Phase-1 local dependency dev contract",
@@ -154,20 +155,22 @@ test(
       });
 
       const pageUrl = `http://127.0.0.1:${port}/`;
+      let pollStep = 0;
+      const freshPageUrl = () => `${pageUrl}?v=${++pollStep}`;
       try {
         await waitForHttpOk(pageUrl, NEXT_DEV_UPDATE_TIMEOUT_MS);
-        const initialPage = await httpGet(pageUrl);
+        const initialPage = await httpGet(freshPageUrl());
         assert.equal(initialPage.status, 200);
         assert.match(initialPage.body, /server:server-a/);
 
-        const initialClientProbe = await clientAssetsContain(pageUrl, "client-a");
+        const initialClientProbe = await clientAssetsContain(freshPageUrl(), "client-a");
         assert.equal(initialClientProbe, true);
 
         const serverPid = devServer.pid;
         await writeAndBumpMtime(libSourcePath, writeLibSource("client-b", "server-a"));
 
         const clientProbeUpdated = await waitForValue(
-          async () => await clientAssetsContain(pageUrl, "client-b"),
+          async () => await clientAssetsContain(freshPageUrl(), "client-b"),
           (value) => value,
           NEXT_DEV_UPDATE_TIMEOUT_MS,
           NEXT_DEV_POLL_MS,
@@ -175,11 +178,20 @@ test(
         assert.equal(clientProbeUpdated, true);
         assertNoProcessRestart(devServer, serverPid);
 
+        await waitForConsecutive(
+          () => clientAssetsContain(freshPageUrl(), "client-b"),
+          2,
+          NEXT_DEV_UPDATE_TIMEOUT_MS,
+          NEXT_DEV_POLL_MS,
+        );
+
         await writeAndBumpMtime(libSourcePath, writeLibSource("client-b", "server-b"));
 
         const serverUpdated = await waitForValue(
-          async () => await httpGet(pageUrl),
+          async () => await httpGet(freshPageUrl()),
           (res) => res.status === 200 && res.body.includes("server:server-b"),
+          NEXT_DEV_UPDATE_TIMEOUT_MS,
+          NEXT_DEV_POLL_MS,
         );
         assert.equal(serverUpdated.status, 200);
         assert.match(serverUpdated.body, /server:server-b/);
