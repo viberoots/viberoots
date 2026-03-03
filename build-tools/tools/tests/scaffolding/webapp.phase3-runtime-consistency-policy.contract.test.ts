@@ -132,7 +132,7 @@ test("Phase-3 policy docs: SSR runtime consistency and startup guidance stay exp
   const hmrPlan = await fsp.readFile(path.join(REPO_ROOT, "hmr-plan.md"), "utf8");
   assert.match(hmrPlan, /### Phase 3 Closeout Status/);
   assert.match(hmrPlan, /Checkpoint: `COMPLETED` for Phase 3/);
-  assert.match(hmrPlan, /Begin Phase 4 regression coverage and docs lock-in/);
+  assert.match(hmrPlan, /Phase 4 is complete\./);
   assert.match(hmrPlan, /## Dev Update Contract Matrix \(Phase 0 through Phase 3\)/);
   assert.match(
     hmrPlan,

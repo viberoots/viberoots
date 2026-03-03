@@ -208,14 +208,14 @@ Tasks:
 
 Completion criteria: E2E in CI and docs include clear recovery commands.
 Dependencies: Phase 3.
-Checkpoint: `COMPLETED` after CI + docs review pass.
+Checkpoint: `COMPLETED` (achieved: CI + docs review passed).
 
 ## E2E Test Matrix
 
 1. `webapp-static.dev.hmr.local-ts-dep.e2e`
    - setup: scaffold static app + local TS lib dep
-   - action: edit exported value in local dep
-   - assert: browser content changes without restart
+   - action: edit app-local module, then edit exported value in local dep
+   - assert: both updates propagate without restart in one dev session
 2. `webapp-ssr-vite.dev.hmr.local-ts-dep.e2e`
    - setup: scaffold SSR vite app + local TS dep
    - action: edit dep used by client path, then dep used by server render path
@@ -264,4 +264,4 @@ Escalation trigger from strict HMR to hybrid:
 
 ## Immediate Next Step
 
-Begin Phase 4 regression coverage and docs lock-in.
+Phase 4 is complete. Keep the regression matrix and troubleshooting contracts stable as baseline maintenance.

@@ -159,6 +159,17 @@ export function parseBuck2BeginEpochSec(lines: string[]): number | undefined {
   return undefined;
 }
 
+export function parseGcDetected(lines: string[]): boolean {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const { normalized } = parseLineForMatching(lines[i]);
+    if (normalized.includes("[verify] nix gc preflight warning:")) return true;
+    if (normalized.includes("[verify] safety-rails notice: active nix gc process detected")) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function formatElapsed(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds));
   const mins = Math.floor(s / 60);

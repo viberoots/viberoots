@@ -63,3 +63,19 @@ test("verify-log-status: does not treat action-level 'Tests finished' as done wh
   assert.equal(st.done, false);
   assert.ok((st.remaining ?? 0) > 0);
 });
+
+test("verify-log-status: marks gcDetected when verify log reports nix gc notice", () => {
+  const log = [
+    "[verify] begin iso=v-2",
+    "[verify] nix gc preflight warning: active_gc_processes=1 sample=123:nix store gc",
+    "Waiting on Test foo -- [local_execute]",
+  ].join("\n");
+
+  const st = computeVerifyStatusFromLogText({
+    logPath: "/repo/buck-out/tmp/verify-logs/verify-124.log",
+    pid: 124,
+    text: log,
+  });
+
+  assert.equal(st.gcDetected, true);
+});

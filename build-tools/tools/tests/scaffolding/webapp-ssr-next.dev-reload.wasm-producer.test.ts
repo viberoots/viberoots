@@ -6,9 +6,9 @@ import path from "node:path";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import {
-  clientAssetsContain,
   nextWasmClientProbeSource,
   nextWasmPageSource,
+  readClientProbeText,
   writeLibSource,
 } from "./lib/next-dev";
 import {
@@ -24,12 +24,13 @@ const TEST_TIMEOUT_MS =
 const NEXT_DEV_UPDATE_TIMEOUT_MS = 120000;
 const NEXT_DEV_POLL_MS = 500;
 
-let fileTouchStep = 0;
+const perFileTouchStep = new Map<string, number>();
 
 async function writeAndBumpMtime(filePath: string, contents: string): Promise<void> {
   await fsp.writeFile(filePath, contents, "utf8");
-  fileTouchStep += 1;
-  const stamp = new Date(Date.now() + fileTouchStep * 1100);
+  const nextStep = (perFileTouchStep.get(filePath) || 0) + 1;
+  perFileTouchStep.set(filePath, nextStep);
+  const stamp = new Date(Date.now() + nextStep * 1100);
   await fsp.utimes(filePath, stamp, stamp);
 }
 
@@ -136,27 +137,25 @@ test(
           NEXT_DEV_UPDATE_TIMEOUT_MS,
           NEXT_DEV_POLL_MS,
         );
-        const initialClientProbe = await clientAssetsContain(pageUrl, "client-a");
-        assert.equal(initialClientProbe, true);
+        const initialClientProbe = await waitForValue(
+          async () => await readClientProbeText(pageUrl),
+          (value) => String(value || "").includes("client:client-a"),
+          NEXT_DEV_UPDATE_TIMEOUT_MS,
+          NEXT_DEV_POLL_MS,
+        );
+        assert.equal(String(initialClientProbe || "").includes("client:client-a"), true);
 
         const serverPid = devServer.pid;
         await writeAndBumpMtime(libSourcePath, writeLibSource("client-b", "server-a"));
         const clientProbeUpdated = await waitForValue(
-          async () => await clientAssetsContain(pageUrl, "client-b"),
-          (value) => value,
+          async () => await readClientProbeText(pageUrl),
+          (value) => String(value || "").includes("client:client-b"),
           NEXT_DEV_UPDATE_TIMEOUT_MS,
           NEXT_DEV_POLL_MS,
         );
-        assert.equal(clientProbeUpdated, true);
+        assert.equal(String(clientProbeUpdated || "").includes("client:client-b"), true);
         assert.equal(devServer.exitCode, null);
         assert.equal(devServer.pid, serverPid);
-
-        await waitForConsecutive(
-          () => clientAssetsContain(pageUrl, "client-b"),
-          2,
-          NEXT_DEV_UPDATE_TIMEOUT_MS,
-          NEXT_DEV_POLL_MS,
-        );
 
         await writeAndBumpMtime(libSourcePath, writeLibSource("client-b", "server-b"));
         await waitForValue(

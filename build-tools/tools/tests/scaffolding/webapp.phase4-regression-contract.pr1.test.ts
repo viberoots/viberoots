@@ -81,3 +81,15 @@ test("phase4 pr1 missing local-link helper reports deterministic recovery guidan
     /recovery: verify importer dependency uses workspace:, link:, or file:, then restart `pnpm run dev`/,
   );
 });
+
+test("phase4 pr4 historical SSR plan docs mark express scaffold as removed", async () => {
+  const webappSsrPlan = await fsp.readFile("webapp-ssr.md", "utf8");
+  assert.match(webappSsrPlan, /historical plan record/i);
+  assert.match(webappSsrPlan, /does not include `webapp-ssr-express`/);
+  assert.match(webappSsrPlan, /Use `webapp-ssr-vite` or `webapp-ssr-next`/);
+
+  const viteSsrPlan = await fsp.readFile("vite-ssr.md", "utf8");
+  assert.match(viteSsrPlan, /historical plan record/i);
+  assert.match(viteSsrPlan, /does not include `webapp-ssr-express`/);
+  assert.match(viteSsrPlan, /Use `webapp-ssr-vite` or `webapp-ssr-next`/);
+});

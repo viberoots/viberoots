@@ -34,6 +34,22 @@ export async function clientAssetsContain(pageUrl: string, needle: string): Prom
   return results.some((r) => r.status === 200 && r.body.includes(needle));
 }
 
+function stripHtmlTags(input: string): string {
+  return input.replace(/<[^>]+>/g, "").trim();
+}
+
+export function clientProbeTextFromHtml(html: string): string | null {
+  const match = html.match(/<p id="client-probe"[^>]*>([\s\S]*?)<\/p>/i);
+  if (!match) return null;
+  return stripHtmlTags(String(match[1] || ""));
+}
+
+export async function readClientProbeText(pageUrl: string): Promise<string | null> {
+  const page = await httpGet(pageUrl);
+  if (page.status !== 200) return null;
+  return clientProbeTextFromHtml(page.body);
+}
+
 export function nextWasmPageSource(): string {
   return [
     'import { depServerMessage } from "@libs/demo-lib";',

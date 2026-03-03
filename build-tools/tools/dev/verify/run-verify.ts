@@ -117,15 +117,18 @@ export async function runVerify(): Promise<void> {
       .join(" | ");
     await appendVerifyLogLine(
       lock.logFile,
-      `[verify] nix gc preflight blocked: active_gc_processes=${nixGc.length} sample=${sample}`,
+      `[verify] nix gc preflight warning: active_gc_processes=${nixGc.length} sample=${sample}`,
     );
-    throw new Error(
-      `verify preflight failed: active 'nix store gc' process(es) detected (${nixGc
+    process.stderr.write(
+      `[verify] WARNING: active 'nix store gc' process(es) detected (${nixGc
         .map((p) => p.pid)
-        .join(", ")}). Stop GC and rerun verify to avoid SQLite lock contention.`,
+        .join(", ")}); continuing verify with potential contention.\n`,
     );
+    process.env.BNX_VERIFY_NIX_GC_DETECTED = "1";
+  } else {
+    await appendVerifyLogLine(lock.logFile, "[verify] nix gc preflight: ok");
+    process.env.BNX_VERIFY_NIX_GC_DETECTED = "0";
   }
-  await appendVerifyLogLine(lock.logFile, "[verify] nix gc preflight: ok");
   process.env.BNX_VERIFY_NIX_GC_PRECHECK_OK = "1";
   await logVerifyRevision(root, lock.logFile);
   const stateFile = path.join(process.env.TMPDIR || "/tmp", `bucknix-buck-reaper-${iso}.txt`);

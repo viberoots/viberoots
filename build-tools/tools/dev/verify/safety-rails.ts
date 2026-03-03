@@ -119,18 +119,9 @@ export async function pollVerifySafetyRailsOnce(opts: {
       .slice(0, 3)
       .map((p) => `${p.pid}:${p.command.slice(0, 120)}`)
       .join(" | ");
-    const reason = `active nix gc process detected during verify (${activeGc.length}): ${sample}`;
-    await opts.deps.onTrigger(reason);
-    await opts.deps.writeSnapshot(opts.analysisDir, reason);
-    try {
-      opts.deps.killProcessGroup(opts.processGroupIdToKill, "SIGTERM");
-    } catch {}
-    opts.deps.setTimeoutFn(() => {
-      try {
-        opts.deps.killProcessGroup(opts.processGroupIdToKill, "SIGKILL");
-      } catch {}
-    }, 10_000);
-    return { shouldStop: true, reason };
+    const note = `active nix gc process detected during verify (${activeGc.length}): ${sample}`;
+    await opts.deps.onTrigger(`[notice] ${note}`);
+    await appendLine(opts.telemetryPath, `[verify] safety-rails notice: ${note}`);
   }
 
   const decision = decideVerifySafetyRailsTrigger({

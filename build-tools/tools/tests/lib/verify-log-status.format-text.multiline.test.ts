@@ -16,6 +16,7 @@ test("verify-log-status: formatVerifyStatusText renders multiline (not one-line 
     failed: [],
     done: false,
     elapsed: "1m23s",
+    gcDetected: true,
     source: "derived",
   };
 
@@ -25,6 +26,7 @@ test("verify-log-status: formatVerifyStatusText renders multiline (not one-line 
   assert.match(out, /\n  Pass:\s+3\n/);
   assert.match(out, /\n  Skip:\s+1\n/);
   assert.match(out, /\nTests remaining:\s+7\n/);
+  assert.match(out, /\nGC detected:\s+yes\n/);
   assert.match(out, /\nLog:\s+\/tmp\/verify\.log/);
 
   // The tail-log legacy formatter used a single line like:
@@ -45,6 +47,7 @@ test("verify-log-status: formatVerifyStatusText includes ANSI color when tty=tru
     failed: [],
     done: true,
     elapsed: "0s",
+    gcDetected: false,
     source: "summary",
   };
   const out = formatVerifyStatusText(st, { isTty: true });

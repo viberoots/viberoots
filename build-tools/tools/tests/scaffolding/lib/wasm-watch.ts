@@ -16,7 +16,7 @@ export function producerByteLength(payload: string): number {
 }
 
 const WORKSPACE_LINK_PREFIXES = ["workspace:", "link:", "file:"];
-let deterministicTouchStep = 0;
+const perFileTouchStep = new Map<string, number>();
 
 export function isWorkspaceLinkedSpec(spec: string): boolean {
   const normalized = String(spec || "").trim();
@@ -95,8 +95,9 @@ export async function waitForConsecutive(
 
 export async function writeAndBumpMtime(filePath: string, contents: string): Promise<void> {
   await fsp.writeFile(filePath, contents, "utf8");
-  deterministicTouchStep += 1;
-  const stamp = new Date(Date.now() + deterministicTouchStep * 1100);
+  const nextStep = (perFileTouchStep.get(filePath) || 0) + 1;
+  perFileTouchStep.set(filePath, nextStep);
+  const stamp = new Date(Date.now() + nextStep * 1100);
   await fsp.utimes(filePath, stamp, stamp);
 }
 

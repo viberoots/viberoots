@@ -12,6 +12,7 @@ export type VerifyStatus = {
   failed: string[];
   done: boolean;
   elapsed?: string;
+  gcDetected: boolean;
   source: VerifyStatusSource;
 };
 

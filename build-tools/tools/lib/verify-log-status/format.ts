@@ -13,6 +13,7 @@ export function formatVerifyStatusJsonLine(st: VerifyStatus): string {
     failed: st.failed,
     done: st.done,
     elapsed: st.elapsed ?? null,
+    gc_detected: st.gcDetected,
     log: st.logPath,
     source: st.source,
   };
@@ -27,10 +28,11 @@ export function formatVerifyStatusText(
 ): string {
   const elapsed = st.elapsed ? st.elapsed : "?";
   const remaining = st.remaining !== undefined ? String(st.remaining) : "?";
-  const anyFailures = st.fail > 0 || st.fatal > 0 || st.buildFailure > 0;
   const isTty = opts.isTty;
 
+  const anyFailures = st.fail > 0 || st.fatal > 0 || st.buildFailure > 0;
   // Color policy:
+  // - blue if no failures, still running, and GC has been detected
   // - orange if failures and still running
   // - yellow if no failures and still running
   // - green if done with no failures
@@ -38,16 +40,19 @@ export function formatVerifyStatusText(
   const RESET = "\u001b[0m";
   const YELLOW = "\u001b[33m";
   const GREEN = "\u001b[32m";
+  const BLUE = "\u001b[34m";
   const RED = "\u001b[31m";
   const ORANGE = "\u001b[38;5;208m";
   const color =
-    st.done && anyFailures
-      ? RED
-      : st.done && !anyFailures
-        ? GREEN
-        : !st.done && anyFailures
-          ? ORANGE
-          : YELLOW;
+    !st.done && !anyFailures && st.gcDetected
+      ? BLUE
+      : st.done && anyFailures
+        ? RED
+        : st.done && !anyFailures
+          ? GREEN
+          : !st.done && anyFailures
+            ? ORANGE
+            : YELLOW;
 
   const DIM = "\u001b[2m";
   const label = (s: string) => (isTty ? `${DIM}${s}${RESET}` : s);
@@ -64,6 +69,7 @@ export function formatVerifyStatusText(
   lines.push(`  ${val(`Build failure: ${st.buildFailure}`)}`);
   lines.push(`${label("----------------------")}`);
   lines.push(`${label("Tests remaining:")} ${val(remaining)}`);
+  lines.push(`${label("GC detected:")} ${val(st.gcDetected ? "yes" : "no")}`);
   lines.push(`${label("Log:")} ${st.logPath}`);
 
   if (st.failed.length > 0) {

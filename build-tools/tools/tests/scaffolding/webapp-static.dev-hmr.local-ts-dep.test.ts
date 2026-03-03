@@ -20,44 +20,11 @@ import {
   assertWorkspaceLinkedDependency,
   esbuildPackageName,
   waitForValue,
+  writeAndBumpMtime,
 } from "./lib/wasm-watch";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
-
-test(
-  "webapp-static scaffolds Phase-1 local dependency Vite contract",
-  { timeout: TEST_TIMEOUT_MS },
-  async () => {
-    await runInTemp("webapp-static-hmr-config", async (tmp, _$) => {
-      const $ = _$({ cwd: tmp, stdio: "pipe" });
-      await $`scaf new ts webapp-static demo-web --yes --no-tests`;
-      const configPath = path.join(tmp, "projects", "apps", "demo-web", "vite.config.ts");
-      const packageJsonPath = path.join(tmp, "projects", "apps", "demo-web", "package.json");
-      const wasmContractPath = path.join(
-        tmp,
-        "projects",
-        "apps",
-        "demo-web",
-        "src",
-        "wasm-contract.ts",
-      );
-      const config = await fsp.readFile(configPath, "utf8");
-      const packageJson = await fsp.readFile(packageJsonPath, "utf8");
-      const wasmContract = await fsp.readFile(wasmContractPath, "utf8");
-      assert.match(config, /const workspaceRoot = path\.resolve\(appRoot, "\.\.\/\.\.\/\.\."\);/);
-      assert.match(config, /server:\s*\{[\s\S]*fs:\s*\{[\s\S]*allow:\s*\[workspaceRoot\]/m);
-      assert.match(config, /spec\.startsWith\("workspace:"\)/);
-      assert.match(config, /spec\.startsWith\("link:"\)/);
-      assert.match(config, /spec\.startsWith\("file:"\)/);
-      assert.match(config, /optimizeDeps:\s*\{[\s\S]*exclude:\s*optimizeDepsExclude/m);
-      assert.match(packageJson, /"dev:wasm:watch"/);
-      assert.match(packageJson, /watch-wasm-producer\.ts/);
-      assert.match(packageJson, /"dev":\s*"zx-wrapper .*dev-with-wasm-watch\.ts/);
-      assert.match(wasmContract, /\.\/wasm-contract\/top\.wasm/);
-    });
-  },
-);
 
 test(
   "webapp-static dev serves updated local TS dependency source without restart",
@@ -84,6 +51,10 @@ test(
         "}",
         "",
       ].join("\n");
+      const appMainLocalEditSource = appMainSource.replace(
+        "  root.textContent = `dep:${depMessage()}`;",
+        "  root.textContent = `dep:${depMessage()}|app:phase1-local`;",
+      );
       const appPackageJson = JSON.parse(await fsp.readFile(appPackageJsonPath, "utf8")) as {
         dependencies?: Record<string, string>;
       };
@@ -205,23 +176,31 @@ test(
         assert.equal(firstRenderedText, "dep:phase1-a");
         const serverPid = devServer.pid;
 
-        await fsp.writeFile(
+        await writeAndBumpMtime(appMainPath, appMainLocalEditSource);
+        const appLocalObserved = await waitForValue(
+          async () => {
+            assertNoProcessRestart(devServer, serverPid);
+            return await evaluateRenderedAppText(mainModuleUrl);
+          },
+          (v) => v === "dep:phase1-a|app:phase1-local",
+          120000,
+        );
+        assert.equal(appLocalObserved, "dep:phase1-a|app:phase1-local");
+
+        await writeAndBumpMtime(
           libSourcePath,
           'export const depMessage = (): string => "phase1-b";\n',
-          "utf8",
         );
-        const now = new Date();
-        await fsp.utimes(libSourcePath, now, now);
 
         const observed = await waitForValue(
           async () => {
             assertNoProcessRestart(devServer, serverPid);
             return await evaluateRenderedAppText(mainModuleUrl);
           },
-          (v) => v === "dep:phase1-b",
+          (v) => v === "dep:phase1-b|app:phase1-local",
           120000,
         );
-        assert.equal(observed, "dep:phase1-b");
+        assert.equal(observed, "dep:phase1-b|app:phase1-local");
 
         // Verify the served dependency module source also advanced, not just DOM text.
         const currentMainModule = await httpGet(mainModuleUrl);

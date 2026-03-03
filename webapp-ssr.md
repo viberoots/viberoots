@@ -1,5 +1,9 @@
 # Webapp SSR Plan - Node Entrypoint SSR, Framework-Agnostic Build/Run Wiring
 
+This document is a historical plan record.
+Current scaffold support in this repository does not include `webapp-ssr-express`.
+Use `webapp-ssr-vite` or `webapp-ssr-next` for active SSR scaffolding paths.
+
 This plan introduces SSR support with a strict runtime contract: production always starts a plain
 Node process at a generated server entrypoint. Framework differences are resolved during scaffolding
 and build planning, not at runtime.

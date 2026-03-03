@@ -22,6 +22,7 @@ function emptyNdjson(pid: number, error: string): string {
     failed: [],
     done: false,
     elapsed: null,
+    gc_detected: false,
     log: null,
     source: "derived",
     error,

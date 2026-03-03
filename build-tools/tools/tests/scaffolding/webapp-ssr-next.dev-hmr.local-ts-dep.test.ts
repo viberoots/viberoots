@@ -5,19 +5,31 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { clientAssetsContain, writeLibSource } from "./lib/next-dev";
+import { readClientProbeText, writeLibSource } from "./lib/next-dev";
 import {
   assertNoProcessRestart,
   assertWorkspaceLinkedDependency,
-  waitForConsecutive,
   waitForValue,
   writeAndBumpMtime,
 } from "./lib/wasm-watch";
 import { httpGet, pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
-const NEXT_DEV_UPDATE_TIMEOUT_MS = Number(process.env.NEXT_DEV_UPDATE_TIMEOUT_MS || "240000");
-const NEXT_DEV_POLL_MS = 300;
+const NEXT_DEV_UPDATE_TIMEOUT_MS = Number(process.env.NEXT_DEV_UPDATE_TIMEOUT_MS || "120000");
+const NEXT_DEV_POLL_MS = 1000;
+
+function clientProbeSource(labelPrefix: string): string {
+  return [
+    '"use client";',
+    "",
+    'import { depClientMessage } from "@libs/demo-lib";',
+    "",
+    "export function ClientProbe() {",
+    `  return <p id="client-probe">{\`${labelPrefix}:\${depClientMessage()}\`}</p>;`,
+    "}",
+    "",
+  ].join("\n");
+}
 
 test(
   "webapp-ssr-next scaffolds Phase-1 local dependency dev contract",
@@ -33,6 +45,8 @@ test(
       assert.match(config, /spec\.startsWith\("file:"\)/);
       assert.match(config, /transpilePackages/);
       assert.match(config, /externalDir:\s*true/);
+      assert.match(config, /webpackDevMiddleware/);
+      assert.match(config, /poll:\s*LOCAL_DEPS_WATCH_POLL_MS/);
     });
   },
 );
@@ -53,7 +67,7 @@ test(
       const libPackageJsonPath = path.join(tmp, "projects", "libs", "demo-lib", "package.json");
       const libSourcePath = path.join(tmp, "projects", "libs", "demo-lib", "src", "index.ts");
       const pageSource = [
-        'import { depServerMessage } from "@libs/demo-lib";',
+        'import { depClientMessage, depServerMessage } from "@libs/demo-lib";',
         'import { ClientProbe } from "./client-probe";',
         "",
         'export const dynamic = "force-dynamic";',
@@ -63,22 +77,18 @@ test(
         '    <main data-ssr-marker="next">',
         "      <h1>Hello from Next SSR</h1>",
         "      <ClientProbe />",
+        '      <p id="server-client-probe">{`server-client:${depClientMessage()}`}</p>',
         '      <p id="server-probe">{`server:${depServerMessage()}`}</p>',
         "    </main>",
         "  );",
         "}",
         "",
       ].join("\n");
-      const clientProbeSource = [
-        '"use client";',
-        "",
-        'import { depClientMessage } from "@libs/demo-lib";',
-        "",
-        "export function ClientProbe() {",
-        '  return <p id="client-probe">{`client:${depClientMessage()}`}</p>;',
-        "}",
-        "",
-      ].join("\n");
+      const appLocalEditedPageSource = pageSource.replace(
+        "Hello from Next SSR",
+        "Hello from Next SSR local-edit",
+      );
+      const initialClientProbeSource = clientProbeSource("client");
 
       const appPackageJson = JSON.parse(await fsp.readFile(appPackageJsonPath, "utf8")) as {
         dependencies?: Record<string, string>;
@@ -104,7 +114,7 @@ test(
         types: "./src/index.ts",
       };
       await fsp.writeFile(appPagePath, pageSource, "utf8");
-      await fsp.writeFile(appClientProbePath, clientProbeSource, "utf8");
+      await fsp.writeFile(appClientProbePath, initialClientProbeSource, "utf8");
       await fsp.writeFile(
         appPackageJsonPath,
         JSON.stringify(nextAppPackageJson, null, 2) + "\n",
@@ -126,7 +136,7 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-      })`pnpm install --filter ./projects/apps/demo-next-ssr --filter ./projects/libs/demo-lib --no-frozen-lockfile --ignore-scripts --reporter=append-only`;
+      })`pnpm install --filter ./projects/apps/demo-next-ssr --filter ./projects/libs/demo-lib --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
 
       const port = await pickFreePort();
       const serverStdout: string[] = [];
@@ -157,36 +167,54 @@ test(
       const pageUrl = `http://127.0.0.1:${port}/`;
       let pollStep = 0;
       const freshPageUrl = () => `${pageUrl}?v=${++pollStep}`;
+      let stage = "boot";
       try {
+        stage = "wait-for-http-ok";
         await waitForHttpOk(pageUrl, NEXT_DEV_UPDATE_TIMEOUT_MS);
+        stage = "initial-server-render";
         const initialPage = await httpGet(freshPageUrl());
         assert.equal(initialPage.status, 200);
+        assert.match(initialPage.body, /server-client:client-a/);
         assert.match(initialPage.body, /server:server-a/);
 
-        const initialClientProbe = await clientAssetsContain(freshPageUrl(), "client-a");
-        assert.equal(initialClientProbe, true);
+        stage = "initial-client-probe";
+        const initialClientProbe = await waitForValue(
+          async () => await readClientProbeText(freshPageUrl()),
+          (value) => String(value || "").includes("client:client-a"),
+          NEXT_DEV_UPDATE_TIMEOUT_MS,
+          NEXT_DEV_POLL_MS,
+        );
+        assert.equal(String(initialClientProbe || "").includes("client:client-a"), true);
 
         const serverPid = devServer.pid;
-        await writeAndBumpMtime(libSourcePath, writeLibSource("client-b", "server-a"));
-
-        const clientProbeUpdated = await waitForValue(
-          async () => await clientAssetsContain(freshPageUrl(), "client-b"),
-          (value) => value,
+        await writeAndBumpMtime(appPagePath, appLocalEditedPageSource);
+        stage = "app-local-page-edit";
+        const appLocalPageUpdated = await waitForValue(
+          async () => await httpGet(freshPageUrl()),
+          (res) => res.status === 200 && res.body.includes("Hello from Next SSR local-edit"),
           NEXT_DEV_UPDATE_TIMEOUT_MS,
           NEXT_DEV_POLL_MS,
         );
-        assert.equal(clientProbeUpdated, true);
+        assert.equal(appLocalPageUpdated.status, 200);
+        assert.match(appLocalPageUpdated.body, /Hello from Next SSR local-edit/);
         assertNoProcessRestart(devServer, serverPid);
 
-        await waitForConsecutive(
-          () => clientAssetsContain(freshPageUrl(), "client-b"),
-          2,
+        await writeAndBumpMtime(libSourcePath, writeLibSource("client-b", "server-a"));
+
+        stage = "workspace-client-dep-edit";
+        const clientDepUpdated = await waitForValue(
+          async () => await httpGet(freshPageUrl()),
+          (res) => res.status === 200 && res.body.includes("server-client:client-b"),
           NEXT_DEV_UPDATE_TIMEOUT_MS,
           NEXT_DEV_POLL_MS,
         );
+        assert.equal(clientDepUpdated.status, 200);
+        assert.match(clientDepUpdated.body, /server-client:client-b/);
+        assertNoProcessRestart(devServer, serverPid);
 
         await writeAndBumpMtime(libSourcePath, writeLibSource("client-b", "server-b"));
 
+        stage = "workspace-server-dep-edit";
         const serverUpdated = await waitForValue(
           async () => await httpGet(freshPageUrl()),
           (res) => res.status === 200 && res.body.includes("server:server-b"),
@@ -199,9 +227,12 @@ test(
       } catch (error) {
         const tailOut = serverStdout.join("").slice(-6000);
         const tailErr = serverStderr.join("").slice(-6000);
+        const lastProbe = await readClientProbeText(freshPageUrl()).catch(() => null);
         throw new Error(
           [
             error instanceof Error ? error.message : String(error),
+            `failure stage: ${stage}`,
+            `last client-probe: ${String(lastProbe ?? "<null>")}`,
             `next stdout tail:\n${tailOut}`,
             `next stderr tail:\n${tailErr}`,
           ].join("\n\n"),

@@ -86,6 +86,11 @@ function validatePatchScopeLabels(name: string, labels: string[], problems: stri
   }
 }
 
+function labelTokensFromText(content: string): string[] {
+  const labelLiterals = content.match(/\b(?:lang|kind|patch_scope):[A-Za-z0-9._/-]+\b/g) || [];
+  return [...new Set(labelLiterals)];
+}
+
 async function main() {
   const problems: string[] = [];
   const buckIsolationDir = String(process.env.BUCK_ISOLATION_DIR || "").trim();
@@ -130,6 +135,7 @@ async function main() {
     }
     for await (const f of walk(process.cwd())) {
       const content = await fsp.readFile(f, "utf8");
+      const labels = labelTokensFromText(content);
       const hasGoRule = /\b(go_library|go_binary|go_test)\s*\(/.test(content);
       const hasLangGo = content.includes("lang:go");
       if (hasGoRule && !hasLangGo) problems.push(`${f} missing label lang:go`);
@@ -138,8 +144,8 @@ async function main() {
       if (hasCppRule && !hasLangCpp) problems.push(`${f} missing label lang:cpp`);
 
       // kind label vocabulary validation (best-effort)
-      const matches = content.match(/\bkind:[A-Za-z0-9_-]+\b/g) || [];
-      validateKindLabels(f, matches, problems);
+      validateKindLabels(f, kindLabelsOf(labels), problems);
+      validatePatchScopeLabels(f, labels, problems);
     }
   }
   if (problems.length) {

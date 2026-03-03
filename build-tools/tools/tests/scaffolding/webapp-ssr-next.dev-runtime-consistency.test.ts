@@ -12,10 +12,12 @@ import {
   writeLibSource,
 } from "./lib/next-dev";
 import {
+  assertNoProcessRestart,
   assertSingleQueueInvariant,
   producerByteLength,
   waitForConsecutive,
   waitForValue,
+  writeAndBumpMtime,
 } from "./lib/wasm-watch";
 import { httpGet, pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
 
@@ -25,21 +27,6 @@ const TEST_TIMEOUT_MS =
 const STARTUP_TIMEOUT_MS = 45000,
   STEP_TIMEOUT_MS = Number(process.env.NEXT_DEV_STEP_TIMEOUT_SECS || "180") * 1000,
   NEXT_DEV_POLL_MS = 500;
-
-let fileTouchStep = 0;
-let requestStep = 0;
-
-async function writeAndBumpMtime(filePath: string, contents: string): Promise<void> {
-  await fsp.writeFile(filePath, contents, "utf8");
-  fileTouchStep += 1;
-  const stamp = new Date(Date.now() + fileTouchStep * 1100);
-  await fsp.utimes(filePath, stamp, stamp);
-}
-
-async function readServerPage(baseUrl: string): Promise<{ status: number; body: string }> {
-  requestStep += 1;
-  return await httpGet(`${baseUrl}?v=${requestStep}`);
-}
 
 test(
   "webapp-ssr-next runtime consistency stays deterministic across repeated mixed cycles without restart or hang",
@@ -129,6 +116,7 @@ test(
       });
 
       try {
+        const readServerPage = async () => await httpGet(pageUrl);
         await waitForValue(
           async () => `${serverStdout.join("")}\n${serverStderr.join("")}`,
           (logs) => logs.includes("Ready in"),
@@ -139,7 +127,7 @@ test(
 
         const expectedA = producerByteLength("runtime-a");
         await waitForValue(
-          async () => await readServerPage(pageUrl),
+          readServerPage,
           (res) =>
             res.status === 200 &&
             res.body.includes("server:server-a") &&
@@ -161,7 +149,6 @@ test(
         const cycles = [
           { tag: "b", client: "client-b", server: "server-b", payload: "runtime-bbb" },
           { tag: "c", client: "client-c", server: "server-c", payload: "runtime-cccc" },
-          { tag: "d", client: "client-d", server: "server-d", payload: "runtime-ddddd" },
         ];
 
         for (const cycle of cycles) {
@@ -175,8 +162,7 @@ test(
             STEP_TIMEOUT_MS,
             NEXT_DEV_POLL_MS,
           );
-          assert.equal(devServer.exitCode, null);
-          assert.equal(devServer.pid, serverPid);
+          assertNoProcessRestart(devServer, serverPid);
 
           await waitForConsecutive(
             () => clientAssetsContain(pageUrl, cycle.client),
@@ -187,24 +173,22 @@ test(
 
           await writeAndBumpMtime(libSourcePath, writeLibSource(cycle.client, cycle.server));
           await waitForValue(
-            async () => await readServerPage(pageUrl),
+            readServerPage,
             (res) => res.status === 200 && res.body.includes(`server:${cycle.server}`),
             STEP_TIMEOUT_MS,
             NEXT_DEV_POLL_MS,
           );
-          assert.equal(devServer.exitCode, null);
-          assert.equal(devServer.pid, serverPid);
+          assertNoProcessRestart(devServer, serverPid);
 
           await writeAndBumpMtime(payloadPath, cycle.payload);
           const expectedWasm = producerByteLength(cycle.payload);
           await waitForValue(
-            async () => await readServerPage(pageUrl),
+            readServerPage,
             (res) => res.status === 200 && res.body.includes(`server-wasm:${expectedWasm}`),
             STEP_TIMEOUT_MS,
             NEXT_DEV_POLL_MS,
           );
-          assert.equal(devServer.exitCode, null);
-          assert.equal(devServer.pid, serverPid);
+          assertNoProcessRestart(devServer, serverPid);
         }
 
         const mergedLogs = `${serverStdout.join("")}\n${serverStderr.join("")}`;

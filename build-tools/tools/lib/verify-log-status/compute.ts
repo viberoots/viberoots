@@ -6,6 +6,7 @@ import {
   formatElapsed,
   parseBuck2BeginEpochSec,
   parseBuck2ExitMarker,
+  parseGcDetected,
 } from "./parsing.ts";
 import { deriveInProgressCounts } from "./derived.ts";
 import { parseFinalSummary } from "./summary.ts";
@@ -23,6 +24,7 @@ export function computeVerifyStatusFromLogText(opts: {
 
   const exitMarker = parseBuck2ExitMarker(window);
   const beginSec = parseBuck2BeginEpochSec(window);
+  const gcDetected = parseGcDetected(window);
 
   // Prefer summary *for the current run window* when present.
   // parseFinalSummary is strict about ignoring nested harness output and won't accept a summary
@@ -58,5 +60,6 @@ export function computeVerifyStatusFromLogText(opts: {
     done,
     buildFailure,
     elapsed,
+    gcDetected,
   };
 }

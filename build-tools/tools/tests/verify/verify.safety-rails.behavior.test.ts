@@ -91,3 +91,43 @@ test("verify safety rails: triggers write snapshot and signal only the intended 
   );
   assert.deepEqual(timers, [10_000]);
 });
+
+test("verify safety rails: active nix gc is logged as notice and does not stop verify", async () => {
+  const analysisDir = await fsp.mkdtemp(path.join(os.tmpdir(), "bnx-safety-rails-gc-"));
+  const telemetryPath = path.join(analysisDir, "telemetry.log");
+  await fsp.writeFile(telemetryPath, "", "utf8");
+
+  const signals: Array<{ pgid: number; signal: NodeJS.Signals }> = [];
+  const notes: string[] = [];
+
+  const decision = await pollVerifySafetyRailsOnce({
+    analysisDir,
+    processGroupIdToKill: 31337,
+    baseFreeGiB: 50,
+    lowSpaceGiB: 0,
+    dropBudgetGiB: 20,
+    telemetryPath,
+    deps: {
+      freeGiBForPath: async (_p: string) => 45,
+      activeNixGcProcesses: async () => [{ pid: 999, command: "nix store gc --debug" }],
+      onTrigger: async (reason: string) => {
+        notes.push(reason);
+      },
+      writeSnapshot: async () => {},
+      killProcessGroup: (pgid: number, signal: NodeJS.Signals) => {
+        signals.push({ pgid, signal });
+      },
+      setTimeoutFn: () => {},
+    },
+  });
+
+  assert.equal(decision, null);
+  assert.equal(signals.length, 0);
+  assert.equal(notes.length, 1);
+  assert.match(notes[0] || "", /\[notice\] active nix gc process detected during verify/);
+  const telemetry = await readText(telemetryPath);
+  assert.match(
+    telemetry,
+    /\[verify\] safety-rails notice: active nix gc process detected during verify/,
+  );
+});

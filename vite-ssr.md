@@ -1,5 +1,9 @@
 # Vite SSR Plan - Add a Vite-First SSR Template Without Breaking Existing SSR Contracts
 
+This document is a historical plan record.
+Current scaffold support in this repository does not include `webapp-ssr-express`.
+Use `webapp-ssr-vite` or `webapp-ssr-next` for active SSR scaffolding paths.
+
 This plan adds a new TypeScript scaffold template for Vite-based SSR while keeping the current
 `webapp-ssr-express` and `webapp-ssr-next` templates stable.
 

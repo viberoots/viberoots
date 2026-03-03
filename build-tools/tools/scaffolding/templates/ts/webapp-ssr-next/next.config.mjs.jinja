@@ -34,6 +34,7 @@ function workspaceDependencyNames(pkg) {
 const transpilePackages = workspaceDependencyNames(
   readPackageJson(path.join(appRoot, "package.json")),
 );
+const LOCAL_DEPS_WATCH_POLL_MS = 1000;
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -41,6 +42,15 @@ const nextConfig = {
   transpilePackages,
   experimental: {
     externalDir: true,
+  },
+  webpackDevMiddleware: (config) => {
+    if (transpilePackages.length > 0) {
+      config.watchOptions = {
+        ...(config.watchOptions || {}),
+        poll: LOCAL_DEPS_WATCH_POLL_MS,
+      };
+    }
+    return config;
   },
 };
 

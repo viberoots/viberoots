@@ -237,7 +237,6 @@ I will complete the deprecated `ts/webapp-ssr-express` removal and lock removal 
 
 ### Verification Commands
 
-- `buck2 test //:scaffolding_webapp_ssr_express_contracts`
 - `buck2 test //:scaffolding_template_conventions_metadata_cquery`
 - `buck2 test //:scaffolding_ts_command_path_docs_contract`
 - `buck2 test //:scaffolding_webapp_static_dev_hmr_local_ts_dep`
@@ -333,7 +332,6 @@ I will close the remaining Phase 4 contract gaps found in review by adding missi
 - `buck2 test //:scaffolding_webapp_ssr_next_dev_hmr_local_ts_dep`
 - `buck2 test //:scaffolding_webapp_ssr_next_dev_reload_wasm_producer`
 - `buck2 test //:scaffolding_webapp_ssr_next_dev_runtime_consistency`
-- `buck2 test //:scaffolding_webapp_ssr_express_contracts`
 - `buck2 test //:scaffolding_template_conventions_metadata_cquery`
 - `buck2 test //:scaffolding_ts_command_path_docs_contract`
 
