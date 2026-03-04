@@ -56,13 +56,19 @@ function truncateAnsi(input: string, maxVisible: number): string {
 
 function getBuckProcessCount(): number {
   try {
-    const out = execFileSync("pgrep", ["-f", "buck"], {
+    const out = execFileSync("ps", ["-A", "-o", "command="], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
-    })
+    });
+    const lines = String(out || "")
       .split("\n")
-      .filter(Boolean).length;
-    return out;
+      .map((x) => x.trim())
+      .filter(Boolean);
+    return lines.filter((cmd) => {
+      if (cmd.includes("buck2d[")) return true;
+      if (cmd.includes("(buck2-forkserver)")) return true;
+      return /(^|\s)buck2(\s|$)/.test(cmd);
+    }).length;
   } catch {
     return 0;
   }
