@@ -83,11 +83,11 @@ def node_asset_stage(
         src = selected.src
         dest = selected.dest
         stage_srcs.append(src)
+        asset_hint_assign = ("ASSET_HINT=%s; " % sh_quote(src))
+        if _is_label_ref(src):
+            asset_hint_assign = ("ASSET_HINT=\"$(location %s)\"; " % _to_abs_label(src))
         copy_assets.append(
-            "if [ \"$#\" -lt 1 ]; then "
-            + ("echo \"node_asset_stage: missing staged asset input for %s\" >&2; exit 2; " % src)
-            + "fi; "
-            + "ASSET_HINT=\"$1\"; shift; "
+            asset_hint_assign
             + ("ASSET_RAW=%s; " % sh_quote(src))
             + ("ASSET_NAME=%s; " % sh_quote(selected.artifact_name))
             + ("ASSET_GLOB=%s; " % sh_quote(selected.artifact_glob))
@@ -103,7 +103,7 @@ def node_asset_stage(
             + "DEST_DIR=\"${DEST%/*}\"; "
             + "if [ \"$DEST_DIR\" = \"$DEST\" ]; then DEST_DIR=\"$OUT_ABS\"; fi; "
             + "mkdir -p \"$DEST_DIR\"; "
-            + "cp -f \"$ASSET_SRC\" \"$DEST\"; "
+            + "if [ \"$ASSET_SRC\" != \"$DEST\" ]; then cp -f \"$ASSET_SRC\" \"$DEST\"; fi; "
         )
 
     cmd = (
@@ -120,20 +120,20 @@ def node_asset_stage(
         + wasm_source_resolver_shell()
         + "if [ -n \"$SRCDIR\" ] && [ \"${SRCDIR#/}\" = \"$SRCDIR\" ]; then SRCDIR=\"$SCRATCH/$SRCDIR\"; fi; "
         + "set -- $SRCS; "
-        + "if [ \"$#\" -lt %s ]; then echo \"node_asset_stage: missing app/assets inputs\" >&2; exit 2; fi; " % (len(assets) + 1)
+        + "if [ \"$#\" -lt 1 ]; then echo \"node_asset_stage: missing app input\" >&2; exit 2; fi; "
         + ("APP_HINT=\"%s\"; " % app_ref)
         + ("APP_PKG=%s; " % sh_quote(app_pkg))
         + "if [ ! -e \"$APP_HINT\" ]; then APP_HINT=\"$1\"; fi; "
         + "if [ -n \"$APP_HINT\" ] && [ \"${APP_HINT#/}\" = \"$APP_HINT\" ]; then APP_HINT=\"$SCRATCH/$APP_HINT\"; fi; "
-        + "shift; "
         + "APP_OUT=\"$APP_HINT\"; "
         + "if [ ! -e \"$APP_OUT\" ] && [ -e \"$SRCDIR/$APP_OUT\" ]; then APP_OUT=\"$SRCDIR/$APP_OUT\"; fi; "
         + "if [ ! -e \"$APP_OUT\" ] && [ -e \"$WORKSPACE_ROOT/$APP_OUT\" ]; then APP_OUT=\"$WORKSPACE_ROOT/$APP_OUT\"; fi; "
         + "if [ ! -e \"$APP_OUT\" ] && [ -n \"$APP_PKG\" ] && [ -d \"$WORKSPACE_ROOT/$APP_PKG/dist\" ]; then APP_OUT=\"$WORKSPACE_ROOT/$APP_PKG/dist\"; fi; "
         + "mkdir -p \"$OUT_ABS\"; "
         + "if [ -e \"$APP_OUT\" ]; then "
-        + "  if [ -d \"$APP_OUT\" ]; then cp -R \"$APP_OUT\"/. \"$OUT_ABS\"; "
-        + "  else cp -f \"$APP_OUT\" \"$OUT_ABS\"; fi; "
+        + "  if [ -d \"$APP_OUT\" ]; then "
+        + "    if [ \"`cd \"$APP_OUT\" && pwd -P`\" != \"`cd \"$OUT_ABS\" && pwd -P`\" ]; then cp -R \"$APP_OUT\"/. \"$OUT_ABS\"; fi; "
+        + "  elif [ \"$APP_OUT\" != \"$OUT_ABS\" ]; then cp -f \"$APP_OUT\" \"$OUT_ABS\"; fi; "
         + "fi; "
         + "".join(copy_assets)
     )

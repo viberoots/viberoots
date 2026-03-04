@@ -8,6 +8,8 @@ import {
   parseTsModuleManifest,
   parseWasmModuleManifest,
 } from "../../scaffolding/webapp-module-manifests.ts";
+import { resolveModuleContractsPaths } from "../../dev/module-contract-paths.ts";
+import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core.ts";
 import { runInTemp } from "../lib/test-helpers";
 import { httpGet, pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
 
@@ -129,7 +131,7 @@ test("webapp multi-module manifest schemas validate deterministic contracts", ()
 });
 
 test(
-  "webapp templates scaffold wasm and TS manifests with typed loader surfaces",
+  "webapp templates generate wasm and TS manifests with typed loader surfaces",
   { timeout: TEST_TIMEOUT_MS },
   async () => {
     await runInTemp("webapp-multi-module-manifest-contract", async (tmp, _$) => {
@@ -141,33 +143,30 @@ test(
       const apps = [
         {
           root: path.join(tmp, "projects", "apps", "demo-static"),
-          wasmManifestRel: path.join("src", "wasm-modules.manifest.json"),
-          tsManifestRel: path.join("src", "ts-modules.manifest.json"),
           clientTsLoaderRel: path.join("src", "ts-modules.ts"),
           serverTsLoaderRel: "",
         },
         {
           root: path.join(tmp, "projects", "apps", "demo-vite"),
-          wasmManifestRel: path.join("src", "wasm-modules.manifest.json"),
-          tsManifestRel: path.join("src", "ts-modules.manifest.json"),
           clientTsLoaderRel: path.join("src", "ts-modules.ts"),
           serverTsLoaderRel: path.join("server", "ts-modules.ts"),
         },
         {
           root: path.join(tmp, "projects", "apps", "demo-next"),
-          wasmManifestRel: path.join("app", "wasm-modules.manifest.json"),
-          tsManifestRel: path.join("app", "ts-modules.manifest.json"),
           clientTsLoaderRel: path.join("app", "ts-modules.ts"),
           serverTsLoaderRel: path.join("server", "ts-modules.ts"),
         },
       ];
 
       for (const app of apps) {
-        const wasmManifestRaw = await fsp.readFile(
-          path.join(app.root, app.wasmManifestRel),
-          "utf8",
-        );
-        const tsManifestRaw = await fsp.readFile(path.join(app.root, app.tsManifestRel), "utf8");
+        const contracts = resolveModuleContractsPaths({ appCwd: app.root, root: tmp });
+        await syncModuleContractsForApp({
+          appCwd: app.root,
+          root: tmp,
+          appTargetLabel: contracts.appTargetLabel,
+        });
+        const wasmManifestRaw = await fsp.readFile(contracts.wasmManifestPath, "utf8");
+        const tsManifestRaw = await fsp.readFile(contracts.tsManifestPath, "utf8");
         const wasmManifest = parseWasmModuleManifest(JSON.parse(wasmManifestRaw), app.root);
         const tsManifest = parseTsModuleManifest(JSON.parse(tsManifestRaw), app.root);
         assert.ok(wasmManifest.modules[0]?.runtimeDestinations.client);
@@ -202,6 +201,12 @@ test(
       await $`scaf new ts webapp-static demo-web --yes --no-tests`;
 
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");
+      const contracts = resolveModuleContractsPaths({ appCwd: appAbs, root: tmp });
+      await syncModuleContractsForApp({
+        appCwd: appAbs,
+        root: tmp,
+        appTargetLabel: contracts.appTargetLabel,
+      });
 
       await _$({ cwd: tmp, stdio: "pipe" })`git add -A projects/apps/demo-web`;
       await _$({
@@ -218,16 +223,18 @@ test(
       );
       try {
         await waitForHttpOk(`http://127.0.0.1:${port}/`);
-        const wasmManifest = await httpGet(
-          `http://127.0.0.1:${port}/src/wasm-modules.manifest.json`,
+        const generatedWasmManifest = parseWasmModuleManifest(
+          JSON.parse(await fsp.readFile(contracts.wasmManifestPath, "utf8")),
+          "webapp-multi-module-manifest-smoke-wasm",
         );
-        const tsManifest = await httpGet(`http://127.0.0.1:${port}/src/ts-modules.manifest.json`);
+        const generatedTsManifest = parseTsModuleManifest(
+          JSON.parse(await fsp.readFile(contracts.tsManifestPath, "utf8")),
+          "webapp-multi-module-manifest-smoke-ts",
+        );
         const mainModule = await httpGet(`http://127.0.0.1:${port}/src/main.ts`);
-        assert.equal(wasmManifest.status, 200);
-        assert.equal(tsManifest.status, 200);
         assert.equal(mainModule.status, 200);
-        assert.match(wasmManifest.body, /"defaultModuleKey":\s*"top-contract"/);
-        assert.match(tsManifest.body, /"defaultModuleKey":\s*"default-message"/);
+        assert.equal(generatedWasmManifest.defaultModuleKey, "top-contract");
+        assert.equal(generatedTsManifest.defaultModuleKey, "default-message");
         assert.match(mainModule.body, /ts-modules/);
         assert.match(mainModule.body, /wasm-contract/);
       } finally {

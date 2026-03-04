@@ -32,13 +32,23 @@ async function readJson(abs: string): Promise<any> {
   }
 }
 
-function parseAssetEntries(targetsText: string): Array<{ src: string; dest: string }> {
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function parseAssetEntries(
+  targetsText: string,
+  appStageTargetName: string,
+): Array<{ src: string; dest: string }> {
   const block = targetsText.match(
-    /node_asset_stage\s*\([\s\S]*?name\s*=\s*"app"[\s\S]*?\)\s*/m,
+    new RegExp(
+      `node_asset_stage\\s*\\([\\s\\S]*?name\\s*=\\s*"${escapeRegExp(appStageTargetName)}"[\\s\\S]*?\\)\\s*`,
+      "m",
+    ),
   )?.[0];
   if (!block)
     throw new Error(
-      "[module-contracts:E_TARGETS_MISSING_APP] missing node_asset_stage(name='app')",
+      `[module-contracts:E_TARGETS_MISSING_APP] missing node_asset_stage(name='${appStageTargetName}')`,
     );
   const assetsRaw = block.match(/assets\s*=\s*\[([\s\S]*?)\]/m)?.[1] || "";
   const out: Array<{ src: string; dest: string }> = [];
@@ -47,9 +57,13 @@ function parseAssetEntries(targetsText: string): Array<{ src: string; dest: stri
   return out;
 }
 
-function wasmEntriesFromTargets(targetsText: string): WasmEntry[] {
+function wasmEntriesFromTargets(
+  targetsText: string,
+  appStageTargetName: string,
+  requireServerDestination: boolean,
+): WasmEntry[] {
   const bySrc = new Map<string, { client: Set<string>; server: Set<string> }>();
-  for (const asset of parseAssetEntries(targetsText)) {
+  for (const asset of parseAssetEntries(targetsText, appStageTargetName)) {
     const src = toPosixPath(asset.src);
     const dest = toPosixPath(asset.dest);
     if (src.startsWith(":") || !src.endsWith(".wasm")) continue;
@@ -64,48 +78,34 @@ function wasmEntriesFromTargets(targetsText: string): WasmEntry[] {
     const moduleKey = sanitizeName(`${path.posix.basename(src, ".wasm")}-contract`);
     const client = Array.from(slots.client).sort((a, b) => a.localeCompare(b))[0] || "";
     const server = Array.from(slots.server).sort((a, b) => a.localeCompare(b))[0] || "";
-    if (!moduleKey || !client || !server) {
+    const resolvedServer = server || (requireServerDestination ? "" : client);
+    if (!moduleKey || !client || !resolvedServer) {
       throw new Error(
         `[module-contracts:E_WASM_ASSET_CONTRACT] invalid wasm asset wiring for '${src}' (need both client and server destinations)`,
       );
     }
-    entries.push({ moduleKey, sourcePath: src, runtimeDestinations: { client, server } });
-  }
-  if (entries.length === 0) {
-    throw new Error(
-      "[module-contracts:E_WASM_EMPTY] no wasm module entries discovered from TARGETS",
-    );
+    entries.push({
+      moduleKey,
+      sourcePath: src,
+      runtimeDestinations: { client, server: resolvedServer },
+    });
   }
   return entries;
 }
 
 async function appTsEntries(appAbs: string): Promise<TsEntry[]> {
-  const candidates: TsEntry[] = [
-    {
-      moduleKey: "default-message",
-      sourceEntryPath: "src/ts-modules/default.ts",
-      runtimeImportPath: "./ts-modules/default",
-    },
-    {
-      moduleKey: "client-entry",
-      sourceEntryPath: "src/entry-client.ts",
-      runtimeImportPath: "./entry-client",
-    },
-    {
-      moduleKey: "server-entry",
-      sourceEntryPath: "src/entry-server.ts",
-      runtimeImportPath: "./entry-server",
-    },
-    { moduleKey: "app-page", sourceEntryPath: "app/page.tsx", runtimeImportPath: "./page" },
-    {
-      moduleKey: "server-runtime",
-      sourceEntryPath: "server/index.ts",
-      runtimeImportPath: "../server/index",
-    },
+  const candidates: Array<[string, string, string]> = [
+    ["default-message", "src/ts-modules/default.ts", "./ts-modules/default"],
+    ["client-entry", "src/entry-client.ts", "./entry-client"],
+    ["server-entry", "src/entry-server.ts", "./entry-server"],
+    ["app-page", "app/page.tsx", "./page"],
+    ["server-runtime", "server/index.ts", "../server/index"],
   ];
   const out: TsEntry[] = [];
-  for (const c of candidates) {
-    if (await exists(path.join(appAbs, c.sourceEntryPath))) out.push(c);
+  for (const [moduleKey, sourceEntryPath, runtimeImportPath] of candidates) {
+    if (await exists(path.join(appAbs, sourceEntryPath))) {
+      out.push({ moduleKey, sourceEntryPath, runtimeImportPath });
+    }
   }
   return out;
 }
@@ -202,13 +202,34 @@ export async function syncModuleContractsForApp(args: {
     );
   });
   const appPkg = await readJson(pkgPath);
-  const wasmModules = wasmEntriesFromTargets(targetsText);
+  const appStageTargetName = paths.appTargetLabel.split(":").pop() || "app";
+  const requireServerDestination = await exists(path.join(appAbs, "server", "wasm-contract.ts"));
+  let wasmModules = wasmEntriesFromTargets(
+    targetsText,
+    appStageTargetName,
+    requireServerDestination,
+  );
+  if (wasmModules.length === 0) {
+    const conventionalWasmRel = "src/wasm-contract/top.wasm";
+    if (await exists(path.join(appAbs, conventionalWasmRel)))
+      wasmModules = [
+        {
+          moduleKey: "top-contract",
+          sourcePath: conventionalWasmRel,
+          runtimeDestinations: { client: "top.wasm", server: "top.wasm" },
+        },
+      ];
+  }
+  if (wasmModules.length === 0) {
+    throw new Error(
+      "[module-contracts:E_WASM_EMPTY] no wasm module entries discovered from TARGETS or conventional src/wasm-contract/top.wasm",
+    );
+  }
   const tsModules = await tsEntries(paths.repoRoot, appAbs, appPkg);
-  if (tsModules.length === 0) {
+  if (tsModules.length === 0)
     throw new Error(
       "[module-contracts:E_TS_EMPTY] no TS module entries discovered from package.json/workspace sources",
     );
-  }
   const wasmDefault = wasmModules[0]!.moduleKey;
   const tsDefault =
     tsModules.find((m) => ["default-message", "client-entry", "app-page"].includes(m.moduleKey))

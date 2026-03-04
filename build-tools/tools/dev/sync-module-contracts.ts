@@ -6,6 +6,7 @@ import { syncModuleContractsForApp } from "./sync-module-contracts-core.ts";
 async function main() {
   const appCwd = path.resolve(getFlagStr("cwd", process.cwd()) || process.cwd());
   const appTargetLabel = getFlagStr("app-target", "");
+  const printJson = String(getFlagStr("print-json", "") || "").trim() !== "";
   try {
     const paths = await syncModuleContractsForApp({
       appCwd,
@@ -14,6 +15,9 @@ async function main() {
     console.error(
       `[module-contracts] sync:ok app_target=${paths.appTargetLabel} app_id=${paths.appId} out=${paths.contractsDir}`,
     );
+    if (printJson) {
+      process.stdout.write(`${JSON.stringify(paths)}\n`);
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[module-contracts] sync:fail");

@@ -71,19 +71,27 @@ nix_go_tiny_wasm_lib(
         const appDir = path.join(tmp, "projects", "apps", "demo-web");
         await fs.outputFile(
           path.join(appDir, "TARGETS"),
-          `load("//build-tools/node:defs.bzl", "node_asset_stage", "node_webapp")
+          `load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
 
 node_webapp(
-    name = "webapp_raw",
-    out = "dist",
+    name = "app_raw",
+)
+
+node_wasm_inline_module(
+    name = "wasm_inline",
+    src = "src/wasm-contract/top.wasm",
 )
 
 node_asset_stage(
-    name = "webapp",
-    app = ":webapp_raw",
+    name = "app",
+    app = ":app_raw",
     assets = [
-        {"src": "//projects/libs/demo-wasm:wasm", "dest": "top.wasm"},
+        {"src": "src/wasm-contract/top.wasm", "dest": "top.wasm"},
+        {"src": ":wasm_inline", "dest": "wasm-inline/index.js"},
+        {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},
+        {"src": "//projects/libs/demo-wasm:wasm", "dest": "tinygo.wasm", "artifact_name": "wasm.wasm"},
     ],
+    labels = ["lang:node", "kind:app", "webapp:static"],
     out = "dist",
 )
 `,
@@ -119,15 +127,15 @@ node_asset_stage(
           cwd: tmp,
           stdio: "pipe",
           env: ensureCertEnv({ ...baseEnv, WEB_WASM_BACKEND: "wasi_single" }),
-        })`buck2 build --target-platforms prelude//platforms:default --show-output //projects/apps/demo-web:webapp`;
+        })`buck2 build --verbose 5 --target-platforms prelude//platforms:default --show-output //projects/apps/demo-web:app`;
         const outText = String(build.stdout || build.stderr || "").trim();
         const outLine = outText.split(/\n+/).pop() || "";
         const outDir = outLine.split(/\s+/).pop() || "";
         if (!outDir) throw new Error("no output dir from buck2 build for staged webapp");
         const outPath = path.isAbsolute(outDir) ? outDir : path.join(tmp, outDir);
-        const stagedWasm = path.join(outPath, "top.wasm");
+        const stagedWasm = path.join(outPath, "tinygo.wasm");
         const stat = await fs.stat(stagedWasm);
-        assert.ok(stat.size > 0, "expected staged top.wasm to be non-empty");
+        assert.ok(stat.size > 0, "expected staged tinygo.wasm to be non-empty");
       });
     } finally {
       if (prevRoots === undefined) delete process.env.TEST_RSYNC_ROOTS;

@@ -49,6 +49,8 @@ Dependency chain:
 3. PR-3 migrates `ts/webapp-static` and `ts/webapp-ssr-vite` to the new contracts.
 4. PR-4 migrates `ts/webapp-ssr-next` and locks cross-template parity.
 5. PR-5 locks the final matrix and removes remaining hardcoded path expectations.
+6. PR-6 introduces producer-surface contracts and root-set module discovery plumbing.
+7. PR-7 finalizes zero-edit module growth, watcher efficiency, and zero-wasm default lock-in across templates.
 
 Phase 5 checkpoints:
 
@@ -56,7 +58,9 @@ Phase 5 checkpoints:
 - Checkpoint B: `READY` for PR-3 when PR-2 multi-module orchestration and generated-contract tests are green.
 - Checkpoint C: `READY` for PR-4 when PR-3 static+SSR-vite migrations are green.
 - Checkpoint D: `READY` for PR-5 when PR-4 SSR-next migration and parity checks are green.
-- Checkpoint E: `COMPLETED` for Phase 5 when PR-5 full matrix tests and docs are green.
+- Checkpoint E: `READY` for PR-6 when PR-5 full matrix and hardcoded-path policy checks are green.
+- Checkpoint F: `READY` for PR-7 when PR-6 producer-surface contracts and root-set discovery tests/docs are green.
+- Checkpoint G: `COMPLETED` for Phase 5 when PR-7 zero-edit growth + zero-wasm default matrix, tests, and docs are green.
 
 ### Phase 5 contract update (effective from PR-2 onward)
 
@@ -493,6 +497,9 @@ I will close Phase 5 by removing remaining single-module hardcoding and locking 
 - `buck2 test //:scaffolding_webapp_multi_module_contract_path_resolver_contract`
 - `buck2 test //:scaffolding_webapp_multi_module_no_source_manifest_dependency_contract`
 - `buck2 test //:scaffolding_webapp_multi_template_parity_contract`
+- `buck2 test //:scaffolding_webapp_phase5_final_goal_validation_contract`
+- `buck2 test //:scaffolding_webapp_phase5_final_goal_validation_static_contract`
+- `buck2 test //:scaffolding_webapp_phase5_final_goal_validation_ssr_next_contract`
 - `buck2 test //:scaffolding_template_conventions_metadata_cquery`
 - `buck2 test //:scaffolding_ts_command_path_docs_contract`
 
@@ -526,6 +533,510 @@ Closeout PR has broad verification scope and can take longer to stabilize.
 ### Recommendation
 
 Implement fifth and treat this PR as Phase 5 closeout gate.
+
+---
+
+## PR-6: Producer-surface contracts + root-set discovery plumbing
+
+### Description
+
+I will introduce one deterministic producer-surface contract that language macros can export, then wire webapp module-contract generation to consume those surfaces so app/importer developers do not need per-file `TARGETS` edits as module files grow.
+
+### Scope & Changes
+
+- Define one macro-level producer surface contract for modules:
+  - producer surfaces declare language-owned source roots and runtime artifact mapping hints
+  - consumers (webapp scaffolding/dev/build) do not infer module paths ad hoc
+  - contract is generated-authoritative and deterministic
+- Add one shared provider symbol in PR-6:
+  - `ModuleSurfaceInfo` (new, additive) exported by producer macros/targets
+  - includes deterministic fields for module kind, declared source roots, runtime mapping policy, and watch hints
+- Add root-set declarations (not per-file declarations) for module growth:
+  - app/dependency `TARGETS` declare root sets once
+  - module files under declared roots are discovered automatically
+  - no per-module `TARGETS` edit required after root-set declaration
+- Keep naming language-specific at macro boundaries:
+  - language macros expose attrs that match language conventions
+  - shared contract normalization happens internally in dev/build tooling
+- Keep generated-only runtime authority:
+  - runtime helpers read generated contracts from canonical path only
+  - no source-manifest fallback behavior
+- Add deterministic module-key derivation and collision policy:
+  - module key derives from normalized path relative to declared root set
+  - duplicate keys fail fast with stable diagnostics
+  - ordering is stable and test-locked
+- Add ergonomic dependency label normalization for surface deps (Node staging boundary):
+  - keep `module_surface_deps` for explicit surface target labels
+  - add optional `module_deps` shorthand for producer targets (for example `//pkg` or `//pkg:target`)
+  - when `module_deps` entry omits `:target`, normalize to Buck-style default target (`//pkg:<pkg-basename>`)
+  - infer surface label as `<normalized-target> + "__surface"` and fail fast when missing
+  - conventional surfaces use `__surface`; non-standard producers remain supported via explicit `module_surface_deps`
+
+### Execution Plan (within PR-6)
+
+- Implement in two internal milestones (single PR, one merge gate):
+  - Milestone A: `ModuleSurfaceInfo` provider + producer macro export plumbing across existing wasm/ts macro families.
+  - Milestone B: `node_asset_stage` ergonomics (`module_deps` normalization/inference), deterministic diagnostics, docs/tests lock-in.
+- Add an internal readiness checkpoint between Milestone A and B:
+  - proceed to Milestone B only after provider parity and root-set discovery tests are stable.
+- Split PR-6 further only if stabilization risk appears:
+  - macro/provider plumbing expands beyond expected touch map,
+  - label normalization/inference logic grows non-trivial edge-case handling,
+  - deterministic diagnostics or cross-language parity tests become unstable.
+
+Starlark contract sketch (shape only, additive in PR-6):
+
+```python
+# language macro family exports one producer surface provider
+ModuleSurfaceInfo = provider(fields = [
+    "module_kind",                # "ts" | "wasm"
+    "source_roots",               # list of declared roots (repo-relative)
+    "artifact_mapping_policy",    # deterministic runtime dest mapping policy id
+    "watch_hints",                # source roots/watch hints for incremental dev loops
+])
+
+def _module_surface_impl(ctx):
+    return [
+        DefaultInfo(),
+        ModuleSurfaceInfo(
+            module_kind = ctx.attrs.module_kind,
+            source_roots = ctx.attrs.source_roots,
+            artifact_mapping_policy = ctx.attrs.artifact_mapping_policy,
+            watch_hints = ctx.attrs.watch_hints,
+        ),
+    ]
+module_surface = rule(
+    impl = _module_surface_impl,
+    attrs = {
+        "module_kind": attrs.string(),
+        "source_roots": attrs.list(attrs.string()),
+        "artifact_mapping_policy": attrs.string(),
+        "watch_hints": attrs.list(attrs.string()),
+    },
+)
+
+load("//build-tools/go:defs.bzl", _base_nix_go_tiny_wasm_lib = "nix_go_tiny_wasm_lib")
+
+def nix_go_tiny_wasm_lib(name, srcs = [], go_source_roots = ["."], **kwargs):
+    # existing symbol retained; PR-6 adds optional metadata companion target
+    _base_nix_go_tiny_wasm_lib(name = name, srcs = srcs, **kwargs)
+    module_surface(
+        name = name + "__surface",
+        module_kind = "wasm",
+        source_roots = go_source_roots,
+        artifact_mapping_policy = "go-tiny-wasm-v1",
+        watch_hints = go_source_roots,
+        visibility = ["//visibility:public"],
+    )
+```
+
+Generated-contract normalization sketch:
+
+```ts
+type NormalizedSurface = {
+  moduleKind: "ts" | "wasm";
+  sourceRoots: string[];
+  watchHints: string[];
+  mappingPolicy: string;
+};
+
+// Consume provider data from graph/planner export, not ad hoc path probing.
+const surfaces: NormalizedSurface[] = readProducerSurfacesFromGraph(node);
+```
+
+Implementation-oriented pseudo-code sketches by existing macro family:
+
+Notes:
+
+1. These sketches show an additive forwarding pattern. They are not copy-paste into current files without corresponding load/rename refactors.
+2. Existing public macro names remain stable. New behavior is additive through companion `__surface` targets and new optional attrs.
+
+```python
+# build-tools/go/defs.bzl forwarding pattern (existing symbol retained)
+load("//build-tools/go:defs.bzl", _base_nix_go_tiny_wasm_lib = "nix_go_tiny_wasm_lib")
+
+def nix_go_tiny_wasm_lib(name, srcs = [], go_source_roots = ["."], **kwargs):
+    _base_nix_go_tiny_wasm_lib(name = name, srcs = srcs, **kwargs)
+    module_surface(
+        name = name + "__surface",
+        module_kind = "wasm",
+        source_roots = go_source_roots,
+        artifact_mapping_policy = "go-tiny-wasm-v1",
+        watch_hints = go_source_roots,
+        visibility = ["//visibility:public"],
+    )
+```
+
+```python
+# build-tools/cpp/wasm_defs.bzl forwarding pattern (existing symbol retained)
+load("//build-tools/cpp:wasm_defs.bzl", _base_nix_cpp_wasm_static_lib = "nix_cpp_wasm_static_lib")
+
+def nix_cpp_wasm_static_lib(name, srcs = [], cpp_source_roots = ["."], **kwargs):
+    _base_nix_cpp_wasm_static_lib(name = name, srcs = srcs, **kwargs)
+    module_surface(
+        name = name + "__surface",
+        module_kind = "wasm",
+        source_roots = cpp_source_roots,
+        artifact_mapping_policy = "cpp-static-wasm-v1",
+        watch_hints = cpp_source_roots,
+        visibility = ["//visibility:public"],
+    )
+```
+
+```python
+# build-tools/python/defs_wasm.bzl forwarding pattern (existing symbols retained)
+load("//build-tools/python:defs_wasm.bzl", _base_nix_python_wasm_app = "nix_python_wasm_app", _base_nix_python_wasm_lib = "nix_python_wasm_lib")
+
+def nix_python_wasm_app(name, srcs = [], python_source_roots = ["."], **kwargs):
+    _base_nix_python_wasm_app(name = name, srcs = srcs, **kwargs)
+    module_surface(
+        name = name + "__surface",
+        module_kind = "wasm",
+        source_roots = python_source_roots,
+        artifact_mapping_policy = "python-wasm-app-v1",
+        watch_hints = python_source_roots,
+        visibility = ["//visibility:public"],
+    )
+
+def nix_python_wasm_lib(name, srcs = [], python_source_roots = ["."], **kwargs):
+    _base_nix_python_wasm_lib(name = name, srcs = srcs, **kwargs)
+    module_surface(
+        name = name + "__surface",
+        module_kind = "wasm",
+        source_roots = python_source_roots,
+        artifact_mapping_policy = "python-wasm-lib-v1",
+        watch_hints = python_source_roots,
+        visibility = ["//visibility:public"],
+    )
+```
+
+```python
+# build-tools/node/defs.bzl / defs_stage.bzl forwarding pattern (existing symbols retained)
+load("//build-tools/node:defs.bzl", _base_node_webapp = "node_webapp")
+load("//build-tools/node:defs.bzl", _base_node_asset_stage = "node_asset_stage")
+load("//build-tools/node:defs.bzl", _base_nix_node_lib = "nix_node_lib")
+
+def node_webapp(name, ts_module_roots = ["src"], **kwargs):
+    _base_node_webapp(name = name, **kwargs)
+    module_surface(
+        name = name + "__ts_surface",
+        module_kind = "ts",
+        source_roots = ts_module_roots,
+        artifact_mapping_policy = "node-ts-v1",
+        watch_hints = ts_module_roots,
+        visibility = ["//visibility:public"],
+    )
+
+def node_asset_stage(
+        name,
+        app,
+        assets = [],
+        wasm_module_roots = [],
+        module_deps = [],
+        module_surface_deps = [],
+        **kwargs):
+    kw = dict(kwargs)
+    base_deps = kw.pop("deps", []) or []
+    inferred_surface_deps = infer_surface_labels_from_module_deps(module_deps)
+    all_surface_deps = dedupe_labels(inferred_surface_deps + module_surface_deps)
+    _base_node_asset_stage(
+        name = name,
+        app = app,
+        assets = assets,
+        deps = base_deps + all_surface_deps,
+        **kw
+    )
+    if len(wasm_module_roots) > 0:
+        module_surface(
+            name = name + "__wasm_surface",
+            module_kind = "wasm",
+            source_roots = wasm_module_roots,
+            artifact_mapping_policy = "node-wasm-stage-v1",
+            watch_hints = wasm_module_roots,
+            visibility = ["//visibility:public"],
+        )
+```
+
+```python
+# dependency-owned TS surface (existing symbol retained)
+def nix_node_lib(name, ts_module_roots = ["src"], **kwargs):
+    _base_nix_node_lib(name = name, **kwargs)
+    module_surface(
+        name = name + "__surface",
+        module_kind = "ts",
+        source_roots = ts_module_roots,
+        artifact_mapping_policy = "node-ts-lib-v1",
+        watch_hints = ts_module_roots,
+        visibility = ["//visibility:public"],
+    )
+```
+
+```python
+# label normalization/inference sketch for node_asset_stage ergonomics
+def _normalize_module_dep_label(dep):
+    # :local -> //current/package:local
+    if dep.startswith(":"):
+        return "//%s:%s" % (native.package_name(), dep[1:])
+    # //pkg -> //pkg:<pkg-basename>
+    if dep.startswith("//") and ":" not in dep:
+        pkg = dep[2:]
+        pkg_base = pkg.split("/")[-1]
+        return "%s:%s" % (dep, pkg_base)
+    # //pkg:target stays as-is
+    return dep
+
+def _surface_label_for_module_dep(dep):
+    normalized = _normalize_module_dep_label(dep)
+    pkg, target = split_abs_label(normalized)  # helper: returns ("projects/libs/x", "foo")
+    return "//%s:%s__surface" % (pkg, target)
+```
+
+```python
+# app TARGETS (importer consumes existing symbols + additive attrs)
+node_webapp(
+    name = "app_raw",
+    ts_module_roots = ["src/ts-modules"],
+)
+
+node_asset_stage(
+    name = "app",
+    app = ":app_raw",
+    assets = [],
+    wasm_module_roots = ["src/wasm-producer"],
+    module_deps = [
+        "//projects/libs/math-wasm",         # normalized to :math-wasm -> :math-wasm__surface
+        "//projects/libs/vision-wasm:wasm",  # explicit producer target -> :wasm__surface
+    ],
+    module_surface_deps = [
+        "//projects/libs/special:runtime_surface_override",  # explicit non-standard override
+        "//projects/libs/demo-lib:demo_lib__surface",
+    ],
+    out = "dist",
+)
+```
+
+Additive attribute map (introduced in PR-6):
+
+| Macro | New attr | Meaning |
+| --- | --- | --- |
+| `node_webapp` | `ts_module_roots` | App-local TS source roots for surface export |
+| `node_asset_stage` | `wasm_module_roots` | App-local wasm producer source roots for surface export |
+| `node_asset_stage` | `module_deps` | Ergonomic producer deps (`//pkg` or `//pkg:target`) inferred to `__surface` |
+| `node_asset_stage` | `module_surface_deps` | Explicit dependency surface targets consumed for discovery/watch |
+| `nix_go_tiny_wasm_lib` | `go_source_roots` | Go-owned source roots used for wasm module surface |
+| `nix_cpp_wasm_static_lib` | `cpp_source_roots` | C++-owned source roots used for wasm module surface |
+| `nix_python_wasm_app` | `python_source_roots` | Python-owned source roots used for wasm module surface |
+| `nix_python_wasm_lib` | `python_source_roots` | Python-owned source roots used for wasm module surface |
+| `nix_node_lib` | `ts_module_roots` | Dependency-owned TS source roots used for TS surface |
+
+### Tests (in this PR)
+
+- Add producer-surface contract tests:
+  - provider fields are present and deterministic for supported macro families
+  - python wasm app/lib macro families both publish the same provider shape
+  - contract export shape is stable across static, SSR Vite, SSR Next fixture apps
+  - source-root declarations are consumed by generator without per-file `TARGETS` wiring
+- Add root-set discovery unit/integration tests:
+  - recursive discovery under declared roots picks up new files automatically
+  - module-key derivation is deterministic and collision-safe
+  - unchanged files do not trigger manifest rewrites
+- Add dependency-label ergonomics tests:
+  - `module_deps = ["//pkg"]` normalizes to Buck-style default target and infers `//pkg:<pkg-basename>__surface`
+  - `module_deps = ["//pkg:custom"]` infers `//pkg:custom__surface`
+  - missing inferred surface fails with deterministic diagnostic that prints normalized and inferred labels
+  - explicit `module_surface_deps` supports non-standard surface labels
+- Add generated-authority tests:
+  - runtime helper reads fail when generated contracts are missing/invalid
+  - source-only manifest presence does not satisfy runtime helper contract
+
+### Docs (in this PR)
+
+- Document producer-surface contract fields and ownership boundaries.
+- Document root-set declaration model and no-per-file-edit growth policy.
+- Document deterministic key-derivation and collision behavior.
+- Document `module_deps` shorthand normalization and explicit override path via `module_surface_deps`.
+
+### Verification Commands
+
+- `buck2 test //:scaffolding_webapp_multi_module_contract_path_resolver_contract`
+- `buck2 test //:scaffolding_webapp_multi_module_generated_manifest_contract`
+- `buck2 test //:scaffolding_webapp_multi_module_no_source_manifest_dependency_contract`
+- `buck2 test //:scaffolding_webapp_producer_surface_contract`
+- `buck2 test //:scaffolding_webapp_root_set_discovery_contract`
+- `buck2 test //:scaffolding_webapp_module_dep_label_normalization_contract`
+- `buck2 test //:scaffolding_webapp_macro_api_parity_contract`
+- `buck2 test //:scaffolding_template_conventions_metadata_cquery`
+- `buck2 test //:scaffolding_ts_command_path_docs_contract`
+
+### Acceptance Criteria
+
+- Producer surfaces are exported by language macros and consumed by generator tooling.
+- Root-set declarations eliminate per-file `TARGETS` edits for module additions.
+- Runtime helper contract is generated-only with deterministic failure signatures.
+- Docs and tests lock the producer-surface + root-set model in the same PR.
+- Existing wasm macro families (Go/C++/Python/Node) expose `ModuleSurfaceInfo` without breaking current callsites.
+- `module_deps` shorthand supports colon-optional labels while preserving explicit `module_surface_deps` overrides.
+
+### Risks
+
+Provider/export contract drift between macros and generator can break discovery in subtle ways.
+
+### Mitigation
+
+Lock provider fields with dedicated contract tests and keep one normalization path in shared tooling.
+
+### Consequence of Not Implementing
+
+Module discovery remains ad hoc, per-file wiring pressure persists, and scaling to multi-language producers stays fragile.
+
+### Downsides for Implementing
+
+Adds a new contract surface between macros and tooling that must be maintained with strict parity tests.
+
+### Recommendation
+
+Implement sixth to establish deterministic producer-surface plumbing before final zero-edit growth lock-in.
+
+---
+
+## PR-7: Zero-edit module growth + efficient watch invalidation + zero-wasm default lock-in
+
+### Description
+
+I will finalize the developer experience so new TS/wasm files under declared canonical roots are picked up automatically (app-owned and dependency-owned), watched for HMR updates, and staged without importer/app per-file edits.
+
+### Scope & Changes
+
+- Finalize zero-edit growth behavior:
+  - adding a new module file under declared canonical roots requires no app/importer `TARGETS` edits
+  - dependency packages do not manage module index files
+  - importer runtime wiring remains unchanged
+- Finalize dependency wiring ergonomics for importer callsites:
+  - allow `module_deps` short labels (`//pkg` and `//pkg:target`) in `node_asset_stage`
+  - infer `__surface` labels from normalized producer labels
+  - keep `module_surface_deps` for explicit non-standard surface targets
+- Support app-owned and dependency-owned module updates in one session:
+  - watcher subscribes to normalized source roots + watch hints from producer surfaces
+  - module updates remain module-scoped with deterministic queue behavior
+  - no process restart for in-scope edit loops
+- Lock zero-wasm defaults across templates:
+  - newly scaffolded webapps can run with no wasm modules declared
+  - watcher path behaves as no-op when wasm set is empty
+  - packaging paths remain valid for zero or many wasm modules
+- Keep path consistency without forcing redundant directory layers:
+  - runtime-relative module destinations use one contract shape (`wasm/<module>.wasm`)
+  - template build roots map consistently by framework packaging needs
+
+App/developer-facing snippet (no per-file additions after roots are declared).
+Uses existing symbols with additive attrs introduced in PR-6:
+
+```python
+node_webapp(
+    name = "app_raw",
+    # new optional attr in PR-6; existing symbol retained
+    ts_module_roots = ["src/ts-modules"],
+)
+
+node_asset_stage(
+    name = "app",
+    app = ":app_raw",
+    # existing path still supported
+    assets = [],
+    # new optional attrs in PR-6; existing symbol retained
+    wasm_module_roots = ["src/wasm-producer"],
+    module_deps = [
+        "//projects/libs/math-wasm",
+        "//projects/libs/feature-wasm:wasm",
+    ],
+    module_surface_deps = [
+        "//projects/vendor/nonstandard:runtime_surface_v2",
+        "//projects/libs/demo-lib:demo_lib__surface",
+    ],
+    out = "dist",
+)
+```
+
+Source growth snippet:
+
+```text
+# no TARGETS edit needed
+src/ts-modules/new_feature.ts
+src/wasm-producer/image_filter.cpp
+```
+
+### Tests (in this PR)
+
+- Add zero-edit growth E2E tests:
+  - add new TS file under declared root, assert contract + runtime pickup with no `TARGETS` edit
+  - add new wasm source file under declared root, assert contract + staged runtime pickup with no `TARGETS` edit
+  - run mixed app-owned + dependency-owned updates in one session
+- Add dependency-declaration ergonomics tests:
+  - `module_deps = ["//pkg"]` resolves to default target and inferred `__surface`
+  - explicit `:target` in `module_deps` resolves to matching `:target__surface`
+  - explicit `module_surface_deps` entries permit non-standard surface target names
+- Add watch/invalidation efficiency tests:
+  - unchanged files do not trigger rebuild/sync events
+  - unrelated files outside declared roots do not trigger rebuild/sync
+  - touching non-module files (for example `README.md`) keeps generated manifest contents and mtime unchanged
+  - only changed module keys emit `[wasm-watch] rebuild:start` markers
+  - queue fairness and module-scoped markers remain deterministic
+- Add zero-wasm default E2E tests for static, SSR Vite, SSR Next:
+  - scaffold -> install -> dev/build paths are green with empty wasm set
+  - add first wasm module from zero baseline without app/importer wiring changes
+
+### Docs (in this PR)
+
+- Document canonical root conventions per template family.
+- Document zero-edit growth workflow for app-owned and dependency-owned modules.
+- Document watch/invalidation behavior and diagnostics for ignored vs in-scope file changes.
+- Document when to use `module_deps` (default ergonomics) vs `module_surface_deps` (explicit override).
+
+### Verification Commands
+
+- `buck2 test //:scaffolding_webapp_zero_wasm_default_static_contract`
+- `buck2 test //:scaffolding_webapp_zero_wasm_default_ssr_vite_contract`
+- `buck2 test //:scaffolding_webapp_zero_wasm_default_ssr_next_contract`
+- `buck2 test //:scaffolding_webapp_zero_wasm_to_multi_wasm_growth_contract`
+- `buck2 test //:scaffolding_webapp_multi_module_orchestrator_contract`
+- `buck2 test //:scaffolding_webapp_multi_module_concurrency_contract`
+- `buck2 test //:scaffolding_webapp_module_surface_dependency_growth_contract`
+- `buck2 test //:scaffolding_webapp_phase5_final_goal_validation_contract`
+- `buck2 test //:scaffolding_webapp_phase5_final_goal_validation_static_contract`
+- `buck2 test //:scaffolding_webapp_phase5_final_goal_validation_ssr_next_contract`
+- `buck2 test //:scaffolding_webapp_module_dep_label_normalization_contract`
+- `buck2 test //:scaffolding_template_conventions_metadata_cquery`
+- `buck2 test //:scaffolding_ts_command_path_docs_contract`
+
+### Acceptance Criteria
+
+- App/importer developers do not edit per-file wiring when adding modules under declared canonical roots.
+- Dependency developers do not maintain module index artifacts.
+- App-owned and dependency-owned module updates are watched and applied in one running dev session.
+- Zero-wasm default behavior is stable across static, SSR Vite, and SSR Next templates.
+- Invalidation behavior is efficient and deterministic for in-scope changes only.
+- Non-module edits outside declared roots do not rewrite module contracts.
+- Module watch logs are key-scoped and only report changed keys.
+- Importer deps can use `module_deps` with or without `:target`; explicit `module_surface_deps` remains available for custom/non-standard surfaces.
+
+### Risks
+
+Broad file discovery can cause noisy invalidation if root scoping and ignore policies are not strict.
+
+### Mitigation
+
+Use declared canonical roots only, stable extension filters, and explicit ignore sets with contract tests.
+
+### Consequence of Not Implementing
+
+Developers keep paying per-file wiring cost, and zero-wasm default behavior remains partial or brittle.
+
+### Downsides for Implementing
+
+Requires coordinated updates across watcher, generator, template wiring, and packaging logic.
+
+### Recommendation
+
+Implement seventh as the final Phase 5 DX and performance lock so growth is zero-edit and runtime behavior remains deterministic.
 
 ---
 
@@ -651,6 +1162,53 @@ Expected new/updated target families:
 Out-of-bounds by default:
 
 - new architecture directions not required by Phase 5 acceptance criteria
+
+### PR-6 default touch map (producer surfaces + root-set discovery)
+
+Expected focus areas:
+
+- language-macro provider/export paths that publish module surface contract fields
+- graph/export/generator modules that normalize producer surfaces into module contracts
+- deterministic root-set file discovery and key-derivation modules
+- runtime helper read paths that enforce generated-only contract authority
+- docs for producer-surface ownership and root-set discovery semantics
+- additive macro API extensions on existing symbols:
+  - `node_webapp` (`ts_module_roots`)
+  - `node_asset_stage` (`wasm_module_roots`, `module_deps`, `module_surface_deps`)
+  - wasm producer macros (`go_source_roots` / `cpp_source_roots` / `python_source_roots` metadata emission)
+
+Expected new/updated target families:
+
+- producer-surface contract target(s)
+- root-set discovery contract target(s)
+- generated-authority contract target(s)
+
+Out-of-bounds by default:
+
+- unrelated template runtime migrations not needed for producer-surface plumbing
+- non-deterministic discovery paths that bypass declared root sets
+
+### PR-7 default touch map (zero-edit growth + zero-wasm default lock-in)
+
+Expected focus areas:
+
+- watcher/orchestrator paths that consume normalized root sets and module surfaces
+- static, SSR Vite, and SSR Next template wiring for zero-wasm defaults
+- packaging/staging logic for zero-or-many wasm modules with consistent runtime-relative destinations
+- E2E contract tests for zero-edit module growth and efficient invalidation
+- docs for canonical roots, growth workflow, and watch diagnostics
+
+Expected new/updated target families:
+
+- zero-wasm default contract target(s)
+- zero-to-multi growth contract target(s)
+- watch/invalidation efficiency contract target(s)
+- final goal-validation matrix target(s) for zero-edit growth
+
+Out-of-bounds by default:
+
+- new provider/schema directions outside PR-6 contract
+- convenience behavior that reintroduces per-file app/importer wiring
 
 ### Definition of "easy module addition" (harness-level)
 

@@ -15,12 +15,15 @@ type WasmModuleManifest = {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function manifestCandidates(fileName: string): string[] {
+  const out = [path.resolve(__dirname, fileName)];
+  const contractsDir = String(process.env.MODULE_CONTRACTS_DIR || "").trim();
+  if (contractsDir) out.push(path.resolve(contractsDir, fileName));
+  return out;
+}
+
 function readManifestJson(): WasmModuleManifest {
-  const candidates = [
-    path.resolve(__dirname, "wasm-modules.manifest.json"),
-    path.resolve(__dirname, "../app/wasm-modules.manifest.json"),
-    path.resolve(__dirname, "../../app/wasm-modules.manifest.json"),
-  ];
+  const candidates = manifestCandidates("wasm-modules.manifest.json");
   for (const p of candidates) {
     try {
       const text = readFileSync(p, "utf8");
@@ -77,7 +80,9 @@ export async function readServerWasmModuleByteLength(moduleKey: string): Promise
     } catch {}
   }
   if (!bytes) {
-    throw new Error(`server wasm contract asset is missing for module '${moduleKey}'`);
+    throw new Error(
+      `server wasm contract asset is missing from expected runtime paths (module '${moduleKey}')`,
+    );
   }
   return bytes.byteLength;
 }

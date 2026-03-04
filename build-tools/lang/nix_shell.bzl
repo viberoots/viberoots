@@ -144,7 +144,7 @@ def nix_calling_genrule_bootstrap(
     """
     pre = ""
     if source_workspace_root_env:
-        pre = pre + ". build-tools/tools/buck/workspace-root.env 2>/dev/null || true; "
+        pre = pre + "if [ -f build-tools/tools/buck/workspace-root.env ]; then . build-tools/tools/buck/workspace-root.env 2>/dev/null || true; fi; "
     pre = pre + "if [ -n \"${WORKSPACE_ROOT:-}\" ]; then export REPO_ROOT=\"$WORKSPACE_ROOT\"; fi; "
     if skip_require_unified_pnpm_store:
         pre = pre + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "

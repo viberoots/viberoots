@@ -14,6 +14,7 @@ import { runGoModTidyForMissingSum } from "./go-tidy.ts";
 import { runGlue } from "./glue.ts";
 import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix.ts";
 import { withExclusiveInstallLock } from "./lock.ts";
+import { syncModuleContractsForWebapps } from "./module-contracts.ts";
 import { runUvRefreshAll } from "./uv.ts";
 import { ensureToolchainPathsFiles } from "../toolchain-paths.ts";
 import { discoverImportersWithLock, sharedUnifiedStorePath } from "./importers.ts";
@@ -84,6 +85,8 @@ if (glueOnly) {
   } else if (verbose) {
     console.log("[skip] glue regeneration");
   }
+  const glueOnlyImporters = await discoverImportersWithLock(repoRoot);
+  await syncModuleContractsForWebapps(repoRoot, glueOnlyImporters, dryRun, verbose);
   console.log("Glue refreshed.");
   process.exit(0);
 }
@@ -174,6 +177,7 @@ if (!skipGlue) {
 } else if (verbose) {
   console.log("[skip] glue regeneration");
 }
+await syncModuleContractsForWebapps(repoRoot, importers, dryRun, verbose);
 if (!skipGlue) {
   await warnNodeDepsInLocal(repoRoot);
   await warnNodePatchRequirementsInLocal(repoRoot);

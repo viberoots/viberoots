@@ -43,7 +43,7 @@ test("Phase-5 PR-4 parity: ts/wasm module-key helpers align across static, SSR v
   }
   assert.match(nextAppWasm, /runtimeDestinations\.client/);
 
-  assert.match(viteServerWasm, /defaultModuleCandidates/);
+  assert.match(viteServerWasm, /export async function readServerWasmModuleByteLength/);
   assert.match(viteServerWasm, /runtimeDestinations\.server/);
   assert.match(nextServerWasm, /export function listWasmModules\(\): string\[]/);
   assert.match(nextServerWasm, /export function defaultWasmModuleKey\(\): string/);
@@ -53,6 +53,8 @@ test("Phase-5 PR-4 parity: ts/wasm module-key helpers align across static, SSR v
     assert.match(src, /export function listTsModules\(\): string\[]/);
     assert.match(src, /export function defaultTsModuleKey\(\): string/);
     assert.match(src, /const entry = manifest\.modules\.find/);
+    assert.match(src, /MODULE_CONTRACTS_DIR/);
+    assert.match(src, /toRuntimeImportSpecifier/);
   }
 
   assert.match(nextBuildScript, /for \(const entry of wasmManifest\.modules \|\| \[\]\)/);

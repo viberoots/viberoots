@@ -103,8 +103,13 @@ test(
       );
       assert.match(appWasmHelper, /runtimeDestinations\.client/);
       assert.match(serverWasmHelper, /readServerWasmModuleByteLength/);
+      assert.match(serverWasmHelper, /MODULE_CONTRACTS_DIR/);
+      assert.doesNotMatch(serverWasmHelper, /\.\.\/app\/wasm-modules\.manifest\.json/);
       assert.match(serverTsHelper, /const entry = manifest\.modules\.find/);
+      assert.match(serverTsHelper, /MODULE_CONTRACTS_DIR/);
+      assert.doesNotMatch(serverTsHelper, /\.\.\/app\/ts-modules\.manifest\.json/);
       assert.match(buildSsrScript, /for \(const entry of wasmManifest\.modules \|\| \[\]\)/);
+      assert.match(buildSsrScript, /sync-module-contracts\.ts --cwd \. --print-json 1/);
 
       const logs: string[] = [];
       const watcher = spawn(
@@ -113,6 +118,10 @@ test(
           "../../../build-tools/tools/dev/watch-wasm-producer.ts",
           "--cwd",
           appAbs,
+          "--wasm-manifest",
+          resolved.wasmManifestPath,
+          "--ts-manifest",
+          resolved.tsManifestPath,
           "--poll-ms",
           "120",
         ],

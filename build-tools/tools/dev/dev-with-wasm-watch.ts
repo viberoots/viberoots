@@ -3,6 +3,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { getFlagStr } from "../lib/cli.ts";
+import { syncModuleContractsForApp } from "./sync-module-contracts-core.ts";
 
 function ensurePublicTopWasmSymlink(cwd: string): void {
   const publicDir = path.join(cwd, "public");
@@ -21,10 +22,15 @@ function required(name: string, value: string): string {
   return v;
 }
 
-function spawnShell(name: string, command: string, cwd: string): ChildProcess {
+function spawnShell(
+  name: string,
+  command: string,
+  cwd: string,
+  envOverrides: Record<string, string>,
+): ChildProcess {
   const child = spawn("/bin/bash", ["--noprofile", "--norc", "-lc", command], {
     cwd,
-    env: process.env,
+    env: { ...process.env, ...envOverrides },
     stdio: "pipe",
     detached: true,
   });
@@ -42,12 +48,23 @@ function killGroup(child: ChildProcess, signal: NodeJS.Signals): void {
 
 async function main() {
   const cwd = path.resolve(getFlagStr("cwd", process.cwd()) || process.cwd());
+  const appTargetLabel = getFlagStr("app-target", "");
   const viteCmd = required("vite-cmd", getFlagStr("vite-cmd", ""));
   const watchCmd = required("watch-cmd", getFlagStr("watch-cmd", ""));
   if (getFlagStr("ensure-public-top-wasm", "")) ensurePublicTopWasmSymlink(cwd);
+  const synced = await syncModuleContractsForApp({
+    appCwd: cwd,
+    appTargetLabel: appTargetLabel || undefined,
+  });
+  const childEnv = {
+    MODULE_CONTRACTS_DIR: synced.contractsDir,
+  };
+  console.error(
+    `[dev-wasm] contracts:ready app_target=${synced.appTargetLabel} app_id=${synced.appId} dir=${synced.contractsDir}`,
+  );
 
-  const vite = spawnShell("vite", viteCmd, cwd);
-  const watch = spawnShell("wasm-watch", watchCmd, cwd);
+  const vite = spawnShell("vite", viteCmd, cwd, childEnv);
+  const watch = spawnShell("wasm-watch", watchCmd, cwd, childEnv);
   let stopping = false;
   let sawFailure = false;
 

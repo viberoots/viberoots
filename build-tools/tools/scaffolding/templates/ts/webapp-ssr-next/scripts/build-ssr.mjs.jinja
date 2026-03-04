@@ -2,12 +2,26 @@ import { execSync } from "node:child_process";
 import { cpSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+const contractsPaths = JSON.parse(
+  execSync("zx-wrapper ../../../build-tools/tools/dev/sync-module-contracts.ts --cwd . --print-json 1", {
+    encoding: "utf8",
+  }),
+);
+const wasmManifestPath = String(contractsPaths.wasmManifestPath || "").trim();
+const tsManifestPath = String(contractsPaths.tsManifestPath || "").trim();
+if (!wasmManifestPath || !tsManifestPath) {
+  throw new Error("module contracts sync did not return wasm/ts manifest paths");
+}
+
+cpSync(wasmManifestPath, "app/wasm-modules.manifest.json");
+cpSync(tsManifestPath, "app/ts-modules.manifest.json");
+
 execSync("next build", { stdio: "inherit" });
 execSync("tsc -p tsconfig.server.json", { stdio: "inherit" });
 
 mkdirSync("dist/server/wasm-contract", { recursive: true });
 
-const wasmManifest = JSON.parse(readFileSync("app/wasm-modules.manifest.json", "utf8"));
+const wasmManifest = JSON.parse(readFileSync(wasmManifestPath, "utf8"));
 for (const entry of wasmManifest.modules || []) {
   const sourcePath = String(entry.sourcePath || "");
   const serverDest = String(entry.runtimeDestinations?.server || "");
@@ -17,5 +31,5 @@ for (const entry of wasmManifest.modules || []) {
   cpSync(sourcePath, outAbs);
 }
 
-cpSync("app/wasm-modules.manifest.json", "dist/server/wasm-modules.manifest.json");
-cpSync("app/ts-modules.manifest.json", "dist/server/ts-modules.manifest.json");
+cpSync(wasmManifestPath, "dist/server/wasm-modules.manifest.json");
+cpSync(tsManifestPath, "dist/server/ts-modules.manifest.json");

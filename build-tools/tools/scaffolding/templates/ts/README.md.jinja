@@ -13,8 +13,9 @@ Local workspace TypeScript dependencies update in the same dev session when they
 
 Generated module manifests and loaders:
 
-- `src/wasm-modules.manifest.json` + `src/wasm-contract.ts`
-- `src/ts-modules.manifest.json` + `src/ts-modules.ts`
+- generated contracts in `buck-out/tmp/module-contracts/<app-id>/`
+- mirrored runtime manifests in `src/` for local tooling compatibility
+- loader surfaces in `src/wasm-contract.ts` and `src/ts-modules.ts`
 - consume through module-key APIs: `listWasmModules()`, `readWasmModuleBytes(moduleKey)`, `listTsModules()`, and `loadTsModule(moduleKey)`
 
 Wasm producer bridge loop (watch producer source -> rebuild -> sync into app path):
@@ -59,8 +60,9 @@ Local workspace TypeScript dependencies update in the same dev session when they
 
 Generated module manifests and loaders:
 
-- `app/wasm-modules.manifest.json` + `app/wasm-contract.ts`
-- `app/ts-modules.manifest.json` + `app/ts-modules.ts`
+- generated contracts in `buck-out/tmp/module-contracts/<app-id>/`
+- mirrored runtime manifests in `app/` for local tooling compatibility
+- loader surfaces in `app/wasm-contract.ts` and `app/ts-modules.ts`
 - server parity helpers: `server/wasm-contract.ts` and `server/ts-modules.ts`
 - consume through module-key APIs only
 
@@ -117,8 +119,9 @@ Local workspace TypeScript dependencies update in the same dev session when they
 
 Generated module manifests and loaders:
 
-- `src/wasm-modules.manifest.json` + `src/wasm-contract.ts`
-- `src/ts-modules.manifest.json` + `src/ts-modules.ts`
+- generated contracts in `buck-out/tmp/module-contracts/<app-id>/`
+- mirrored runtime manifests in `src/` for local tooling compatibility
+- loader surfaces in `src/wasm-contract.ts` and `src/ts-modules.ts`
 - server parity helpers: `server/wasm-contract.ts` and `server/ts-modules.ts`
 - consume through module-key APIs only
 

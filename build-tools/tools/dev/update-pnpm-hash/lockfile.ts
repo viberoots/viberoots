@@ -1,34 +1,50 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { gcWaitConfig, waitForNoActiveNixGc } from "../../lib/nix-gc-lock.ts";
+import { activeNixGcPids, gcWaitConfig, waitForNoActiveNixGc } from "../../lib/nix-gc-lock.ts";
 import { importerLockfileNeedsRegen } from "../../lib/pnpm-importer-lockfile.ts";
 
-async function waitForNixGcToClearForLockfile(): Promise<void> {
-  // Verify preflight already enforces "no active nix gc" and safety rails monitor for
-  // mid-run GC. Skip redundant per-lockfile polling in that execution path.
-  if (String(process.env.BNX_VERIFY_NIX_GC_PRECHECK_OK || "").trim() === "1") {
+async function runLockfileInstallWithGcRetry(opts: {
+  importerAbs: string;
+  flakeRef: string;
+  timeoutMs: number;
+  fetchTimeout: string;
+  homeDir: string;
+  storeDir: string;
+}): Promise<void> {
+  const runInstall = async () =>
+    await $({
+      cwd: opts.importerAbs,
+      stdio: "inherit",
+      timeout: opts.timeoutMs,
+      env: {
+        ...process.env,
+        NIX_PNPM_ALLOW_GENERATE: "1",
+        NIX_PNPM_FETCH_TIMEOUT: opts.fetchTimeout,
+        PNPM_HOME: opts.homeDir,
+      },
+    })`nix run --accept-flake-config ${opts.flakeRef} -- install --lockfile-only --prod=false --ignore-scripts --lockfile-dir . --dir . --store-dir ${opts.storeDir} --color never`;
+
+  try {
+    await runInstall();
     return;
-  }
-  const cfg = gcWaitConfig();
-  let lastLogAt = 0;
-  const stillActive = await waitForNoActiveNixGc({
-    timeoutMs: cfg.timeoutMs,
-    pollMs: cfg.pollMs,
-    onWait: (pids, elapsedMs, timeoutMs) => {
-      if (elapsedMs - lastLogAt < 15_000) return;
-      lastLogAt = elapsedMs;
-      const elapsedSec = Math.floor(elapsedMs / 1000);
-      const timeoutSec = Math.floor(timeoutMs / 1000);
-      console.warn(
-        `[lockfile] waiting for active nix gc to finish (${pids.join(", ")}); elapsed=${elapsedSec}s timeout=${timeoutSec}s`,
-      );
-    },
-  });
-  if (stillActive.length > 0) {
-    throw new Error(
-      `lockfile generation blocked: active 'nix store gc' process(es) detected (${stillActive.join(", ")}). Stop GC and rerun 'scaf new ...'.`,
+  } catch (error) {
+    const gcPids = activeNixGcPids();
+    if (gcPids.length === 0) throw error;
+    const cfg = gcWaitConfig();
+    console.warn(
+      `[lockfile] install failed while nix gc active (${gcPids.join(", ")}); waiting for gc completion and retrying once`,
     );
+    const stillActive = await waitForNoActiveNixGc({
+      timeoutMs: cfg.timeoutMs,
+      pollMs: cfg.pollMs,
+    });
+    if (stillActive.length > 0) {
+      throw new Error(
+        `lockfile generation blocked after install failure: active 'nix store gc' process(es) still running (${stillActive.join(", ")}). Stop GC and rerun 'scaf new ...'.`,
+      );
+    }
+    await runInstall();
   }
 }
 
@@ -110,8 +126,6 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
   // Ensure pnpm uses a writable local store/cache. Run from importer root to avoid
   // pnpm choosing the workspace root implicitly and write lockfile to importer dir.
   const importerAbs = path.resolve(opts.repoRoot, opts.importer);
-  await waitForNixGcToClearForLockfile();
-
   const { workspaceFileAbs, hadLocalWorkspaceFile } = await ensureLocalWorkspaceMarker(importerAbs);
   const fetchTimeout = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "").trim() || "600";
   const timeoutMs = (Number.parseInt(fetchTimeout, 10) || 600) * 1000 + 120_000;
@@ -120,17 +134,14 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
   await fsp.mkdir(storeDir, { recursive: true }).catch(() => {});
   const flakeRef = pnpmFlakeRef(opts.repoRoot);
   console.log(`[lockfile] generating importer lockfile: ${opts.importer}`);
-  await $({
-    cwd: importerAbs,
-    stdio: "inherit",
-    timeout: timeoutMs,
-    env: {
-      ...process.env,
-      NIX_PNPM_ALLOW_GENERATE: "1",
-      NIX_PNPM_FETCH_TIMEOUT: fetchTimeout,
-      PNPM_HOME: homeDir,
-    },
-  })`nix run --accept-flake-config ${flakeRef} -- install --lockfile-only --prod=false --ignore-scripts --lockfile-dir . --dir . --store-dir ${storeDir} --color never`;
+  await runLockfileInstallWithGcRetry({
+    importerAbs,
+    flakeRef,
+    timeoutMs,
+    fetchTimeout,
+    homeDir,
+    storeDir,
+  });
 
   await seedImporterLockfileFromRootIfNeeded({ repoRoot: opts.repoRoot, importerAbs });
   await cleanupLocalWorkspaceMarker({ workspaceFileAbs, hadLocalWorkspaceFile });

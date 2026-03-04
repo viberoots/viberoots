@@ -105,6 +105,7 @@ For `scaf new ts webapp-static <name>`, `scaf new ts webapp-ssr-vite <name>`, an
 - `pnpm run dev` composes Vite and a wasm producer watcher with clean shutdown.
 - `pnpm run dev:wasm:watch` syncs generated module contracts from app `TARGETS` + `package.json` into `buck-out/tmp/module-contracts/<app-id>/`.
 - `pnpm run dev:wasm:watch` reads generated wasm/TS manifests from that canonical path and orchestrates one producer pipeline per declared wasm module key.
+- SSR server helpers read manifests from the canonical generated contracts path via `MODULE_CONTRACTS_DIR` and no longer rely on source-tree manifest paths.
 - The producer build command path is canonical TypeScript via `zx-wrapper ../../../build-tools/tools/dev/build-wasm-producer.ts`.
 - Template-local `.mjs` producer build scripts are not used for substantive behavior.
 - Watcher output is deterministic and structured for tests:
@@ -158,7 +159,7 @@ Shared Phase-4 regression helper contract:
 - Reuse `build-tools/tools/tests/scaffolding/lib/wasm-watch.ts` helpers for deterministic file mutation (`writeAndBumpMtime`), process no-restart assertions, watcher failure-signature checks, and local-link validation.
 - Keep template-specific behavior assertions in template tests; keep deterministic probe/mutation primitives in the shared helper module.
 
-Phase 4 matrix verification (maintainer guidance):
+Phase 5 matrix verification (maintainer guidance):
 
 To verify the permanent regression matrix is complete in CI, run the following targets:
 
@@ -171,8 +172,19 @@ buck2 test //:scaffolding_webapp_ssr_vite_dev_runtime_consistency_phase3
 buck2 test //:scaffolding_webapp_ssr_next_dev_hmr_local_ts_dep
 buck2 test //:scaffolding_webapp_ssr_next_dev_reload_wasm_producer
 buck2 test //:scaffolding_webapp_ssr_next_dev_runtime_consistency
+buck2 test //:scaffolding_webapp_static_dev_multi_module_runtime_contract
+buck2 test //:scaffolding_webapp_ssr_vite_dev_multi_module_runtime_contract
 buck2 test //:scaffolding_webapp_ssr_next_dev_multi_module_runtime_contract
+buck2 test //:scaffolding_webapp_multi_module_orchestrator_contract
+buck2 test //:scaffolding_webapp_multi_module_concurrency_contract
+buck2 test //:scaffolding_webapp_multi_module_generated_manifest_contract
+buck2 test //:scaffolding_webapp_multi_module_contract_path_resolver_contract
+buck2 test //:scaffolding_webapp_multi_module_no_source_manifest_dependency_contract
 buck2 test //:scaffolding_webapp_multi_template_parity_contract
+buck2 test //:scaffolding_webapp_phase5_hardcoded_runtime_path_policy_contract
+buck2 test //:scaffolding_webapp_phase5_final_goal_validation_contract
+buck2 test //:scaffolding_webapp_phase5_final_goal_validation_static_contract
+buck2 test //:scaffolding_webapp_phase5_final_goal_validation_ssr_next_contract
 buck2 test //:scaffolding_template_conventions_metadata_cquery
 buck2 test //:scaffolding_ts_command_path_docs_contract
 buck2 test //:scaffolding_webapp_multi_module_manifest_contract

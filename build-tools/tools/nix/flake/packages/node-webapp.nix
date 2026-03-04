@@ -113,6 +113,12 @@ EOF
             test -d dist/client
             test -f dist/server/index.js
             stage_wasm_contract "src/wasm-contract/top.wasm" "dist/client" "dist/server/wasm-contract"
+            if [ -f src/wasm-modules.manifest.json ]; then
+              cp -f src/wasm-modules.manifest.json dist/server/wasm-modules.manifest.json
+            fi
+            if [ -f src/ts-modules.manifest.json ]; then
+              cp -f src/ts-modules.manifest.json dist/server/ts-modules.manifest.json
+            fi
           else
             if [ ! -x "$NEXT_BIN" ] || [ ! -x "$TSC_BIN" ]; then
               echo "[nix] ERROR: expected next and tsc binaries for Next SSR build" >&2
@@ -140,6 +146,12 @@ EOF
             test -f dist/server/index.js
             test -f dist/server/server-main.js
             stage_wasm_contract "app/wasm-contract/top.wasm" "dist/client/public" "dist/server/wasm-contract"
+            if [ -f app/wasm-modules.manifest.json ]; then
+              cp -f app/wasm-modules.manifest.json dist/server/wasm-modules.manifest.json
+            fi
+            if [ -f app/ts-modules.manifest.json ]; then
+              cp -f app/ts-modules.manifest.json dist/server/ts-modules.manifest.json
+            fi
           fi
           if [ -n "$HB_PID" ]; then kill "$HB_PID" >/dev/null 2>&1 || true; fi
           phase_log "webapp-build-complete"

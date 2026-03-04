@@ -175,6 +175,38 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
+    "build-tools/tools/tests/scaffolding/webapp.phase5.hardcoded-runtime-path-policy.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
+    },
+    "build-tools/tools/tests/scaffolding/webapp.phase5.final-goal-validation.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
+    },
+    "build-tools/tools/tests/scaffolding/webapp.phase5.final-goal-validation.static.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
+    },
+    "build-tools/tools/tests/scaffolding/webapp.phase5.final-goal-validation.ssr-next.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
+    },
     "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/python/lib"],
         "classification": "template:smoke",

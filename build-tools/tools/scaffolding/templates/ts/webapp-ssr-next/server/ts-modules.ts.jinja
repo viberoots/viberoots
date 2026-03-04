@@ -14,12 +14,15 @@ type TsModuleManifest = {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function manifestCandidates(fileName: string): string[] {
+  const out = [path.resolve(__dirname, fileName)];
+  const contractsDir = String(process.env.MODULE_CONTRACTS_DIR || "").trim();
+  if (contractsDir) out.push(path.resolve(contractsDir, fileName));
+  return out;
+}
+
 function readManifestJson(): TsModuleManifest {
-  const candidates = [
-    path.resolve(__dirname, "ts-modules.manifest.json"),
-    path.resolve(__dirname, "../app/ts-modules.manifest.json"),
-    path.resolve(__dirname, "../../app/ts-modules.manifest.json"),
-  ];
+  const candidates = manifestCandidates("ts-modules.manifest.json");
   for (const p of candidates) {
     try {
       const text = readFileSync(p, "utf8");
@@ -43,14 +46,26 @@ export function defaultTsModuleKey(): string {
   return manifest.defaultModuleKey;
 }
 
+function toRuntimeImportSpecifier(runtimeImportPath: string): string {
+  const spec = runtimeImportPath.trim();
+  if (spec.startsWith("./") || spec.startsWith("../")) {
+    const withExt = spec.endsWith(".js") ? spec : `${spec}.js`;
+    return new URL(withExt, import.meta.url).href;
+  }
+  return spec;
+}
+
 export async function loadTsModule(moduleKey: string): Promise<TsModuleNamespace> {
   const entry = manifest.modules.find((mod) => mod.moduleKey === moduleKey);
   if (!entry) {
     throw new Error(`unknown TS module key '${moduleKey}'`);
   }
-  if (entry.runtimeImportPath.includes("server/index")) {
-    return (await import("./index.js")) as TsModuleNamespace;
+  const importSpecifier = toRuntimeImportSpecifier(entry.runtimeImportPath);
+  try {
+    return (await import(importSpecifier)) as TsModuleNamespace;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`TS module '${moduleKey}' failed to import for server runtime: ${message}`);
   }
-  throw new Error(`TS module '${moduleKey}' is not available in server runtime`);
 }
 

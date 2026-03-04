@@ -98,8 +98,14 @@ test(
         "utf8",
       );
       assert.doesNotMatch(serverWasmHelper, /server\/wasm-contract\/top\.wasm/);
+      assert.match(serverWasmHelper, /readServerWasmModuleByteLength/);
+      assert.match(serverWasmHelper, /MODULE_CONTRACTS_DIR/);
+      assert.doesNotMatch(serverWasmHelper, /\.\.\/src\/wasm-modules\.manifest\.json/);
       assert.doesNotMatch(serverTsHelper, /const moduleKeys = \["client-entry", "server-entry"\]/);
+      assert.match(serverTsHelper, /MODULE_CONTRACTS_DIR/);
+      assert.doesNotMatch(serverTsHelper, /\.\.\/src\/ts-modules\.manifest\.json/);
       assert.match(buildSsrScript, /for \(const entry of wasmManifest\.modules \|\| \[\]\)/);
+      assert.match(buildSsrScript, /sync-module-contracts\.ts --cwd \. --print-json 1/);
 
       const logs: string[] = [];
       const watcher = spawn(
@@ -108,6 +114,10 @@ test(
           "../../../build-tools/tools/dev/watch-wasm-producer.ts",
           "--cwd",
           appAbs,
+          "--wasm-manifest",
+          resolved.wasmManifestPath,
+          "--ts-manifest",
+          resolved.tsManifestPath,
           "--poll-ms",
           "120",
         ],

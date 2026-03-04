@@ -90,6 +90,12 @@ EOF
         test -d dist/client
         test -f dist/server/index.js
         stage_wasm_contract "src/wasm-contract/top.wasm" "dist/client"
+        if [ -f src/wasm-modules.manifest.json ]; then
+          cp -f src/wasm-modules.manifest.json dist/server/wasm-modules.manifest.json
+        fi
+        if [ -f src/ts-modules.manifest.json ]; then
+          cp -f src/ts-modules.manifest.json dist/server/ts-modules.manifest.json
+        fi
       '' else if framework == "next" then ''
         if [ ! -x "$NEXT_BIN" ] || [ ! -x "$TSC_BIN" ]; then
           echo "node planner: expected next and tsc in locked node_modules for ${importerDir}" >&2
@@ -117,6 +123,12 @@ EOF
         test -f dist/server/index.js
         test -f dist/server/server-main.js
         stage_wasm_contract "app/wasm-contract/top.wasm" "dist/client/public"
+        if [ -f app/wasm-modules.manifest.json ]; then
+          cp -f app/wasm-modules.manifest.json dist/server/wasm-modules.manifest.json
+        fi
+        if [ -f app/ts-modules.manifest.json ]; then
+          cp -f app/ts-modules.manifest.json dist/server/ts-modules.manifest.json
+        fi
       '' else ''
         echo "${frameworkMissingError}" >&2
         exit 2
