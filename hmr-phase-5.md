@@ -26,6 +26,8 @@ No-boilerplate definition for this phase:
 1. Adding a new declared TS or wasm module must not require app authors to add new dev scripts.
 2. Adding a new declared TS or wasm module must not require app authors to add module-specific runtime wiring in app entrypoints.
 3. App authors consume modules through generated module-key APIs only.
+4. After scaffold time, app authors must not manually edit wasm/TS manifest files to add dependencies.
+5. For dependency growth, required app-author inputs are limited to existing module wiring in `TARGETS` and dependency declarations in `package.json`.
 
 Completion criteria:
 
@@ -35,7 +37,7 @@ Completion criteria:
 4. Wasm and TS module orchestration is manifest-driven, not hardcoded to one module path or filename.
 5. For SSR templates, per-module-key behavior is verified for both client and server paths.
 6. Each merged PR includes implementation, tests, and docs for the behavior introduced in that PR.
-7. Adding a new module key to manifests is sufficient to enable dev updates for that module in the same session.
+7. Adding new dependencies through `TARGETS` and `package.json` is sufficient to enable dev updates in the same session; no manual manifest edits are required.
 8. Final goal-validation tests prove no-boilerplate multi-module HMR behavior for client and server code.
 9. E2E suites validate mixed TS+wasm module additions and edit cycles for static, SSR Vite, and SSR Next templates.
 10. Each PR closes with a green verification set and no failing touched tests.
@@ -51,10 +53,27 @@ Dependency chain:
 Phase 5 checkpoints:
 
 - Checkpoint A: `READY` for PR-2 when PR-1 contract generation, tests, and docs are green.
-- Checkpoint B: `READY` for PR-3 when PR-2 multi-module orchestration tests are green.
+- Checkpoint B: `READY` for PR-3 when PR-2 multi-module orchestration and generated-contract tests are green.
 - Checkpoint C: `READY` for PR-4 when PR-3 static+SSR-vite migrations are green.
 - Checkpoint D: `READY` for PR-5 when PR-4 SSR-next migration and parity checks are green.
 - Checkpoint E: `COMPLETED` for Phase 5 when PR-5 full matrix tests and docs are green.
+
+### Phase 5 contract update (effective from PR-2 onward)
+
+PR-1 content remains unchanged. Starting with PR-2 implementation, manifest ownership shifts from user-managed source files to generated contract artifacts:
+
+1. Dev/build orchestration generates runtime manifest contracts from existing app wiring in `TARGETS` and dependency declarations in `package.json`.
+2. Generated manifest artifacts live outside template source trees (for example under `buck-out/tmp/...`), and are not user-edited.
+3. Runtime helper APIs remain module-key based, but module-key availability is derived from generated contracts rather than user-authored manifest edits.
+4. Dependency growth after scaffold time must not require manual manifest updates.
+
+Generated-path contract (explicit):
+
+1. Generated manifest artifacts use one canonical location family under `buck-out/tmp/module-contracts/<app-id>/`.
+2. The canonical location is resolved through one shared resolver API used by dev orchestration, runtime helper wiring, tests, and build packaging.
+3. No project-local symlink is required for correctness. Any optional convenience symlink is non-canonical and must not be required by tooling or tests.
+4. For PR-2, generated artifacts are authoritative for dev/watch orchestration.
+5. Runtime helper cutover from source-tree manifests to generated artifacts is completed in PR-3.
 
 ---
 
@@ -152,11 +171,13 @@ Implement first to establish strict, testable module contracts for all later PRs
 
 ### Description
 
-I will move from hardcoded single-module watch paths to manifest-driven orchestration loops that run all wasm and TS module pipelines automatically with deterministic behavior under concurrent edits.
+I will move from hardcoded single-module watch paths to generated-manifest orchestration loops that run all wasm and TS module pipelines automatically with deterministic behavior under concurrent edits, without requiring users to manually maintain manifest files.
 
 ### Scope & Changes
 
-- Extend dev orchestration to load app wasm and TS manifests at startup.
+- Extend dev orchestration to generate app wasm and TS manifests at startup from existing `TARGETS` wiring and `package.json` dependency declarations.
+- Load generated manifests from canonical non-source generated paths in `buck-out/tmp/module-contracts/<app-id>/` for dev/watch orchestration paths.
+- Add one shared contract-path resolver and remove ad hoc path inference in call sites.
 - For each declared wasm module, create one managed watch/build/sync pipeline.
 - For each declared TS module set, ensure orchestration registers and validates module-key-driven dev update probes.
 - Keep deterministic queue behavior per module and deterministic logging across modules.
@@ -164,27 +185,55 @@ I will move from hardcoded single-module watch paths to manifest-driven orchestr
 - Ensure startup/shutdown lifecycle handles all module watchers with clean teardown.
 - Do not require app authors to add one script per module.
 - Add explicit concurrency bounds and fairness rules for multi-module queues.
+- Keep `TARGETS` and `package.json` as the only required app-author touch points for dependency growth.
+- For PR-2, consume generated artifacts on the watcher/dev orchestration path; keep runtime helper source-manifest cutover scoped to PR-3.
 
 ### Tests (in this PR)
 
+- Add generated-contract tests:
+  - generated wasm/TS manifests are deterministic for unchanged `TARGETS` and `package.json`
+  - manifest regeneration updates only when `TARGETS`/`package.json` contract inputs change
+  - generated manifests are consumed from canonical non-source generated paths via the shared resolver
+  - no call site relies on a template-local source manifest path or optional symlink
 - Add orchestrator unit/integration tests:
   - starts one watcher per declared wasm module
   - module-scoped rebuild events are deterministic
   - failure in one module is surfaced without hiding errors from others
   - queue fairness holds across at least 5 concurrently edited module keys
 - Add scaffolded E2E temp-repo tests for multi-module edits:
-  - edit wasm producer A, assert module A output updates
-  - edit wasm producer B, assert module B output updates
+  - add/update wasm dependency wiring in `TARGETS`, assert corresponding module output updates
+  - add/update TS local dependency in `package.json`, assert module update in one session
   - edit TS module A and TS module B in one session, assert both update
   - assert no dev process restart
 - Add E2E stress tests for sequential and concurrent edits across multiple module keys in one session.
+- Add deterministic negative-path tests for generated contracts:
+  - malformed or incomplete `TARGETS`/`package.json` contract inputs fail with stable diagnostics
+  - missing generated artifact path or resolver mismatch fails with stable diagnostics
+
+### PR-2 generated contract freeze (handoff contract for PR-3+)
+
+1. Canonical output path:
+   - `buck-out/tmp/module-contracts/<app-id>/`
+2. `app-id` derivation:
+   - deterministic, cross-platform normalized identifier derived from canonical app target identity
+   - shared implementation used by generator, resolver, watcher, tests, and packaging
+3. Resolver contract:
+   - one shared resolver API is the only supported path lookup mechanism
+   - callsites must not hand-roll generated-contract paths
+4. Generated schema contract:
+   - versioned generated schema for wasm and TS manifests
+   - required fields and ordering are deterministic and test-locked
+5. Failure-signature contract:
+   - generation failures emit stable markers and actionable recovery guidance
+   - no silent fallback to stale source-tree manifests
 
 ### Docs (in this PR)
 
-- Document manifest-driven watcher orchestration in scaffolding docs.
+- Document generated-manifest watcher orchestration in scaffolding docs.
 - Document module-scoped diagnostics and recovery commands for wasm and TS module paths.
 - Update template README guidance to reflect zero per-module script boilerplate.
 - Document concurrency and fairness guarantees in the dev orchestration contract.
+- Document that manifests are generated artifacts, not user-authored source files, and that dependency growth uses only `TARGETS` and `package.json`.
 
 ### Verification Commands
 
@@ -193,6 +242,9 @@ I will move from hardcoded single-module watch paths to manifest-driven orchestr
 - `buck2 test //:scaffolding_webapp_ssr_next_dev_reload_wasm_producer`
 - `buck2 test //:scaffolding_webapp_multi_module_orchestrator_contract`
 - `buck2 test //:scaffolding_webapp_multi_module_concurrency_contract`
+- `buck2 test //:scaffolding_webapp_multi_module_generated_manifest_contract`
+- `buck2 test //:scaffolding_webapp_multi_module_contract_path_resolver_contract`
+- `buck2 test //:scaffolding_webapp_multi_module_no_source_manifest_dependency_contract`
 - `buck2 test //:scaffolding_ts_command_path_docs_contract`
 
 ### Acceptance Criteria
@@ -202,6 +254,10 @@ I will move from hardcoded single-module watch paths to manifest-driven orchestr
 - Deterministic behavior is validated under concurrent multi-module edits.
 - Tests and docs confirm module-scoped diagnostics and recovery behavior.
 - Multi-module orchestration requires no per-module script additions in scaffolded app `package.json`.
+- Adding dependencies after scaffold time does not require manual edits to wasm/TS manifest files.
+- Generated manifest artifacts are derived from existing `TARGETS` and `package.json` inputs and consumed from canonical non-source generated paths via one shared resolver on the PR-2 dev/watch path.
+- PR-2 locks the generated-contract freeze for PR-3+ (canonical path, `app-id` derivation, resolver contract, schema version, and failure signatures).
+- PR-2 closes with generated-contract + orchestration implementation combined (no PR-2A/PR-2B split), leaving runtime helper cutover for PR-3.
 - E2E targets prove mixed TS+wasm module edits in one session on the orchestrated path.
 
 ### Risks
@@ -210,7 +266,7 @@ Running multiple watchers can increase orchestration complexity and failure tria
 
 ### Mitigation
 
-Keep per-module queues isolated, logs structured, concurrency bounded, and lifecycle control centralized.
+Keep per-module queues isolated, logs structured, concurrency bounded, lifecycle control centralized, and manifest generation deterministic with explicit input contracts.
 
 ### Consequence of Not Implementing
 
@@ -224,6 +280,11 @@ Orchestration code becomes a critical path and needs strict test coverage.
 
 Implement second to make the module contracts operational in dev sessions.
 
+PR-2 delivery policy:
+
+1. Combine generated-manifest contract generation and multi-module watcher orchestration in one PR-2 implementation.
+2. Keep PR-3 focused on runtime helper cutover and template runtime migration.
+
 ---
 
 ## PR-3: Template migration to multi-module contracts for static and SSR Vite
@@ -234,8 +295,9 @@ I will migrate template runtime wiring to consume generated wasm and TS module c
 
 ### Scope & Changes
 
-- Update static and SSR Vite runtime helpers to load wasm by module key through generated helper.
-- Update static and SSR Vite runtime helpers to load TS modules by module key through generated helper.
+- Update static and SSR Vite runtime helpers to load wasm by module key through generated helper and generated manifest artifacts.
+- Update static and SSR Vite runtime helpers to load TS modules by module key through generated helper and generated manifest artifacts.
+- Make generated artifacts authoritative for runtime helper reads in static and SSR Vite (completes runtime helper cutover begun by PR-2 dev/watch path).
 - Remove hardcoded single-path assumptions in static and SSR Vite runtime code and scripts.
 - Ensure SSR Vite server parity paths for each wasm module are staged consistently.
 - Ensure SSR Vite client and server paths can resolve TS modules by module key.
@@ -247,7 +309,7 @@ I will migrate template runtime wiring to consume generated wasm and TS module c
   - static multi-module wasm and TS usage
   - SSR Vite multi-module wasm and TS usage (client + server)
 - Add per-module-key E2E edit-cycle tests:
-  - for each declared key in fixture manifests, assert static and SSR Vite updates where applicable
+  - for each declared/generated key from fixture `TARGETS` + `package.json` inputs, assert static and SSR Vite updates where applicable
   - combined TS module edit + wasm module A edit + wasm module B edit in one dev session
   - no process restart, deterministic output updates
 - Keep existing HMR no-restart assertions in migrated tests.
@@ -255,6 +317,7 @@ I will migrate template runtime wiring to consume generated wasm and TS module c
 ### Docs (in this PR)
 
 - Update static and SSR Vite docs to show module-key usage through generated helpers for wasm and TS.
+- Update static and SSR Vite docs to call out canonical generated contract paths and resolver usage.
 - Update troubleshooting sections for multi-module TS and wasm edit-cycle diagnostics.
 - Update plan/status docs to mark migrated templates and active constraints.
 
@@ -273,6 +336,7 @@ I will migrate template runtime wiring to consume generated wasm and TS module c
 - Combined TS + multi-wasm edit cycles pass deterministically in static and SSR Vite tests.
 - Docs match actual static and SSR Vite behavior and runtime helper APIs.
 - Template usage for new module keys is via generated APIs only, with no module-specific app-entrypoint boilerplate.
+- Dependency growth in static and SSR Vite requires only existing `TARGETS`/`package.json` updates, not manual manifest edits.
 - E2E coverage for static and SSR Vite validates easy addition of extra TS/wasm module keys without extra app wiring.
 
 ### Risks
@@ -305,8 +369,9 @@ I will migrate `ts/webapp-ssr-next` to generated wasm and TS module contracts an
 
 ### Scope & Changes
 
-- Update SSR Next runtime helpers to load wasm by module key through generated helper.
-- Update SSR Next runtime helpers to load TS modules by module key through generated helper.
+- Update SSR Next runtime helpers to load wasm by module key through generated helper and generated manifest artifacts.
+- Update SSR Next runtime helpers to load TS modules by module key through generated helper and generated manifest artifacts.
+- Make generated artifacts authoritative for runtime helper reads in SSR Next parity with static and SSR Vite.
 - Remove hardcoded single-path assumptions in SSR Next runtime code and scripts.
 - Ensure SSR Next server parity paths for each wasm module are staged consistently.
 - Ensure SSR Next client and server paths resolve TS modules by module key.
@@ -325,6 +390,7 @@ I will migrate `ts/webapp-ssr-next` to generated wasm and TS module contracts an
 ### Docs (in this PR)
 
 - Update SSR Next docs to present multi-module contracts as canonical behavior.
+- Update SSR Next docs to call out canonical generated contract paths and resolver usage.
 - Update cross-template docs to record parity requirements and diagnostics.
 - Record verification commands for SSR Next migration and parity checks.
 
@@ -344,6 +410,7 @@ I will migrate `ts/webapp-ssr-next` to generated wasm and TS module contracts an
 - For SSR Next, each declared module key is verified in both client and server update paths.
 - Cross-template parity checks are green for equivalent multi-module edit scenarios.
 - Docs and tests are consistent with migrated SSR Next behavior.
+- Dependency growth in SSR Next requires only existing `TARGETS`/`package.json` updates, not manual manifest edits.
 - E2E parity checks prove SSR Next supports easy TS/wasm module-key additions without module-specific app wiring.
 
 ### Risks
@@ -396,14 +463,15 @@ I will close Phase 5 by removing remaining single-module hardcoding and locking 
   - per-module-key SSR client/server target checks
 - Add targeted deterministic diagnostics tests for multi-module failure triage output.
 - Add explicit final goal-validation tests:
-  - add new TS module key in fixture manifest, run dev, assert client/server updates with no app-entrypoint edits
-  - add new wasm module key in fixture manifest, run dev, assert client/server updates with no app-entrypoint edits
-  - add mixed TS+wasm module keys together in one fixture, run one dev session, assert both update paths without extra boilerplate edits
+  - add a new TS dependency entry through fixture `package.json`, run dev, assert client/server updates with no app-entrypoint edits
+  - add a new wasm dependency wiring through fixture `TARGETS`, run dev, assert client/server updates with no app-entrypoint edits
+  - add mixed TS+wasm dependencies together in one fixture, run one dev session, assert both update paths without extra boilerplate edits
 
 ### Docs (in this PR)
 
 - Update docs to present final Phase 5 contracts as canonical behavior.
 - Remove outdated single-module implementation guidance from active docs.
+- Remove/forbid guidance that implies source-tree manifest edits are required for dependency growth.
 - Record final verification matrix and troubleshooting commands for maintainers.
 
 ### Verification Commands
@@ -421,6 +489,9 @@ I will close Phase 5 by removing remaining single-module hardcoding and locking 
 - `buck2 test //:scaffolding_webapp_ssr_next_dev_multi_module_runtime_contract`
 - `buck2 test //:scaffolding_webapp_multi_module_orchestrator_contract`
 - `buck2 test //:scaffolding_webapp_multi_module_concurrency_contract`
+- `buck2 test //:scaffolding_webapp_multi_module_generated_manifest_contract`
+- `buck2 test //:scaffolding_webapp_multi_module_contract_path_resolver_contract`
+- `buck2 test //:scaffolding_webapp_multi_module_no_source_manifest_dependency_contract`
 - `buck2 test //:scaffolding_webapp_multi_template_parity_contract`
 - `buck2 test //:scaffolding_template_conventions_metadata_cquery`
 - `buck2 test //:scaffolding_ts_command_path_docs_contract`
@@ -434,6 +505,7 @@ I will close Phase 5 by removing remaining single-module hardcoding and locking 
 - Phase 5 checkpoint reaches `COMPLETED`.
 - Final goal-validation tests prove no-boilerplate multi-module HMR for TS and wasm in client and server code.
 - Final E2E matrix proves mixed TS+wasm module additions can be made quickly without module-specific scripts or runtime entrypoint wiring.
+- Final E2E matrix proves dependency growth requires only `TARGETS` and `package.json` updates and does not require manual manifest edits.
 
 ### Risks
 
@@ -507,6 +579,7 @@ Out-of-bounds by default:
 Expected focus areas:
 
 - dev orchestration modules (watch/build/sync coordination)
+- generated manifest contract modules and deterministic input mapping (`TARGETS` + `package.json`)
 - module-scoped logging and lifecycle handling
 - concurrency/fairness controls
 - orchestration E2E + stress tests
@@ -516,6 +589,7 @@ Expected new/updated target families:
 
 - multi-module orchestrator contract test target(s)
 - multi-module concurrency contract test target(s)
+- generated-manifest derivation contract target(s)
 - orchestrator mixed-edit E2E target(s)
 
 Out-of-bounds by default:
@@ -582,10 +656,11 @@ Out-of-bounds by default:
 
 A PR set satisfies "easy module addition" when these assertions are green:
 
-1. Add a new TS module key in fixture manifests.
-2. Add a new wasm module key in fixture manifests.
+1. Add a new TS dependency through fixture `package.json` (for local workspace-linked TS paths).
+2. Add a new wasm dependency wiring through fixture `TARGETS`.
 3. Run one dev session and observe expected client/server updates for both module types.
 4. Do not add module-specific scripts in app `package.json`.
 5. Do not add module-specific runtime entrypoint wiring in app code.
+6. Do not manually edit wasm/TS manifest files.
 
 If any of the above requires additional edits outside listed touch maps, the engineer should make those edits using best judgment, keep them minimal, and include test coverage in the same PR.

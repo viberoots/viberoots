@@ -159,6 +159,79 @@ const EXPECTATIONS: TemplateExpectation[] = [
     ],
   },
   {
+    script: "build-tools/tools/tests/scaffolding/webapp.multi-module.orchestrator.contract.test.ts",
+    requiredLabels: [
+      "template:ts/webapp-static",
+      "template:ts/webapp-ssr-vite",
+      "template:ts/webapp-ssr-next",
+      "template:shared",
+    ],
+    requiredTemplateRoots: [
+      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+    ],
+  },
+  {
+    script: "build-tools/tools/tests/scaffolding/webapp.multi-module.concurrency.contract.test.ts",
+    requiredLabels: [
+      "template:ts/webapp-static",
+      "template:ts/webapp-ssr-vite",
+      "template:ts/webapp-ssr-next",
+      "template:shared",
+    ],
+    requiredTemplateRoots: [
+      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+    ],
+  },
+  {
+    script:
+      "build-tools/tools/tests/scaffolding/webapp.multi-module.generated-manifest.contract.test.ts",
+    requiredLabels: [
+      "template:ts/webapp-static",
+      "template:ts/webapp-ssr-vite",
+      "template:ts/webapp-ssr-next",
+      "template:shared",
+    ],
+    requiredTemplateRoots: [
+      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+    ],
+  },
+  {
+    script:
+      "build-tools/tools/tests/scaffolding/webapp.multi-module.contract-path-resolver.contract.test.ts",
+    requiredLabels: [
+      "template:ts/webapp-static",
+      "template:ts/webapp-ssr-vite",
+      "template:ts/webapp-ssr-next",
+      "template:shared",
+    ],
+    requiredTemplateRoots: [
+      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+    ],
+  },
+  {
+    script:
+      "build-tools/tools/tests/scaffolding/webapp.multi-module.no-source-manifest-dependency.contract.test.ts",
+    requiredLabels: [
+      "template:ts/webapp-static",
+      "template:ts/webapp-ssr-vite",
+      "template:ts/webapp-ssr-next",
+      "template:shared",
+    ],
+    requiredTemplateRoots: [
+      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+    ],
+  },
+  {
     script: "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts",
     requiredLabels: ["template:python/lib", "template:smoke"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/python/lib/"],

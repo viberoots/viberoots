@@ -43,8 +43,8 @@ test(
           "utf8",
         );
         assert.match(devWasmWatchScript, /watch-wasm-producer\.ts/);
-        assert.match(devWasmWatchScript, /build-wasm-producer\.ts/);
         assert.doesNotMatch(devWasmWatchScript, /build-wasm-producer\.mjs/);
+        assert.doesNotMatch(devWasmWatchScript, /--watch|--build-cmd|--build-out|--sync-out/);
         const buildSsrScript = await fsp.readFile(
           path.join(appRoot, "scripts", "build-ssr.mjs"),
           "utf8",

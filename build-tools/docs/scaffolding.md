@@ -103,19 +103,20 @@ For `scaf new ts webapp-static <name>` and `scaf new ts webapp-ssr-vite <name>`,
 For `scaf new ts webapp-static <name>`, `scaf new ts webapp-ssr-vite <name>`, and `scaf new ts webapp-ssr-next <name>`, the generated app also includes a Phase-2 wasm producer bridge loop:
 
 - `pnpm run dev` composes Vite and a wasm producer watcher with clean shutdown.
-- `pnpm run dev:wasm:watch` watches producer inputs, runs a producer build command, and syncs output to `src/wasm-contract/top.wasm`.
+- `pnpm run dev:wasm:watch` syncs generated module contracts from app `TARGETS` + `package.json` into `buck-out/tmp/module-contracts/<app-id>/`.
+- `pnpm run dev:wasm:watch` reads generated wasm/TS manifests from that canonical path and orchestrates one producer pipeline per declared wasm module key.
 - The producer build command path is canonical TypeScript via `zx-wrapper ../../../build-tools/tools/dev/build-wasm-producer.ts`.
 - Template-local `.mjs` producer build scripts are not used for substantive behavior.
 - Watcher output is deterministic and structured for tests:
-  - `[wasm-watch] rebuild:start`
-  - `[wasm-watch] sync:ok`
-  - `[wasm-watch] rebuild:fail` with a recovery command.
+  - `[wasm-watch] rebuild:start ... module_type=wasm module_key=<key>`
+  - `[wasm-watch] sync:ok ... module_type=wasm module_key=<key>`
+  - `[wasm-watch] rebuild:fail ... module_type=wasm module_key=<key>` with a recovery command.
 
 For `webapp-ssr-vite`, server-side dev probes can read wasm from `src/wasm-contract/top.wasm` and packaged builds continue to read `dist/server/wasm-contract/top.wasm`.
 
 Phase 5 module contract terms (PR-1 baseline):
 
-- Generated per-app manifests define module-key contracts for wasm and TypeScript modules:
+- Generated per-app manifests define module-key contracts for wasm and TypeScript modules under `buck-out/tmp/module-contracts/<app-id>/`:
   - `wasm-modules.manifest.json`
   - `ts-modules.manifest.json`
 - Generated helper surfaces expose module-key APIs and remove single-module runtime assumptions:

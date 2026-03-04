@@ -2,17 +2,7 @@ import { spawn } from "node:child_process";
 
 const child = spawn(
   "zx-wrapper",
-  [
-    "../../../build-tools/tools/dev/watch-wasm-producer.ts",
-    "--watch",
-    "app/wasm-producer/payload.txt",
-    "--build-cmd",
-    "zx-wrapper ../../../build-tools/tools/dev/build-wasm-producer.ts --payload app/wasm-producer/payload.txt --out .wasm-producer/top.wasm",
-    "--build-out",
-    ".wasm-producer/top.wasm",
-    "--sync-out",
-    "app/wasm-contract/top.wasm",
-  ],
+  ["../../../build-tools/tools/dev/watch-wasm-producer.ts"],
   { stdio: "inherit" },
 );
 

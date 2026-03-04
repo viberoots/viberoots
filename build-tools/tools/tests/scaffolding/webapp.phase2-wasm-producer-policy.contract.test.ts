@@ -11,8 +11,6 @@ type Phase2TemplateContract = {
   id: string;
   templateRoot: string;
   payloadFile: string;
-  watchPathFragment: string;
-  syncPathFragment: string;
 };
 
 const CONTRACTS: Phase2TemplateContract[] = [
@@ -27,8 +25,6 @@ const CONTRACTS: Phase2TemplateContract[] = [
       "webapp-static",
     ),
     payloadFile: path.join("src", "wasm-producer", "payload.txt"),
-    watchPathFragment: "--watch src/wasm-producer/payload.txt",
-    syncPathFragment: "--sync-out src/wasm-contract/top.wasm",
   },
   {
     id: "ts/webapp-ssr-vite",
@@ -41,8 +37,6 @@ const CONTRACTS: Phase2TemplateContract[] = [
       "webapp-ssr-vite",
     ),
     payloadFile: path.join("src", "wasm-producer", "payload.txt"),
-    watchPathFragment: "--watch src/wasm-producer/payload.txt",
-    syncPathFragment: "--sync-out src/wasm-contract/top.wasm",
   },
   {
     id: "ts/webapp-ssr-next",
@@ -55,8 +49,6 @@ const CONTRACTS: Phase2TemplateContract[] = [
       "webapp-ssr-next",
     ),
     payloadFile: path.join("app", "wasm-producer", "payload.txt"),
-    watchPathFragment: "--watch app/wasm-producer/payload.txt",
-    syncPathFragment: "--sync-out app/wasm-contract/top.wasm",
   },
 ];
 
@@ -95,33 +87,17 @@ test("Phase-2 template policy: wasm producer contract keys exist across template
       /watch-wasm-producer\.ts/,
       `${contract.id}: watcher command mismatch`,
     );
-    assert.match(watchScript, /--build-cmd/, `${contract.id}: watcher build command flag missing`);
-    assert.match(
+    assert.doesNotMatch(watchScript, /--wasm-manifest|--ts-manifest/);
+    assert.doesNotMatch(watchScript, /wasm-modules\.manifest\.json|ts-modules\.manifest\.json/);
+    assert.doesNotMatch(
       watchScript,
-      /build-wasm-producer\.ts/,
-      `${contract.id}: watcher build command must use zx-wrapper TypeScript producer script`,
+      /--watch/,
+      `${contract.id}: legacy single-watch flag should be removed`,
     );
     assert.doesNotMatch(
       watchScript,
-      /build-wasm-producer\.mjs/,
-      `${contract.id}: watcher build command must not rely on legacy .mjs producer logic`,
-    );
-    assert.match(watchScript, /--build-out/, `${contract.id}: watcher build output flag missing`);
-    assert.match(watchScript, /--watch/, `${contract.id}: watcher source flag missing`);
-    assert.match(
-      watchScript,
-      new RegExp(
-        contract.watchPathFragment.replace("--watch ", "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-      ),
-      `${contract.id}: watcher source path mismatch`,
-    );
-    assert.match(watchScript, /--sync-out/, `${contract.id}: watcher sync flag missing`);
-    assert.match(
-      watchScript,
-      new RegExp(
-        contract.syncPathFragment.replace("--sync-out ", "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-      ),
-      `${contract.id}: watcher sync path mismatch`,
+      /--build-cmd|--build-out|--sync-out/,
+      `${contract.id}: legacy single-module build/sync flags should be removed`,
     );
 
     assert.equal(

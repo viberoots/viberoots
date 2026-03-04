@@ -10,8 +10,6 @@ type Phase3TemplateContract = {
   id: string;
   templateRoot: string;
   payloadPath: string;
-  contractPath: string;
-  watchPathFragment: string;
 };
 
 const SSR_CONTRACTS: Phase3TemplateContract[] = [
@@ -26,8 +24,6 @@ const SSR_CONTRACTS: Phase3TemplateContract[] = [
       "webapp-ssr-vite",
     ),
     payloadPath: path.join("src", "wasm-producer", "payload.txt"),
-    contractPath: path.join("src", "wasm-contract", "top.wasm"),
-    watchPathFragment: "--watch src/wasm-producer/payload.txt",
   },
   {
     id: "ts/webapp-ssr-next",
@@ -40,14 +36,8 @@ const SSR_CONTRACTS: Phase3TemplateContract[] = [
       "webapp-ssr-next",
     ),
     payloadPath: path.join("app", "wasm-producer", "payload.txt"),
-    contractPath: path.join("app", "wasm-contract", "top.wasm"),
-    watchPathFragment: "--watch app/wasm-producer/payload.txt",
   },
 ];
-
-function escapeRegex(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 test("Phase-3 template policy: SSR runtime-consistency script and path contracts stay deterministic", async () => {
   for (const contract of SSR_CONTRACTS) {
@@ -90,25 +80,18 @@ test("Phase-3 template policy: SSR runtime-consistency script and path contracts
     assert.match(watchScript, /watch-wasm-producer\.ts/, `${contract.id}: watcher entry mismatch`);
     assert.match(
       watchScript,
-      /build-wasm-producer\.ts/,
-      `${contract.id}: canonical producer command missing`,
+      /watch-wasm-producer\.ts/,
+      `${contract.id}: canonical watcher missing`,
     );
     assert.doesNotMatch(
       watchScript,
       /build-wasm-producer\.mjs/,
       `${contract.id}: legacy .mjs producer path must stay disabled`,
     );
-    assert.match(watchScript, /--watch/, `${contract.id}: watcher source flag missing`);
-    assert.match(
+    assert.doesNotMatch(
       watchScript,
-      new RegExp(escapeRegex(contract.watchPathFragment.replace("--watch ", ""))),
-      `${contract.id}: watcher source path mismatch`,
-    );
-    assert.match(watchScript, /--sync-out/, `${contract.id}: watcher contract sync flag missing`);
-    assert.match(
-      watchScript,
-      new RegExp(escapeRegex(contract.contractPath)),
-      `${contract.id}: watcher contract sync path mismatch`,
+      /--watch|--build-cmd|--build-out|--sync-out/,
+      `${contract.id}: legacy watcher flags should not be hardcoded`,
     );
     assert.doesNotMatch(
       packageJson,
