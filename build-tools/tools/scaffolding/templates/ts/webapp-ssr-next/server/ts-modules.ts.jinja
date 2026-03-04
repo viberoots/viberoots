@@ -44,7 +44,11 @@ export function defaultTsModuleKey(): string {
 }
 
 export async function loadTsModule(moduleKey: string): Promise<TsModuleNamespace> {
-  if (moduleKey === "server-runtime") {
+  const entry = manifest.modules.find((mod) => mod.moduleKey === moduleKey);
+  if (!entry) {
+    throw new Error(`unknown TS module key '${moduleKey}'`);
+  }
+  if (entry.runtimeImportPath.includes("server/index")) {
     return (await import("./index.js")) as TsModuleNamespace;
   }
   throw new Error(`TS module '${moduleKey}' is not available in server runtime`);

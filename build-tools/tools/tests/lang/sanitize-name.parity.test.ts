@@ -47,7 +47,13 @@ async function starlarkProbeOutput(target: string): Promise<string> {
     if (!outName) throw new Error("no output path for " + target);
     return outName.replace(/\.txt$/, "");
   } finally {
-    // Let verify/test harness manage daemon lifecycle; avoid per-test cold-start churn.
+    if (!inherited) {
+      await $({
+        env: buckCommandEnv(),
+        reject: false,
+        stdio: "ignore",
+      })`buck2 --isolation-dir ${iso} kill`;
+    }
   }
 }
 

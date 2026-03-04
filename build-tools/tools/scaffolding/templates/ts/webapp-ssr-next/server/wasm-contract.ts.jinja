@@ -33,19 +33,42 @@ function readManifestJson(): WasmModuleManifest {
 }
 
 const manifest = readManifestJson();
-const defaultWasm = manifest.modules.find((mod) => mod.moduleKey === manifest.defaultModuleKey);
-if (!defaultWasm) {
-  throw new Error(`WASM manifest default module key '${manifest.defaultModuleKey}' is not declared`);
-}
-const serverRuntimeDest = defaultWasm.runtimeDestinations.server;
-const wasmCandidates = [
-  path.resolve(__dirname, "..", serverRuntimeDest),
-  path.resolve(__dirname, "wasm-contract", "top.wasm"),
-  path.resolve(__dirname, "../client/public/top.wasm"),
-  path.resolve(__dirname, "../client/top.wasm"),
-];
 
-export async function readServerWasmContractByteLength(): Promise<number> {
+function manifestEntryFor(moduleKey: string) {
+  const entry = manifest.modules.find((mod) => mod.moduleKey === moduleKey);
+  if (!entry) {
+    throw new Error(`unknown wasm module key '${moduleKey}'`);
+  }
+  return entry;
+}
+
+function wasmCandidatesFor(moduleKey: string): string[] {
+  const entry = manifestEntryFor(moduleKey);
+  const serverRuntimeDest = entry.runtimeDestinations.server;
+  const clientRuntimeDest = entry.runtimeDestinations.client;
+  const sourceBase = path.basename(entry.sourcePath);
+  return [
+    path.resolve(__dirname, "..", serverRuntimeDest),
+    path.resolve(__dirname, serverRuntimeDest),
+    path.resolve(__dirname, "..", clientRuntimeDest),
+    path.resolve(__dirname, clientRuntimeDest),
+    path.resolve(__dirname, "wasm-contract", sourceBase),
+    path.resolve(__dirname, "../app/wasm-contract", sourceBase),
+    path.resolve(__dirname, "../client/public", sourceBase),
+    path.resolve(__dirname, "../client", sourceBase),
+  ];
+}
+
+export function listWasmModules(): string[] {
+  return manifest.modules.map((mod) => mod.moduleKey);
+}
+
+export function defaultWasmModuleKey(): string {
+  return manifest.defaultModuleKey;
+}
+
+export async function readServerWasmModuleByteLength(moduleKey: string): Promise<number> {
+  const wasmCandidates = wasmCandidatesFor(moduleKey);
   let bytes: Buffer | null = null;
   for (const p of wasmCandidates) {
     try {
@@ -54,7 +77,11 @@ export async function readServerWasmContractByteLength(): Promise<number> {
     } catch {}
   }
   if (!bytes) {
-    throw new Error("server wasm contract asset is missing from expected runtime paths");
+    throw new Error(`server wasm contract asset is missing for module '${moduleKey}'`);
   }
   return bytes.byteLength;
+}
+
+export async function readServerWasmContractByteLength(): Promise<number> {
+  return readServerWasmModuleByteLength(defaultWasmModuleKey());
 }

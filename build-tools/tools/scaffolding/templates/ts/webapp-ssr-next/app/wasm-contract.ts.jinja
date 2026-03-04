@@ -28,8 +28,9 @@ export function defaultWasmModuleKey(): string {
 }
 
 export async function readWasmModuleBytes(moduleKey: string): Promise<Uint8Array> {
-  manifestEntryFor(moduleKey);
-  const wasmUrl = new URL("/top.wasm", window.location.href).toString();
+  const entry = manifestEntryFor(moduleKey);
+  const clientPath = entry.runtimeDestinations.client.replace(/^client\/public\//, "");
+  const wasmUrl = new URL(`/${clientPath}`, window.location.href).toString();
   const res = await fetch(wasmUrl);
   if (!res.ok) {
     throw new Error(`failed to load wasm module '${moduleKey}': ${res.status}`);

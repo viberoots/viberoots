@@ -143,7 +143,7 @@ For `scaf new ts webapp-ssr-next <name>`, the generated `next.config.mjs` includ
 - `transpilePackages` derived from the same `workspace:`, `link:`, and `file:` dependency specs.
 - `experimental.externalDir = true` so workspace-linked source outside the app directory is resolvable in dev mode.
 - `dev` and `dev:ssr` compose `next dev` with a wasm producer watcher.
-- `dev:wasm:watch` rebuilds from `app/wasm-producer/payload.txt` and syncs `app/wasm-contract/top.wasm`.
+- `dev:wasm:watch` rebuilds from `app/wasm-producer/*.txt` inputs and syncs each declared module key destination from `app/wasm-modules.manifest.json`.
 
 Troubleshooting when local dependency edits do not refresh:
 
@@ -171,6 +171,8 @@ buck2 test //:scaffolding_webapp_ssr_vite_dev_runtime_consistency_phase3
 buck2 test //:scaffolding_webapp_ssr_next_dev_hmr_local_ts_dep
 buck2 test //:scaffolding_webapp_ssr_next_dev_reload_wasm_producer
 buck2 test //:scaffolding_webapp_ssr_next_dev_runtime_consistency
+buck2 test //:scaffolding_webapp_ssr_next_dev_multi_module_runtime_contract
+buck2 test //:scaffolding_webapp_multi_template_parity_contract
 buck2 test //:scaffolding_template_conventions_metadata_cquery
 buck2 test //:scaffolding_ts_command_path_docs_contract
 buck2 test //:scaffolding_webapp_multi_module_manifest_contract
@@ -397,17 +399,17 @@ If you change dependencies in an importer, update the lockfile and then run:
 
 I stage runtime Wasm artifacts explicitly so the built `dist/` includes them without changing Vite/Next build steps. The pattern is a two-step build where `node_webapp` produces the base output and `node_asset_stage` copies the Wasm into the final output directory.
 
-Shared client-side contract paths:
+Shared client-side contract path pattern:
 
-- `webapp-static`: `dist/top.wasm` and `dist/wasm-inline/index.js`
-- `webapp-ssr-next`: `dist/client/public/top.wasm` and `dist/client/public/wasm-inline/index.js`
-- `webapp-ssr-vite`: `dist/client/top.wasm` and `dist/client/wasm-inline/index.js`
+- `webapp-static`: `dist/<module>.wasm` and `dist/wasm-inline/index.js`
+- `webapp-ssr-next`: `dist/client/public/<module>.wasm` and `dist/client/public/wasm-inline/index.js`
+- `webapp-ssr-vite`: `dist/client/<module>.wasm` and `dist/client/wasm-inline/index.js`
 
-Shared server-side parity contract path:
+Shared server-side parity contract path pattern:
 
-- `webapp-static`: `dist/server/wasm-contract/top.wasm`
-- `webapp-ssr-next`: `dist/server/wasm-contract/top.wasm`
-- `webapp-ssr-vite`: `dist/server/wasm-contract/top.wasm`
+- `webapp-static`: `dist/server/wasm-contract/<module>.wasm`
+- `webapp-ssr-next`: `dist/server/wasm-contract/<module>.wasm`
+- `webapp-ssr-vite`: `dist/server/wasm-contract/<module>.wasm`
 
 Static example:
 

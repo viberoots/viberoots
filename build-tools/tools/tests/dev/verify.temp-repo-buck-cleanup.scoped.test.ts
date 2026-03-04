@@ -55,6 +55,45 @@ async function waitForNoForkserver(token: string, timeoutMs: number): Promise<vo
   );
 }
 
+function psLinesMatching(substr: string): Promise<string[]> {
+  return new Promise((resolve) => {
+    const child = spawn("/bin/ps", ["-A", "-o", "pid=,ppid=,command="], {
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    let buf = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (d) => (buf += d));
+    child.on("error", () => resolve([]));
+    child.on("close", () => {
+      const lines = String(buf || "")
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean);
+      resolve(lines.filter((l) => l.includes(substr)));
+    });
+  });
+}
+
+async function waitForProcess(substr: string, timeoutMs: number): Promise<void> {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    const lines = await psLinesMatching(substr);
+    if (lines.length > 0) return;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error(`expected process containing '${substr}'`);
+}
+
+async function waitForNoProcess(substr: string, timeoutMs: number): Promise<void> {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    const lines = await psLinesMatching(substr);
+    if (lines.length === 0) return;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error(`expected no process containing '${substr}'`);
+}
+
 test(
   "verify cleanup: scoped temp repo buck cleanup does not kill other temp repos",
   { timeout: 240_000 },
@@ -160,6 +199,50 @@ test(
       if (stateDir) {
         await fsp.rm(stateDir, { recursive: true, force: true }).catch(() => {});
       }
+    }
+  },
+);
+
+test(
+  "verify cleanup: scoped temp repo process cleanup does not kill foreign temp repo dev servers",
+  { timeout: 120_000 },
+  async () => {
+    const ownedTmp = await fsp.mkdtemp(path.join(os.tmpdir(), "verify-owned-dev-"));
+    const foreignTmp = await fsp.mkdtemp(path.join(os.tmpdir(), "verify-foreign-dev-"));
+    const ownedScript = path.join(ownedTmp, "projects/apps/demo-vite-ssr/server/dev.mjs");
+    const foreignScript = path.join(foreignTmp, "projects/apps/demo-vite-ssr/server/dev.mjs");
+    const mkScript = async (p: string) => {
+      await fsp.mkdir(path.dirname(p), { recursive: true });
+      await fsp.writeFile(p, "setInterval(() => {}, 1000);", "utf8");
+    };
+    await mkScript(ownedScript);
+    await mkScript(foreignScript);
+    const owned = spawn(process.execPath, [ownedScript], { stdio: "ignore" });
+    const foreign = spawn(process.execPath, [foreignScript], { stdio: "ignore" });
+    const ownedKey = `${ownedTmp}/projects/apps/demo-vite-ssr/server/dev.mjs`;
+    const foreignKey = `${foreignTmp}/projects/apps/demo-vite-ssr/server/dev.mjs`;
+    let stateDir = "";
+    try {
+      await waitForProcess(ownedKey, 10_000);
+      await waitForProcess(foreignKey, 10_000);
+      stateDir = await fsp.mkdtemp(path.join(os.tmpdir(), "buck-cleanup-state-"));
+      const stateFile = path.join(stateDir, "state.txt");
+      await fsp.writeFile(stateFile, `${ownedTmp}\n`, "utf8");
+      await cleanupRegisteredTempRepos({ stateFile, maxKills: 50 });
+      await waitForNoProcess(ownedKey, 10_000);
+      await waitForProcess(foreignKey, 10_000);
+    } finally {
+      try {
+        owned.kill("SIGKILL");
+      } catch {}
+      try {
+        foreign.kill("SIGKILL");
+      } catch {}
+      if (stateDir) {
+        await fsp.rm(stateDir, { recursive: true, force: true }).catch(() => {});
+      }
+      await fsp.rm(ownedTmp, { recursive: true, force: true }).catch(() => {});
+      await fsp.rm(foreignTmp, { recursive: true, force: true }).catch(() => {});
     }
   },
 );

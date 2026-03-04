@@ -72,7 +72,7 @@ test(
         "utf8",
       );
       assert.match(nextClientWasm, /export async function readWasmContractBytes\(\)/);
-      assert.match(nextClientWasm, /\/top\.wasm/);
+      assert.match(nextClientWasm, /runtimeDestinations\.client/);
       assert.match(nextClientWasm, /\/wasm-inline\/index\.js/);
 
       const nextServerWasm = await fsp.readFile(
@@ -80,7 +80,7 @@ test(
         "utf8",
       );
       assert.match(nextServerWasm, /export async function readServerWasmContractByteLength\(\)/);
-      assert.match(nextServerWasm, /wasmCandidates/);
+      assert.match(nextServerWasm, /wasmCandidatesFor/);
       assert.match(nextServerWasm, /server wasm contract asset is missing/);
     });
   },

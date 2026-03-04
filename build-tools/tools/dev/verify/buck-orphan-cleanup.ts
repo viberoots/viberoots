@@ -11,6 +11,7 @@ import {
   tryRepoRootFromStateDir,
 } from "./buck-orphan-cleanup-lib";
 import type { ForkserverProc } from "./buck-orphan-cleanup-lib";
+import { cleanupTempRepoProcesses } from "./temp-repo-process-cleanup";
 
 function parseForkservers(lines: string[]): ForkserverProc[] {
   const forks: ForkserverProc[] = [];
@@ -98,12 +99,7 @@ export async function cleanupOrphanBuckDaemons(opts: {
     if (killed >= maxKills) continue;
 
     const repoOk = await pathExists(repoRoot);
-    // Safety: never kill processes that might belong to another *active* run.
-    // Only clean up when the temp repo root has already been deleted from disk.
-    // (If the repo still exists, we cannot prove the daemon is unused.)
     if (repoOk) continue;
-
-    // Ensure processes are gone when the repo directory no longer exists.
     if (isPidAlive(f.pid)) {
       try {
         process.kill(f.pid, "SIGKILL");
@@ -212,8 +208,6 @@ export async function cleanupRegisteredTempRepos(opts: {
     forks = parseForkservers(await psLines(2000));
   }
 
-  // Final fallback: if buck2 kill + forkserver sweep didn't clear daemons,
-  // kill buck2d processes scoped to registered temp repo basenames.
   const lines2 = await psLines(2000);
   for (const root of uniqueRoots) {
     if (killed >= maxKills) break;
@@ -241,6 +235,12 @@ export async function cleanupRegisteredTempRepos(opts: {
       }
     }
   }
+  const procRes = await cleanupTempRepoProcesses({
+    roots: uniqueRoots,
+    log: opts.log,
+    maxKills: maxKills * 2,
+  });
+  killed += procRes.killed;
 
   return { roots: uniqueRoots.length, killed };
 }

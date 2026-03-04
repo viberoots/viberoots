@@ -123,7 +123,7 @@ test("Phase-2 policy docs: troubleshooting and template parity text are present"
   );
   assert.match(templateReadme, /pnpm run dev:wasm/);
   assert.match(templateReadme, /pnpm run dev:wasm:watch/);
-  assert.match(templateReadme, /app\/wasm-producer\/payload\.txt/);
+  assert.match(templateReadme, /app\/wasm-producer/);
   assert.match(templateReadme, /\[wasm-watch\] sync:ok/);
 
   const scaffoldingDoc = await fsp.readFile(
@@ -133,6 +133,6 @@ test("Phase-2 policy docs: troubleshooting and template parity text are present"
   assert.match(scaffoldingDoc, /webapp-static <name>/);
   assert.match(scaffoldingDoc, /webapp-ssr-vite <name>/);
   assert.match(scaffoldingDoc, /webapp-ssr-next <name>/);
-  assert.match(scaffoldingDoc, /app\/wasm-producer\/payload\.txt/);
-  assert.match(scaffoldingDoc, /app\/wasm-contract\/top\.wasm/);
+  assert.match(scaffoldingDoc, /app\/wasm-producer/);
+  assert.match(scaffoldingDoc, /dist\/server\/wasm-contract\/<module>\.wasm/);
 });
