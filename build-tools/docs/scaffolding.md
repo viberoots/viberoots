@@ -112,7 +112,7 @@ For `scaf new ts webapp-static <name>`, `scaf new ts webapp-ssr-vite <name>`, an
   - `[wasm-watch] sync:ok ... module_type=wasm module_key=<key>`
   - `[wasm-watch] rebuild:fail ... module_type=wasm module_key=<key>` with a recovery command.
 
-For `webapp-ssr-vite`, server-side dev probes can read wasm from `src/wasm-contract/top.wasm` and packaged builds continue to read `dist/server/wasm-contract/top.wasm`.
+For `webapp-ssr-vite`, server-side dev probes read the default wasm module declared in generated manifests, and packaged builds stage each declared server runtime wasm destination under `dist/server/...`.
 
 Phase 5 module contract terms (PR-1 baseline):
 

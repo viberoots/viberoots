@@ -12,7 +12,7 @@
       "Canonical production startup is node dist/server/index.js.",
       "dev and dev:ssr compose Vite SSR dev and a wasm producer watcher with deterministic logs.",
       "dev:ssr:only runs only the Vite SSR middleware server path.",
-      "dev:wasm:watch rebuilds producer input and syncs src/wasm-contract/top.wasm in place.",
+      "dev:wasm:watch rebuilds producer input and syncs declared wasm module paths from generated contracts.",
       "SSR dev runs on http://127.0.0.1:5173 and renders / through Vite ssrLoadModule + transformIndexHtml.",
       "Broken SSR wiring fails deterministically with SSR contract error messages.",
       "Missing packaged SSR paths fail fast with deterministic contract errors for serverEntry/clientDir.",

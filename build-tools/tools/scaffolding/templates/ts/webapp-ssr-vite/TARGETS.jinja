@@ -16,6 +16,8 @@ node_asset_stage(
         {"src": "src/wasm-contract/top.wasm", "dest": "client/top.wasm"},
         {"src": ":wasm_inline", "dest": "client/wasm-inline/index.js"},
         {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},
+        {"src": "src/wasm-modules.manifest.json", "dest": "server/wasm-modules.manifest.json"},
+        {"src": "src/ts-modules.manifest.json", "dest": "server/ts-modules.manifest.json"},
     ],
     labels = ["lang:node", "kind:app", "webapp:ssr", "framework:vite"],
     out = "dist",

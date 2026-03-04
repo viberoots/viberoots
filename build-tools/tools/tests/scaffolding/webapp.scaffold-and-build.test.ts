@@ -93,7 +93,7 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
         throw new Error("dist/wasm-inline/index.js missing in Nix webapp output");
       }
       const entrySource = await fsp.readFile(path.join(appAbs, "src", "wasm-contract.ts"), "utf8");
-      assert.match(entrySource, /\.\/wasm-contract\/top\.wasm/);
+      assert.match(entrySource, /entry\.sourcePath/);
       assert.match(entrySource, /\/wasm-inline\/index\.js/);
     });
   } finally {

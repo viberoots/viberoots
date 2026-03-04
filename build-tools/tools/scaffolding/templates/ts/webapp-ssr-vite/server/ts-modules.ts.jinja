@@ -1,21 +1,54 @@
-const moduleKeys = ["client-entry", "server-entry"] as const;
-const defaultModuleKey = "client-entry";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
+
+type TsModuleManifest = {
+  defaultModuleKey: string;
+  modules: Array<{
+    moduleKey: string;
+    sourceEntryPath: string;
+    runtimeImportPath: string;
+  }>;
+};
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+function readManifestJson(): TsModuleManifest {
+  const candidates = [
+    path.resolve(__dirname, "ts-modules.manifest.json"),
+    path.resolve(__dirname, "../src/ts-modules.manifest.json"),
+    path.resolve(__dirname, "../../src/ts-modules.manifest.json"),
+  ];
+  for (const manifestPath of candidates) {
+    try {
+      return JSON.parse(readFileSync(manifestPath, "utf8")) as TsModuleManifest;
+    } catch {}
+  }
+  throw new Error(`TS module manifest is missing at expected paths: ${candidates.join(", ")}`);
+}
+
+const manifest = readManifestJson();
 
 export type TsModuleNamespace = Record<string, unknown>;
 
 export function listTsModules(): string[] {
-  return [...moduleKeys];
+  return manifest.modules.map((mod) => mod.moduleKey);
 }
 
 export function defaultTsModuleKey(): string {
-  return defaultModuleKey;
+  return manifest.defaultModuleKey;
 }
 
 export async function loadTsModule(moduleKey: string): Promise<TsModuleNamespace> {
-  if (moduleKey === "server-entry") {
+  const entry = manifest.modules.find((mod) => mod.moduleKey === moduleKey);
+  if (!entry) {
+    throw new Error(`unknown TS module key '${moduleKey}'`);
+  }
+  if (entry.runtimeImportPath.includes("entry-server")) {
     const runtimeImportUrl = new URL("./entry-server.js", import.meta.url).href;
     return (await import(runtimeImportUrl)) as TsModuleNamespace;
   }
-  throw new Error(`TS module '${moduleKey}' is not available in server runtime`);
+  throw new Error(`TS module '${moduleKey}' is not available in SSR server runtime`);
 }
 

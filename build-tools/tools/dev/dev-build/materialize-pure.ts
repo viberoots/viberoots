@@ -7,10 +7,10 @@ import {
   parseRunnableManifest,
 } from "../../lib/runnables.ts";
 
-function materializeTimeoutSec(): number {
+function materializeTimeoutSec(defaultSec: number): number {
   const raw = String(process.env.BNX_MATERIALIZE_TIMEOUT_SEC || "").trim();
-  const parsed = Number(raw || "120");
-  if (!Number.isFinite(parsed) || parsed <= 0) return 120;
+  const parsed = Number(raw || String(defaultSec));
+  if (!Number.isFinite(parsed) || parsed <= 0) return defaultSec;
   return Math.floor(parsed);
 }
 
@@ -19,8 +19,9 @@ async function nixBuildPrintOutPaths(opts: {
   env: Record<string, string>;
   args: string;
   label: string;
+  timeoutSec?: number;
 }): Promise<string> {
-  const tout = materializeTimeoutSec();
+  const tout = materializeTimeoutSec(opts.timeoutSec ?? 120);
   const res = await $({
     stdio: "pipe",
     cwd: opts.root,
@@ -133,6 +134,7 @@ export async function materializePureGraphIfEnabled(opts: {
           env: envSel as Record<string, string>,
           args: "--no-write-lock-file .#graph-generator-pure-selected --accept-flake-config --print-out-paths",
           label: `materialize selected target ${sel}`,
+          timeoutSec: 120,
         });
         const outPath =
           String(selOut || "")
@@ -169,6 +171,7 @@ export async function materializePureGraphIfEnabled(opts: {
     env: envFull as Record<string, string>,
     args: "--impure --no-write-lock-file .#graph-generator-pure --accept-flake-config --print-out-paths",
     label: "materialize full pure graph",
+    timeoutSec: 420,
   });
   const purePath =
     String(pureOut || "")

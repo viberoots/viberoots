@@ -64,7 +64,7 @@ test(
         "utf8",
       );
       assert.match(staticClientWasm, /export async function readWasmContractBytes\(\)/);
-      assert.match(staticClientWasm, /\.\/wasm-contract\/top\.wasm/);
+      assert.match(staticClientWasm, /entry\.sourcePath/);
       assert.match(staticClientWasm, /\/wasm-inline\/index\.js/);
 
       const nextClientWasm = await fsp.readFile(

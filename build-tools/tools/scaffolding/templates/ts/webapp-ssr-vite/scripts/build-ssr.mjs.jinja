@@ -1,11 +1,22 @@
 import { execSync } from "node:child_process";
-import { cpSync, mkdirSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync } from "node:fs";
+import path from "node:path";
 
 execSync("vite build --outDir dist/client", { stdio: "inherit" });
 execSync("vite build --ssr src/entry-server.ts --outDir dist/server", { stdio: "inherit" });
 execSync("tsc -p tsconfig.server.json", { stdio: "inherit" });
 
 mkdirSync("dist/server/wasm-contract", { recursive: true });
-cpSync("src/wasm-contract/top.wasm", "dist/server/wasm-contract/top.wasm");
+
+const wasmManifest = JSON.parse(readFileSync("src/wasm-modules.manifest.json", "utf8"));
+for (const entry of wasmManifest.modules || []) {
+  const sourcePath = String(entry.sourcePath || "");
+  const serverDest = String(entry.runtimeDestinations?.server || "");
+  if (!sourcePath || !serverDest) continue;
+  const outAbs = path.join("dist", serverDest);
+  mkdirSync(path.dirname(outAbs), { recursive: true });
+  cpSync(sourcePath, outAbs);
+}
+
 cpSync("src/wasm-modules.manifest.json", "dist/server/wasm-modules.manifest.json");
 cpSync("src/ts-modules.manifest.json", "dist/server/ts-modules.manifest.json");

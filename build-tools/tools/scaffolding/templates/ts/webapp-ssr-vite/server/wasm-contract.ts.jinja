@@ -1,19 +1,81 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as fsp from "node:fs/promises";
+import { readFileSync } from "node:fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const serverRuntimeDest = "server/wasm-contract/top.wasm";
-const wasmCandidates = [
-  path.resolve(__dirname, "..", serverRuntimeDest),
-  path.resolve(__dirname, "wasm-contract", "top.wasm"),
-  path.resolve(__dirname, "../src/wasm-contract/top.wasm"),
-  path.resolve(__dirname, "../client/top.wasm"),
-  path.resolve(__dirname, "../client/public/top.wasm"),
-];
+
+type WasmModuleManifest = {
+  defaultModuleKey: string;
+  modules: Array<{
+    moduleKey: string;
+    sourcePath: string;
+    runtimeDestinations: { client: string; server: string };
+  }>;
+};
+
+function readManifestJson(): WasmModuleManifest | null {
+  const candidates = [
+    path.resolve(__dirname, "wasm-modules.manifest.json"),
+    path.resolve(__dirname, "../src/wasm-modules.manifest.json"),
+    path.resolve(__dirname, "../../src/wasm-modules.manifest.json"),
+  ];
+  for (const manifestPath of candidates) {
+    try {
+      return JSON.parse(readFileSync(manifestPath, "utf8")) as WasmModuleManifest;
+    } catch {}
+  }
+  return null;
+}
+
+async function defaultModuleCandidates(): Promise<string[]> {
+  const manifest = readManifestJson();
+  if (manifest) {
+    const defaultModule = manifest.modules.find((mod) => mod.moduleKey === manifest.defaultModuleKey);
+    if (!defaultModule) {
+      throw new Error(`WASM manifest default module key '${manifest.defaultModuleKey}' is not declared`);
+    }
+    return [
+      path.resolve(__dirname, "..", defaultModule.runtimeDestinations.server),
+      path.resolve(__dirname, defaultModule.runtimeDestinations.server),
+      path.resolve(__dirname, "..", defaultModule.runtimeDestinations.client),
+      path.resolve(__dirname, defaultModule.runtimeDestinations.client),
+      path.resolve(__dirname, "../src/wasm-contract", path.basename(defaultModule.sourcePath)),
+      path.resolve(__dirname, "../../src/wasm-contract", path.basename(defaultModule.sourcePath)),
+    ];
+  }
+
+  const runtimeDirCandidates = [
+    path.resolve(__dirname, "wasm-contract"),
+    path.resolve(__dirname, "..", "wasm-contract"),
+  ];
+  for (const dirAbs of runtimeDirCandidates) {
+    try {
+      const rows = await fsp.readdir(dirAbs);
+      const wasmFiles = rows.filter((name) => name.endsWith(".wasm")).sort();
+      if (wasmFiles.length === 1) {
+        return [path.join(dirAbs, wasmFiles[0]!)];
+      }
+      if (wasmFiles.length > 1) {
+        throw new Error(
+          `server wasm contract directory has multiple wasm files and no manifest: ${dirAbs}`,
+        );
+      }
+    } catch {}
+  }
+  return [
+    path.resolve(__dirname, "wasm-contract", "top.wasm"),
+    path.resolve(__dirname, "..", "wasm-contract", "top.wasm"),
+    path.resolve(__dirname, "..", "client", "top.wasm"),
+    path.resolve(__dirname, "..", "client", "public", "top.wasm"),
+    path.resolve(__dirname, "../src/wasm-contract", "top.wasm"),
+    path.resolve(__dirname, "../../src/wasm-contract", "top.wasm"),
+  ];
+}
 
 export async function readServerWasmContractByteLength(): Promise<number> {
+  const wasmCandidates = await defaultModuleCandidates();
   let bytes: Buffer | null = null;
   for (const p of wasmCandidates) {
     try {

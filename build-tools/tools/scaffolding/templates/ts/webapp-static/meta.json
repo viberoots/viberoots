@@ -12,7 +12,7 @@
       "Local workspace TS dependencies can be imported directly in dev mode; the generated Vite config allows reads from the repo workspace root.",
       "When local dependencies are linked with workspace:/link:/file: specs, the generated Vite config excludes them from optimizeDeps prebundling to preserve live source updates.",
       "Wasm producer bridge loop is wired via pnpm run dev:wasm and pnpm run dev:wasm:watch with deterministic [wasm-watch] logs.",
-      "The watcher sync contract path is src/wasm-contract/top.wasm and uses a serialized rebuild queue.",
+      "The watcher sync contract is module-key driven and uses a serialized rebuild queue across declared wasm module paths.",
       "If local dependency edits do not refresh, confirm the dependency spec is workspace:/link:/file: and restart dev after any package.json change.",
       "SSR alternatives: webapp-ssr-vite for Vite-first SSR, webapp-ssr-next for Next app-router SSR.",
       "Labels include lockfile:projects/apps/<name>/pnpm-lock.yaml#projects/apps/<name> to auto-wire providers."

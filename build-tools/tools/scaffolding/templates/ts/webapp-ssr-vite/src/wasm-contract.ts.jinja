@@ -1,5 +1,4 @@
 import wasmManifest from "./wasm-modules.manifest.json";
-import topWasmUrl from "./wasm-contract/top.wasm?url";
 
 type WasmModuleManifest = {
   defaultModuleKey: string;
@@ -11,9 +10,6 @@ type WasmModuleManifest = {
 };
 
 const manifest = wasmManifest as WasmModuleManifest;
-const wasmModuleUrls: Record<string, string> = {
-  "top-contract": topWasmUrl,
-};
 
 function manifestEntryFor(moduleKey: string) {
   const entry = manifest.modules.find((mod) => mod.moduleKey === moduleKey);
@@ -33,10 +29,7 @@ export function defaultWasmModuleKey(): string {
 
 export async function readWasmModuleBytes(moduleKey: string): Promise<Uint8Array> {
   const entry = manifestEntryFor(moduleKey);
-  const wasmUrl = wasmModuleUrls[entry.moduleKey];
-  if (!wasmUrl) {
-    throw new Error(`missing wasm module URL mapping for '${entry.moduleKey}'`);
-  }
+  const wasmUrl = new URL(`/${entry.sourcePath.replace(/^\.\//, "")}`, window.location.href).toString();
   const res = await fetch(wasmUrl);
   if (!res.ok) {
     throw new Error(`failed to load wasm module '${moduleKey}': ${res.status}`);

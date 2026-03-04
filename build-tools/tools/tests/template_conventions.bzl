@@ -52,6 +52,10 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static"],
         "classification": "template:contract",
     },
+    "build-tools/tools/tests/scaffolding/webapp-static.dev-multi-module-runtime-contract.test.ts": {
+        "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static"],
+        "classification": "template:contract",
+    },
     "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-contract-and-runtime-smoke.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
         "classification": "template:shared",
@@ -89,6 +93,10 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "classification": "template:contract",
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-reload.wasm-producer.test.ts": {
+        "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
+        "classification": "template:contract",
+    },
+    "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-multi-module-runtime-contract.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
         "classification": "template:contract",
     },
