@@ -4,8 +4,6 @@ import path from "node:path";
 import { sanitizeName } from "../lib/sanitize.ts";
 import { toPosixPath } from "../lib/posix-path.ts";
 
-type RuntimePolicy = "static" | "vite" | "next";
-
 export type AssetStageMetadata = {
   wasmModuleRoots: string[];
   labels: string[];
@@ -43,22 +41,17 @@ export function assetStageMetadataFromTargets(
         "m",
       ),
     )?.[0] || "";
-  return {
-    wasmModuleRoots: listAttr(block, "wasm_module_roots"),
-    labels: listAttr(block, "labels"),
-  };
-}
-
-function runtimePolicy(labels: string[]): RuntimePolicy {
-  if (labels.includes("framework:next")) return "next";
-  if (labels.includes("framework:vite")) return "vite";
-  return "static";
-}
-
-function wasmClientDest(policy: RuntimePolicy, basename: string): string {
-  if (policy === "next") return `client/public/${basename}.wasm`;
-  if (policy === "vite") return `client/${basename}.wasm`;
-  return `${basename}.wasm`;
+  const labels = listAttr(block, "labels");
+  const wasmModuleRoots = listAttr(block, "wasm_module_roots");
+  if (wasmModuleRoots.length > 0) {
+    return { wasmModuleRoots, labels };
+  }
+  // Zero-wasm templates omit explicit roots by default. Keep first-module growth zero-edit by
+  // inferring canonical roots from framework labels.
+  if (labels.includes("framework:next")) {
+    return { wasmModuleRoots: ["app/wasm-producer"], labels };
+  }
+  return { wasmModuleRoots: ["src/wasm-producer"], labels };
 }
 
 function moduleKeyFromRelativeNoExt(relativeNoExt: string, suffix: string): string {
@@ -129,7 +122,7 @@ export async function discoverTsModulesFromRoots(
 export async function discoverWasmModulesFromRoots(
   appAbs: string,
   roots: string[],
-  labels: string[],
+  _labels: string[],
 ): Promise<
   Array<{
     moduleKey: string;
@@ -142,7 +135,6 @@ export async function discoverWasmModulesFromRoots(
     sourcePath: string;
     runtimeDestinations: { client: string; server: string };
   }> = [];
-  const policy = runtimePolicy(labels);
   for (const root of roots) {
     const rootAbs = path.join(appAbs, root);
     const files = await walkFiles(rootAbs);
@@ -152,17 +144,18 @@ export async function discoverWasmModulesFromRoots(
       const relNoExt = rel.replace(/\.[^.]+$/, "");
       const rootPosix = toPosixPath(root).replace(/\/+$/, "");
       const relFromRoot = toPosixPath(path.relative(rootAbs, abs)).replace(/\.[^.]+$/, "");
+      const moduleStem = relFromRoot === "payload" ? "top" : relFromRoot;
       const contractRoot = rootPosix.includes("wasm-producer")
         ? rootPosix.replace(/wasm-producer/g, "wasm-contract")
         : `${rootPosix}/../wasm-contract`;
-      const sourcePath = toPosixPath(path.posix.normalize(`${contractRoot}/${relFromRoot}.wasm`));
+      const sourcePath = toPosixPath(path.posix.normalize(`${contractRoot}/${moduleStem}.wasm`));
       const basename = path.posix.basename(sourcePath, ".wasm");
       out.push({
-        moduleKey: moduleKeyFromRelativeNoExt(relNoExt, "-contract"),
+        moduleKey: moduleKeyFromRelativeNoExt(moduleStem, "-contract"),
         sourcePath,
         runtimeDestinations: {
-          client: wasmClientDest(policy, basename),
-          server: `server/wasm-contract/${basename}.wasm`,
+          client: `wasm/${basename}.wasm`,
+          server: `server/wasm/${basename}.wasm`,
         },
       });
     }

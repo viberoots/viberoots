@@ -10,6 +10,7 @@ const rootDir = path.resolve(__dirname, "..");
 const htmlTemplatePath = path.resolve(rootDir, "index.html");
 const host = "127.0.0.1";
 const port = Number(process.env.PORT || "5173");
+const hmrPort = Number(process.env.HMR_PORT || String(port + 1));
 const ssrEntryModule = "/src/entry-server.ts";
 
 async function loadRender(vite, url) {
@@ -38,7 +39,13 @@ const app = express();
 const vite = await createViteServer({
   root: rootDir,
   appType: "custom",
-  server: { middlewareMode: true, host, port, strictPort: true },
+  server: {
+    middlewareMode: true,
+    host,
+    port,
+    strictPort: true,
+    hmr: { host, port: hmrPort, clientPort: hmrPort },
+  },
 });
 
 app.use(vite.middlewares);

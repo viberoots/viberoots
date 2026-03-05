@@ -84,9 +84,9 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
       const stagedWasm = path.join(outPath, "dist", "top.wasm");
       if (!(await exists(stagedWasm)))
         throw new Error("dist/top.wasm missing in Nix webapp output");
-      const serverParityWasm = path.join(outPath, "dist", "server", "wasm-contract", "top.wasm");
+      const serverParityWasm = path.join(outPath, "dist", "server", "wasm", "top.wasm");
       if (!(await exists(serverParityWasm))) {
-        throw new Error("dist/server/wasm-contract/top.wasm missing in Nix webapp output");
+        throw new Error("dist/server/wasm/top.wasm missing in Nix webapp output");
       }
       const inlineModule = path.join(outPath, "dist", "wasm-inline", "index.js");
       if (!(await exists(inlineModule))) {
@@ -94,7 +94,7 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
       }
       const entrySource = await fsp.readFile(path.join(appAbs, "src", "wasm-contract.ts"), "utf8");
       assert.match(entrySource, /entry\.sourcePath/);
-      assert.match(entrySource, /\/wasm-inline\/index\.js/);
+      assert.doesNotMatch(entrySource, /wasm-inline/);
     });
   } finally {
     if (prevRoots === undefined) delete process.env.TEST_RSYNC_ROOTS;

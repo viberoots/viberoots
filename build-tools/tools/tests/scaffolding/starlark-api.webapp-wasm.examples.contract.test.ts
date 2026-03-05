@@ -19,45 +19,29 @@ test(
     );
     assert.match(starlarkApi, /Vite webapp \+ Python wasm library/);
     assert.match(starlarkApi, /nix_python_wasm_lib\(/);
-    assert.match(starlarkApi, /"dest": "top\.wasm"/);
-    assert.match(starlarkApi, /"dest": "wasm-inline\/py\.js"/);
     assert.match(starlarkApi, /"dest": "server\/wasm-contract\/top\.wasm"/);
+    assert.match(starlarkApi, /"dest": "wasm-inline\/py\.js"/);
+    assert.match(starlarkApi, /node_asset_stage\(/);
 
     await runInTemp("starlark-api-webapp-wasm-contract", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
       await $`scaf new ts webapp-static demo-web --yes --no-tests`;
       await $`scaf new ts webapp-ssr-next demo-ssr-next --yes --no-tests`;
-      await $`scaf new ts wasm-linking-app demo-link --yes --no-tests`;
 
       const staticApp = path.join(tmp, "projects", "apps", "demo-web");
       const nextApp = path.join(tmp, "projects", "apps", "demo-ssr-next");
-      const linkingApp = path.join(tmp, "projects", "apps", "demo-link");
 
       const staticTargets = await fsp.readFile(path.join(staticApp, "TARGETS"), "utf8");
       assert.match(staticTargets, /node_webapp\(/);
-      assert.match(staticTargets, /node_wasm_inline_module\(/);
       assert.match(staticTargets, /node_asset_stage\(/);
-      assert.match(staticTargets, /"dest": "top\.wasm"/);
-      assert.match(staticTargets, /"dest": "wasm-inline\/index\.js"/);
-      assert.match(staticTargets, /"dest": "server\/wasm-contract\/top\.wasm"/);
+      assert.match(staticTargets, /assets = \[\]/);
+      assert.doesNotMatch(staticTargets, /node_wasm_inline_module\(/);
 
       const nextTargets = await fsp.readFile(path.join(nextApp, "TARGETS"), "utf8");
       assert.match(nextTargets, /node_webapp\(/);
-      assert.match(nextTargets, /node_wasm_inline_module\(/);
       assert.match(nextTargets, /node_asset_stage\(/);
-      assert.match(nextTargets, /"dest": "client\/public\/top\.wasm"/);
-      assert.match(nextTargets, /"dest": "client\/public\/wasm-inline\/index\.js"/);
-      assert.match(nextTargets, /"dest": "server\/wasm-contract\/top\.wasm"/);
-
-      const linkingTargets = await fsp.readFile(path.join(linkingApp, "TARGETS"), "utf8");
-      assert.match(linkingTargets, /node_asset_stage\(/);
-      assert.match(linkingTargets, /"dest": "top\.wasm"/);
-      assert.match(linkingTargets, /"dest": "wasm-inline\/py\.js"/);
-      const linkingInlineTargets = await fsp.readFile(
-        path.join(tmp, "projects", "libs", "demo-link-wasm-inline", "TARGETS"),
-        "utf8",
-      );
-      assert.match(linkingInlineTargets, /\/\/projects\/libs\/demo-link-py-wasm:py_wasm/);
+      assert.match(nextTargets, /assets = \[\]/);
+      assert.doesNotMatch(nextTargets, /node_wasm_inline_module\(/);
 
       const staticClientWasm = await fsp.readFile(
         path.join(staticApp, "src", "wasm-contract.ts"),
@@ -65,7 +49,7 @@ test(
       );
       assert.match(staticClientWasm, /export async function readWasmContractBytes\(\)/);
       assert.match(staticClientWasm, /entry\.sourcePath/);
-      assert.match(staticClientWasm, /\/wasm-inline\/index\.js/);
+      assert.doesNotMatch(staticClientWasm, /wasm-inline/);
 
       const nextClientWasm = await fsp.readFile(
         path.join(nextApp, "app", "wasm-contract.ts"),
@@ -73,7 +57,7 @@ test(
       );
       assert.match(nextClientWasm, /export async function readWasmContractBytes\(\)/);
       assert.match(nextClientWasm, /runtimeDestinations\.client/);
-      assert.match(nextClientWasm, /\/wasm-inline\/index\.js/);
+      assert.doesNotMatch(nextClientWasm, /wasm-inline/);
 
       const nextServerWasm = await fsp.readFile(
         path.join(nextApp, "server", "wasm-contract.ts"),

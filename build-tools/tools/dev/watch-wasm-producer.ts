@@ -78,25 +78,6 @@ async function copyAtomically(src: string, dst: string): Promise<number> {
   return srcStat.size;
 }
 
-async function mirrorManifestContracts(
-  cwd: string,
-  wasmManifestPath: string,
-  tsManifestPath: string,
-) {
-  const wasmRaw = await fsp.readFile(wasmManifestPath, "utf8");
-  const tsRaw = await fsp.readFile(tsManifestPath, "utf8");
-  for (const rel of ["src/wasm-modules.manifest.json", "app/wasm-modules.manifest.json"]) {
-    const abs = path.resolve(cwd, rel);
-    await fsp.mkdir(path.dirname(abs), { recursive: true });
-    await fsp.writeFile(abs, wasmRaw, "utf8");
-  }
-  for (const rel of ["src/ts-modules.manifest.json", "app/ts-modules.manifest.json"]) {
-    const abs = path.resolve(cwd, rel);
-    await fsp.mkdir(path.dirname(abs), { recursive: true });
-    await fsp.writeFile(abs, tsRaw, "utf8");
-  }
-}
-
 async function main() {
   const cwd = path.resolve(getFlagStr("cwd", process.cwd()) || process.cwd());
   const pollMs = Math.max(100, Number(getFlagStr("poll-ms", "300")));
@@ -127,7 +108,6 @@ async function main() {
     );
     wasmManifest = resolved.wasmManifestPath;
     tsManifest = resolved.tsManifestPath;
-    await mirrorManifestContracts(cwd, wasmManifest, tsManifest);
     console.error(
       `[wasm-watch] contracts:generated app_target=${resolved.appTargetLabel} app_id=${resolved.appId} dir=${resolved.contractsDir}`,
     );
@@ -199,10 +179,14 @@ async function main() {
         );
         try {
           await runBuildStep(spec.buildCommand, cwd);
-          const copiedSize = await copyAtomically(spec.buildOut, spec.syncOut);
+          const syncOuts = [spec.syncOut, ...(spec.extraSyncOuts || [])];
+          let copiedSize = 0;
+          for (const outPath of syncOuts) {
+            copiedSize = await copyAtomically(spec.buildOut, outPath);
+          }
           const elapsed = Date.now() - startedAt;
           console.error(
-            `[wasm-watch] sync:ok seq=${seq} module_type=${spec.moduleType} module_key=${moduleKey} bytes=${copiedSize} elapsed_ms=${elapsed} out=${spec.syncOut}`,
+            `[wasm-watch] sync:ok seq=${seq} module_type=${spec.moduleType} module_key=${moduleKey} bytes=${copiedSize} elapsed_ms=${elapsed} out=${syncOuts.join(",")}`,
           );
         } catch (err) {
           const elapsed = Date.now() - startedAt;

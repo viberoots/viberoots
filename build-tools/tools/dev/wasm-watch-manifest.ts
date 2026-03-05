@@ -14,6 +14,7 @@ export type WasmModuleSpec = {
   buildCommand: string;
   buildOut: string;
   syncOut: string;
+  extraSyncOuts: string[];
 };
 
 function splitList(value: string): string[] {
@@ -89,6 +90,13 @@ export async function specsFromWasmManifest(
       buildCommand: buildCmd,
       buildOut: path.resolve(cwd, buildOutRel),
       syncOut: path.resolve(cwd, entry.sourcePath),
+      extraSyncOuts: Array.from(
+        new Set(
+          [entry.runtimeDestinations.client, entry.runtimeDestinations.server]
+            .map((p) => path.resolve(cwd, p))
+            .filter((p) => p !== path.resolve(cwd, entry.sourcePath)),
+        ),
+      ),
     };
   });
 }
@@ -136,5 +144,6 @@ export function legacySpecFromFlags(
     buildCommand: args.buildCommand,
     buildOut: path.resolve(cwd, args.buildOut),
     syncOut: path.resolve(cwd, args.syncOut),
+    extraSyncOuts: [],
   };
 }

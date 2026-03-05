@@ -101,7 +101,7 @@ EOF
             fi
             "$VITE_BIN" build
             test -d dist
-            stage_wasm_contract "src/wasm-contract/top.wasm" "dist" "dist/server/wasm-contract"
+            stage_wasm_contract "src/wasm-contract/top.wasm" "dist" "dist/server/wasm"
           elif [ "$WEBAPP_FRAMEWORK" = "express" ] || [ "$WEBAPP_FRAMEWORK" = "vite" ]; then
             if [ ! -x "$VITE_BIN" ] || [ ! -x "$TSC_BIN" ]; then
               echo "[nix] ERROR: expected vite and tsc binaries for Express/Vite SSR build" >&2
@@ -112,7 +112,7 @@ EOF
             "$TSC_BIN" -p tsconfig.server.json
             test -d dist/client
             test -f dist/server/index.js
-            stage_wasm_contract "src/wasm-contract/top.wasm" "dist/client" "dist/server/wasm-contract"
+            stage_wasm_contract "src/wasm-contract/top.wasm" "dist/client" "dist/server/wasm"
             if [ -f src/wasm-modules.manifest.json ]; then
               cp -f src/wasm-modules.manifest.json dist/server/wasm-modules.manifest.json
             fi
@@ -145,7 +145,7 @@ EOF
             test -d dist/client
             test -f dist/server/index.js
             test -f dist/server/server-main.js
-            stage_wasm_contract "app/wasm-contract/top.wasm" "dist/client/public" "dist/server/wasm-contract"
+            stage_wasm_contract "app/wasm-contract/top.wasm" "dist/client/public" "dist/server/wasm"
             if [ -f app/wasm-modules.manifest.json ]; then
               cp -f app/wasm-modules.manifest.json dist/server/wasm-modules.manifest.json
             fi

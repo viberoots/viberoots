@@ -42,11 +42,14 @@ in
       stage_wasm_contract() {
         local wasm_src="$1"
         local client_root="$2"
+        local server_root="$3"
         if [ ! -f "$wasm_src" ]; then
           return 0
         fi
         mkdir -p "$client_root/wasm-inline"
+        mkdir -p "$server_root"
         cp -f "$wasm_src" "$client_root/top.wasm"
+        cp -f "$wasm_src" "$server_root/top.wasm"
         local wasm_b64
         wasm_b64="$(base64 < "$wasm_src" | tr -d '\n')"
         cat > "$client_root/wasm-inline/index.js" <<EOF
@@ -78,7 +81,7 @@ EOF
         fi
         "$VITE_BIN" build
         test -d dist
-        stage_wasm_contract "src/wasm-contract/top.wasm" "dist"
+        stage_wasm_contract "src/wasm-contract/top.wasm" "dist" "dist/server/wasm"
       '' else if framework == "express" || framework == "vite" then ''
         if [ ! -x "$VITE_BIN" ] || [ ! -x "$TSC_BIN" ]; then
           echo "node planner: expected vite and tsc in locked node_modules for ${importerDir}" >&2
@@ -89,7 +92,7 @@ EOF
         "$TSC_BIN" -p tsconfig.server.json
         test -d dist/client
         test -f dist/server/index.js
-        stage_wasm_contract "src/wasm-contract/top.wasm" "dist/client"
+        stage_wasm_contract "src/wasm-contract/top.wasm" "dist/client" "dist/server/wasm"
         if [ -f src/wasm-modules.manifest.json ]; then
           cp -f src/wasm-modules.manifest.json dist/server/wasm-modules.manifest.json
         fi
@@ -122,7 +125,7 @@ EOF
         test -d dist/client
         test -f dist/server/index.js
         test -f dist/server/server-main.js
-        stage_wasm_contract "app/wasm-contract/top.wasm" "dist/client/public"
+        stage_wasm_contract "app/wasm-contract/top.wasm" "dist/client/public" "dist/server/wasm"
         if [ -f app/wasm-modules.manifest.json ]; then
           cp -f app/wasm-modules.manifest.json dist/server/wasm-modules.manifest.json
         fi

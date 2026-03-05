@@ -17,15 +17,6 @@ import { stopServer } from "./lib/webapp-static-hmr";
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
-function addExtraWasmAssets(targetsRaw: string): string {
-  const anchor = `        {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},\n`;
-  const extra = [
-    `        {"src": "src/wasm-contract/extra.wasm", "dest": "extra.wasm"},`,
-    `        {"src": "src/wasm-contract/extra.wasm", "dest": "server/wasm-contract/extra.wasm"},`,
-  ].join("\n");
-  return targetsRaw.replace(anchor, `${anchor}${extra}\n`);
-}
-
 test(
   "webapp-static runtime contract supports generated multi-module manifests",
   { timeout: TEST_TIMEOUT_MS },
@@ -39,8 +30,6 @@ test(
       const libAbs = path.join(tmp, "projects", "libs", "demo-lib");
       const appPkgPath = path.join(appAbs, "package.json");
       const libPkgPath = path.join(libAbs, "package.json");
-      const targetsPath = path.join(appAbs, "TARGETS");
-      const extraWasmPath = path.join(appAbs, "src", "wasm-contract", "extra.wasm");
       const topPayloadPath = path.join(appAbs, "src", "wasm-producer", "payload.txt");
       const extraPayloadPath = path.join(appAbs, "src", "wasm-producer", "extra.txt");
       const loaderPath = path.join(appAbs, "src", "wasm-contract.ts");
@@ -63,9 +52,6 @@ test(
       };
       await fsp.writeFile(libPkgPath, JSON.stringify(nextLibPkg, null, 2) + "\n", "utf8");
 
-      const targetsRaw = await fsp.readFile(targetsPath, "utf8");
-      await fsp.writeFile(targetsPath, addExtraWasmAssets(targetsRaw), "utf8");
-      await fsp.writeFile(extraWasmPath, "wasm-producer:extra-a", "utf8");
       await fsp.writeFile(topPayloadPath, "top-a", "utf8");
       await fsp.writeFile(extraPayloadPath, "extra-a", "utf8");
 
@@ -84,8 +70,14 @@ test(
         "static-generated-ts",
       );
       assert.ok(wasmManifest.modules.some((m) => m.moduleKey === "top-contract"));
-      assert.ok(wasmManifest.modules.some((m) => m.moduleKey === "extra-contract"));
+      assert.ok(wasmManifest.modules.some((m) => m.moduleKey.endsWith("extra-contract")));
       assert.ok(tsManifest.modules.some((m) => m.runtimeImportPath === "@libs/demo-lib"));
+      const payloadEntry = wasmManifest.modules.find((m) => m.moduleKey === "top-contract");
+      const extraEntry = wasmManifest.modules.find((m) => m.moduleKey.endsWith("extra-contract"));
+      assert.ok(payloadEntry);
+      assert.ok(extraEntry);
+      const payloadWasmPath = path.join(appAbs, payloadEntry!.sourcePath);
+      const extraWasmPath = path.join(appAbs, extraEntry!.sourcePath);
 
       const loaderSrc = await fsp.readFile(loaderPath, "utf8");
       const tsLoaderSrc = await fsp.readFile(tsLoaderPath, "utf8");
@@ -114,11 +106,8 @@ test(
 
       try {
         await waitForValue(
-          async () =>
-            await fsp.readFile(path.join(appAbs, "src", "wasm-contract", "top.wasm"), "utf8"),
+          async () => await fsp.readFile(payloadWasmPath, "utf8"),
           (v) => v.includes("wasm-producer:top-a"),
-          20000,
-          150,
         );
         await waitForValue(
           async () => await fsp.readFile(extraWasmPath, "utf8"),
@@ -131,11 +120,8 @@ test(
         await writeAndBumpMtime(extraPayloadPath, "extra-b");
 
         await waitForValue(
-          async () =>
-            await fsp.readFile(path.join(appAbs, "src", "wasm-contract", "top.wasm"), "utf8"),
+          async () => await fsp.readFile(payloadWasmPath, "utf8"),
           (v) => v.includes("wasm-producer:top-b"),
-          20000,
-          150,
         );
         await waitForValue(
           async () => await fsp.readFile(extraWasmPath, "utf8"),
@@ -144,8 +130,8 @@ test(
           150,
         );
         const merged = logs.join("");
-        assert.match(merged, /module_key=top-contract/);
-        assert.match(merged, /module_key=extra-contract/);
+        assert.match(merged, new RegExp(`module_key=${payloadEntry!.moduleKey}`));
+        assert.match(merged, new RegExp(`module_key=${extraEntry!.moduleKey}`));
       } finally {
         await stopServer(watcher);
       }

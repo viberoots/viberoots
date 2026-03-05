@@ -23,8 +23,6 @@ execSync(
 execSync("next build", { stdio: "inherit" });
 execSync("tsc -p tsconfig.server.json", { stdio: "inherit" });
 
-mkdirSync("dist/server/wasm-contract", { recursive: true });
-
 const wasmManifest = JSON.parse(readFileSync(wasmManifestPath, "utf8"));
 for (const entry of wasmManifest.modules || []) {
   const sourcePath = String(entry.sourcePath || "");

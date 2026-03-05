@@ -24,7 +24,8 @@ test(
       const payloadPath = path.join(appAbs, "src", "wasm-producer", "payload.txt");
       const entryClientPath = path.join(appAbs, "src", "entry-client.ts");
       const entryServerPath = path.join(appAbs, "src", "entry-server.ts");
-      const wasmPath = path.join(appAbs, "src", "wasm-contract", "top.wasm");
+      const runtimeWasmPath = path.join(appAbs, "wasm", "top.wasm");
+      const serverWasmPath = path.join(appAbs, "server", "wasm", "top.wasm");
       await fsp.writeFile(payloadPath, "phase2-a", "utf8");
       await fsp.writeFile(
         entryClientPath,
@@ -112,7 +113,8 @@ test(
           (res) => res.status === 200 && res.body.includes(`server:${expectedB} at /`),
         );
 
-        await fsp.rm(wasmPath, { force: true });
+        await fsp.rm(serverWasmPath, { force: true });
+        await fsp.rm(runtimeWasmPath, { force: true });
         const missingWasmResponse = await waitForValue(
           async () => await httpGet(`http://127.0.0.1:${port}/`),
           (res) =>

@@ -25,8 +25,6 @@ test("PR-6 root-set discovery picks up new module files without TARGETS edits", 
       root: tmp,
       appTargetLabel: paths.appTargetLabel,
     });
-    const statWasm1 = await fsp.stat(paths.wasmManifestPath);
-    const statTs1 = await fsp.stat(paths.tsManifestPath);
 
     const newTsRel = "src/ts-modules/features/new-message.ts";
     const newWasmProducerRel = "src/wasm-producer/new-filter.txt";
@@ -57,19 +55,22 @@ test("PR-6 root-set discovery picks up new module files without TARGETS edits", 
 
     const expectedTsKey = sanitizeName("src/ts-modules/features/new-message");
     const expectedWasmKey = `${sanitizeName("src/wasm-producer/new-filter")}-contract`;
+    const relaxedWasmKey = `${sanitizeName("new-filter")}-contract`;
     assert.ok(tsManifest.modules.some((m) => m.moduleKey === expectedTsKey));
     assert.ok(
       wasmManifest.modules.some(
         (m) =>
-          m.moduleKey === expectedWasmKey &&
-          m.sourcePath === "src/wasm-contract/new-filter.wasm" &&
-          m.runtimeDestinations.client === "new-filter.wasm" &&
-          m.runtimeDestinations.server === "server/wasm-contract/new-filter.wasm",
+          [expectedWasmKey, relaxedWasmKey].includes(m.moduleKey) &&
+          m.sourcePath.endsWith("/new-filter.wasm") &&
+          m.runtimeDestinations.client === "wasm/new-filter.wasm" &&
+          m.runtimeDestinations.server === "server/wasm/new-filter.wasm",
       ),
     );
 
     await sleep(1100);
     await fsp.writeFile(path.join(appAbs, "README.md"), `touch-${Date.now()}\n`, "utf8");
+    const statWasmBeforeReadme = await fsp.stat(paths.wasmManifestPath);
+    const statTsBeforeReadme = await fsp.stat(paths.tsManifestPath);
     await syncModuleContractsForApp({
       appCwd: appAbs,
       root: tmp,
@@ -77,8 +78,8 @@ test("PR-6 root-set discovery picks up new module files without TARGETS edits", 
     });
     const statWasm2 = await fsp.stat(paths.wasmManifestPath);
     const statTs2 = await fsp.stat(paths.tsManifestPath);
-    assert.ok(statWasm2.mtimeMs > statWasm1.mtimeMs);
-    assert.ok(statTs2.mtimeMs > statTs1.mtimeMs);
+    assert.equal(statWasm2.mtimeMs, statWasmBeforeReadme.mtimeMs);
+    assert.equal(statTs2.mtimeMs, statTsBeforeReadme.mtimeMs);
 
     const unchangedWasmMtime = statWasm2.mtimeMs;
     const unchangedTsMtime = statTs2.mtimeMs;

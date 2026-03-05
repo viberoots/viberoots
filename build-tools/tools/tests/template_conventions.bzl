@@ -191,6 +191,14 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
+    "build-tools/tools/tests/scaffolding/webapp.module-surface-dependency-growth.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
+    },
     "build-tools/tools/tests/scaffolding/webapp.multi-template.parity.contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/webapp-static",
@@ -224,6 +232,38 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "classification": "template:shared",
     },
     "build-tools/tools/tests/scaffolding/webapp.phase5.final-goal-validation.ssr-next.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
+    },
+    "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.static.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
+    },
+    "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.ssr-vite.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
+    },
+    "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.ssr-next.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
+    },
+    "build-tools/tools/tests/scaffolding/webapp.zero-wasm-to-multi-wasm-growth.contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/webapp-static",
             "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",

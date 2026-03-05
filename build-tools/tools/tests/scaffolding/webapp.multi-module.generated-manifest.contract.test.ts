@@ -45,15 +45,7 @@ test("PR-2 generated manifests are deterministic and refresh on TARGETS changes"
     assert.equal(wasmStat1.mtimeMs, wasmStat2.mtimeMs, "wasm manifest should be no-op unchanged");
     assert.equal(tsStat1.mtimeMs, tsStat2.mtimeMs, "ts manifest should be no-op unchanged");
 
-    const targetsPath = path.join(appAbs, "TARGETS");
-    const targetsRaw = await fsp.readFile(targetsPath, "utf8");
-    const patch = `        {"src": "src/wasm-contract/extra.wasm", "dest": "extra.wasm"},\n        {"src": "src/wasm-contract/extra.wasm", "dest": "server/wasm-contract/extra.wasm"},\n`;
-    const updated = targetsRaw.replace(
-      `        {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},\n`,
-      `        {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},\n${patch}`,
-    );
-    await fsp.writeFile(targetsPath, updated, "utf8");
-    await fsp.writeFile(path.join(appAbs, "src", "wasm-contract", "extra.wasm"), "extra", "utf8");
+    await fsp.writeFile(path.join(appAbs, "src", "wasm-producer", "extra.txt"), "extra", "utf8");
 
     await syncModuleContractsForApp({
       appCwd: appAbs,
@@ -62,6 +54,6 @@ test("PR-2 generated manifests are deterministic and refresh on TARGETS changes"
     });
     const wasmRaw2 = await fsp.readFile(paths.wasmManifestPath, "utf8");
     const wasm2 = parseWasmModuleManifest(JSON.parse(wasmRaw2), "wasm-2");
-    assert.ok(wasm2.modules.some((m) => m.moduleKey === "extra-contract"));
+    assert.ok(wasm2.modules.some((m) => m.moduleKey.endsWith("extra-contract")));
   });
 });

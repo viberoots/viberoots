@@ -12,6 +12,9 @@ type WasmModuleManifest = {
 const manifest = wasmManifest as WasmModuleManifest;
 
 function manifestEntryFor(moduleKey: string) {
+  if (manifest.modules.length === 0) {
+    return null;
+  }
   const entry = manifest.modules.find((mod) => mod.moduleKey === moduleKey);
   if (!entry) {
     throw new Error(`unknown wasm module key '${moduleKey}'`);
@@ -24,30 +27,27 @@ export function listWasmModules(): string[] {
 }
 
 export function defaultWasmModuleKey(): string {
-  return manifest.defaultModuleKey;
+  return manifest.defaultModuleKey || "";
 }
 
 export async function readWasmModuleBytes(moduleKey: string): Promise<Uint8Array> {
   const entry = manifestEntryFor(moduleKey);
+  if (!entry) {
+    return new Uint8Array();
+  }
   const clientPath = entry.runtimeDestinations.client.replace(/^client\/public\//, "");
   const wasmUrl = new URL(`/${clientPath}`, window.location.href).toString();
   const res = await fetch(wasmUrl);
   if (!res.ok) {
     throw new Error(`failed to load wasm module '${moduleKey}': ${res.status}`);
   }
-  const bytes = new Uint8Array(await res.arrayBuffer());
-  const inlineUrl = new URL("/wasm-inline/index.js", window.location.href).toString();
-  const inlineRes = await fetch(inlineUrl);
-  if (!inlineRes.ok) {
-    throw new Error(`failed to load inline wasm module: ${inlineRes.status}`);
-  }
-  const inlineText = await inlineRes.text();
-  if (!inlineText.includes("wasmBytesBase64")) {
-    throw new Error("inline wasm contract module shape mismatch");
-  }
-  return bytes;
+  return new Uint8Array(await res.arrayBuffer());
 }
 
 export async function readWasmContractBytes(): Promise<Uint8Array> {
-  return readWasmModuleBytes(defaultWasmModuleKey());
+  const moduleKey = defaultWasmModuleKey();
+  if (!moduleKey) {
+    return new Uint8Array();
+  }
+  return readWasmModuleBytes(moduleKey);
 }

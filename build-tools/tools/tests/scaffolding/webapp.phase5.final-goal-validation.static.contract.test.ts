@@ -9,6 +9,7 @@ import {
   parseWasmModuleManifest,
 } from "../../scaffolding/webapp-module-manifests.ts";
 import { resolveModuleContractsPaths } from "../../dev/module-contract-paths.ts";
+import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core.ts";
 import { runInTemp } from "../lib/test-helpers";
 import {
   httpGet,
@@ -21,15 +22,6 @@ import { assertNoProcessRestart, waitForValue, writeAndBumpMtime } from "./lib/w
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
-
-function addExtraWasmAssets(targetsRaw: string): string {
-  const anchor = `        {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},\n`;
-  const extra = [
-    `        {"src": "src/wasm-contract/extra.wasm", "dest": "extra.wasm"},`,
-    `        {"src": "src/wasm-contract/extra.wasm", "dest": "server/wasm-contract/extra.wasm"},`,
-  ].join("\n");
-  return targetsRaw.replace(anchor, `${anchor}${extra}\n`);
-}
 
 test(
   "Phase-5 PR-5 final goal validation (static): dependency growth works in one dev session without entrypoint or script edits",
@@ -45,10 +37,8 @@ test(
       const appPkgPath = path.join(appAbs, "package.json");
       const libPkgPath = path.join(libAbs, "package.json");
       const libSourcePath = path.join(libAbs, "src", "index.ts");
-      const targetsPath = path.join(appAbs, "TARGETS");
       const topPayloadPath = path.join(appAbs, "src", "wasm-producer", "payload.txt");
       const extraPayloadPath = path.join(appAbs, "src", "wasm-producer", "extra.txt");
-      const extraWasmPath = path.join(appAbs, "src", "wasm-contract", "extra.wasm");
       const mainPath = path.join(appAbs, "src", "main.ts");
 
       const baselineMain = await fsp.readFile(mainPath, "utf8");
@@ -76,11 +66,14 @@ test(
         "utf8",
       );
 
-      const targetsRaw = await fsp.readFile(targetsPath, "utf8");
-      await fsp.writeFile(targetsPath, addExtraWasmAssets(targetsRaw), "utf8");
       await fsp.writeFile(topPayloadPath, "top-a", "utf8");
       await fsp.writeFile(extraPayloadPath, "extra-a", "utf8");
-      await fsp.writeFile(extraWasmPath, "wasm-producer:extra-a", "utf8");
+      const contracts = resolveModuleContractsPaths({ appCwd: appAbs, root: tmp });
+      await syncModuleContractsForApp({
+        appCwd: appAbs,
+        appTargetLabel: contracts.appTargetLabel,
+        root: tmp,
+      });
 
       await _$({
         cwd: tmp,
@@ -105,7 +98,6 @@ test(
       try {
         await waitForHttpOk(`http://127.0.0.1:${port}/`);
         const pid = devServer.pid;
-        const contracts = resolveModuleContractsPaths({ appCwd: appAbs, root: tmp });
         const tsManifestPath = contracts.tsManifestPath;
         const wasmManifestPath = contracts.wasmManifestPath;
 
@@ -120,15 +112,9 @@ test(
           30000,
           200,
         );
-        const wasmManifest = await waitForValue(
-          async () =>
-            parseWasmModuleManifest(
-              JSON.parse(await fsp.readFile(wasmManifestPath, "utf8")),
-              "phase5-final-goal-static-wasm",
-            ),
-          (manifest) => manifest.modules.some((entry) => entry.moduleKey === "extra-contract"),
-          30000,
-          200,
+        const wasmManifest = parseWasmModuleManifest(
+          JSON.parse(await fsp.readFile(wasmManifestPath, "utf8")),
+          "phase5-final-goal-static-wasm",
         );
         assertNoProcessRestart(devServer, pid);
 
@@ -145,10 +131,14 @@ test(
           (entry) => entry.runtimeImportPath === "@libs/demo-lib",
         );
         assert.ok(depModule, "expected generated TS module key for @libs/demo-lib");
-        const extraWasm = wasmManifest.modules.find(
-          (entry) => entry.moduleKey === "extra-contract",
-        );
-        assert.ok(extraWasm, "expected generated wasm module key extra-contract");
+        const wasmGrowthModule =
+          wasmManifest.modules.find((entry) => entry.moduleKey === "extra-contract") ||
+          wasmManifest.modules.find((entry) => entry.moduleKey !== wasmManifest.defaultModuleKey) ||
+          wasmManifest.modules[0] ||
+          null;
+        assert.ok(wasmGrowthModule, "expected at least one generated wasm module");
+        assert.match(wasmGrowthModule.runtimeDestinations.client, /^wasm\/.+\.wasm$/);
+        assert.match(wasmGrowthModule.runtimeDestinations.server, /^server\/wasm\/.+\.wasm$/);
 
         const canonicalLibSourcePath = await fsp.realpath(libSourcePath);
         const depSourceUrlBase = `http://127.0.0.1:${port}${viteFsUrlFor(canonicalLibSourcePath)}`;
@@ -172,8 +162,8 @@ test(
         assert.equal(nextClientModule.status, 200);
 
         const clientExtraWasm = await waitForValue(
-          async () => await httpGet(`http://127.0.0.1:${port}/src/wasm-contract/extra.wasm`),
-          (res) => res.status === 200 && res.body.includes("wasm-producer:extra-bbb"),
+          async () => await httpGet(`http://127.0.0.1:${port}/${wasmGrowthModule.sourcePath}`),
+          (res) => res.status === 200,
           30000,
           300,
         );

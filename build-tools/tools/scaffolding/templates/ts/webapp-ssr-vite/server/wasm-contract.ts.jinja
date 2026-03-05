@@ -37,6 +37,9 @@ function readManifestJson(): WasmModuleManifest {
 const manifest = readManifestJson();
 
 function manifestEntryFor(moduleKey: string) {
+  if (manifest.modules.length === 0) {
+    return null;
+  }
   const entry = manifest.modules.find((mod) => mod.moduleKey === moduleKey);
   if (!entry) {
     throw new Error(`unknown wasm module key '${moduleKey}'`);
@@ -46,14 +49,16 @@ function manifestEntryFor(moduleKey: string) {
 
 function wasmCandidatesFor(moduleKey: string): string[] {
   const entry = manifestEntryFor(moduleKey);
-  const sourceBase = path.basename(entry.sourcePath);
+  if (!entry) {
+    return [];
+  }
+  const serverRuntimeDest = entry.runtimeDestinations.server;
+  const clientRuntimeDest = entry.runtimeDestinations.client;
   return [
-    path.resolve(__dirname, "..", entry.runtimeDestinations.server),
-    path.resolve(__dirname, entry.runtimeDestinations.server),
-    path.resolve(__dirname, "..", entry.runtimeDestinations.client),
-    path.resolve(__dirname, entry.runtimeDestinations.client),
-    path.resolve(__dirname, "../src/wasm-contract", sourceBase),
-    path.resolve(__dirname, "../../src/wasm-contract", sourceBase),
+    path.resolve(__dirname, "..", serverRuntimeDest),
+    path.resolve(__dirname, serverRuntimeDest),
+    path.resolve(__dirname, "..", clientRuntimeDest),
+    path.resolve(__dirname, clientRuntimeDest),
   ];
 }
 
@@ -62,11 +67,14 @@ export function listWasmModules(): string[] {
 }
 
 export function defaultWasmModuleKey(): string {
-  return manifest.defaultModuleKey;
+  return manifest.defaultModuleKey || "";
 }
 
 export async function readServerWasmModuleByteLength(moduleKey: string): Promise<number> {
   const wasmCandidates = wasmCandidatesFor(moduleKey);
+  if (wasmCandidates.length === 0) {
+    return 0;
+  }
   let bytes: Buffer | null = null;
   for (const p of wasmCandidates) {
     try {
@@ -83,5 +91,9 @@ export async function readServerWasmModuleByteLength(moduleKey: string): Promise
 }
 
 export async function readServerWasmContractByteLength(): Promise<number> {
-  return readServerWasmModuleByteLength(defaultWasmModuleKey());
+  const moduleKey = defaultWasmModuleKey();
+  if (!moduleKey) {
+    return 0;
+  }
+  return readServerWasmModuleByteLength(moduleKey);
 }

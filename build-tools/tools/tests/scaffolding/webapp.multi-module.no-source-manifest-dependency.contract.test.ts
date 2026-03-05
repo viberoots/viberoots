@@ -6,6 +6,7 @@ import path from "node:path";
 import { after, test } from "node:test";
 import { resolveModuleContractsPaths } from "../../dev/module-contract-paths.ts";
 import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core.ts";
+import { parseWasmModuleManifest } from "../../scaffolding/webapp-module-manifests.ts";
 import { waitForValue, writeAndBumpMtime } from "./lib/wasm-watch";
 import { runInTemp } from "../lib/test-helpers";
 import { stopServer } from "./lib/webapp-static-hmr";
@@ -54,6 +55,14 @@ test(
       watcher.stdout?.on("data", (chunk) => logs.push(String(chunk || "")));
       watcher.stderr?.on("data", (chunk) => logs.push(String(chunk || "")));
       try {
+        const wasmManifest = parseWasmModuleManifest(
+          JSON.parse(await fsp.readFile(contracts.wasmManifestPath, "utf8")),
+          "no-source-manifest-dependency",
+        );
+        const wasmSourcePath = wasmManifest.modules[0]?.sourcePath;
+        if (!wasmSourcePath) {
+          throw new Error("expected at least one wasm module in generated manifest");
+        }
         await writeAndBumpMtime(
           path.join(appAbs, "src", "wasm-producer", "payload.txt"),
           `source-manifest-free-${Date.now()}`,
@@ -61,8 +70,13 @@ test(
         let body = "";
         try {
           body = await waitForValue(
-            async () =>
-              await fsp.readFile(path.join(appAbs, "src", "wasm-contract", "top.wasm"), "utf8"),
+            async () => {
+              try {
+                return await fsp.readFile(path.join(appAbs, wasmSourcePath), "utf8");
+              } catch {
+                return "";
+              }
+            },
             (txt) => txt.includes("source-manifest-free-"),
             60000,
             150,

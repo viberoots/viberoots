@@ -30,4 +30,8 @@ export const attrList = [
   "defines",
   "cflags",
   "ldflags",
+  "module_kind",
+  "source_roots",
+  "artifact_mapping_policy",
+  "watch_hints",
 ];

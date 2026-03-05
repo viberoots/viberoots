@@ -16,8 +16,8 @@ import {
   assetStageMetadataFromTargets,
   discoverTsModulesFromRoots,
   discoverWasmModulesFromRoots,
-  tsModuleRootsFromTargets,
 } from "./module-surface-discovery.ts";
+import { moduleSurfaceRootsFromGraph } from "./module-surface-graph.ts";
 
 type TsEntry = { moduleKey: string; sourceEntryPath: string; runtimeImportPath: string };
 
@@ -171,6 +171,20 @@ export async function syncModuleContractsForApp(args: {
   const appStageTargetName = paths.appTargetLabel.split(":").pop() || "app";
   const requireServerDestination = await exists(path.join(appAbs, "server", "wasm-contract.ts"));
   const stageMetadata = assetStageMetadataFromTargets(targetsText, appStageTargetName);
+  const graphSurfaceData = await moduleSurfaceRootsFromGraph({
+    repoRoot: paths.repoRoot,
+    appTargetLabel: paths.appTargetLabel,
+  });
+  if (!graphSurfaceData) {
+    throw new Error(
+      `[module-contracts:E_SURFACE_GRAPH_MISSING] missing module-surface graph data for '${paths.appTargetLabel}'`,
+    );
+  }
+  if (graphSurfaceData.tsRoots.length === 0 && graphSurfaceData.wasmRoots.length === 0) {
+    throw new Error(
+      `[module-contracts:E_SURFACE_GRAPH_EMPTY] no module-surface roots exported for '${paths.appTargetLabel}'`,
+    );
+  }
   let wasmModules = wasmEntriesFromTargets(
     targetsText,
     appStageTargetName,
@@ -178,39 +192,39 @@ export async function syncModuleContractsForApp(args: {
   );
   wasmModules = mergeWasmEntries(
     wasmModules,
-    await discoverWasmModulesFromRoots(appAbs, stageMetadata.wasmModuleRoots, stageMetadata.labels),
+    await discoverWasmModulesFromRoots(
+      appAbs,
+      graphSurfaceData.wasmRoots,
+      graphSurfaceData.appLabels,
+    ),
   );
-  if (wasmModules.length === 0) {
-    const conventionalWasmRel = "src/wasm-contract/top.wasm";
-    if (await exists(path.join(appAbs, conventionalWasmRel)))
-      wasmModules = [
-        {
-          moduleKey: "top-contract",
-          sourcePath: conventionalWasmRel,
-          runtimeDestinations: { client: "top.wasm", server: "top.wasm" },
-        },
-      ];
-  }
-  if (wasmModules.length === 0) {
-    throw new Error(
-      "[module-contracts:E_WASM_EMPTY] no wasm module entries discovered from TARGETS or conventional src/wasm-contract/top.wasm",
-    );
-  }
   const tsModules = mergeTsEntries(
     await tsEntries(paths.repoRoot, appAbs, appPkg),
-    await discoverTsModulesFromRoots(appAbs, tsModuleRootsFromTargets(targetsText)),
+    await discoverTsModulesFromRoots(appAbs, graphSurfaceData.tsRoots),
   );
   if (tsModules.length === 0)
     throw new Error(
       "[module-contracts:E_TS_EMPTY] no TS module entries discovered from package.json/workspace sources",
     );
   const wasmDefault =
-    wasmModules.find((m) => m.moduleKey === "top-contract")?.moduleKey || wasmModules[0]!.moduleKey;
+    wasmModules.find((m) => m.moduleKey === "top-contract")?.moduleKey ||
+    wasmModules[0]?.moduleKey ||
+    "";
   const tsDefault =
     tsModules.find((m) => ["default-message", "client-entry", "app-page"].includes(m.moduleKey))
       ?.moduleKey || tsModules[0]!.moduleKey;
+  const wasmManifestText = manifestJson(1, wasmDefault, wasmModules);
+  const tsManifestText = manifestJson(1, tsDefault, tsModules);
   await fsp.mkdir(paths.contractsDir, { recursive: true });
-  await writeIfChanged(paths.wasmManifestPath, manifestJson(1, wasmDefault, wasmModules));
-  await writeIfChanged(paths.tsManifestPath, manifestJson(1, tsDefault, tsModules));
+  await writeIfChanged(paths.wasmManifestPath, wasmManifestText);
+  await writeIfChanged(paths.tsManifestPath, tsManifestText);
+  const manifestDir = graphSurfaceData.appLabels.includes("framework:next")
+    ? path.join(appAbs, "app")
+    : path.join(appAbs, "src");
+  if (await exists(manifestDir)) {
+    await fsp.mkdir(manifestDir, { recursive: true });
+    await writeIfChanged(path.join(manifestDir, "wasm-modules.manifest.json"), wasmManifestText);
+    await writeIfChanged(path.join(manifestDir, "ts-modules.manifest.json"), tsManifestText);
+  }
   return paths;
 }

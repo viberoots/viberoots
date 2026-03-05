@@ -199,10 +199,90 @@ buck2 test //:scaffolding_webapp_phase5_hardcoded_runtime_path_policy_contract
 buck2 test //:scaffolding_webapp_phase5_final_goal_validation_contract
 buck2 test //:scaffolding_webapp_phase5_final_goal_validation_static_contract
 buck2 test //:scaffolding_webapp_phase5_final_goal_validation_ssr_next_contract
+buck2 test //:scaffolding_webapp_zero_wasm_default_static_contract
+buck2 test //:scaffolding_webapp_zero_wasm_default_ssr_vite_contract
+buck2 test //:scaffolding_webapp_zero_wasm_default_ssr_next_contract
+buck2 test //:scaffolding_webapp_zero_wasm_to_multi_wasm_growth_contract
+buck2 test //:scaffolding_webapp_module_surface_dependency_growth_contract
 buck2 test //:scaffolding_template_conventions_metadata_cquery
 buck2 test //:scaffolding_ts_command_path_docs_contract
 buck2 test //:scaffolding_webapp_multi_module_manifest_contract
 ```
+
+PR-7 zero-wasm + growth lock-in:
+
+- generated wasm contracts can be empty (`modules: []`, `defaultModuleKey: ""`) for zero-wasm scaffolds
+- `pnpm run dev` watcher path treats empty wasm manifests as a deterministic no-op
+- runtime wasm helpers return zero-length bytes or byte length `0` when the wasm set is empty
+- adding a first wasm producer file under declared roots rehydrates contracts without script or entrypoint rewiring
+
+### Adding wasm to a zero-wasm webapp (app-owned and dependency-owned)
+
+New `ts/webapp-static`, `ts/webapp-ssr-vite`, and `ts/webapp-ssr-next` scaffolds are zero-wasm by default.
+You do not need to add runtime entrypoint wiring or edit generated manifests by hand.
+
+Primary-path contract:
+
+- generated manifests under `buck-out/tmp/module-contracts/<app-id>/` are authoritative
+- `pnpm run dev` (or `pnpm run dev:ssr`) regenerates contracts and watches module roots
+- module additions are discovered from declared/canonical roots, not per-file `TARGETS` entries
+
+#### A) Add wasm owned by the app itself
+
+1. Put a new producer source/input file in the canonical wasm producer root:
+   - static / vite SSR: `src/wasm-producer/`
+   - next SSR: `app/wasm-producer/`
+2. Run `pnpm run dev` (or keep it running).
+3. Confirm watcher markers:
+   - `[wasm-watch] rebuild:start ... module_key=<key>`
+   - `[wasm-watch] sync:ok ... module_key=<key>`
+4. Consume via generated helpers (module-key APIs), not by hardcoded source paths.
+
+Example (static or vite SSR app):
+
+```text
+projects/apps/demo-web/src/wasm-producer/image-filter.txt
+```
+
+No `TARGETS` edit is required when using canonical roots.
+If your project intentionally uses a non-canonical root, declare it once through `wasm_module_roots` and then keep adding files under that root.
+
+#### B) Add wasm provided by a local dependency
+
+1. In the dependency package, define producer target(s) that export a surface companion (`__surface`).
+2. In the importer webapp `TARGETS`, reference dependency surfaces with:
+   - `module_deps` for standard ergonomics (`//pkg` or `//pkg:target`)
+   - `module_surface_deps` when you need an explicit non-standard surface label
+3. Keep `pnpm run dev` running; dependency-source edits are discovered through producer-surface roots.
+
+Importer example (`node_asset_stage`):
+
+```python
+node_asset_stage(
+    name = "app",
+    app = ":app_raw",
+    assets = [],
+    module_deps = [
+        "//projects/libs/math-wasm",        # -> //projects/libs/math-wasm:math-wasm__surface
+        "//projects/libs/vision-wasm:wasm", # -> //projects/libs/vision-wasm:wasm__surface
+    ],
+    module_surface_deps = [
+        "//projects/libs/special:runtime_surface_override",
+    ],
+    out = "dist",
+)
+```
+
+Dependency growth rule:
+
+- adding new wasm files inside the dependency's declared source roots does not require importer edits
+- importer edits are only needed when adding/removing dependency relationships themselves
+
+#### What you should not do
+
+- do not hand-edit `wasm-modules.manifest.json` / `ts-modules.manifest.json`
+- do not add one watcher script per wasm module
+- do not hardcode `app/wasm-contract/*.wasm` or source-tree manifest paths as authority
 
 #### Subcommands and semantics
 

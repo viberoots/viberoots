@@ -72,19 +72,6 @@ function parsePathsJson(stdout: string): ModuleContractsPaths | null {
   return null;
 }
 
-async function mirrorManifestPair(
-  importerAbs: string,
-  wasmManifestPath: string,
-  tsManifestPath: string,
-): Promise<void> {
-  for (const rootRel of ["src", "app"]) {
-    const rootAbs = path.join(importerAbs, rootRel);
-    if (!(await fileExists(rootAbs))) continue;
-    await fsp.copyFile(wasmManifestPath, path.join(rootAbs, "wasm-modules.manifest.json"));
-    await fsp.copyFile(tsManifestPath, path.join(rootAbs, "ts-modules.manifest.json"));
-  }
-}
-
 export async function syncModuleContractsForWebapps(
   repoRoot: string,
   importers: string[],
@@ -143,24 +130,19 @@ export async function syncModuleContractsForWebapps(
       if (!resolvedPaths) {
         throw new Error(lastErr || `module-contract sync failed for ${importer}`);
       }
-      await mirrorManifestPair(
-        importerAbs,
-        resolvedPaths.wasmManifestPath,
-        resolvedPaths.tsManifestPath,
-      );
       if (verbose) {
-        console.log(`[module-contracts] sync+mirror:ok importer=${importer}`);
+        console.log(`[module-contracts] sync:ok importer=${importer}`);
       }
     } catch (e) {
       if (!requiresContracts) {
         if (verbose) {
           const msg = e instanceof Error ? e.message : String(e);
-          console.log(`[module-contracts] sync+mirror:skip importer=${importer} reason=${msg}`);
+          console.log(`[module-contracts] sync:skip importer=${importer} reason=${msg}`);
         }
         continue;
       }
       const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(`[module-contracts] sync+mirror failed for ${importer}: ${msg}`);
+      throw new Error(`[module-contracts] sync failed for ${importer}: ${msg}`);
     }
   }
 }

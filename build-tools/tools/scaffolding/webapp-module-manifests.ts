@@ -64,10 +64,23 @@ export function parseWasmModuleManifest(value: unknown, context: string): WasmMo
     throw new Error(`${context}: manifest root must be an object`);
   }
   const root = value as Record<string, unknown>;
-  const defaultModuleKey = readString(root, "defaultModuleKey", context);
+  const defaultRaw = root.defaultModuleKey;
+  if (typeof defaultRaw !== "string") {
+    throw new Error(`${context}: 'defaultModuleKey' must be a string`);
+  }
+  const defaultModuleKey = defaultRaw.trim();
   const modules = root.modules;
-  if (!Array.isArray(modules) || modules.length === 0) {
-    throw new Error(`${context}: 'modules' must be a non-empty array`);
+  if (!Array.isArray(modules)) {
+    throw new Error(`${context}: 'modules' must be an array`);
+  }
+  if (modules.length === 0) {
+    if (defaultModuleKey !== "") {
+      throw new Error(`${context}: default module key must be empty when no wasm modules exist`);
+    }
+    return { defaultModuleKey: "", modules: [] };
+  }
+  if (defaultModuleKey === "") {
+    throw new Error(`${context}: default module key must be non-empty when wasm modules exist`);
   }
 
   const parsed: WasmModuleManifestEntry[] = modules.map((entry, index) => {
