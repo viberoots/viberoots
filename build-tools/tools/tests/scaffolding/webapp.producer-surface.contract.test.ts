@@ -95,16 +95,20 @@ test("PR-6 producer surfaces expose deterministic contract attrs", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute module_kind --output-attribute source_roots --output-attribute artifact_mapping_policy --output-attribute watch_hints //projects/libs/go-wasm:wasm__surface //projects/libs/cpp-wasm:core__surface //projects/libs/py-wasm:app__surface //projects/libs/py-wasm:lib__surface //projects/libs/ts-lib:lib__surface //projects/apps/web:app_raw__ts_surface //projects/apps/web:app__wasm_surface`;
-    if (probe.exitCode !== 0) return;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute module_kind --output-attribute source_roots --output-attribute artifact_mapping_policy --output-attribute watch_hints "set(//projects/libs/go-wasm:wasm__surface //projects/libs/cpp-wasm:core__surface //projects/libs/py-wasm:app__surface //projects/libs/py-wasm:lib__surface //projects/libs/ts-lib:lib__surface //projects/apps/web:app_raw__ts_surface //projects/apps/web:app__wasm_surface)"`;
+    assert.equal(
+      probe.exitCode,
+      0,
+      `buck2 producer-surface probe failed:\n${String(probe.stdout || "")}\n${String(probe.stderr || "")}`,
+    );
     const out = String(probe.stdout || "");
-    assert.match(out, /"module_kind":"wasm"/);
-    assert.match(out, /"module_kind":"ts"/);
-    assert.match(out, /"artifact_mapping_policy":"go-tiny-wasm-v1"/);
-    assert.match(out, /"artifact_mapping_policy":"cpp-static-wasm-v1"/);
-    assert.match(out, /"artifact_mapping_policy":"python-wasm-app-v1"/);
-    assert.match(out, /"artifact_mapping_policy":"python-wasm-lib-v1"/);
-    assert.match(out, /"source_roots":\["src\/ts-modules"\]/);
-    assert.match(out, /"source_roots":\["src\/wasm-producer"\]/);
+    assert.match(out, /"module_kind"\s*:\s*"wasm"/);
+    assert.match(out, /"module_kind"\s*:\s*"ts"/);
+    assert.match(out, /"artifact_mapping_policy"\s*:\s*"go-tiny-wasm-v1"/);
+    assert.match(out, /"artifact_mapping_policy"\s*:\s*"cpp-static-wasm-v1"/);
+    assert.match(out, /"artifact_mapping_policy"\s*:\s*"python-wasm-app-v1"/);
+    assert.match(out, /"artifact_mapping_policy"\s*:\s*"python-wasm-lib-v1"/);
+    assert.match(out, /"source_roots"\s*:\s*\[\s*"src\/ts-modules"/);
+    assert.match(out, /"source_roots"\s*:\s*\[\s*"src\/wasm-producer"/);
   });
 });

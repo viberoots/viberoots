@@ -138,6 +138,17 @@ Phase 5 module contract terms (PR-1 baseline):
   - `node_asset_stage(module_deps=[...], module_surface_deps=[...])`
   - producer macros expose source-root attrs for surface metadata (`go_source_roots`, `cpp_source_roots`, `python_source_roots`)
 - Runtime helpers remain generated-authoritative. Source-tree manifests do not satisfy runtime reads.
+- In-session refresh contract (PR-8):
+  - watcher refreshes generated manifests while `pnpm run dev:wasm:watch` is running
+  - added module keys are enrolled with `[wasm-watch] refresh:ok ... added=<keys>`
+  - removed module keys are retired with `[wasm-watch] refresh:ok ... removed=<keys>`
+  - refresh failures are explicit and actionable:
+    - `[wasm-watch] refresh:fail reason=contracts-or-surface-change`
+    - `[wasm-watch] refresh:recovery: fix module contracts or surface metadata, then rerun \`pnpm run dev:wasm:watch\``
+  - refresh cadence is bounded by trigger fingerprint changes and throttle windows; unchanged inputs must not hot-loop refresh probes.
+- Strict contract-test enforcement (PR-8):
+  - Buck probe failures in producer-surface and module-dependency normalization contract tests are hard failures.
+  - Probe commands must not use silent early-return paths on non-zero exit.
 
 Phase-3 runtime consistency checks for `webapp-ssr-vite` in one `pnpm run dev` session:
 
@@ -204,6 +215,8 @@ buck2 test //:scaffolding_webapp_zero_wasm_default_ssr_vite_contract
 buck2 test //:scaffolding_webapp_zero_wasm_default_ssr_next_contract
 buck2 test //:scaffolding_webapp_zero_wasm_to_multi_wasm_growth_contract
 buck2 test //:scaffolding_webapp_module_surface_dependency_growth_contract
+buck2 test //:scaffolding_webapp_phase5_dynamic_refresh_contract
+buck2 test //:scaffolding_webapp_phase5_dynamic_refresh_negative_contract
 buck2 test //:scaffolding_template_conventions_metadata_cquery
 buck2 test //:scaffolding_ts_command_path_docs_contract
 buck2 test //:scaffolding_webapp_multi_module_manifest_contract

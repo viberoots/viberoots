@@ -1,9 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { getFlagStr } from "../lib/cli.ts";
-import { runManagedCommand } from "../lib/managed-command.ts";
 import { resolveModuleContractsPaths } from "./module-contract-paths.ts";
 import { syncModuleContractsForApp } from "./sync-module-contracts-core.ts";
 import {
@@ -12,8 +10,15 @@ import {
   type WasmModuleSpec,
   validateTsManifestProbes,
 } from "./wasm-watch-manifest.ts";
-
-type Fingerprint = { mtimeMs: number; size: number };
+import {
+  type Fingerprint,
+  computeFingerprintMap,
+  copyAtomically,
+  mapsEqual,
+  refreshTriggerPaths,
+  refreshWatcherSpecs,
+  runBuildStep,
+} from "./watch-wasm-producer-ops.ts";
 
 function required(name: string, value: string): string {
   const v = String(value || "").trim();
@@ -21,61 +26,8 @@ function required(name: string, value: string): string {
   return v;
 }
 
-async function fileFingerprint(absPath: string): Promise<Fingerprint> {
-  try {
-    const st = await fsp.stat(absPath);
-    return { mtimeMs: st.mtimeMs, size: st.size };
-  } catch {
-    return { mtimeMs: 0, size: -1 };
-  }
-}
-
-async function computeFingerprintMap(paths: string[]): Promise<Map<string, Fingerprint>> {
-  const out = new Map<string, Fingerprint>();
-  for (const p of paths) out.set(p, await fileFingerprint(p));
-  return out;
-}
-
-function mapsEqual(a: Map<string, Fingerprint>, b: Map<string, Fingerprint>): boolean {
-  if (a.size !== b.size) return false;
-  for (const [k, av] of a.entries()) {
-    const bv = b.get(k);
-    if (!bv) return false;
-    if (av.mtimeMs !== bv.mtimeMs || av.size !== bv.size) return false;
-  }
-  return true;
-}
-
-async function runBuildStep(buildCommand: string, cwd: string): Promise<void> {
-  const result = await runManagedCommand({
-    command: "/bin/bash",
-    args: ["--noprofile", "--norc", "-lc", buildCommand],
-    cwd,
-    env: process.env,
-    timeoutMs: 10 * 60 * 1000,
-  });
-  if (result.ok) return;
-  const stderrTail = String(result.stderr || "").slice(-4000);
-  const stdoutTail = String(result.stdout || "").slice(-2000);
-  throw new Error(
-    [
-      `build command failed (code=${String(result.code)} signal=${String(result.signal)})`,
-      stderrTail ? `stderr tail:\n${stderrTail}` : "",
-      stdoutTail ? `stdout tail:\n${stdoutTail}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n\n"),
-  );
-}
-
-async function copyAtomically(src: string, dst: string): Promise<number> {
-  const srcStat = await fsp.stat(src);
-  const dstDir = path.dirname(dst);
-  await fsp.mkdir(dstDir, { recursive: true });
-  const tmp = path.join(dstDir, `.${path.basename(dst)}.tmp-${process.pid}-${Date.now()}`);
-  await fsp.copyFile(src, tmp);
-  await fsp.rename(tmp, dst);
-  return srcStat.size;
+function uniqueSorted(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
 }
 
 async function main() {
@@ -92,6 +44,13 @@ async function main() {
   const hasLegacyFlags = [watchRaw, buildCmdRaw, buildOutRaw, syncOutRaw].some(
     (value) => String(value || "").trim() !== "",
   );
+  const refreshThrottleMs = Math.max(500, Number(getFlagStr("refresh-throttle-ms", "1200")));
+  let baseRefreshPaths: string[] = [];
+  let refreshState = new Map();
+  let lastRefreshAt = 0;
+  let generatedContracts = false;
+  let generatedAppTarget = "";
+  let generatedRoot = "";
 
   if (!wasmManifest && !tsManifest && !hasLegacyFlags) {
     const resolved = resolveModuleContractsPaths({
@@ -106,13 +65,23 @@ async function main() {
     console.error(
       `[module-contracts] sync:ok app_target=${resolved.appTargetLabel} app_id=${resolved.appId} out=${resolved.contractsDir}`,
     );
+    generatedContracts = true;
+    generatedAppTarget = resolved.appTargetLabel;
+    generatedRoot = resolved.repoRoot;
     wasmManifest = resolved.wasmManifestPath;
     tsManifest = resolved.tsManifestPath;
     console.error(
       `[wasm-watch] contracts:generated app_target=${resolved.appTargetLabel} app_id=${resolved.appId} dir=${resolved.contractsDir}`,
     );
+    baseRefreshPaths = uniqueSorted([
+      wasmManifest,
+      tsManifest,
+      path.join(cwd, "TARGETS"),
+      path.join(cwd, "package.json"),
+      path.join(generatedRoot, "build-tools", "tools", "buck", "graph.json"),
+    ]);
   }
-  const specs = wasmManifest
+  let specs = wasmManifest
     ? await specsFromWasmManifest(cwd, wasmManifest)
     : [
         legacySpecFromFlags(cwd, {
@@ -132,8 +101,14 @@ async function main() {
     const probeLogs = await validateTsManifestProbes(cwd, tsManifest);
     for (const line of probeLogs) console.error(line);
   }
+  if (wasmManifest && baseRefreshPaths.length === 0) {
+    baseRefreshPaths = uniqueSorted([wasmManifest, tsManifest].filter(Boolean));
+  }
+  if (baseRefreshPaths.length > 0) {
+    refreshState = await computeFingerprintMap(refreshTriggerPaths(baseRefreshPaths, specs));
+  }
 
-  const byKey = new Map(specs.map((spec) => [spec.moduleKey, spec]));
+  let byKey = new Map(specs.map((spec) => [spec.moduleKey, spec]));
   const prevByModule = new Map<string, Map<string, Fingerprint>>();
   for (const spec of specs)
     prevByModule.set(spec.moduleKey, await computeFingerprintMap(spec.watchPaths));
@@ -209,6 +184,45 @@ async function main() {
 
   for (;;) {
     await sleep(pollMs);
+    if (baseRefreshPaths.length > 0 && Date.now() - lastRefreshAt >= refreshThrottleMs) {
+      const triggerPaths = refreshTriggerPaths(baseRefreshPaths, specs);
+      const nextRefreshState = await computeFingerprintMap(triggerPaths);
+      if (!mapsEqual(refreshState, nextRefreshState)) {
+        const startedAt = Date.now();
+        console.error("[wasm-watch] refresh:start reason=contracts-or-surface-change");
+        try {
+          const refreshed = await refreshWatcherSpecs({
+            cwd,
+            wasmManifest,
+            tsManifest,
+            specs,
+            generated: generatedContracts
+              ? { appTargetLabel: generatedAppTarget, root: generatedRoot }
+              : null,
+            baseRefreshPaths,
+            prevByModule,
+            pending,
+            pendingCoalesced,
+            queueBuild,
+          });
+          specs = refreshed.specs;
+          byKey = new Map(specs.map((spec) => [spec.moduleKey, spec]));
+          refreshState = refreshed.refreshState;
+          if (specs.length > 0) roundRobinStart = roundRobinStart % specs.length;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(
+            `[wasm-watch] refresh:fail reason=contracts-or-surface-change elapsed_ms=${Date.now() - startedAt}`,
+          );
+          console.error(msg);
+          console.error(
+            "[wasm-watch] refresh:recovery: fix module contracts or surface metadata, then rerun `pnpm run dev:wasm:watch`",
+          );
+        } finally {
+          lastRefreshAt = Date.now();
+        }
+      }
+    }
     for (const spec of specs) {
       const prev = prevByModule.get(spec.moduleKey) || new Map<string, Fingerprint>();
       const next = await computeFingerprintMap(spec.watchPaths);

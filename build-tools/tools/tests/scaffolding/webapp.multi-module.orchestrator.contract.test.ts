@@ -56,10 +56,16 @@ const TEMPLATE_WATCHERS: TemplateWatcherExpectation[] = [
 test("PR-2 contract: watcher emits module-scoped deterministic markers", async () => {
   const watcherPath = path.join(REPO_ROOT, "build-tools", "tools", "dev", "watch-wasm-producer.ts");
   const source = await fsp.readFile(watcherPath, "utf8");
+  const opsPath = path.join(REPO_ROOT, "build-tools", "tools", "dev", "watch-wasm-producer-ops.ts");
+  const opsSource = await fsp.readFile(opsPath, "utf8");
   assert.match(source, /\[wasm-watch\] rebuild:start .*module_type=.*module_key=/);
   assert.match(source, /\[wasm-watch\] sync:ok .*module_type=.*module_key=/);
   assert.match(source, /\[wasm-watch\] rebuild:fail .*module_type=.*module_key=/);
   assert.match(source, /\[wasm-watch\] queue:coalesced module_key=/);
+  assert.match(source, /\[wasm-watch\] refresh:start reason=/);
+  assert.match(source, /\[wasm-watch\] refresh:fail reason=/);
+  assert.match(source, /\[wasm-watch\] refresh:recovery:/);
+  assert.match(opsSource, /\[wasm-watch\] refresh:ok module_count=/);
   assert.match(source, /specsFromWasmManifest/);
   assert.match(source, /validateTsManifestProbes/);
   assert.match(source, /roundRobinStart/);

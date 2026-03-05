@@ -57,7 +57,11 @@ test("PR-6 module_deps infers __surface labels and preserves explicit overrides"
       reject: false,
       nothrow: true,
     })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute deps //projects/apps/web:app`;
-    if (depsProbe.exitCode !== 0) return;
+    assert.equal(
+      depsProbe.exitCode,
+      0,
+      `buck2 deps probe failed:\n${String(depsProbe.stdout || "")}\n${String(depsProbe.stderr || "")}`,
+    );
     const deps = String(depsProbe.stdout || "");
     assert.match(deps, /\/\/projects\/libs\/math-wasm:math-wasm__surface/);
     assert.match(deps, /\/\/projects\/libs\/math-wasm:custom__surface/);
