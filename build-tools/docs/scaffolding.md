@@ -127,6 +127,17 @@ Phase 5 module contract terms (PR-1 baseline):
   - `listTsModules()`
 - Wasm manifest entries include runtime destination paths for client and server parity.
 - TS manifest entries include source entry paths and runtime import contract paths.
+- Producer surfaces are additive companion targets on existing macros and publish deterministic module metadata via `ModuleSurfaceInfo`:
+  - `module_kind`
+  - `source_roots`
+  - `artifact_mapping_policy`
+  - `watch_hints`
+- Root-set module discovery is declaration-based:
+  - `node_webapp(ts_module_roots=[...])`
+  - `node_asset_stage(wasm_module_roots=[...])`
+  - `node_asset_stage(module_deps=[...], module_surface_deps=[...])`
+  - producer macros expose source-root attrs for surface metadata (`go_source_roots`, `cpp_source_roots`, `python_source_roots`)
+- Runtime helpers remain generated-authoritative. Source-tree manifests do not satisfy runtime reads.
 
 Phase-3 runtime consistency checks for `webapp-ssr-vite` in one `pnpm run dev` session:
 
@@ -180,6 +191,9 @@ buck2 test //:scaffolding_webapp_multi_module_concurrency_contract
 buck2 test //:scaffolding_webapp_multi_module_generated_manifest_contract
 buck2 test //:scaffolding_webapp_multi_module_contract_path_resolver_contract
 buck2 test //:scaffolding_webapp_multi_module_no_source_manifest_dependency_contract
+buck2 test //:scaffolding_webapp_producer_surface_contract
+buck2 test //:scaffolding_webapp_root_set_discovery_contract
+buck2 test //:scaffolding_webapp_module_dep_label_normalization_contract
 buck2 test //:scaffolding_webapp_multi_template_parity_contract
 buck2 test //:scaffolding_webapp_phase5_hardcoded_runtime_path_policy_contract
 buck2 test //:scaffolding_webapp_phase5_final_goal_validation_contract

@@ -2,6 +2,7 @@ load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module
 
 node_webapp(
     name = "app_raw",
+    ts_module_roots = ["src/ts-modules"],
 )
 
 node_wasm_inline_module(
@@ -17,6 +18,7 @@ node_asset_stage(
         {"src": ":wasm_inline", "dest": "wasm-inline/index.js"},
         {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},
     ],
+    wasm_module_roots = ["src/wasm-producer"],
     labels = ["lang:node", "kind:app", "webapp:static"],
     out = "dist",
 )

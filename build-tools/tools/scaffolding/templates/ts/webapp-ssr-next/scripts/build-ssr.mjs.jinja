@@ -15,6 +15,10 @@ if (!wasmManifestPath || !tsManifestPath) {
 
 cpSync(wasmManifestPath, "app/wasm-modules.manifest.json");
 cpSync(tsManifestPath, "app/ts-modules.manifest.json");
+execSync(
+  `zx-wrapper ../../../build-tools/tools/dev/ensure-wasm-contract-assets.ts --cwd . --wasm-manifest ${JSON.stringify(wasmManifestPath)}`,
+  { stdio: "inherit" },
+);
 
 execSync("next build", { stdio: "inherit" });
 execSync("tsc -p tsconfig.server.json", { stdio: "inherit" });

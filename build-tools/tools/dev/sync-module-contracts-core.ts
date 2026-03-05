@@ -7,12 +7,18 @@ import { getImporterRootsContract } from "../lib/importer-roots.ts";
 import { sanitizeName } from "../lib/sanitize.ts";
 import { writeIfChanged } from "../lib/fs-helpers.ts";
 import { resolveModuleContractsPaths, type ModuleContractsPaths } from "./module-contract-paths.ts";
+import {
+  mergeWasmEntries,
+  wasmEntriesFromTargets,
+  type WasmEntry,
+} from "./module-contract-wasm-targets.ts";
+import {
+  assetStageMetadataFromTargets,
+  discoverTsModulesFromRoots,
+  discoverWasmModulesFromRoots,
+  tsModuleRootsFromTargets,
+} from "./module-surface-discovery.ts";
 
-type WasmEntry = {
-  moduleKey: string;
-  sourcePath: string;
-  runtimeDestinations: { client: string; server: string };
-};
 type TsEntry = { moduleKey: string; sourceEntryPath: string; runtimeImportPath: string };
 
 async function exists(abs: string): Promise<boolean> {
@@ -30,67 +36,6 @@ async function readJson(abs: string): Promise<any> {
   } catch (e) {
     throw new Error(`[module-contracts:E_JSON_READ] failed to read ${abs}: ${String(e)}`);
   }
-}
-
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function parseAssetEntries(
-  targetsText: string,
-  appStageTargetName: string,
-): Array<{ src: string; dest: string }> {
-  const block = targetsText.match(
-    new RegExp(
-      `node_asset_stage\\s*\\([\\s\\S]*?name\\s*=\\s*"${escapeRegExp(appStageTargetName)}"[\\s\\S]*?\\)\\s*`,
-      "m",
-    ),
-  )?.[0];
-  if (!block)
-    throw new Error(
-      `[module-contracts:E_TARGETS_MISSING_APP] missing node_asset_stage(name='${appStageTargetName}')`,
-    );
-  const assetsRaw = block.match(/assets\s*=\s*\[([\s\S]*?)\]/m)?.[1] || "";
-  const out: Array<{ src: string; dest: string }> = [];
-  const entryRe = /\{\s*"src"\s*:\s*"([^"]+)"\s*,\s*"dest"\s*:\s*"([^"]+)"\s*\}/g;
-  for (const m of assetsRaw.matchAll(entryRe)) out.push({ src: m[1], dest: m[2] });
-  return out;
-}
-
-function wasmEntriesFromTargets(
-  targetsText: string,
-  appStageTargetName: string,
-  requireServerDestination: boolean,
-): WasmEntry[] {
-  const bySrc = new Map<string, { client: Set<string>; server: Set<string> }>();
-  for (const asset of parseAssetEntries(targetsText, appStageTargetName)) {
-    const src = toPosixPath(asset.src);
-    const dest = toPosixPath(asset.dest);
-    if (src.startsWith(":") || !src.endsWith(".wasm")) continue;
-    if (!bySrc.has(src)) bySrc.set(src, { client: new Set(), server: new Set() });
-    const slots = bySrc.get(src)!;
-    if (dest.startsWith("server/")) slots.server.add(dest);
-    else slots.client.add(dest);
-  }
-  const entries: WasmEntry[] = [];
-  for (const src of Array.from(bySrc.keys()).sort((a, b) => a.localeCompare(b))) {
-    const slots = bySrc.get(src)!;
-    const moduleKey = sanitizeName(`${path.posix.basename(src, ".wasm")}-contract`);
-    const client = Array.from(slots.client).sort((a, b) => a.localeCompare(b))[0] || "";
-    const server = Array.from(slots.server).sort((a, b) => a.localeCompare(b))[0] || "";
-    const resolvedServer = server || (requireServerDestination ? "" : client);
-    if (!moduleKey || !client || !resolvedServer) {
-      throw new Error(
-        `[module-contracts:E_WASM_ASSET_CONTRACT] invalid wasm asset wiring for '${src}' (need both client and server destinations)`,
-      );
-    }
-    entries.push({
-      moduleKey,
-      sourcePath: src,
-      runtimeDestinations: { client, server: resolvedServer },
-    });
-  }
-  return entries;
 }
 
 async function appTsEntries(appAbs: string): Promise<TsEntry[]> {
@@ -183,6 +128,27 @@ async function tsEntries(root: string, appAbs: string, appPkg: any): Promise<TsE
   return Array.from(byKey.values()).sort((a, b) => a.moduleKey.localeCompare(b.moduleKey));
 }
 
+function mergeTsEntries(base: TsEntry[], discovered: TsEntry[]): TsEntry[] {
+  const byKey = new Map<string, TsEntry>();
+  const bySource = new Map<string, TsEntry>();
+  for (const entry of [...base, ...discovered]) {
+    if (bySource.has(entry.sourceEntryPath)) continue;
+    const prev = byKey.get(entry.moduleKey);
+    if (
+      prev &&
+      (prev.sourceEntryPath !== entry.sourceEntryPath ||
+        prev.runtimeImportPath !== entry.runtimeImportPath)
+    ) {
+      throw new Error(
+        `[module-contracts:E_TS_DUP_KEY] duplicate TS module key '${entry.moduleKey}'`,
+      );
+    }
+    byKey.set(entry.moduleKey, entry);
+    bySource.set(entry.sourceEntryPath, entry);
+  }
+  return Array.from(byKey.values()).sort((a, b) => a.moduleKey.localeCompare(b.moduleKey));
+}
+
 function manifestJson(version: number, defaultModuleKey: string, modules: any[]): string {
   return JSON.stringify({ schemaVersion: version, defaultModuleKey, modules }, null, 2) + "\n";
 }
@@ -204,10 +170,15 @@ export async function syncModuleContractsForApp(args: {
   const appPkg = await readJson(pkgPath);
   const appStageTargetName = paths.appTargetLabel.split(":").pop() || "app";
   const requireServerDestination = await exists(path.join(appAbs, "server", "wasm-contract.ts"));
+  const stageMetadata = assetStageMetadataFromTargets(targetsText, appStageTargetName);
   let wasmModules = wasmEntriesFromTargets(
     targetsText,
     appStageTargetName,
     requireServerDestination,
+  );
+  wasmModules = mergeWasmEntries(
+    wasmModules,
+    await discoverWasmModulesFromRoots(appAbs, stageMetadata.wasmModuleRoots, stageMetadata.labels),
   );
   if (wasmModules.length === 0) {
     const conventionalWasmRel = "src/wasm-contract/top.wasm";
@@ -225,12 +196,16 @@ export async function syncModuleContractsForApp(args: {
       "[module-contracts:E_WASM_EMPTY] no wasm module entries discovered from TARGETS or conventional src/wasm-contract/top.wasm",
     );
   }
-  const tsModules = await tsEntries(paths.repoRoot, appAbs, appPkg);
+  const tsModules = mergeTsEntries(
+    await tsEntries(paths.repoRoot, appAbs, appPkg),
+    await discoverTsModulesFromRoots(appAbs, tsModuleRootsFromTargets(targetsText)),
+  );
   if (tsModules.length === 0)
     throw new Error(
       "[module-contracts:E_TS_EMPTY] no TS module entries discovered from package.json/workspace sources",
     );
-  const wasmDefault = wasmModules[0]!.moduleKey;
+  const wasmDefault =
+    wasmModules.find((m) => m.moduleKey === "top-contract")?.moduleKey || wasmModules[0]!.moduleKey;
   const tsDefault =
     tsModules.find((m) => ["default-message", "client-entry", "app-page"].includes(m.moduleKey))
       ?.moduleKey || tsModules[0]!.moduleKey;

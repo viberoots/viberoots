@@ -167,6 +167,30 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
+    "build-tools/tools/tests/scaffolding/webapp.producer-surface.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
+    },
+    "build-tools/tools/tests/scaffolding/webapp.root-set-discovery.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
+    },
+    "build-tools/tools/tests/scaffolding/webapp.module-dep-label-normalization.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
+    },
     "build-tools/tools/tests/scaffolding/webapp.multi-template.parity.contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/webapp-static",

@@ -6,6 +6,7 @@ load(
 )
 load("//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
 load("//build-tools/lang:sanitize.bzl", "sanitize_name")
+load("//build-tools/lang:module_surface.bzl", "module_surface")
 load("//build-tools/cpp/private:nix_build.bzl", "cpp_nix_build")
 load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
 
@@ -36,6 +37,7 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
       - wasm_target:<triple> derived from wasm_abi
     """
     kw = dict(kwargs)
+    cpp_source_roots = kw.pop("cpp_source_roots", ["."])
     _ = _apply_wasm_abi(kw)
     deps = kw.pop("deps", []) or []
     link_deps = kw.pop("link_deps", []) or []
@@ -69,6 +71,14 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
         labels = prepared.get("labels", []) or [],
         nix_inputs = nix_inputs,
         visibility = prepared.get("visibility", []),
+    )
+    module_surface(
+        name = name + "__surface",
+        module_kind = "wasm",
+        source_roots = cpp_source_roots,
+        artifact_mapping_policy = "cpp-static-wasm-v1",
+        watch_hints = cpp_source_roots,
+        visibility = ["PUBLIC"],
     )
 
 

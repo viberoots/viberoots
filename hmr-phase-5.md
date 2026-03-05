@@ -817,17 +817,17 @@ node_asset_stage(
 
 Additive attribute map (introduced in PR-6):
 
-| Macro | New attr | Meaning |
-| --- | --- | --- |
-| `node_webapp` | `ts_module_roots` | App-local TS source roots for surface export |
-| `node_asset_stage` | `wasm_module_roots` | App-local wasm producer source roots for surface export |
-| `node_asset_stage` | `module_deps` | Ergonomic producer deps (`//pkg` or `//pkg:target`) inferred to `__surface` |
-| `node_asset_stage` | `module_surface_deps` | Explicit dependency surface targets consumed for discovery/watch |
-| `nix_go_tiny_wasm_lib` | `go_source_roots` | Go-owned source roots used for wasm module surface |
-| `nix_cpp_wasm_static_lib` | `cpp_source_roots` | C++-owned source roots used for wasm module surface |
-| `nix_python_wasm_app` | `python_source_roots` | Python-owned source roots used for wasm module surface |
-| `nix_python_wasm_lib` | `python_source_roots` | Python-owned source roots used for wasm module surface |
-| `nix_node_lib` | `ts_module_roots` | Dependency-owned TS source roots used for TS surface |
+| Macro                     | New attr              | Meaning                                                                     |
+| ------------------------- | --------------------- | --------------------------------------------------------------------------- |
+| `node_webapp`             | `ts_module_roots`     | App-local TS source roots for surface export                                |
+| `node_asset_stage`        | `wasm_module_roots`   | App-local wasm producer source roots for surface export                     |
+| `node_asset_stage`        | `module_deps`         | Ergonomic producer deps (`//pkg` or `//pkg:target`) inferred to `__surface` |
+| `node_asset_stage`        | `module_surface_deps` | Explicit dependency surface targets consumed for discovery/watch            |
+| `nix_go_tiny_wasm_lib`    | `go_source_roots`     | Go-owned source roots used for wasm module surface                          |
+| `nix_cpp_wasm_static_lib` | `cpp_source_roots`    | C++-owned source roots used for wasm module surface                         |
+| `nix_python_wasm_app`     | `python_source_roots` | Python-owned source roots used for wasm module surface                      |
+| `nix_python_wasm_lib`     | `python_source_roots` | Python-owned source roots used for wasm module surface                      |
+| `nix_node_lib`            | `ts_module_roots`     | Dependency-owned TS source roots used for TS surface                        |
 
 ### Tests (in this PR)
 

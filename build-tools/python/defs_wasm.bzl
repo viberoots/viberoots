@@ -4,6 +4,7 @@ load(
     "prepare_language_wiring",
     "stamp_wasm_variant",
 )
+load("//build-tools/lang:module_surface.bzl", "module_surface")
 load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
 load("//build-tools/python:defs_lockfile.bzl", "apply_default_lockfile_label")
 load("//build-tools/python/private:nix_build.bzl", "python_nix_wasm_build")
@@ -11,6 +12,7 @@ load("//build-tools/python/private:nix_build.bzl", "python_nix_wasm_build")
 # WASM (WASI) convenience macros — stamp kind:wasm so planner routes to pyWasm* templates
 def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **kwargs):
     kw = dict(kwargs)
+    python_source_roots = kw.pop("python_source_roots", ["."])
     stamp_wasm_variant(kw, "python", "wasi")
     nixpkg_deps = kw.pop("nixpkg_deps", [])
     append_nixpkg_labels(kw, nixpkg_deps)
@@ -44,9 +46,18 @@ def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **k
         labels = prepared.get("labels", []) or [],
         visibility = prepared.get("visibility", []),
     )
+    module_surface(
+        name = name + "__surface",
+        module_kind = "wasm",
+        source_roots = python_source_roots,
+        artifact_mapping_policy = "python-wasm-app-v1",
+        watch_hints = python_source_roots,
+        visibility = ["PUBLIC"],
+    )
 
 def nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **kwargs):
     kw = dict(kwargs)
+    python_source_roots = kw.pop("python_source_roots", ["."])
     stamp_wasm_variant(kw, "python", "wasi")
     nixpkg_deps = kw.pop("nixpkg_deps", [])
     append_nixpkg_labels(kw, nixpkg_deps)
@@ -79,6 +90,14 @@ def nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **k
         nix_inputs = prepared.get("nix_inputs", []) or [],
         labels = prepared.get("labels", []) or [],
         visibility = prepared.get("visibility", []),
+    )
+    module_surface(
+        name = name + "__surface",
+        module_kind = "wasm",
+        source_roots = python_source_roots,
+        artifact_mapping_policy = "python-wasm-lib-v1",
+        watch_hints = python_source_roots,
+        visibility = ["PUBLIC"],
     )
 
 __all__ = [
