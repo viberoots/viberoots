@@ -51,6 +51,8 @@ Dependency chain:
 5. PR-5 locks the final matrix and removes remaining hardcoded path expectations.
 6. PR-6 introduces producer-surface contracts and root-set module discovery plumbing.
 7. PR-7 finalizes zero-edit module growth, watcher efficiency, and zero-wasm default lock-in across templates.
+8. PR-8 closes in-session growth gaps by refreshing generated contracts/watch sets without restart and strengthens contract-test enforcement.
+9. PR-9 enforces generated-only runtime authority and removes remaining compatibility/fallback bridges.
 
 Phase 5 checkpoints:
 
@@ -60,7 +62,9 @@ Phase 5 checkpoints:
 - Checkpoint D: `READY` for PR-5 when PR-4 SSR-next migration and parity checks are green.
 - Checkpoint E: `READY` for PR-6 when PR-5 full matrix and hardcoded-path policy checks are green.
 - Checkpoint F: `READY` for PR-7 when PR-6 producer-surface contracts and root-set discovery tests/docs are green.
-- Checkpoint G: `COMPLETED` for Phase 5 when PR-7 zero-edit growth + zero-wasm default matrix, tests, and docs are green.
+- Checkpoint G: `READY` for PR-8 when PR-7 zero-edit growth + zero-wasm default matrix, tests, and docs are green.
+- Checkpoint H: `READY` for PR-9 when PR-8 in-session growth + strict contract-test enforcement is green.
+- Checkpoint I: `COMPLETED` for Phase 5 when PR-9 generated-authority + fallback-removal matrix, tests, and docs are green.
 
 ### Phase 5 contract update (effective from PR-2 onward)
 
@@ -68,6 +72,7 @@ PR-1 content remains unchanged. Starting with PR-2 implementation, manifest owne
 
 1. Dev/build orchestration generates runtime manifest contracts from existing app wiring in `TARGETS` and dependency declarations in `package.json`.
 2. Generated manifest artifacts live outside template source trees (for example under `buck-out/tmp/...`), and are not user-edited.
+   - Note (intentionally refined in PR-9): some frameworks may consume generated projections in `app/` or `src/`, but those files remain generated derivatives of the canonical `buck-out` artifacts, not user-authored authority.
 3. Runtime helper APIs remain module-key based, but module-key availability is derived from generated contracts rather than user-authored manifest edits.
 4. Dependency growth after scaffold time must not require manual manifest updates.
 
@@ -78,6 +83,7 @@ Generated-path contract (explicit):
 3. No project-local symlink is required for correctness. Any optional convenience symlink is non-canonical and must not be required by tooling or tests.
 4. For PR-2, generated artifacts are authoritative for dev/watch orchestration.
 5. Runtime helper cutover from source-tree manifests to generated artifacts is completed in PR-3.
+   - Note (intentionally superseded by PR-9 closeout): PR-3/PR-4 complete template migration, while PR-9 performs final authority hard-cutover/policy lock and removes remaining compatibility bridges.
 
 ---
 
@@ -191,6 +197,7 @@ I will move from hardcoded single-module watch paths to generated-manifest orche
 - Add explicit concurrency bounds and fairness rules for multi-module queues.
 - Keep `TARGETS` and `package.json` as the only required app-author touch points for dependency growth.
 - For PR-2, consume generated artifacts on the watcher/dev orchestration path; keep runtime helper source-manifest cutover scoped to PR-3.
+  - Note (intentionally superseded by PR-9 closeout): final authority lock and fallback/bridge removal complete in PR-9 after migration and growth plumbing land.
 
 ### Tests (in this PR)
 
@@ -302,6 +309,7 @@ I will migrate template runtime wiring to consume generated wasm and TS module c
 - Update static and SSR Vite runtime helpers to load wasm by module key through generated helper and generated manifest artifacts.
 - Update static and SSR Vite runtime helpers to load TS modules by module key through generated helper and generated manifest artifacts.
 - Make generated artifacts authoritative for runtime helper reads in static and SSR Vite (completes runtime helper cutover begun by PR-2 dev/watch path).
+  - Note (intentionally refined in PR-9): canonical authority remains generated artifacts, with framework-local generated projections allowed where runtime import mechanics require them.
 - Remove hardcoded single-path assumptions in static and SSR Vite runtime code and scripts.
 - Ensure SSR Vite server parity paths for each wasm module are staged consistently.
 - Ensure SSR Vite client and server paths can resolve TS modules by module key.
@@ -376,6 +384,7 @@ I will migrate `ts/webapp-ssr-next` to generated wasm and TS module contracts an
 - Update SSR Next runtime helpers to load wasm by module key through generated helper and generated manifest artifacts.
 - Update SSR Next runtime helpers to load TS modules by module key through generated helper and generated manifest artifacts.
 - Make generated artifacts authoritative for runtime helper reads in SSR Next parity with static and SSR Vite.
+  - Note (intentionally refined in PR-9): canonical authority remains generated artifacts, with framework-local generated projections allowed where runtime import mechanics require them.
 - Remove hardcoded single-path assumptions in SSR Next runtime code and scripts.
 - Ensure SSR Next server parity paths for each wasm module are staged consistently.
 - Ensure SSR Next client and server paths resolve TS modules by module key.
@@ -457,6 +466,7 @@ I will close Phase 5 by removing remaining single-module hardcoding and locking 
   - combined TS and wasm edit cycles in one session
   - per-module-key SSR client and server assertions
 - Keep only primary-path behavior. No compatibility bridges.
+  - Note (intentionally superseded by PR-9 sequencing): this closeout objective is finalized in PR-9, where remaining legacy watcher flags and `top.wasm` compatibility bridge behavior are removed and policy-locked.
 
 ### Tests (in this PR)
 
@@ -561,6 +571,7 @@ I will introduce one deterministic producer-surface contract that language macro
 - Keep generated-only runtime authority:
   - runtime helpers read generated contracts from canonical path only
   - no source-manifest fallback behavior
+  - Note (intentionally refined in PR-9): "canonical path only" is interpreted as canonical generated authority, while framework-local generated projections remain allowed when required by template runtime loading.
 - Add deterministic module-key derivation and collision policy:
   - module key derives from normalized path relative to declared root set
   - duplicate keys fail fast with stable diagnostics
@@ -919,6 +930,7 @@ I will finalize the developer experience so new TS/wasm files under declared can
   - watcher subscribes to normalized source roots + watch hints from producer surfaces
   - module updates remain module-scoped with deterministic queue behavior
   - no process restart for in-scope edit loops
+  - Note (intentionally extended in PR-8): PR-7 establishes restart-free edit loops for already enrolled module sets; PR-8 adds in-session refresh/enrollment for module-set changes discovered during the same running session.
 - Lock zero-wasm defaults across templates:
   - newly scaffolded webapps can run with no wasm modules declared
   - watcher path behaves as no-op when wasm set is empty
@@ -1037,6 +1049,188 @@ Requires coordinated updates across watcher, generator, template wiring, and pac
 ### Recommendation
 
 Implement seventh as the final Phase 5 DX and performance lock so growth is zero-edit and runtime behavior remains deterministic.
+
+---
+
+## PR-8: In-session contract refresh + strict contract-test enforcement
+
+### Description
+
+I will close remaining in-session growth gaps by making watcher orchestration refresh generated module contracts and watch sets during a running session, while also hard-failing contract tests that currently allow probe failures to pass silently.
+
+### Scope & Changes
+
+- Add generated-contract refresh behavior on the dev/watch path:
+  - watcher re-evaluates generated wasm/TS contract artifacts during a running session
+  - newly discovered module keys are enrolled without process restart
+  - removed module keys are retired deterministically with stable diagnostics
+- Add deterministic watch-set refresh triggers:
+  - refresh when generated manifest files change
+  - refresh when producer-surface graph inputs change
+  - preserve module-scoped fairness and queue determinism through refresh cycles
+  - keep refresh bounded (fingerprint/mtime gated + throttled) to avoid execution-time regression
+- Make dynamic growth behavior explicit in watcher diagnostics:
+  - contract refresh markers include added/removed module keys
+  - refresh failure signatures are stable and actionable
+- Tighten contract-test enforcement:
+  - remove any early-return paths that convert failed Buck probes into implicit passes
+  - fail fast when required contract probes fail or produce incomplete evidence
+- Keep runtime behavior restart-free for in-scope module additions through canonical roots and dependency declarations.
+
+### Tests (in this PR)
+
+- Add/extend watcher refresh contract tests:
+  - add new wasm/TS module file during one active dev session and assert pickup without restart
+  - add workspace dependency module during one active dev session and assert pickup without restart
+  - remove/rename module file and assert deterministic de-registration behavior
+- Add/extend concurrency/fairness tests with refresh events:
+  - refresh under pending queue load does not violate single-build-at-a-time invariant
+  - fairness remains deterministic after dynamic module-set changes
+- Add strict contract-test enforcement checks:
+  - producer-surface and module-dep normalization contract tests fail when Buck probe fails
+  - no silent test pass on probe failure
+- Add deterministic negative-path tests:
+  - manifest refresh failure emits stable marker and recovery guidance
+  - malformed refresh input does not fall back to stale watcher state silently
+  - refresh cadence remains bounded under unchanged inputs (no hot-loop re-probe churn)
+
+### Docs (in this PR)
+
+- Document in-session contract refresh semantics and diagnostics.
+- Document dynamic module enrollment/removal behavior in one running dev session.
+- Document strict contract-test policy (probe failure is a hard failure).
+- Update troubleshooting with refresh-specific failure signatures and recovery steps.
+
+### Verification Commands
+
+- `buck2 test //:scaffolding_webapp_multi_module_orchestrator_contract`
+- `buck2 test //:scaffolding_webapp_multi_module_concurrency_contract`
+- `buck2 test //:scaffolding_webapp_zero_wasm_to_multi_wasm_growth_contract`
+- `buck2 test //:scaffolding_webapp_module_surface_dependency_growth_contract`
+- `buck2 test //:scaffolding_webapp_producer_surface_contract`
+- `buck2 test //:scaffolding_webapp_module_dep_label_normalization_contract`
+- `buck2 test //:scaffolding_webapp_phase5_dynamic_refresh_contract`
+- `buck2 test //:scaffolding_webapp_phase5_dynamic_refresh_negative_contract`
+- `buck2 test //:scaffolding_template_conventions_metadata_cquery`
+- `buck2 test //:scaffolding_ts_command_path_docs_contract`
+
+### Acceptance Criteria
+
+- New in-scope TS/wasm modules are discovered and watched in one running dev session with no process restart.
+- Dynamic module enrollment/removal keeps queue fairness and module-scoped diagnostics deterministic.
+- Contract tests no longer allow Buck probe failures to pass silently.
+- Refresh failures produce stable markers and actionable recovery guidance.
+- Refresh behavior is deterministic and bounded under steady-state inputs.
+- Docs, tests, and watcher behavior are aligned on in-session growth semantics.
+
+### Risks
+
+Refreshing module sets while builds are queued can introduce race conditions or non-deterministic ordering.
+
+### Mitigation
+
+Use explicit refresh boundaries, atomic module-set swaps, and deterministic queue-order assertions in tests.
+
+### Consequence of Not Implementing
+
+Phase 5 continues to miss no-restart growth behavior in real running sessions for some module-addition paths.
+
+### Downsides for Implementing
+
+Watcher/orchestrator logic grows and requires additional deterministic-state testing.
+
+### Recommendation
+
+Implement eighth to make in-session growth behavior operational and test-enforced before final authority/fallback closeout.
+
+---
+
+## PR-9: Generated-authority hard cutover + compatibility bridge removal
+
+### Description
+
+I will complete the Phase 5 closeout by enforcing generated-only runtime authority, removing remaining compatibility/fallback paths, and aligning docs/tests to the final canonical behavior.
+
+### Scope & Changes
+
+- Enforce generated-only runtime contract authority:
+  - runtime helpers resolve module contracts from canonical generated outputs via shared resolver
+  - framework-local manifest files (for example `app/` or `src/`) are generated projections of canonical outputs, never hand-authored authority
+  - remove non-generated/non-authoritative mirror paths and stale-manifest fallbacks
+- Remove legacy watcher compatibility paths:
+  - remove legacy single-module CLI flag mode from watcher tooling
+  - fail fast on legacy flag usage with stable migration diagnostics
+- Remove remaining hardcoded compatibility bridges:
+  - remove `top.wasm` compatibility symlink/bridge behavior from active dev paths (including Next public bridge mode)
+  - keep canonical module-key/runtime-destination authority in generated manifests; remove docs guidance that treats bridge behavior as required
+- Lock policy tests that prevent regression:
+  - no new hand-authored source-manifest authority paths
+  - no new legacy single-module watcher fallback wiring
+  - no new hardcoded `top.wasm` compatibility bridge assumptions in active templates/dev scripts
+
+### Tests (in this PR)
+
+- Add generated-authority runtime tests:
+  - runtime helper authority is canonical generated contracts (directly or via generated projection)
+  - non-generated/source-authored manifest presence does not alter authority behavior
+- Add legacy-removal negative-path tests:
+  - legacy watcher flag invocation fails with stable migration message
+  - compatibility symlink assumptions are absent from active dev path tests
+- Extend hardcoded-path policy tests:
+  - fail on reintroduced `top.wasm` hardcoded assumptions in active runtime helpers/scripts/docs
+- Re-run full final matrix with authority/fallback checks included:
+  - static, SSR Vite, SSR Next
+  - mixed TS+wasm growth and per-module-key client/server behavior
+
+### Docs (in this PR)
+
+- Update docs to declare canonical generated-contract authority as the only supported runtime source.
+- Remove compatibility wording that implies source-tree manifests or `top.wasm` bridges are required.
+- Document migration guidance for removed legacy watcher flags.
+- Publish final closeout notes for Phase 5 authority/fallback policy lock.
+
+### Verification Commands
+
+- `buck2 test //:scaffolding_webapp_multi_module_no_source_manifest_dependency_contract`
+- `buck2 test //:scaffolding_webapp_phase5_hardcoded_runtime_path_policy_contract`
+- `buck2 test //:scaffolding_webapp_phase5_final_goal_validation_contract`
+- `buck2 test //:scaffolding_webapp_phase5_final_goal_validation_static_contract`
+- `buck2 test //:scaffolding_webapp_phase5_final_goal_validation_ssr_next_contract`
+- `buck2 test //:scaffolding_webapp_phase5_generated_authority_runtime_contract`
+- `buck2 test //:scaffolding_webapp_phase5_legacy_flag_removal_contract`
+- `buck2 test //:scaffolding_webapp_phase5_top_wasm_bridge_removal_contract`
+- `buck2 test //:scaffolding_webapp_multi_template_parity_contract`
+- `buck2 test //:scaffolding_template_conventions_metadata_cquery`
+- `buck2 test //:scaffolding_ts_command_path_docs_contract`
+
+### Acceptance Criteria
+
+- Runtime helper authority is canonical generated contracts only.
+- Active templates may consume framework-local generated projections, but correctness does not rely on hand-authored or stale source-tree manifests.
+- Legacy single-module watcher flags and compatibility `top.wasm` bridge behavior are removed from active paths.
+- Policy tests block reintroduction of removed fallback/compatibility behaviors.
+- Docs, tests, and runtime behavior are consistent with final generated-authority contracts.
+- Phase 5 reaches final `COMPLETED` checkpoint.
+
+### Risks
+
+Removing compatibility behavior can expose hidden consumers still relying on transitional paths.
+
+### Mitigation
+
+Add explicit negative-path tests, stable migration diagnostics, and one final full matrix run in the same PR.
+
+### Consequence of Not Implementing
+
+Phase 5 remains partially transitional, with ambiguous authority and fallback paths that can hide regressions.
+
+### Downsides for Implementing
+
+Closeout touches runtime helpers, watcher tooling, tests, and docs simultaneously and needs careful stabilization.
+
+### Recommendation
+
+Implement ninth as the final closeout gate that locks generated-authority behavior and removes remaining compatibility bridges.
 
 ---
 
@@ -1209,6 +1403,49 @@ Out-of-bounds by default:
 
 - new provider/schema directions outside PR-6 contract
 - convenience behavior that reintroduces per-file app/importer wiring
+
+### PR-8 default touch map (in-session refresh + strict contract-test enforcement)
+
+Expected focus areas:
+
+- watcher/orchestrator refresh logic for generated contract changes in one running session
+- deterministic module-set enrollment/removal and queue coordination
+- strict contract-test enforcement where probe failures must fail tests
+- dynamic-refresh diagnostics and recovery markers
+- docs for in-session refresh semantics
+
+Expected new/updated target families:
+
+- dynamic-refresh watcher contract target(s)
+- dynamic-refresh negative-path contract target(s)
+- strict probe-enforcement contract target(s)
+
+Out-of-bounds by default:
+
+- generated-authority hard cutover and compatibility bridge removals (reserved for PR-9)
+- broad template/runtime rewrites unrelated to refresh correctness
+
+### PR-9 default touch map (generated authority + fallback removal closeout)
+
+Expected focus areas:
+
+- runtime helper authority cutover to canonical generated contracts plus framework-required generated projections
+- removal of legacy watcher single-module flag mode
+- removal of hardcoded `top.wasm` compatibility bridge behavior (not canonical producer artifact naming)
+- policy tests that forbid reintroduction of removed fallback/compatibility paths
+- final docs alignment for authority and migration guidance
+
+Expected new/updated target families:
+
+- generated-authority runtime contract target(s)
+- legacy-flag removal contract target(s)
+- top-wasm bridge removal contract target(s)
+- final closeout matrix/policy lock target(s)
+
+Out-of-bounds by default:
+
+- new architecture directions beyond Phase 5 completion criteria
+- new compatibility bridges that reintroduce non-authoritative paths
 
 ### Definition of "easy module addition" (harness-level)
 
