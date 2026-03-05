@@ -5,7 +5,6 @@ import { getFlagStr } from "../lib/cli.ts";
 import { resolveModuleContractsPaths } from "./module-contract-paths.ts";
 import { syncModuleContractsForApp } from "./sync-module-contracts-core.ts";
 import {
-  legacySpecFromFlags,
   specsFromWasmManifest,
   type WasmModuleSpec,
   validateTsManifestProbes,
@@ -20,14 +19,18 @@ import {
   runBuildStep,
 } from "./watch-wasm-producer-ops.ts";
 
-function required(name: string, value: string): string {
-  const v = String(value || "").trim();
-  if (!v) throw new Error(`missing required flag --${name}`);
-  return v;
-}
-
 function uniqueSorted(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
+}
+
+function failLegacyFlags(legacyFlags: string[]): never {
+  throw new Error(
+    [
+      "[wasm-watch] legacy-args:unsupported",
+      `[wasm-watch] legacy-args:received ${legacyFlags.join(",")}`,
+      "[wasm-watch] migration: remove legacy watcher flags and run `pnpm run dev:wasm:watch` without --watch/--build-cmd/--build-out/--sync-out.",
+    ].join("\n"),
+  );
 }
 
 async function main() {
@@ -40,10 +43,13 @@ async function main() {
   const buildCmdRaw = getFlagStr("build-cmd", "");
   const buildOutRaw = getFlagStr("build-out", "");
   const syncOutRaw = getFlagStr("sync-out", "");
-  const moduleKeyRaw = getFlagStr("module-key", "top-contract") || "top-contract";
-  const hasLegacyFlags = [watchRaw, buildCmdRaw, buildOutRaw, syncOutRaw].some(
-    (value) => String(value || "").trim() !== "",
-  );
+  const legacyFlags = [watchRaw, buildCmdRaw, buildOutRaw, syncOutRaw]
+    .map((value, idx) =>
+      String(value || "").trim() !== ""
+        ? (["--watch", "--build-cmd", "--build-out", "--sync-out"][idx] as string)
+        : "",
+    )
+    .filter(Boolean);
   const refreshThrottleMs = Math.max(500, Number(getFlagStr("refresh-throttle-ms", "1200")));
   let baseRefreshPaths: string[] = [];
   let refreshState = new Map();
@@ -52,7 +58,9 @@ async function main() {
   let generatedAppTarget = "";
   let generatedRoot = "";
 
-  if (!wasmManifest && !tsManifest && !hasLegacyFlags) {
+  if (legacyFlags.length > 0) failLegacyFlags(legacyFlags);
+
+  if (!wasmManifest && !tsManifest) {
     const resolved = resolveModuleContractsPaths({
       appCwd: cwd,
       appTargetLabel: appTarget || undefined,
@@ -81,17 +89,10 @@ async function main() {
       path.join(generatedRoot, "build-tools", "tools", "buck", "graph.json"),
     ]);
   }
-  let specs = wasmManifest
-    ? await specsFromWasmManifest(cwd, wasmManifest)
-    : [
-        legacySpecFromFlags(cwd, {
-          watchRaw: required("watch", watchRaw),
-          buildCommand: required("build-cmd", buildCmdRaw),
-          buildOut: required("build-out", buildOutRaw),
-          syncOut: required("sync-out", syncOutRaw),
-          moduleKey: moduleKeyRaw,
-        }),
-      ];
+  if (!String(wasmManifest || "").trim()) {
+    throw new Error("missing required flag --wasm-manifest");
+  }
+  let specs = await specsFromWasmManifest(cwd, wasmManifest);
   if (wasmManifest) {
     console.error(
       `[wasm-watch] manifest:wasm modules=${specs.length} path=${path.relative(cwd, path.resolve(cwd, wasmManifest)) || "."}`,

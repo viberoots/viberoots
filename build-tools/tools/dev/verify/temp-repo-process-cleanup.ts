@@ -26,6 +26,13 @@ function isScopedTempDevProcess(cmd: string): boolean {
   if (c.includes("/esbuild") && c.includes("--service=")) return true;
   if (c.includes("vite/bin/vite.js")) return true;
   if (c.includes("next/dist/bin/next") && c.includes(" dev")) return true;
+  if (c.includes("next-server")) return true;
+  if (c.includes("watch-wasm-producer.ts")) return true;
+  if (c.includes("dev-with-wasm-watch.ts")) return true;
+  if (c.includes("/scripts/dev-wasm-watch.mjs")) return true;
+  if (c.includes("pnpm exec vite")) return true;
+  if (c.includes("pnpm run dev:ssr:only")) return true;
+  if (c.includes("pnpm run dev:wasm:watch")) return true;
   if (c.includes("/server/dev.mjs")) return true;
   return false;
 }

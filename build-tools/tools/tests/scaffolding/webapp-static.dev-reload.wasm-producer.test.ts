@@ -27,33 +27,9 @@ test(
       const $ = _$({ cwd: tmp, stdio: "inherit" });
       await $`scaf new ts webapp-static demo-web --yes --no-tests`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");
-      const producerPayloadPath = path.join(
-        tmp,
-        "projects",
-        "libs",
-        "demo-wasm-producer",
-        "payload.txt",
-      );
+      const producerPayloadPath = path.join(appAbs, "src", "wasm-producer", "payload.txt");
       await fsp.mkdir(path.dirname(producerPayloadPath), { recursive: true });
       await fsp.writeFile(producerPayloadPath, "phase2-a", "utf8");
-
-      const packageJsonPath = path.join(appAbs, "package.json");
-      const packageJsonRaw = await fsp.readFile(packageJsonPath, "utf8");
-      const packageJson = JSON.parse(packageJsonRaw) as {
-        scripts?: Record<string, string>;
-      };
-      const depWatchCmd = [
-        "zx-wrapper ../../../build-tools/tools/dev/watch-wasm-producer.ts",
-        "--watch ../../libs/demo-wasm-producer/payload.txt",
-        '--build-cmd "zx-wrapper ../../../build-tools/tools/dev/build-wasm-producer.ts --payload ../../libs/demo-wasm-producer/payload.txt --out .wasm-producer/top.wasm"',
-        "--build-out .wasm-producer/top.wasm",
-        "--sync-out src/wasm-contract/top.wasm",
-      ].join(" ");
-      packageJson.scripts = {
-        ...(packageJson.scripts || {}),
-        "dev:wasm:watch": depWatchCmd,
-      };
-      await fsp.writeFile(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");
 
       await _$({ cwd: tmp, stdio: "pipe" })`git add -A projects/apps/demo-web`;
       const outPathRaw = await _$({

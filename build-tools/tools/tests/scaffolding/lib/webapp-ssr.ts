@@ -8,6 +8,7 @@ import net from "node:net";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { formatRunnableLine, inferRunnableFromOutPath } from "../../../lib/runnables.ts";
+import { terminateChildTree } from "../../lib/process-tree.ts";
 
 export const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -157,16 +158,9 @@ export async function runExpressDockerSmoke(runtimeRoot: string, marker: string)
     }
     throw new Error(`runtime smoke did not serve expected marker\n${stderrText.trim()}`);
   } finally {
+    await terminateChildTree(child, 5000);
     try {
-      if (child.pid) child.kill("SIGINT");
+      if (child.exitCode == null) await Promise.race([once(child, "exit"), sleep(500)]);
     } catch {}
-    try {
-      await Promise.race([once(child, "exit"), sleep(5000)]);
-    } catch {}
-    if (child.exitCode == null) {
-      try {
-        if (child.pid) child.kill("SIGKILL");
-      } catch {}
-    }
   }
 }

@@ -4,10 +4,6 @@ const child = spawn(
   "zx-wrapper",
   [
     "../../../build-tools/tools/dev/dev-with-wasm-watch.ts",
-    "--cwd",
-    ".",
-    "--ensure-public-top-wasm",
-    "1",
     "--vite-cmd",
     "pnpm run dev:ssr:only",
     "--watch-cmd",

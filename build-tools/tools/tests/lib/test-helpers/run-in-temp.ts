@@ -6,6 +6,7 @@ import { killBuckDaemonsForRepo } from "./buck-kill";
 import { ensureBuckReaperStarted } from "./buck-reaper";
 import { getCgoToolchainPathsOncePerWorker, getDarwinSdkPathOncePerWorker } from "./cgo-toolchain";
 import { rewriteCoverageUrls } from "./coverage";
+import { cleanupTempRepoProcesses } from "../../../dev/verify/temp-repo-process-cleanup";
 import { rsyncRepoTo } from "./rsync";
 import { initTempRepoFromSeedStore } from "./seed-store";
 import { shSingleQuote } from "./shell-quote";
@@ -373,6 +374,9 @@ export async function runInTemp<T>(
   try {
     return await withTempProcessEnv(tmp, async () => await fn(tmp, _$));
   } finally {
+    await timeAsync("temp process cleanup", async () => {
+      await cleanupTempRepoProcesses({ roots: [tmp] }).catch(() => {});
+    });
     await timeAsync("buck-daemon cleanup", async () => await killBuckDaemonsForRepo(tmp, _$));
     if ((process.env.TEST_REWRITE_COVERAGE_TMP || "") === "1") {
       await timeAsync(`rewriteCoverageUrls(${path.basename(tmp)})`, async () =>

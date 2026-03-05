@@ -15,23 +15,20 @@ type WasmModuleManifest = {
   }>;
 };
 
-function manifestCandidates(fileName: string): string[] {
-  const out = [path.resolve(__dirname, fileName)];
+function manifestPath(fileName: string): string {
   const contractsDir = String(process.env.MODULE_CONTRACTS_DIR || "").trim();
-  if (contractsDir) out.push(path.resolve(contractsDir, fileName));
-  return out;
+  if (contractsDir) return path.resolve(contractsDir, fileName);
+  return path.resolve(__dirname, fileName);
 }
 
 function readManifestJson(): WasmModuleManifest {
-  const candidates = manifestCandidates("wasm-modules.manifest.json");
-  for (const manifestPath of candidates) {
-    try {
-      return JSON.parse(readFileSync(manifestPath, "utf8")) as WasmModuleManifest;
-    } catch {}
+  const manifestAbs = manifestPath("wasm-modules.manifest.json");
+  try {
+    return JSON.parse(readFileSync(manifestAbs, "utf8")) as WasmModuleManifest;
+  } catch {
+    const mode = process.env.MODULE_CONTRACTS_DIR ? "generated contracts" : "runtime projection";
+    throw new Error(`WASM module manifest is missing at expected ${mode} path: ${manifestAbs}`);
   }
-  throw new Error(
-    `WASM module manifest is missing at expected paths: ${candidates.join(", ")}`,
-  );
 }
 
 const manifest = readManifestJson();

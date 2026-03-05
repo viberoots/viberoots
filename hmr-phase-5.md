@@ -53,6 +53,7 @@ Dependency chain:
 7. PR-7 finalizes zero-edit module growth, watcher efficiency, and zero-wasm default lock-in across templates.
 8. PR-8 closes in-session growth gaps by refreshing generated contracts/watch sets without restart and strengthens contract-test enforcement.
 9. PR-9 enforces generated-only runtime authority and removes remaining compatibility/fallback bridges.
+10. PR-10 closes remaining hardcoded runtime-path and policy-coverage gaps for final strict canonical-path behavior.
 
 Phase 5 checkpoints:
 
@@ -64,7 +65,8 @@ Phase 5 checkpoints:
 - Checkpoint F: `READY` for PR-7 when PR-6 producer-surface contracts and root-set discovery tests/docs are green.
 - Checkpoint G: `READY` for PR-8 when PR-7 zero-edit growth + zero-wasm default matrix, tests, and docs are green.
 - Checkpoint H: `READY` for PR-9 when PR-8 in-session growth + strict contract-test enforcement is green.
-- Checkpoint I: `COMPLETED` for Phase 5 when PR-9 generated-authority + fallback-removal matrix, tests, and docs are green.
+- Checkpoint I: `READY` for PR-10 when PR-9 generated-authority + compatibility-bridge-removal matrix, tests, and docs are green.
+- Checkpoint J: `COMPLETED` for Phase 5 when PR-10 runtime-path canonicalization + policy-lock matrix, tests, and docs are green.
 
 ### Phase 5 contract update (effective from PR-2 onward)
 
@@ -1210,7 +1212,7 @@ I will complete the Phase 5 closeout by enforcing generated-only runtime authori
 - Legacy single-module watcher flags and compatibility `top.wasm` bridge behavior are removed from active paths.
 - Policy tests block reintroduction of removed fallback/compatibility behaviors.
 - Docs, tests, and runtime behavior are consistent with final generated-authority contracts.
-- Phase 5 reaches final `COMPLETED` checkpoint.
+- Phase 5 reaches checkpoint `READY` for PR-10 closeout.
 
 ### Risks
 
@@ -1230,7 +1232,127 @@ Closeout touches runtime helpers, watcher tooling, tests, and docs simultaneousl
 
 ### Recommendation
 
-Implement ninth as the final closeout gate that locks generated-authority behavior and removes remaining compatibility bridges.
+Implement ninth as the generated-authority and compatibility-bridge closeout gate that makes PR-10 the final strict runtime-path completion step.
+
+---
+
+## PR-10: Runtime-path canonicalization closeout + strict policy coverage completion
+
+### Description
+
+I will close the remaining Phase 5 gaps by removing residual hardcoded legacy runtime path assumptions, eliminating multi-candidate fallback probing in active helper/test surfaces, and extending policy tests/docs so canonical runtime paths are enforced consistently across runtime, planner, and test helper boundaries.
+
+### Scope & Changes
+
+- Canonicalize server/runtime wasm artifact references across active paths:
+  - explicitly close residual legacy-path assumptions in:
+    - `build-tools/tools/lib/runnables.ts`
+    - `build-tools/tools/nix/planner/manifest.nix`
+    - `build-tools/tools/tests/lib/ssr-scaffold-build.ts`
+    - `build-tools/tools/tests/scaffolding/webapp.multi-module.manifest.contract.test.ts`
+  - remove residual hardcoded `server/wasm-contract/top.wasm` assumptions in runnable/planner helper surfaces
+  - align runtime/planner artifact metadata with canonical runtime-destination contracts used by generated manifests
+  - keep generated-authority contracts as the only source of truth for path selection
+- Remove fallback-style multi-candidate path probing from active helper/test surfaces:
+  - replace "try many candidate locations" behavior with strict canonical-path assertions
+  - fail fast with stable diagnostics when canonical runtime artifacts are missing
+  - avoid compatibility probing that can mask primary-path regressions
+- Extend policy coverage for hardcoded runtime-path regressions:
+  - include runnable/planner metadata paths and scaffold helper surfaces in policy checks
+  - add explicit negative checks for reintroduction of `server/wasm-contract/top.wasm` assumptions in active runtime/planner paths
+  - keep top-wasm bridge-removal policy checks while broadening path-canonicalization coverage
+- Wire new/updated tests into canonical target metadata in the same PR:
+  - update `build-tools/tools/tests/template_conventions.bzl` mappings for any new Phase 5 closeout tests
+  - keep verification commands and generated test target wiring aligned
+- Final docs alignment for canonical runtime destinations:
+  - update architecture/docs examples to match canonical runtime path behavior
+  - remove stale examples that still describe transitional runtime locations
+
+### Tests (in this PR)
+
+- Add canonical-runtime-path contract tests:
+  - runnable/planner contract generation emits canonical server wasm runtime path metadata
+  - scaffold SSR/static helper paths assert canonical runtime location only (no candidate fallback set)
+- Extend hardcoded-path policy tests:
+  - fail on reintroduced `server/wasm-contract/top.wasm` assumptions in active runtime/planner/helper surfaces
+  - fail on reintroduced multi-candidate runtime probing in active helper/test contract surfaces
+- Keep final matrix coverage with canonical-path assertions enabled:
+  - static, SSR Vite, SSR Next
+  - mixed TS+wasm growth and per-module-key client/server behavior
+- Add test wiring/metadata coverage checks:
+  - new PR-10 contract tests are discoverable through canonical target wiring conventions
+  - template/test metadata contract checks remain green after PR-10 additions
+
+### Docs (in this PR)
+
+- Update runtime-path references in build-system/scaffolding docs to canonical generated-authority behavior.
+- Document strict canonical-path policy for runtime/planner/helper surfaces (no compatibility probing).
+- Record migration notes for removing residual hardcoded legacy runtime path assumptions.
+
+### Verification Commands
+
+- `buck2 test //:scaffolding_webapp_phase5_hardcoded_runtime_path_policy_contract`
+- `buck2 test //:scaffolding_webapp_phase5_generated_authority_runtime_contract`
+- `buck2 test //:scaffolding_webapp_phase5_top_wasm_bridge_removal_contract`
+- `buck2 test //:scaffolding_webapp_phase5_runtime_path_canonicalization_contract`
+- `buck2 test //:scaffolding_webapp_phase5_runtime_path_fallback_probe_removal_contract`
+- `buck2 test //:scaffolding_webapp_phase5_final_goal_validation_contract`
+- `buck2 test //:scaffolding_webapp_phase5_final_goal_validation_static_contract`
+- `buck2 test //:scaffolding_webapp_phase5_final_goal_validation_ssr_next_contract`
+- `buck2 test //:scaffolding_webapp_multi_template_parity_contract`
+- `buck2 test //:scaffolding_template_conventions_metadata_cquery`
+- `buck2 test //:scaffolding_ts_command_path_docs_contract`
+
+### Acceptance Criteria
+
+- Active runtime/planner/helper surfaces no longer hardcode legacy `server/wasm-contract/top.wasm` runtime assumptions.
+- Active helper/test contract surfaces no longer rely on multi-candidate fallback probing for runtime wasm path selection.
+- Policy tests block reintroduction of hardcoded legacy runtime paths and fallback probing in active paths.
+- Docs, tests, and runtime/planner metadata are consistent with canonical generated-authority runtime destinations.
+- Phase 5 reaches final `COMPLETED` checkpoint.
+
+### Phase 5 Final Closure Checklist (PR-10 merge gate)
+
+PR-10 is not complete unless every item below is explicitly confirmed in the PR description/checklist:
+
+1. Runtime/planner path closure:
+   - no active runtime/planner/helper surface hardcodes legacy `server/wasm-contract/top.wasm` assumptions
+   - canonical runtime-destination behavior is used consistently in active paths
+2. Fallback/probe closure:
+   - no active helper/test contract surface relies on multi-candidate runtime path probing
+   - canonical-path failures are fail-fast with stable diagnostics
+3. Policy-test closure:
+   - policy tests cover runtime + planner + helper/doc surfaces for hardcoded legacy path reintroduction
+   - policy tests cover fallback-probe reintroduction
+4. Matrix closure:
+   - final Phase 5 matrix targets are green with canonical-path and policy assertions enabled
+   - static, SSR Vite, and SSR Next parity is preserved under the same assertions
+5. Documentation closure:
+   - `hmr-phase-5.md`, `build-tools/docs/build-system-design.md`, and scaffolding/runtime docs describe the same canonical behavior
+   - no active docs describe transitional/compatibility runtime locations as canonical
+6. Final audit closure:
+   - one final read-only implementation-vs-plan audit reports no remaining behavior/policy/test/doc gaps for Phase 5
+   - if any implementation-affecting gap remains, it must be absorbed into PR-10 before Phase 5 can be marked `COMPLETED`
+
+### Risks
+
+Tightening canonical-path assertions can expose hidden consumers still depending on transitional runtime path assumptions.
+
+### Mitigation
+
+Use explicit fail-fast diagnostics, targeted negative-path policy tests, and one final full matrix rerun in the same PR.
+
+### Consequence of Not Implementing
+
+Phase 5 remains partially transitional in runtime-path behavior, with residual hardcoded/fallback assumptions that can hide regressions.
+
+### Downsides for Implementing
+
+Closeout requires coordinated updates across runtime/planner helpers, policy tests, and docs to keep strict behavior consistent.
+
+### Recommendation
+
+Implement tenth as the final Phase 5 strictness and consistency closeout for canonical runtime-path behavior.
 
 ---
 
@@ -1446,6 +1568,27 @@ Out-of-bounds by default:
 
 - new architecture directions beyond Phase 5 completion criteria
 - new compatibility bridges that reintroduce non-authoritative paths
+
+### PR-10 default touch map (runtime-path canonicalization + strict policy completion)
+
+Expected focus areas:
+
+- runtime/planner helper metadata path canonicalization for server wasm artifacts
+- removal of fallback-style multi-candidate runtime path probing in active helper/test surfaces
+- policy-test expansion for residual hardcoded legacy runtime path assumptions
+- docs alignment for final canonical runtime destination behavior
+
+Expected new/updated target families:
+
+- runtime-path canonicalization contract target(s)
+- runtime fallback-probe removal contract target(s)
+- hardcoded-path policy extension target(s)
+- final closeout matrix target(s)
+
+Out-of-bounds by default:
+
+- new architecture directions beyond Phase 5 completion criteria
+- compatibility probes/bridges that reintroduce non-canonical runtime path behavior
 
 ### Definition of "easy module addition" (harness-level)
 

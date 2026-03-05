@@ -1,20 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import { spawn, type ChildProcess } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
 import { getFlagStr } from "../lib/cli.ts";
 import { syncModuleContractsForApp } from "./sync-module-contracts-core.ts";
-
-function ensurePublicTopWasmSymlink(cwd: string): void {
-  const publicDir = path.join(cwd, "public");
-  const topWasm = path.join(publicDir, "top.wasm");
-  const target = path.join(cwd, "app", "wasm-contract", "top.wasm");
-  if (!fs.existsSync(publicDir) || !fs.existsSync(target)) return;
-  try {
-    if (fs.existsSync(topWasm)) fs.unlinkSync(topWasm);
-    fs.symlinkSync(path.relative(publicDir, target), topWasm, "file");
-  } catch {}
-}
 
 function required(name: string, value: string): string {
   const v = String(value || "").trim();
@@ -51,7 +39,6 @@ async function main() {
   const appTargetLabel = getFlagStr("app-target", "");
   const viteCmd = required("vite-cmd", getFlagStr("vite-cmd", ""));
   const watchCmd = required("watch-cmd", getFlagStr("watch-cmd", ""));
-  if (getFlagStr("ensure-public-top-wasm", "")) ensurePublicTopWasmSymlink(cwd);
   const synced = await syncModuleContractsForApp({
     appCwd: cwd,
     appTargetLabel: appTargetLabel || undefined,

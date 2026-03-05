@@ -8,6 +8,7 @@ import net from "node:net";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { after, test } from "node:test";
+import { terminateChildTree } from "../lib/process-tree.ts";
 import { runInTemp } from "../lib/test-helpers";
 
 const TEST_TIMEOUT_MS =
@@ -73,17 +74,10 @@ async function waitForResponse(
 }
 
 async function stopServer(child: ChildProcess): Promise<void> {
+  await terminateChildTree(child, 5000);
   try {
-    if (child.pid) child.kill("SIGINT");
+    if (child.exitCode == null) await Promise.race([once(child, "exit"), sleep(500)]);
   } catch {}
-  try {
-    await Promise.race([once(child, "exit"), sleep(5000)]);
-  } catch {}
-  if (child.exitCode == null) {
-    try {
-      if (child.pid) child.kill("SIGKILL");
-    } catch {}
-  }
 }
 
 test(

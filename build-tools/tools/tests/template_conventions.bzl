@@ -239,6 +239,30 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
+    "build-tools/tools/tests/scaffolding/webapp.phase5.generated-authority-runtime.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
+    },
+    "build-tools/tools/tests/scaffolding/webapp.phase5.legacy-flag-removal.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
+    },
+    "build-tools/tools/tests/scaffolding/webapp.phase5.top-wasm-bridge-removal.contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
+            "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
+        ],
+        "classification": "template:shared",
+    },
     "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.static.contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/webapp-static",

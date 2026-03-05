@@ -14,24 +14,21 @@ type TsModuleManifest = {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-function manifestCandidates(fileName: string): string[] {
-  const out = [path.resolve(__dirname, fileName)];
+function manifestPath(fileName: string): string {
   const contractsDir = String(process.env.MODULE_CONTRACTS_DIR || "").trim();
-  if (contractsDir) out.push(path.resolve(contractsDir, fileName));
-  return out;
+  if (contractsDir) return path.resolve(contractsDir, fileName);
+  return path.resolve(__dirname, fileName);
 }
 
 function readManifestJson(): TsModuleManifest {
-  const candidates = manifestCandidates("ts-modules.manifest.json");
-  for (const p of candidates) {
-    try {
-      const text = readFileSync(p, "utf8");
-      return JSON.parse(text) as TsModuleManifest;
-    } catch {}
+  const manifestAbs = manifestPath("ts-modules.manifest.json");
+  try {
+    const text = readFileSync(manifestAbs, "utf8");
+    return JSON.parse(text) as TsModuleManifest;
+  } catch {
+    const mode = process.env.MODULE_CONTRACTS_DIR ? "generated contracts" : "runtime projection";
+    throw new Error(`TS module manifest is missing at expected ${mode} path: ${manifestAbs}`);
   }
-  throw new Error(
-    `TS module manifest is missing at expected paths: ${candidates.join(", ")}`,
-  );
 }
 
 const manifest = readManifestJson();

@@ -14,7 +14,7 @@ Local workspace TypeScript dependencies update in the same dev session when they
 Generated module manifests and loaders:
 
 - generated contracts in `buck-out/tmp/module-contracts/<app-id>/`
-- mirrored runtime manifests in `src/` for local tooling compatibility
+- generated runtime manifest projection in `src/` (derived from canonical contracts)
 - loader surfaces in `src/wasm-contract.ts` and `src/ts-modules.ts`
 - consume through module-key APIs: `listWasmModules()`, `readWasmModuleBytes(moduleKey)`, `listTsModules()`, and `loadTsModule(moduleKey)`
 
@@ -43,7 +43,7 @@ Local dependency troubleshooting:
 - If local dependency edits stay stale after `package.json` changes, restart `pnpm dev`.
 - If producer edits do not update wasm output, check `src/wasm-producer/payload.txt`, then run `pnpm run dev:wasm:watch` and verify `[wasm-watch] sync:ok`.
 - `pnpm run dev:wasm:watch` syncs generated contracts into `buck-out/tmp/module-contracts/<app-id>/` and loads manifests from that path.
-- If watcher failures persist, run the logged recovery command and confirm `src/wasm-contract/top.wasm` exists.
+- If watcher failures persist, run the logged recovery command and confirm the generated wasm module destination exists under `src/wasm-contract/`.
 {% endif %}
 {% if template == "webapp-ssr-next" %}
 This is a Next.js SSR scaffold with an explicit Node server wrapper for production startup.
@@ -61,7 +61,7 @@ Local workspace TypeScript dependencies update in the same dev session when they
 Generated module manifests and loaders:
 
 - generated contracts in `buck-out/tmp/module-contracts/<app-id>/`
-- mirrored runtime manifests in `app/` for local tooling compatibility
+- generated runtime manifest projection in `app/` (derived from canonical contracts)
 - loader surfaces in `app/wasm-contract.ts` and `app/ts-modules.ts`
 - server parity helpers: `server/wasm-contract.ts` and `server/ts-modules.ts`
 - consume through module-key APIs only
@@ -86,7 +86,7 @@ Local dependency troubleshooting:
 - If local dependency edits stay stale after `package.json` changes, restart `pnpm run dev:ssr`.
 - If producer edits do not update wasm output, check `app/wasm-producer/payload.txt`, then run `pnpm run dev:wasm:watch` and verify `[wasm-watch] sync:ok`.
 - `pnpm run dev:wasm:watch` syncs generated contracts into `buck-out/tmp/module-contracts/<app-id>/` and loads manifests from that path.
-- If server-rendered wasm probes fail in dev, confirm `app/wasm-contract/top.wasm` exists and rerun the logged watcher recovery command.
+- If server-rendered wasm probes fail in dev, confirm generated assets exist under `app/wasm-contract/` and rerun the logged watcher recovery command.
 - For deterministic Phase 3 checks, run repeated client/server/wasm edit cycles in one `dev:ssr` session and verify process PID stays stable.
 - If updates appear stalled, check for a recent `[wasm-watch] rebuild:start` without a matching `sync:ok` or `rebuild:fail`, then run the logged recovery command.
 - If startup appears blocked, verify `/` responds on `http://127.0.0.1:${PORT:-4173}` before making edits.
@@ -120,7 +120,7 @@ Local workspace TypeScript dependencies update in the same dev session when they
 Generated module manifests and loaders:
 
 - generated contracts in `buck-out/tmp/module-contracts/<app-id>/`
-- mirrored runtime manifests in `src/` for local tooling compatibility
+- generated runtime manifest projection in `src/` (derived from canonical contracts)
 - loader surfaces in `src/wasm-contract.ts` and `src/ts-modules.ts`
 - server parity helpers: `server/wasm-contract.ts` and `server/ts-modules.ts`
 - consume through module-key APIs only
@@ -148,7 +148,7 @@ Local dependency troubleshooting:
 - If local dependency source resolves outside the app root, verify `vite.config.ts` keeps `server.fs.allow` scoped to the workspace root.
 - If producer edits do not update wasm output, check `src/wasm-producer/payload.txt`, then run `pnpm run dev:wasm:watch` and verify `[wasm-watch] sync:ok`.
 - `pnpm run dev:wasm:watch` syncs generated contracts into `buck-out/tmp/module-contracts/<app-id>/` and loads manifests from that path.
-- If server-rendered wasm probes fail in dev, confirm `src/wasm-contract/top.wasm` exists and rerun the logged watcher recovery command.
+- If server-rendered wasm probes fail in dev, confirm generated assets exist under `src/wasm-contract/` and rerun the logged watcher recovery command.
 - For deterministic Phase 3 checks, run repeated client/server/wasm edit cycles in one `dev` session and verify process PID stays stable.
 - If updates appear stalled, check for a recent `[wasm-watch] rebuild:start` without a matching `sync:ok` or `rebuild:fail`, then run the logged recovery command.
 - If startup appears blocked, verify `/` responds on `http://127.0.0.1:${PORT:-5173}` before making edits.

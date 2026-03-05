@@ -8,6 +8,7 @@ import net from "node:net";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { inferRunnableFromOutPath } from "../../lib/runnables.ts";
+import { terminateChildTree } from "./process-tree.ts";
 import { exists } from "./test-helpers.ts";
 
 async function httpGet(
@@ -111,20 +112,10 @@ async function runNodeServerSmoke(
     }
     throw new Error(`server did not return expected marker within 90000ms\n${stderrText.trim()}`);
   } finally {
+    await terminateChildTree(child, 5000);
     try {
-      if (child.pid) child.kill("SIGINT");
+      if (child.exitCode == null) await Promise.race([once(child, "exit"), sleep(500)]);
     } catch {}
-    try {
-      await Promise.race([once(child, "exit"), sleep(5000)]);
-    } catch {}
-    if (child.exitCode == null) {
-      try {
-        if (child.pid) child.kill("SIGKILL");
-      } catch {}
-      try {
-        await Promise.race([once(child, "exit"), sleep(2000)]);
-      } catch {}
-    }
   }
 }
 

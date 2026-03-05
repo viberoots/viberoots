@@ -17,13 +17,6 @@ export type WasmModuleSpec = {
   extraSyncOuts: string[];
 };
 
-function splitList(value: string): string[] {
-  return value
-    .split(",")
-    .map((v) => v.trim())
-    .filter(Boolean);
-}
-
 function shellQuote(value: string): string {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
@@ -75,8 +68,10 @@ export async function specsFromWasmManifest(
     const basename = moduleBasename || entry.moduleKey;
     const payloadRel = choosePayloadPath(cwd, entry.sourcePath, basename);
     const buildOutRel = path.posix.join(".wasm-producer", `${basename}.wasm`);
+    const nodeBin = process.execPath;
     const buildCmd = [
-      "zx-wrapper",
+      shellQuote(nodeBin),
+      "--experimental-strip-types",
       shellQuote(producerTool),
       "--payload",
       shellQuote(payloadRel),
@@ -123,27 +118,4 @@ export async function validateTsManifestProbes(
       );
   }
   return probeLogs;
-}
-
-export function legacySpecFromFlags(
-  cwd: string,
-  args: {
-    watchRaw: string;
-    buildCommand: string;
-    buildOut: string;
-    syncOut: string;
-    moduleKey: string;
-  },
-): WasmModuleSpec {
-  const watchPaths = splitList(args.watchRaw).map((p) => path.resolve(cwd, p));
-  if (watchPaths.length === 0) throw new Error("at least one --watch path is required");
-  return {
-    moduleKey: args.moduleKey || "top-contract",
-    moduleType: "wasm",
-    watchPaths,
-    buildCommand: args.buildCommand,
-    buildOut: path.resolve(cwd, args.buildOut),
-    syncOut: path.resolve(cwd, args.syncOut),
-    extraSyncOuts: [],
-  };
 }
