@@ -37,6 +37,8 @@ in
     nativeBuildInputs = [ pkgs.nodejs_22 ];
     buildPhase = ''
       set -euo pipefail
+      REPO_ROOT="$PWD"
+      export WORKSPACE_ROOT="$REPO_ROOT"
       cd ${importerDir}
       export SOURCE_DATE_EPOCH=1
       stage_wasm_contract() {
@@ -74,6 +76,41 @@ EOF
       VITE_BIN="${nm}/node_modules/.bin/vite"
       TSC_BIN="${nm}/node_modules/.bin/tsc"
       NEXT_BIN="${nm}/node_modules/.bin/next"
+      SYNC_CONTRACTS_SCRIPT="${repoStoreRoot}/build-tools/tools/dev/sync-module-contracts.ts"
+      requires_module_contracts() {
+        [ -f src/ts-modules.ts ] || [ -f src/wasm-contract.ts ] || [ -f app/ts-modules.ts ] || [ -f app/wasm-contract.ts ]
+      }
+      sync_module_contracts() {
+        if ! requires_module_contracts; then
+          return 0
+        fi
+        if [ ! -f "$SYNC_CONTRACTS_SCRIPT" ]; then
+          echo "node planner: missing sync-module-contracts script for ${importerDir}" >&2
+          exit 2
+        fi
+        APP_STAGE_NAME="$(
+          awk '
+            /node_asset_stage[[:space:]]*\(/ { in_stage=1 }
+            in_stage && /name[[:space:]]*=[[:space:]]*"/ {
+              line=$0
+              sub(/^.*name[[:space:]]*=[[:space:]]*"/, "", line)
+              sub(/".*$/, "", line)
+              print line
+              exit
+            }
+          ' TARGETS
+        )"
+        if [ -z "$APP_STAGE_NAME" ]; then APP_STAGE_NAME="app"; fi
+        # Ensure manifests are materialized during the build itself.
+        node --experimental-top-level-await \
+          --disable-warning=ExperimentalWarning \
+          --experimental-strip-types \
+          "$SYNC_CONTRACTS_SCRIPT" \
+          --cwd . \
+          --app-target "//${importerDir}:$APP_STAGE_NAME" \
+          --print-json 1 >/dev/null
+      }
+      sync_module_contracts
       ${if !hasSsr then ''
         if [ ! -x "$VITE_BIN" ]; then
           echo "node planner: missing vite in locked node_modules for ${importerDir}" >&2

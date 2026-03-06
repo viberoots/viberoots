@@ -1,4 +1,6 @@
 import { resolveSelectedTargetLabel } from "../target-label-resolver.ts";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 
 const SUBCMDS_WITH_TARGETS = new Set(["build", "test", "run"]);
 
@@ -66,5 +68,57 @@ export async function normalizeDevBuildTargetArgs(opts: {
       }),
     );
   }
-  return out;
+  let passthroughSeen = false;
+  let skipNextValue = false;
+  let keptTargetTokens = 0;
+  const filtered: string[] = [];
+  for (let i = 0; i < out.length; i++) {
+    const tok = String(out[i] || "");
+    if (passthroughSeen) {
+      filtered.push(tok);
+      continue;
+    }
+    if (tok === "--") {
+      passthroughSeen = true;
+      filtered.push(tok);
+      continue;
+    }
+    if (skipNextValue) {
+      skipNextValue = false;
+      filtered.push(tok);
+      continue;
+    }
+    if (tok.startsWith("-")) {
+      filtered.push(tok);
+      if (FLAGS_WITH_VALUES.has(tok) && i + 1 < out.length) {
+        skipNextValue = true;
+      }
+      continue;
+    }
+
+    const rec = tok.match(/^(?:root\/\/|\/\/)([^:]+)\/\.\.\.$/);
+    if (rec) {
+      const rel = String(rec[1] || "").replace(/^\/+/, "");
+      if (rel === "patches" || rel.startsWith("patches/")) {
+        const abs = path.join(opts.workspaceRoot, rel);
+        const exists = await fsp
+          .stat(abs)
+          .then((s) => s.isDirectory())
+          .catch(() => false);
+        if (!exists) {
+          console.warn(
+            `[dev-build] skipping missing optional patch scope target: ${tok} (directory '${rel}' not found)`,
+          );
+          continue;
+        }
+      }
+    }
+    keptTargetTokens++;
+    filtered.push(tok);
+  }
+
+  if (opts.subcmd === "build" && keptTargetTokens === 0) {
+    return ["//..."];
+  }
+  return filtered;
 }

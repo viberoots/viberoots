@@ -16,6 +16,48 @@ import { maybeAutoImpureFromUntrackedFiles } from "./untracked.ts";
 import { getArgvTokens } from "../../lib/cli.ts";
 import { findRepoRoot } from "../../lib/repo.ts";
 
+async function maybeResetSharedDaemonForMissingOptionalPatchDirs(opts: {
+  root: string;
+  subcmd: string;
+  restArgs: string[];
+  buckIsolation: string;
+  isolationFlags: string[];
+  reuseDaemon: boolean;
+}): Promise<void> {
+  if (!opts.reuseDaemon) return;
+  if (opts.subcmd !== "build") return;
+  if (!opts.restArgs.some((t) => String(t || "").trim() === "//...")) return;
+  if (opts.isolationFlags.length === 0) return;
+
+  const patchRoot = path.join(opts.root, "patches");
+  const patchRootExists = await fsp
+    .stat(patchRoot)
+    .then((s) => s.isDirectory())
+    .catch(() => false);
+  if (!patchRootExists) return;
+
+  const optionalPatchDirs = ["cpp", "go", "node", "python", "rust"] as const;
+  const missing: string[] = [];
+  for (const d of optionalPatchDirs) {
+    const exists = await fsp
+      .stat(path.join(patchRoot, d))
+      .then((s) => s.isDirectory())
+      .catch(() => false);
+    if (!exists) missing.push(d);
+  }
+  if (missing.length === 0) return;
+
+  // Shared buckd can retain stale recursive-spec state for removed optional patch dirs.
+  // Reset once before full-repo builds so optional missing dirs are treated as empty.
+  console.warn(
+    `[dev-build] resetting shared buck daemon before full recursive build; missing optional patch dirs: ${missing.join(", ")}`,
+  );
+  await $({
+    cwd: opts.root,
+    stdio: "pipe",
+  })`buck2 --isolation-dir ${opts.buckIsolation} kill`.nothrow();
+}
+
 export async function runDevBuild(): Promise<void> {
   const invocationCwd = process.cwd();
   const root = await findRepoRoot(invocationCwd);
@@ -107,6 +149,15 @@ export async function runDevBuild(): Promise<void> {
     materialize,
     impure,
     restArgs: parsed.restArgs,
+  });
+
+  await maybeResetSharedDaemonForMissingOptionalPatchDirs({
+    root,
+    subcmd: parsed.subcmd,
+    restArgs: parsed.restArgs,
+    buckIsolation: iso.buckIsolation,
+    isolationFlags: iso.isolationFlags,
+    reuseDaemon: iso.reuseDaemon,
   });
 
   if (materialize && impure && !exportedGraphDuringMaterialize) {

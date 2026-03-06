@@ -1,14 +1,4 @@
 {
   "pnpm-lock.yaml": "sha256-OzBIr7U8VbaW7SBG75q8ae9mACR2QoH1yQ4KycHrTR8=",
-  "projects/apps/demo-node/pnpm-lock.yaml": "sha256-B5DYPmvtkBrpkaZz7sMyvLViSbI1rWdQXqvVjNhmvG4=",
-  "projects/apps/demo/pnpm-lock.yaml": "sha256-ki1u4i2Ir0ezLsCJOaqOZDQ9S/641+09eRpTIRCckyY=",
-  "projects/apps/demo-cli/pnpm-lock.yaml": "sha256-5hmF1IxKTUQLrFpEXAIfwmSRQXrTmzTtFnccWUSi4hc=",
-  "projects/apps/demo-web-dev/pnpm-lock.yaml": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-  "projects/apps/example/pnpm-lock.yaml": "sha256-fRC+K9fncUsjK5qiwi+wkK/yhR/y1VXxR54tU5sB5Ww=",
-  "projects/libs/demo/pnpm-lock.yaml": "sha256-ObVjNvHYmlr9Lg5Ldpeh1aT8mV6UFhESac/5ynCfvvk=",
-  "projects/apps/myapp/pnpm-lock.yaml": "sha256-RRBDAJbHdvRnL5amg2P1VYB0LQXwi0L060KulQXrUcs=",
-  "projects/apps/express-app/pnpm-lock.yaml": "sha256-2Tino913CR8TqAD2yRhGB3CFPRSvv0HRVsOS8t4TGJk=",
-  "projects/apps/my-app/pnpm-lock.yaml": "sha256-arktnMfDuKQQxiWI+x6d9Obl8uxmmBXj2RzEy7FtXyo=",
-  "projects/apps/demo-vite-ssr/pnpm-lock.yaml": "sha256-arktnMfDuKQQxiWI+x6d9Obl8uxmmBXj2RzEy7FtXyo=",
-  "projects/apps/demo-next-ssr/pnpm-lock.yaml": "sha256-uze9BjrXzXfuXHXAe1qYedrvJ86/smOIzKiHXkNHfzI="
+  "projects/apps/test-app/pnpm-lock.yaml": "sha256-dDkt08v5wq5Zw6wNkrHiHDOTb3UFCAfyEOpfXPlrurg="
 }

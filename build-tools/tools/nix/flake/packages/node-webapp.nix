@@ -21,6 +21,8 @@ let
           PHASE_T0="$(date +%s)"
           phase_log() { echo "[node-webapp][phase] $1 t=$(date +%s)"; }
           phase_log "begin"
+          REPO_ROOT="$PWD"
+          export WORKSPACE_ROOT="$REPO_ROOT"
           cd ${importerDir}
           phase_log "cd-importer"
           export SOURCE_DATE_EPOCH=1
@@ -36,6 +38,41 @@ let
           VITE_BIN="node_modules/.bin/vite"
           TSC_BIN="node_modules/.bin/tsc"
           NEXT_BIN="node_modules/.bin/next"
+          SYNC_CONTRACTS_SCRIPT="${repoRoot}/build-tools/tools/dev/sync-module-contracts.ts"
+          requires_module_contracts() {
+            [ -f src/ts-modules.ts ] || [ -f src/wasm-contract.ts ] || [ -f app/ts-modules.ts ] || [ -f app/wasm-contract.ts ]
+          }
+          sync_module_contracts() {
+            if ! requires_module_contracts; then
+              return 0
+            fi
+            if [ ! -f "$SYNC_CONTRACTS_SCRIPT" ]; then
+              echo "[nix] ERROR: missing sync-module-contracts script: $SYNC_CONTRACTS_SCRIPT" >&2
+              exit 3
+            fi
+            APP_STAGE_NAME="$(
+              awk '
+                /node_asset_stage[[:space:]]*\(/ { in_stage=1 }
+                in_stage && /name[[:space:]]*=[[:space:]]*"/ {
+                  line=$0
+                  sub(/^.*name[[:space:]]*=[[:space:]]*"/, "", line)
+                  sub(/".*$/, "", line)
+                  print line
+                  exit
+                }
+              ' TARGETS
+            )"
+            if [ -z "$APP_STAGE_NAME" ]; then APP_STAGE_NAME="app"; fi
+            # Primary path: generate TS/WASM manifests inside the hermetic build,
+            # so webapp builds never depend on untracked local artifacts.
+            node --experimental-top-level-await \
+              --disable-warning=ExperimentalWarning \
+              --experimental-strip-types \
+              "$SYNC_CONTRACTS_SCRIPT" \
+              --cwd . \
+              --app-target "//${importerDir}:$APP_STAGE_NAME" \
+              --print-json 1 >/dev/null
+          }
           if [ ! -f TARGETS ]; then
             echo "[nix] ERROR: expected TARGETS file in ${importerDir}" >&2
             exit 3
@@ -94,6 +131,7 @@ EOF
             done
           ) &
           HB_PID="$!"
+          sync_module_contracts
           if [ "$WEBAPP_FRAMEWORK" = "static" ]; then
             if [ ! -x "$VITE_BIN" ]; then
               echo "[nix] ERROR: vite binary missing for static webapp build" >&2

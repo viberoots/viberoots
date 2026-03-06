@@ -23,8 +23,9 @@ def _decode_patch_filename(filename):
     return ("%s@%s" % (name, version)).lower()
 
 def _infer_patch_ids():
+    all_patches = native.glob(["**/*.patch"])
     out = []
-    for rel in sorted(native.glob(["patches/node/*.patch"])):
+    for rel in sorted([p for p in all_patches if p.startswith("patches/node/") and p.find("/", len("patches/node/")) == -1]):
         key = _decode_patch_filename(_basename_posix(rel))
         if key == None:
             continue

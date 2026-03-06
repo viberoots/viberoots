@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { getImporterRootsContract } from "../../../lib/importer-roots.ts";
+import { isRetryableCqueryError, resetBuckDaemon } from "./retry.ts";
 
 export type CqueryRunnerOptions = {
   scope: string; // label selector used by attrfilter(labels, <scope>, <expr>)
@@ -165,25 +166,6 @@ export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record
     return JSON.parse(String(stdout)) as Record<string, any>;
   };
 
-  const isTransientBuckInitError = (msg: string): boolean =>
-    msg.includes("Error initializing DaemonStateData") ||
-    msg.includes("Error loading system root certificates native frameworks");
-
-  const resetBuckDaemon = async (): Promise<void> => {
-    if (!iso) return;
-    try {
-      await $({
-        cwd,
-        stdio: "pipe",
-        env: {
-          ...process.env,
-          HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
-          SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
-        },
-      })`buck2 --isolation-dir ${iso} kill`.nothrow();
-    } catch {}
-  };
-
   return await withBuckCleanup(iso, ownsIso, async () => {
     const runQueriesOnce = async (): Promise<Record<string, any>> => {
       const base = `deps(//..., 1, exec_deps())`;
@@ -225,8 +207,8 @@ export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record
         } catch (e) {
           lastErr = e;
           const msg = e instanceof Error ? e.message : String(e);
-          if (!isTransientBuckInitError(msg)) break;
-          await resetBuckDaemon();
+          if (!isRetryableCqueryError(msg)) break;
+          await resetBuckDaemon(cwd, iso);
           const backoffMs = 150 * (attempt + 1);
           await new Promise<void>((resolve) => setTimeout(resolve, backoffMs));
         }

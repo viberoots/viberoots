@@ -1,0 +1,18 @@
+load("//build-tools/node:defs.bzl", "node_asset_stage", "node_webapp", "nix_node_test")
+
+node_webapp(
+    name = "app_raw",
+    ts_module_roots = ["src/ts-modules"],
+)
+
+node_asset_stage(
+    name = "app",
+    app = ":app_raw",
+    assets = [],
+    labels = ["lang:node", "kind:app", "webapp:ssr", "framework:vite"],
+    out = "dist",
+)
+
+nix_node_test(
+    name = "unit",
+)

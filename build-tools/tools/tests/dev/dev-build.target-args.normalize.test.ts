@@ -83,3 +83,28 @@ test("dev-build keeps query expressions and passthrough args untouched", async (
     ]);
   });
 });
+
+test("dev-build drops missing optional patch recursive scopes", async () => {
+  await runInTemp("dev-build-target-args-missing-patches", async (tmp) => {
+    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    await fsp.mkdir(graphDir, { recursive: true });
+    await fsp.writeFile(path.join(graphDir, "graph.json"), "[]\n", "utf8");
+
+    const missingPatchScope = await normalizeDevBuildTargetArgs({
+      workspaceRoot: tmp,
+      baseDir: tmp,
+      subcmd: "build",
+      args: ["//patches/cpp/..."],
+    });
+    assert.deepEqual(missingPatchScope, ["//..."]);
+
+    await fsp.mkdir(path.join(tmp, "patches", "cpp"), { recursive: true });
+    const existingPatchScope = await normalizeDevBuildTargetArgs({
+      workspaceRoot: tmp,
+      baseDir: tmp,
+      subcmd: "build",
+      args: ["//patches/cpp/..."],
+    });
+    assert.deepEqual(existingPatchScope, ["//patches/cpp/..."]);
+  });
+});

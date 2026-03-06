@@ -20,13 +20,16 @@ def append_patch_inputs(kwargs, dirs, into = "srcs"):
     # Some rules use dict-shaped srcs (mapping dest -> source). Do not mutate that shape.
     if isinstance(existing, dict):
         return
+    all_patches = native.glob(["**/*.patch"])
     merged = existing
     for d in dirs or []:
         if not isinstance(d, str):
             continue
         if d == "":
             continue
-        merged = merged + native.glob(["%s/*.patch" % d])
+        prefix = d + "/"
+        direct = [p for p in all_patches if p.startswith(prefix) and p.find("/", len(prefix)) == -1]
+        merged = merged + direct
     if len(merged) > 0:
         kwargs[into] = dedupe_preserve(merged)
 
@@ -52,11 +55,14 @@ def append_patch_inputs_dict_safe(kwargs, dirs, into = "srcs", key_prefix = PATC
     if not isinstance(existing, dict):
         return
 
+    all_patches = native.glob(["**/*.patch"])
     patch_paths = []
     for d in dirs or []:
         if not isinstance(d, str) or d == "":
             continue
-        patch_paths = patch_paths + native.glob(["%s/*.patch" % d])
+        prefix = d + "/"
+        direct = [p for p in all_patches if p.startswith(prefix) and p.find("/", len(prefix)) == -1]
+        patch_paths = patch_paths + direct
     patch_paths = dedupe_preserve(sorted(patch_paths))
     kwargs[into] = attach_items_dict_safe(existing, patch_paths, key_prefix)
 

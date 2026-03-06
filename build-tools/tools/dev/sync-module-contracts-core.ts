@@ -15,6 +15,7 @@ import {
 import {
   assetStageMetadataFromTargets,
   discoverTsModulesFromRoots,
+  tsModuleRootsFromTargets,
   discoverWasmModulesFromRoots,
 } from "./module-surface-discovery.ts";
 import { moduleSurfaceRootsFromGraph } from "./module-surface-graph.ts";
@@ -171,19 +172,19 @@ export async function syncModuleContractsForApp(args: {
   const appStageTargetName = paths.appTargetLabel.split(":").pop() || "app";
   const requireServerDestination = await exists(path.join(appAbs, "server", "wasm-contract.ts"));
   const stageMetadata = assetStageMetadataFromTargets(targetsText, appStageTargetName);
-  const graphSurfaceData = await moduleSurfaceRootsFromGraph({
-    repoRoot: paths.repoRoot,
-    appTargetLabel: paths.appTargetLabel,
-  });
+  let graphSurfaceData =
+    (await moduleSurfaceRootsFromGraph({
+      repoRoot: paths.repoRoot,
+      appTargetLabel: paths.appTargetLabel,
+    }).catch(() => null)) || null;
   if (!graphSurfaceData) {
-    throw new Error(
-      `[module-contracts:E_SURFACE_GRAPH_MISSING] missing module-surface graph data for '${paths.appTargetLabel}'`,
-    );
-  }
-  if (graphSurfaceData.tsRoots.length === 0 && graphSurfaceData.wasmRoots.length === 0) {
-    throw new Error(
-      `[module-contracts:E_SURFACE_GRAPH_EMPTY] no module-surface roots exported for '${paths.appTargetLabel}'`,
-    );
+    // Hermetic/pure builders can legitimately lack refresh capabilities (for example buck2).
+    // Use TARGETS-derived roots so contract generation remains deterministic in primary builds.
+    graphSurfaceData = {
+      tsRoots: tsModuleRootsFromTargets(targetsText),
+      wasmRoots: stageMetadata.wasmModuleRoots,
+      appLabels: stageMetadata.labels,
+    };
   }
   let wasmModules = wasmEntriesFromTargets(
     targetsText,

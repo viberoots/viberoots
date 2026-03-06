@@ -203,3 +203,38 @@ test("node macros fail on unknown patch_options keys", async () => {
     assert.match(all, /unknown option key 'unexpected'/);
   });
 });
+
+test("node macros tolerate missing importer patches/node directory", async () => {
+  await runInTemp("node-patch-options-missing-patch-dir", async (tmp, $) => {
+    const libDir = path.join(tmp, "projects", "libs", "foo");
+    await fsp.mkdir(libDir, { recursive: true });
+    await fsp.writeFile(path.join(libDir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
+    await fsp.writeFile(
+      path.join(libDir, "TARGETS"),
+      [
+        'load("//build-tools/node:defs.bzl", "nix_node_lib")',
+        "",
+        "nix_node_lib(",
+        '  name = "foo",',
+        '  out = "foo.txt",',
+        '  cmd = ": > $OUT",',
+        '  labels = ["lockfile:projects/libs/foo/pnpm-lock.yaml#projects/libs/foo"],',
+        ")",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const probe = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/libs/foo:foo`;
+    if (probe.exitCode !== 0) {
+      throw new Error("expected cquery to pass when patches/node is missing");
+    }
+    const out = String(probe.stdout || "");
+    assert.ok(!out.includes("node_patch_required:"));
+    assert.ok(!out.includes("node_patch_optional:"));
+  });
+});

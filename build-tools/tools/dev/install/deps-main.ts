@@ -18,6 +18,7 @@ import { syncModuleContractsForWebapps } from "./module-contracts.ts";
 import { runUvRefreshAll } from "./uv.ts";
 import { ensureToolchainPathsFiles } from "../toolchain-paths.ts";
 import { discoverImportersWithLock, sharedUnifiedStorePath } from "./importers.ts";
+import { pruneNodeModulesHashesJson } from "../update-pnpm-hash/hashes-json.ts";
 
 type Flags = {
   force: boolean;
@@ -111,6 +112,13 @@ if (dryRun) {
         console.log("[install-deps] lock acquired");
       }
       try {
+        const activeLockfiles = importers.map((imp) => path.join(imp, "pnpm-lock.yaml"));
+        const removedHashEntries = await pruneNodeModulesHashesJson(activeLockfiles);
+        if (verbose && removedHashEntries.length > 0) {
+          console.log(
+            `[install-deps] pruned stale node-modules hash entries: ${removedHashEntries.join(", ")}`,
+          );
+        }
         const absUpdate = path.join(repoRoot, "build-tools/tools/dev/update-pnpm-hash.ts");
         for (const imp of importers) {
           const relLock = path.join(imp, "pnpm-lock.yaml");

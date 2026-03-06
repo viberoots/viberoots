@@ -26,6 +26,15 @@ async function isNodeWebappImporter(repoRoot: string, importer: string): Promise
   }
 }
 
+async function importerContractInputsPresent(repoRoot: string, importer: string): Promise<boolean> {
+  const importerAbs = path.join(repoRoot, importer);
+  const required = ["pnpm-lock.yaml", "package.json", "TARGETS"];
+  for (const rel of required) {
+    if (!(await fileExists(path.join(importerAbs, rel)))) return false;
+  }
+  return true;
+}
+
 async function listNodeAssetStageTargets(repoRoot: string, importer: string): Promise<string[]> {
   const targetsPath = path.join(repoRoot, importer, "TARGETS");
   try {
@@ -82,6 +91,14 @@ export async function syncModuleContractsForWebapps(
   const zxInitPath = path.join(repoRoot, "build-tools", "tools", "dev", "zx-init.mjs");
   if (!(await fileExists(script)) || !(await fileExists(zxInitPath))) return;
   for (const importer of importers) {
+    if (!(await importerContractInputsPresent(repoRoot, importer))) {
+      if (verbose) {
+        console.log(
+          `[module-contracts] sync:skip importer=${importer} reason=missing importer contract inputs`,
+        );
+      }
+      continue;
+    }
     if (!(await isNodeWebappImporter(repoRoot, importer))) continue;
     const importerAbs = path.join(repoRoot, importer);
     const requiresContracts = await expectsModuleContracts(importerAbs);
@@ -93,7 +110,15 @@ export async function syncModuleContractsForWebapps(
     }
     try {
       const nodeAssetStageTargets = await listNodeAssetStageTargets(repoRoot, importer);
-      const targetCandidates = nodeAssetStageTargets.length > 0 ? nodeAssetStageTargets : [""];
+      if (nodeAssetStageTargets.length === 0) {
+        if (verbose) {
+          console.log(
+            `[module-contracts] sync:skip importer=${importer} reason=no node_asset_stage target`,
+          );
+        }
+        continue;
+      }
+      const targetCandidates = nodeAssetStageTargets;
       let resolvedPaths: ModuleContractsPaths | null = null;
       let lastErr = "";
       for (const targetName of targetCandidates) {
@@ -134,6 +159,23 @@ export async function syncModuleContractsForWebapps(
         console.log(`[module-contracts] sync:ok importer=${importer}`);
       }
     } catch (e) {
+      // Deletion/teardown race: if importer was removed or no longer wired as a webapp,
+      // skip this importer instead of failing the entire install pass.
+      if (!(await importerContractInputsPresent(repoRoot, importer))) {
+        if (verbose) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.log(`[module-contracts] sync:skip importer=${importer} reason=${msg}`);
+        }
+        continue;
+      }
+      const remainingAssetStageTargets = await listNodeAssetStageTargets(repoRoot, importer);
+      if (remainingAssetStageTargets.length === 0) {
+        if (verbose) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.log(`[module-contracts] sync:skip importer=${importer} reason=${msg}`);
+        }
+        continue;
+      }
       if (!requiresContracts) {
         if (verbose) {
           const msg = e instanceof Error ? e.message : String(e);
