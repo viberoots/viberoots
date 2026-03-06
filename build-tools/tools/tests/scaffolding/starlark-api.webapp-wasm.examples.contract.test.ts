@@ -22,6 +22,10 @@ test(
     assert.match(starlarkApi, /"dest": "server\/wasm\/top\.wasm"/);
     assert.match(starlarkApi, /"dest": "wasm-inline\/py\.js"/);
     assert.match(starlarkApi, /node_asset_stage\(/);
+    assert.match(starlarkApi, /Augmenting scaffolded webapp templates/);
+    assert.match(starlarkApi, /Scaffolded webapps start with no wasm modules/);
+    assert.match(starlarkApi, /module_deps = \["\/\/projects\/libs\/demo-ts:demo-ts"\]/);
+    assert.match(starlarkApi, /src = "src\/wasm-contract\/top\.wasm"/);
 
     await runInTemp("starlark-api-webapp-wasm-contract", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });

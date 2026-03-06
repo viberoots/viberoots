@@ -1,6 +1,6 @@
 # HMR Phase 4 Implementation Plan - PR Breakdown
 
-This plan covers implementation of Phase 4 from `hmr-plan.md`: regression coverage and docs lock-in, without reopening Phase 2 design decisions.
+This plan covers implementation of Phase 4 from `docs/design-history/hmr-plan.md`: regression coverage and docs lock-in, without reopening Phase 2 design decisions.
 
 Each PR includes code, tests, and documentation updates together.
 
@@ -73,7 +73,7 @@ I will establish the shared regression contract baseline used by all Phase 4 tem
 
 ### Docs (in this PR)
 
-- Update `hmr-plan.md` and scaffolding docs sections used as canonical contract sources:
+- Update `docs/design-history/hmr-plan.md` and scaffolding docs sections used as canonical contract sources:
   - deterministic failure signatures per change class
   - direct recovery command expectations
   - no-restart and marker requirements as first-class constraints
@@ -233,7 +233,7 @@ I will complete the deprecated `ts/webapp-ssr-express` removal and lock removal 
 ### Docs (in this PR)
 
 - Update docs to remove Express SSR generation path and references.
-- Update `hmr-plan.md` Phase 4 closeout notes to reflect completed removal.
+- Update `docs/design-history/hmr-plan.md` Phase 4 closeout notes to reflect completed removal.
 
 ### Verification Commands
 
@@ -314,7 +314,7 @@ I will close the remaining Phase 4 contract gaps found in review by adding missi
 
 ### Docs (in this PR)
 
-- Update `hmr-plan.md` and `build-tools/docs/scaffolding.md` to reflect final Phase 4 completeness:
+- Update `docs/design-history/hmr-plan.md` and `build-tools/docs/scaffolding.md` to reflect final Phase 4 completeness:
   - explicit static app-local edit coverage as permanent CI contract
   - explicit statement that deprecated Express SSR scaffold path remains removed
 - Update active docs still implying Express template scaffolding:

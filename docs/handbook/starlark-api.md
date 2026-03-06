@@ -40,6 +40,15 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
   - `rust_library`
   - `rust_binary`
 
+## Additional public surfaces
+
+These macros are public and loaded from `TARGETS`, but intentionally excluded from the
+Index because the Index is consumed by `nix-gaps` inventory checks for artifact-producing
+language macro coverage.
+
+- `//build-tools/tools/tests:defs.bzl`
+  - `auto_zx_tests` (test target autoload helper)
+
 ## Go macros
 
 Load from `//build-tools/go:defs.bzl`.
@@ -106,6 +115,8 @@ Public args:
   - Example: `labels = ["team:core"]`
 - `visibility` list of labels. Optional visibility.
   - Example: `visibility = ["//visibility:public"]`
+- `extra_module_providers` list of labels. Optional normalized extra providers merged into deps.
+  - Example: `extra_module_providers = ["//third_party/providers:lf_demo"]`
 - `library` label or string. If set, it points to the library under test.
   - Example: `library = ":util"`
 - `link_deps` list of labels. Link deps for test intent.
@@ -119,9 +130,6 @@ Public args:
   - `transitive` follows `link_deps` recursively.
 - `link_closure_overrides` dict. Per dep closure overrides.
   - Example: `link_closure_overrides = {"//third_party:openssl": "transitive"}`
-  - Allowed values for each override:
-    - `direct` uses only the direct `link_deps` for that dep.
-    - `transitive` follows that dep's `link_deps` recursively.
   - Allowed values for each override:
     - `direct` uses only the direct `link_deps` for that dep.
     - `transitive` follows that dep's `link_deps` recursively.
@@ -143,6 +151,8 @@ Public args:
   - Example: `labels = ["team:core"]`
 - `visibility` list of labels. Optional visibility.
   - Example: `visibility = ["//visibility:public"]`
+- `extra_module_providers` list of labels. Optional normalized extra providers merged into deps.
+  - Example: `extra_module_providers = ["//third_party/providers:lf_demo"]`
 
 ### `nix_go_tiny_wasm_lib(name, **kwargs)`
 
@@ -162,8 +172,6 @@ Public args:
   - Example: `visibility = ["//visibility:public"]`
 - `link_deps` list of labels. Link deps for wasm intent.
   - Example: `link_deps = ["//third_party:openssl"]`
-- `header_deps` list of labels. Header deps for wasm intent.
-  - Example: `header_deps = ["//third_party:zlib"]`
 - `link_closure` string. Link closure policy. Default is `direct`.
   - Example: `link_closure = "direct"`
 - Allowed values:
@@ -176,6 +184,8 @@ Public args:
     - `transitive` follows that dep's `link_deps` recursively.
 - `use_selected_wasm` bool. Select a specific wasm variant produced by the build.
   - Example: `use_selected_wasm = True`
+- `go_source_roots` list of strings. Optional source roots for generated wasm module-surface metadata.
+  - Example: `go_source_roots = ["."]`
 - `extra_module_providers` list of labels. Extra module labels to attach.
   - Example: `extra_module_providers = ["//third_party:zlib"]`
 
@@ -291,9 +301,16 @@ Public args:
   - Example: `header_deps = ["//third_party:zlib"]`
 - `link_mode` string. Must not be `shared`.
   - Example: `link_mode = "static"`
+- `link_kind` string. Legacy alias for `link_mode`.
+  - Example: `link_kind = "static"`
 - Allowed values:
   - `static` produces a header only target.
   - `shared` is invalid for header only targets.
+- `link_closure` string. Link closure policy. Default is `direct`.
+  - Example: `link_closure = "direct"`
+- Allowed values:
+  - `direct` uses only the direct `link_deps`.
+  - `transitive` follows `link_deps` recursively.
 
 ### `nix_cpp_test(name, **kwargs)`
 
@@ -317,6 +334,8 @@ Public args:
   - Example: `header_deps = ["//third_party:zlib"]`
 - `link_mode` string. `static` or `shared`. Default is `static`.
   - Example: `link_mode = "static"`
+- `link_kind` string. Legacy alias for `link_mode`.
+  - Example: `link_kind = "static"`
 - Allowed values:
   - `static` produces a static binary.
   - `shared` produces a shared library test binary.
@@ -349,6 +368,20 @@ Public args:
   - Example: `labels = ["team:core"]`
 - `visibility` list of labels. Optional visibility.
   - Example: `visibility = ["//visibility:public"]`
+- `link_deps` list of labels. Link deps.
+  - Example: `link_deps = ["//third_party:openssl"]`
+- `header_deps` list of labels. Header deps.
+  - Example: `header_deps = ["//third_party:zlib"]`
+- `link_mode` string. `static` or `shared`. Default is `static`.
+  - Example: `link_mode = "shared"`
+- `link_kind` string. Legacy alias for `link_mode`.
+  - Example: `link_kind = "shared"`
+- `link_closure` string. Link closure policy. Default is `direct`.
+  - Example: `link_closure = "direct"`
+- `link_closure_overrides` dict. Per dep closure overrides.
+  - Example: `link_closure_overrides = {"//third_party:openssl": "transitive"}`
+- `extra_module_providers` list of labels. Extra module labels to attach.
+  - Example: `extra_module_providers = ["//third_party:zlib"]`
 
 ### `nix_cpp_wasm_static_lib(name, **kwargs)`
 
@@ -375,6 +408,8 @@ Public args:
   - Example: `link_deps = ["//third_party:openssl"]`
 - `header_deps` list of labels. Header deps.
   - Example: `header_deps = ["//third_party:zlib"]`
+- `cpp_source_roots` list of strings. Optional source roots for generated wasm module-surface metadata.
+  - Example: `cpp_source_roots = ["."]`
 
 ### `nix_cpp_wasm_emscripten_lib(name, **kwargs)`
 
@@ -392,6 +427,12 @@ Public args:
   - Example: `labels = ["team:core"]`
 - `visibility` list of labels. Optional visibility.
   - Example: `visibility = ["//visibility:public"]`
+- `link_deps` list of labels. Link deps.
+  - Example: `link_deps = ["//third_party:openssl"]`
+- `header_deps` list of labels. Header deps.
+  - Example: `header_deps = ["//third_party:zlib"]`
+- `exported_functions` list of strings. Optional Emscripten export list.
+  - Example: `exported_functions = ["_malloc", "_free"]`
 
 ### `cpp_sanitize_probe(name, label)`
 
@@ -408,7 +449,7 @@ Public args:
 
 Load from `//build-tools/node:defs.bzl`.
 
-### `nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, kind = "gen", **kwargs)`
+### `nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, patch_options = None, kind = "gen", **kwargs)`
 
 Use this for Node artifact-producing generators that run through the Nix selected planner path.
 The public target is a Nix-calling wrapper; a planner companion target retains the original `cmd`.
@@ -429,6 +470,8 @@ Public args:
   - Example: `labels = ["team:web"]`
 - `lockfile_label` string. Lockfile label in the form `lockfile:<path>#<package>`.
   - Example: `lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"`
+- `patch_options` dict. Optional per-patch behavior overrides for importer-local Node patches.
+  - Example: `patch_options = {"lodash@4.17.21": {"optional": true}}`
 - `kind` string. Optional kind label value. Default is `gen`.
   - Example: `kind = "gen"`
 - Allowed values:
@@ -491,7 +534,7 @@ Public args:
 - `cmd` string. Accepted but ignored by the runner.
   - Example: `cmd = "unused"`
 
-### `nix_node_lib(name, **kwargs)`
+### `nix_node_lib(name, patch_options = None, **kwargs)`
 
 Use this for Node library targets that produce generated artifacts.
 This is an alias of `nix_node_gen(..., kind = "lib")`.
@@ -500,6 +543,10 @@ Public args:
 
 - `name` string. Target name.
   - Example: `nix_node_lib(name = "node_lib")`
+- `patch_options` dict. Optional per-patch behavior overrides.
+  - Example: `patch_options = {"lodash@4.17.21": {"optional": true}}`
+- `ts_module_roots` list of strings. Optional TypeScript source roots used for module surface metadata.
+  - Example: `ts_module_roots = ["src", "generated"]`
 - `srcs` list of labels or files. Inputs.
   - Example: `srcs = ["src/index.ts"]`
 - `out` string. Output filename.
@@ -535,7 +582,7 @@ Public args:
 - `lockfile_label` string. Lockfile label in the form `lockfile:<path>#<package>`.
   - Example: `lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"`
 
-### `node_webapp(name, labels = [], lockfile_label = None, importer = None, out = None, **kwargs)`
+### `node_webapp(name, deps = [], labels = [], lockfile_label = None, importer = None, out = None, ts_module_roots = ["src/ts-modules"], **kwargs)`
 
 Use this for Vite-style web apps built from a Node workspace.
 
@@ -543,6 +590,8 @@ Public args:
 
 - `name` string. Target name.
   - Example: `node_webapp(name = "webapp")`
+- `deps` list of labels. Optional direct deps.
+  - Example: `deps = [":web_runtime"]`
 - `labels` list of strings. Optional labels to add.
   - Example: `labels = ["team:web"]`
 - `lockfile_label` string. Lockfile label in the form `lockfile:<path>#<package>`.
@@ -551,6 +600,8 @@ Public args:
   - Example: `importer = "projects/apps/web"`
 - `out` string. Output directory name. Default is `dist`.
   - Example: `out = "dist"`
+- `ts_module_roots` list of strings. TypeScript module roots for generated module-surface metadata.
+  - Example: `ts_module_roots = ["src/ts-modules"]`
 
 ### `nix_node_cli_bin(name, entry = None, out = None, labels = [], deps = [], lockfile_label = None, bundle = False, importer = None, **kwargs)`
 
@@ -578,7 +629,7 @@ Public args:
 - `importer` string. Optional package name. Must match the lockfile label suffix.
   - Example: `importer = "projects/apps/web"`
 
-### `node_asset_stage(name, app, assets = [], out = None, deps = [], labels = [], lockfile_label = None, **kwargs)`
+### `node_asset_stage(name, app, assets = [], out = None, deps = [], wasm_module_roots = [], module_deps = [], module_surface_deps = [], **kwargs)`
 
 Use this to stage a webapp output with extra assets into one directory.
 
@@ -586,7 +637,7 @@ Public args:
 
 - `name` string. Target name.
   - Example: `node_asset_stage(name = "web_assets")`
-- `app` label. Webapp output to copy.
+- `app` label or path string. Webapp output to copy.
   - Example: `app = ":webapp"`
 - `assets` list of dicts. Each item requires `src` and `dest`, and may set one selector.
   - Example: `assets = [{"src": "//assets:logo", "dest": "img/logo.svg"}]`
@@ -604,10 +655,13 @@ Public args:
   - Example: `out = "dist"`
 - `deps` list of labels. Optional direct deps.
   - Example: `deps = [":app_raw"]`
-- `labels` list of strings. Optional labels to add.
-  - Example: `labels = ["team:web"]`
-- `lockfile_label` string. Lockfile label in the form `lockfile:<path>#<package>`.
-  - Example: `lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"`
+- `wasm_module_roots` list of strings. Optional wasm source roots for generated module-surface metadata.
+  - Example: `wasm_module_roots = ["src/wasm-producer"]`
+- `module_deps` list of labels. Optional module deps that are normalized and mapped to `__surface` deps.
+  - Example: `module_deps = ["//projects/libs/demo-wasm"]`
+- `module_surface_deps` list of labels. Optional explicit surface deps merged with inferred `module_deps`.
+  - Example: `module_surface_deps = ["//projects/libs/demo-wasm:demo-wasm__surface"]`
+- Common `**kwargs` include `labels` and `lockfile_label`.
 
 ### `node_wasm_inline_module(name, src, out = None, artifact_name = None, artifact_glob = None, labels = [], lockfile_label = None, **kwargs)`
 
@@ -617,7 +671,7 @@ Public args:
 
 - `name` string. Target name.
   - Example: `node_wasm_inline_module(name = "inline_wasm")`
-- `src` label. Wasm file input.
+- `src` label or path string. Wasm file input.
   - Example: `src = ":core_wasm"`
 - `out` string. Output filename. Default is `index.js`.
   - Example: `out = "inline.js"`
@@ -643,6 +697,88 @@ Contract notes for all examples:
 - `top.wasm` is the canonical browser-runtime filename expected by the client helper (`new URL("/top.wasm", ...)`).
 - `server/wasm/<default-module>.wasm` is the canonical server-side runtime path used by SSR runtimes.
 - Producer outputs can keep their native filename (for example `lib/top.wasm` or `pyext.wasm`), while `node_asset_stage(..., dest = ".../top.wasm")` normalizes the runtime path.
+
+#### Augmenting scaffolded webapp templates
+
+Scaffolded webapps start with no wasm modules (`assets = []` in `node_asset_stage(...)`).
+Use these patterns to add runtime wasm/ts wiring incrementally.
+
+1. Add wasm dependencies from other targets:
+
+```python
+# TARGETS (in a scaffolded app package)
+load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
+load("//build-tools/python:defs.bzl", "nix_python_wasm_lib")
+
+nix_python_wasm_lib(
+    name = "py_wasm",
+    labels = ["backend:pyodide"],
+)
+
+node_webapp(name = "app_raw")
+
+node_wasm_inline_module(
+    name = "py_wasm_inline",
+    src = ":py_wasm",
+)
+
+node_asset_stage(
+    name = "app",
+    app = ":app_raw",
+    assets = [
+        {"src": ":py_wasm", "dest": "top.wasm"},
+        {"src": ":py_wasm_inline", "dest": "wasm-inline/py.js"},
+        {"src": ":py_wasm", "dest": "server/wasm/top.wasm"},
+    ],
+)
+```
+
+2. Add TypeScript module dependencies (module-surface tracking):
+
+```python
+# TARGETS (in a scaffolded app package)
+load("//build-tools/node:defs.bzl", "node_asset_stage", "node_webapp")
+
+node_webapp(
+    name = "app_raw",
+    # Optional explicit source roots for the app ts surface.
+    ts_module_roots = ["src/ts-modules"],
+)
+
+node_asset_stage(
+    name = "app",
+    app = ":app_raw",
+    # Inferred to //projects/libs/demo-ts:demo-ts__surface
+    module_deps = ["//projects/libs/demo-ts:demo-ts"],
+    # Optional explicit surface deps can be merged in:
+    # module_surface_deps = ["//projects/libs/extra-ts:extra-ts__surface"],
+    assets = [],
+)
+```
+
+3. Add local wasm files from the app package:
+
+```python
+# TARGETS (in a scaffolded app package)
+load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
+
+node_webapp(name = "app_raw")
+
+node_wasm_inline_module(
+    name = "wasm_inline",
+    src = "src/wasm-contract/top.wasm",
+)
+
+node_asset_stage(
+    name = "app",
+    app = ":app_raw",
+    assets = [
+        {"src": "src/wasm-contract/top.wasm", "dest": "top.wasm"},
+        {"src": ":wasm_inline", "dest": "wasm-inline/index.js"},
+        {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm/top.wasm"},
+    ],
+)
+```
 
 ```python
 # static webapp: top.wasm + wasm-inline module in dist/
@@ -844,8 +980,8 @@ Public args:
   - Example: `lockfile_label = "lockfile:projects/apps/etl/uv.lock#projects/apps/etl"`
 - `main` string. Main file.
   - Example: `main = "main.py"`
-- `main_module` string. Main module name.
-  - Example: `main_module = "app.main"`
+- `srcs` list is not accepted by this macro.
+  - If provided, macro fails with: `nix_python_binary does not accept srcs; use main/main_module + deps instead`
 - `nixpkg_deps` list of strings. System deps used by native extensions.
   - Example: `nixpkg_deps = ["openssl", "zlib"]`
 
@@ -973,6 +1109,9 @@ Public args:
   - Example: `lockfile_label = "lockfile:projects/apps/etl/uv.lock#projects/apps/etl"`
 - `nixpkg_deps` list of strings. System deps used by native extensions.
   - Example: `nixpkg_deps = ["openssl", "zlib"]`
+- `python_source_roots` list of strings. Optional source roots for generated wasm module-surface metadata.
+  - Example: `python_source_roots = ["."]`
+- The macro stamps wasm labels and appends `wasm:app`.
 
 ### `nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **kwargs)`
 
@@ -992,6 +1131,9 @@ Public args:
   - Example: `lockfile_label = "lockfile:projects/apps/etl/uv.lock#projects/apps/etl"`
 - `nixpkg_deps` list of strings. System deps used by native extensions.
   - Example: `nixpkg_deps = ["openssl", "zlib"]`
+- `python_source_roots` list of strings. Optional source roots for generated wasm module-surface metadata.
+  - Example: `python_source_roots = ["."]`
+- The macro stamps wasm labels and appends `wasm:lib`.
 
 ## Rust macros
 
@@ -1013,6 +1155,8 @@ Public args:
   - Example: `labels = ["team:core"]`
 - `visibility` list of labels. Optional visibility.
   - Example: `visibility = ["//visibility:public"]`
+- `extra_module_providers` list of labels. Optional normalized extra providers merged into deps.
+  - Example: `extra_module_providers = ["//third_party/providers:lf_demo"]`
 
 ### `rust_binary(name, **kwargs)`
 
@@ -1030,3 +1174,5 @@ Public args:
   - Example: `labels = ["team:core"]`
 - `visibility` list of labels. Optional visibility.
   - Example: `visibility = ["//visibility:public"]`
+- `extra_module_providers` list of labels. Optional normalized extra providers merged into deps.
+  - Example: `extra_module_providers = ["//third_party/providers:lf_demo"]`

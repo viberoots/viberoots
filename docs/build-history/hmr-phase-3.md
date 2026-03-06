@@ -1,6 +1,6 @@
 # HMR Phase 3 Implementation Plan - PR Breakdown
 
-This plan covers implementation of Phase 3 from `hmr-plan.md`: SSR and runtime consistency on top of the locked Phase 2 baseline.
+This plan covers implementation of Phase 3 from `docs/design-history/hmr-plan.md`: SSR and runtime consistency on top of the locked Phase 2 baseline.
 
 Each PR includes code, tests, and documentation updates together.
 
@@ -207,7 +207,7 @@ I will close Phase 3 by locking cross-template runtime consistency requirements 
 
 ### Docs (in this PR)
 
-- Update `hmr-plan.md` and template-facing docs to mark Phase 3 closure outcomes:
+- Update `docs/design-history/hmr-plan.md` and template-facing docs to mark Phase 3 closure outcomes:
   - SSR runtime consistency expectations
   - startup non-blocking requirement
   - continued Phase 2 invariants (canonical producer path, strict update policy)
@@ -304,7 +304,7 @@ I will close the remaining Phase 3 planning gaps by making the dev-update contra
 
 ### Docs (in this PR)
 
-- Update `hmr-plan.md` to include an explicit contract table for expected dev behavior by change type.
+- Update `docs/design-history/hmr-plan.md` to include an explicit contract table for expected dev behavior by change type.
 - Update `build-tools/docs/scaffolding.md` and template-facing guidance to mirror the same matrix and failure/recovery signatures.
 - Add a concise runner-policy section documenting:
   - current selected runner contract for this suite

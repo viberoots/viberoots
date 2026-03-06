@@ -86,7 +86,7 @@ async function buildTarget(target) {
       WORKSPACE_ROOT: repoRoot,
       EXPORTER_VALIDATION: readEnv("EXPORTER_VALIDATION") || "warn",
     },
-  })`nix build --impure ${repoRoot}#graph-generator-selected --accept-flake-config --print-out-paths`;
+  })`nix build --impure ${repoRoot}#graph-generator-selected --accept-flake-config --no-link --print-out-paths`;
   const outText = String(res.stdout || "").trim();
   const line = outText.split(/\n+/).pop() || "";
   if (!line) {

@@ -1328,7 +1328,7 @@ PR-10 is not complete unless every item below is explicitly confirmed in the PR 
    - final Phase 5 matrix targets are green with canonical-path and policy assertions enabled
    - static, SSR Vite, and SSR Next parity is preserved under the same assertions
 5. Documentation closure:
-   - `hmr-phase-5.md`, `build-tools/docs/build-system-design.md`, and scaffolding/runtime docs describe the same canonical behavior
+   - `docs/build-history/hmr-phase-5.md`, `build-tools/docs/build-system-design.md`, and scaffolding/runtime docs describe the same canonical behavior
    - no active docs describe transitional/compatibility runtime locations as canonical
 6. Final audit closure:
    - one final read-only implementation-vs-plan audit reports no remaining behavior/policy/test/doc gaps for Phase 5

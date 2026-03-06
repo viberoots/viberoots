@@ -132,7 +132,7 @@ export async function materializePureGraphIfEnabled(opts: {
         const selOut = await nixBuildPrintOutPaths({
           root: opts.root,
           env: envSel as Record<string, string>,
-          args: "--no-write-lock-file .#graph-generator-pure-selected --accept-flake-config --print-out-paths",
+          args: "--no-write-lock-file .#graph-generator-pure-selected --accept-flake-config --no-link --print-out-paths",
           label: `materialize selected target ${sel}`,
           timeoutSec: 120,
         });
@@ -169,7 +169,7 @@ export async function materializePureGraphIfEnabled(opts: {
   const pureOut = await nixBuildPrintOutPaths({
     root: opts.root,
     env: envFull as Record<string, string>,
-    args: "--impure --no-write-lock-file .#graph-generator-pure --accept-flake-config --print-out-paths",
+    args: "--impure --no-write-lock-file .#graph-generator-pure --accept-flake-config --no-link --print-out-paths",
     label: "materialize full pure graph",
     timeoutSec: 420,
   });

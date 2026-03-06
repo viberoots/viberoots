@@ -129,7 +129,10 @@ test("Phase-3 policy docs: SSR runtime consistency and startup guidance stay exp
   assert.match(templateReadme, /\[wasm-watch\] rebuild:start/);
   assert.match(templateReadme, /\[wasm-watch\] sync:ok/);
 
-  const hmrPlan = await fsp.readFile(path.join(REPO_ROOT, "hmr-plan.md"), "utf8");
+  const hmrPlan = await fsp.readFile(
+    path.join(REPO_ROOT, "docs", "design-history", "hmr-plan.md"),
+    "utf8",
+  );
   assert.match(hmrPlan, /### Phase 3 Closeout Status/);
   assert.match(hmrPlan, /Checkpoint: `COMPLETED` for Phase 3/);
   assert.match(hmrPlan, /Phase 4 is complete\./);

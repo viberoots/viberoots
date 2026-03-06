@@ -30,8 +30,8 @@ const DOC_ALLOWLIST_PREFIXES = [
   "docs/build-history/",
   "docs/pnpm/",
   "docs/handbook/nix-gaps-prs.md",
-  "vite-ssr.md",
-  "webapp-ssr.md",
+  "docs/build-history/vite-ssr.md",
+  "docs/build-history/webapp-ssr.md",
 ];
 const DOC_ARTIFACT_REF_PATTERN =
   /(build-tools\/tools\/tests\/[A-Za-z0-9_./-]+|\/\/:[A-Za-z0-9_.-]+|[A-Za-z0-9_.-]+\.test\.ts)/;

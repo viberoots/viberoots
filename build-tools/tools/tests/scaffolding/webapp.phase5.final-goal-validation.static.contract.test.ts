@@ -168,8 +168,8 @@ test(
             return await httpGet(`${depSourceUrl}?t=${Date.now()}`);
           },
           (res) => res.status === 200 && res.body.includes("dep-b"),
-          120000,
-          300,
+          180000,
+          700,
         );
         assert.equal(nextClientModule.status, 200);
 

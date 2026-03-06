@@ -1,6 +1,6 @@
 # HMR Phase 1 Implementation Plan - PR Breakdown
 
-This plan covers implementation of Phase 1 from `hmr-plan.md`: local workspace TypeScript dependency
+This plan covers implementation of Phase 1 from `docs/design-history/hmr-plan.md`: local workspace TypeScript dependency
 HMR for webapp templates.
 
 Each PR includes code, tests, and documentation updates together.

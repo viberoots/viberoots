@@ -147,7 +147,7 @@ async function main() {
     case "nix-build-graph-generator":
       // Optional: if the flake doesn't expose graph-generator, skip gracefully in local runs
       try {
-        await $`nix build .#graph-generator`;
+        await $`nix build .#graph-generator --no-link`;
       } catch (e) {
         console.warn("graph-generator attribute missing; skipping nix build stage");
       }
@@ -209,7 +209,7 @@ async function main() {
       }
       // Build all wheelhouse outputs for this system
       const attrs = keys.map((k) => `.#${k}`).join(" ");
-      await $`bash --noprofile --norc -c ${`set -euo pipefail; nix build --impure --accept-flake-config ${attrs}`}`;
+      await $`bash --noprofile --norc -c ${`set -euo pipefail; nix build --impure --accept-flake-config --no-link ${attrs}`}`;
       // Optionally push to a binary cache if configured
       if (to && to.trim() !== "") {
         const pathsOut =

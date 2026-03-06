@@ -1,6 +1,6 @@
 # HMR Phase 2 Implementation Plan - PR Breakdown
 
-This plan covers implementation of Phase 2 from `hmr-plan.md`: wasm dev update pipeline for
+This plan covers implementation of Phase 2 from `docs/design-history/hmr-plan.md`: wasm dev update pipeline for
 template-generated webapps.
 
 Each PR includes code, tests, and documentation updates together.
@@ -339,7 +339,7 @@ test modules back into methodology file-size compliance without changing Phase 2
 
 ### Docs (in this PR)
 
-- Update `hmr-phase-2.md` and template-facing docs to record gap closure outcomes:
+- Update `docs/build-history/hmr-phase-2.md` and template-facing docs to record gap closure outcomes:
   - static seed parity contract and expected initial wasm behavior
   - producer automation script-policy alignment notes (zx-wrapper TypeScript path)
   - maintained strict HMR/module invalidation policy statement for wasm edits
