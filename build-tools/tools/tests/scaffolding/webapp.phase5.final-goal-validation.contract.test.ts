@@ -97,6 +97,7 @@ test(
       try {
         await waitForHttpOk(`http://127.0.0.1:${port}/`);
         const pid = devServer.pid;
+        assertNoProcessRestart(devServer, pid);
         const tsManifestPath = contracts.tsManifestPath;
         const wasmManifestPath = contracts.wasmManifestPath;
 
@@ -154,7 +155,10 @@ test(
         await writeAndBumpMtime(extraPayloadPath, "extra-bbb");
 
         const nextClientModule = await waitForValue(
-          async () => await httpGet(depSourceUrl),
+          async () => {
+            assertNoProcessRestart(devServer, pid);
+            return await httpGet(depSourceUrl);
+          },
           (res) => res.status === 200 && res.body.includes("dep-b"),
           30000,
           300,

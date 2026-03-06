@@ -134,5 +134,5 @@ test("Phase-2 policy docs: troubleshooting and template parity text are present"
   assert.match(scaffoldingDoc, /webapp-ssr-vite <name>/);
   assert.match(scaffoldingDoc, /webapp-ssr-next <name>/);
   assert.match(scaffoldingDoc, /app\/wasm-producer/);
-  assert.match(scaffoldingDoc, /dist\/server\/wasm-contract\/<module>\.wasm/);
+  assert.match(scaffoldingDoc, /dist\/server\/wasm\/<module>\.wasm/);
 });

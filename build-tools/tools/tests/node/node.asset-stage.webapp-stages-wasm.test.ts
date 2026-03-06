@@ -88,7 +88,7 @@ node_asset_stage(
     assets = [
         {"src": "src/wasm-contract/top.wasm", "dest": "top.wasm"},
         {"src": ":wasm_inline", "dest": "wasm-inline/index.js"},
-        {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},
+        {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm/top.wasm"},
         {"src": "//projects/libs/demo-wasm:wasm", "dest": "tinygo.wasm", "artifact_name": "wasm.wasm"},
     ],
     labels = ["lang:node", "kind:app", "webapp:static"],

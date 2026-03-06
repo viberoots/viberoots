@@ -19,7 +19,9 @@ test("planner manifest script retains runnable contract shapes for bin and webap
   assert.ok(txt.includes('\\"runnable\\": { \\"kind\\": \\"webapp-ssr\\"'));
   assert.ok(txt.includes('\\"framework\\": \\"$framework\\"'));
   assert.ok(txt.includes('\\"node\\", \\"$serverEntry\\"'));
-  assert.ok(txt.includes('\\"serverWasmContract\\": \\"$serverWasmContract\\"'));
+  assert.ok(
+    txt.includes('serverWasmArtifactField=", \\"serverWasmContract\\": \\"$serverWasmContract\\""'),
+  );
   assert.ok(txt.includes('\\"dev:ssr\\"'));
   assert.ok(txt.includes('\\"pnpm\\", \\"--dir\\", \\"$importer\\", \\"dev\\"'));
   assert.ok(txt.includes('elif [ -d "$dist" ];'));

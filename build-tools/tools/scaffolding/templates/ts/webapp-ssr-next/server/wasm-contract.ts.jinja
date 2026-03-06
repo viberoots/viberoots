@@ -45,19 +45,13 @@ function manifestEntryFor(moduleKey: string) {
   return entry;
 }
 
-function wasmCandidatesFor(moduleKey: string): string[] {
+function serverWasmPathFor(moduleKey: string): string {
   const entry = manifestEntryFor(moduleKey);
   if (!entry) {
-    return [];
+    return "";
   }
   const serverRuntimeDest = entry.runtimeDestinations.server;
-  const clientRuntimeDest = entry.runtimeDestinations.client;
-  return [
-    path.resolve(__dirname, "..", serverRuntimeDest),
-    path.resolve(__dirname, serverRuntimeDest),
-    path.resolve(__dirname, "..", clientRuntimeDest),
-    path.resolve(__dirname, clientRuntimeDest),
-  ];
+  return path.resolve(__dirname, "..", serverRuntimeDest);
 }
 
 export function listWasmModules(): string[] {
@@ -69,23 +63,18 @@ export function defaultWasmModuleKey(): string {
 }
 
 export async function readServerWasmModuleByteLength(moduleKey: string): Promise<number> {
-  const wasmCandidates = wasmCandidatesFor(moduleKey);
-  if (wasmCandidates.length === 0) {
+  const wasmPath = serverWasmPathFor(moduleKey);
+  if (!wasmPath) {
     return 0;
   }
-  let bytes: Buffer | null = null;
-  for (const p of wasmCandidates) {
-    try {
-      bytes = await fsp.readFile(p);
-      break;
-    } catch {}
-  }
-  if (!bytes) {
+  try {
+    const bytes = await fsp.readFile(wasmPath);
+    return bytes.byteLength;
+  } catch {
     throw new Error(
-      `server wasm contract asset is missing from expected runtime paths (module '${moduleKey}')`,
+      `server wasm contract asset is missing at canonical runtime path '${wasmPath}' (module '${moduleKey}')`,
     );
   }
-  return bytes.byteLength;
 }
 
 export async function readServerWasmContractByteLength(): Promise<number> {

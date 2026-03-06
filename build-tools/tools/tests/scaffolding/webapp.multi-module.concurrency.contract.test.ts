@@ -74,7 +74,7 @@ test(
             sourcePath: `src/wasm-contract/${key}.wasm`,
             runtimeDestinations: {
               client: `${key}.wasm`,
-              server: `server/wasm-contract/${key}.wasm`,
+              server: `server/wasm/${key}.wasm`,
             },
           })),
         },

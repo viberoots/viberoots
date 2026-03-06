@@ -641,7 +641,7 @@ These examples show complete wiring for webapps that need runtime WASM assets pl
 Contract notes for all examples:
 
 - `top.wasm` is the canonical browser-runtime filename expected by the client helper (`new URL("/top.wasm", ...)`).
-- `server/wasm-contract/top.wasm` is the canonical server-side parity path used by SSR runtimes.
+- `server/wasm/<default-module>.wasm` is the canonical server-side runtime path used by SSR runtimes.
 - Producer outputs can keep their native filename (for example `lib/top.wasm` or `pyext.wasm`), while `node_asset_stage(..., dest = ".../top.wasm")` normalizes the runtime path.
 
 ```python
@@ -663,7 +663,7 @@ node_asset_stage(
     assets = [
         {"src": "src/wasm-contract/top.wasm", "dest": "top.wasm"},
         {"src": ":wasm_inline", "dest": "wasm-inline/index.js"},
-        {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},
+        {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm/top.wasm"},
     ],
     labels = ["lang:node", "kind:app", "webapp:static"],
     out = "dist",
@@ -697,7 +697,7 @@ node_asset_stage(
     assets = [
         {"src": "//projects/libs/demo-py-wasm:py_wasm", "dest": "top.wasm"},
         {"src": ":py_wasm_inline", "dest": "wasm-inline/py.js"},
-        {"src": "//projects/libs/demo-py-wasm:py_wasm", "dest": "server/wasm-contract/top.wasm"},
+        {"src": "//projects/libs/demo-py-wasm:py_wasm", "dest": "server/wasm/top.wasm"},
     ],
     labels = ["lang:node", "kind:app", "webapp:static"],
     out = "dist",
@@ -723,7 +723,7 @@ node_asset_stage(
     assets = [
         {"src": "src/wasm-contract/top.wasm", "dest": "client/top.wasm"},
         {"src": ":wasm_inline", "dest": "client/wasm-inline/index.js"},
-        {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},
+        {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm/top.wasm"},
     ],
     labels = ["lang:node", "kind:app", "webapp:ssr", "framework:express"],
     out = "dist",
@@ -749,7 +749,7 @@ node_asset_stage(
     assets = [
         {"src": "app/wasm-contract/top.wasm", "dest": "client/public/top.wasm"},
         {"src": ":wasm_inline", "dest": "client/public/wasm-inline/index.js"},
-        {"src": "app/wasm-contract/top.wasm", "dest": "server/wasm-contract/top.wasm"},
+        {"src": "app/wasm-contract/top.wasm", "dest": "server/wasm/top.wasm"},
     ],
     labels = ["lang:node", "kind:app", "webapp:ssr", "framework:next"],
     out = "dist",

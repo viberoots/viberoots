@@ -19,7 +19,7 @@ test(
     );
     assert.match(starlarkApi, /Vite webapp \+ Python wasm library/);
     assert.match(starlarkApi, /nix_python_wasm_lib\(/);
-    assert.match(starlarkApi, /"dest": "server\/wasm-contract\/top\.wasm"/);
+    assert.match(starlarkApi, /"dest": "server\/wasm\/top\.wasm"/);
     assert.match(starlarkApi, /"dest": "wasm-inline\/py\.js"/);
     assert.match(starlarkApi, /node_asset_stage\(/);
 
@@ -64,8 +64,8 @@ test(
         "utf8",
       );
       assert.match(nextServerWasm, /export async function readServerWasmContractByteLength\(\)/);
-      assert.match(nextServerWasm, /wasmCandidatesFor/);
-      assert.match(nextServerWasm, /server wasm contract asset is missing/);
+      assert.match(nextServerWasm, /serverWasmPathFor/);
+      assert.match(nextServerWasm, /canonical runtime path/);
     });
   },
 );

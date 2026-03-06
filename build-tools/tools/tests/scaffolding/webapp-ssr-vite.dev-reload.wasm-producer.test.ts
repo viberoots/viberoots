@@ -119,7 +119,7 @@ test(
           async () => await httpGet(`http://127.0.0.1:${port}/`),
           (res) =>
             res.status === 500 &&
-            res.body.includes("server wasm contract asset is missing from expected runtime paths"),
+            res.body.includes("server wasm contract asset is missing at canonical runtime path"),
         );
         assert.equal(missingWasmResponse.status, 500);
 

@@ -1,7 +1,11 @@
 import { execFileSync } from "node:child_process";
 
 export function getExtraStatusLines(isTty: boolean): string {
-  const buckCount = getBuckProcessCount();
+  const commands = getProcessCommands();
+  const buckCount = getBuckProcessCount(commands);
+  const nodeCount = getNodeProcessCount(commands);
+  const viteCount = getViteNonNodeProcessCount(commands);
+  const nextCount = getNextNonNodeProcessCount(commands);
   const diskUsage = getDiskUsage();
   const DIM = "\u001b[2m";
   const RESET = "\u001b[0m";
@@ -12,9 +16,15 @@ export function getExtraStatusLines(isTty: boolean): string {
     return " ".repeat(padLen);
   };
   const buckLabel = "Buck processes:";
+  const nodeLabel = "Node processes:";
+  const viteLabel = "Vite processes:";
+  const nextLabel = "Next processes:";
   const diskLabel = "Disk usage:";
   return (
     `${label(buckLabel)}${padFor(buckLabel)}${buckCount}\n` +
+    `${label(nodeLabel)}${padFor(nodeLabel)}${nodeCount}\n` +
+    `${label(viteLabel)}${padFor(viteLabel)}${viteCount}\n` +
+    `${label(nextLabel)}${padFor(nextLabel)}${nextCount}\n` +
     `${label(diskLabel)}${padFor(diskLabel)}${diskUsage}`
   );
 }
@@ -54,24 +64,49 @@ function truncateAnsi(input: string, maxVisible: number): string {
   return hasAnsi ? out + "\u001b[0m" : out;
 }
 
-function getBuckProcessCount(): number {
+function getProcessCommands(): string[] {
   try {
     const out = execFileSync("ps", ["-A", "-o", "command="], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     });
-    const lines = String(out || "")
+    return String(out || "")
       .split("\n")
       .map((x) => x.trim())
       .filter(Boolean);
-    return lines.filter((cmd) => {
-      if (cmd.includes("buck2d[")) return true;
-      if (cmd.includes("(buck2-forkserver)")) return true;
-      return /(^|\s)buck2(\s|$)/.test(cmd);
-    }).length;
   } catch {
-    return 0;
+    return [];
   }
+}
+
+function getBuckProcessCount(commands: string[]): number {
+  return commands.filter((cmd) => {
+    if (cmd.includes("buck2d[")) return true;
+    if (cmd.includes("(buck2-forkserver)")) return true;
+    return /(^|\s)buck2(\s|$)/.test(cmd);
+  }).length;
+}
+
+function getNodeProcessCount(commands: string[]): number {
+  return commands.filter(isNodeProcess).length;
+}
+
+function getViteNonNodeProcessCount(commands: string[]): number {
+  return commands.filter((cmd) => {
+    if (isNodeProcess(cmd)) return false;
+    return /(^|[\s/])vite(\s|$)/.test(cmd);
+  }).length;
+}
+
+function getNextNonNodeProcessCount(commands: string[]): number {
+  return commands.filter((cmd) => {
+    if (isNodeProcess(cmd)) return false;
+    return /(^|[\s/])next(\s|$)/.test(cmd);
+  }).length;
+}
+
+function isNodeProcess(command: string): boolean {
+  return /(^|[\s/])node(\s|$)/.test(command) || /(^|[\s/])nodejs(\s|$)/.test(command);
 }
 
 function getDiskUsage(): string {

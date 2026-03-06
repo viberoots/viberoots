@@ -10,7 +10,7 @@ async function readTemplate(relativePath: string): Promise<string> {
   return await fsp.readFile(path.join(REPO_ROOT, relativePath), "utf8");
 }
 
-test("Phase-5 PR-5 policy: active webapp runtime helpers avoid hardcoded single-module wasm paths", async () => {
+test("Phase-5 PR-10 policy: active runtime, planner, and helper surfaces avoid hardcoded legacy wasm paths", async () => {
   const staticClientWasm = await readTemplate(
     "build-tools/tools/scaffolding/templates/ts/webapp-static/src/wasm-contract.ts.jinja",
   );
@@ -32,6 +32,12 @@ test("Phase-5 PR-5 policy: active webapp runtime helpers avoid hardcoded single-
   const nextServerTs = await readTemplate(
     "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/server/ts-modules.ts.jinja",
   );
+  const runnables = await readTemplate("build-tools/tools/lib/runnables.ts");
+  const runnableWasmArtifacts = await readTemplate(
+    "build-tools/tools/lib/runnable-wasm-artifacts.ts",
+  );
+  const plannerManifest = await readTemplate("build-tools/tools/nix/planner/manifest.nix");
+  const ssrScaffoldBuild = await readTemplate("build-tools/tools/tests/lib/ssr-scaffold-build.ts");
 
   for (const src of [
     staticClientWasm,
@@ -61,4 +67,12 @@ test("Phase-5 PR-5 policy: active webapp runtime helpers avoid hardcoded single-
     assert.doesNotMatch(src, /\.\.\/app\/wasm-modules\.manifest\.json/);
     assert.match(src, /MODULE_CONTRACTS_DIR/);
   }
+
+  for (const src of [runnables, plannerManifest, ssrScaffoldBuild]) {
+    assert.doesNotMatch(src, /server\/wasm-contract\/top\.wasm/);
+  }
+  assert.match(runnables, /resolveServerWasmContractArtifact/);
+  assert.match(runnableWasmArtifacts, /wasm-modules\.manifest\.json/);
+  assert.match(plannerManifest, /runtimeDestinations\.server/);
+  assert.match(ssrScaffoldBuild, /missing canonical server runtime wasm asset/);
 });

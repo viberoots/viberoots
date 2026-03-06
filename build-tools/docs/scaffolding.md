@@ -526,9 +526,9 @@ Shared client-side contract path pattern:
 
 Shared server-side parity contract path pattern:
 
-- `webapp-static`: `dist/server/wasm-contract/<module>.wasm`
-- `webapp-ssr-next`: `dist/server/wasm-contract/<module>.wasm`
-- `webapp-ssr-vite`: `dist/server/wasm-contract/<module>.wasm`
+- `webapp-static`: `dist/server/wasm/<module>.wasm`
+- `webapp-ssr-next`: `dist/server/wasm/<module>.wasm`
+- `webapp-ssr-vite`: `dist/server/wasm/<module>.wasm`
 
 Static example:
 

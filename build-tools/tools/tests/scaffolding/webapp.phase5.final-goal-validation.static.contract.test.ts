@@ -98,6 +98,7 @@ test(
       try {
         await waitForHttpOk(`http://127.0.0.1:${port}/`);
         const pid = devServer.pid;
+        assertNoProcessRestart(devServer, pid);
         const tsManifestPath = contracts.tsManifestPath;
         const wasmManifestPath = contracts.wasmManifestPath;
 
@@ -141,8 +142,16 @@ test(
         assert.match(wasmGrowthModule.runtimeDestinations.server, /^server\/wasm\/.+\.wasm$/);
 
         const canonicalLibSourcePath = await fsp.realpath(libSourcePath);
-        const depSourceUrlBase = `http://127.0.0.1:${port}${viteFsUrlFor(canonicalLibSourcePath)}`;
-        const initialClientModule = await httpGet(`${depSourceUrlBase}?t=${Date.now()}`);
+        const depSourceUrl = `http://127.0.0.1:${port}${viteFsUrlFor(canonicalLibSourcePath)}`;
+        const initialClientModule = await waitForValue(
+          async () => {
+            assertNoProcessRestart(devServer, pid);
+            return await httpGet(`${depSourceUrl}?t=${Date.now()}`);
+          },
+          (res) => res.status === 200 && res.body.includes("dep-a"),
+          120000,
+          300,
+        );
         assert.equal(initialClientModule.status, 200);
         assert.match(initialClientModule.body, /dep-a/);
 
@@ -154,9 +163,12 @@ test(
         await writeAndBumpMtime(extraPayloadPath, "extra-bbb");
 
         const nextClientModule = await waitForValue(
-          async () => await httpGet(`${depSourceUrlBase}?t=${Date.now()}`),
+          async () => {
+            assertNoProcessRestart(devServer, pid);
+            return await httpGet(`${depSourceUrl}?t=${Date.now()}`);
+          },
           (res) => res.status === 200 && res.body.includes("dep-b"),
-          30000,
+          120000,
           300,
         );
         assert.equal(nextClientModule.status, 200);

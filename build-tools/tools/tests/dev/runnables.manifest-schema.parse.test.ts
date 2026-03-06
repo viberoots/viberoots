@@ -146,3 +146,13 @@ test("inferRunnableFromOutPath accepts vite SSR framework", async () => {
   assert.equal(runnable?.framework, "vite");
   assert.deepEqual(runnable?.run.prod.argv, ["node", path.join(tmp, "dist", "server", "index.js")]);
 });
+
+test("inferRunnableFromOutPath returns null when outPath is not a runnable webapp output", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "runnable-non-webapp-"));
+  const runnable = await inferRunnableFromOutPath({
+    label: "//projects/apps/misc:tooling",
+    outPath: tmp,
+    mode: "static",
+  });
+  assert.equal(runnable, null);
+});

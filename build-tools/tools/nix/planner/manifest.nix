@@ -125,7 +125,25 @@ let
           framework="${(nodeRunnableMeta.${n}.framework or "")}"
           serverEntry="$dist/server/index.js"
           clientDir="$dist/client"
-          serverWasmContract="$dist/server/wasm-contract/top.wasm"
+          serverWasmContract=""
+          serverWasmArtifactField=""
+          serverWasmManifest="$dist/server/wasm-modules.manifest.json"
+          if [ -f "$serverWasmManifest" ]; then
+            defaultWasmModuleKey="$(${pkgs.jq}/bin/jq -r '.defaultModuleKey // ""' "$serverWasmManifest")"
+            if [ -n "$defaultWasmModuleKey" ]; then
+              serverRuntimeDest="$(${pkgs.jq}/bin/jq -r --arg key "$defaultWasmModuleKey" '.modules[]? | select(.moduleKey == $key) | .runtimeDestinations.server // empty' "$serverWasmManifest" | sed -n '1p')"
+              if [ -z "$serverRuntimeDest" ]; then
+                echo "node planner: webapp target ${n} missing runtimeDestinations.server for default module '$defaultWasmModuleKey' in $serverWasmManifest" >&2
+                exit 1
+              fi
+              serverWasmContract="$dist/$serverRuntimeDest"
+              if [ ! -f "$serverWasmContract" ]; then
+                echo "node planner: webapp target ${n} missing canonical server wasm artifact $serverWasmContract" >&2
+                exit 1
+              fi
+              serverWasmArtifactField=", \"serverWasmContract\": \"$serverWasmContract\""
+            fi
+          fi
           if [ -n "$bins" ]; then
             if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
             echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [], \"runnable\": { \"kind\": \"script\", \"run\": { \"prod\": { \"argv\": [ \"$first_bin\" ] } }, \"artifacts\": { \"bins\": [ $bins ] } } }" >> $out/manifest.json
@@ -133,17 +151,17 @@ let
           elif [ "$webappMode" = "ssr" ]; then
             if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
             if [ -n "$importer" ]; then
-              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [], \"aux\": [], \"runnable\": { \"kind\": \"webapp-ssr\", \"framework\": \"$framework\", \"run\": { \"prod\": { \"argv\": [ \"node\", \"$serverEntry\" ] }, \"dev\": { \"argv\": [ \"pnpm\", \"--dir\", \"$importer\", \"dev:ssr\" ] } }, \"artifacts\": { \"serverEntry\": \"$serverEntry\", \"clientDir\": \"$clientDir\", \"serverWasmContract\": \"$serverWasmContract\" } } }" >> $out/manifest.json
+              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [], \"aux\": [], \"runnable\": { \"kind\": \"webapp-ssr\", \"framework\": \"$framework\", \"run\": { \"prod\": { \"argv\": [ \"node\", \"$serverEntry\" ] }, \"dev\": { \"argv\": [ \"pnpm\", \"--dir\", \"$importer\", \"dev:ssr\" ] } }, \"artifacts\": { \"serverEntry\": \"$serverEntry\", \"clientDir\": \"$clientDir\"$serverWasmArtifactField } } }" >> $out/manifest.json
             else
-              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [], \"aux\": [], \"runnable\": { \"kind\": \"webapp-ssr\", \"framework\": \"$framework\", \"run\": { \"prod\": { \"argv\": [ \"node\", \"$serverEntry\" ] } }, \"artifacts\": { \"serverEntry\": \"$serverEntry\", \"clientDir\": \"$clientDir\", \"serverWasmContract\": \"$serverWasmContract\" } } }" >> $out/manifest.json
+              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [], \"aux\": [], \"runnable\": { \"kind\": \"webapp-ssr\", \"framework\": \"$framework\", \"run\": { \"prod\": { \"argv\": [ \"node\", \"$serverEntry\" ] } }, \"artifacts\": { \"serverEntry\": \"$serverEntry\", \"clientDir\": \"$clientDir\"$serverWasmArtifactField } } }" >> $out/manifest.json
             fi
             first=0
           elif [ -d "$dist" ]; then
             if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
             if [ -n "$importer" ]; then
-              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [], \"aux\": [], \"runnable\": { \"kind\": \"webapp\", \"run\": { \"prod\": { \"argv\": [ \"python3\", \"-m\", \"http.server\", \"--directory\", \"$dist\" ] }, \"dev\": { \"argv\": [ \"pnpm\", \"--dir\", \"$importer\", \"dev\" ] } }, \"artifacts\": { \"dist\": \"$dist\", \"serverWasmContract\": \"$serverWasmContract\" } } }" >> $out/manifest.json
+              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [], \"aux\": [], \"runnable\": { \"kind\": \"webapp\", \"run\": { \"prod\": { \"argv\": [ \"python3\", \"-m\", \"http.server\", \"--directory\", \"$dist\" ] }, \"dev\": { \"argv\": [ \"pnpm\", \"--dir\", \"$importer\", \"dev\" ] } }, \"artifacts\": { \"dist\": \"$dist\"$serverWasmArtifactField } } }" >> $out/manifest.json
             else
-              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [], \"aux\": [], \"runnable\": { \"kind\": \"webapp\", \"run\": { \"prod\": { \"argv\": [ \"python3\", \"-m\", \"http.server\", \"--directory\", \"$dist\" ] } }, \"artifacts\": { \"dist\": \"$dist\", \"serverWasmContract\": \"$serverWasmContract\" } } }" >> $out/manifest.json
+              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [], \"aux\": [], \"runnable\": { \"kind\": \"webapp\", \"run\": { \"prod\": { \"argv\": [ \"python3\", \"-m\", \"http.server\", \"--directory\", \"$dist\" ] } }, \"artifacts\": { \"dist\": \"$dist\"$serverWasmArtifactField } } }" >> $out/manifest.json
             fi
             first=0
           fi

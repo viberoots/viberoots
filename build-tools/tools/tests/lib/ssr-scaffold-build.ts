@@ -8,6 +8,7 @@ import net from "node:net";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { inferRunnableFromOutPath } from "../../lib/runnables.ts";
+import { parseWasmModuleManifest } from "../../scaffolding/webapp-module-manifests.ts";
 import { terminateChildTree } from "./process-tree.ts";
 import { exists } from "./test-helpers.ts";
 
@@ -45,6 +46,26 @@ function sanitizeImporterForNixAttr(importer: string): string {
     .replace(/\/\//g, "")
     .replace(/:/g, "-")
     .replace(/[\/\s]+/g, "-");
+}
+
+async function readCanonicalServerWasmArtifact(outPath: string): Promise<string | null> {
+  const manifestPath = path.join(outPath, "dist", "server", "wasm-modules.manifest.json");
+  const manifest = parseWasmModuleManifest(
+    JSON.parse(await fsp.readFile(manifestPath, "utf8")),
+    manifestPath,
+  );
+  if (manifest.modules.length === 0 || manifest.defaultModuleKey === "") {
+    return null;
+  }
+  const defaultEntry = manifest.modules.find(
+    (entry) => entry.moduleKey === manifest.defaultModuleKey,
+  );
+  if (!defaultEntry) {
+    throw new Error(
+      `missing default wasm module '${manifest.defaultModuleKey}' in generated manifest: ${manifestPath}`,
+    );
+  }
+  return path.join(outPath, "dist", ...defaultEntry.runtimeDestinations.server.split("/"));
 }
 
 async function installNodeModules(appAbs: string, _$: any): Promise<void> {
@@ -158,22 +179,9 @@ export async function scaffoldBuildAndSmoke(
   if (!(await exists(stagedWasm))) {
     throw new Error(`missing staged client wasm artifact: ${stagedWasm}`);
   }
-  const serverWasmCandidates = [
-    path.join(outPath, "dist", "server", "wasm-contract", "top.wasm"),
-    path.join(clientDir, "top.wasm"),
-    path.join(clientDir, "public", "top.wasm"),
-  ];
-  let foundServerWasm = false;
-  for (const candidate of serverWasmCandidates) {
-    if (await exists(candidate)) {
-      foundServerWasm = true;
-      break;
-    }
-  }
-  if (!foundServerWasm) {
-    throw new Error(
-      `missing server runtime wasm asset candidates: ${serverWasmCandidates.join(", ")}`,
-    );
+  const serverWasmContract = await readCanonicalServerWasmArtifact(outPath);
+  if (serverWasmContract && !(await exists(serverWasmContract))) {
+    throw new Error(`missing canonical server runtime wasm asset: ${serverWasmContract}`);
   }
   const inlineModule = path.join(clientWasmRoot, "wasm-inline", "index.js");
   if (!(await exists(inlineModule))) {

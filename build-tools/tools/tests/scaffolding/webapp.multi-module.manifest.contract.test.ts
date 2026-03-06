@@ -26,7 +26,7 @@ test("webapp multi-module manifest schemas validate deterministic contracts", ()
           sourcePath: "src/wasm-contract/top.wasm",
           runtimeDestinations: {
             client: "client/top.wasm",
-            server: "server/wasm-contract/top.wasm",
+            server: "server/wasm/top.wasm",
           },
         },
         {
@@ -34,7 +34,7 @@ test("webapp multi-module manifest schemas validate deterministic contracts", ()
           sourcePath: "src/wasm-contract/alt.wasm",
           runtimeDestinations: {
             client: "client/alt.wasm",
-            server: "server/wasm-contract/alt.wasm",
+            server: "server/wasm/alt.wasm",
           },
         },
       ],

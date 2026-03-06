@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { normalizeTargetLabel } from "./labels.ts";
+import { resolveServerWasmContractArtifact } from "./runnable-wasm-artifacts.ts";
 import { SSR_FRAMEWORKS } from "./runnable-contracts.ts";
 
 export type RunnableExec = {
@@ -160,7 +161,6 @@ export async function inferRunnableFromOutPath(opts: {
     }
     const serverEntry = path.join(dist, "server", "index.js");
     const clientDir = path.join(dist, "client");
-    const serverWasmContract = path.join(dist, "server", "wasm-contract", "top.wasm");
     try {
       const st = await fsp.stat(serverEntry);
       if (!st.isFile()) throw new Error("not a file");
@@ -177,6 +177,11 @@ export async function inferRunnableFromOutPath(opts: {
         `SSR packaging contract violation for ${opts.label}: missing clientDir at ${clientDir}`,
       );
     }
+    const serverWasmContract = await resolveServerWasmContractArtifact({
+      label: opts.label,
+      distDir: dist,
+      allowMissingManifest: true,
+    });
     return {
       kind: "webapp-ssr",
       framework,
@@ -190,7 +195,11 @@ export async function inferRunnableFromOutPath(opts: {
             }
           : {}),
       },
-      artifacts: { serverEntry, clientDir, serverWasmContract },
+      artifacts: {
+        serverEntry,
+        clientDir,
+        ...(serverWasmContract ? { serverWasmContract } : {}),
+      },
     };
   }
   try {
@@ -199,6 +208,11 @@ export async function inferRunnableFromOutPath(opts: {
   } catch {
     return null;
   }
+  const serverWasmContract = await resolveServerWasmContractArtifact({
+    label: opts.label,
+    distDir: dist,
+    allowMissingManifest: true,
+  });
 
   return {
     kind: "webapp",
@@ -214,7 +228,10 @@ export async function inferRunnableFromOutPath(opts: {
           }
         : {}),
     },
-    artifacts: { dist, serverWasmContract: path.join(dist, "server", "wasm-contract", "top.wasm") },
+    artifacts: {
+      dist,
+      ...(serverWasmContract ? { serverWasmContract } : {}),
+    },
   };
 }
 
