@@ -7,6 +7,12 @@ import * as fsp from "node:fs/promises";
 import { ensureImporterLockfileFresh } from "../../../dev/update-pnpm-hash/lockfile.ts";
 import { printSkip } from "../../../lib/errors.ts";
 import { confirmOrExit } from "../confirm.ts";
+import {
+  formatImporterLockfiles,
+  formatScaffoldOutput,
+  refreshImporterStoreHash,
+  templateImportersToRefresh,
+} from "./new-helpers.ts";
 import { runCopierCopy } from "../copier/copy.ts";
 import { runPostSteps } from "../copier/post-steps.ts";
 import { recordSource } from "../copier/record-source.ts";
@@ -158,15 +164,36 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
       // Nix builders run pnpm with --frozen-lockfile; placeholder lockfiles are not acceptable.
       const repoRoot = process.cwd();
       const importer = (() => {
-        if (template === "go-addon" || template === "cpp-addon") return path.join("libs", name);
+        // Multi-package templates scaffold under a root destination directory (for example "projects"),
+        // so lockfile refresh must point at that rooted importer path rather than repo-root apps/libs.
+        if (template === "go-addon" || template === "cpp-addon")
+          return path.join(destInfo.path, "libs", name);
         if (template === "wasm-app" || template === "wasm-linking-app")
-          return path.join("apps", name);
-        if (template === "go-cpp-lib") return path.join("libs", `${name}-ts`);
+          return path.join(destInfo.path, "apps", name);
+        if (template === "go-cpp-lib") return path.join(destInfo.path, "libs", `${name}-ts`);
         return destInfo.path;
       })();
-      await ensureImporterLockfileFresh({ repoRoot, importer });
+      const importersToRefresh = templateImportersToRefresh({
+        template,
+        name,
+        destRoot: destInfo.path,
+        primaryImporter: importer,
+      });
+      for (const imp of importersToRefresh) {
+        if (imp === importer) {
+          await ensureImporterLockfileFresh({ repoRoot, importer: imp });
+        }
+      }
+      // Keep lockfile contents stable before computing fixed-output pnpm store hashes.
+      await formatImporterLockfiles(repoRoot, importersToRefresh);
+      for (const imp of importersToRefresh) {
+        await refreshImporterStoreHash(repoRoot, imp);
+      }
     }
   }
+
+  // Keep all scaffold outputs formatting-clean immediately, regardless of language.
+  await formatScaffoldOutput(dest);
 
   console.log("created:", dest);
 }

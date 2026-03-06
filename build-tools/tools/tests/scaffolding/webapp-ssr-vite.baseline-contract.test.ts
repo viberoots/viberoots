@@ -110,5 +110,7 @@ test("Vite SSR template metadata and scaffold baseline are present", async () =>
     );
     assert.match(buildSsrScript, /vite build --outDir dist\/client/);
     assert.match(buildSsrScript, /vite build --ssr src\/entry-server\.ts --outDir dist\/server/);
+
+    await $`pnpm prettier --check ${path.join(appRoot, "pnpm-lock.yaml")} ${path.join(appRoot, "scripts", "build-ssr.mjs")} ${path.join(appRoot, "scripts", "dev-wasm-watch.mjs")} ${path.join(appRoot, "server", "dev.mjs")} ${path.join(appRoot, "server", "index.ts")} ${path.join(appRoot, "server", "ts-modules.ts")} ${path.join(appRoot, "src", "ts-modules.ts")} ${path.join(appRoot, "src", "wasm-contract.ts")} ${path.join(appRoot, "test", "entry-server.test.ts")} ${path.join(appRoot, "vite.config.ts")}`;
   });
 });

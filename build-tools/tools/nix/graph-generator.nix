@@ -9,6 +9,8 @@ let
   traceEnabled = (builtins.getEnv "PLANNER_TRACE") != "";
   onlyCpp = (builtins.getEnv "PLANNER_ONLY_CPP") != "";
   selectedTargetName = builtins.getEnv "BUCK_TARGET";
+  # build-tools/tools/{dev,buck} needed for node-webapp sync-module-contracts during Nix build.
+  # Use suffix/infix matching (like projects/*) to stay robust to /var vs /private/var path aliases.
   keepAppsLibsPath = path: type:
     let
       p = builtins.toString path;
@@ -19,8 +21,12 @@ let
       isProjectsLibs = lib.hasSuffix "/projects/libs" p;
       inProjectsApps = lib.hasInfix "/projects/apps/" p;
       inProjectsLibs = lib.hasInfix "/projects/libs/" p;
+      isBuildTools = lib.hasSuffix "/build-tools" p;
+      isBuildToolsTools = lib.hasSuffix "/build-tools/tools" p;
+      inBuildToolsTools = lib.hasInfix "/build-tools/tools/" p;
     in
-      isRoot || isProjects || isProjectsApps || isProjectsLibs || inProjectsApps || inProjectsLibs;
+      isRoot || isProjects || isProjectsApps || isProjectsLibs || inProjectsApps || inProjectsLibs
+      || isBuildTools || isBuildToolsTools || inBuildToolsTools;
   # Filtered source that includes both projects/apps/* and projects/libs/* so local replaces resolve.
   # In BUCK_TEST_SRC mode, use builtins.path to keep temp-repo test fixtures (including untracked files).
   appsLibsSrc = if buckTestSrcEnv != ""

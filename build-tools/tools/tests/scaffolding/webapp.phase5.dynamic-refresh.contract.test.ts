@@ -5,11 +5,47 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
+import { setTimeout as sleep } from "node:timers/promises";
 import { stopServer } from "./lib/webapp-static-hmr";
 import { assertSingleQueueInvariant, waitForValue, writeAndBumpMtime } from "./lib/wasm-watch";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
+const STEP_TIMEOUT_MS = Math.max(25000, Math.min(120000, Math.floor(TEST_TIMEOUT_MS / 8)));
+
+async function waitForValueOrWatcherFailure<T>(opts: {
+  getter: () => Promise<T>;
+  check: (value: T) => boolean;
+  watcher: { exitCode: number | null };
+  logs: string[];
+  timeoutMs: number;
+  pollMs: number;
+  label: string;
+}): Promise<T> {
+  const start = Date.now();
+  while (Date.now() - start < opts.timeoutMs) {
+    if (opts.watcher.exitCode != null) {
+      throw new Error(
+        `[hmr-contract] watcher exited while waiting for ${opts.label} (code=${opts.watcher.exitCode})\n${opts.logs.join("").slice(-12000)}`,
+      );
+    }
+    const merged = opts.logs.join("");
+    if (
+      merged.includes("[wasm-watch] refresh:fail") ||
+      merged.includes("[wasm-watch] rebuild:fail")
+    ) {
+      throw new Error(
+        `[hmr-contract] watcher reported failure while waiting for ${opts.label}\n${merged.slice(-12000)}`,
+      );
+    }
+    const value = await opts.getter();
+    if (opts.check(value)) return value;
+    await sleep(opts.pollMs);
+  }
+  throw new Error(
+    `[hmr-contract] timed out waiting for ${opts.label} after ${opts.timeoutMs}ms\n${opts.logs.join("").slice(-12000)}`,
+  );
+}
 
 function wasmManifest(keys: string[]): string {
   return (
@@ -101,8 +137,8 @@ test(
     const initialPid = watcher.pid;
 
     try {
-      await waitForValue(
-        async () => {
+      await waitForValueOrWatcherFailure({
+        getter: async () => {
           try {
             return await fsp.readFile(
               path.join(tempRoot, "src", "wasm-contract", "alpha.wasm"),
@@ -112,10 +148,13 @@ test(
             return "";
           }
         },
-        (body) => body.includes("alpha-0"),
-        20000,
-        150,
-      );
+        check: (body) => body.includes("alpha-0"),
+        watcher,
+        logs,
+        timeoutMs: STEP_TIMEOUT_MS,
+        pollMs: 150,
+        label: "initial alpha contract",
+      });
 
       await fsp.writeFile(
         path.join(tempRoot, "src", "wasm-producer", "beta.txt"),
@@ -127,8 +166,8 @@ test(
         wasmManifest(["alpha", "beta"]),
         "utf8",
       );
-      await waitForValue(
-        async () => {
+      await waitForValueOrWatcherFailure({
+        getter: async () => {
           try {
             return await fsp.readFile(
               path.join(tempRoot, "src", "wasm-contract", "beta.wasm"),
@@ -138,19 +177,25 @@ test(
             return "";
           }
         },
-        (body) => body.includes("beta-0"),
-        25000,
-        150,
-      );
+        check: (body) => body.includes("beta-0"),
+        watcher,
+        logs,
+        timeoutMs: STEP_TIMEOUT_MS,
+        pollMs: 150,
+        label: "beta contract enrollment",
+      });
 
       await writeAndBumpMtime(path.join(tempRoot, "src", "wasm-producer", "beta.txt"), "beta-1");
-      await waitForValue(
-        async () =>
+      await waitForValueOrWatcherFailure({
+        getter: async () =>
           await fsp.readFile(path.join(tempRoot, "src", "wasm-contract", "beta.wasm"), "utf8"),
-        (body) => body.includes("beta-1"),
-        25000,
-        150,
-      );
+        check: (body) => body.includes("beta-1"),
+        watcher,
+        logs,
+        timeoutMs: STEP_TIMEOUT_MS,
+        pollMs: 150,
+        label: "beta contract refresh",
+      });
 
       await fsp.writeFile(
         path.join(tempRoot, "src", "wasm-modules.manifest.json"),
