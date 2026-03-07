@@ -8,6 +8,23 @@ import { runInTemp } from "../lib/test-helpers.ts";
 
 test("materialize impure fails fast when nix build exceeds timeout", async () => {
   await runInTemp("materialize-impure-timeout", async (tmp) => {
+    const graphPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    await fsp.mkdir(path.dirname(graphPath), { recursive: true });
+    await fsp.writeFile(
+      graphPath,
+      JSON.stringify(
+        [
+          {
+            name: "root//projects/apps/web:web",
+            labels: ["kind:app"],
+          },
+        ],
+        null,
+        2,
+      ) + "\n",
+      "utf8",
+    );
+
     const stubBin = path.join(tmp, ".stub-bin");
     const stubNix = path.join(stubBin, "nix");
     await fsp.mkdir(stubBin, { recursive: true });

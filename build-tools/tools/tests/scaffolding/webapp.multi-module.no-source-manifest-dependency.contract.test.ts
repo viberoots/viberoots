@@ -31,27 +31,13 @@ test(
         appTargetLabel: contracts.appTargetLabel,
       });
 
-      const watcherAbs = path.join(tmp, "build-tools", "tools", "dev", "watch-wasm-producer.ts");
+      const watcherAbs = path.join(tmp, "build-tools", "tools", "dev", "watch-wasm-coordinator.ts");
       const logs: string[] = [];
-      const watcher = spawn(
-        "zx-wrapper",
-        [
-          watcherAbs,
-          "--cwd",
-          appAbs,
-          "--wasm-manifest",
-          contracts.wasmManifestPath,
-          "--ts-manifest",
-          contracts.tsManifestPath,
-          "--poll-ms",
-          "120",
-        ],
-        {
-          cwd: appAbs,
-          stdio: "pipe",
-          env: process.env,
-        },
-      );
+      const watcher = spawn("zx-wrapper", [watcherAbs, "--cwd", appAbs, "--poll-ms", "120"], {
+        cwd: appAbs,
+        stdio: "pipe",
+        env: process.env,
+      });
       watcher.stdout?.on("data", (chunk) => logs.push(String(chunk || "")));
       watcher.stderr?.on("data", (chunk) => logs.push(String(chunk || "")));
       try {
@@ -91,7 +77,7 @@ test(
         }
         assert.match(body, /wasm-producer:/);
         const merged = logs.join("");
-        assert.match(merged, /\[wasm-watch\] manifest:wasm/);
+        assert.match(merged, /\[wasm-watch\] coordinator:registered app_target=/);
       } finally {
         await stopServer(watcher);
       }

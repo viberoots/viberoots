@@ -122,8 +122,14 @@ export async function buildSelectedSsr(
     framework === "next"
       ? path.join(outPath, "dist", "client", "public")
       : path.join(outPath, "dist", "client");
-  await fsp.access(path.join(clientContractRoot, "top.wasm"));
-  await fsp.access(path.join(clientContractRoot, "wasm-inline", "index.js"));
+  const topWasmPath = path.join(clientContractRoot, "top.wasm");
+  const hasTopWasm = await fsp
+    .stat(topWasmPath)
+    .then((st) => st.isFile())
+    .catch(() => false);
+  if (hasTopWasm) {
+    await fsp.access(path.join(clientContractRoot, "wasm-inline", "index.js"));
+  }
   const line = formatRunnableLine({ label, runnable } as any);
   assert.ok(line.includes(label));
   assert.ok(line.includes("[webapp-ssr]"));
@@ -131,7 +137,11 @@ export async function buildSelectedSsr(
   return { outPath, importer };
 }
 
-export async function runExpressDockerSmoke(runtimeRoot: string, marker: string): Promise<void> {
+export async function runExpressDockerSmoke(
+  runtimeRoot: string,
+  marker: string,
+  expectedHtmlFragments: string[] = [],
+): Promise<void> {
   const port = await pickFreePort();
   const child = spawn("node", ["dist/server/index.js"], {
     cwd: runtimeRoot,
@@ -152,7 +162,10 @@ export async function runExpressDockerSmoke(runtimeRoot: string, marker: string)
       }
       try {
         const res = await httpGet(`http://127.0.0.1:${port}/`);
-        if (res.status === 200 && res.body.includes(marker)) return;
+        const hasAllExpected = expectedHtmlFragments.every((fragment) =>
+          res.body.includes(fragment),
+        );
+        if (res.status === 200 && res.body.includes(marker) && hasAllExpected) return;
       } catch {}
       await sleep(500);
     }

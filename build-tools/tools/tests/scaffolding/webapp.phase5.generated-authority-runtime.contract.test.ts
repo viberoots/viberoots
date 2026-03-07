@@ -46,15 +46,20 @@ test(
           appAbs: path.join(tmp, "projects", "apps", "demo-vite-ssr"),
           serverHelper: "server/wasm-contract.ts",
           localManifest: "src/wasm-modules.manifest.json",
+          payloadFile: path.join("src", "wasm-producer", "payload.txt"),
         },
         {
           appAbs: path.join(tmp, "projects", "apps", "demo-next-ssr"),
           serverHelper: "server/wasm-contract.ts",
           localManifest: "app/wasm-modules.manifest.json",
+          payloadFile: path.join("app", "wasm-producer", "payload.txt"),
         },
       ];
 
       for (const scenario of scenarios) {
+        const payloadAbs = path.join(scenario.appAbs, scenario.payloadFile);
+        await fsp.mkdir(path.dirname(payloadAbs), { recursive: true });
+        await fsp.writeFile(payloadAbs, "phase5-generated-authority", "utf8");
         const contracts = resolveModuleContractsPaths({ appCwd: scenario.appAbs, root: tmp });
         await syncModuleContractsForApp({
           appCwd: scenario.appAbs,

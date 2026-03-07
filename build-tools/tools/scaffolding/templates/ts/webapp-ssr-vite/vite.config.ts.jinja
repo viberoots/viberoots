@@ -41,6 +41,13 @@ function workspaceDependencyNames(pkg: PackageJson): string[] {
 }
 
 const optimizeDepsExclude = workspaceDependencyNames(readPackageJson(path.join(appRoot, "package.json")));
+const optimizeDepsInclude = [
+  "react",
+  "react/jsx-runtime",
+  "react/jsx-dev-runtime",
+  "react-dom",
+  "react-native-web",
+];
 
 export default defineConfig(({ isSsrBuild }) => ({
   appType: "custom",
@@ -72,7 +79,7 @@ export default defineConfig(({ isSsrBuild }) => ({
   cacheDir: ".vite-cache",
   optimizeDeps: {
     noDiscovery: true,
-    include: [],
+    include: optimizeDepsInclude,
     exclude: optimizeDepsExclude,
   },
   ssr: {

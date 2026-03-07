@@ -45,7 +45,7 @@ test(
       assert.match(packageJson, /"dev":\s*"node scripts\/dev\.mjs"/);
       assert.match(packageJson, /"dev:wasm:watch":\s*"node scripts\/dev-wasm-watch\.mjs"/);
       assert.match(devScript, /dev-with-wasm-watch\.ts/);
-      assert.match(watchScript, /watch-wasm-producer\.ts/);
+      assert.match(watchScript, /watch-wasm-coordinator\.ts/);
       assert.match(wasmContract, /entry\.sourcePath/);
     });
   },

@@ -102,7 +102,8 @@ test(
         const server = startDevServer(appAbs, port);
         try {
           const res = await waitForResponse(port, 200, 'data-ssr-marker="vite"');
-          assert.match(res.body, /Hello from Vite SSR at \//);
+          assert.match(res.body, /Vite SSR \+ React Native Web/);
+          assert.match(res.body, /Welcome to demo-vite-ssr/);
           assert.ok(
             !res.body.includes('data-ssr-marker="vite-dev"'),
             "dev runtime must not fall back to static shell marker",

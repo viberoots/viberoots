@@ -38,56 +38,66 @@ const DEP_EDIT_EXPECTATIONS: InstallGuardrailExpectation[] = [
     file: "build-tools/tools/tests/scaffolding/webapp-static.dev-hmr.local-ts-dep.test.ts",
     required: [
       "pnpm install",
-      "--filter ./projects/apps/demo-web",
-      "--filter ./projects/libs/demo-lib",
+      "--filter ./projects/apps/demo-web...",
       "--no-frozen-lockfile",
       "--ignore-scripts",
     ],
-    forbidden: ["pnpm install --ignore-scripts --reporter=append-only"],
+    forbidden: [
+      "pnpm install --ignore-scripts --reporter=append-only",
+      "--filter ./projects/libs/demo-lib",
+    ],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-hmr.local-ts-dep.test.ts",
     required: [
       "pnpm install",
-      "--filter ./projects/apps/demo-vite-ssr",
-      "--filter ./projects/libs/demo-lib",
+      "--filter ./projects/apps/demo-vite-ssr...",
       "--no-frozen-lockfile",
       "--ignore-scripts",
     ],
-    forbidden: ["pnpm install --ignore-scripts --reporter=append-only"],
+    forbidden: [
+      "pnpm install --ignore-scripts --reporter=append-only",
+      "--filter ./projects/libs/demo-lib",
+    ],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-hmr.local-ts-dep.test.ts",
     required: [
       "pnpm install",
-      "--filter ./projects/apps/demo-next-ssr",
-      "--filter ./projects/libs/demo-lib",
+      "--filter ./projects/apps/demo-next-ssr...",
       "--no-frozen-lockfile",
       "--ignore-scripts",
     ],
-    forbidden: ["pnpm install --ignore-scripts --reporter=append-only"],
+    forbidden: [
+      "pnpm install --ignore-scripts --reporter=append-only",
+      "--filter ./projects/libs/demo-lib",
+    ],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-reload.wasm-producer.test.ts",
     required: [
       "pnpm install",
-      "--filter ./projects/apps/demo-next-ssr",
-      "--filter ./projects/libs/demo-lib",
+      "--filter ./projects/apps/demo-next-ssr...",
       "--no-frozen-lockfile",
       "--ignore-scripts",
     ],
-    forbidden: ["pnpm install --ignore-scripts --reporter=append-only"],
+    forbidden: [
+      "pnpm install --ignore-scripts --reporter=append-only",
+      "--filter ./projects/libs/demo-lib",
+    ],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-runtime-consistency.test.ts",
     required: [
       "pnpm install",
-      "--filter ./projects/apps/demo-next-ssr",
-      "--filter ./projects/libs/demo-lib",
+      "--filter ./projects/apps/demo-next-ssr...",
       "--no-frozen-lockfile",
       "--ignore-scripts",
     ],
-    forbidden: ["pnpm install --ignore-scripts --reporter=append-only"],
+    forbidden: [
+      "pnpm install --ignore-scripts --reporter=append-only",
+      "--filter ./projects/libs/demo-lib",
+    ],
   },
 ];
 

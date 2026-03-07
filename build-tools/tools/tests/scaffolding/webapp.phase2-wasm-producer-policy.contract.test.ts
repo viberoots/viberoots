@@ -11,6 +11,7 @@ type Phase2TemplateContract = {
   id: string;
   templateRoot: string;
   payloadFile: string;
+  payloadExpected: boolean;
 };
 
 const CONTRACTS: Phase2TemplateContract[] = [
@@ -25,6 +26,7 @@ const CONTRACTS: Phase2TemplateContract[] = [
       "webapp-static",
     ),
     payloadFile: path.join("src", "wasm-producer", "payload.txt"),
+    payloadExpected: true,
   },
   {
     id: "ts/webapp-ssr-vite",
@@ -37,6 +39,7 @@ const CONTRACTS: Phase2TemplateContract[] = [
       "webapp-ssr-vite",
     ),
     payloadFile: path.join("src", "wasm-producer", "payload.txt"),
+    payloadExpected: false,
   },
   {
     id: "ts/webapp-ssr-next",
@@ -49,6 +52,7 @@ const CONTRACTS: Phase2TemplateContract[] = [
       "webapp-ssr-next",
     ),
     payloadFile: path.join("app", "wasm-producer", "payload.txt"),
+    payloadExpected: true,
   },
 ];
 
@@ -84,7 +88,7 @@ test("Phase-2 template policy: wasm producer contract keys exist across template
     );
     assert.match(
       watchScript,
-      /watch-wasm-producer\.ts/,
+      /watch-wasm-coordinator\.ts/,
       `${contract.id}: watcher command mismatch`,
     );
     assert.doesNotMatch(watchScript, /--wasm-manifest|--ts-manifest/);
@@ -102,7 +106,7 @@ test("Phase-2 template policy: wasm producer contract keys exist across template
 
     assert.equal(
       await exists(path.join(root, contract.payloadFile)),
-      true,
+      contract.payloadExpected,
       `${contract.id}: payload missing`,
     );
   }

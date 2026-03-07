@@ -71,7 +71,10 @@ test(
           path.join(appAbs, "node_modules"),
           path.join(runtimeRoot, "node_modules"),
         );
-        await runExpressDockerSmoke(runtimeRoot, 'data-ssr-marker="vite"');
+        await runExpressDockerSmoke(runtimeRoot, 'data-ssr-marker="vite"', [
+          'id="react-native-stylesheet"',
+          "Vite SSR + React Native Web",
+        ]);
 
         await expectMissingArtifactFailure(tmp, importer, label, "serverEntry");
         await expectMissingArtifactFailure(tmp, importer, label, "clientDir");

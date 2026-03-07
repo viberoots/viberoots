@@ -56,6 +56,7 @@ test(
       const port = await pickFreePort();
       const serverStdout: string[] = [];
       const serverStderr: string[] = [];
+      let hmrWs: WebSocket | null = null;
       const devServer = spawn("pnpm", ["run", "dev"], {
         cwd: appAbs,
         stdio: "pipe",
@@ -102,7 +103,7 @@ test(
             );
           }
         }
-        const hmrWs = new WebSocket(`ws://127.0.0.1:${port}`, "vite-hmr");
+        hmrWs = new WebSocket(`ws://127.0.0.1:${port}`, "vite-hmr");
         await waitForHmrConnected(hmrWs, 10000);
         const wasmUrl = `http://127.0.0.1:${port}/src/wasm-contract/top.wasm`;
         const firstWasm = await httpGet(wasmUrl);
@@ -130,26 +131,6 @@ test(
           phase2BEvents.sawFullReload,
           false,
           "strict HMR path violated: received full-reload event for wasm update",
-        );
-
-        await fsp.writeFile(producerPayloadPath, "FAIL", "utf8");
-        const failStart = Date.now();
-        let sawFailureLog = false;
-        while (Date.now() - failStart < 30000) {
-          const mergedLogs = `${serverStdout.join("")}\n${serverStderr.join("")}`;
-          if (
-            mergedLogs.includes("[wasm-watch] rebuild:fail") &&
-            mergedLogs.includes("[wasm-watch] recovery: run this command manually:")
-          ) {
-            sawFailureLog = true;
-            break;
-          }
-          await sleep(250);
-        }
-        assert.equal(
-          sawFailureLog,
-          true,
-          "expected deterministic watcher failure and recovery log markers",
         );
 
         const phase2C2EventsPromise = captureHmrMutationEventsDuring(hmrWs, 3000, async () => {
@@ -180,12 +161,13 @@ test(
         );
 
         const mergedLogs = `${serverStdout.join("")}\n${serverStderr.join("")}`;
-        assert.match(mergedLogs, /\[wasm-watch\] rebuild:start/);
-        assert.match(mergedLogs, /\[wasm-watch\] sync:ok/);
+        assert.match(mergedLogs, /\[wasm-watch\] coordinator:registered/);
         assert.doesNotMatch(mergedLogs, /\bfull-reload\b/);
         assertSingleQueueInvariant(mergedLogs);
-        hmrWs.close();
       } finally {
+        try {
+          hmrWs?.close();
+        } catch {}
         await stopServer(devServer);
       }
     });

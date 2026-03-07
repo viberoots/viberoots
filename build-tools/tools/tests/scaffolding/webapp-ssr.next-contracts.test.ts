@@ -42,7 +42,7 @@ test(
           path.join(appRoot, "scripts", "dev-wasm-watch.mjs"),
           "utf8",
         );
-        assert.match(devWasmWatchScript, /watch-wasm-producer\.ts/);
+        assert.match(devWasmWatchScript, /watch-wasm-coordinator\.ts/);
         assert.doesNotMatch(devWasmWatchScript, /build-wasm-producer\.mjs/);
         assert.doesNotMatch(devWasmWatchScript, /--watch|--build-cmd|--build-out|--sync-out/);
         const buildSsrScript = await fsp.readFile(

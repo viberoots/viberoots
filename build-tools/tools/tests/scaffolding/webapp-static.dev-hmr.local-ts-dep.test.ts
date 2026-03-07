@@ -34,8 +34,8 @@ test(
     process.env.NIX_PNPM_FETCH_TIMEOUT = process.env.NIX_PNPM_FETCH_TIMEOUT || "240";
     await runInTemp("webapp-static-hmr-local-dep", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-static demo-web --yes --no-tests`;
-      await $`scaf new ts lib demo-lib --yes --no-tests`;
+      await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
+      await $`scaf new ts lib demo-lib --yes --no-tests --skip-lockfile-gen`;
 
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");
       const appMainPath = path.join(appAbs, "src", "main.ts");
@@ -104,7 +104,7 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-      })`pnpm install --filter ./projects/apps/demo-web --filter ./projects/libs/demo-lib --no-frozen-lockfile --ignore-scripts --reporter=append-only`;
+      })`pnpm install --filter ./projects/apps/demo-web... --no-frozen-lockfile --ignore-scripts --reporter=append-only`;
 
       const esbuildPkg = esbuildPackageName();
       const esbuildBin = esbuildPkg

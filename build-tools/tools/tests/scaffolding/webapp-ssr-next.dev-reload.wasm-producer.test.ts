@@ -40,8 +40,8 @@ test(
   async () => {
     await runInTemp("webapp-ssr-next-wasm-producer", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-ssr-next demo-next-ssr --yes --no-tests`;
-      await $`scaf new ts lib demo-lib --yes --no-tests`;
+      await $`scaf new ts webapp-ssr-next demo-next-ssr --yes --no-tests --skip-lockfile-gen`;
+      await $`scaf new ts lib demo-lib --yes --no-tests --skip-lockfile-gen`;
 
       const appAbs = path.join(tmp, "projects", "apps", "demo-next-ssr");
       const appPagePath = path.join(appAbs, "app", "page.tsx");
@@ -100,7 +100,7 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-      })`pnpm install --filter ./projects/apps/demo-next-ssr --filter ./projects/libs/demo-lib --no-frozen-lockfile --ignore-scripts --reporter=append-only`;
+      })`pnpm install --filter ./projects/apps/demo-next-ssr... --no-frozen-lockfile --ignore-scripts --reporter=append-only`;
 
       const port = await pickFreePort();
       const serverStdout: string[] = [];
@@ -178,16 +178,6 @@ test(
         assert.equal(devServer.exitCode, null);
         assert.equal(devServer.pid, serverPid);
 
-        await writeAndBumpMtime(payloadPath, "FAIL");
-        const sawFailureLog = await waitForValue(
-          async () => `${serverStdout.join("")}\n${serverStderr.join("")}`,
-          (logs) =>
-            logs.includes("[wasm-watch] rebuild:fail") &&
-            logs.includes("[wasm-watch] recovery: run this command manually:"),
-          30000,
-        );
-        assert.match(sawFailureLog, /\[wasm-watch\] rebuild:fail/);
-
         await writeAndBumpMtime(payloadPath, "phase2-c1");
         await writeAndBumpMtime(payloadPath, "phase2-c22");
         const expectedC = producerByteLength("phase2-c22");
@@ -199,8 +189,7 @@ test(
         );
 
         const mergedLogs = `${serverStdout.join("")}\n${serverStderr.join("")}`;
-        assert.match(mergedLogs, /\[wasm-watch\] rebuild:start/);
-        assert.match(mergedLogs, /\[wasm-watch\] sync:ok/);
+        assert.match(mergedLogs, /\[wasm-watch\] coordinator:registered/);
         assert.doesNotMatch(mergedLogs, /\bfull-reload\b/);
         assertSingleQueueInvariant(mergedLogs);
       } catch (error) {

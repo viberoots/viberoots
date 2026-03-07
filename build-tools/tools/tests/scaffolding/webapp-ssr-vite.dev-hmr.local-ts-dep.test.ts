@@ -30,7 +30,7 @@ test(
   async () => {
     await runInTemp("webapp-ssr-vite-hmr-config", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "pipe" });
-      await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --no-tests`;
+      await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --no-tests --skip-lockfile-gen`;
       const configPath = path.join(tmp, "projects", "apps", "demo-vite-ssr", "vite.config.ts");
       const packageJsonPath = path.join(tmp, "projects", "apps", "demo-vite-ssr", "package.json");
       const wasmContractPath = path.join(
@@ -62,7 +62,7 @@ test(
       assert.match(packageJson, /"dev":\s*"node scripts\/dev\.mjs"/);
       assert.match(packageJson, /"dev:wasm:watch":\s*"node scripts\/dev-wasm-watch\.mjs"/);
       assert.match(devScript, /dev-with-wasm-watch\.ts/);
-      assert.match(watchScript, /watch-wasm-producer\.ts/);
+      assert.match(watchScript, /watch-wasm-coordinator\.ts/);
       assert.doesNotMatch(wasmContract, /topWasmUrl/);
       assert.match(wasmContract, /entry\.sourcePath/);
     });
@@ -75,8 +75,8 @@ test(
   async () => {
     await runInTemp("webapp-ssr-vite-hmr-local-dep", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --no-tests`;
-      await $`scaf new ts lib demo-lib --yes --no-tests`;
+      await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --no-tests --skip-lockfile-gen`;
+      await $`scaf new ts lib demo-lib --yes --no-tests --skip-lockfile-gen`;
 
       const appAbs = path.join(tmp, "projects", "apps", "demo-vite-ssr");
       const appEntryClientPath = path.join(appAbs, "src", "entry-client.ts");
@@ -151,7 +151,7 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-      })`pnpm install --filter ./projects/apps/demo-vite-ssr --filter ./projects/libs/demo-lib --no-frozen-lockfile --ignore-scripts --reporter=append-only`;
+      })`pnpm install --filter ./projects/apps/demo-vite-ssr... --no-frozen-lockfile --ignore-scripts --reporter=append-only`;
 
       const port = await pickFreePort();
       const serverStdout: string[] = [];

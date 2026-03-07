@@ -62,10 +62,22 @@ export async function waitForValue<T>(
 ): Promise<T> {
   const start = Date.now();
   let last: T | undefined;
+  let lastError: unknown = null;
   while (Date.now() - start < timeoutMs) {
-    last = await getter();
-    if (check(last)) return last;
+    try {
+      last = await getter();
+      if (check(last)) return last;
+      lastError = null;
+    } catch (error) {
+      lastError = error;
+    }
     await sleep(pollMs);
+  }
+  if (lastError) {
+    const message = lastError instanceof Error ? lastError.message : String(lastError);
+    throw new Error(
+      `timed out waiting for expected value after ${timeoutMs}ms (last error: ${message})`,
+    );
   }
   throw new Error(`timed out waiting for expected value after ${timeoutMs}ms`);
 }

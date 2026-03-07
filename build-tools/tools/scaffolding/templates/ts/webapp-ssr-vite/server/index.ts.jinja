@@ -9,6 +9,11 @@ const __dirname = path.dirname(__filename);
 const clientDir = path.resolve(__dirname, "../client");
 const port = Number(process.env.PORT || "4173");
 const entryServerPath = path.resolve(__dirname, "entry-server.js");
+const baseShellStyles = [
+  "html,body,#app{margin:0;min-height:100%;}",
+  'body{background:#070b19;color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}',
+].join("");
+type Rendered = { appHtml: string; styleHtml: string };
 
 const app = express();
 async function requireServerEntry(p: string): Promise<void> {
@@ -34,17 +39,21 @@ await requireClientDir(clientDir);
 app.use(express.static(clientDir));
 const serverWasmByteLength = await readServerWasmContractByteLength();
 
-async function loadRender(): Promise<(url: string) => string> {
+async function loadRender(): Promise<(url: string) => Rendered> {
   try {
     const mod = (await import(pathToFileURL(entryServerPath).href)) as {
       render?: (url: string) => string;
+      renderParts?: (url: string) => Rendered;
     };
+    if (typeof mod.renderParts === "function") {
+      return (url: string) => mod.renderParts!(url);
+    }
     if (typeof mod.render !== "function") {
       throw new Error(
         "SSR contract error: dist/server/entry-server.js must export a render(url) function",
       );
     }
-    return mod.render;
+    return (url: string) => ({ appHtml: mod.render!(url), styleHtml: "" });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.startsWith("SSR contract error:")) {
@@ -58,7 +67,9 @@ async function loadRender(): Promise<(url: string) => string> {
 const render = await loadRender();
 
 app.get("*", (req, res) => {
-  const appHtml = render(req.originalUrl);
+  const rendered = render(req.originalUrl);
+  const appHtml = rendered.appHtml;
+  const styleHtml = rendered.styleHtml;
   const html = [
     "<!doctype html>",
     "<html lang=\"en\">",
@@ -66,10 +77,12 @@ app.get("*", (req, res) => {
     "    <meta charset=\"UTF-8\" />",
     "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />",
     "    <title>{{ name }} SSR Vite</title>",
+    `    <style>${baseShellStyles}</style>`,
+    styleHtml ? `    ${styleHtml}` : "",
     "  </head>",
     "  <body>",
     `    <div data-server-wasm-bytes="${serverWasmByteLength}"></div>`,
-    `    ${appHtml}`,
+    `    <div id="app" data-ssr-marker="vite">${appHtml}</div>`,
     "    <script type=\"module\" src=\"/entry-client.js\"></script>",
     "  </body>",
     "</html>",

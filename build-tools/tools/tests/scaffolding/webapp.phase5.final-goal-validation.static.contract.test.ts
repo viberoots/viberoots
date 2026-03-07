@@ -29,8 +29,8 @@ test(
   async () => {
     await runInTemp("webapp-phase5-final-goal-validation-static", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-static demo-web --yes --no-tests`;
-      await $`scaf new ts lib demo-lib --yes --no-tests`;
+      await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
+      await $`scaf new ts lib demo-lib --yes --no-tests --skip-lockfile-gen`;
 
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");
       const libAbs = path.join(tmp, "projects", "libs", "demo-lib");
@@ -83,7 +83,7 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-      })`pnpm install --filter ./projects/apps/demo-web --filter ./projects/libs/demo-lib --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+      })`pnpm install --filter ./projects/apps/demo-web... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
 
       const port = await pickFreePort();
       const logs: string[] = [];

@@ -46,9 +46,19 @@ export function repoRoot(): string {
     (process.env.LIVE_ROOT || "").trim(),
     process.cwd(),
   ].filter(Boolean);
+  const findFlakeRoot = (start: string): string | null => {
+    let dir = canonical(start);
+    for (;;) {
+      if (fs.existsSync(path.join(dir, "flake.nix"))) return dir;
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    return null;
+  };
   for (const c of candidates) {
-    const root = canonical(c);
-    if (fs.existsSync(path.join(root, "flake.nix"))) return root;
+    const root = findFlakeRoot(c);
+    if (root) return root;
   }
   return canonical(candidates[0] || process.cwd());
 }

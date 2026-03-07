@@ -10,6 +10,7 @@ type Phase3TemplateContract = {
   id: string;
   templateRoot: string;
   payloadPath: string;
+  payloadExpected: boolean;
 };
 
 const SSR_CONTRACTS: Phase3TemplateContract[] = [
@@ -24,6 +25,7 @@ const SSR_CONTRACTS: Phase3TemplateContract[] = [
       "webapp-ssr-vite",
     ),
     payloadPath: path.join("src", "wasm-producer", "payload.txt"),
+    payloadExpected: false,
   },
   {
     id: "ts/webapp-ssr-next",
@@ -36,6 +38,7 @@ const SSR_CONTRACTS: Phase3TemplateContract[] = [
       "webapp-ssr-next",
     ),
     payloadPath: path.join("app", "wasm-producer", "payload.txt"),
+    payloadExpected: true,
   },
 ];
 
@@ -77,10 +80,14 @@ test("Phase-3 template policy: SSR runtime-consistency script and path contracts
     assert.match(devScript, /dev-with-wasm-watch\.ts/, `${contract.id}: dev wrapper mismatch`);
     assert.match(devScript, /--watch-cmd/, `${contract.id}: missing watcher wiring`);
     assert.match(devScript, /dev:wasm:watch/, `${contract.id}: missing watcher wiring`);
-    assert.match(watchScript, /watch-wasm-producer\.ts/, `${contract.id}: watcher entry mismatch`);
     assert.match(
       watchScript,
-      /watch-wasm-producer\.ts/,
+      /watch-wasm-coordinator\.ts/,
+      `${contract.id}: watcher entry mismatch`,
+    );
+    assert.match(
+      watchScript,
+      /watch-wasm-coordinator\.ts/,
       `${contract.id}: canonical watcher missing`,
     );
     assert.doesNotMatch(
@@ -103,7 +110,11 @@ test("Phase-3 template policy: SSR runtime-consistency script and path contracts
       .access(path.join(templateAbs, contract.payloadPath))
       .then(() => true)
       .catch(() => false);
-    assert.equal(payloadExists, true, `${contract.id}: wasm producer payload source missing`);
+    assert.equal(
+      payloadExists,
+      contract.payloadExpected,
+      `${contract.id}: wasm producer payload source mismatch`,
+    );
   }
 });
 

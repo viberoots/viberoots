@@ -1,0 +1,97 @@
+import express from "express";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { readServerWasmContractByteLength } from "./wasm-contract.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const clientDir = path.resolve(__dirname, "../client");
+const port = Number(process.env.PORT || "4173");
+const entryServerPath = path.resolve(__dirname, "entry-server.js");
+const baseShellStyles = [
+  "html,body,#app{margin:0;min-height:100%;}",
+  'body{background:#070b19;color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}',
+].join("");
+type Rendered = { appHtml: string; styleHtml: string };
+
+const app = express();
+async function requireServerEntry(p: string): Promise<void> {
+  try {
+    const st = await fsp.stat(p);
+    if (!st.isFile()) throw new Error("not a file");
+  } catch {
+    throw new Error(`SSR contract error: missing serverEntry at ${p}`);
+  }
+}
+
+async function requireClientDir(p: string): Promise<void> {
+  try {
+    const st = await fsp.stat(p);
+    if (!st.isDirectory()) throw new Error("not a directory");
+  } catch {
+    throw new Error(`SSR contract error: missing clientDir at ${p}`);
+  }
+}
+
+await requireServerEntry(entryServerPath);
+await requireClientDir(clientDir);
+app.use(express.static(clientDir));
+const serverWasmByteLength = await readServerWasmContractByteLength();
+
+async function loadRender(): Promise<(url: string) => Rendered> {
+  try {
+    const mod = (await import(pathToFileURL(entryServerPath).href)) as {
+      render?: (url: string) => string;
+      renderParts?: (url: string) => Rendered;
+    };
+    if (typeof mod.renderParts === "function") {
+      return (url: string) => mod.renderParts!(url);
+    }
+    if (typeof mod.render !== "function") {
+      throw new Error(
+        "SSR contract error: dist/server/entry-server.js must export a render(url) function",
+      );
+    }
+    return (url: string) => ({ appHtml: mod.render!(url), styleHtml: "" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.startsWith("SSR contract error:")) {
+      throw error;
+    }
+    throw new Error(`SSR contract error: failed to load dist/server/entry-server.js: ${message}`);
+  }
+}
+const render = await loadRender();
+
+app.get("*", (req, res) => {
+  const rendered = render(req.originalUrl);
+  const appHtml = rendered.appHtml;
+  const styleHtml = rendered.styleHtml;
+  const html = [
+    "<!doctype html>",
+    '<html lang="en">',
+    "  <head>",
+    '    <meta charset="UTF-8" />',
+    '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+    "    <title>example-webapp SSR Vite</title>",
+    `    <style>${baseShellStyles}</style>`,
+    styleHtml ? `    ${styleHtml}` : "",
+    "  </head>",
+    "  <body>",
+    `    <div data-server-wasm-bytes="${serverWasmByteLength}"></div>`,
+    `    <div id="app" data-ssr-marker="vite">${appHtml}</div>`,
+    '    <script type="module" src="/entry-client.js"></script>',
+    "  </body>",
+    "</html>",
+  ].join("\n");
+  res
+    .status(200)
+    .setHeader("content-type", "text/html; charset=utf-8")
+    .setHeader("x-server-wasm-bytes", String(serverWasmByteLength))
+    .end(html);
+});
+
+app.listen(port, "127.0.0.1", () => {
+  console.log(`[webapp-ssr-vite] listening on http://127.0.0.1:${port}`);
+});

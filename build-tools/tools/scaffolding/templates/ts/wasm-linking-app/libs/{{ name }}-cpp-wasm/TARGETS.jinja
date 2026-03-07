@@ -9,9 +9,10 @@ nix_cpp_wasm_emscripten_lib(
 )
 
 genrule(
-    name = "cpp_wasm",
+    name = "app",
     srcs = [
         ":cpp_emscripten",
+        "src/add.c",
         "//build-tools/tools/wasm:export-wasm-from-nix",
     ],
     out = "cpp_emscripten.wasm",
@@ -20,5 +21,6 @@ genrule(
           + "WASM_EXTS=.wasm "
           + "OUT_PATH=\"$OUT\" "
           + "zx-wrapper \"$(location //build-tools/tools/wasm:export-wasm-from-nix)\"",
+    labels = ["lang:cpp", "kind:wasm"],
     visibility = ["PUBLIC"],
 )

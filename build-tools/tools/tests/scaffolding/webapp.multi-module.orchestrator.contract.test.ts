@@ -54,21 +54,32 @@ const TEMPLATE_WATCHERS: TemplateWatcherExpectation[] = [
 ];
 
 test("PR-2 contract: watcher emits module-scoped deterministic markers", async () => {
-  const watcherPath = path.join(REPO_ROOT, "build-tools", "tools", "dev", "watch-wasm-producer.ts");
+  const watcherPath = path.join(
+    REPO_ROOT,
+    "build-tools",
+    "tools",
+    "dev",
+    "watch-wasm-coordinator.ts",
+  );
+  const daemonPath = path.join(
+    REPO_ROOT,
+    "build-tools",
+    "tools",
+    "dev",
+    "wasm-watch-coordinator-daemon.ts",
+  );
   const source = await fsp.readFile(watcherPath, "utf8");
+  const daemonSource = await fsp.readFile(daemonPath, "utf8");
   const opsPath = path.join(REPO_ROOT, "build-tools", "tools", "dev", "watch-wasm-producer-ops.ts");
   const opsSource = await fsp.readFile(opsPath, "utf8");
-  assert.match(source, /\[wasm-watch\] rebuild:start .*module_type=.*module_key=/);
-  assert.match(source, /\[wasm-watch\] sync:ok .*module_type=.*module_key=/);
-  assert.match(source, /\[wasm-watch\] rebuild:fail .*module_type=.*module_key=/);
-  assert.match(source, /\[wasm-watch\] queue:coalesced module_key=/);
-  assert.match(source, /\[wasm-watch\] refresh:start reason=/);
-  assert.match(source, /\[wasm-watch\] refresh:fail reason=/);
-  assert.match(source, /\[wasm-watch\] refresh:recovery:/);
+  assert.match(daemonSource, /\[wasm-watchd\] rebuild:start seq=/);
+  assert.match(daemonSource, /\[wasm-watchd\] sync:ok seq=/);
+  assert.match(daemonSource, /\[wasm-watchd\] rebuild:fail seq=/);
+  assert.match(source, /\[wasm-watch\] coordinator:registered app_target=/);
+  assert.match(source, /\[wasm-watch\] coordinator:refresh modules=/);
   assert.match(opsSource, /\[wasm-watch\] refresh:ok module_count=/);
   assert.match(source, /specsFromWasmManifest/);
   assert.match(source, /validateTsManifestProbes/);
-  assert.match(source, /roundRobinStart/);
 });
 
 test("PR-2 contract: template watchers rely on generated contract paths", async () => {
@@ -77,7 +88,7 @@ test("PR-2 contract: template watchers rely on generated contract paths", async 
     const source = await fsp.readFile(abs, "utf8");
     assert.match(
       source,
-      /watch-wasm-producer\.ts/,
+      /watch-wasm-coordinator\.ts/,
       `${item.id}: watcher entrypoint changed unexpectedly`,
     );
     assert.doesNotMatch(source, /--wasm-manifest|--ts-manifest/);

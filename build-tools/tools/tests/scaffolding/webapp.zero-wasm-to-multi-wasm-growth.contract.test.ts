@@ -73,7 +73,7 @@ test(
       const watcher = spawn(
         "zx-wrapper",
         [
-          path.join(process.cwd(), "build-tools", "tools", "dev", "watch-wasm-producer.ts"),
+          path.join(process.cwd(), "build-tools", "tools", "dev", "watch-wasm-coordinator.ts"),
           "--cwd",
           appAbs,
         ],

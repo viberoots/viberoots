@@ -81,7 +81,7 @@ export async function runVerifyLintPreflight(
     : [];
   const scoped = lintFilters.length > 0;
   const lintCmd = scoped
-    ? `pnpm exec eslint ${lintFilters.join(" ")} --ext .ts --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic && pnpm exec prettier -c ${lintFilters.join(" ")}`
+    ? `pnpm exec eslint ${lintFilters.join(" ")} --ext .ts --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern '**/.vite-cache/**' && pnpm exec prettier -c ${lintFilters.join(" ")}`
     : "pnpm -s lint";
   process.stderr.write(`[verify] lint preflight: timeout -k 10s ${secs}s ${lintCmd}\n`);
 
@@ -90,7 +90,7 @@ export async function runVerifyLintPreflight(
         stdio: "inherit",
         cwd: root,
         reject: false,
-      })`timeout -k 10s ${secs}s pnpm exec eslint ${lintFilters} --ext .ts --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic`
+      })`timeout -k 10s ${secs}s pnpm exec eslint ${lintFilters} --ext .ts --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern "**/.vite-cache/**"`
     : await $({
         stdio: "inherit",
         cwd: root,

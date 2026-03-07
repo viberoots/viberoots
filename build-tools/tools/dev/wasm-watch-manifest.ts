@@ -6,6 +6,7 @@ import {
   parseTsModuleManifest,
   parseWasmModuleManifest,
 } from "../scaffolding/webapp-module-manifests.ts";
+import { findRepoRoot } from "../lib/repo.ts";
 
 export type WasmModuleSpec = {
   moduleKey: string;
@@ -53,35 +54,64 @@ function producerToolAbsPath(): string {
   return path.resolve(path.dirname(thisFile), "build-wasm-producer.ts");
 }
 
+function labelToolAbsPath(): string {
+  const thisFile = fileURLToPath(import.meta.url);
+  return path.resolve(path.dirname(thisFile), "build-wasm-from-label.ts");
+}
+
 export async function specsFromWasmManifest(
   cwd: string,
   wasmManifestPath: string,
 ): Promise<WasmModuleSpec[]> {
+  const root = await findRepoRoot(cwd);
   const manifestAbs = path.resolve(cwd, wasmManifestPath);
   const parsed = parseWasmModuleManifest(
     await readJsonObject(manifestAbs),
     `wasm manifest '${manifestAbs}'`,
   );
   const producerTool = producerToolAbsPath();
+  const labelTool = labelToolAbsPath();
   return parsed.modules.map((entry): WasmModuleSpec => {
     const moduleBasename = path.posix.basename(entry.sourcePath.replace(/\\/g, "/"), ".wasm");
     const basename = moduleBasename || entry.moduleKey;
-    const payloadRel = choosePayloadPath(cwd, entry.sourcePath, basename);
     const buildOutRel = path.posix.join(".wasm-producer", `${basename}.wasm`);
     const nodeBin = process.execPath;
-    const buildCmd = [
-      shellQuote(nodeBin),
-      "--experimental-strip-types",
-      shellQuote(producerTool),
-      "--payload",
-      shellQuote(payloadRel),
-      "--out",
-      shellQuote(buildOutRel),
-    ].join(" ");
+    const buildCmd = entry.sourceLabel
+      ? [
+          shellQuote(nodeBin),
+          "--experimental-strip-types",
+          shellQuote(labelTool),
+          "--label",
+          shellQuote(entry.sourceLabel),
+          "--out",
+          shellQuote(buildOutRel),
+        ].join(" ")
+      : [
+          shellQuote(nodeBin),
+          "--experimental-strip-types",
+          shellQuote(producerTool),
+          "--payload",
+          shellQuote(choosePayloadPath(cwd, entry.sourcePath, basename)),
+          "--out",
+          shellQuote(buildOutRel),
+        ].join(" ");
+    const watchPaths =
+      Array.isArray(entry.sourceWatchPaths) && entry.sourceWatchPaths.length > 0
+        ? entry.sourceWatchPaths
+            .map((p) => path.resolve(cwd, p))
+            .map((abs, idx) => {
+              const raw = entry.sourceWatchPaths?.[idx] || "";
+              if (path.isAbsolute(raw)) return raw;
+              if (raw.startsWith("projects/") || raw.startsWith("build-tools/")) {
+                return path.resolve(root, raw);
+              }
+              return abs;
+            })
+        : [path.resolve(cwd, choosePayloadPath(cwd, entry.sourcePath, basename))];
     return {
       moduleKey: entry.moduleKey,
       moduleType: "wasm",
-      watchPaths: [path.resolve(cwd, payloadRel)],
+      watchPaths,
       buildCommand: buildCmd,
       buildOut: path.resolve(cwd, buildOutRel),
       syncOut: path.resolve(cwd, entry.sourcePath),

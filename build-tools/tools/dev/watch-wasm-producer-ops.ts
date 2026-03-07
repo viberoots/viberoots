@@ -14,6 +14,29 @@ export type Fingerprint = { mtimeMs: number; size: number };
 async function fileFingerprint(absPath: string): Promise<Fingerprint> {
   try {
     const st = await fsp.stat(absPath);
+    if (st.isDirectory()) {
+      const stack = [absPath];
+      let newest = st.mtimeMs;
+      let totalSize = 0;
+      while (stack.length > 0) {
+        const cur = stack.pop()!;
+        const entries = await fsp.readdir(cur, { withFileTypes: true }).catch(() => []);
+        for (const entry of entries) {
+          const child = path.join(cur, entry.name);
+          if (entry.isDirectory()) {
+            if (entry.name === ".git" || entry.name === "node_modules") continue;
+            stack.push(child);
+            continue;
+          }
+          if (!entry.isFile()) continue;
+          const cst = await fsp.stat(child).catch(() => null);
+          if (!cst) continue;
+          newest = Math.max(newest, cst.mtimeMs);
+          totalSize += cst.size;
+        }
+      }
+      return { mtimeMs: newest, size: totalSize };
+    }
     return { mtimeMs: st.mtimeMs, size: st.size };
   } catch {
     return { mtimeMs: 0, size: -1 };

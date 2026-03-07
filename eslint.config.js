@@ -5,6 +5,18 @@ import bucknix from "./build-tools/tools/eslint-plugin-bucknix/index.js";
 
 export default [
   {
+    ignores: [
+      "**/node_modules/**",
+      "**/buck-out/**",
+      "**/.direnv/**",
+      "**/coverage/**",
+      "**/.clinic/**",
+      "**/.vite-cache/**",
+      "**/prelude/**",
+      "build-tools/tools/scaffolding/templates/**",
+    ],
+  },
+  {
     files: ["**/*.ts"],
     ignores: [
       "**/node_modules/**",
@@ -12,6 +24,7 @@ export default [
       "**/.direnv/**",
       "**/coverage/**",
       "**/.clinic/**",
+      "**/.vite-cache/**",
       "**/prelude/**",
       "**/._*.ts",
       "build-tools/tools/scaffolding/templates/**",

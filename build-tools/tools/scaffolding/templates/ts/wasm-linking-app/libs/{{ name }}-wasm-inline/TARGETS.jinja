@@ -8,7 +8,7 @@ node_wasm_inline_module(
 
 node_wasm_inline_module(
     name = "wasm_inline_cpp",
-    src = "//projects/libs/{{ name }}-cpp-wasm:cpp_wasm",
+    src = "//projects/libs/{{ name }}-cpp-wasm:app",
     out = "cpp.js",
     visibility = ["PUBLIC"],
 )

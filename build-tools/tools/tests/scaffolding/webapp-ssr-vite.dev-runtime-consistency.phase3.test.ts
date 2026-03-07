@@ -103,11 +103,6 @@ test(
 
       try {
         await waitForHttpOk(`http://127.0.0.1:${port}/`);
-        await waitForValue(
-          async () => `${serverStdout.join("")}\n${serverStderr.join("")}`,
-          (logs) => logs.includes("[webapp-ssr-vite] dev listening on http://"),
-          45000,
-        );
 
         const serverPid = devServer.pid;
         assert.ok(serverPid && serverPid > 0, "dev server pid must be available");

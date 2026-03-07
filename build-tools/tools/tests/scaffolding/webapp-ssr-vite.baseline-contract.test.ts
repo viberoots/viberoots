@@ -63,7 +63,6 @@ test("Vite SSR template metadata and scaffold baseline are present", async () =>
     const expectedFiles = [
       path.join(appRoot, "TARGETS"),
       path.join(appRoot, "package.json"),
-      path.join(appRoot, "copier.yaml"),
       path.join(appRoot, "index.html"),
       path.join(appRoot, "vite.config.ts"),
       path.join(appRoot, "tsconfig.json"),
@@ -73,13 +72,15 @@ test("Vite SSR template metadata and scaffold baseline are present", async () =>
       path.join(appRoot, "server", "wasm-contract.ts"),
       path.join(appRoot, "src", "entry-client.ts"),
       path.join(appRoot, "src", "entry-server.ts"),
+      path.join(appRoot, "src", "home.tsx"),
       path.join(appRoot, "src", "wasm-contract.ts"),
-      path.join(appRoot, "src", "wasm-contract", "top.wasm"),
-      path.join(appRoot, "src", "wasm-producer", "payload.txt"),
     ];
     for (const file of expectedFiles) {
       assert.ok(await exists(file), `expected scaffold file missing: ${file}`);
     }
+    assert.equal(await exists(path.join(appRoot, "copier.yaml")), false);
+    assert.equal(await exists(path.join(appRoot, "src", "wasm-contract", "top.wasm")), false);
+    assert.equal(await exists(path.join(appRoot, "src", "wasm-producer", "payload.txt")), false);
 
     const targets = await fsp.readFile(path.join(appRoot, "TARGETS"), "utf8");
     assert.match(targets, /webapp:ssr/);
@@ -88,6 +89,7 @@ test("Vite SSR template metadata and scaffold baseline are present", async () =>
       await fsp.readFile(path.join(appRoot, "package.json"), "utf8"),
     ) as {
       scripts?: Record<string, string>;
+      dependencies?: Record<string, string>;
     };
     assert.equal(String(packageJson.scripts?.dev || ""), "node scripts/dev.mjs");
     assert.equal(
@@ -95,13 +97,16 @@ test("Vite SSR template metadata and scaffold baseline are present", async () =>
       "node scripts/dev-wasm-watch.mjs",
     );
     assert.equal(String(packageJson.scripts?.["build:ssr"] || ""), "node scripts/build-ssr.mjs");
+    assert.equal(String(packageJson.dependencies?.react || ""), "^18.3.1");
+    assert.equal(String(packageJson.dependencies?.["react-dom"] || ""), "^18.3.1");
+    assert.equal(String(packageJson.dependencies?.["react-native-web"] || ""), "^0.19.13");
     const devScript = await fsp.readFile(path.join(appRoot, "scripts", "dev.mjs"), "utf8");
     assert.match(devScript, /dev-with-wasm-watch\.ts/);
     const devWasmWatchScript = await fsp.readFile(
       path.join(appRoot, "scripts", "dev-wasm-watch.mjs"),
       "utf8",
     );
-    assert.match(devWasmWatchScript, /watch-wasm-producer\.ts/);
+    assert.match(devWasmWatchScript, /watch-wasm-coordinator\.ts/);
     assert.doesNotMatch(devWasmWatchScript, /build-wasm-producer\.mjs/);
     assert.doesNotMatch(devWasmWatchScript, /--watch|--build-cmd|--build-out|--sync-out/);
     const buildSsrScript = await fsp.readFile(
@@ -111,6 +116,6 @@ test("Vite SSR template metadata and scaffold baseline are present", async () =>
     assert.match(buildSsrScript, /vite build --outDir dist\/client/);
     assert.match(buildSsrScript, /vite build --ssr src\/entry-server\.ts --outDir dist\/server/);
 
-    await $`pnpm prettier --check ${path.join(appRoot, "pnpm-lock.yaml")} ${path.join(appRoot, "scripts", "build-ssr.mjs")} ${path.join(appRoot, "scripts", "dev-wasm-watch.mjs")} ${path.join(appRoot, "server", "dev.mjs")} ${path.join(appRoot, "server", "index.ts")} ${path.join(appRoot, "server", "ts-modules.ts")} ${path.join(appRoot, "src", "ts-modules.ts")} ${path.join(appRoot, "src", "wasm-contract.ts")} ${path.join(appRoot, "test", "entry-server.test.ts")} ${path.join(appRoot, "vite.config.ts")}`;
+    await $`pnpm prettier --check ${path.join(appRoot, "pnpm-lock.yaml")} ${path.join(appRoot, "scripts", "build-ssr.mjs")} ${path.join(appRoot, "scripts", "dev-wasm-watch.mjs")} ${path.join(appRoot, "server", "dev.mjs")} ${path.join(appRoot, "server", "index.ts")} ${path.join(appRoot, "server", "ts-modules.ts")} ${path.join(appRoot, "src", "home.tsx")} ${path.join(appRoot, "src", "ts-modules.ts")} ${path.join(appRoot, "src", "wasm-contract.ts")} ${path.join(appRoot, "test", "entry-server.test.ts")} ${path.join(appRoot, "vite.config.ts")}`;
   });
 });

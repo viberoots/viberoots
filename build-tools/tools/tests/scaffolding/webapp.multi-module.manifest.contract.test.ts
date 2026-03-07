@@ -145,16 +145,19 @@ test(
           root: path.join(tmp, "projects", "apps", "demo-static"),
           clientTsLoaderRel: path.join("src", "ts-modules.ts"),
           serverTsLoaderRel: "",
+          wasmModulesExpected: true,
         },
         {
           root: path.join(tmp, "projects", "apps", "demo-vite"),
           clientTsLoaderRel: path.join("src", "ts-modules.ts"),
           serverTsLoaderRel: path.join("server", "ts-modules.ts"),
+          wasmModulesExpected: false,
         },
         {
           root: path.join(tmp, "projects", "apps", "demo-next"),
           clientTsLoaderRel: path.join("app", "ts-modules.ts"),
           serverTsLoaderRel: path.join("server", "ts-modules.ts"),
+          wasmModulesExpected: true,
         },
       ];
 
@@ -169,8 +172,15 @@ test(
         const tsManifestRaw = await fsp.readFile(contracts.tsManifestPath, "utf8");
         const wasmManifest = parseWasmModuleManifest(JSON.parse(wasmManifestRaw), app.root);
         const tsManifest = parseTsModuleManifest(JSON.parse(tsManifestRaw), app.root);
-        assert.ok(wasmManifest.modules[0]?.runtimeDestinations.client);
-        assert.ok(wasmManifest.modules[0]?.runtimeDestinations.server);
+        assert.equal(
+          wasmManifest.modules.length > 0,
+          app.wasmModulesExpected,
+          `${app.root}: unexpected wasm module count`,
+        );
+        if (app.wasmModulesExpected) {
+          assert.ok(wasmManifest.modules[0]?.runtimeDestinations.client);
+          assert.ok(wasmManifest.modules[0]?.runtimeDestinations.server);
+        }
         assert.ok(tsManifest.modules.length >= 1);
 
         const clientTsLoader = await fsp.readFile(

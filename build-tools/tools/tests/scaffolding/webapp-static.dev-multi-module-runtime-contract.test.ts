@@ -89,13 +89,9 @@ test(
       const watcher = spawn(
         "zx-wrapper",
         [
-          "../../../build-tools/tools/dev/watch-wasm-producer.ts",
+          "../../../build-tools/tools/dev/watch-wasm-coordinator.ts",
           "--cwd",
           appAbs,
-          "--wasm-manifest",
-          resolved.wasmManifestPath,
-          "--ts-manifest",
-          resolved.tsManifestPath,
           "--poll-ms",
           "120",
         ],
@@ -130,8 +126,7 @@ test(
           150,
         );
         const merged = logs.join("");
-        assert.match(merged, new RegExp(`module_key=${payloadEntry!.moduleKey}`));
-        assert.match(merged, new RegExp(`module_key=${extraEntry!.moduleKey}`));
+        assert.match(merged, /\[wasm-watch\] coordinator:registered .* modules=2/);
       } finally {
         await stopServer(watcher);
       }

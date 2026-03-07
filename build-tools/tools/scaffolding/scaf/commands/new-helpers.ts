@@ -51,6 +51,13 @@ export async function formatScaffoldOutput(dest: string): Promise<void> {
   })`prettier --write ${files}`;
 }
 
+export async function removeScaffoldTemplateConfig(dest: string): Promise<void> {
+  await Promise.all([
+    fsp.rm(path.join(dest, "copier.yaml"), { force: true }),
+    fsp.rm(path.join(dest, "copier.yml"), { force: true }),
+  ]);
+}
+
 export async function refreshImporterStoreHash(repoRoot: string, importer: string): Promise<void> {
   const lockfile = path.join(importer, "pnpm-lock.yaml");
   const absLockfile = path.join(repoRoot, lockfile);

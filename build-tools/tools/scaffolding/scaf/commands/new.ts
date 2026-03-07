@@ -10,6 +10,7 @@ import { confirmOrExit } from "../confirm.ts";
 import {
   formatImporterLockfiles,
   formatScaffoldOutput,
+  removeScaffoldTemplateConfig,
   refreshImporterStoreHash,
   templateImportersToRefresh,
 } from "./new-helpers.ts";
@@ -112,6 +113,7 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
   await runCopierCopy(root, dest, data);
   await recordSource(dest, canonicalLanguage, template);
   await runPostSteps(dest);
+  await removeScaffoldTemplateConfig(dest);
 
   if (isLangKit) {
     const withPlanner = ["true", "1", "yes"].includes((flags["with-planner"] || "").toLowerCase());

@@ -123,6 +123,18 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
     const coreTargetsText = await fs.readFile(coreTargets, "utf8");
     assert.ok(coreTargetsText.includes("header_deps"), "expected core_wasm to declare header_deps");
     assert.ok(coreTargetsText.includes("link_deps"), "expected core_wasm to declare link_deps");
+    const cppWasmTargetsText = await fs.readFile(
+      path.join(tmp, "projects", "libs", `${name}-cpp-wasm`, "TARGETS"),
+      "utf8",
+    );
+    assert.ok(
+      cppWasmTargetsText.includes('name = "app"'),
+      'expected cpp wasm library package to include an "app" target for package selection',
+    );
+    assert.ok(
+      cppWasmTargetsText.includes('labels = ["lang:cpp", "kind:wasm"]'),
+      "expected cpp wasm library target to include kind labels",
+    );
 
     const apiTargetsText = await fs.readFile(apiTargets, "utf8");
     assert.ok(
@@ -144,6 +156,13 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
       target: `//projects/apps/${name}:webapp`,
       env: { WEB_WASM_BACKEND: "wasi_single" },
     });
+    const cppWasmOut = await buckOutPath({
+      tmp,
+      $,
+      target: `//projects/libs/${name}-cpp-wasm:app`,
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
+    await fs.access(cppWasmOut);
     const wasmPath = path.join(webappOut, "top.wasm");
     await fs.access(wasmPath);
     const inst = await instantiateWasmFromFile(wasmPath);

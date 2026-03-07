@@ -24,8 +24,8 @@ test(
   async () => {
     await runInTemp("webapp-phase5-final-goal-validation-ssr-next", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-ssr-next demo-next-ssr --yes --no-tests`;
-      await $`scaf new ts lib demo-lib --yes --no-tests`;
+      await $`scaf new ts webapp-ssr-next demo-next-ssr --yes --no-tests --skip-lockfile-gen`;
+      await $`scaf new ts lib demo-lib --yes --no-tests --skip-lockfile-gen`;
 
       const appAbs = path.join(tmp, "projects", "apps", "demo-next-ssr");
       const libAbs = path.join(tmp, "projects", "libs", "demo-lib");
@@ -80,7 +80,7 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-      })`pnpm install --filter ./projects/apps/demo-next-ssr --filter ./projects/libs/demo-lib --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+      })`pnpm install --filter ./projects/apps/demo-next-ssr... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
 
       const port = await pickFreePort();
       const logs: string[] = [];

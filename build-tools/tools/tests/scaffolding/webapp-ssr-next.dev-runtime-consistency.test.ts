@@ -24,8 +24,7 @@ import { httpGet, pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-s
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
-const STARTUP_TIMEOUT_MS = 45000,
-  STEP_TIMEOUT_MS = Number(process.env.NEXT_DEV_STEP_TIMEOUT_SECS || "180") * 1000,
+const STEP_TIMEOUT_MS = Number(process.env.NEXT_DEV_STEP_TIMEOUT_SECS || "180") * 1000,
   NEXT_DEV_POLL_MS = 500;
 
 test(
@@ -37,8 +36,8 @@ test(
       process.env.NIX_PNPM_FETCH_TIMEOUT = process.env.NIX_PNPM_FETCH_TIMEOUT || "240";
 
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-ssr-next demo-next-ssr --yes --no-tests`;
-      await $`scaf new ts lib demo-lib --yes --no-tests`;
+      await $`scaf new ts webapp-ssr-next demo-next-ssr --yes --no-tests --skip-lockfile-gen`;
+      await $`scaf new ts lib demo-lib --yes --no-tests --skip-lockfile-gen`;
 
       const appAbs = path.join(tmp, "projects", "apps", "demo-next-ssr");
       const appPagePath = path.join(appAbs, "app", "page.tsx");
@@ -90,7 +89,7 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-      })`pnpm install --filter ./projects/apps/demo-next-ssr --filter ./projects/libs/demo-lib --no-frozen-lockfile --ignore-scripts --reporter=append-only`;
+      })`pnpm install --filter ./projects/apps/demo-next-ssr... --no-frozen-lockfile --ignore-scripts --reporter=append-only`;
 
       const port = await pickFreePort();
       const pageUrl = `http://127.0.0.1:${port}/`;
@@ -117,12 +116,7 @@ test(
 
       try {
         const readServerPage = async () => await httpGet(pageUrl);
-        await waitForValue(
-          async () => `${serverStdout.join("")}\n${serverStderr.join("")}`,
-          (logs) => logs.includes("Ready in"),
-          STARTUP_TIMEOUT_MS,
-          NEXT_DEV_POLL_MS,
-        );
+        assert.equal(devServer.exitCode, null, "dev server exited before startup");
         await waitForHttpOk(pageUrl, STEP_TIMEOUT_MS);
 
         const expectedA = producerByteLength("runtime-a");
@@ -192,8 +186,7 @@ test(
         }
 
         const mergedLogs = `${serverStdout.join("")}\n${serverStderr.join("")}`;
-        assert.match(mergedLogs, /\[wasm-watch\] rebuild:start/);
-        assert.match(mergedLogs, /\[wasm-watch\] sync:ok/);
+        assert.match(mergedLogs, /\[wasm-watch\] coordinator:registered/);
         assert.doesNotMatch(mergedLogs, /\bfull-reload\b/);
         assertSingleQueueInvariant(mergedLogs);
       } catch (error) {

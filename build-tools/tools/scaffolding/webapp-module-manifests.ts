@@ -7,6 +7,8 @@ export type WasmModuleManifestEntry = {
   moduleKey: string;
   sourcePath: string;
   runtimeDestinations: WasmModuleRuntimeDestinations;
+  sourceLabel?: string;
+  sourceWatchPaths?: string[];
 };
 
 export type WasmModuleManifest = {
@@ -97,6 +99,15 @@ export function parseWasmModuleManifest(value: unknown, context: string): WasmMo
         client: readString(runtime, "client", `${rowContext}.runtimeDestinations`),
         server: readString(runtime, "server", `${rowContext}.runtimeDestinations`),
       },
+      sourceLabel:
+        typeof row.sourceLabel === "string" && row.sourceLabel.trim() !== ""
+          ? row.sourceLabel.trim()
+          : undefined,
+      sourceWatchPaths: Array.isArray(row.sourceWatchPaths)
+        ? row.sourceWatchPaths
+            .map((v) => (typeof v === "string" ? v.trim() : ""))
+            .filter((v) => v !== "")
+        : undefined,
     };
   });
 

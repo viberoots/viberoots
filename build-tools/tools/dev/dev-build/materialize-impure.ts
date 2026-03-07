@@ -45,6 +45,12 @@ async function listBinArtifacts(outPath: string): Promise<string[]> {
 
 type GraphNode = { name?: unknown; labels?: unknown };
 
+function normalizeGraphLabel(value: string): string {
+  const s = String(value || "").trim();
+  if (s.startsWith("root//")) return `//${s.slice("root//".length)}`;
+  return s;
+}
+
 function extractRunnablesFromGraph(raw: unknown): Array<{ label: string; kind: string }> {
   const nodes = Array.isArray(raw)
     ? (raw as GraphNode[])
@@ -99,8 +105,18 @@ export async function maybePrintImpureMaterializedBins(opts: {
   const graphPath = path.join(opts.root, DEFAULT_GRAPH_PATH);
 
   if (specific.length > 0) {
+    let runnableLabels = new Set<string>();
+    try {
+      const graphTxt = await fsp.readFile(graphPath, "utf8");
+      const runnables = extractRunnablesFromGraph(JSON.parse(graphTxt));
+      runnableLabels = new Set<string>(runnables.map((r) => normalizeGraphLabel(r.label)));
+    } catch {}
     console.log("Impure selected targets:");
     for (const sel of specific) {
+      if (!runnableLabels.has(normalizeGraphLabel(sel))) {
+        console.log(` - ${sel}: (non-runnable target; skipping impure materialization)`);
+        continue;
+      }
       try {
         const stdout = await nixBuildPrintOutPaths({
           root: opts.root,
