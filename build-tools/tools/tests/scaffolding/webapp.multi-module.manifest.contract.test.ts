@@ -136,9 +136,9 @@ test(
   async () => {
     await runInTemp("webapp-multi-module-manifest-contract", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-static demo-static --yes --no-tests`;
-      await $`scaf new ts webapp-ssr-vite demo-vite --yes --no-tests`;
-      await $`scaf new ts webapp-ssr-next demo-next --yes --no-tests`;
+      await $`scaf new ts webapp-static demo-static --yes --no-tests --skip-lockfile-gen`;
+      await $`scaf new ts webapp-ssr-vite demo-vite --yes --no-tests --skip-lockfile-gen`;
+      await $`scaf new ts webapp-ssr-next demo-next --yes --no-tests --skip-lockfile-gen`;
 
       const apps = [
         {
@@ -208,7 +208,7 @@ test(
   async () => {
     await runInTemp("webapp-multi-module-manifest-smoke", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-static demo-web --yes --no-tests`;
+      await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
 
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");
       const contracts = resolveModuleContractsPaths({ appCwd: appAbs, root: tmp });
@@ -223,7 +223,7 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, CI: "1", NEXT_TELEMETRY_DISABLED: "1" },
-      })`pnpm install --filter ./projects/apps/demo-web --frozen-lockfile --ignore-scripts --reporter=append-only`;
+      })`pnpm install --filter ./projects/apps/demo-web... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
 
       const port = await pickFreePort();
       const devServer = spawn(

@@ -31,7 +31,7 @@ test(
   async () => {
     await runInTemp("webapp-zero-to-multi-wasm-growth", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-static demo-web --yes --no-tests`;
+      await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");
       const targetsPath = path.join(appAbs, "TARGETS");
       const targetsRaw = await fsp.readFile(targetsPath, "utf8");

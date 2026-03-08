@@ -37,7 +37,7 @@ test(
   async () => {
     await runInTemp("bnx-multi-module-watch", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-static demo-web --yes --no-tests`;
+      await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");
       const moduleKeys = ["a", "b", "c", "d", "e"];
       const payloadByKey = new Map(

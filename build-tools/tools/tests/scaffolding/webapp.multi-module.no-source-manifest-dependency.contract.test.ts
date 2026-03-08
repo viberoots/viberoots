@@ -20,7 +20,7 @@ test(
   async () => {
     await runInTemp("webapp-no-source-manifest-dependency", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-static demo-web --yes --no-tests`;
+      await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");
       await fsp.rm(path.join(appAbs, "src", "wasm-modules.manifest.json"), { force: true });
       await fsp.rm(path.join(appAbs, "src", "ts-modules.manifest.json"), { force: true });

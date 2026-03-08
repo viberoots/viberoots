@@ -38,8 +38,8 @@ test(
   async () => {
     await runInTemp("webapp-phase5-generated-authority-runtime", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --no-tests`;
-      await $`scaf new ts webapp-ssr-next demo-next-ssr --yes --no-tests`;
+      await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --no-tests --skip-lockfile-gen`;
+      await $`scaf new ts webapp-ssr-next demo-next-ssr --yes --no-tests --skip-lockfile-gen`;
 
       const scenarios = [
         {

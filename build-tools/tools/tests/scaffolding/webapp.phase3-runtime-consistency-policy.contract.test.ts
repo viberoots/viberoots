@@ -210,8 +210,22 @@ test("Phase-4 PR-1 shared helper reuse: representative template local-dep tests 
     ),
     "utf8",
   );
-  assert.match(viteLocalDep, /from "\.\/lib\/wasm-watch"/);
-  assert.match(viteLocalDep, /writeAndBumpMtime/);
+  assert.match(viteLocalDep, /from "\.\/lib\/webapp-ssr-vite-local-ts-dep"/);
+
+  const viteLocalDepHelper = await fsp.readFile(
+    path.join(
+      REPO_ROOT,
+      "build-tools",
+      "tools",
+      "tests",
+      "scaffolding",
+      "lib",
+      "webapp-ssr-vite-local-ts-dep.ts",
+    ),
+    "utf8",
+  );
+  assert.match(viteLocalDepHelper, /from "\.\/wasm-watch"/);
+  assert.match(viteLocalDepHelper, /writeAndBumpMtime/);
 
   const nextLocalDep = await fsp.readFile(
     path.join(

@@ -16,7 +16,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("PR-6 root-set discovery picks up new module files without TARGETS edits", async () => {
   await runInTemp("webapp-root-set-discovery-contract", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "inherit" });
-    await $`scaf new ts webapp-static demo-web --yes --no-tests`;
+    await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
     const appAbs = path.join(tmp, "projects", "apps", "demo-web");
     const paths = resolveModuleContractsPaths({ appCwd: appAbs, root: tmp });
 

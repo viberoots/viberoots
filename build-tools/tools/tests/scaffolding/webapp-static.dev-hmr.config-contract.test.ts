@@ -14,7 +14,7 @@ test(
   async () => {
     await runInTemp("webapp-static-hmr-config", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "pipe" });
-      await $`scaf new ts webapp-static demo-web --yes --no-tests`;
+      await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
       const configPath = path.join(tmp, "projects", "apps", "demo-web", "vite.config.ts");
       const packageJsonPath = path.join(tmp, "projects", "apps", "demo-web", "package.json");
       const wasmContractPath = path.join(

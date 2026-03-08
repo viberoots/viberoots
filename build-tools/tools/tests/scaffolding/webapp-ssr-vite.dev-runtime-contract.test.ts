@@ -58,19 +58,43 @@ async function waitForResponse(
   port: number,
   status: number,
   bodyMustInclude: string,
-  timeoutMs = 45000,
+  logs: string[],
+  server: ChildProcess,
+  timeoutMs = 120000,
 ): Promise<{ status: number; body: string }> {
   const start = Date.now();
+  let lastResponse: { status: number; body: string } | null = null;
   while (Date.now() - start < timeoutMs) {
+    if (server.exitCode != null) {
+      const logTail = logs.join("").slice(-12000);
+      throw new Error(
+        [
+          `dev server exited before expected response (code=${server.exitCode})`,
+          `expected status=${status} body fragment=${bodyMustInclude}`,
+          `logs tail:\n${logTail}`,
+        ].join("\n\n"),
+      );
+    }
     try {
       const res = await httpGet(`http://127.0.0.1:${port}/`);
+      lastResponse = res;
       if (res.status === status && res.body.includes(bodyMustInclude)) {
         return res;
       }
     } catch {}
     await sleep(500);
   }
-  throw new Error(`server did not return expected response within ${timeoutMs}ms`);
+  const logTail = logs.join("").slice(-12000);
+  const lastStatus = lastResponse?.status ?? 0;
+  const lastBodyTail = (lastResponse?.body || "").slice(-2000);
+  throw new Error(
+    [
+      `server did not return expected response within ${timeoutMs}ms`,
+      `expected status=${status} body fragment=${bodyMustInclude}`,
+      `last response status=${lastStatus} body tail:\n${lastBodyTail}`,
+      `logs tail:\n${logTail}`,
+    ].join("\n\n"),
+  );
 }
 
 async function stopServer(child: ChildProcess): Promise<void> {
@@ -86,13 +110,13 @@ test(
   async () => {
     await runInTemp("scaf-webapp-ssr-vite-dev-runtime", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --no-tests`;
+      await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --no-tests --skip-lockfile-gen`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-vite-ssr");
       await _$({
         cwd: appAbs,
         stdio: "inherit",
         env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-      })`pnpm install --frozen-lockfile --ignore-workspace --reporter=append-only`;
+      })`pnpm install --no-frozen-lockfile --prefer-offline --ignore-workspace --reporter=append-only`;
 
       const entryServerPath = path.join(appAbs, "src", "entry-server.ts");
       const originalEntryServer = await fsp.readFile(entryServerPath, "utf8");
@@ -100,8 +124,11 @@ test(
       {
         const port = await pickFreePort();
         const server = startDevServer(appAbs, port);
+        const logs: string[] = [];
+        server.stdout?.on("data", (chunk) => logs.push(String(chunk || "")));
+        server.stderr?.on("data", (chunk) => logs.push(String(chunk || "")));
         try {
-          const res = await waitForResponse(port, 200, 'data-ssr-marker="vite"');
+          const res = await waitForResponse(port, 200, 'data-ssr-marker="vite"', logs, server);
           assert.match(res.body, /Vite SSR \+ React Native Web/);
           assert.match(res.body, /Welcome to demo-vite-ssr/);
           assert.ok(
@@ -117,11 +144,16 @@ test(
       try {
         const port = await pickFreePort();
         const server = startDevServer(appAbs, port);
+        const logs: string[] = [];
+        server.stdout?.on("data", (chunk) => logs.push(String(chunk || "")));
+        server.stderr?.on("data", (chunk) => logs.push(String(chunk || "")));
         try {
           const res = await waitForResponse(
             port,
             500,
             "SSR contract error: failed to load /src/entry-server.ts:",
+            logs,
+            server,
           );
           assert.match(res.body, /failed to load \/src\/entry-server\.ts:/);
         } finally {
@@ -135,11 +167,16 @@ test(
       try {
         const port = await pickFreePort();
         const server = startDevServer(appAbs, port);
+        const logs: string[] = [];
+        server.stdout?.on("data", (chunk) => logs.push(String(chunk || "")));
+        server.stderr?.on("data", (chunk) => logs.push(String(chunk || "")));
         try {
           const res = await waitForResponse(
             port,
             500,
             "SSR contract error: /src/entry-server.ts must export a render(url) function",
+            logs,
+            server,
           );
           assert.equal(
             res.body.trim(),

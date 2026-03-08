@@ -25,7 +25,7 @@ test(
     process.env.NIX_PNPM_FETCH_TIMEOUT = process.env.NIX_PNPM_FETCH_TIMEOUT || "240";
     await runInTemp("webapp-static-wasm-producer", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-static demo-web --yes --no-tests`;
+      await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");
       const producerPayloadPath = path.join(appAbs, "src", "wasm-producer", "payload.txt");
       await fsp.mkdir(path.dirname(producerPayloadPath), { recursive: true });

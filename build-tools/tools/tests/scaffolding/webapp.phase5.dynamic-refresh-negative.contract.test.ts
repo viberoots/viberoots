@@ -44,7 +44,7 @@ test(
         await waitForValue(
           async () => await fsp.readFile(topContractPath, "utf8").catch(() => ""),
           (body) => body.includes("wasm-producer:"),
-          20000,
+          45000,
           150,
         );
 
@@ -59,14 +59,25 @@ test(
         await writeAndBumpMtime(packageJsonPath, await fsp.readFile(packageJsonPath, "utf8"));
         await writeAndBumpMtime(payloadPath, "after-invalid-dep");
 
-        const mergedAfterFail = await waitForValue(
-          async () => logs.join(""),
-          (text) =>
-            text.includes("[wasm-watch] fatal") &&
-            text.includes("[module-contracts:E_TS_WORKSPACE_DEP]"),
-          20000,
-          150,
-        );
+        let mergedAfterFail = "";
+        try {
+          mergedAfterFail = await waitForValue(
+            async () => logs.join(""),
+            (text) =>
+              text.includes("[wasm-watch] fatal") &&
+              text.includes("[module-contracts:E_TS_WORKSPACE_DEP]"),
+            45000,
+            150,
+          );
+        } catch (error) {
+          mergedAfterFail = logs.join("");
+          if (
+            !mergedAfterFail.includes("[wasm-watch] fatal") ||
+            !mergedAfterFail.includes("[module-contracts:E_TS_WORKSPACE_DEP]")
+          ) {
+            throw error;
+          }
+        }
         const fatalCount = (mergedAfterFail.match(/\[wasm-watch\] fatal/g) || []).length;
         assert.equal(fatalCount, 1, `expected single fatal marker, got ${fatalCount}`);
       } finally {

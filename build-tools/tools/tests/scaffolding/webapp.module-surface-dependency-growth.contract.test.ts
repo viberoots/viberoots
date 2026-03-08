@@ -11,8 +11,8 @@ import { runInTemp } from "../lib/test-helpers";
 test("PR-7 module-surface dependency growth: adding workspace TS dep updates TS module contract", async () => {
   await runInTemp("webapp-module-surface-dependency-growth", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "inherit" });
-    await $`scaf new ts webapp-static demo-web --yes --no-tests`;
-    await $`scaf new ts lib demo-lib --yes --no-tests`;
+    await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
+    await $`scaf new ts lib demo-lib --yes --no-tests --skip-lockfile-gen`;
     const appAbs = path.join(tmp, "projects", "apps", "demo-web");
     const libAbs = path.join(tmp, "projects", "libs", "demo-lib");
     const appPkgPath = path.join(appAbs, "package.json");

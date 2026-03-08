@@ -14,22 +14,37 @@ const SOURCE_ONLY_EXPECTATIONS: InstallGuardrailExpectation[] = [
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-reload.wasm-producer.test.ts",
     required: [
+      "--skip-lockfile-gen",
       "pnpm install",
-      "--filter ./projects/apps/demo-vite-ssr",
-      "--frozen-lockfile",
+      "--filter ./projects/apps/demo-vite-ssr...",
+      "--no-frozen-lockfile",
+      "--prefer-offline",
       "--ignore-scripts",
     ],
-    forbidden: ["--no-frozen-lockfile"],
+    forbidden: ["--frozen-lockfile"],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-consistency.phase3.test.ts",
     required: [
+      "--skip-lockfile-gen",
       "pnpm install",
-      "--filter ./projects/apps/demo-vite-ssr",
-      "--frozen-lockfile",
+      "--filter ./projects/apps/demo-vite-ssr...",
+      "--no-frozen-lockfile",
+      "--prefer-offline",
       "--ignore-scripts",
     ],
-    forbidden: ["--no-frozen-lockfile"],
+    forbidden: ["--frozen-lockfile"],
+  },
+  {
+    file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-contract.test.ts",
+    required: [
+      "--skip-lockfile-gen",
+      "pnpm install",
+      "--no-frozen-lockfile",
+      "--prefer-offline",
+      "--ignore-workspace",
+    ],
+    forbidden: ["--frozen-lockfile"],
   },
 ];
 
@@ -37,6 +52,7 @@ const DEP_EDIT_EXPECTATIONS: InstallGuardrailExpectation[] = [
   {
     file: "build-tools/tools/tests/scaffolding/webapp-static.dev-hmr.local-ts-dep.test.ts",
     required: [
+      "--skip-lockfile-gen",
       "pnpm install",
       "--filter ./projects/apps/demo-web...",
       "--no-frozen-lockfile",
@@ -48,8 +64,9 @@ const DEP_EDIT_EXPECTATIONS: InstallGuardrailExpectation[] = [
     ],
   },
   {
-    file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-hmr.local-ts-dep.test.ts",
+    file: "build-tools/tools/tests/scaffolding/lib/webapp-ssr-vite-local-ts-dep.ts",
     required: [
+      "--skip-lockfile-gen",
       "pnpm install",
       "--filter ./projects/apps/demo-vite-ssr...",
       "--no-frozen-lockfile",
@@ -63,6 +80,7 @@ const DEP_EDIT_EXPECTATIONS: InstallGuardrailExpectation[] = [
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-hmr.local-ts-dep.test.ts",
     required: [
+      "--skip-lockfile-gen",
       "pnpm install",
       "--filter ./projects/apps/demo-next-ssr...",
       "--no-frozen-lockfile",
@@ -76,6 +94,7 @@ const DEP_EDIT_EXPECTATIONS: InstallGuardrailExpectation[] = [
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-reload.wasm-producer.test.ts",
     required: [
+      "--skip-lockfile-gen",
       "pnpm install",
       "--filter ./projects/apps/demo-next-ssr...",
       "--no-frozen-lockfile",
@@ -89,6 +108,7 @@ const DEP_EDIT_EXPECTATIONS: InstallGuardrailExpectation[] = [
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-runtime-consistency.test.ts",
     required: [
+      "--skip-lockfile-gen",
       "pnpm install",
       "--filter ./projects/apps/demo-next-ssr...",
       "--no-frozen-lockfile",

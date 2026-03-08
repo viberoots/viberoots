@@ -19,7 +19,7 @@ test(
     process.env.NIX_PNPM_FETCH_TIMEOUT = process.env.NIX_PNPM_FETCH_TIMEOUT || "240";
     await runInTemp("webapp-ssr-vite-wasm-producer", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --no-tests`;
+      await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --no-tests --skip-lockfile-gen`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-vite-ssr");
       const payloadPath = path.join(appAbs, "src", "wasm-producer", "payload.txt");
       const entryClientPath = path.join(appAbs, "src", "entry-client.ts");
@@ -62,7 +62,7 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-      })`pnpm install --filter ./projects/apps/demo-vite-ssr --frozen-lockfile --ignore-scripts --reporter=append-only`;
+      })`pnpm install --filter ./projects/apps/demo-vite-ssr... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
       const port = await pickFreePort();
       const serverStdout: string[] = [];
       const serverStderr: string[] = [];

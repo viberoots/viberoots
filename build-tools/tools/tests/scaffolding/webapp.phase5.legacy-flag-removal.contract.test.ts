@@ -14,9 +14,9 @@ test(
   async () => {
     await runInTemp("webapp-phase5-legacy-flag-removal", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-static demo-web --yes --no-tests`;
-      await $`scaf new ts webapp-ssr-vite demo-vite --yes --no-tests`;
-      await $`scaf new ts webapp-ssr-next demo-next --yes --no-tests`;
+      await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
+      await $`scaf new ts webapp-ssr-vite demo-vite --yes --no-tests --skip-lockfile-gen`;
+      await $`scaf new ts webapp-ssr-next demo-next --yes --no-tests --skip-lockfile-gen`;
 
       for (const appName of ["demo-web", "demo-vite", "demo-next"]) {
         const scriptPath = path.join(

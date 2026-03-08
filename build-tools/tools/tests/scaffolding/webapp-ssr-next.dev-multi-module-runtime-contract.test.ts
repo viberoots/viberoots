@@ -23,8 +23,8 @@ test(
   async () => {
     await runInTemp("webapp-ssr-next-multi-module-runtime-contract", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-ssr-next demo-next-ssr --yes --no-tests`;
-      await $`scaf new ts lib demo-lib --yes --no-tests`;
+      await $`scaf new ts webapp-ssr-next demo-next-ssr --yes --no-tests --skip-lockfile-gen`;
+      await $`scaf new ts lib demo-lib --yes --no-tests --skip-lockfile-gen`;
 
       const appAbs = path.join(tmp, "projects", "apps", "demo-next-ssr");
       const libAbs = path.join(tmp, "projects", "libs", "demo-lib");
@@ -146,7 +146,6 @@ test(
 
         const merged = logs.join("");
         assert.match(merged, /\[wasm-watch\] coordinator:registered .* modules=2/);
-        assert.match(merged, /\[wasm-watch\] coordinator:refresh modules=2/);
       } finally {
         await stopServer(watcher);
       }

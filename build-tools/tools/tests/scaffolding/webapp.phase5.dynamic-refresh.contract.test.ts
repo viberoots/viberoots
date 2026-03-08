@@ -53,7 +53,7 @@ test(
   async () => {
     await runInTemp("bnx-phase5-refresh", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-static demo-web --yes --no-tests`;
+      await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");
       const targetPath = path.join(appAbs, "TARGETS");
       const topPayloadPath = path.join(appAbs, "src", "wasm-producer", "payload.txt");

@@ -20,7 +20,7 @@ test(
   async () => {
     await runInTemp("webapp-zero-wasm-default-static", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-static demo-web --yes --no-tests`;
+      await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");
       const targetsPath = path.join(appAbs, "TARGETS");
       const targetsRaw = await fsp.readFile(targetsPath, "utf8");
@@ -61,7 +61,7 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, CI: "1", NEXT_TELEMETRY_DISABLED: "1" },
-      })`pnpm install --filter ./projects/apps/demo-web --frozen-lockfile --ignore-scripts --reporter=append-only`;
+      })`pnpm install --filter ./projects/apps/demo-web... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
       await _$({ cwd: appAbs, stdio: "inherit" })`pnpm run build`;
 
       const port = await pickFreePort();

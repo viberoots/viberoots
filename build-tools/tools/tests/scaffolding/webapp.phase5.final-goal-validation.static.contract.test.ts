@@ -146,7 +146,7 @@ test(
         const initialClientModule = await waitForValue(
           async () => {
             assertNoProcessRestart(devServer, pid);
-            return await httpGet(`${depSourceUrl}?t=${Date.now()}`);
+            return await httpGet(depSourceUrl);
           },
           (res) => res.status === 200 && res.body.includes("dep-a"),
           120000,
@@ -165,11 +165,11 @@ test(
         const nextClientModule = await waitForValue(
           async () => {
             assertNoProcessRestart(devServer, pid);
-            return await httpGet(`${depSourceUrl}?t=${Date.now()}`);
+            return await httpGet(depSourceUrl);
           },
           (res) => res.status === 200 && res.body.includes("dep-b"),
-          180000,
-          700,
+          60000,
+          300,
         );
         assert.equal(nextClientModule.status, 200);
 
