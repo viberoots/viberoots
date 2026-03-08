@@ -20,7 +20,7 @@ test(
   async () => {
     await runInTemp("webapp-zero-wasm-default-ssr-vite", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-ssr-vite demo-vite --yes --no-tests --skip-lockfile-gen`;
+      await $`scaf new ts webapp-ssr-vite demo-vite --yes --no-tests`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-vite");
       const targetsPath = path.join(appAbs, "TARGETS");
       const targetsRaw = await fsp.readFile(targetsPath, "utf8");
@@ -51,7 +51,7 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, CI: "1", NEXT_TELEMETRY_DISABLED: "1" },
-      })`pnpm install --filter ./projects/apps/demo-vite... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+      })`pnpm install --filter ./projects/apps/demo-vite... --frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
       await _$({ cwd: appAbs, stdio: "inherit" })`pnpm run build:ssr`;
 
       const port = await pickFreePort();

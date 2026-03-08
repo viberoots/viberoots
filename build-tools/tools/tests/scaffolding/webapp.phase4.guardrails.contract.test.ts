@@ -14,37 +14,29 @@ const SOURCE_ONLY_EXPECTATIONS: InstallGuardrailExpectation[] = [
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-reload.wasm-producer.test.ts",
     required: [
-      "--skip-lockfile-gen",
       "pnpm install",
       "--filter ./projects/apps/demo-vite-ssr...",
-      "--no-frozen-lockfile",
+      "--frozen-lockfile",
       "--prefer-offline",
       "--ignore-scripts",
     ],
-    forbidden: ["--frozen-lockfile"],
+    forbidden: ["--skip-lockfile-gen", "--no-frozen-lockfile"],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-consistency.phase3.test.ts",
     required: [
-      "--skip-lockfile-gen",
       "pnpm install",
       "--filter ./projects/apps/demo-vite-ssr...",
-      "--no-frozen-lockfile",
+      "--frozen-lockfile",
       "--prefer-offline",
       "--ignore-scripts",
     ],
-    forbidden: ["--frozen-lockfile"],
+    forbidden: ["--skip-lockfile-gen", "--no-frozen-lockfile"],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-contract.test.ts",
-    required: [
-      "--skip-lockfile-gen",
-      "pnpm install",
-      "--no-frozen-lockfile",
-      "--prefer-offline",
-      "--ignore-workspace",
-    ],
-    forbidden: ["--frozen-lockfile"],
+    required: ["pnpm install", "--frozen-lockfile", "--prefer-offline", "--ignore-workspace"],
+    forbidden: ["--skip-lockfile-gen", "--no-frozen-lockfile"],
   },
 ];
 

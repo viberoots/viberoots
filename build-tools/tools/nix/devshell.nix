@@ -12,23 +12,43 @@ let
 in {
   default = pkgs.mkShell {
     shellHook = ''
-      # Guard against recursive shell hook invocation
-      if [ -n "''${_BUCKNIX_DEVSHELL_ACTIVE:-}" ]; then
-        return 0
+      dev_root="$PWD"
+      if [ ! -f "$dev_root/flake.nix" ]; then
+        search_root="$dev_root"
+        while [ "$search_root" != "/" ] && [ ! -f "$search_root/flake.nix" ]; do
+          search_root="$(dirname "$search_root")"
+        done
+        if [ -f "$search_root/flake.nix" ]; then
+          dev_root="$search_root"
+        fi
+      fi
+      # Guard against recursive shell hook invocation only when this root is already wired.
+      if [ -n "''${_BUCKNIX_DEVSHELL_ACTIVE:-}" ] && [ "''${_BUCKNIX_DEVSHELL_ROOT:-}" = "$dev_root" ]; then
+        if command -v i >/dev/null 2>&1; then
+          return 0
+        fi
       fi
       export _BUCKNIX_DEVSHELL_ACTIVE=1
+      export _BUCKNIX_DEVSHELL_ROOT="$dev_root"
       is_interactive=0
       case "$-" in
         *i*) is_interactive=1 ;;
       esac
-      
-      if [ -e node_modules ] && [ ! -L node_modules ]; then
-        echo "(devShell) existing non-symlink node_modules detected; not overwriting" >&2 || true
-      else
-        zx-wrapper "$PWD/build-tools/tools/dev/devshell-link-node-modules.ts" || true
+
+      cd "$dev_root"
+
+      link_script="$PWD/build-tools/tools/dev/devshell-link-node-modules.ts"
+      if [ -f "$link_script" ]; then
+        if [ -e node_modules ] && [ ! -L node_modules ]; then
+          echo "(devShell) existing non-symlink node_modules detected; not overwriting" >&2 || true
+        else
+          zx-wrapper "$link_script" || true
+        fi
       fi
 
-      export PATH="$PWD/build-tools/tools/bin:$PWD/node_modules/.bin:$PATH"
+      if [ -d "$PWD/build-tools/tools/bin" ]; then
+        export PATH="$PWD/build-tools/tools/bin:$PWD/node_modules/.bin:$PATH"
+      fi
       # Ensure wrapper scripts on PATH are used even if stale aliases linger
       # from an older shellHook revision.
       unalias i b v t >/dev/null 2>&1 || true
@@ -83,6 +103,22 @@ EOF
       export ZDOTDIR="$PWD/.nix-zsh"
       cat > .nix-zsh/.zshrc <<'EOF'
 PROMPT='%F{green}[nix-shell]%f %m:%~$ '
+_bnx_update_path() {
+  local d="$PWD"
+  while [[ "$d" != "/" ]]; do
+    if [[ -f "$d/flake.nix" && -d "$d/build-tools/tools/bin" ]]; then
+      case ":$PATH:" in
+        *":$d/build-tools/tools/bin:"*) ;;
+        *) export PATH="$d/build-tools/tools/bin:$d/node_modules/.bin:$PATH" ;;
+      esac
+      return
+    fi
+    d="$(dirname "$d")"
+  done
+}
+_bnx_update_path
+autoload -Uz add-zsh-hook
+add-zsh-hook chpwd _bnx_update_path
 autoload -Uz compinit
 compinit -i
 if command -v scaf >/dev/null 2>&1; then

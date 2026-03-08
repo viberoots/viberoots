@@ -23,6 +23,39 @@ import { assertNoProcessRestart, waitForValue, writeAndBumpMtime } from "./lib/w
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
+async function waitForSourceContains(
+  url: string,
+  expected: string,
+  devServer: ChildProcess,
+  expectedPid: number | undefined,
+  logs: string[],
+  timeoutMs = 60000,
+): Promise<{ status: number; body: string }> {
+  const start = Date.now();
+  let lastStatus = 0;
+  let lastBody = "";
+  while (Date.now() - start < timeoutMs) {
+    assertNoProcessRestart(devServer, expectedPid);
+    const res = await httpGet(url);
+    lastStatus = res.status;
+    lastBody = res.body;
+    if (res.status === 200 && res.body.includes(expected)) {
+      return res;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  const logsTail = logs.join("").slice(-8000);
+  throw new Error(
+    [
+      `timed out waiting for source '${expected}' after ${timeoutMs}ms`,
+      `url=${url}`,
+      `last status=${lastStatus}`,
+      `last body tail:\n${lastBody.slice(-2000)}`,
+      `dev logs tail:\n${logsTail}`,
+    ].join("\n\n"),
+  );
+}
+
 test(
   "Phase-5 PR-5 final goal validation (static): dependency growth works in one dev session without entrypoint or script edits",
   { timeout: TEST_TIMEOUT_MS },
@@ -162,14 +195,13 @@ test(
         await writeAndBumpMtime(topPayloadPath, "top-bb");
         await writeAndBumpMtime(extraPayloadPath, "extra-bbb");
 
-        const nextClientModule = await waitForValue(
-          async () => {
-            assertNoProcessRestart(devServer, pid);
-            return await httpGet(depSourceUrl);
-          },
-          (res) => res.status === 200 && res.body.includes("dep-b"),
+        const nextClientModule = await waitForSourceContains(
+          `${depSourceUrl}?v=${Date.now()}`,
+          "dep-b",
+          devServer,
+          pid,
+          logs,
           60000,
-          300,
         );
         assert.equal(nextClientModule.status, 200);
 
