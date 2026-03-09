@@ -9,7 +9,9 @@ describe("render", () => {
     expect(parts.styleHtml).toContain('id="react-native-stylesheet"');
     expect(html).toContain("Tangram Sandbox");
     expect(html).toContain("Piece Tray");
-    expect(html).toContain("Board (");
+    expect(html).toMatch(/Board \((?:<!-- -->)?10(?:<!-- -->)?x(?:<!-- -->)?15(?:<!-- -->)?\)/);
     expect(html).toContain("/games/tangram");
+    expect(html.match(/data-testid="tangram-board-row"/g)?.length ?? 0).toBe(15);
+    expect(html.match(/data-testid="tangram-board-cell"/g)?.length ?? 0).toBe(150);
   });
 });

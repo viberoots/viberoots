@@ -3,7 +3,11 @@ import { StyleSheet, Text, View } from "react-native-web";
 import { BOARD_COLUMNS, BOARD_ROWS } from "../game/board";
 import { createInitialGameState } from "../game/state";
 
-const boardCells = Array.from({ length: BOARD_COLUMNS * BOARD_ROWS }, (_, index) => index);
+const boardRows = Array.from({ length: BOARD_ROWS }, (_, row) => row);
+const boardColumns = Array.from({ length: BOARD_COLUMNS }, (_, column) => column);
+const CELL_SIZE = 32;
+const GRID_LINE_WIDTH = 1;
+const CELL_CONTENT_SIZE = CELL_SIZE - GRID_LINE_WIDTH;
 
 export function GameShell(props: { url: string }) {
   const gameState = createInitialGameState();
@@ -18,9 +22,21 @@ export function GameShell(props: { url: string }) {
           <Text style={styles.sectionTitle}>
             Board ({BOARD_COLUMNS}x{BOARD_ROWS})
           </Text>
-          <View style={styles.boardGrid}>
-            {boardCells.map((index) => (
-              <View key={index} style={styles.boardCell} />
+          <View style={styles.boardGrid} testID="tangram-board-grid">
+            {boardRows.map((row) => (
+              <View key={row} style={styles.boardRow} testID="tangram-board-row">
+                {boardColumns.map((column) => (
+                  <View
+                    key={`${row}-${column}`}
+                    style={[
+                      styles.boardCell,
+                      column < BOARD_COLUMNS - 1 ? styles.boardCellDividerRight : null,
+                      row < BOARD_ROWS - 1 ? styles.boardCellDividerBottom : null,
+                    ]}
+                    testID="tangram-board-cell"
+                  />
+                ))}
+              </View>
             ))}
           </View>
         </View>
@@ -83,19 +99,29 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   boardGrid: {
-    width: 320,
     display: "flex",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    borderWidth: 1,
+    flexDirection: "column",
+    alignSelf: "flex-start",
+    overflow: "hidden",
+    borderWidth: GRID_LINE_WIDTH,
     borderColor: "#cbd5e1",
   },
+  boardRow: {
+    display: "flex",
+    flexDirection: "row",
+  },
   boardCell: {
-    width: 32,
-    height: 20,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+    width: CELL_CONTENT_SIZE,
+    height: CELL_CONTENT_SIZE,
     backgroundColor: "#f1f5f9",
+  },
+  boardCellDividerRight: {
+    borderRightWidth: GRID_LINE_WIDTH,
+    borderColor: "#e2e8f0",
+  },
+  boardCellDividerBottom: {
+    borderBottomWidth: GRID_LINE_WIDTH,
+    borderColor: "#e2e8f0",
   },
   trayText: {
     color: "#334155",

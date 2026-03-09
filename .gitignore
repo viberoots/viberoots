@@ -42,6 +42,7 @@ graph-pure-out
 # Test coverage and reports
 coverage/
 .nyc_output/
+.vite-cache/
 
 # Husky/lint-staged temp patches
 .git/lint-staged_unstaged.patch
