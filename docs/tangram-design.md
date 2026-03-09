@@ -130,6 +130,15 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
   - `game-geometry.test.ts`
   - `game-placement.test.ts`
   - updated SSR smoke test: `entry-server.test.ts`
+- PR-1.5 is implemented in verify preflight selection:
+  - new selector utility: `build-tools/tools/lib/project-impact-selector.ts`
+  - verify wiring: `build-tools/tools/dev/verify/template-test-scope.ts`
+  - tests:
+    - `build-tools/tools/tests/verify/project-impact-selector.policy.test.ts`
+    - `build-tools/tools/tests/verify/template-test-scope.policy.test.ts`
+  - docs updated:
+    - `build-tools/docs/build-system-design.md`
+    - `docs/handbook/getting-started-on-a-pr.md`
 
 ## Domain Foundations (PR-1 Locked Conventions)
 

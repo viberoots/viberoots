@@ -708,6 +708,36 @@ I wire template selector decisions directly into `v` and CI verify execution.
   - run filtered lint with `pnpm --filter . -s lint`
   - avoid workspace-wide lint for template-only changes
 
+## Verify project-impact selector contract (PR-1.5)
+
+I keep build-system scope rules authoritative and add a dependency-aware default mode for app/lib
+changes that do not touch build-system paths.
+
+- Decision order:
+  - if requested targets are explicit (not `//...`), keep explicit targets (existing behavior)
+  - if `BNX_TEMPLATE_TEST_SCOPE=never`, keep existing build-system scope behavior
+  - if template selector mode is `template-only`, run template-targeted selection (existing behavior)
+  - if build-system changes are detected, keep existing build-system scope/fallback behavior
+  - otherwise (`no-template-impact` + no build-system changes), run `project-impact`
+- `project-impact` graph resolution:
+  - map changed paths to owning projects under `projects/apps/<name>` and `projects/libs/<name>`
+  - resolve reverse dependencies across `build-tools/tools/buck/graph.json` using one traversal per
+    verify run
+  - include changed projects plus full recursive downstream dependents
+  - output stable, deduplicated project scopes (`//projects/.../<name>/...`)
+- Diagnostics contract:
+  - template modes keep existing template diagnostics
+  - project-impact diagnostics include:
+    - `mode` (`project-impact` or fallback/no-impact mode)
+    - `changedProjects`
+    - `dependentProjects`
+    - `selectedTargets`
+    - `reason`
+- Conservative fallback:
+  - if project-impact graph resolution fails (for example graph read failure), verify falls back to
+    existing build-system scope and emits `mode: "fallback-build-system-scope"` with an explicit
+    `reason`.
+
 ## Implementation Plan (bite‑sized, ordered, with verification)
 
 > This plan is designed for a junior engineer or an LLM agent. Each step is **small**, has **clear acceptance criteria**, and includes a **verification** recipe to prevent regressions. Follow in order.

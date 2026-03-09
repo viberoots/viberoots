@@ -3,23 +3,35 @@ import {
   type TemplateTestSelectorDiagnostics,
   resolveTemplateTestSelection,
 } from "../../lib/template-test-selector.ts";
-import { resolveBuildSystemBuckTestScope } from "../../lib/build-system-test-scope.ts";
+import {
+  type ProjectImpactSelectorDiagnostics,
+  resolveProjectImpactSelection,
+} from "../../lib/project-impact-selector.ts";
+import {
+  isIgnoredBuildSystemScopePath,
+  resolveBuildSystemBuckTestScope,
+} from "../../lib/build-system-test-scope.ts";
 import { packagePathFromLabel } from "../../lib/labels.ts";
 
 export type VerifyTemplateScopeMode = "auto" | "always" | "never";
 
 export type VerifyTemplateScopeDecision = {
   requestedMode: VerifyTemplateScopeMode;
-  selectorMode: "template-only" | "mixed" | "no-template-impact" | "skipped";
+  selectorMode: "template-only" | "mixed" | "no-template-impact" | "project-impact" | "skipped";
   targets: string[];
-  diagnostics: TemplateTestSelectorDiagnostics | null;
+  diagnostics: VerifySelectionDiagnostics | null;
   lintFilters: string[] | null;
   reason: string;
 };
 
+export type VerifySelectionDiagnostics =
+  | TemplateTestSelectorDiagnostics
+  | ProjectImpactSelectorDiagnostics;
+
 export type VerifyTemplateScopeDeps = {
   resolveTemplateSelection: typeof resolveTemplateTestSelection;
   resolveBuildScope: typeof resolveBuildSystemBuckTestScope;
+  resolveProjectImpactSelection: typeof resolveProjectImpactSelection;
 };
 
 function parseVerifyTemplateScopeMode(raw: string | undefined): VerifyTemplateScopeMode {
@@ -74,6 +86,9 @@ function guardTemplateSelection(diagnostics: TemplateTestSelectorDiagnostics): v
 export function summarizeTemplateScopeDecision(d: VerifyTemplateScopeDecision): string {
   const base = `requested=${d.requestedMode} selector=${d.selectorMode} reason=${d.reason}`;
   if (!d.diagnostics) return `${base} targets=${d.targets.length}`;
+  if ("changedProjects" in d.diagnostics) {
+    return `${base} changedProjects=${d.diagnostics.changedProjects.join(",") || "none"} dependentProjects=${d.diagnostics.dependentProjects.join(",") || "none"} targets=${d.targets.length}`;
+  }
   return `${base} templates=${d.diagnostics.changedTemplateIds.join(",") || "none"} targets=${d.targets.length}`;
 }
 
@@ -115,6 +130,8 @@ export async function resolveVerifyTemplateTestScope(opts: {
 
   const resolveTemplateSelection =
     opts.deps?.resolveTemplateSelection || resolveTemplateTestSelection;
+  const resolveProjectImpact =
+    opts.deps?.resolveProjectImpactSelection || resolveProjectImpactSelection;
   const selected = await resolveTemplateSelection({ root: opts.root, env });
   const diagnostics = selected.diagnostics;
 
@@ -138,6 +155,34 @@ export async function resolveVerifyTemplateTestScope(opts: {
       lintFilters: ["."],
       reason: "template-targeted",
     };
+  }
+
+  if (!baseScope.hasBuildSystemChanges && selected.mode === "no-template-impact") {
+    const changedPaths = diagnostics.changedPaths.filter((p) => !isIgnoredBuildSystemScopePath(p));
+    const projectImpact = await resolveProjectImpact({
+      root: opts.root,
+      changedPaths,
+    });
+    if (projectImpact.mode === "project-impact") {
+      return {
+        requestedMode,
+        selectorMode: "project-impact",
+        targets: projectImpact.targets,
+        diagnostics: projectImpact.diagnostics,
+        lintFilters: null,
+        reason: "project-impact-targeted",
+      };
+    }
+    if (projectImpact.mode === "fallback-build-system-scope") {
+      return {
+        requestedMode,
+        selectorMode: selected.mode,
+        targets: baseScope.targets,
+        diagnostics: projectImpact.diagnostics,
+        lintFilters: null,
+        reason: "fallback-build-system-scope",
+      };
+    }
   }
 
   return {
