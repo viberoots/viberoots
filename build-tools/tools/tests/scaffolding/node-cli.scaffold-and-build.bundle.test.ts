@@ -13,7 +13,7 @@ test("node cli: build bundled single-file and run help", async () => {
   }
   try {
     await runInTemp("node-cli-bundle", async (tmp, $) => {
-      await $`scaf new ts cli demo --yes`;
+      await $`scaf new ts cli demo --yes --skip-lockfile-gen`;
       const targetsPath = path.join(tmp, "projects", "apps", "demo", "TARGETS");
       // Toggle bundle mode with importer param
       await $`node -e ${`const fs=require('fs');
@@ -27,7 +27,7 @@ test("node cli: build bundled single-file and run help", async () => {
       await $({
         cwd: tmp,
         stdio: "inherit",
-      })`node build-tools/tools/dev/update-pnpm-hash.ts --lockfile projects/apps/demo/pnpm-lock.yaml`;
+      })`NIX_PNPM_ALLOW_GENERATE=1 node build-tools/tools/dev/update-pnpm-hash.ts --lockfile projects/apps/demo/pnpm-lock.yaml`;
       await $({
         cwd: tmp,
         stdio: "inherit",

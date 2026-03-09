@@ -1,0 +1,4 @@
+name: tangram
+language: ts
+template: webapp-ssr-vite
+scaf_src_path: build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite

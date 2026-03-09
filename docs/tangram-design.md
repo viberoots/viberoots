@@ -112,6 +112,45 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
 - React Native Web is the primary component layer; no canvas/WebGL dependency in v1.
 - The design doc is authored as implementation-ready guidance in `docs/tangram-design.md` and references scaffold and macro contracts without changing them.
 
+## Implementation Status
+
+- PR-1 is implemented in `projects/apps/tangram` with scaffolded SSR app wiring:
+  - `node_webapp(name = "app_raw")`
+  - `node_asset_stage(name = "app", app = ":app_raw", labels = ["lang:node","kind:app","webapp:ssr","framework:vite"], out = "dist")`
+- The template placeholder screen is replaced by a deterministic tangram shell:
+  - board container with fixed `10x15` grid rendering
+  - piece-tray placeholder panel for pre-catalog state
+- Domain foundations are landed as pure modules:
+  - board constants: `src/game/board.ts`
+  - type contracts: `src/game/types.ts`
+  - geometry helpers: `src/game/geometry.ts`
+  - placement validity helpers: `src/game/placement.ts`
+  - deterministic initial state: `src/game/state.ts`
+- PR-1 test coverage is wired in `projects/apps/tangram/test`:
+  - `game-geometry.test.ts`
+  - `game-placement.test.ts`
+  - updated SSR smoke test: `entry-server.test.ts`
+
+## Domain Foundations (PR-1 Locked Conventions)
+
+- Coordinate system:
+  - `x` increases to the right
+  - `y` increases downward
+  - all geometry units are board-cell integers
+- Rotation convention:
+  - clockwise around origin `(0,0)`
+  - valid values: `0|90|180|270`
+- Flip convention:
+  - horizontal mirror across vertical axis (`x -> -x`)
+  - represented as `PieceTransform.flipped: boolean`
+- Normalization convention:
+  - transformed cell sets are normalized by min-anchoring to `(0,0)`
+  - canonical order is stable sort by `y`, then `x`
+- Placement validity contract:
+  - `isPlacementValid(boardSize, occupiedSet, cells)` returns true only when:
+    - every cell is within board bounds
+    - no transformed cell key overlaps the occupied set
+
 ## Appendix A: Development Plan (PR Sequence)
 
 This plan follows the same PR structure used in `docs/design-history/quad-alignment-48.md`.

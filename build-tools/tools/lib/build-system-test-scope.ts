@@ -11,6 +11,10 @@ type ScopeDecision = {
 
 const AUTO_TARGETS = ["//..."];
 const PROJECT_TARGETS = ["//projects/..."];
+const AUTO_SCOPE_IGNORED_BUILD_SYSTEM_PATHS = new Set([
+  "build-tools/tools/nix/node-modules.hashes.json",
+  "build-tools/tools/node/workspace-map.json",
+]);
 
 function normalizePath(relPath: string): string {
   return String(relPath || "")
@@ -45,6 +49,39 @@ export function isBuildSystemPath(relPath: string): boolean {
     return true;
   }
   if (p === "prelude" || p.startsWith("prelude/")) {
+    return true;
+  }
+  return false;
+}
+
+export function isIgnoredBuildSystemScopePath(relPath: string): boolean {
+  const p = normalizePath(relPath);
+  if (!p) {
+    return false;
+  }
+  if (AUTO_SCOPE_IGNORED_BUILD_SYSTEM_PATHS.has(p)) {
+    return true;
+  }
+  if (p === "node_modules" || p.startsWith("node_modules/")) {
+    return true;
+  }
+  if (p.includes("/node_modules/") || p.endsWith("/node_modules")) {
+    return true;
+  }
+  if (p.includes("/.vite-cache/") || p.endsWith("/.vite-cache")) {
+    return true;
+  }
+  return false;
+}
+
+export function hasRelevantBuildSystemChanges(paths: string[]): boolean {
+  for (const relPath of paths.map((p) => normalizePath(p)).filter(Boolean)) {
+    if (!isBuildSystemPath(relPath)) {
+      continue;
+    }
+    if (isIgnoredBuildSystemScopePath(relPath)) {
+      continue;
+    }
     return true;
   }
   return false;
@@ -164,12 +201,7 @@ export async function collectChangedPaths(
 
 async function hasBuildSystemChanges(root: string, env: NodeJS.ProcessEnv): Promise<boolean> {
   const changed = await collectChangedPaths(root, env);
-  for (const p of changed) {
-    if (isBuildSystemPath(p)) {
-      return true;
-    }
-  }
-  return false;
+  return hasRelevantBuildSystemChanges(changed);
 }
 
 export async function resolveBuildSystemBuckTestScope(opts: {

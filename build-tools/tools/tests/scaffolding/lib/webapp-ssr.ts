@@ -63,7 +63,7 @@ export async function scaffoldAndPrepareWorkspace(
   const graphJsonAbs = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
   const appLabel = `//${appRel}:app`;
   const $ = _$({ cwd: tmp, stdio: "inherit" });
-  await $`scaf new ts ${template} ${name} --yes --no-tests`;
+  await $`scaf new ts ${template} ${name} --yes --no-tests --skip-lockfile-gen`;
   await _$({
     cwd: tmp,
     stdio: "inherit",

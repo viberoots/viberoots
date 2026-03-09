@@ -67,7 +67,7 @@ nix_go_tiny_wasm_lib(
 `,
         );
 
-        await $`scaf new ts webapp-static demo-web --yes`;
+        await $`scaf new ts webapp-static demo-web --yes --skip-lockfile-gen`;
         const appDir = path.join(tmp, "projects", "apps", "demo-web");
         await fs.outputFile(
           path.join(appDir, "TARGETS"),

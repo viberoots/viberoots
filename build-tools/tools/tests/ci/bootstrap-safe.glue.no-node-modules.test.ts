@@ -96,10 +96,8 @@ test("glue stages run without node_modules and are idempotent", async () => {
       })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/ci/run-stage.ts --stage ${name}`;
     };
 
-    // Run each glue stage
-    await runStage("export-graph");
-    await runStage("sync-providers");
-    await runStage("gen-auto-map");
+    // Run the canonical glue pipeline once (export graph + sync providers + auto-map).
+    await runStage("glue");
     await runStage("prebuild-guard");
 
     // Verify outputs exist
@@ -113,8 +111,7 @@ test("glue stages run without node_modules and are idempotent", async () => {
 
     // Snapshot outputs, rerun stages, ensure no diffs
     const before = await dirSnapshot(providersDir);
-    await runStage("sync-providers");
-    await runStage("gen-auto-map");
+    await runStage("glue");
     const after = await dirSnapshot(providersDir);
     // Compare maps
     if (before.size !== after.size) {

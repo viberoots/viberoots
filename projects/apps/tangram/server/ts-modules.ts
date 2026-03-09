@@ -1,0 +1,66 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
+
+type TsModuleManifest = {
+  defaultModuleKey: string;
+  modules: Array<{
+    moduleKey: string;
+    sourceEntryPath: string;
+    runtimeImportPath: string;
+  }>;
+};
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+function manifestPath(fileName: string): string {
+  const contractsDir = String(process.env.MODULE_CONTRACTS_DIR || "").trim();
+  if (contractsDir) return path.resolve(contractsDir, fileName);
+  return path.resolve(__dirname, fileName);
+}
+
+function readManifestJson(): TsModuleManifest {
+  const manifestAbs = manifestPath("ts-modules.manifest.json");
+  try {
+    return JSON.parse(readFileSync(manifestAbs, "utf8")) as TsModuleManifest;
+  } catch {
+    const mode = process.env.MODULE_CONTRACTS_DIR ? "generated contracts" : "runtime projection";
+    throw new Error(`TS module manifest is missing at expected ${mode} path: ${manifestAbs}`);
+  }
+}
+
+const manifest = readManifestJson();
+
+export type TsModuleNamespace = Record<string, unknown>;
+
+export function listTsModules(): string[] {
+  return manifest.modules.map((mod) => mod.moduleKey);
+}
+
+export function defaultTsModuleKey(): string {
+  return manifest.defaultModuleKey;
+}
+
+function toRuntimeImportSpecifier(runtimeImportPath: string): string {
+  const spec = runtimeImportPath.trim();
+  if (spec.startsWith("./") || spec.startsWith("../")) {
+    const withExt = spec.endsWith(".js") ? spec : `${spec}.js`;
+    return new URL(withExt, import.meta.url).href;
+  }
+  return spec;
+}
+
+export async function loadTsModule(moduleKey: string): Promise<TsModuleNamespace> {
+  const entry = manifest.modules.find((mod) => mod.moduleKey === moduleKey);
+  if (!entry) {
+    throw new Error(`unknown TS module key '${moduleKey}'`);
+  }
+  const importSpecifier = toRuntimeImportSpecifier(entry.runtimeImportPath);
+  try {
+    return (await import(importSpecifier)) as TsModuleNamespace;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`TS module '${moduleKey}' failed to import for server runtime: ${message}`);
+  }
+}

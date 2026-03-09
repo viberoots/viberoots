@@ -47,20 +47,6 @@ const optimizeDepsInclude = [
   "react-native-web",
 ];
 
-// HMR configuration for reverse proxy scenarios
-function getHmrConfig() {
-  const isProxyAccess = process.env.HOST && !process.env.HOST.startsWith("0.");
-  return {
-    protocol: isProxyAccess || process.env.VITE_HMR_URL ? "wss" : undefined,
-    host: process.env.HMR_HOST || (isProxyAccess ? "local-5174.home.kilty.io" : undefined),
-    port: Number(process.env.HMR_PORT) || 443,
-    clientPort: Number(process.env.HMR_CLIENT_PORT) || Number(process.env.HMR_PORT) || 443,
-    clientUrl:
-      process.env.VITE_HMR_URL ||
-      (isProxyAccess ? "wss://local-5174.home.kilty.io:443" : undefined),
-  };
-}
-
 export default defineConfig(({ isSsrBuild }) => ({
   appType: "custom",
   clearScreen: false,
@@ -81,11 +67,9 @@ export default defineConfig(({ isSsrBuild }) => ({
   },
   server: {
     strictPort: true,
-    host: process.env.HOST || "0.0.0.0",
+    host: "127.0.0.1",
     port: 5173,
     preTransformRequests: false,
-    allowedHosts: ["local-5173.home.kilty.io"],
-    hmr: getHmrConfig(),
     fs: {
       allow: [workspaceRoot],
     },

@@ -26,7 +26,7 @@ test(
       );
 
       // Scaffold with tests default-on
-      await $`scaf new ts lib demo --yes`;
+      await $`scaf new ts lib demo --yes --skip-lockfile-gen`;
 
       // Commit scaffold so Nix flake sees importer under git+file sources
       await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();

@@ -58,18 +58,41 @@ test("planner imports plugins listed in langs.json when present", async () => {
       stdio: "pipe",
     })`git add build-tools/tools/nix/langs.json build-tools/tools/nix/planner/toy.nix build-tools/tools/buck/graph.json`;
 
-    // Nix build should succeed and produce graph-generator output
+    // Eval-only check against planner/langs.nix so we avoid graph-generator/full-flake work.
+    const manifestBase = JSON.stringify(path.join(tmp, "build-tools/tools/nix"));
+    const expr = `
+let
+  pkgs = import <nixpkgs> {};
+  lib = pkgs.lib;
+  manifestBase = builtins.toPath ${manifestBase};
+  get = node: key: null;
+  ctx = {
+    T = {};
+    get = get;
+    modulesTomlFor = name: "mods.toml";
+    repoRoot = ".";
+    pkgPathOf = name: ".";
+  };
+  T = {
+    goApp = args: args;
+    goLib = args: args;
+  };
+  M = {};
+  langs = import (manifestBase + "/planner/langs.nix") {
+    inherit lib manifestBase;
+    nodesList = [];
+    ctx = ctx;
+    get = get;
+    T = T;
+    M = M;
+  };
+in builtins.attrNames langs.LANGS
+`;
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`nix build ${`path:${tmp}#graph-generator`} --no-link --print-out-paths --accept-flake-config`;
-    const outPath =
-      String(stdout || "")
-        .trim()
-        .split("\n")
-        .filter(Boolean)
-        .pop() || "";
-    const manifestPath = path.join(outPath, "manifest.json");
-    assert.ok(await fs.pathExists(manifestPath), "manifest.json should exist");
+    })`nix eval --json --impure --expr ${expr}`;
+    const langIds = JSON.parse(String(stdout || "[]")) as string[];
+    assert.ok(langIds.includes("toy"), `expected LANGS to include toy, got: ${langIds.join(",")}`);
   });
 });

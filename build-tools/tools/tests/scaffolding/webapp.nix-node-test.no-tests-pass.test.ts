@@ -12,7 +12,7 @@ test("node webapp: nix_node_test target passes when no tests present", async () 
     const $ = _$({ cwd: tmp, stdio: "pipe" });
     await $`git init`;
     // Scaffold with test target enabled by default
-    await $`scaf new ts webapp-static demo-web --yes`;
+    await $`scaf new ts webapp-static demo-web --yes --skip-lockfile-gen`;
 
     // Proceed; environment is expected to provide Buck prelude via runInTemp setup
 
@@ -36,7 +36,7 @@ test("node webapp: nix_node_test target passes when no tests present", async () 
     }
     await $({
       stdio: "inherit",
-    })`node build-tools/tools/dev/update-pnpm-hash.ts --lockfile apps/demo-web/pnpm-lock.yaml`;
+    })`NIX_PNPM_ALLOW_GENERATE=1 node build-tools/tools/dev/update-pnpm-hash.ts --lockfile apps/demo-web/pnpm-lock.yaml`;
 
     // Glue and provider mapping (export graph → providers → auto_map)
     await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;

@@ -1,3 +1,4 @@
 {
-  "@apps/example-webapp": "//projects/apps/example-webapp:app"
+  "@apps/example-webapp": "//projects/apps/example-webapp:app",
+  "@apps/tangram": "//projects/apps/tangram:app"
 }

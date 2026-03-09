@@ -7,7 +7,7 @@ test("webapp-ssr-vite: scaffold includes a sample Vitest test", async () => {
   await runInTemp("webapp-ssr-vite-sample-test", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "inherit" });
     await $`git init`;
-    await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes`;
+    await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --skip-lockfile-gen`;
 
     const sampleTest = path.join(
       tmp,

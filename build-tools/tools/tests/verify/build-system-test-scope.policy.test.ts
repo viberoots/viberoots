@@ -1,7 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isBuildSystemPath, parseBuildSystemTestMode } from "../../lib/build-system-test-scope.ts";
+import {
+  hasRelevantBuildSystemChanges,
+  isBuildSystemPath,
+  isIgnoredBuildSystemScopePath,
+  parseBuildSystemTestMode,
+} from "../../lib/build-system-test-scope.ts";
 
 test("build-system test scope mode parsing supports auto/always/never", () => {
   assert.equal(parseBuildSystemTestMode(undefined), "auto");
@@ -24,4 +29,40 @@ test("build-system path detection includes toolchain/build files and excludes pr
   assert.equal(isBuildSystemPath("projects/apps/myapp/src/index.ts"), false);
   assert.equal(isBuildSystemPath("build-tools/docs/build-system-design.md"), false);
   assert.equal(isBuildSystemPath("docs/handbook/ci.md"), false);
+});
+
+test("auto-scope ignores generated metadata and transient dependency/cache directories", () => {
+  assert.equal(
+    isIgnoredBuildSystemScopePath("build-tools/tools/nix/node-modules.hashes.json"),
+    true,
+  );
+  assert.equal(isIgnoredBuildSystemScopePath("build-tools/tools/node/workspace-map.json"), true);
+  assert.equal(isIgnoredBuildSystemScopePath("projects/apps/tangram/node_modules"), true);
+  assert.equal(
+    isIgnoredBuildSystemScopePath("projects/apps/tangram/node_modules/react/index.js"),
+    true,
+  );
+  assert.equal(
+    isIgnoredBuildSystemScopePath("projects/apps/tangram/.vite-cache/vitest/results.json"),
+    true,
+  );
+  assert.equal(isIgnoredBuildSystemScopePath("build-tools/tools/dev/verify.ts"), false);
+});
+
+test("relevant build-system changes exclude ignored paths", () => {
+  assert.equal(
+    hasRelevantBuildSystemChanges([
+      "build-tools/tools/nix/node-modules.hashes.json",
+      "build-tools/tools/node/workspace-map.json",
+      "projects/apps/tangram/node_modules",
+    ]),
+    false,
+  );
+  assert.equal(
+    hasRelevantBuildSystemChanges([
+      "build-tools/tools/nix/node-modules.hashes.json",
+      "build-tools/tools/dev/verify.ts",
+    ]),
+    true,
+  );
 });
