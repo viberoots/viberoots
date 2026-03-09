@@ -40,7 +40,7 @@ export function Home(props: { url: string }) {
         </View>
         <View style={styles.actions}>
           <Pressable style={styles.primary}>
-            <Text style={styles.primaryText}>Start Building</Text>
+            <Text style={styles.primaryText}>Start Building!</Text>
           </Pressable>
           <Pressable style={styles.secondary}>
             <Text style={styles.secondaryText}>Read SSR Flow</Text>
