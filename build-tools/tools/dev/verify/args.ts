@@ -3,18 +3,46 @@ import { getArgvTokens } from "../../lib/cli.ts";
 import { normalizeDevBuildTargetArgs } from "../dev-build/target-args.ts";
 
 export type VerifyConsole = "auto" | "super" | "simple";
+export type VerifySelectorMode = "default" | "project-closure";
 
 export type VerifyArgs = {
   coverage: boolean;
   console: VerifyConsole;
   targets: string[];
+  selector: VerifySelectorMode;
+  requestedProjects: string[];
+  explainSelection: boolean;
 };
 
-export function parseVerifyArgs(): VerifyArgs {
-  const tokens = getArgvTokens();
+function parseProjectsCsv(raw: string): string[] {
+  return String(raw || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
 
+function toSortedUnique(values: Iterable<string>): string[] {
+  return Array.from(new Set(Array.from(values).filter(Boolean))).sort();
+}
+
+function parseSelector(raw: string): VerifySelectorMode {
+  const normalized = String(raw || "").trim();
+  if (!normalized) return "default";
+  if (normalized === "project-closure") return normalized;
+  throw new Error(`unknown verify selector: ${normalized}`);
+}
+
+export function parseVerifyArgs(opts?: {
+  argvTokens?: string[];
+  env?: NodeJS.ProcessEnv;
+}): VerifyArgs {
+  const tokens = opts?.argvTokens || getArgvTokens();
+  const env = opts?.env || process.env;
   let coverage = false;
   let console: VerifyConsole = "auto";
+  let selectorFlag = "";
+  let explainSelection = false;
+  const projectFlags: string[] = [];
   const passthrough: string[] = [];
 
   for (let i = 0; i < tokens.length; i++) {
@@ -25,6 +53,37 @@ export function parseVerifyArgs(): VerifyArgs {
     }
     if (t === "--coverage") {
       coverage = true;
+      continue;
+    }
+    if (t === "--explain-selection") {
+      explainSelection = true;
+      continue;
+    }
+    if (t.startsWith("--selector=")) {
+      selectorFlag = t.slice("--selector=".length).trim();
+      continue;
+    }
+    if (t === "--selector") {
+      selectorFlag = String(tokens[i + 1] || "").trim();
+      i++;
+      continue;
+    }
+    if (t.startsWith("--project=")) {
+      projectFlags.push(t.slice("--project=".length).trim());
+      continue;
+    }
+    if (t === "--project") {
+      projectFlags.push(String(tokens[i + 1] || "").trim());
+      i++;
+      continue;
+    }
+    if (t.startsWith("--projects=")) {
+      projectFlags.push(...parseProjectsCsv(t.slice("--projects=".length)));
+      continue;
+    }
+    if (t === "--projects") {
+      projectFlags.push(...parseProjectsCsv(String(tokens[i + 1] || "")));
+      i++;
       continue;
     }
     if (t.startsWith("--console=")) {
@@ -43,7 +102,36 @@ export function parseVerifyArgs(): VerifyArgs {
     passthrough.push(t);
   }
 
-  return { coverage, console, targets: passthrough.length > 0 ? passthrough : ["//..."] };
+  const selector = parseSelector(selectorFlag || String(env.VERIFY_SELECTOR || ""));
+  const requestedProjects = toSortedUnique(
+    projectFlags.length > 0 ? projectFlags : parseProjectsCsv(String(env.VERIFY_PROJECTS || "")),
+  );
+  const targets = passthrough.length > 0 ? passthrough : ["//..."];
+
+  if (selector === "project-closure" && requestedProjects.length === 0) {
+    throw new Error(
+      "verify selector 'project-closure' requires at least one --project or --projects value",
+    );
+  }
+  if (selector === "project-closure" && passthrough.length > 0) {
+    throw new Error(
+      "verify selector 'project-closure' cannot be combined with explicit Buck targets",
+    );
+  }
+  if (selector === "default" && (requestedProjects.length > 0 || explainSelection)) {
+    throw new Error(
+      "project selectors require '--selector project-closure' or VERIFY_SELECTOR=project-closure",
+    );
+  }
+
+  return {
+    coverage,
+    console,
+    targets,
+    selector,
+    requestedProjects,
+    explainSelection,
+  };
 }
 
 export async function normalizeVerifyTargets(opts: {

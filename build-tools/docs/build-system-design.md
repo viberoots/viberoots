@@ -738,6 +738,41 @@ changes that do not touch build-system paths.
     existing build-system scope and emits `mode: "fallback-build-system-scope"` with an explicit
     `reason`.
 
+## Verify project-closure selector contract (PR-1.6)
+
+I add an explicit compliance selector without changing default verify behavior.
+
+- Invocation contract:
+  - `v --selector project-closure --project projects/apps/tangram`
+  - `v --selector project-closure --project projects/apps/tangram --project projects/libs/shared-ui`
+  - `v --selector project-closure --projects projects/apps/tangram,projects/libs/shared-ui`
+  - `v --selector project-closure --project projects/apps/tangram --explain-selection`
+  - env aliases: `VERIFY_SELECTOR=project-closure`, `VERIFY_PROJECTS=<csv>`
+  - CLI flags take precedence over env aliases
+- Validation contract:
+  - fail fast if `project-closure` is requested without at least one project id
+  - require canonical repo-relative project ids (`projects/apps/<name>` or `projects/libs/<name>`)
+  - fail fast on unknown ids with nearest canonical suggestions
+  - reject mixing `project-closure` with explicit Buck target positionals
+- Decision precedence:
+  - explicit `project-closure` runs before template/project-impact selection
+  - build-system broadening rules remain authoritative
+  - if build-system changes are present, or `BNX_BUILD_SYSTEM_TESTS=always`, keep the existing broader scope and attach a `fallbackReason`
+- Resolution contract:
+  - seed with the caller-provided projects
+  - traverse Buck graph project dependencies recursively to fixed point
+  - include tests owned by every project in the resolved closure
+  - emit stable, deduplicated `//<project>/...` targets
+- Diagnostics contract:
+  - `mode: "project-closure"`
+  - `requestedProjects`
+  - `resolvedDependencyClosure`
+  - `selectedTargets`
+  - optional `fallbackReason` when broader build-system scope wins
+- Troubleshooting:
+  - use `--explain-selection` to print the projected closure without running lint/build/test
+  - if diagnostics show `fallbackReason`, fix or isolate the build-system change first before using closure timing as evidence
+
 ## Implementation Plan (bite‑sized, ordered, with verification)
 
 > This plan is designed for a junior engineer or an LLM agent. Each step is **small**, has **clear acceptance criteria**, and includes a **verification** recipe to prevent regressions. Follow in order.

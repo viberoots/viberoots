@@ -91,6 +91,13 @@ When adding or materially editing scaffold command guidance:
   - default `v` behavior for non-build-system app/lib edits is dependency-aware project selection
   - selected test scope = changed projects + full recursive downstream dependents
   - build-system edits still keep existing broad-scope/fallback behavior
+- Verify project-closure opt-in (PR-1.6):
+  - use this only for compliance/release-gate runs that must verify one or more projects plus their full recursive dependency closure
+  - invocation: `v --selector project-closure --project projects/apps/tangram`
+  - multiple projects: `v --selector project-closure --projects projects/apps/tangram,projects/libs/shared-ui`
+  - preview only: `v --selector project-closure --project projects/apps/tangram --explain-selection`
+  - `VERIFY_SELECTOR=project-closure` and `VERIFY_PROJECTS=<csv>` are equivalent to the CLI flags; CLI flags win when both are set
+  - this mode is intentionally slower than default project-impact because it walks full dependency closure instead of changed-project downstreams
 - Nix builds (planner outputs):
   - `nix build .#graph-generator`
 - Repo wrappers (preferred; thin shims that delegate into TypeScript and ensure the dev shell is loaded):
@@ -200,6 +207,7 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 - **Validate selector diagnostics for template PRs before full verify**: run `zx-wrapper build-tools/tools/dev/select-template-tests.ts` and inspect `diagnostics.nonTemplateBuildSystemPaths`; if it is non-empty, fix the path classification issue or split unrelated build-system edits into a separate PR before running full `v`.
 - **Do not treat `build-tools/tools/scaffolding/templates/<lang>/README.md.jinja` as a template id**: this file is shared template guidance, not a concrete template directory. If selector output shows ids like `ts/README.md.jinja`, fix selector/template-id parsing first, because this causes avoidable mixed-mode scope expansion.
 - **Use project-impact diagnostics for app/lib PRs**: inspect verify logs for `mode: "project-impact"` and validate `changedProjects`, `dependentProjects`, and `selectedTargets` before large runs.
+- **Use project-closure diagnostics for compliance runs**: inspect verify logs for `mode: "project-closure"` and validate `requestedProjects`, `resolvedDependencyClosure`, `selectedTargets`, and any `fallbackReason` before trusting the narrowed scope.
 - **Fallback visibility is intentional**: if logs show `mode: "fallback-build-system-scope"`, treat it as a signal to fix selector inputs/graph availability before attributing runtime regressions.
 - **Re-profile top offenders in isolation before broad tuning**: run `TEST_TIMING=summary v //:slow_target` for the top entries from `latest.log` to separate true per-target cost from suite fan-out contention.
 - **Treat empty numeric env vars as unset**: parsing `""` with `Number(...)` yields `0`. For polling/time-budget envs (for example `VERIFY_SAFETY_RAILS_POLL_SECS`), this can silently force aggressive loops (for example 1s polling) and add suite-wide process churn. Parse empty strings as unset and apply explicit defaults first.

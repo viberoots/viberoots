@@ -6,7 +6,7 @@ import { runNodeWithZx } from "../../lib/node-run.ts";
 import { repoRoot } from "../dev-build/paths.ts";
 import { ensureBuckPreludeConfig } from "../dev-build/prelude.ts";
 import { runStartupCheck } from "../dev-build/startup.ts";
-import { normalizeVerifyTargets, parseVerifyArgs } from "./args.ts";
+import { parseVerifyArgs } from "./args.ts";
 import { cleanupOrphanBuckDaemons, cleanupRegisteredTempRepos } from "./buck-orphan-cleanup.ts";
 import { spawnVerifyBuck2Tests } from "./buck2-test.ts";
 import { runMergedCoverageReport, setupCoverage } from "./coverage.ts";
@@ -20,6 +20,7 @@ import { runVerifyLintPreflight } from "./lint-preflight.ts";
 import { acquireVerifyLock } from "./lock.ts";
 import { activeNixGcProcesses, logVerifyRevision } from "./preflight.ts";
 import { prewarmVerifyOnce } from "./prewarm.ts";
+import { printVerifySelection, resolveRequestedVerifyScope } from "./requested-scope.ts";
 import {
   appendVerifyLogLine,
   killBuckIsolation,
@@ -31,33 +32,25 @@ import {
 import { startVerifySafetyRails } from "./safety-rails.ts";
 import { prepareVerifySeed, shouldPrepareVerifySeedForRequestedTargets } from "./seed.ts";
 import { isProjectsOnlyVerifyTargets } from "./target-scope.ts";
-import {
-  resolveVerifyTemplateTestScope,
-  summarizeTemplateScopeDecision,
-} from "./template-test-scope.ts";
+import { summarizeTemplateScopeDecision } from "./template-test-scope.ts";
 import { ensureRepoLocalTmpRoot } from "./tmp-root.ts";
 import { computeZxTestNodeModulesOut } from "./zx-node-modules.ts";
 
 export async function runVerify(): Promise<void> {
   const invocationCwd = process.cwd();
   const root = repoRoot();
-  const parsedArgs = parseVerifyArgs();
-  const args = {
-    ...parsedArgs,
-    targets: await normalizeVerifyTargets({
-      workspaceRoot: root,
-      baseDir: invocationCwd,
-      targets: parsedArgs.targets,
-    }),
-  };
+  const { args, templateScope } = await resolveRequestedVerifyScope({
+    root,
+    invocationCwd,
+    args: parseVerifyArgs(),
+  });
   const zxInitPath = path.join(root, "build-tools", "tools", "dev", "zx-init.mjs");
-
+  if (args.explainSelection) {
+    printVerifySelection(templateScope);
+    return;
+  }
   await runStartupCheck(root);
   process.chdir(root);
-  const templateScope = await resolveVerifyTemplateTestScope({
-    root,
-    requestedTargets: args.targets,
-  });
   const projectsOnlyScope = isProjectsOnlyVerifyTargets(templateScope.targets);
   await runVerifyLintPreflight(root, zxInitPath, {
     lintFilters: templateScope.lintFilters,
@@ -79,7 +72,6 @@ export async function runVerify(): Promise<void> {
   const allowConcurrent = process.env.VERIFY_ALLOW_CONCURRENT === "1";
   const lock = await acquireVerifyLock({ root, allowConcurrent });
   await ensureRepoLocalTmpRoot(root);
-
   const analysisDir = path.join(
     root,
     "buck-out",
@@ -88,12 +80,9 @@ export async function runVerify(): Promise<void> {
     `run-${process.pid}-${Date.now()}`,
   );
   await fsp.mkdir(analysisDir, { recursive: true }).catch(() => {});
-
   await fsp.rm(path.join(root, ".tmp"), { recursive: true, force: true }).catch(() => {});
-
   await ensureBuckPreludeConfig(root);
   process.env.BNX_SHARED_PRELUDE_PATH = path.join(root, "prelude");
-
   const targetFreeGiB = verifyTargetFreeGiBDefault(args.coverage);
   const runNixStoreOptimize = shouldRunNixStoreOptimizeForRequestedTargets(templateScope.targets);
   const { freeGiB } = await runVerifyHousekeeping({
@@ -103,9 +92,7 @@ export async function runVerify(): Promise<void> {
     runNixStoreOptimize,
   });
   enforceVerifyDiskGate({ freeGiB, targetFreeGiB });
-
   const cov = await setupCoverage({ root, enabled: args.coverage });
-
   const iso = `v-${process.pid}-${Date.now()}`;
   await writeVerifyIsoMarker(lock.lockDir, iso);
   await appendVerifyLogLine(lock.logFile, `[verify] begin iso=${iso}`);
@@ -170,7 +157,6 @@ export async function runVerify(): Promise<void> {
       `[verify] buck2 orphan cleanup: scanned_forkservers=${res.scanned} candidates=${res.candidates} killed=${res.killed}`,
     );
   } catch {}
-
   let pgid = process.pid;
   let requestedExitCode: number | null = null;
   let shutdownPromise: Promise<void> | null = null;

@@ -4,6 +4,10 @@ import {
   resolveTemplateTestSelection,
 } from "../../lib/template-test-selector.ts";
 import {
+  type ProjectClosureSelectorDiagnostics,
+  resolveProjectClosureSelection,
+} from "../../lib/project-closure-selector.ts";
+import {
   type ProjectImpactSelectorDiagnostics,
   resolveProjectImpactSelection,
 } from "../../lib/project-impact-selector.ts";
@@ -12,12 +16,19 @@ import {
   resolveBuildSystemBuckTestScope,
 } from "../../lib/build-system-test-scope.ts";
 import { packagePathFromLabel } from "../../lib/labels.ts";
+import { resolveProjectClosureVerifyScope } from "./project-closure-scope.ts";
 
 export type VerifyTemplateScopeMode = "auto" | "always" | "never";
 
 export type VerifyTemplateScopeDecision = {
   requestedMode: VerifyTemplateScopeMode;
-  selectorMode: "template-only" | "mixed" | "no-template-impact" | "project-impact" | "skipped";
+  selectorMode:
+    | "template-only"
+    | "mixed"
+    | "no-template-impact"
+    | "project-impact"
+    | "project-closure"
+    | "skipped";
   targets: string[];
   diagnostics: VerifySelectionDiagnostics | null;
   lintFilters: string[] | null;
@@ -26,12 +37,14 @@ export type VerifyTemplateScopeDecision = {
 
 export type VerifySelectionDiagnostics =
   | TemplateTestSelectorDiagnostics
+  | ProjectClosureSelectorDiagnostics
   | ProjectImpactSelectorDiagnostics;
 
 export type VerifyTemplateScopeDeps = {
   resolveTemplateSelection: typeof resolveTemplateTestSelection;
   resolveBuildScope: typeof resolveBuildSystemBuckTestScope;
   resolveProjectImpactSelection: typeof resolveProjectImpactSelection;
+  resolveProjectClosureSelection: typeof resolveProjectClosureSelection;
 };
 
 function parseVerifyTemplateScopeMode(raw: string | undefined): VerifyTemplateScopeMode {
@@ -86,6 +99,9 @@ function guardTemplateSelection(diagnostics: TemplateTestSelectorDiagnostics): v
 export function summarizeTemplateScopeDecision(d: VerifyTemplateScopeDecision): string {
   const base = `requested=${d.requestedMode} selector=${d.selectorMode} reason=${d.reason}`;
   if (!d.diagnostics) return `${base} targets=${d.targets.length}`;
+  if ("requestedProjects" in d.diagnostics) {
+    return `${base} requestedProjectCount=${d.diagnostics.requestedProjects.length} closureProjectCount=${d.diagnostics.resolvedDependencyClosure.length} targets=${d.targets.length}`;
+  }
   if ("changedProjects" in d.diagnostics) {
     return `${base} changedProjects=${d.diagnostics.changedProjects.join(",") || "none"} dependentProjects=${d.diagnostics.dependentProjects.join(",") || "none"} targets=${d.targets.length}`;
   }
@@ -95,6 +111,7 @@ export function summarizeTemplateScopeDecision(d: VerifyTemplateScopeDecision): 
 export async function resolveVerifyTemplateTestScope(opts: {
   root: string;
   requestedTargets: string[];
+  requestedSelector?: { mode: "project-closure"; projects: string[] } | null;
   env?: NodeJS.ProcessEnv;
   deps?: Partial<VerifyTemplateScopeDeps>;
 }): Promise<VerifyTemplateScopeDecision> {
@@ -106,6 +123,17 @@ export async function resolveVerifyTemplateTestScope(opts: {
     requestedTargets: opts.requestedTargets,
     env,
   });
+  const resolveProjectClosure =
+    opts.deps?.resolveProjectClosureSelection || resolveProjectClosureSelection;
+  const projectClosureScope = await resolveProjectClosureVerifyScope({
+    root: opts.root,
+    requestedMode,
+    requestedTargets: opts.requestedTargets,
+    requestedSelector: opts.requestedSelector,
+    baseScope,
+    resolveProjectClosure,
+  });
+  if (projectClosureScope) return projectClosureScope;
 
   if (!isDefaultVerifyTargetSet(opts.requestedTargets)) {
     return {
