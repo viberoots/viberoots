@@ -225,6 +225,205 @@ Implement.
 
 ---
 
+## PR-1.5: Make verify test selection dependency-aware by default
+
+### Description
+
+I will add a deterministic selector mode that, by default, runs tests for changed projects plus
+projects that depend on those changed projects, while preserving the existing build-system
+inclusion/exclusion behavior.
+
+### Scope & Changes
+
+- Add a new selection mode in verify preflight:
+  - `project-impact` (default for non-build-system-only app/lib changes)
+- Keep existing selector outcomes for build-system paths:
+  - if build-system paths are touched, keep current build-system selection/fallback rules
+  - if only template/build-system scope applies, continue using existing mixed/full behavior
+- Add deterministic project-impact graph resolution:
+  - map changed files to owning project(s) (app/lib/package boundaries)
+  - compute downstream dependents recursively via repo dependency graph (reverse deps /
+    transitive consumers, including dependents-of-dependents to full fixed point)
+  - select tests for:
+    - changed project targets
+    - all recursive dependent project targets (full downstream closure)
+  - de-duplicate and stable-sort target list for reproducible logs
+- Keep existing diagnostics contract and extend it with:
+  - `mode: "project-impact" | existing modes`
+  - `changedProjects`
+  - `dependentProjects`
+  - `selectedTargets`
+  - `reason` when fallback to mixed/full is used
+- Reuse existing utilities for:
+  - changed-path classification
+  - build-system path detection
+  - target discovery/query execution
+  - verify log diagnostics emission
+- Add guardrails to avoid runtime regressions:
+  - cache per-run project-owner mapping
+  - bound graph traversals to a single reverse-deps walk per verify invocation
+  - skip graph expansion when there are zero project-owned file changes
+
+### Tests (in this PR)
+
+- Selector unit tests:
+  - changed app selects only that app’s tests when no dependents exist
+  - changed lib selects lib tests plus all downstream consumer project tests, recursively through
+    dependents-of-dependents
+  - mixed app/lib edits produce union without duplicates
+  - build-system change still routes to existing build-system scope logic
+  - unrelated dirty ignored paths (for example `.vite-cache`) do not widen scope
+- Integration test for verify preflight:
+  - fixture repo with 3+ projects and known dependency edges
+  - assert `project-impact` mode emits expected stable `selectedTargets`
+  - assert fallback mode and diagnostics remain unchanged for build-system edits
+- Performance regression test:
+  - assert selector runtime remains within existing preflight budget on representative fixture
+
+### Docs (in this PR)
+
+- Update `docs/handbook/getting-started-on-a-pr.md`:
+  - add `project-impact` mode explanation and troubleshooting
+  - clarify when/why verify falls back to mixed/full scope
+- Update `build-tools/docs/build-system-design.md`:
+  - document selector decision order and diagnostics fields
+  - record the contract that build-system scope logic is preserved
+
+### Acceptance Criteria
+
+- With only `projects/apps/tangram/**` changes, verify excludes unrelated projects by default.
+- With shared-lib changes, verify includes the full recursive downstream consumer closure.
+- Build-system-trigger behavior is unchanged from current guardrails.
+- Selector diagnostics clearly explain chosen mode and selected targets.
+- No measurable global verify-time regression from selector computation.
+
+### Risks
+
+Incorrect ownership mapping or reverse-deps expansion could under-select required tests.
+
+### Mitigation
+
+Use conservative fallback: when classification/graph resolution is ambiguous, promote to existing
+mixed/full behavior and emit explicit diagnostics.
+
+### Consequence of Not Implementing
+
+Project-local PRs continue paying unnecessary verify cost and noisy unrelated target execution.
+
+### Downsides for Implementing
+
+Adds selector complexity and maintenance burden in preflight logic.
+
+### Recommendation
+
+Implement.
+
+---
+
+## PR-1.6: Add opt-in compliance verify mode for project plus full dependency closure
+
+### Description
+
+I will add an opt-in verify mode that runs tests for a caller-specified set of projects and all of
+their dependencies, intended for compliance, certification, or release-gate workflows that require
+broader assurance than default project-impact selection.
+
+### Scope & Changes
+
+- Add a new explicit verify selector mode:
+  - `project-closure` (opt-in, never default)
+- Add user-facing invocation contract (CLI flag/config) to pass one or more project identifiers.
+- CLI UX proposal (aligned with build-system philosophy: one outer command, explicit modes,
+  deterministic diagnostics):
+  - Keep `v` as the single user-facing entrypoint; no new top-level command.
+  - Add explicit selector flag:
+    - `v --selector project-closure --project projects/apps/tangram`
+    - `v --selector project-closure --project projects/apps/tangram --project projects/libs/shared-ui`
+  - Add comma form for shell ergonomics (equivalent to repeated flags):
+    - `v --selector project-closure --projects projects/apps/tangram,projects/libs/shared-ui`
+  - Add explain-only mode to preview scope without running tests:
+    - `v --selector project-closure --project projects/apps/tangram --explain-selection`
+  - Validation contract:
+    - fail fast if `project-closure` is set without at least one `--project`/`--projects` value
+    - fail fast on unknown project identifiers, with nearest-match suggestions
+    - reject ambiguous aliases; require canonical repo-relative project paths
+  - Output contract:
+    - human summary line (mode, requested project count, closure project count, target count)
+    - stable JSON diagnostics in verify log (same deterministic schema used by other selector modes)
+  - CI/compliance ergonomics:
+    - allow env alias `VERIFY_SELECTOR=project-closure` and `VERIFY_PROJECTS=<csv>` as exact
+      equivalents to CLI flags for pipeline wiring; CLI flags take precedence when both are set.
+- Resolve target set deterministically:
+  - seed with specified projects
+  - traverse dependencies recursively (full transitive closure, including
+    dependencies-of-dependencies to fixed point)
+  - include tests owned by every project in closure
+  - de-duplicate and stable-sort targets
+- Preserve existing build-system handling:
+  - build-system change logic remains authoritative and unchanged
+  - if build-system rules require broader scope, keep current fallback behavior
+- Extend diagnostics with closure-specific evidence:
+  - `mode: "project-closure"`
+  - `requestedProjects`
+  - `resolvedDependencyClosure`
+  - `selectedTargets`
+  - `fallbackReason` when broadening occurs
+
+### Tests (in this PR)
+
+- Selector unit tests:
+  - single requested project includes itself + full recursive dependency closure
+  - multiple requested projects resolve merged closure without duplicate targets
+  - unknown/invalid project id returns clear error before verify execution
+  - build-system path changes still apply existing fallback/broad-scope policy
+- Integration test:
+  - fixture dependency graph with known fan-in/fan-out
+  - assert closure membership and stable `selectedTargets` output
+- Performance test:
+  - assert closure computation remains bounded and does not regress default-mode latency
+
+### Docs (in this PR)
+
+- Update `docs/handbook/getting-started-on-a-pr.md` with:
+  - when to use `project-closure`
+  - invocation examples
+  - expected runtime tradeoffs versus default mode
+- Update `build-tools/docs/build-system-design.md` with:
+  - selector decision precedence between default and opt-in modes
+  - closure diagnostics schema and troubleshooting
+
+### Acceptance Criteria
+
+- Users can opt into `project-closure` and specify one or more projects.
+- Verify includes tests for requested projects and their full recursive dependency closure.
+- Build-system-triggered scope rules remain unchanged.
+- Diagnostics clearly show requested projects, resolved closure, and final selected targets.
+- Default verify behavior is unchanged when `project-closure` is not requested.
+
+### Risks
+
+Large dependency closures may increase runtime and be overused in normal PR flows.
+
+### Mitigation
+
+Keep mode explicit opt-in, document intended compliance use, and print projected target count before
+execution so users can confirm cost.
+
+### Consequence of Not Implementing
+
+Teams needing compliance-grade project verification must either run full-suite verify or rely on ad
+hoc target lists, reducing reproducibility and confidence.
+
+### Downsides for Implementing
+
+Adds another selector mode and additional maintenance surface in verify tooling.
+
+### Recommendation
+
+Implement.
+
+---
+
 ## PR-2: Add exact piece catalog and validation pipeline
 
 ### Description
