@@ -975,3 +975,242 @@ Additional maintenance for persistence compatibility.
 ### Recommendation
 
 Implement.
+
+## Appendix B: Proposed PR Sequence for Minimal Toolbar + Undo/Redo + Interesting Solve
+
+This is a design-only proposal (no implementation in this section). The goal is to add a minimalist toolbar with `Reset`, `Undo`, `Redo`, and `Solve` while keeping drag UX fast, deterministic, and aligned with current URL-hash state persistence.
+
+### UX Direction (applies across all PRs)
+
+- Toolbar is minimal, icon-first, single row, no text labels by default.
+- Controls order: `Reset`, `Undo`, `Redo`, `Solve`.
+- Placement:
+  - large mode: anchored top-right outside board collision area.
+  - small mode: anchored top-center with compact spacing and safe-area inset support.
+- State affordances:
+  - disabled opacity for unavailable actions (undo stack empty, redo stack empty, solve running).
+  - subtle active press feedback only (no heavy chrome).
+- Accessibility:
+  - each button has explicit `accessibilityLabel` and keyboard focus ring.
+  - keyboard shortcuts: `Cmd/Ctrl+Z` undo, `Cmd/Ctrl+Shift+Z` redo, `R` reset, `S` solve.
+
+---
+
+## PR-7: Introduce Minimal Toolbar Shell and Action Wiring
+
+### Scope
+
+- Add a new `GameToolbar` component with four icon buttons:
+  - reset
+  - undo
+  - redo
+  - solve
+- Mount toolbar in `game-screen` layout without reducing board/tray usable area.
+- Wire existing reset action to toolbar reset button.
+- Add no-op placeholders for undo/redo/solve dispatch paths (feature flags internal to reducer/action layer).
+
+### Implementation Notes
+
+- Reuse existing button/pressable utilities already used in UI.
+- Keep styles in existing style modules; avoid new styling framework.
+- Add deterministic test IDs for each toolbar action.
+
+### Tests
+
+- Component test: toolbar renders all 4 controls in both large/small layouts.
+- Interaction test: reset button dispatches existing reset path.
+- Accessibility test: labels exist and buttons are focusable.
+
+### Acceptance Criteria
+
+- Toolbar is visible and non-overlapping in all responsive modes.
+- Reset behavior unchanged from current behavior.
+
+---
+
+## PR-8: Add Undo/Redo via Reducer History (Primary Path)
+
+### Scope
+
+- Introduce reducer-level history stacks:
+  - `past: GameStateSnapshot[]`
+  - `present: GameState`
+  - `future: GameStateSnapshot[]`
+- Define history policy:
+  - record only committed semantic actions (place, rotate, flip, reset, solve-commit).
+  - do not record transient drag-preview updates.
+- Implement actions:
+  - `history/undo`
+  - `history/redo`
+  - `history/push` (internal reducer helper)
+
+### URL-State Contract
+
+- URL hash remains source of truth for persisted state.
+- Encode/decode only `present` state in URL (not full history) to keep hash compact and deterministic.
+- On load, initialize empty history with decoded `present`.
+
+### Performance Constraints
+
+- Use structural sharing/snapshot minimization where possible.
+- Cap `past` stack length (proposed default: 200 commits) with FIFO truncation.
+
+### Tests
+
+- Reducer tests:
+  - undo restores previous committed state exactly.
+  - redo restores undone state.
+  - new commit clears `future`.
+  - preview-only actions do not add history entries.
+- Browser test:
+  - button and keyboard undo/redo paths both function.
+
+### Acceptance Criteria
+
+- Undo/redo are instant and deterministic.
+- No regression in drag-frame responsiveness.
+
+---
+
+## PR-9: Build Solver Core with Constraint Search and Deterministic Candidate Generation
+
+### Scope
+
+- Add a pure solver module (no UI coupling) that searches valid full-board tilings.
+- Inputs:
+  - board dimensions
+  - piece catalog
+  - current committed placements (treated as locked constraints)
+  - remaining piece inventory
+- Outputs:
+  - one or more complete valid placements (or empty when unsolved within budget).
+
+### Algorithm (base)
+
+- Precompute all valid piece placements per orientation and board origin.
+- Use exact-cover style search with aggressive pruning:
+  - choose next empty cell with minimum candidate count (MRV heuristic).
+  - forward-check piece inventory and occupancy feasibility.
+  - deterministic candidate order (stable sort) for reproducible output.
+- Enforce hard budget:
+  - max node expansions
+  - max wall-clock budget per solve request
+
+### Solve Semantics
+
+- Preferred behavior: solve current constrained board.
+- If no solution under current constraints and budget, return explicit `unsolved` result (no hidden fallback).
+
+### Tests
+
+- Unit tests:
+  - candidate generation correctness (bounds/overlap/orientation).
+  - solver finds known solvable fixtures.
+  - solver returns unsolved on contradictory fixtures.
+- Performance test:
+  - fixed benchmark fixture must complete under target budget.
+
+### Acceptance Criteria
+
+- Solver is pure, deterministic, and bounded.
+- No UI thread blocking in test environment expectations.
+
+---
+
+## PR-10: Interestingness Scoring and Ranked Solve Selection
+
+### Scope
+
+- Extend solver to rank complete solutions by an `interestingnessScore`.
+- Keep feasibility and scoring separated:
+  - Phase 1: generate top-K feasible solutions under budget.
+  - Phase 2: score and select highest-ranked solution.
+
+### Interestingness Heuristics (proposed weighted sum)
+
+- `symmetryScore` (highest weight):
+  - horizontal mirror agreement
+  - vertical mirror agreement
+  - 180-degree rotational agreement
+- `patternRepetitionScore`:
+  - repeated local motifs in color/orientation neighborhoods.
+- `rhythmScore`:
+  - balanced spacing and periodicity of repeated shape families.
+- `edgeAestheticScore`:
+  - penalize noisy/jagged boundary transitions.
+- `colorDistributionScore`:
+  - reward visually balanced color spread across quadrants.
+
+### Determinism Rules
+
+- Fixed heuristic weights in code.
+- Stable tie-breakers:
+  1. higher score
+  2. fewer search nodes consumed
+  3. lexicographic canonical board signature
+
+### Tests
+
+- Unit tests per scoring component.
+- Ranking tests with crafted fixtures where preferred visual pattern is known.
+- Determinism test: repeated runs return same chosen solution signature.
+
+### Acceptance Criteria
+
+- `Solve` picks aesthetically ranked solution, not just first feasible solution.
+- Ranking behavior is reproducible across runs.
+
+---
+
+## PR-11: UI Integration for Solve + Non-Blocking Execution + Polish
+
+### Scope
+
+- Wire `Solve` button to asynchronous solver pipeline.
+- Add solving states:
+  - idle
+  - solving
+  - solved-applied
+  - unsolved
+- On success:
+  - commit chosen solution as one atomic reducer action (`solve/apply`), so undo returns to pre-solve state.
+- On failure:
+  - preserve current board and show lightweight unsolved feedback.
+
+### Responsiveness
+
+- Run solve off main interaction path (worker or deferred task boundary).
+- Keep drag/keyboard interactions disabled only while solve commit is pending.
+- Add cancellation token for stale solve requests.
+
+### Tests
+
+- Browser integration:
+  - solve button transitions and final placement application.
+  - undo after solve restores exact pre-solve board.
+  - redo reapplies solved board.
+- Regression tests:
+  - no ghost preview artifacts after solve/undo/redo.
+  - URL hash updates only after committed solve apply.
+
+### Acceptance Criteria
+
+- Toolbar fully functional with robust primary-path behavior.
+- No measurable interaction latency regression.
+
+---
+
+## Cross-PR Guardrails
+
+- Keep modules under file-size limits; split solver internals by responsibility:
+  - placement generation
+  - search engine
+  - scoring
+  - orchestration
+- Reuse existing geometry/placement/reducer utilities before introducing new helpers.
+- Preserve SSR/hydration contracts and avoid client/server className drift.
+- Maintain deterministic behavior and stable test outputs.
+- Verify sequence per PR:
+  - `direnv` load
+  - `i && b && v <new-tests>`
+  - do not run full-suite `v` unless explicitly requested.
