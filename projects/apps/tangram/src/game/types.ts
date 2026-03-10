@@ -15,6 +15,7 @@ export type PieceDefinition = {
 };
 
 export type PlacedPiece = {
+  instanceId: string;
   pieceId: string;
   transform: PieceTransform;
   position: Cell;
@@ -38,4 +39,5 @@ export type GameState = {
   pieceCatalog: readonly PieceDefinition[];
   selectedPieceId: string | null;
   previewByPieceId: PiecePreviewMap;
+  nextPlacedInstanceId: number;
 };

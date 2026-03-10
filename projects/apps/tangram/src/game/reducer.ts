@@ -1,3 +1,4 @@
+import { PIECE_TYPE_INITIAL_SUPPLY } from "./board";
 import { transformCells, translateCells } from "./geometry";
 import { cellKey, isPlacementValid } from "./placement";
 import { createInitialGameState } from "./state";
@@ -11,16 +12,17 @@ export const DEFAULT_PIECE_TRANSFORM: PieceTransform = {
 export type GameAction =
   | { type: "piece/select"; pieceId: string }
   | { type: "piece/preview"; pieceId: string; position: Cell | null }
-  | { type: "piece/commit"; pieceId: string }
+  | {
+      type: "piece/commit";
+      pieceId: string;
+      sourceInstanceId?: string | null;
+      dropOutside?: boolean;
+    }
   | { type: "piece/revert"; pieceId: string }
   | { type: "board/reset" };
 
 function findPieceDefinition(state: GameState, pieceId: string): PieceDefinition | undefined {
   return state.pieceCatalog.find((piece) => piece.pieceId === pieceId);
-}
-
-function findPlacedPiece(state: GameState, pieceId: string): PlacedPiece | undefined {
-  return state.board.placedPieces.find((piece) => piece.pieceId === pieceId);
 }
 
 function normalizePreviewPosition(position: Cell | null): Cell | null {
@@ -33,12 +35,16 @@ function normalizePreviewPosition(position: Cell | null): Cell | null {
   };
 }
 
-function collectOccupiedCellsExcept(state: GameState, excludedPieceId: string): Set<string> {
+function findPlacedInstance(state: GameState, instanceId: string): PlacedPiece | undefined {
+  return state.board.placedPieces.find((piece) => piece.instanceId === instanceId);
+}
+
+function collectOccupiedCells(state: GameState, excludedInstanceId?: string | null): Set<string> {
   const occupied = new Set<string>();
   const pieceById = new Map(state.pieceCatalog.map((piece) => [piece.pieceId, piece]));
 
   for (const placed of state.board.placedPieces) {
-    if (placed.pieceId === excludedPieceId) {
+    if (excludedInstanceId && placed.instanceId === excludedInstanceId) {
       continue;
     }
     const definition = pieceById.get(placed.pieceId);
@@ -57,18 +63,8 @@ function collectOccupiedCellsExcept(state: GameState, excludedPieceId: string): 
   return occupied;
 }
 
-function upsertPlacedPiece(
-  placedPieces: readonly PlacedPiece[],
-  nextPiece: PlacedPiece,
-): PlacedPiece[] {
-  const currentIndex = placedPieces.findIndex((piece) => piece.pieceId === nextPiece.pieceId);
-  if (currentIndex === -1) {
-    return [...placedPieces, nextPiece];
-  }
-
-  const nextPlacedPieces = [...placedPieces];
-  nextPlacedPieces[currentIndex] = nextPiece;
-  return nextPlacedPieces;
+function countPlacedPiecesOfType(state: GameState, pieceId: string): number {
+  return state.board.placedPieces.filter((piece) => piece.pieceId === pieceId).length;
 }
 
 function reduceSelectPiece(state: GameState, pieceId: string): GameState {
@@ -117,21 +113,41 @@ function reduceRevertPiece(state: GameState, pieceId: string): GameState {
     return state;
   }
 
-  const placedPiece = findPlacedPiece(state, pieceId);
-  const nextPreview = placedPiece ? placedPiece.position : null;
   return {
     ...state,
     previewByPieceId: {
       ...state.previewByPieceId,
-      [pieceId]: nextPreview,
+      [pieceId]: null,
     },
   };
 }
 
-function reduceCommitPiece(state: GameState, pieceId: string): GameState {
+function reduceCommitPiece(
+  state: GameState,
+  pieceId: string,
+  sourceInstanceId?: string | null,
+  dropOutside?: boolean,
+): GameState {
   const definition = findPieceDefinition(state, pieceId);
   if (!definition) {
     return state;
+  }
+
+  if (dropOutside && sourceInstanceId) {
+    const nextPlacedPieces = state.board.placedPieces.filter(
+      (piece) => piece.instanceId !== sourceInstanceId,
+    );
+    return {
+      ...state,
+      board: {
+        ...state.board,
+        placedPieces: nextPlacedPieces,
+      },
+      previewByPieceId: {
+        ...state.previewByPieceId,
+        [pieceId]: null,
+      },
+    };
   }
 
   const previewPosition = state.previewByPieceId[pieceId] ?? null;
@@ -139,35 +155,64 @@ function reduceCommitPiece(state: GameState, pieceId: string): GameState {
     return state;
   }
 
-  const currentPlacement = findPlacedPiece(state, pieceId);
-  const transform = currentPlacement?.transform ?? DEFAULT_PIECE_TRANSFORM;
+  const sourceInstance = sourceInstanceId ? findPlacedInstance(state, sourceInstanceId) : undefined;
+  if (!sourceInstance) {
+    const placedCount = countPlacedPiecesOfType(state, pieceId);
+    const remainingSupply = PIECE_TYPE_INITIAL_SUPPLY - placedCount;
+    if (remainingSupply <= 0) {
+      return reduceRevertPiece(state, pieceId);
+    }
+  }
+
+  const transform = sourceInstance?.transform ?? DEFAULT_PIECE_TRANSFORM;
   const candidateCells = translateCells(
     transformCells(definition.baseCells, transform),
     previewPosition,
   );
-  const occupiedWithoutSelected = collectOccupiedCellsExcept(state, pieceId);
+  const occupiedCells = collectOccupiedCells(state, sourceInstanceId ?? null);
 
-  if (!isPlacementValid(state.board.size, occupiedWithoutSelected, candidateCells)) {
+  if (!isPlacementValid(state.board.size, occupiedCells, candidateCells)) {
+    if (sourceInstance) {
+      return {
+        ...state,
+        previewByPieceId: {
+          ...state.previewByPieceId,
+          [pieceId]: sourceInstance.position,
+        },
+      };
+    }
     return reduceRevertPiece(state, pieceId);
   }
 
-  const nextPlacement: PlacedPiece = {
-    pieceId,
-    transform,
-    position: previewPosition,
-    isPlaced: true,
-  };
+  const nextPlacement = sourceInstance
+    ? { ...sourceInstance, position: previewPosition }
+    : {
+        instanceId: `${pieceId}#${state.nextPlacedInstanceId}`,
+        pieceId,
+        transform,
+        position: previewPosition,
+        isPlaced: true,
+      };
+
+  const nextPlacedPieces = sourceInstance
+    ? state.board.placedPieces.map((piece) =>
+        piece.instanceId === sourceInstance.instanceId ? nextPlacement : piece,
+      )
+    : [...state.board.placedPieces, nextPlacement];
 
   return {
     ...state,
     board: {
       ...state.board,
-      placedPieces: upsertPlacedPiece(state.board.placedPieces, nextPlacement),
+      placedPieces: nextPlacedPieces,
     },
     previewByPieceId: {
       ...state.previewByPieceId,
       [pieceId]: null,
     },
+    nextPlacedInstanceId: sourceInstance
+      ? state.nextPlacedInstanceId
+      : state.nextPlacedInstanceId + 1,
   };
 }
 
@@ -189,7 +234,7 @@ export function tangramGameReducer(state: GameState, action: GameAction): GameSt
     case "piece/preview":
       return reducePreviewPiece(state, action.pieceId, action.position);
     case "piece/commit":
-      return reduceCommitPiece(state, action.pieceId);
+      return reduceCommitPiece(state, action.pieceId, action.sourceInstanceId, action.dropOutside);
     case "piece/revert":
       return reduceRevertPiece(state, action.pieceId);
     case "board/reset":

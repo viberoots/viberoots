@@ -1,3 +1,4 @@
+import { PIECE_TYPE_INITIAL_SUPPLY } from "./board";
 import { transformCells, translateCells } from "./geometry";
 import { cellKey } from "./placement";
 import { DEFAULT_PIECE_TRANSFORM } from "./reducer";
@@ -8,17 +9,18 @@ export type BoardCellView = {
   x: number;
   y: number;
   pieceId: string | null;
+  instanceId: string | null;
+  localCell: Cell | null;
   color: string | null;
+  state: "empty" | "placed" | "preview";
 };
 
 export type PieceViewModel = {
   pieceId: string;
   color: string;
   cells: readonly Cell[];
-  isSelected: boolean;
-  isPlaced: boolean;
-  boardPosition: Cell | null;
-  previewPosition: Cell | null;
+  remainingCount: number;
+  canDrag: boolean;
 };
 
 export type BoardViewModel = {
@@ -51,6 +53,8 @@ export type GameViewModel = {
 
 type OccupiedCell = {
   pieceId: string;
+  instanceId: string;
+  localCell: Cell;
   color: string;
 };
 
@@ -58,8 +62,12 @@ function indexPiecesById(catalog: readonly PieceDefinition[]): Map<string, Piece
   return new Map(catalog.map((piece) => [piece.pieceId, piece]));
 }
 
-function indexPlacedById(placedPieces: readonly PlacedPiece[]): Map<string, PlacedPiece> {
-  return new Map(placedPieces.map((placed) => [placed.pieceId, placed]));
+function countPlacedByType(placedPieces: readonly PlacedPiece[]): Map<string, number> {
+  const countByType = new Map<string, number>();
+  for (const piece of placedPieces) {
+    countByType.set(piece.pieceId, (countByType.get(piece.pieceId) ?? 0) + 1);
+  }
+  return countByType;
 }
 
 function buildOccupiedCellMap(state: GameState): Map<string, OccupiedCell> {
@@ -73,9 +81,13 @@ function buildOccupiedCellMap(state: GameState): Map<string, OccupiedCell> {
     }
     const transformed = transformCells(definition.baseCells, placed.transform);
     const boardCells = translateCells(transformed, placed.position);
-    for (const cell of boardCells) {
+    for (let index = 0; index < boardCells.length; index += 1) {
+      const cell = boardCells[index];
+      const localCell = transformed[index];
       occupiedByCell.set(cellKey(cell), {
         pieceId: placed.pieceId,
+        instanceId: placed.instanceId,
+        localCell,
         color: definition.color,
       });
     }
@@ -85,19 +97,58 @@ function buildOccupiedCellMap(state: GameState): Map<string, OccupiedCell> {
 }
 
 export function selectBoardView(state: GameState): BoardViewModel {
+  const pieceById = indexPiecesById(state.pieceCatalog);
   const occupiedByCell = buildOccupiedCellMap(state);
+  const previewByCell = new Map<string, OccupiedCell>();
+  const boardColumns = state.board.size.columns;
+  const boardRows = state.board.size.rows;
+
+  for (const [pieceId, previewPosition] of Object.entries(state.previewByPieceId)) {
+    if (!previewPosition) {
+      continue;
+    }
+    const definition = pieceById.get(pieceId);
+    if (!definition) {
+      continue;
+    }
+    const transform = DEFAULT_PIECE_TRANSFORM;
+    const previewCells = translateCells(
+      transformCells(definition.baseCells, transform),
+      previewPosition,
+    );
+    for (const cell of previewCells) {
+      if (cell.x < 0 || cell.y < 0 || cell.x >= boardColumns || cell.y >= boardRows) {
+        continue;
+      }
+      const key = cellKey(cell);
+      if (occupiedByCell.has(key)) {
+        continue;
+      }
+      previewByCell.set(key, {
+        pieceId,
+        instanceId: `${pieceId}#preview`,
+        localCell: cell,
+        color: definition.color,
+      });
+    }
+  }
+
   const cells: BoardCellView[] = [];
 
-  for (let row = 0; row < state.board.size.rows; row += 1) {
-    for (let column = 0; column < state.board.size.columns; column += 1) {
+  for (let row = 0; row < boardRows; row += 1) {
+    for (let column = 0; column < boardColumns; column += 1) {
       const key = `${column},${row}`;
       const occupied = occupiedByCell.get(key);
+      const preview = previewByCell.get(key);
       cells.push({
         key,
         x: column,
         y: row,
-        pieceId: occupied?.pieceId ?? null,
-        color: occupied?.color ?? null,
+        pieceId: occupied?.pieceId ?? preview?.pieceId ?? null,
+        instanceId: occupied?.instanceId ?? null,
+        localCell: occupied?.localCell ?? null,
+        color: occupied?.color ?? preview?.color ?? null,
+        state: occupied ? "placed" : preview ? "preview" : "empty",
       });
     }
   }
@@ -110,21 +161,19 @@ export function selectBoardView(state: GameState): BoardViewModel {
 }
 
 export function selectPieceTrayView(state: GameState): PieceTrayViewModel {
-  const placedById = indexPlacedById(state.board.placedPieces);
+  const placedCountByType = countPlacedByType(state.board.placedPieces);
 
   return {
     selectedPieceId: state.selectedPieceId,
     pieces: state.pieceCatalog.map((piece) => {
-      const placed = placedById.get(piece.pieceId);
-      const transform = placed?.transform ?? DEFAULT_PIECE_TRANSFORM;
+      const placedCount = placedCountByType.get(piece.pieceId) ?? 0;
+      const remainingCount = Math.max(0, PIECE_TYPE_INITIAL_SUPPLY - placedCount);
       return {
         pieceId: piece.pieceId,
         color: piece.color,
-        cells: transformCells(piece.baseCells, transform),
-        isSelected: state.selectedPieceId === piece.pieceId,
-        isPlaced: Boolean(placed?.isPlaced),
-        boardPosition: placed?.position ?? null,
-        previewPosition: state.previewByPieceId[piece.pieceId] ?? null,
+        cells: transformCells(piece.baseCells, DEFAULT_PIECE_TRANSFORM),
+        remainingCount,
+        canDrag: remainingCount > 0,
       };
     }),
   };

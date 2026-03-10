@@ -151,6 +151,16 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
     - `test/game-reducer.test.ts`
     - `test/game-components.test.tsx`
     - `test/entry-server.test.ts` (deterministic SSR markup handshake assertion)
+- PR-4 drag-and-drop with snapping and rollback is implemented in `projects/apps/tangram`:
+  - pure interaction helpers: `src/game/interaction.ts`
+  - board cell-size constant shared by render + interaction: `src/game/board.ts`
+  - responder wiring:
+    - `src/ui/game-screen.tsx`
+    - `src/ui/piece-tray.tsx`
+    - `src/ui/piece-view.tsx`
+  - tests:
+    - `test/game-interaction.test.ts`
+    - `test/game-drag-flow.test.ts`
 - PR-1.5 is implemented in verify preflight selection:
   - new selector utility: `build-tools/tools/lib/project-impact-selector.ts`
   - verify wiring: `build-tools/tools/dev/verify/template-test-scope.ts`
@@ -275,6 +285,55 @@ flowchart TD
   in UI.
 - Reducer updates are pure and deterministic; no timing-dependent or random behavior is allowed.
 - `BoardGrid`, `PieceTray`, and `Toolbar` render from selector output only.
+
+## Drag Contract (PR-4)
+
+### Event lifecycle
+
+1. `piece/select` is dispatched when drag starts on a piece card.
+2. `beginDragSession(...)` captures deterministic drag session state:
+   - `pieceId`
+   - grabbed shape-cell anchor (`grabbedCell`) from the exact tray cell under pointer-down
+3. `previewCellFromDrag(...)` converts pointer movement into board-cell preview origins and dispatches
+   `piece/preview`.
+4. Drag end dispatches `piece/commit` for the active piece.
+
+### Snap formula
+
+- Board cell conversion:
+  - `cellX = floor((pageX - boardLeft) / BOARD_CELL_SIZE)`
+  - `cellY = floor((pageY - boardTop) / BOARD_CELL_SIZE)`
+- Final preview origin:
+  - `preview = pointerCell - grabbedCell`
+- All preview coordinates are integer board units and flow through reducer normalization.
+
+### Tray supply + rendering rules
+
+- Tray entries represent piece types with fixed initial supply `5` per type.
+- `remainingCount = 5 - placedCount(pieceId)`, clamped to `>= 0`.
+- Drag start is blocked when `remainingCount === 0`.
+- Each valid commit appends a new placed instance and consumes one unit of supply.
+- Tray piece rendering is full-size (same board cell size), with no per-piece border, ID label, or
+  selected-state text label.
+
+### Rollback rules
+
+- Commits always route through `reduceCommitPiece(...)` and existing
+  `isPlacementValid(boardSize, occupiedSet, candidateCells)`.
+- Valid commit:
+  - upsert into `board.placedPieces`
+  - clear preview for that piece
+- Invalid commit:
+  - revert preview to last committed position for placed pieces
+  - revert preview to `null` for never-placed pieces
+
+### Troubleshooting notes
+
+- Browser/device pointer differences are contained by RN Web responder events plus pure drag math.
+- Board hit-testing uses the measured board element rectangle in page coordinates and the shared
+  `BOARD_CELL_SIZE` constant so render + interaction remain aligned.
+- If drag events terminate unexpectedly, `onResponderTerminate` follows the same commit path as
+  release for deterministic state transitions.
 
 ## Appendix A: Development Plan (PR Sequence)
 

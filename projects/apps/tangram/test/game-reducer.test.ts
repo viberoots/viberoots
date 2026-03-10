@@ -44,7 +44,7 @@ describe("game reducer", () => {
     expect(committed.previewByPieceId["purple-2-1"]).toBeNull();
   });
 
-  it("reverts invalid commits to last valid position for an already placed piece", () => {
+  it("reverts invalid commits to null preview", () => {
     const state = createInitialGameState();
     const committed = reduce(
       reduce(state, {
@@ -63,7 +63,7 @@ describe("game reducer", () => {
     const invalidCommit = reduce(invalidPreview, { type: "piece/commit", pieceId: "purple-2-1" });
 
     expect(getPlacedPosition(invalidCommit, "purple-2-1")).toEqual({ x: 0, y: 0 });
-    expect(invalidCommit.previewByPieceId["purple-2-1"]).toEqual({ x: 0, y: 0 });
+    expect(invalidCommit.previewByPieceId["purple-2-1"]).toBeNull();
   });
 
   it("reverts invalid overlap commits to null preview for unplaced pieces", () => {
@@ -111,5 +111,34 @@ describe("game reducer", () => {
     expect(reset.board.placedPieces).toEqual([]);
     expect(reset.previewByPieceId["purple-2-1"]).toBeNull();
     expect(reset.pieceCatalog).toBe(state.pieceCatalog);
+  });
+
+  it("consumes supply up to five placements per piece type", () => {
+    let state = createInitialGameState();
+    for (let index = 0; index < 5; index += 1) {
+      state = reduce(
+        reduce(state, {
+          type: "piece/preview",
+          pieceId: "purple-2-1",
+          position: { x: index * 2, y: index * 2 },
+        }),
+        { type: "piece/commit", pieceId: "purple-2-1" },
+      );
+    }
+
+    const sixthAttempt = reduce(
+      reduce(state, {
+        type: "piece/preview",
+        pieceId: "purple-2-1",
+        position: { x: 1, y: 1 },
+      }),
+      { type: "piece/commit", pieceId: "purple-2-1" },
+    );
+
+    const placedCount = sixthAttempt.board.placedPieces.filter(
+      (piece) => piece.pieceId === "purple-2-1",
+    ).length;
+    expect(placedCount).toBe(5);
+    expect(sixthAttempt.previewByPieceId["purple-2-1"]).toBeNull();
   });
 });

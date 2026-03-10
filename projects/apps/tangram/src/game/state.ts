@@ -23,5 +23,6 @@ export function createInitialGameState(): GameState {
     pieceCatalog: INITIAL_PIECE_CATALOG,
     selectedPieceId: null,
     previewByPieceId: createPreviewByPieceId(INITIAL_PIECE_CATALOG),
+    nextPlacedInstanceId: 0,
   };
 }
