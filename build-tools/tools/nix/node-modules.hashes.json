@@ -1,5 +1,5 @@
 {
   "pnpm-lock.yaml": "sha256-OzBIr7U8VbaW7SBG75q8ae9mACR2QoH1yQ4KycHrTR8=",
   "projects/apps/example-webapp/pnpm-lock.yaml": "sha256-/MmDCks4GxVOPAc/leZjwuc69T4yrZpGRM5WkCOnzeQ=",
-  "projects/apps/tangram/pnpm-lock.yaml": "sha256-Ka47sdLTVafeaf9wEWSMvMt3Api3aG+QnE6AkT71OX8="
+  "projects/apps/pleomino/pnpm-lock.yaml": "sha256-Ka47sdLTVafeaf9wEWSMvMt3Api3aG+QnE6AkT71OX8="
 }

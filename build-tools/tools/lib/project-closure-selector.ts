@@ -24,9 +24,9 @@ export type ProjectClosureSelectorResult = {
   diagnostics: ProjectClosureSelectorDiagnostics;
 };
 
-function canonicalProjectId(raw: string): string | null {
+function canonicalProjectId(raw: string, projectPrefixes?: readonly string[]): string | null {
   const normalized = normalizeRepoPath(raw).replace(/^\/+/, "").replace(/\/+$/, "");
-  const project = projectFromPackagePath(normalized);
+  const project = projectFromPackagePath(normalized, projectPrefixes);
   if (!project) return null;
   return project === normalized ? project : null;
 }
@@ -67,12 +67,18 @@ function nearestProjectSuggestions(input: string, knownProjects: string[]): stri
     .map((entry) => entry.candidate);
 }
 
-function invalidProjectError(raw: string, knownProjects: string[]): Error {
+function invalidProjectError(
+  raw: string,
+  knownProjects: string[],
+  projectPrefixes?: readonly string[],
+): Error {
   const normalized = normalizeRepoPath(raw).replace(/^\/+/, "").replace(/\/+$/, "");
   const suggestions = nearestProjectSuggestions(normalized, knownProjects);
+  const examplePrefix = String(projectPrefixes?.[0] || "projects/apps").replace(/\/+$/, "");
+  const example = `${examplePrefix}/foo`;
   const lines = [
     `unknown project identifier: ${raw}`,
-    "project-closure requires canonical repo-relative project paths like projects/apps/foo",
+    `project-closure requires canonical repo-relative project paths like ${example}`,
   ];
   if (suggestions.length > 0) {
     lines.push(`did you mean: ${suggestions.join(", ")}`);
@@ -80,17 +86,21 @@ function invalidProjectError(raw: string, knownProjects: string[]): Error {
   return new Error(lines.join("\n"));
 }
 
-function validateRequestedProjects(requestedProjects: string[], knownProjects: string[]): string[] {
+function validateRequestedProjects(
+  requestedProjects: string[],
+  knownProjects: string[],
+  projectPrefixes?: readonly string[],
+): string[] {
   const known = new Set(knownProjects);
   const canonical: string[] = [];
   for (const project of requestedProjects) {
-    const resolved = canonicalProjectId(project);
-    if (!resolved) throw invalidProjectError(project, knownProjects);
+    const resolved = canonicalProjectId(project, projectPrefixes);
+    if (!resolved) throw invalidProjectError(project, knownProjects, projectPrefixes);
     canonical.push(resolved);
   }
   for (const project of canonical) {
     if (known.has(project)) continue;
-    throw invalidProjectError(project, knownProjects);
+    throw invalidProjectError(project, knownProjects, projectPrefixes);
   }
   return toSortedUnique(canonical);
 }
@@ -99,10 +109,15 @@ export async function resolveProjectClosureSelection(opts: {
   root: string;
   requestedProjects: string[];
   graphPath?: string;
+  projectPrefixes?: readonly string[];
 }): Promise<ProjectClosureSelectorResult> {
   const graphPath = opts.graphPath || path.join(opts.root, DEFAULT_GRAPH_PATH);
-  const graph = buildProjectGraph(await readGraph(graphPath));
-  const requestedProjects = validateRequestedProjects(opts.requestedProjects, graph.projects);
+  const graph = buildProjectGraph(await readGraph(graphPath), opts.projectPrefixes);
+  const requestedProjects = validateRequestedProjects(
+    opts.requestedProjects,
+    graph.projects,
+    opts.projectPrefixes,
+  );
   const resolvedDependencyClosure = computeProjectClosure(requestedProjects, graph.depsByProject);
   const selectedTargets = toProjectTargets(resolvedDependencyClosure);
   return {

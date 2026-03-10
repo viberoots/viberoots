@@ -10,7 +10,7 @@ test("auto mode uses template-selected targets for template-only changes", async
     env: {},
     deps: {
       resolveBuildScope: async () => ({
-        targets: ["//projects/..."],
+        targets: ["//workspace/..."],
         mode: "auto",
         hasBuildSystemChanges: false,
       }),
@@ -81,7 +81,7 @@ test("never mode bypasses selector path and keeps existing build-system scope", 
     env: { BNX_TEMPLATE_TEST_SCOPE: "never" },
     deps: {
       resolveBuildScope: async () => ({
-        targets: ["//projects/..."],
+        targets: ["//workspace/..."],
         mode: "auto",
         hasBuildSystemChanges: false,
       }),
@@ -91,7 +91,7 @@ test("never mode bypasses selector path and keeps existing build-system scope", 
     },
   });
   assert.equal(result.selectorMode, "skipped");
-  assert.deepEqual(result.targets, ["//projects/..."]);
+  assert.deepEqual(result.targets, ["//workspace/..."]);
 });
 
 test("explicit project target scopes lint/prettier to that importer", async () => {
@@ -130,7 +130,7 @@ test("always mode fails with actionable diagnostics when change-set is not templ
             targets: [],
             diagnostics: {
               mode: "no-template-impact",
-              changedPaths: ["projects/apps/myapp/src/index.ts"],
+              changedPaths: ["workspace/apps/myapp/src/index.ts"],
               changedTemplateIds: [],
               ownedChangedTestPaths: [],
               ownedChangedTestTargets: [],

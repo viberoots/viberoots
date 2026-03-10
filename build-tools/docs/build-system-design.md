@@ -743,10 +743,10 @@ changes that do not touch build-system paths.
 I add an explicit compliance selector without changing default verify behavior.
 
 - Invocation contract:
-  - `v --selector project-closure --project projects/apps/tangram`
-  - `v --selector project-closure --project projects/apps/tangram --project projects/libs/shared-ui`
-  - `v --selector project-closure --projects projects/apps/tangram,projects/libs/shared-ui`
-  - `v --selector project-closure --project projects/apps/tangram --explain-selection`
+  - `v --selector project-closure --project projects/apps/pleomino`
+  - `v --selector project-closure --project projects/apps/pleomino --project projects/libs/shared-ui`
+  - `v --selector project-closure --projects projects/apps/pleomino,projects/libs/shared-ui`
+  - `v --selector project-closure --project projects/apps/pleomino --explain-selection`
   - env aliases: `VERIFY_SELECTOR=project-closure`, `VERIFY_PROJECTS=<csv>`
   - CLI flags take precedence over env aliases
 - Validation contract:

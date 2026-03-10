@@ -68,9 +68,10 @@ export async function resolveProjectImpactSelection(opts: {
   root: string;
   changedPaths: string[];
   graphPath?: string;
+  projectPrefixes?: readonly string[];
 }): Promise<ProjectImpactSelectorResult> {
   const changedPaths = toSortedUnique(opts.changedPaths.map((p) => normalizeRepoPath(p)));
-  const changedProjects = collectChangedProjects(changedPaths);
+  const changedProjects = collectChangedProjects(changedPaths, opts.projectPrefixes);
   if (changedProjects.length === 0) {
     return noImpactResult(changedPaths);
   }
@@ -83,7 +84,7 @@ export async function resolveProjectImpactSelection(opts: {
     return fallbackResult(changedPaths, changedProjects, "graph-read-failed");
   }
 
-  const graph = buildProjectGraph(nodes || []);
+  const graph = buildProjectGraph(nodes || [], opts.projectPrefixes);
   const closure = computeProjectClosure(changedProjects, graph.reverseDepsByProject);
   const dependentProjects = closure.filter((project) => !changedProjects.includes(project));
   const selectedTargets = toProjectTargets([...changedProjects, ...dependentProjects]);

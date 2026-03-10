@@ -1,0 +1,37 @@
+{
+  "name": "@apps/pleomino",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:ssr": "pnpm run dev",
+    "dev:ssr:only": "node server/dev.mjs",
+    "dev:wasm": "pnpm run dev",
+    "dev:wasm:watch": "node scripts/dev-wasm-watch.mjs",
+    "build:ssr": "node scripts/build-ssr.mjs",
+    "start:ssr": "node dist/server/index.js",
+    "test": "vitest run",
+    "test:e2e:repro": "pnpm dlx playwright test e2e/tray-drop-repro.e2e.ts --config=playwright.config.ts"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "never": "^1.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-native-web": "^0.19.13"
+  },
+  "devDependencies": {
+    "@esbuild/darwin-arm64": "^0.21.5",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@vitest/coverage-v8": "^1.6.0",
+    "esbuild": "^0.21.5",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^1.6.0"
+  }
+}

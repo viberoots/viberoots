@@ -58,7 +58,7 @@ test("selector mode classification handles template-only, mixed, and no-template
   assert.deepEqual(mixed.nonTemplateBuildSystemPaths, ["build-tools/tools/dev/verify.ts"]);
 
   const noTemplate = await classifyTemplateSelectorMode(process.cwd(), [
-    "projects/apps/myapp/src/index.ts",
+    "workspace/apps/myapp/src/index.ts",
     "docs/handbook/getting-started-on-a-pr.md",
   ]);
   assert.equal(noTemplate.mode, "no-template-impact");
@@ -140,7 +140,7 @@ test("mixed and no-template-impact modes do not select narrowed targets", async 
 
   const none = await resolveTemplateTestSelection({
     root: process.cwd(),
-    changedPaths: ["projects/apps/myapp/src/index.ts"],
+    changedPaths: ["workspace/apps/myapp/src/index.ts"],
   });
   assert.equal(none.mode, "no-template-impact");
   assert.deepEqual(none.targets, []);

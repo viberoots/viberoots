@@ -11,7 +11,18 @@ export type ProjectGraph = {
   reverseDepsByProject: Map<string, Set<string>>;
 };
 
-const PROJECT_PREFIXES = ["projects/apps/", "projects/libs/"] as const;
+export const DEFAULT_PROJECT_PREFIXES = ["projects/apps/", "projects/libs/"] as const;
+
+function normalizedProjectPrefixes(projectPrefixes?: readonly string[]): string[] {
+  const source =
+    projectPrefixes && projectPrefixes.length > 0 ? projectPrefixes : DEFAULT_PROJECT_PREFIXES;
+  return toSortedUnique(
+    source
+      .map((prefix) => normalizeRepoPath(prefix).replace(/^\/+/, "").replace(/\/+$/, ""))
+      .filter(Boolean)
+      .map((prefix) => `${prefix}/`),
+  );
+}
 
 export function normalizeRepoPath(relPath: string): string {
   return String(relPath || "")
@@ -23,9 +34,12 @@ export function toSortedUnique(values: Iterable<string>): string[] {
   return Array.from(new Set(Array.from(values).filter(Boolean))).sort();
 }
 
-export function projectFromPackagePath(packagePath: string): string | null {
+export function projectFromPackagePath(
+  packagePath: string,
+  projectPrefixes?: readonly string[],
+): string | null {
   const normalized = normalizeRepoPath(packagePath).replace(/^\/+/, "");
-  for (const prefix of PROJECT_PREFIXES) {
+  for (const prefix of normalizedProjectPrefixes(projectPrefixes)) {
     if (!normalized.startsWith(prefix)) continue;
     const projectName = normalized.slice(prefix.length).split("/")[0] || "";
     if (!projectName) return null;
@@ -34,17 +48,28 @@ export function projectFromPackagePath(packagePath: string): string | null {
   return null;
 }
 
-export function projectFromRepoPath(relPath: string): string | null {
-  return projectFromPackagePath(normalizeRepoPath(relPath));
+export function projectFromRepoPath(
+  relPath: string,
+  projectPrefixes?: readonly string[],
+): string | null {
+  return projectFromPackagePath(normalizeRepoPath(relPath), projectPrefixes);
 }
 
-export function projectFromTargetLabel(label: string): string | null {
-  return projectFromPackagePath(packagePathFromLabel(label));
+export function projectFromTargetLabel(
+  label: string,
+  projectPrefixes?: readonly string[],
+): string | null {
+  return projectFromPackagePath(packagePathFromLabel(label), projectPrefixes);
 }
 
-export function collectChangedProjects(changedPaths: string[]): string[] {
+export function collectChangedProjects(
+  changedPaths: string[],
+  projectPrefixes?: readonly string[],
+): string[] {
   return toSortedUnique(
-    changedPaths.map((p) => projectFromRepoPath(p)).filter((x): x is string => !!x),
+    changedPaths
+      .map((p) => projectFromRepoPath(p, projectPrefixes))
+      .filter((x): x is string => !!x),
   );
 }
 
@@ -66,18 +91,21 @@ function pushEdge(
   edges.add(toProject);
 }
 
-export function buildProjectGraph(nodes: GraphNodeLike[]): ProjectGraph {
+export function buildProjectGraph(
+  nodes: GraphNodeLike[],
+  projectPrefixes?: readonly string[],
+): ProjectGraph {
   const projects = new Set<string>();
   const depsByProject = new Map<string, Set<string>>();
   const reverseDepsByProject = new Map<string, Set<string>>();
 
   for (const node of nodes) {
-    const project = projectFromTargetLabel(String(node.name || ""));
+    const project = projectFromTargetLabel(String(node.name || ""), projectPrefixes);
     if (!project) continue;
     projects.add(project);
     const deps = Array.isArray(node.deps) ? node.deps : [];
     for (const dep of deps) {
-      const dependencyProject = projectFromTargetLabel(String(dep || ""));
+      const dependencyProject = projectFromTargetLabel(String(dep || ""), projectPrefixes);
       if (!dependencyProject) continue;
       projects.add(dependencyProject);
       pushEdge(depsByProject, project, dependencyProject);

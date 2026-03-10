@@ -26,7 +26,7 @@ test("build-system path detection includes toolchain/build files and excludes pr
   assert.equal(isBuildSystemPath("flake.lock"), true);
   assert.equal(isBuildSystemPath("toolchains/rust/TARGETS"), true);
   assert.equal(isBuildSystemPath("third_party/providers/auto_map.bzl"), true);
-  assert.equal(isBuildSystemPath("projects/apps/myapp/src/index.ts"), false);
+  assert.equal(isBuildSystemPath("workspace/apps/myapp/src/index.ts"), false);
   assert.equal(isBuildSystemPath("build-tools/docs/build-system-design.md"), false);
   assert.equal(isBuildSystemPath("docs/handbook/ci.md"), false);
 });
@@ -37,13 +37,13 @@ test("auto-scope ignores generated metadata and transient dependency/cache direc
     true,
   );
   assert.equal(isIgnoredBuildSystemScopePath("build-tools/tools/node/workspace-map.json"), true);
-  assert.equal(isIgnoredBuildSystemScopePath("projects/apps/tangram/node_modules"), true);
+  assert.equal(isIgnoredBuildSystemScopePath("workspace/apps/puzzle/node_modules"), true);
   assert.equal(
-    isIgnoredBuildSystemScopePath("projects/apps/tangram/node_modules/react/index.js"),
+    isIgnoredBuildSystemScopePath("workspace/apps/puzzle/node_modules/react/index.js"),
     true,
   );
   assert.equal(
-    isIgnoredBuildSystemScopePath("projects/apps/tangram/.vite-cache/vitest/results.json"),
+    isIgnoredBuildSystemScopePath("workspace/apps/puzzle/.vite-cache/vitest/results.json"),
     true,
   );
   assert.equal(isIgnoredBuildSystemScopePath("build-tools/tools/dev/verify.ts"), false);
@@ -54,7 +54,7 @@ test("relevant build-system changes exclude ignored paths", () => {
     hasRelevantBuildSystemChanges([
       "build-tools/tools/nix/node-modules.hashes.json",
       "build-tools/tools/node/workspace-map.json",
-      "projects/apps/tangram/node_modules",
+      "workspace/apps/puzzle/node_modules",
     ]),
     false,
   );

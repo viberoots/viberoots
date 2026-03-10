@@ -93,9 +93,9 @@ When adding or materially editing scaffold command guidance:
   - build-system edits still keep existing broad-scope/fallback behavior
 - Verify project-closure opt-in (PR-1.6):
   - use this only for compliance/release-gate runs that must verify one or more projects plus their full recursive dependency closure
-  - invocation: `v --selector project-closure --project projects/apps/tangram`
-  - multiple projects: `v --selector project-closure --projects projects/apps/tangram,projects/libs/shared-ui`
-  - preview only: `v --selector project-closure --project projects/apps/tangram --explain-selection`
+  - invocation: `v --selector project-closure --project projects/apps/pleomino`
+  - multiple projects: `v --selector project-closure --projects projects/apps/pleomino,projects/libs/shared-ui`
+  - preview only: `v --selector project-closure --project projects/apps/pleomino --explain-selection`
   - `VERIFY_SELECTOR=project-closure` and `VERIFY_PROJECTS=<csv>` are equivalent to the CLI flags; CLI flags win when both are set
   - this mode is intentionally slower than default project-impact because it walks full dependency closure instead of changed-project downstreams
 - Nix builds (planner outputs):

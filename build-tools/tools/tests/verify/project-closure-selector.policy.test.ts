@@ -22,27 +22,28 @@ async function writeGraph(tmp: string, nodes: GraphNode[]): Promise<string> {
 test("project-closure: single requested project includes full recursive dependency closure", async () => {
   await runInTemp("verify-project-closure-single", async (tmp) => {
     const graphPath = await writeGraph(tmp, [
-      { name: "//projects/apps/tangram:app", deps: ["//projects/libs/ui:lib"] },
-      { name: "//projects/libs/ui:lib", deps: ["//projects/libs/theme:lib"] },
-      { name: "//projects/libs/theme:lib", deps: [] },
+      { name: "//workspace/apps/puzzle:app", deps: ["//workspace/libs/ui:lib"] },
+      { name: "//workspace/libs/ui:lib", deps: ["//workspace/libs/theme:lib"] },
+      { name: "//workspace/libs/theme:lib", deps: [] },
     ]);
     const result = await resolveProjectClosureSelection({
       root: tmp,
       graphPath,
-      requestedProjects: ["projects/apps/tangram"],
+      requestedProjects: ["workspace/apps/puzzle"],
+      projectPrefixes: ["workspace/apps", "workspace/libs"],
     });
 
     assert.equal(result.mode, "project-closure");
-    assert.deepEqual(result.diagnostics.requestedProjects, ["projects/apps/tangram"]);
+    assert.deepEqual(result.diagnostics.requestedProjects, ["workspace/apps/puzzle"]);
     assert.deepEqual(result.diagnostics.resolvedDependencyClosure, [
-      "projects/apps/tangram",
-      "projects/libs/theme",
-      "projects/libs/ui",
+      "workspace/apps/puzzle",
+      "workspace/libs/theme",
+      "workspace/libs/ui",
     ]);
     assert.deepEqual(result.targets, [
-      "//projects/apps/tangram/...",
-      "//projects/libs/theme/...",
-      "//projects/libs/ui/...",
+      "//workspace/apps/puzzle/...",
+      "//workspace/libs/theme/...",
+      "//workspace/libs/ui/...",
     ]);
   });
 });
@@ -50,28 +51,29 @@ test("project-closure: single requested project includes full recursive dependen
 test("project-closure: multiple requested projects merge closure without duplicate targets", async () => {
   await runInTemp("verify-project-closure-merged", async (tmp) => {
     const graphPath = await writeGraph(tmp, [
-      { name: "//projects/apps/tangram:app", deps: ["//projects/libs/ui:lib"] },
-      { name: "//projects/apps/admin:app", deps: ["//projects/libs/ui:lib"] },
-      { name: "//projects/libs/ui:lib", deps: ["//projects/libs/theme:lib"] },
-      { name: "//projects/libs/theme:lib", deps: [] },
+      { name: "//workspace/apps/puzzle:app", deps: ["//workspace/libs/ui:lib"] },
+      { name: "//workspace/apps/admin:app", deps: ["//workspace/libs/ui:lib"] },
+      { name: "//workspace/libs/ui:lib", deps: ["//workspace/libs/theme:lib"] },
+      { name: "//workspace/libs/theme:lib", deps: [] },
     ]);
     const result = await resolveProjectClosureSelection({
       root: tmp,
       graphPath,
-      requestedProjects: ["projects/apps/admin", "projects/apps/tangram", "projects/apps/admin"],
+      requestedProjects: ["workspace/apps/admin", "workspace/apps/puzzle", "workspace/apps/admin"],
+      projectPrefixes: ["workspace/apps", "workspace/libs"],
     });
 
     assert.deepEqual(result.diagnostics.resolvedDependencyClosure, [
-      "projects/apps/admin",
-      "projects/apps/tangram",
-      "projects/libs/theme",
-      "projects/libs/ui",
+      "workspace/apps/admin",
+      "workspace/apps/puzzle",
+      "workspace/libs/theme",
+      "workspace/libs/ui",
     ]);
     assert.deepEqual(result.targets, [
-      "//projects/apps/admin/...",
-      "//projects/apps/tangram/...",
-      "//projects/libs/theme/...",
-      "//projects/libs/ui/...",
+      "//workspace/apps/admin/...",
+      "//workspace/apps/puzzle/...",
+      "//workspace/libs/theme/...",
+      "//workspace/libs/ui/...",
     ]);
   });
 });
@@ -79,8 +81,8 @@ test("project-closure: multiple requested projects merge closure without duplica
 test("project-closure: invalid project id fails fast with canonical-path guidance", async () => {
   await runInTemp("verify-project-closure-invalid", async (tmp) => {
     const graphPath = await writeGraph(tmp, [
-      { name: "//projects/apps/tangram:app", deps: [] },
-      { name: "//projects/libs/shared-ui:lib", deps: [] },
+      { name: "//workspace/apps/puzzle:app", deps: [] },
+      { name: "//workspace/libs/shared-ui:lib", deps: [] },
     ]);
 
     await assert.rejects(
@@ -88,12 +90,13 @@ test("project-closure: invalid project id fails fast with canonical-path guidanc
         resolveProjectClosureSelection({
           root: tmp,
           graphPath,
-          requestedProjects: ["tangram"],
+          requestedProjects: ["puzzle"],
+          projectPrefixes: ["workspace/apps", "workspace/libs"],
         }),
       (error: unknown) => {
         const message = String((error as Error)?.message || error);
         assert.match(message, /canonical repo-relative project paths/);
-        assert.match(message, /projects\/apps\/tangram/);
+        assert.match(message, /workspace\/apps\/puzzle/);
         return true;
       },
     );
@@ -104,13 +107,13 @@ test("project-closure: large closure resolution remains bounded", async () => {
   await runInTemp("verify-project-closure-bounded", async (tmp) => {
     const nodes: GraphNode[] = [];
     for (let i = 0; i < 400; i++) {
-      const current = `//projects/libs/lib-${i}:lib`;
-      const next = i + 1 < 400 ? [`//projects/libs/lib-${i + 1}:lib`] : [];
+      const current = `//workspace/libs/lib-${i}:lib`;
+      const next = i + 1 < 400 ? [`//workspace/libs/lib-${i + 1}:lib`] : [];
       nodes.push({ name: current, deps: next });
     }
     nodes.push({
-      name: "//projects/apps/tangram:app",
-      deps: ["//projects/libs/lib-0:lib"],
+      name: "//workspace/apps/puzzle:app",
+      deps: ["//workspace/libs/lib-0:lib"],
     });
     const graphPath = await writeGraph(tmp, nodes);
 
@@ -118,7 +121,8 @@ test("project-closure: large closure resolution remains bounded", async () => {
     const result = await resolveProjectClosureSelection({
       root: tmp,
       graphPath,
-      requestedProjects: ["projects/apps/tangram"],
+      requestedProjects: ["workspace/apps/puzzle"],
+      projectPrefixes: ["workspace/apps", "workspace/libs"],
     });
     const elapsedMs = performance.now() - start;
 

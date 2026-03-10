@@ -21,42 +21,47 @@ async function writeGraph(tmp: string, nodes: GraphNode[]): Promise<string> {
 test("project-impact: changed app selects only that app when no dependent projects exist", async () => {
   await runInTemp("verify-project-impact-single-app", async (tmp, $) => {
     const graphPath = await writeGraph(tmp, [
-      { name: "//projects/apps/demo:app", deps: [] },
-      { name: "//projects/libs/shared:lib", deps: [] },
+      { name: "//workspace/apps/demo:app", deps: [] },
+      { name: "//workspace/libs/shared:lib", deps: [] },
     ]);
     const result = await resolveProjectImpactSelection({
       root: tmp,
       graphPath,
-      changedPaths: ["projects/apps/demo/src/main.ts"],
+      changedPaths: ["workspace/apps/demo/src/main.ts"],
+      projectPrefixes: ["workspace/apps", "workspace/libs"],
     });
 
     assert.equal(result.mode, "project-impact");
-    assert.deepEqual(result.diagnostics.changedProjects, ["projects/apps/demo"]);
+    assert.deepEqual(result.diagnostics.changedProjects, ["workspace/apps/demo"]);
     assert.deepEqual(result.diagnostics.dependentProjects, []);
-    assert.deepEqual(result.targets, ["//projects/apps/demo/..."]);
+    assert.deepEqual(result.targets, ["//workspace/apps/demo/..."]);
   });
 });
 
 test("project-impact: changed lib includes full recursive downstream dependent closure", async () => {
   await runInTemp("verify-project-impact-lib-closure", async (tmp, $) => {
     const graphPath = await writeGraph(tmp, [
-      { name: "//projects/libs/core:lib", deps: [] },
-      { name: "//projects/apps/a:app", deps: ["//projects/libs/core:lib"] },
-      { name: "//projects/apps/b:app", deps: ["//projects/apps/a:app"] },
+      { name: "//workspace/libs/core:lib", deps: [] },
+      { name: "//workspace/apps/a:app", deps: ["//workspace/libs/core:lib"] },
+      { name: "//workspace/apps/b:app", deps: ["//workspace/apps/a:app"] },
     ]);
     const result = await resolveProjectImpactSelection({
       root: tmp,
       graphPath,
-      changedPaths: ["projects/libs/core/src/index.ts"],
+      changedPaths: ["workspace/libs/core/src/index.ts"],
+      projectPrefixes: ["workspace/apps", "workspace/libs"],
     });
 
     assert.equal(result.mode, "project-impact");
-    assert.deepEqual(result.diagnostics.changedProjects, ["projects/libs/core"]);
-    assert.deepEqual(result.diagnostics.dependentProjects, ["projects/apps/a", "projects/apps/b"]);
+    assert.deepEqual(result.diagnostics.changedProjects, ["workspace/libs/core"]);
+    assert.deepEqual(result.diagnostics.dependentProjects, [
+      "workspace/apps/a",
+      "workspace/apps/b",
+    ]);
     assert.deepEqual(result.targets, [
-      "//projects/apps/a/...",
-      "//projects/apps/b/...",
-      "//projects/libs/core/...",
+      "//workspace/apps/a/...",
+      "//workspace/apps/b/...",
+      "//workspace/libs/core/...",
     ]);
   });
 });
@@ -64,36 +69,38 @@ test("project-impact: changed lib includes full recursive downstream dependent c
 test("project-impact: mixed app/lib changes produce stable union without duplicates", async () => {
   await runInTemp("verify-project-impact-mixed-union", async (tmp, $) => {
     const graphPath = await writeGraph(tmp, [
-      { name: "//projects/libs/core:lib", deps: [] },
-      { name: "//projects/apps/a:app", deps: ["//projects/libs/core:lib"] },
-      { name: "//projects/apps/b:app", deps: ["//projects/apps/a:app"] },
+      { name: "//workspace/libs/core:lib", deps: [] },
+      { name: "//workspace/apps/a:app", deps: ["//workspace/libs/core:lib"] },
+      { name: "//workspace/apps/b:app", deps: ["//workspace/apps/a:app"] },
     ]);
     const result = await resolveProjectImpactSelection({
       root: tmp,
       graphPath,
       changedPaths: [
-        "projects/apps/b/src/main.ts",
-        "projects/libs/core/src/index.ts",
-        "projects/apps/b/src/main.ts",
+        "workspace/apps/b/src/main.ts",
+        "workspace/libs/core/src/index.ts",
+        "workspace/apps/b/src/main.ts",
       ],
+      projectPrefixes: ["workspace/apps", "workspace/libs"],
     });
 
     assert.equal(result.mode, "project-impact");
     assert.deepEqual(result.targets, [
-      "//projects/apps/a/...",
-      "//projects/apps/b/...",
-      "//projects/libs/core/...",
+      "//workspace/apps/a/...",
+      "//workspace/apps/b/...",
+      "//workspace/libs/core/...",
     ]);
   });
 });
 
 test("project-impact: no project-owned changed paths keeps existing scope behavior", async () => {
   await runInTemp("verify-project-impact-no-project", async (tmp, $) => {
-    const graphPath = await writeGraph(tmp, [{ name: "//projects/apps/a:app", deps: [] }]);
+    const graphPath = await writeGraph(tmp, [{ name: "//workspace/apps/a:app", deps: [] }]);
     const result = await resolveProjectImpactSelection({
       root: tmp,
       graphPath,
-      changedPaths: ["docs/tangram-design.md"],
+      changedPaths: ["docs/guide.md"],
+      projectPrefixes: ["workspace/apps", "workspace/libs"],
     });
 
     assert.equal(result.mode, "no-project-impact");
@@ -107,7 +114,8 @@ test("project-impact: graph read failure falls back to existing broad scope", as
     const result = await resolveProjectImpactSelection({
       root: tmp,
       graphPath: path.join(tmp, "missing-graph.json"),
-      changedPaths: ["projects/apps/demo/src/main.ts"],
+      changedPaths: ["workspace/apps/demo/src/main.ts"],
+      projectPrefixes: ["workspace/apps", "workspace/libs"],
     });
 
     assert.equal(result.mode, "fallback-build-system-scope");

@@ -7,22 +7,22 @@ test("project-closure selector uses requested closure targets and scoped lint fi
   const result = await resolveVerifyTemplateTestScope({
     root: process.cwd(),
     requestedTargets: ["//..."],
-    requestedSelector: { mode: "project-closure", projects: ["projects/apps/tangram"] },
+    requestedSelector: { mode: "project-closure", projects: ["workspace/apps/puzzle"] },
     env: {},
     deps: {
       resolveBuildScope: async () => ({
-        targets: ["//projects/..."],
+        targets: ["//workspace/..."],
         mode: "auto",
         hasBuildSystemChanges: false,
       }),
       resolveProjectClosureSelection: async () => ({
         mode: "project-closure",
-        targets: ["//projects/apps/tangram/...", "//projects/libs/ui/..."],
+        targets: ["//workspace/apps/puzzle/...", "//workspace/libs/ui/..."],
         diagnostics: {
           mode: "project-closure",
-          requestedProjects: ["projects/apps/tangram"],
-          resolvedDependencyClosure: ["projects/apps/tangram", "projects/libs/ui"],
-          selectedTargets: ["//projects/apps/tangram/...", "//projects/libs/ui/..."],
+          requestedProjects: ["workspace/apps/puzzle"],
+          resolvedDependencyClosure: ["workspace/apps/puzzle", "workspace/libs/ui"],
+          selectedTargets: ["//workspace/apps/puzzle/...", "//workspace/libs/ui/..."],
         },
       }),
     },
@@ -30,15 +30,15 @@ test("project-closure selector uses requested closure targets and scoped lint fi
 
   assert.equal(result.selectorMode, "project-closure");
   assert.equal(result.reason, "project-closure-targeted");
-  assert.deepEqual(result.targets, ["//projects/apps/tangram/...", "//projects/libs/ui/..."]);
-  assert.deepEqual(result.lintFilters, ["./projects/apps/tangram", "./projects/libs/ui"]);
+  assert.deepEqual(result.targets, ["//workspace/apps/puzzle/...", "//workspace/libs/ui/..."]);
+  assert.deepEqual(result.lintFilters, ["./workspace/apps/puzzle", "./workspace/libs/ui"]);
 });
 
 test("project-closure selector preserves build-system fallback behavior", async () => {
   const result = await resolveVerifyTemplateTestScope({
     root: process.cwd(),
     requestedTargets: ["//..."],
-    requestedSelector: { mode: "project-closure", projects: ["projects/apps/tangram"] },
+    requestedSelector: { mode: "project-closure", projects: ["workspace/apps/puzzle"] },
     env: {},
     deps: {
       resolveBuildScope: async () => ({
@@ -48,12 +48,12 @@ test("project-closure selector preserves build-system fallback behavior", async 
       }),
       resolveProjectClosureSelection: async () => ({
         mode: "project-closure",
-        targets: ["//projects/apps/tangram/...", "//projects/libs/ui/..."],
+        targets: ["//workspace/apps/puzzle/...", "//workspace/libs/ui/..."],
         diagnostics: {
           mode: "project-closure",
-          requestedProjects: ["projects/apps/tangram"],
-          resolvedDependencyClosure: ["projects/apps/tangram", "projects/libs/ui"],
-          selectedTargets: ["//projects/apps/tangram/...", "//projects/libs/ui/..."],
+          requestedProjects: ["workspace/apps/puzzle"],
+          resolvedDependencyClosure: ["workspace/apps/puzzle", "workspace/libs/ui"],
+          selectedTargets: ["//workspace/apps/puzzle/...", "//workspace/libs/ui/..."],
         },
       }),
     },
@@ -64,8 +64,8 @@ test("project-closure selector preserves build-system fallback behavior", async 
   assert.deepEqual(result.targets, ["//..."]);
   assert.deepEqual(result.diagnostics, {
     mode: "project-closure",
-    requestedProjects: ["projects/apps/tangram"],
-    resolvedDependencyClosure: ["projects/apps/tangram", "projects/libs/ui"],
+    requestedProjects: ["workspace/apps/puzzle"],
+    resolvedDependencyClosure: ["workspace/apps/puzzle", "workspace/libs/ui"],
     selectedTargets: ["//..."],
     fallbackReason: "build-system-changes",
   });
