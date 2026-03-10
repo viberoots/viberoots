@@ -20,13 +20,13 @@ function reduce(state: GameState, action: GameAction): GameState {
 function runDrag(
   state: GameState,
   pieceId: string,
-  grabbedCell: { x: number; y: number } | null,
+  grabbedOffsetPx: { x: number; y: number } | null,
 ): {
   move: (pointer: { pageX: number; pageY: number }) => GameState;
 } {
   const session = beginDragSession({
     pieceId,
-    grabbedCell,
+    grabbedOffsetPx,
   });
 
   const selected = reduce(state, { type: "piece/select", pieceId });

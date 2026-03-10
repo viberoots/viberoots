@@ -10,11 +10,18 @@ export type GlobalDragHandlers = {
 };
 
 export function bindGlobalDragListeners(handlers: GlobalDragHandlers): () => void {
+  function pointerFromMouseEvent(event: MouseEvent): PointerPoint {
+    return {
+      pageX: event.clientX + window.scrollX,
+      pageY: event.clientY + window.scrollY,
+    };
+  }
+
   function handleMouseMove(event: MouseEvent) {
     if (!handlers.isDragging()) {
       return;
     }
-    handlers.onMove({ pageX: event.pageX, pageY: event.pageY });
+    handlers.onMove(pointerFromMouseEvent(event));
   }
 
   function handleTouchMove(event: TouchEvent) {
@@ -29,7 +36,7 @@ export function bindGlobalDragListeners(handlers: GlobalDragHandlers): () => voi
   }
 
   function handleMouseUp(event: MouseEvent) {
-    handlers.onEnd({ pageX: event.pageX, pageY: event.pageY });
+    handlers.onEnd(pointerFromMouseEvent(event));
   }
 
   function handleTouchEnd(event: TouchEvent) {

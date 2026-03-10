@@ -23,13 +23,7 @@ describe("game components", () => {
     const state = createInitialGameState();
     const viewModel = selectGameViewModel(state);
     const html = renderToStaticMarkup(
-      <PieceTray
-        tray={viewModel.tray}
-        onSelectPiece={() => {}}
-        onStartDrag={() => {}}
-        onMoveDrag={() => {}}
-        onEndDrag={() => {}}
-      />,
+      <PieceTray tray={viewModel.tray} onStartDrag={() => {}} onEndDrag={() => {}} />,
     );
 
     expect(html.match(/data-testid=\"tangram-piece-view\"/g)?.length ?? 0).toBe(
@@ -50,13 +44,7 @@ describe("game components", () => {
     );
     const viewModel = selectGameViewModel(state);
     const html = renderToStaticMarkup(
-      <PieceTray
-        tray={viewModel.tray}
-        onSelectPiece={() => {}}
-        onStartDrag={() => {}}
-        onMoveDrag={() => {}}
-        onEndDrag={() => {}}
-      />,
+      <PieceTray tray={viewModel.tray} onStartDrag={() => {}} onEndDrag={() => {}} />,
     );
 
     expect(html).toContain("4 left");

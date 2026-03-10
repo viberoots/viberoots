@@ -6,9 +6,16 @@ import type { GameState } from "../src/game/types.ts";
 function reduce(
   state: GameState,
   action:
-    | { type: "piece/select"; pieceId: string }
+    | { type: "piece/select"; pieceId: string; instanceId?: string | null }
     | { type: "piece/preview"; pieceId: string; position: { x: number; y: number } | null }
-    | { type: "piece/commit"; pieceId: string }
+    | { type: "piece/commit"; pieceId: string; sourceInstanceId?: string | null }
+    | {
+        type: "piece/rotate";
+        pieceId: string;
+        instanceId?: string | null;
+        direction?: "cw" | "ccw";
+      }
+    | { type: "piece/flip"; pieceId: string; instanceId?: string | null }
     | { type: "piece/revert"; pieceId: string }
     | { type: "board/reset" },
 ): GameState {
@@ -108,6 +115,7 @@ describe("game reducer", () => {
     const reset = reduce(populated, { type: "board/reset" });
 
     expect(reset.selectedPieceId).toBeNull();
+    expect(reset.selectedInstanceId).toBeNull();
     expect(reset.board.placedPieces).toEqual([]);
     expect(reset.previewByPieceId["purple-2-1"]).toBeNull();
     expect(reset.pieceCatalog).toBe(state.pieceCatalog);
@@ -140,5 +148,51 @@ describe("game reducer", () => {
     ).length;
     expect(placedCount).toBe(5);
     expect(sixthAttempt.previewByPieceId["purple-2-1"]).toBeNull();
+  });
+
+  it("rotates and flips selected tray piece transform", () => {
+    const state = createInitialGameState();
+
+    const rotated = reduce(state, {
+      type: "piece/rotate",
+      pieceId: "purple-2-1",
+      direction: "cw",
+    });
+    const flipped = reduce(rotated, {
+      type: "piece/flip",
+      pieceId: "purple-2-1",
+    });
+
+    expect(rotated.transformByPieceId["purple-2-1"]).toEqual({ rotation: 90, flipped: false });
+    expect(flipped.transformByPieceId["purple-2-1"]).toEqual({ rotation: 90, flipped: true });
+  });
+
+  it("rotates an already placed piece instance in place when valid", () => {
+    const placed = reduce(
+      reduce(createInitialGameState(), {
+        type: "piece/preview",
+        pieceId: "black-1-1-1-1",
+        position: { x: 0, y: 0 },
+      }),
+      { type: "piece/commit", pieceId: "black-1-1-1-1" },
+    );
+    const blackInstance = placed.board.placedPieces.find(
+      (piece) => piece.pieceId === "black-1-1-1-1",
+    );
+    if (!blackInstance) {
+      throw new Error("expected placed black instance");
+    }
+
+    const rotated = reduce(placed, {
+      type: "piece/rotate",
+      pieceId: "black-1-1-1-1",
+      instanceId: blackInstance.instanceId,
+      direction: "cw",
+    });
+
+    const nextBlack = rotated.board.placedPieces.find(
+      (piece) => piece.instanceId === blackInstance.instanceId,
+    );
+    expect(nextBlack?.transform).toEqual({ rotation: 90, flipped: false });
   });
 });

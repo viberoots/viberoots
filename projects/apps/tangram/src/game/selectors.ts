@@ -1,7 +1,8 @@
 import { PIECE_TYPE_INITIAL_SUPPLY } from "./board";
 import { transformCells, translateCells } from "./geometry";
 import { cellKey } from "./placement";
-import { DEFAULT_PIECE_TRANSFORM } from "./reducer";
+import { DEFAULT_PIECE_TRANSFORM } from "./piece-transform";
+import { computeWinState } from "./win";
 import type { Cell, GameState, PieceDefinition, PlacedPiece } from "./types";
 
 export type BoardCellView = {
@@ -36,9 +37,14 @@ export type PieceTrayViewModel = {
 
 export type ToolbarViewModel = {
   selectedPieceId: string | null;
+  selectedInstanceId: string | null;
+  selectedRotation: 0 | 90 | 180 | 270 | null;
+  selectedFlipped: boolean | null;
   canPreviewSelected: boolean;
   canCommitSelected: boolean;
   canRevertSelected: boolean;
+  canRotateSelected: boolean;
+  canFlipSelected: boolean;
 };
 
 export type GameViewModel = {
@@ -48,6 +54,7 @@ export type GameViewModel = {
   status: {
     catalogPieceCount: number;
     placedPieceCount: number;
+    isSolved: boolean;
   };
 };
 
@@ -111,7 +118,7 @@ export function selectBoardView(state: GameState): BoardViewModel {
     if (!definition) {
       continue;
     }
-    const transform = DEFAULT_PIECE_TRANSFORM;
+    const transform = state.transformByPieceId[pieceId] ?? DEFAULT_PIECE_TRANSFORM;
     const previewCells = translateCells(
       transformCells(definition.baseCells, transform),
       previewPosition,
@@ -165,13 +172,17 @@ export function selectPieceTrayView(state: GameState): PieceTrayViewModel {
 
   return {
     selectedPieceId: state.selectedPieceId,
+    selectedInstanceId: state.selectedInstanceId,
     pieces: state.pieceCatalog.map((piece) => {
       const placedCount = placedCountByType.get(piece.pieceId) ?? 0;
       const remainingCount = Math.max(0, PIECE_TYPE_INITIAL_SUPPLY - placedCount);
       return {
         pieceId: piece.pieceId,
         color: piece.color,
-        cells: transformCells(piece.baseCells, DEFAULT_PIECE_TRANSFORM),
+        cells: transformCells(
+          piece.baseCells,
+          state.transformByPieceId[piece.pieceId] ?? DEFAULT_PIECE_TRANSFORM,
+        ),
         remainingCount,
         canDrag: remainingCount > 0,
       };
@@ -184,9 +195,14 @@ export function selectToolbarView(state: GameState): ToolbarViewModel {
   if (!selectedPieceId) {
     return {
       selectedPieceId,
+      selectedInstanceId: null,
+      selectedRotation: null,
+      selectedFlipped: null,
       canPreviewSelected: false,
       canCommitSelected: false,
       canRevertSelected: false,
+      canRotateSelected: false,
+      canFlipSelected: false,
     };
   }
 
@@ -194,12 +210,23 @@ export function selectToolbarView(state: GameState): ToolbarViewModel {
   const hasPlacedSelection = state.board.placedPieces.some(
     (piece) => piece.pieceId === selectedPieceId,
   );
+  const selectedInstance = state.selectedInstanceId
+    ? (state.board.placedPieces.find((piece) => piece.instanceId === state.selectedInstanceId) ??
+      null)
+    : null;
+  const selectedTransform =
+    selectedInstance?.transform ?? state.transformByPieceId[selectedPieceId];
 
   return {
     selectedPieceId,
+    selectedInstanceId: state.selectedInstanceId,
+    selectedRotation: selectedTransform?.rotation ?? null,
+    selectedFlipped: selectedTransform?.flipped ?? null,
     canPreviewSelected: true,
     canCommitSelected: previewPosition !== null,
     canRevertSelected: previewPosition !== null || hasPlacedSelection,
+    canRotateSelected: true,
+    canFlipSelected: true,
   };
 }
 
@@ -211,6 +238,7 @@ export function selectGameViewModel(state: GameState): GameViewModel {
     status: {
       catalogPieceCount: state.pieceCatalog.length,
       placedPieceCount: state.board.placedPieces.length,
+      isSolved: computeWinState(state),
     },
   };
 }

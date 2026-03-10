@@ -6,9 +6,12 @@ import { PieceView } from "./piece-view";
 
 export function PieceTray(props: {
   tray: PieceTrayViewModel;
-  onSelectPiece: (pieceId: string) => void;
-  onStartDrag: (pieceId: string, pointer: PointerPoint, grabbedOffsetPx: PixelPoint | null) => void;
-  onMoveDrag: (pointer: PointerPoint) => void;
+  onStartDrag: (
+    pieceId: string,
+    pointer: PointerPoint,
+    grabbedOffsetPx: PixelPoint | null,
+    mouseButton?: number,
+  ) => void;
   onEndDrag: (pointer?: PointerPoint | null) => void;
   returnTargetPieceId?: string | null;
 }) {
@@ -21,9 +24,7 @@ export function PieceTray(props: {
             key={piece.pieceId}
             piece={piece}
             isReturnTarget={piece.pieceId === (props.returnTargetPieceId ?? null)}
-            onSelectPiece={props.onSelectPiece}
             onStartDrag={props.onStartDrag}
-            onMoveDrag={props.onMoveDrag}
             onEndDrag={props.onEndDrag}
           />
         ))}

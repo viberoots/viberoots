@@ -1,16 +1,17 @@
 import { PIECE_TYPE_INITIAL_SUPPLY } from "./board";
 import { transformCells, translateCells } from "./geometry";
 import { cellKey, isPlacementValid } from "./placement";
+import {
+  DEFAULT_PIECE_TRANSFORM,
+  flipTransformHorizontally,
+  rotateTransformClockwise,
+  rotateTransformCounterClockwise,
+} from "./piece-transform";
 import { createInitialGameState } from "./state";
 import type { Cell, GameState, PieceDefinition, PieceTransform, PlacedPiece } from "./types";
 
-export const DEFAULT_PIECE_TRANSFORM: PieceTransform = {
-  rotation: 0,
-  flipped: false,
-};
-
 export type GameAction =
-  | { type: "piece/select"; pieceId: string }
+  | { type: "piece/select"; pieceId: string; instanceId?: string | null }
   | { type: "piece/preview"; pieceId: string; position: Cell | null }
   | {
       type: "piece/commit";
@@ -18,6 +19,8 @@ export type GameAction =
       sourceInstanceId?: string | null;
       dropOutside?: boolean;
     }
+  | { type: "piece/rotate"; pieceId: string; instanceId?: string | null; direction?: "cw" | "ccw" }
+  | { type: "piece/flip"; pieceId: string; instanceId?: string | null }
   | { type: "piece/revert"; pieceId: string }
   | { type: "board/reset" };
 
@@ -67,17 +70,38 @@ function countPlacedPiecesOfType(state: GameState, pieceId: string): number {
   return state.board.placedPieces.filter((piece) => piece.pieceId === pieceId).length;
 }
 
-function reduceSelectPiece(state: GameState, pieceId: string): GameState {
+function normalizeSelectedInstanceId(
+  state: GameState,
+  pieceId: string,
+  instanceId: string | null | undefined,
+): string | null {
+  if (!instanceId) {
+    return null;
+  }
+  const instance = findPlacedInstance(state, instanceId);
+  if (!instance || instance.pieceId !== pieceId) {
+    return null;
+  }
+  return instanceId;
+}
+
+function reduceSelectPiece(
+  state: GameState,
+  pieceId: string,
+  instanceId: string | null | undefined,
+): GameState {
   if (!findPieceDefinition(state, pieceId)) {
     return state;
   }
-  if (state.selectedPieceId === pieceId) {
+  const nextSelectedInstanceId = normalizeSelectedInstanceId(state, pieceId, instanceId);
+  if (state.selectedPieceId === pieceId && state.selectedInstanceId === nextSelectedInstanceId) {
     return state;
   }
 
   return {
     ...state,
     selectedPieceId: pieceId,
+    selectedInstanceId: nextSelectedInstanceId,
   };
 }
 
@@ -122,6 +146,119 @@ function reduceRevertPiece(state: GameState, pieceId: string): GameState {
   };
 }
 
+function pieceTransformForType(state: GameState, pieceId: string): PieceTransform {
+  return state.transformByPieceId[pieceId] ?? DEFAULT_PIECE_TRANSFORM;
+}
+
+function reduceRotatePiece(
+  state: GameState,
+  pieceId: string,
+  instanceId: string | null | undefined,
+  direction: "cw" | "ccw",
+): GameState {
+  if (!findPieceDefinition(state, pieceId)) {
+    return state;
+  }
+  const sourceInstance = instanceId ? findPlacedInstance(state, instanceId) : undefined;
+  if (sourceInstance && sourceInstance.pieceId !== pieceId) {
+    return state;
+  }
+
+  if (sourceInstance) {
+    const definition = findPieceDefinition(state, pieceId);
+    if (!definition) {
+      return state;
+    }
+    const nextTransform =
+      direction === "ccw"
+        ? rotateTransformCounterClockwise(sourceInstance.transform)
+        : rotateTransformClockwise(sourceInstance.transform);
+    const candidateCells = translateCells(
+      transformCells(definition.baseCells, nextTransform),
+      sourceInstance.position,
+    );
+    const occupiedCells = collectOccupiedCells(state, sourceInstance.instanceId);
+    if (!isPlacementValid(state.board.size, occupiedCells, candidateCells)) {
+      return state;
+    }
+    return {
+      ...state,
+      board: {
+        ...state.board,
+        placedPieces: state.board.placedPieces.map((piece) =>
+          piece.instanceId === sourceInstance.instanceId
+            ? { ...piece, transform: nextTransform }
+            : piece,
+        ),
+      },
+    };
+  }
+
+  const currentTransform = pieceTransformForType(state, pieceId);
+  const nextTransform =
+    direction === "ccw"
+      ? rotateTransformCounterClockwise(currentTransform)
+      : rotateTransformClockwise(currentTransform);
+  return {
+    ...state,
+    transformByPieceId: {
+      ...state.transformByPieceId,
+      [pieceId]: nextTransform,
+    },
+  };
+}
+
+function reduceFlipPiece(
+  state: GameState,
+  pieceId: string,
+  instanceId: string | null | undefined,
+): GameState {
+  if (!findPieceDefinition(state, pieceId)) {
+    return state;
+  }
+  const sourceInstance = instanceId ? findPlacedInstance(state, instanceId) : undefined;
+  if (sourceInstance && sourceInstance.pieceId !== pieceId) {
+    return state;
+  }
+
+  if (sourceInstance) {
+    const definition = findPieceDefinition(state, pieceId);
+    if (!definition) {
+      return state;
+    }
+    const nextTransform = flipTransformHorizontally(sourceInstance.transform);
+    const candidateCells = translateCells(
+      transformCells(definition.baseCells, nextTransform),
+      sourceInstance.position,
+    );
+    const occupiedCells = collectOccupiedCells(state, sourceInstance.instanceId);
+    if (!isPlacementValid(state.board.size, occupiedCells, candidateCells)) {
+      return state;
+    }
+    return {
+      ...state,
+      board: {
+        ...state.board,
+        placedPieces: state.board.placedPieces.map((piece) =>
+          piece.instanceId === sourceInstance.instanceId
+            ? { ...piece, transform: nextTransform }
+            : piece,
+        ),
+      },
+    };
+  }
+
+  const currentTransform = pieceTransformForType(state, pieceId);
+  const nextTransform = flipTransformHorizontally(currentTransform);
+  return {
+    ...state,
+    transformByPieceId: {
+      ...state.transformByPieceId,
+      [pieceId]: nextTransform,
+    },
+  };
+}
+
 function reduceCommitPiece(
   state: GameState,
   pieceId: string,
@@ -137,12 +274,14 @@ function reduceCommitPiece(
     const nextPlacedPieces = state.board.placedPieces.filter(
       (piece) => piece.instanceId !== sourceInstanceId,
     );
+    const removedSelected = state.selectedInstanceId === sourceInstanceId;
     return {
       ...state,
       board: {
         ...state.board,
         placedPieces: nextPlacedPieces,
       },
+      selectedInstanceId: removedSelected ? null : state.selectedInstanceId,
       previewByPieceId: {
         ...state.previewByPieceId,
         [pieceId]: null,
@@ -164,7 +303,7 @@ function reduceCommitPiece(
     }
   }
 
-  const transform = sourceInstance?.transform ?? DEFAULT_PIECE_TRANSFORM;
+  const transform = sourceInstance?.transform ?? pieceTransformForType(state, pieceId);
   const candidateCells = translateCells(
     transformCells(definition.baseCells, transform),
     previewPosition,
@@ -213,6 +352,7 @@ function reduceCommitPiece(
     nextPlacedInstanceId: sourceInstance
       ? state.nextPlacedInstanceId
       : state.nextPlacedInstanceId + 1,
+    selectedInstanceId: sourceInstance ? sourceInstance.instanceId : state.selectedInstanceId,
   };
 }
 
@@ -230,11 +370,15 @@ function reduceResetBoard(state: GameState): GameState {
 export function tangramGameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "piece/select":
-      return reduceSelectPiece(state, action.pieceId);
+      return reduceSelectPiece(state, action.pieceId, action.instanceId);
     case "piece/preview":
       return reducePreviewPiece(state, action.pieceId, action.position);
     case "piece/commit":
       return reduceCommitPiece(state, action.pieceId, action.sourceInstanceId, action.dropOutside);
+    case "piece/rotate":
+      return reduceRotatePiece(state, action.pieceId, action.instanceId, action.direction ?? "cw");
+    case "piece/flip":
+      return reduceFlipPiece(state, action.pieceId, action.instanceId);
     case "piece/revert":
       return reduceRevertPiece(state, action.pieceId);
     case "board/reset":

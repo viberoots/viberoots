@@ -161,6 +161,31 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
   - tests:
     - `test/game-interaction.test.ts`
     - `test/game-drag-flow.test.ts`
+- PR-5 rotate/flip controls, keyboard accessibility, and win detection are implemented in
+  `projects/apps/tangram`:
+  - transform + selection state:
+    - `src/game/types.ts`
+    - `src/game/state.ts`
+    - `src/game/piece-transform.ts`
+  - reducer action support for tray + placed-instance transforms:
+    - `src/game/reducer.ts`
+  - solved-state detector:
+    - `src/game/win.ts`
+    - `src/game/selectors.ts`
+  - UI interactions:
+    - single tap/click rotates selected/targeted piece
+      - left mouse click rotates counter-clockwise
+      - right mouse click rotates clockwise
+    - double tap/click flips selected/targeted piece
+    - tap/click + drag preserves movement behavior
+    - keyboard controls (`Arrow` move preview, `Enter` commit, `Esc` revert, `R/Q` rotate,
+      `F` flip)
+    - status banner includes solved-state feedback
+  - tests:
+    - `test/game-reducer.test.ts` (transform actions)
+    - `test/game-drag-browser.test.tsx` (tap/double-tap + drag behavior)
+    - `test/game-keyboard-browser.test.tsx` (keyboard flow)
+    - `test/game-win.test.ts` (win detector)
 - PR-1.5 is implemented in verify preflight selection:
   - new selector utility: `build-tools/tools/lib/project-impact-selector.ts`
   - verify wiring: `build-tools/tools/dev/verify/template-test-scope.ts`

@@ -27,12 +27,21 @@ export function Toolbar(props: {
   onPreviewSelected: () => void;
   onCommitSelected: () => void;
   onRevertSelected: () => void;
+  onRotateSelectedClockwise: () => void;
+  onRotateSelectedCounterClockwise: () => void;
+  onFlipSelected: () => void;
   onResetBoard: () => void;
 }) {
   return (
     <View style={styles.toolbarCard}>
       <Text style={styles.title}>Toolbar</Text>
       <Text style={styles.status}>Selected piece: {props.toolbar.selectedPieceId ?? "none"}</Text>
+      <Text style={styles.status} testID="tangram-toolbar-transform">
+        Transform:{" "}
+        {props.toolbar.selectedRotation === null
+          ? "none"
+          : `${props.toolbar.selectedRotation}deg, flipped=${props.toolbar.selectedFlipped ? "yes" : "no"}`}
+      </Text>
       <View style={styles.actions}>
         <ActionButton
           label="Preview @ 0,0"
@@ -53,15 +62,21 @@ export function Toolbar(props: {
           testID="tangram-toolbar-revert"
         />
         <ActionButton
-          label="Rotate (PR-5)"
-          onPress={() => {}}
-          disabled={true}
-          testID="tangram-toolbar-rotate"
+          label="Rotate CW"
+          onPress={props.onRotateSelectedClockwise}
+          disabled={!props.toolbar.canRotateSelected}
+          testID="tangram-toolbar-rotate-cw"
         />
         <ActionButton
-          label="Flip (PR-5)"
-          onPress={() => {}}
-          disabled={true}
+          label="Rotate CCW"
+          onPress={props.onRotateSelectedCounterClockwise}
+          disabled={!props.toolbar.canRotateSelected}
+          testID="tangram-toolbar-rotate-ccw"
+        />
+        <ActionButton
+          label="Flip Horizontal"
+          onPress={props.onFlipSelected}
+          disabled={!props.toolbar.canFlipSelected}
           testID="tangram-toolbar-flip"
         />
         <ActionButton

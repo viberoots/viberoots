@@ -52,9 +52,12 @@ function texturedCellColor(baseColor: string, x: number, y: number): string {
 export function PieceView(props: {
   piece: PieceViewModel;
   isReturnTarget?: boolean;
-  onSelectPiece: (pieceId: string) => void;
-  onStartDrag: (pieceId: string, pointer: PointerPoint, grabbedOffsetPx: PixelPoint | null) => void;
-  onMoveDrag: (pointer: PointerPoint) => void;
+  onStartDrag: (
+    pieceId: string,
+    pointer: PointerPoint,
+    grabbedOffsetPx: PixelPoint | null,
+    mouseButton?: number,
+  ) => void;
   onEndDrag: (pointer?: PointerPoint | null) => void;
 }) {
   const bounds = pieceBounds(props.piece.cells);
@@ -83,12 +86,6 @@ export function PieceView(props: {
       };
     }): PointerPoint => {
       const native = event.nativeEvent;
-      if (typeof native.pageX === "number" && typeof native.pageY === "number") {
-        return {
-          pageX: native.pageX,
-          pageY: native.pageY,
-        };
-      }
       const firstTouch = native.touches?.[0] ?? native.changedTouches?.[0];
       if (firstTouch) {
         return {
@@ -100,6 +97,12 @@ export function PieceView(props: {
         return {
           pageX: native.clientX + window.scrollX,
           pageY: native.clientY + window.scrollY,
+        };
+      }
+      if (typeof native.pageX === "number" && typeof native.pageY === "number") {
+        return {
+          pageX: native.pageX,
+          pageY: native.pageY,
         };
       }
       return {
@@ -146,6 +149,7 @@ export function PieceView(props: {
         clientY?: number;
         touches?: Array<{ pageX: number; pageY: number }>;
         changedTouches?: Array<{ pageX: number; pageY: number }>;
+        button?: number;
       };
       target: EventTarget | null;
     }) => {
@@ -157,22 +161,19 @@ export function PieceView(props: {
       if (!grabbedOffsetPx) {
         return;
       }
-      props.onStartDrag(props.piece.pieceId, pointer, grabbedOffsetPx);
+      props.onStartDrag(props.piece.pieceId, pointer, grabbedOffsetPx, event.nativeEvent.button);
     },
     [grabbedOffsetFromPointer, pointerFromEvent, props],
   );
 
   return (
     <Pressable
-      onPress={() => props.onSelectPiece(props.piece.pieceId)}
       onMouseDown={handleStartDrag}
       onTouchStart={handleStartDrag}
-      onStartShouldSetResponder={() => true}
-      onMoveShouldSetResponder={() => true}
-      onResponderGrant={handleStartDrag}
-      onResponderMove={(event) => props.onMoveDrag(pointerFromEvent(event))}
-      onResponderRelease={(event) => props.onEndDrag(pointerFromEvent(event))}
-      onResponderTerminate={() => props.onEndDrag(null)}
+      onMouseUp={(event) => props.onEndDrag(pointerFromEvent(event))}
+      onContextMenu={(event) => {
+        event.preventDefault();
+      }}
       disabled={!props.piece.canDrag}
       style={[styles.card, !props.piece.canDrag ? styles.cardDisabled : null]}
       testID="tangram-piece-view"

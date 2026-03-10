@@ -8,6 +8,8 @@ export type PieceTransform = {
   flipped: boolean;
 };
 
+export type PieceTransformMap = Record<string, PieceTransform>;
+
 export type PieceDefinition = {
   pieceId: string;
   color: string;
@@ -38,6 +40,8 @@ export type GameState = {
   board: BoardState;
   pieceCatalog: readonly PieceDefinition[];
   selectedPieceId: string | null;
+  selectedInstanceId: string | null;
   previewByPieceId: PiecePreviewMap;
+  transformByPieceId: PieceTransformMap;
   nextPlacedInstanceId: number;
 };

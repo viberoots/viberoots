@@ -16,16 +16,22 @@ function pointerFromEvent(event: {
   };
 }): { pageX: number; pageY: number } {
   const native = event.nativeEvent;
-  if (typeof native.pageX === "number" && typeof native.pageY === "number") {
-    return { pageX: native.pageX, pageY: native.pageY };
-  }
   const touch = native.touches?.[0] ?? native.changedTouches?.[0];
   if (touch) {
     return { pageX: touch.pageX, pageY: touch.pageY };
   }
+  if (typeof native.clientX === "number" && typeof native.clientY === "number") {
+    return {
+      pageX: native.clientX + window.scrollX,
+      pageY: native.clientY + window.scrollY,
+    };
+  }
+  if (typeof native.pageX === "number" && typeof native.pageY === "number") {
+    return { pageX: native.pageX, pageY: native.pageY };
+  }
   return {
-    pageX: (native.clientX ?? 0) + window.scrollX,
-    pageY: (native.clientY ?? 0) + window.scrollY,
+    pageX: 0,
+    pageY: 0,
   };
 }
 
@@ -54,6 +60,7 @@ export function BoardGrid(props: {
     instanceId: string,
     grabbedOffsetPx: PixelPoint,
     pointer: { pageX: number; pageY: number },
+    mouseButton?: number,
   ) => void;
   onBoardGridElement?: (element: HTMLElement | null) => void;
   snapTargetCellKeys?: ReadonlySet<string>;
@@ -105,6 +112,7 @@ export function BoardGrid(props: {
                           cell.instanceId!,
                           grabbedOffsetPx,
                           pointer,
+                          event.nativeEvent.button,
                         );
                       }
                     : undefined
@@ -126,28 +134,7 @@ export function BoardGrid(props: {
                           cell.instanceId!,
                           grabbedOffsetPx,
                           pointer,
-                        );
-                      }
-                    : undefined
-                }
-                onStartShouldSetResponder={() => cell.state === "placed"}
-                onResponderGrant={
-                  cell.state === "placed" && cell.pieceId && cell.instanceId && cell.localCell
-                    ? (event) => {
-                        const pointer = pointerFromEvent(event);
-                        const grabbedOffsetPx = grabbedOffsetFromBoardCellEvent(
-                          event,
-                          cell.localCell!,
-                          pointer,
-                        );
-                        if (!grabbedOffsetPx) {
-                          return;
-                        }
-                        props.onStartDragPlaced(
-                          cell.pieceId!,
-                          cell.instanceId!,
-                          grabbedOffsetPx,
-                          pointer,
+                          event.nativeEvent.button,
                         );
                       }
                     : undefined
