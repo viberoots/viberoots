@@ -1,17 +1,16 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native-web";
-import { BOARD_CELL_SIZE } from "../game/board";
+import { Pressable, StyleSheet, View } from "react-native-web";
 import type { PixelPoint, PointerPoint } from "../game/interaction";
 import type { PieceViewModel } from "../game/selectors";
 import {
   grabbedOffsetFromPointer as grabbedOffsetFromPointerHelper,
   pieceBounds,
   pointerFromPressEvent,
-  texturedCellColor,
 } from "./piece-view-helpers";
 
 function PieceViewBase(props: {
   piece: PieceViewModel;
+  cellSize: number;
   isReturnTarget?: boolean;
   onStartDrag: (
     pieceId: string,
@@ -19,7 +18,7 @@ function PieceViewBase(props: {
     grabbedOffsetPx: PixelPoint | null,
     mouseButton?: number,
   ) => void;
-  onEndDrag: (pointer?: PointerPoint | null) => void;
+  onEndDrag: (pointer?: PointerPoint | null, source?: "piece" | "global") => void;
 }) {
   const bounds = pieceBounds(props.piece.cells);
   const spriteRef = React.useRef<HTMLElement | null>(null);
@@ -42,10 +41,11 @@ function PieceViewBase(props: {
         spriteElement: spriteRef.current,
         columns: bounds.columns,
         rows: bounds.rows,
+        cellSize: props.cellSize,
         spriteCellsByPosition,
       });
     },
-    [bounds.columns, bounds.rows, spriteCellsByPosition],
+    [bounds.columns, bounds.rows, props.cellSize, spriteCellsByPosition],
   );
 
   const handleStartDrag = React.useCallback(
@@ -65,6 +65,9 @@ function PieceViewBase(props: {
         return;
       }
       const pointer = pointerFromPressEvent(event);
+      if (typeof (event as { preventDefault?: () => void }).preventDefault === "function") {
+        event.preventDefault();
+      }
       const grabbedOffsetPx = grabbedOffsetFromPointer(pointer);
       if (!grabbedOffsetPx) {
         return;
@@ -78,13 +81,14 @@ function PieceViewBase(props: {
     <Pressable
       onMouseDown={handleStartDrag}
       onTouchStart={handleStartDrag}
-      onMouseUp={(event) => props.onEndDrag(pointerFromPressEvent(event))}
+      onMouseUp={(event) => props.onEndDrag(pointerFromPressEvent(event), "piece")}
       onContextMenu={(event) => {
         event.preventDefault();
       }}
-      disabled={!props.piece.canDrag}
+      hitSlop={Math.max(8, Math.floor(props.cellSize * 0.3))}
       style={[styles.card, !props.piece.canDrag ? styles.cardDisabled : null]}
       testID="tangram-piece-view"
+      data-piece-id={props.piece.pieceId}
       accessibilityRole="button"
       accessibilityLabel={`Piece ${props.piece.pieceId}, ${props.piece.remainingCount} left`}
       accessibilityState={{ disabled: !props.piece.canDrag }}
@@ -96,8 +100,8 @@ function PieceViewBase(props: {
         style={[
           styles.sprite,
           {
-            width: bounds.columns * BOARD_CELL_SIZE,
-            height: bounds.rows * BOARD_CELL_SIZE,
+            width: bounds.columns * props.cellSize,
+            height: bounds.rows * props.cellSize,
           },
         ]}
         testID={props.isReturnTarget ? "tangram-piece-return-target" : undefined}
@@ -108,9 +112,11 @@ function PieceViewBase(props: {
             style={[
               styles.spriteCell,
               {
-                left: cell.x * BOARD_CELL_SIZE,
-                top: cell.y * BOARD_CELL_SIZE,
-                backgroundColor: texturedCellColor(props.piece.color, cell.x, cell.y),
+                left: cell.x * props.cellSize,
+                top: cell.y * props.cellSize,
+                backgroundColor: props.piece.color,
+                width: props.cellSize,
+                height: props.cellSize,
               },
             ]}
             data-cell-x={cell.x}
@@ -124,21 +130,20 @@ function PieceViewBase(props: {
                 style={[
                   styles.returnTargetCell,
                   {
-                    left: cell.x * BOARD_CELL_SIZE,
-                    top: cell.y * BOARD_CELL_SIZE,
+                    left: cell.x * props.cellSize,
+                    top: cell.y * props.cellSize,
                     borderLeftWidth: pieceCellKeySet.has(`${cell.x - 1},${cell.y}`) ? 0 : 2,
                     borderRightWidth: pieceCellKeySet.has(`${cell.x + 1},${cell.y}`) ? 0 : 2,
                     borderTopWidth: pieceCellKeySet.has(`${cell.x},${cell.y - 1}`) ? 0 : 2,
                     borderBottomWidth: pieceCellKeySet.has(`${cell.x},${cell.y + 1}`) ? 0 : 2,
+                    width: props.cellSize,
+                    height: props.cellSize,
                   },
                 ]}
               />
             ))
           : null}
       </View>
-      <Text style={styles.countText} testID={`tangram-piece-count-${props.piece.pieceId}`}>
-        {props.piece.remainingCount} left
-      </Text>
     </Pressable>
   );
 }
@@ -159,18 +164,9 @@ const styles = StyleSheet.create({
   },
   spriteCell: {
     position: "absolute",
-    width: BOARD_CELL_SIZE,
-    height: BOARD_CELL_SIZE,
-  },
-  countText: {
-    color: "#334155",
-    fontSize: 13,
-    fontWeight: "600",
   },
   returnTargetCell: {
     position: "absolute",
-    width: BOARD_CELL_SIZE,
-    height: BOARD_CELL_SIZE,
     borderColor: "rgba(255, 255, 255, 0.9)",
     zIndex: 2,
     pointerEvents: "none",

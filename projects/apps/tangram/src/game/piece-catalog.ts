@@ -63,7 +63,7 @@ export const TANGRAM_PIECE_CATALOG: readonly PieceDefinition[] = [
   },
   {
     pieceId: "black-1-1-1-1",
-    color: "#000000",
+    color: "#101820",
     baseCells: [
       { x: 0, y: 0 },
       { x: 1, y: 0 },
@@ -73,7 +73,7 @@ export const TANGRAM_PIECE_CATALOG: readonly PieceDefinition[] = [
   },
   {
     pieceId: "white-1-1",
-    color: "#ffffff",
+    color: "#f7fbff",
     baseCells: [
       { x: 0, y: 0 },
       { x: 1, y: 0 },

@@ -12,6 +12,8 @@ type PackageJson = {
 
 const appRoot = fileURLToPath(new URL(".", import.meta.url));
 const workspaceRoot = path.resolve(appRoot, "../../..");
+const defaultHost = process.env.HOST || "0.0.0.0";
+const defaultPort = Number(process.env.PORT || "5173");
 
 function readPackageJson(pkgPath: string): PackageJson {
   try {
@@ -67,8 +69,8 @@ export default defineConfig(({ isSsrBuild }) => ({
   },
   server: {
     strictPort: true,
-    host: "127.0.0.1",
-    port: 5173,
+    host: defaultHost,
+    port: defaultPort,
     preTransformRequests: false,
     fs: {
       allow: [workspaceRoot],

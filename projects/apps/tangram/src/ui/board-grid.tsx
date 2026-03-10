@@ -1,6 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native-web";
-import { BOARD_CELL_SIZE } from "../game/board";
+import { StyleSheet, View } from "react-native-web";
 import type { BoardViewModel } from "../game/selectors";
 import type { PixelPoint } from "../game/interaction";
 import { cellKey } from "../game/placement";
@@ -39,6 +38,7 @@ function grabbedOffsetFromBoardCellEvent(
   event: { currentTarget: EventTarget | null; nativeEvent: unknown },
   localCell: { x: number; y: number },
   pointer: { pageX: number; pageY: number },
+  cellSize: number,
 ): PixelPoint | null {
   const target = event.currentTarget;
   if (!(target instanceof HTMLElement)) {
@@ -48,13 +48,15 @@ function grabbedOffsetFromBoardCellEvent(
   const localInCellX = pointer.pageX - (rect.left + window.scrollX);
   const localInCellY = pointer.pageY - (rect.top + window.scrollY);
   return {
-    x: localCell.x * BOARD_CELL_SIZE + localInCellX,
-    y: localCell.y * BOARD_CELL_SIZE + localInCellY,
+    x: localCell.x * cellSize + localInCellX,
+    y: localCell.y * cellSize + localInCellY,
   };
 }
 
 export function BoardGrid(props: {
   board: BoardViewModel;
+  cellSize: number;
+  shakeToken?: number;
   onStartDragPlaced: (
     pieceId: string,
     instanceId: string,
@@ -65,7 +67,17 @@ export function BoardGrid(props: {
   onBoardGridElement?: (element: HTMLElement | null) => void;
   snapTargetCellKeys?: ReadonlySet<string>;
 }) {
+  const [isShaking, setIsShaking] = React.useState(false);
   const snapTargetCellSet = props.snapTargetCellKeys ?? new Set<string>();
+
+  React.useEffect(() => {
+    if (!props.shakeToken) {
+      return;
+    }
+    setIsShaking(true);
+    const timeoutId = setTimeout(() => setIsShaking(false), 240);
+    return () => clearTimeout(timeoutId);
+  }, [props.shakeToken]);
 
   const snapOutlineStyleForCell = React.useCallback(
     (x: number, y: number) => {
@@ -99,10 +111,12 @@ export function BoardGrid(props: {
                   cell.state === "placed" && cell.pieceId && cell.instanceId && cell.localCell
                     ? (event) => {
                         const pointer = pointerFromEvent(event);
+                        event.preventDefault();
                         const grabbedOffsetPx = grabbedOffsetFromBoardCellEvent(
                           event,
                           cell.localCell!,
                           pointer,
+                          props.cellSize,
                         );
                         if (!grabbedOffsetPx) {
                           return;
@@ -121,10 +135,12 @@ export function BoardGrid(props: {
                   cell.state === "placed" && cell.pieceId && cell.instanceId && cell.localCell
                     ? (event) => {
                         const pointer = pointerFromEvent(event);
+                        event.preventDefault();
                         const grabbedOffsetPx = grabbedOffsetFromBoardCellEvent(
                           event,
                           cell.localCell!,
                           pointer,
+                          props.cellSize,
                         );
                         if (!grabbedOffsetPx) {
                           return;
@@ -141,6 +157,7 @@ export function BoardGrid(props: {
                 }
                 style={[
                   styles.boardCell,
+                  { width: props.cellSize, height: props.cellSize },
                   cell.color
                     ? cell.state === "preview"
                       ? [styles.previewCell, { backgroundColor: cell.color }]
@@ -169,10 +186,7 @@ export function BoardGrid(props: {
   }
 
   return (
-    <View style={styles.boardCard}>
-      <Text style={styles.sectionTitle}>
-        Board ({props.board.columns}x{props.board.rows})
-      </Text>
+    <View style={[styles.boardCard, isShaking ? styles.boardCardShake : null]}>
       <View
         ref={(element) => props.onBoardGridElement?.(element as HTMLElement | null)}
         style={styles.boardGrid}
@@ -186,23 +200,29 @@ export function BoardGrid(props: {
 
 const styles = StyleSheet.create({
   boardCard: {
-    padding: 12,
-    borderRadius: 10,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: "#94a3b8",
-    backgroundColor: "#ffffff",
-    minWidth: 360,
+    borderColor: "#89b0de",
+    backgroundColor: "#d9e8f7",
+    padding: 6,
+    boxShadow: "0 10px 18px rgba(56, 104, 168, 0.18)",
   },
-  sectionTitle: {
-    color: "#0f172a",
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 8,
+  boardCardShake: {
+    animationDuration: "240ms",
+    animationTimingFunction: "ease-in-out",
+    animationKeyframes: {
+      "0%": { transform: "translateX(0px)" },
+      "20%": { transform: "translateX(-7px)" },
+      "40%": { transform: "translateX(7px)" },
+      "60%": { transform: "translateX(-5px)" },
+      "80%": { transform: "translateX(5px)" },
+      "100%": { transform: "translateX(0px)" },
+    },
   },
   boardGrid: {
     display: "flex",
     flexDirection: "column",
-    alignSelf: "flex-start",
+    alignSelf: "center",
     overflow: "hidden",
     borderRadius: 6,
   },
@@ -211,19 +231,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
   },
   boardCell: {
-    width: BOARD_CELL_SIZE,
-    height: BOARD_CELL_SIZE,
+    position: "relative",
   },
   previewCell: {
-    opacity: 0.55,
+    opacity: 0.78,
   },
   boardCellEmptyA: {
-    backgroundColor: "#e8d5b6",
+    backgroundColor: "#cadcf0",
   },
   boardCellEmptyB: {
-    backgroundColor: "#e3cfad",
+    backgroundColor: "#bccfe6",
   },
   snapTargetCell: {
-    borderColor: "rgba(255, 255, 255, 0.9)",
+    borderColor: "rgba(22, 101, 216, 0.85)",
   },
 });

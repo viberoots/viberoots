@@ -95,6 +95,40 @@ describe("game reducer", () => {
     expect(overlapCommit.previewByPieceId["red-2-2"]).toBeNull();
   });
 
+  it("clears preview when moving a placed piece to an invalid position", () => {
+    const placed = reduce(
+      reduce(createInitialGameState(), {
+        type: "piece/preview",
+        pieceId: "yellow-1-2-1",
+        position: { x: 1, y: 1 },
+      }),
+      { type: "piece/commit", pieceId: "yellow-1-2-1" },
+    );
+    const yellowInstance = placed.board.placedPieces.find(
+      (piece) => piece.pieceId === "yellow-1-2-1",
+    );
+    if (!yellowInstance) {
+      throw new Error("expected placed yellow instance");
+    }
+
+    const invalidMovePreview = reduce(placed, {
+      type: "piece/preview",
+      pieceId: "yellow-1-2-1",
+      position: { x: -5, y: -5 },
+    });
+    const invalidMoveCommit = reduce(invalidMovePreview, {
+      type: "piece/commit",
+      pieceId: "yellow-1-2-1",
+      sourceInstanceId: yellowInstance.instanceId,
+    });
+
+    const afterInvalidMove = invalidMoveCommit.board.placedPieces.find(
+      (piece) => piece.instanceId === yellowInstance.instanceId,
+    );
+    expect(afterInvalidMove?.position).toEqual({ x: 1, y: 1 });
+    expect(invalidMoveCommit.previewByPieceId["yellow-1-2-1"]).toBeNull();
+  });
+
   it("resets board, selection, and previews deterministically", () => {
     const state = createInitialGameState();
     const populated = reduce(
@@ -150,7 +184,7 @@ describe("game reducer", () => {
     expect(sixthAttempt.previewByPieceId["purple-2-1"]).toBeNull();
   });
 
-  it("rotates and flips selected tray piece transform", () => {
+  it("rotates and flips tray piece transform when no placed instance is selected", () => {
     const state = createInitialGameState();
 
     const rotated = reduce(state, {

@@ -1,79 +1,52 @@
 import { StyleSheet } from "react-native-web";
-import { BOARD_CELL_SIZE } from "../game/board";
 
 export const gameScreenStyles = StyleSheet.create({
   page: {
     minHeight: "100vh",
-    backgroundColor: "#f5efe4",
-    padding: 20,
-    gap: 14,
-  },
-  headerCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#c8b58f",
-    backgroundColor: "#fffaf0",
-    padding: 16,
-    gap: 6,
-  },
-  title: {
-    color: "#362718",
-    fontSize: 30,
-    fontWeight: "800",
-    letterSpacing: 0.2,
-  },
-  subtitle: {
-    color: "#594325",
-    fontSize: 13,
-  },
-  actionRow: {
-    display: "flex",
-    flexDirection: "row",
-    gap: 10,
-    flexWrap: "wrap",
-    marginTop: 6,
-  },
-  actionButton: {
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-  },
-  actionButtonDefault: {
-    borderColor: "#8f7754",
-    backgroundColor: "#ead9bb",
-  },
-  actionButtonDanger: {
-    borderColor: "#8e3528",
-    backgroundColor: "#f5c3ae",
-  },
-  actionButtonText: {
-    color: "#2e2116",
-    fontSize: 12,
-    fontWeight: "700",
+    backgroundColor: "#27446b",
+    paddingHorizontal: 2,
+    paddingVertical: 2,
+    justifyContent: "flex-start",
   },
   layout: {
     display: "flex",
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 16,
-    alignItems: "flex-start",
-  },
-  statusCard: {
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#c8b58f",
-    backgroundColor: "#fffaf0",
+    alignItems: "stretch",
+    justifyContent: "center",
     gap: 4,
   },
-  statusText: {
-    color: "#5b4327",
-    fontSize: 13,
+  layoutStacked: {
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    width: "100%",
   },
-  solvedText: {
-    color: "#166534",
+  orientationLockCard: {
+    marginTop: 48,
+    alignSelf: "center",
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#3f5f8c",
+    backgroundColor: "#27446b",
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  orientationLockTitle: {
+    color: "#eef5ff",
+    fontSize: 24,
+    lineHeight: 28,
     fontWeight: "700",
+    textAlign: "center",
+  },
+  orientationLockSubtitle: {
+    marginTop: 8,
+    color: "#cde1ff",
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: "center",
   },
   dragOverlay: {
     position: "fixed",
@@ -83,8 +56,9 @@ export const gameScreenStyles = StyleSheet.create({
   },
   dragCell: {
     position: "absolute",
-    width: BOARD_CELL_SIZE,
-    height: BOARD_CELL_SIZE,
-    opacity: 0.8,
+    opacity: 0.88,
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.42)",
   },
 });

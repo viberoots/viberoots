@@ -1,12 +1,8 @@
 import React from "react";
-import { Pressable, Text, View } from "react-native-web";
+import { Text, View } from "react-native-web";
 import { BOARD_CELL_SIZE } from "../game/board";
 import { transformCells } from "../game/geometry";
-import {
-  clearPersistedGameState,
-  loadPersistedGameState,
-  savePersistedGameState,
-} from "../game/persistence";
+import { loadPersistedGameStateFromHash, savePersistedGameStateToHash } from "../game/persistence";
 import { tangramGameReducer } from "../game/reducer";
 import { createGameViewSelector } from "../game/view-selector";
 import { createInitialGameState } from "../game/state";
@@ -14,53 +10,102 @@ import { BoardGrid } from "./board-grid";
 import { pageToViewportPosition } from "./game-screen-interaction-helpers";
 import { gameScreenStyles as styles } from "./game-screen-styles";
 import { PieceTray } from "./piece-tray";
+import { pointerFromPressEvent } from "./piece-view-helpers";
 import { useGameScreenInteractions } from "./use-game-screen-interactions";
 import { useGameScreenKeyboard } from "./use-game-screen-keyboard";
 
-function createInitialStateWithPersistence() {
-  const initial = createInitialGameState();
-  if (typeof window === "undefined") {
-    return initial;
-  }
-  try {
-    return loadPersistedGameState(window.localStorage, initial) ?? initial;
-  } catch {
-    return initial;
-  }
+const PAGE_HORIZONTAL_PADDING = 2;
+const PAGE_VERTICAL_PADDING = 2;
+const LAYOUT_GAP = 4;
+const BOARD_CARD_PADDING = 6;
+const BOARD_CARD_BORDER = 1;
+const DESKTOP_TRAY_MAX_ROW_UNITS = 7;
+const DESKTOP_TRAY_COLUMN_GAP = 18;
+const DESKTOP_TRAY_HORIZONTAL_PADDING = 12;
+const MIN_CELL_SIZE = 24;
+const STACKED_MAX_CELL_SIZE = 56;
+const DESKTOP_MAX_CELL_SIZE = 72;
+const MOBILE_BREAKPOINT_PX = 900;
+const STACKED_TRAY_HEIGHT_CHROME = 58;
+const STACKED_TOTAL_CELL_ROWS = 24;
+const STACKED_BOTTOM_SAFE_PX = 2;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
 
-function ActionButton(props: {
-  label: string;
-  onPress: () => void;
-  testID?: string;
-  tone?: "default" | "danger";
-}) {
-  return (
-    <Pressable
-      onPress={props.onPress}
-      onClick={props.onPress}
-      style={[
-        styles.actionButton,
-        props.tone === "danger" ? styles.actionButtonDanger : styles.actionButtonDefault,
-      ]}
-      accessibilityRole="button"
-      testID={props.testID}
-    >
-      <Text style={styles.actionButtonText}>{props.label}</Text>
-    </Pressable>
+function computeResponsiveMetrics(
+  viewportWidth: number,
+  viewportHeight: number,
+): {
+  cellSize: number;
+  isStacked: boolean;
+  cardWidth: number | string;
+} {
+  if (viewportWidth <= 0 || viewportHeight <= 0) {
+    return {
+      cellSize: BOARD_CELL_SIZE,
+      isStacked: false,
+      cardWidth:
+        BOARD_CELL_SIZE * DESKTOP_TRAY_MAX_ROW_UNITS +
+        DESKTOP_TRAY_COLUMN_GAP +
+        DESKTOP_TRAY_HORIZONTAL_PADDING,
+    };
+  }
+
+  const isStacked = viewportWidth < MOBILE_BREAKPOINT_PX;
+  const boardChrome = BOARD_CARD_PADDING * 2 + BOARD_CARD_BORDER * 2;
+  const desktopTrayChrome = DESKTOP_TRAY_COLUMN_GAP + DESKTOP_TRAY_HORIZONTAL_PADDING;
+  const maxCellSizeByWidth = isStacked
+    ? Math.floor((viewportWidth - PAGE_HORIZONTAL_PADDING * 2 - boardChrome) / 10)
+    : Math.floor(
+        (viewportWidth -
+          PAGE_HORIZONTAL_PADDING * 2 -
+          LAYOUT_GAP -
+          boardChrome -
+          desktopTrayChrome) /
+          (10 + DESKTOP_TRAY_MAX_ROW_UNITS),
+      );
+  const maxCellSizeByHeight = isStacked
+    ? Math.floor(
+        (viewportHeight -
+          PAGE_VERTICAL_PADDING -
+          STACKED_BOTTOM_SAFE_PX -
+          LAYOUT_GAP -
+          STACKED_TRAY_HEIGHT_CHROME) /
+          STACKED_TOTAL_CELL_ROWS,
+      )
+    : Math.floor((viewportHeight - PAGE_VERTICAL_PADDING * 2 - BOARD_CARD_PADDING * 2) / 15);
+
+  const cellSize = clamp(
+    Math.min(
+      isStacked ? STACKED_MAX_CELL_SIZE : DESKTOP_MAX_CELL_SIZE,
+      maxCellSizeByWidth,
+      maxCellSizeByHeight,
+    ),
+    MIN_CELL_SIZE,
+    isStacked ? STACKED_MAX_CELL_SIZE : DESKTOP_MAX_CELL_SIZE,
   );
+  const boardCardWidth = cellSize * 10 + BOARD_CARD_PADDING * 2 + BOARD_CARD_BORDER * 2;
+  const cardWidth = isStacked
+    ? viewportWidth - PAGE_HORIZONTAL_PADDING * 2
+    : cellSize * DESKTOP_TRAY_MAX_ROW_UNITS + desktopTrayChrome;
+  return { cellSize, isStacked, cardWidth };
 }
 
-export function GameScreen(props: { url: string }) {
-  const [state, dispatch] = React.useReducer(
-    tangramGameReducer,
-    undefined,
-    createInitialStateWithPersistence,
-  );
+export function GameScreen(_props: { url: string }) {
+  const [state, dispatch] = React.useReducer(tangramGameReducer, undefined, createInitialGameState);
+  const [viewport, setViewport] = React.useState({ width: 0, height: 0 });
   const selectGameView = React.useMemo(() => createGameViewSelector(), []);
   const viewModel = selectGameView(state);
   const boardGridElementRef = React.useRef<HTMLElement | null>(null);
-  const skipNextPersistRef = React.useRef(false);
+  const persistenceReadyRef = React.useRef(false);
+  const responsive = React.useMemo(
+    () => computeResponsiveMetrics(viewport.width, viewport.height),
+    [viewport.height, viewport.width],
+  );
+  const isLandscapeBlocked =
+    responsive.isStacked && viewport.height > 0 && viewport.width > viewport.height;
 
   const pieceById = React.useMemo(
     () => new Map(state.pieceCatalog.map((piece) => [piece.pieceId, piece])),
@@ -73,6 +118,7 @@ export function GameScreen(props: { url: string }) {
 
   const interactions = useGameScreenInteractions({
     state,
+    cellSize: responsive.cellSize,
     dispatch,
     pieceById,
     placedByInstanceId,
@@ -93,89 +139,100 @@ export function GameScreen(props: { url: string }) {
     dispatch({ type: "board/reset" });
   }, [interactions]);
 
-  const handleNewGame = React.useCallback(() => {
-    if (typeof window !== "undefined") {
-      try {
-        clearPersistedGameState(window.localStorage);
-      } catch {}
-      skipNextPersistRef.current = true;
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
     }
-    interactions.clearPendingTap();
-    dispatch({ type: "board/reset" });
-  }, [interactions]);
+    const applyViewport = () => {
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    };
+    applyViewport();
+    window.addEventListener("resize", applyViewport);
+    return () => window.removeEventListener("resize", applyViewport);
+  }, []);
 
   React.useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
-    if (skipNextPersistRef.current) {
-      skipNextPersistRef.current = false;
+    try {
+      const restored = loadPersistedGameStateFromHash(window.location, state);
+      if (restored) {
+        interactions.clearPendingTap();
+        dispatch({ type: "state/replace", state: restored });
+      }
+    } catch {}
+    persistenceReadyRef.current = true;
+    // hydration-safe restore runs once after mount
+  }, []);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    if (!persistenceReadyRef.current) {
       return;
     }
     try {
-      savePersistedGameState(window.localStorage, state);
+      savePersistedGameStateToHash(window.history, window.location, state);
     } catch {}
   }, [state]);
 
   return (
-    <View style={styles.page} testID="tangram-game-screen">
-      <View style={styles.headerCard}>
-        <Text style={styles.title}>Tangram Sandbox</Text>
-        <Text style={styles.subtitle}>SSR route: {props.url}</Text>
-        <Text style={styles.subtitle}>Persistence: local, versioned, safe-restore</Text>
-        <View style={styles.actionRow}>
-          <ActionButton
-            label="Reset Board"
-            onPress={handleResetBoard}
-            testID="tangram-action-reset"
+    <View
+      style={styles.page}
+      onMouseUp={(event) => interactions.handleEndDrag(pointerFromPressEvent(event), "global")}
+      onTouchEnd={(event) => interactions.handleEndDrag(pointerFromPressEvent(event), "global")}
+      testID="tangram-game-screen"
+      data-placed-piece-count={String(viewModel.status.placedPieceCount)}
+      data-selected-piece-id={viewModel.toolbar.selectedPieceId ?? "none"}
+      data-selected-rotation={
+        viewModel.toolbar.selectedRotation === null
+          ? "none"
+          : String(viewModel.toolbar.selectedRotation)
+      }
+      data-selected-flipped={
+        viewModel.toolbar.selectedFlipped === null
+          ? "none"
+          : viewModel.toolbar.selectedFlipped
+            ? "yes"
+            : "no"
+      }
+    >
+      {isLandscapeBlocked ? (
+        <View style={styles.orientationLockCard} testID="tangram-orientation-lock">
+          <Text style={styles.orientationLockTitle}>Rotate to Portrait</Text>
+          <Text style={styles.orientationLockSubtitle}>
+            Landscape mode is disabled on smaller screens.
+          </Text>
+        </View>
+      ) : null}
+      {isLandscapeBlocked ? null : (
+        <View style={[styles.layout, responsive.isStacked ? styles.layoutStacked : null]}>
+          <BoardGrid
+            board={viewModel.board}
+            cellSize={responsive.cellSize}
+            shakeToken={interactions.boardShakeToken}
+            onStartDragPlaced={interactions.handleStartDragPlaced}
+            snapTargetCellKeys={interactions.snapTargetKeySet}
+            onBoardGridElement={(element) => {
+              boardGridElementRef.current = element;
+            }}
           />
-          <ActionButton
-            label="New Game"
-            onPress={handleNewGame}
-            testID="tangram-action-new-game"
-            tone="danger"
+          <PieceTray
+            tray={viewModel.tray}
+            isStacked={responsive.isStacked}
+            cellSize={responsive.cellSize}
+            trayWidth={responsive.cardWidth}
+            onResetBoard={handleResetBoard}
+            returnTargetPieceId={interactions.trayReturnTargetPieceId}
+            onStartDrag={interactions.handleStartDrag}
+            onEndDrag={interactions.handleEndDrag}
           />
         </View>
-      </View>
+      )}
 
-      <View style={styles.layout}>
-        <BoardGrid
-          board={viewModel.board}
-          onStartDragPlaced={interactions.handleStartDragPlaced}
-          snapTargetCellKeys={interactions.snapTargetKeySet}
-          onBoardGridElement={(element) => {
-            boardGridElementRef.current = element;
-          }}
-        />
-        <PieceTray
-          tray={viewModel.tray}
-          returnTargetPieceId={interactions.trayReturnTargetPieceId}
-          onStartDrag={interactions.handleStartDrag}
-          onEndDrag={interactions.handleEndDrag}
-        />
-      </View>
-
-      <View style={styles.statusCard} testID="tangram-status-card">
-        <Text style={styles.statusText}>Catalog pieces: {viewModel.status.catalogPieceCount}</Text>
-        <Text style={styles.statusText}>Placed pieces: {viewModel.status.placedPieceCount}</Text>
-        <Text style={styles.statusText}>
-          Selected piece: {viewModel.toolbar.selectedPieceId ?? "none"}
-        </Text>
-        <Text style={styles.statusText} testID="tangram-selection-transform">
-          Transform:{" "}
-          {viewModel.toolbar.selectedRotation === null
-            ? "none"
-            : `${viewModel.toolbar.selectedRotation}deg, flipped=${viewModel.toolbar.selectedFlipped ? "yes" : "no"}`}
-        </Text>
-        <Text
-          style={[styles.statusText, viewModel.status.isSolved ? styles.solvedText : null]}
-          testID="tangram-solved-status"
-        >
-          {viewModel.status.isSolved ? "Solved: yes" : "Solved: no"}
-        </Text>
-      </View>
-
-      {interactions.dragVisual ? (
+      {interactions.dragVisual && !isLandscapeBlocked ? (
         <View
           style={styles.dragOverlay}
           testID="tangram-drag-ghost"
@@ -195,8 +252,12 @@ export function GameScreen(props: { url: string }) {
                 style={[
                   styles.dragCell,
                   {
-                    left: viewportPointer.x - session.grabbedOffsetPx.x + cell.x * BOARD_CELL_SIZE,
-                    top: viewportPointer.y - session.grabbedOffsetPx.y + cell.y * BOARD_CELL_SIZE,
+                    left:
+                      viewportPointer.x - session.grabbedOffsetPx.x + cell.x * responsive.cellSize,
+                    top:
+                      viewportPointer.y - session.grabbedOffsetPx.y + cell.y * responsive.cellSize,
+                    width: responsive.cellSize,
+                    height: responsive.cellSize,
                     backgroundColor: piece.color,
                   },
                 ]}

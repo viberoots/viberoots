@@ -1,6 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { BOARD_CELL_SIZE } from "../src/game/board.ts";
 import { tangramGameReducer } from "../src/game/reducer.ts";
 import { selectGameViewModel } from "../src/game/selectors.ts";
 import { createInitialGameState } from "../src/game/state.ts";
@@ -15,7 +16,7 @@ describe("board preview", () => {
     });
     const viewModel = selectGameViewModel(previewed);
     const html = renderToStaticMarkup(
-      <BoardGrid board={viewModel.board} onStartDragPlaced={() => {}} />,
+      <BoardGrid board={viewModel.board} cellSize={BOARD_CELL_SIZE} onStartDragPlaced={() => {}} />,
     );
 
     expect(html.match(/data-testid="tangram-board-cell-preview"/g)?.length ?? 0).toBeGreaterThan(0);

@@ -178,13 +178,11 @@ export function selectPieceTrayView(state: GameState): PieceTrayViewModel {
     pieces: state.pieceCatalog.map((piece) => {
       const placedCount = placedCountByType.get(piece.pieceId) ?? 0;
       const remainingCount = Math.max(0, PIECE_TYPE_INITIAL_SUPPLY - placedCount);
+      const trayTransform = state.transformByPieceId[piece.pieceId] ?? DEFAULT_PIECE_TRANSFORM;
       return {
         pieceId: piece.pieceId,
         color: piece.color,
-        cells: transformCells(
-          piece.baseCells,
-          state.transformByPieceId[piece.pieceId] ?? DEFAULT_PIECE_TRANSFORM,
-        ),
+        cells: transformCells(piece.baseCells, trayTransform),
         remainingCount,
         canDrag: remainingCount > 0,
       };

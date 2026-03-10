@@ -1,6 +1,6 @@
-import { BOARD_CELL_SIZE } from "../game/board";
 import { transformCells, translateCells } from "../game/geometry";
 import { previewCellFromDrag } from "../game/interaction";
+import { isPlacementValid } from "../game/placement";
 import type { Cell, GameState, PieceDefinition, PieceTransform } from "../game/types";
 
 export type Pointer = { pageX: number; pageY: number };
@@ -87,13 +87,14 @@ export function tapTargetKey(pieceId: string, instanceId: string | null): string
 }
 
 export function rotationDirectionForMouseButton(mouseButton: number | null): "cw" | "ccw" {
-  return mouseButton === 2 ? "ccw" : "cw";
+  return mouseButton === 2 ? "cw" : "ccw";
 }
 
 export function computeSnapTargetKeys(args: {
   boardSize: GameState["board"]["size"];
   boardRect: { left: number; top: number; width: number; height: number } | null;
   pointer: Pointer;
+  cellSize: number;
   pieceById: Map<string, PieceDefinition>;
   session: ActiveDragSession;
   cellKey: (cell: Cell) => string;
@@ -109,7 +110,7 @@ export function computeSnapTargetKeys(args: {
     args.session,
     args.pointer,
     args.boardRect,
-    BOARD_CELL_SIZE,
+    args.cellSize,
   );
   const footprint = translateCells(
     transformCells(definition.baseCells, args.session.transform),
@@ -128,6 +129,33 @@ export function computeSnapTargetKeys(args: {
     keys.push(args.cellKey(cell));
   }
   return keys;
+}
+
+export function findNearestValidPlacement(args: {
+  boardSize: GameState["board"]["size"];
+  occupiedCells: ReadonlySet<string>;
+  transformedCells: readonly Cell[];
+  preferredPosition: Cell;
+}): Cell | null {
+  let bestPosition: Cell | null = null;
+  let bestDistanceSquared = Number.POSITIVE_INFINITY;
+  for (let y = 0; y < args.boardSize.rows; y += 1) {
+    for (let x = 0; x < args.boardSize.columns; x += 1) {
+      const candidatePosition = { x, y };
+      const candidateCells = translateCells(args.transformedCells, candidatePosition);
+      if (!isPlacementValid(args.boardSize, args.occupiedCells, candidateCells)) {
+        continue;
+      }
+      const deltaX = x - args.preferredPosition.x;
+      const deltaY = y - args.preferredPosition.y;
+      const distanceSquared = deltaX * deltaX + deltaY * deltaY;
+      if (distanceSquared < bestDistanceSquared) {
+        bestDistanceSquared = distanceSquared;
+        bestPosition = candidatePosition;
+      }
+    }
+  }
+  return bestPosition;
 }
 
 export function computeTrayReturnTargetPieceId(

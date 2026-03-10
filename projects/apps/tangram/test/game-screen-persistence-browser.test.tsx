@@ -2,9 +2,13 @@
 import React from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { createRoot, type Root } from "react-dom/client";
-import { clearPersistedGameState } from "../src/game/persistence.ts";
+import {
+  clearPersistedGameStateFromHash,
+  loadPersistedGameStateFromHash,
+  savePersistedGameStateToHash,
+} from "../src/game/persistence.ts";
+import { createInitialGameState } from "../src/game/state.ts";
 import { GameScreen } from "../src/ui/game-screen.tsx";
-import { TANGRAM_PERSISTENCE_STORAGE_KEY } from "../src/game/persistence.ts";
 
 function flushUi(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
@@ -23,33 +27,25 @@ describe("game screen persistence", () => {
       container.remove();
       container = null;
     }
-    window.localStorage.clear();
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
     await flushUi();
   });
 
   it("restores persisted placement state on startup", async () => {
-    window.localStorage.setItem(
-      TANGRAM_PERSISTENCE_STORAGE_KEY,
-      JSON.stringify({
-        version: 1,
-        board: {
-          placedPieces: [
-            {
-              instanceId: "purple-2-1#1",
-              pieceId: "purple-2-1",
-              transform: { rotation: 0, flipped: false },
-              position: { x: 0, y: 0 },
-              isPlaced: true,
-            },
-          ],
-        },
-        selectedPieceId: "purple-2-1",
-        selectedInstanceId: "purple-2-1#1",
-        previewByPieceId: { "purple-2-1": null },
-        transformByPieceId: { "purple-2-1": { rotation: 0, flipped: false } },
-        nextPlacedInstanceId: 2,
-      }),
-    );
+    const seeded = createInitialGameState();
+    seeded.board.placedPieces = [
+      {
+        instanceId: "purple-2-1#1",
+        pieceId: "purple-2-1",
+        transform: { rotation: 0, flipped: false },
+        position: { x: 0, y: 0 },
+        isPlaced: true,
+      },
+    ];
+    seeded.selectedPieceId = "purple-2-1";
+    seeded.selectedInstanceId = "purple-2-1#1";
+    seeded.nextPlacedInstanceId = 2;
+    savePersistedGameStateToHash(window.history, window.location, seeded);
 
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -57,39 +53,33 @@ describe("game screen persistence", () => {
     root.render(<GameScreen url="/games/tangram" />);
     await flushUi();
 
-    expect(document.body.textContent ?? "").toContain("Placed pieces: 1");
+    const persisted = loadPersistedGameStateFromHash(window.location, createInitialGameState());
+    expect(persisted?.board.placedPieces.length ?? 0).toBe(1);
   });
 
   it("clear behavior with storage resets startup state to a clean board", async () => {
-    window.localStorage.setItem(
-      TANGRAM_PERSISTENCE_STORAGE_KEY,
-      JSON.stringify({
-        version: 1,
-        board: {
-          placedPieces: [
-            {
-              instanceId: "purple-2-1#1",
-              pieceId: "purple-2-1",
-              transform: { rotation: 0, flipped: false },
-              position: { x: 0, y: 0 },
-              isPlaced: true,
-            },
-          ],
-        },
-        selectedPieceId: "purple-2-1",
-        selectedInstanceId: "purple-2-1#1",
-        previewByPieceId: { "purple-2-1": null },
-        transformByPieceId: { "purple-2-1": { rotation: 0, flipped: false } },
-        nextPlacedInstanceId: 2,
-      }),
-    );
-    clearPersistedGameState(window.localStorage);
+    const seeded = createInitialGameState();
+    seeded.board.placedPieces = [
+      {
+        instanceId: "purple-2-1#1",
+        pieceId: "purple-2-1",
+        transform: { rotation: 0, flipped: false },
+        position: { x: 0, y: 0 },
+        isPlaced: true,
+      },
+    ];
+    seeded.selectedPieceId = "purple-2-1";
+    seeded.selectedInstanceId = "purple-2-1#1";
+    seeded.nextPlacedInstanceId = 2;
+    savePersistedGameStateToHash(window.history, window.location, seeded);
+    clearPersistedGameStateFromHash(window.history, window.location);
 
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
     root.render(<GameScreen url="/games/tangram" />);
     await flushUi();
-    expect(document.body.textContent ?? "").toContain("Placed pieces: 0");
+    const persisted = loadPersistedGameStateFromHash(window.location, createInitialGameState());
+    expect(persisted?.board.placedPieces.length ?? 0).toBe(0);
   });
 });

@@ -8,11 +8,23 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const clientDir = path.resolve(__dirname, "../client");
 const port = Number(process.env.PORT || "4173");
+const host = process.env.HOST || "0.0.0.0";
 const entryServerPath = path.resolve(__dirname, "entry-server.js");
 const baseShellStyles = [
-  "html,body,#app{margin:0;min-height:100%;}",
-  'body{background:#070b19;color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}',
+  "html,body,#app{margin:0;min-height:100%;overflow:hidden;overscroll-behavior:none;}",
+  'body{background:#27446b;color:#f8fafc;user-select:none;-webkit-user-select:none;touch-action:none;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}',
 ].join("");
+const pwaHeadTags = [
+  '<meta name="description" content="A polished tangram puzzle you can install as an app." />',
+  '<meta name="theme-color" content="#0b1324" />',
+  '<meta name="mobile-web-app-capable" content="yes" />',
+  '<meta name="apple-mobile-web-app-capable" content="yes" />',
+  '<meta name="apple-mobile-web-app-title" content="Tangram" />',
+  '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />',
+  '<link rel="manifest" href="/manifest.webmanifest" />',
+  '<link rel="icon" href="/favicon.svg" type="image/svg+xml" />',
+  '<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />',
+].join("\n");
 type Rendered = { appHtml: string; styleHtml: string };
 
 const app = express();
@@ -74,7 +86,8 @@ app.get("*", (req, res) => {
     "  <head>",
     '    <meta charset="UTF-8" />',
     '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
-    "    <title>tangram SSR Vite</title>",
+    "    <title>Tangram</title>",
+    `    ${pwaHeadTags}`,
     `    <style>${baseShellStyles}</style>`,
     styleHtml ? `    ${styleHtml}` : "",
     "  </head>",
@@ -92,6 +105,6 @@ app.get("*", (req, res) => {
     .end(html);
 });
 
-app.listen(port, "127.0.0.1", () => {
-  console.log(`[webapp-ssr-vite] listening on http://127.0.0.1:${port}`);
+app.listen(port, host, () => {
+  console.log(`[webapp-ssr-vite] listening on http://${host}:${port}`);
 });

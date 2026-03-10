@@ -33,8 +33,8 @@ describe("piece catalog", () => {
         "#3b82f6",
         "#facc15",
         "#f97316",
-        "#000000",
-        "#ffffff",
+        "#101820",
+        "#f7fbff",
       ],
       canonicalSignatures: {
         "purple-2-1": "0,0;1,0;0,1",

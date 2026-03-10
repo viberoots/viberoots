@@ -1,6 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { BOARD_CELL_SIZE } from "../src/game/board.ts";
 import { tangramGameReducer } from "../src/game/reducer.ts";
 import { selectGameViewModel } from "../src/game/selectors.ts";
 import { createInitialGameState } from "../src/game/state.ts";
@@ -11,10 +12,9 @@ describe("game components", () => {
   it("renders the expected 10x15 board grid shape", () => {
     const viewModel = selectGameViewModel(createInitialGameState());
     const html = renderToStaticMarkup(
-      <BoardGrid board={viewModel.board} onStartDragPlaced={() => {}} />,
+      <BoardGrid board={viewModel.board} cellSize={BOARD_CELL_SIZE} onStartDragPlaced={() => {}} />,
     );
 
-    expect(html).toContain("Board");
     expect(html.match(/data-testid=\"tangram-board-row\"/g)?.length ?? 0).toBe(15);
     expect(html.match(/data-testid=\"tangram-board-cell\"/g)?.length ?? 0).toBe(150);
   });
@@ -23,14 +23,21 @@ describe("game components", () => {
     const state = createInitialGameState();
     const viewModel = selectGameViewModel(state);
     const html = renderToStaticMarkup(
-      <PieceTray tray={viewModel.tray} onStartDrag={() => {}} onEndDrag={() => {}} />,
+      <PieceTray
+        tray={viewModel.tray}
+        isStacked={false}
+        cellSize={BOARD_CELL_SIZE}
+        trayWidth={220}
+        onStartDrag={() => {}}
+        onEndDrag={() => {}}
+        onResetBoard={() => {}}
+      />,
     );
 
     expect(html.match(/data-testid=\"tangram-piece-view\"/g)?.length ?? 0).toBe(
       state.pieceCatalog.length,
     );
-
-    expect(html.match(/left</g)?.length ?? 0).toBe(state.pieceCatalog.length);
+    expect(html).toContain('data-testid="tangram-action-reset"');
   });
 
   it("renders remaining supply counts for tray piece types", () => {
@@ -43,10 +50,44 @@ describe("game components", () => {
       { type: "piece/commit", pieceId: "purple-2-1" },
     );
     const viewModel = selectGameViewModel(state);
+    const reducedPiece = viewModel.tray.pieces.find((piece) => piece.pieceId === "purple-2-1");
     const html = renderToStaticMarkup(
-      <PieceTray tray={viewModel.tray} onStartDrag={() => {}} onEndDrag={() => {}} />,
+      <PieceTray
+        tray={viewModel.tray}
+        isStacked={false}
+        cellSize={BOARD_CELL_SIZE}
+        trayWidth={220}
+        onStartDrag={() => {}}
+        onEndDrag={() => {}}
+        onResetBoard={() => {}}
+      />,
     );
 
-    expect(html).toContain("4 left");
+    expect(reducedPiece?.remainingCount).toBe(4);
+    expect(html.match(/data-testid=\"tangram-piece-view\"/g)?.length ?? 0).toBe(
+      state.pieceCatalog.length,
+    );
+  });
+
+  it("keeps small-mode tray rows visibility-safe", () => {
+    const state = createInitialGameState();
+    const viewModel = selectGameViewModel(state);
+    const html = renderToStaticMarkup(
+      <PieceTray
+        tray={viewModel.tray}
+        isStacked={true}
+        cellSize={24}
+        trayWidth={260}
+        onStartDrag={() => {}}
+        onEndDrag={() => {}}
+        onResetBoard={() => {}}
+      />,
+    );
+
+    const rowMatches = [...html.matchAll(/data-testid=\"tangram-piece-tray-row-(\d+)\"/g)];
+    expect(rowMatches.length).toBe(2);
+    for (const match of rowMatches) {
+      expect(Number.parseInt(match[1] ?? "0", 10)).toBe(4);
+    }
   });
 });

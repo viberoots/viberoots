@@ -8,14 +8,9 @@ describe("render", () => {
 
     expect(parts.styleHtml).toContain('id="react-native-stylesheet"');
     expect(parts.appHtml).toBe(html);
-    expect(html).toContain("Tangram Sandbox");
-    expect(html).toContain("Piece Tray");
-    expect(html).toContain("Reset Board");
-    expect(html).toContain("New Game");
-    expect(html).toContain("Catalog pieces:");
-    expect(html).toContain("Selected piece:");
-    expect(html).toMatch(/Board \((?:<!-- -->)?10(?:<!-- -->)?x(?:<!-- -->)?15(?:<!-- -->)?\)/);
-    expect(html).toContain("/games/tangram");
+    expect(html).toContain('data-testid="tangram-board-grid"');
+    expect(html).toContain('data-testid="tangram-piece-tray-grid"');
+    expect(html).toContain('data-testid="tangram-action-reset"');
     expect(html.match(/data-testid="tangram-board-row"/g)?.length ?? 0).toBe(15);
     expect(html.match(/data-testid="tangram-board-cell"/g)?.length ?? 0).toBe(150);
     expect(html.match(/data-testid="tangram-piece-view"/g)?.length ?? 0).toBe(8);

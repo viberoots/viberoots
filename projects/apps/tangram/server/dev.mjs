@@ -9,10 +9,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 const htmlTemplatePath = path.resolve(rootDir, "index.html");
-const host = "127.0.0.1";
+const host = process.env.HOST || "0.0.0.0";
 const preferredPort = Number(process.env.PORT || "5173");
 const preferredHmrPort = Number(process.env.HMR_PORT || String(preferredPort + 1));
 const ssrEntryModule = "/src/entry-server.ts";
+const hmrHost = process.env.HMR_HOST;
 
 function canListen(host, port) {
   return new Promise((resolve) => {
@@ -91,7 +92,9 @@ const vite = await createViteServer({
     host,
     port,
     strictPort: false,
-    hmr: { host, port: hmrPort, clientPort: hmrPort },
+    hmr: hmrHost
+      ? { host: hmrHost, port: hmrPort, clientPort: hmrPort }
+      : { port: hmrPort, clientPort: hmrPort },
   },
 });
 

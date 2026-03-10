@@ -1,0 +1,33 @@
+{
+  "id": "/games/tangram",
+  "name": "Tangram",
+  "short_name": "Tangram",
+  "description": "A polished tangram puzzle you can install as an app on iOS and macOS.",
+  "start_url": "/games/tangram",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "background_color": "#0b1324",
+  "theme_color": "#0b1324",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
