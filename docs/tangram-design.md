@@ -19,7 +19,7 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
   - `game-state` (board/pieces/placement state + reducers/actions)
   - `geometry` (rotation, flip, normalization, collision, bounds)
   - `interaction` (drag/rotate/flip/snap lifecycle)
-  - `ui` (Board, PieceTray, PieceSprite, Toolbar, Status)
+  - `ui` (Board, PieceTray, PieceSprite, Control strip, Status)
   - `persistence` (optional local storage restore/reset; no server state)
 - Include explicit data flow: user input → interaction handler → reducer/state transition → derived selectors → render.
 
@@ -146,7 +146,6 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
     - `src/ui/board-grid.tsx`
     - `src/ui/piece-tray.tsx`
     - `src/ui/piece-view.tsx`
-    - `src/ui/toolbar.tsx`
   - tests:
     - `test/game-reducer.test.ts`
     - `test/game-components.test.tsx`
@@ -186,6 +185,24 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
     - `test/game-drag-browser.test.tsx` (tap/double-tap + drag behavior)
     - `test/game-keyboard-browser.test.tsx` (keyboard flow)
     - `test/game-win.test.ts` (win detector)
+- PR-6 runtime reliability, persistence, and release readiness are implemented in
+  `projects/apps/tangram`:
+  - persistence + schema validation:
+    - `src/game/persistence.ts`
+    - `src/ui/game-screen.tsx` (safe restore/save wiring)
+  - deterministic new-game + reset controls:
+    - `src/ui/game-screen.tsx`
+  - render/perf hardening:
+    - memoized view selector factory in `src/game/selectors.ts`
+    - memoized tray/piece rendering in `src/ui/piece-tray.tsx` and `src/ui/piece-view.tsx`
+  - UI polish:
+    - toolbar removed from runtime surface
+    - refined status/control layout with same keyboard and tap/drag contracts
+  - tests:
+    - `test/game-persistence.test.ts`
+    - `test/game-screen-persistence-browser.test.tsx`
+    - `test/game-stability.test.ts`
+    - updated `test/entry-server.test.ts` for release UI contract
 - PR-1.5 is implemented in verify preflight selection:
   - new selector utility: `build-tools/tools/lib/project-impact-selector.ts`
   - verify wiring: `build-tools/tools/dev/verify/template-test-scope.ts`
@@ -274,11 +291,11 @@ flowchart TD
   C --> D["selectGameViewModel(state)"]
   D --> E["BoardGrid"]
   D --> F["PieceTray"]
-  D --> G["Toolbar"]
+  D --> G["Status/Controls"]
   F --> H["PieceView"]
 ```
 
-- Input flow: `PieceView`/`Toolbar` user events dispatch reducer actions in `GameScreen`.
+- Input flow: `PieceView` plus status/control actions dispatch reducer actions in `GameScreen`.
 - State flow: reducer returns a new `GameState` deterministically.
 - Render flow: UI consumes only selector outputs (`selectGameViewModel`) and does not derive
   mutable ad hoc view state.
@@ -309,7 +326,7 @@ flowchart TD
 - Placement validity is centralized in existing geometry/placement utilities and never re-implemented
   in UI.
 - Reducer updates are pure and deterministic; no timing-dependent or random behavior is allowed.
-- `BoardGrid`, `PieceTray`, and `Toolbar` render from selector output only.
+- `BoardGrid`, `PieceTray`, and status/control panels render from selector output only.
 
 ## Drag Contract (PR-4)
 
@@ -431,6 +448,24 @@ Some up-front investment before visible gameplay.
 ### Recommendation
 
 Implement.
+
+## Operational Notes (PR-6)
+
+- Persistence policy:
+  - runtime key: `tangram.game-state.v1`
+  - persisted payload is versioned and validated before restore
+  - invalid/corrupt/incompatible payloads fall back to `createInitialGameState()`
+- Recovery behavior:
+  - storage read/write/clear failures do not break reducer flow
+  - `Reset Board` restores deterministic initial reducer state
+  - `New Game` clears local persistence and restores deterministic initial reducer state
+- Release verification commands:
+  - baseline: `i && b && v`
+  - tangram app-specific checks:
+    - `cd projects/apps/tangram && pnpm run build:ssr`
+    - `cd projects/apps/tangram && pnpm run test`
+  - SSR contract must continue to expose built server/client artifacts through
+    `node_asset_stage(name = "app", app = ":app_raw", labels = ["lang:node","kind:app","webapp:ssr","framework:vite"], out = "dist")`
 
 ---
 

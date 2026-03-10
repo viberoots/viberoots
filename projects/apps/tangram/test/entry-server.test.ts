@@ -10,7 +10,8 @@ describe("render", () => {
     expect(parts.appHtml).toBe(html);
     expect(html).toContain("Tangram Sandbox");
     expect(html).toContain("Piece Tray");
-    expect(html).toContain("Toolbar");
+    expect(html).toContain("Reset Board");
+    expect(html).toContain("New Game");
     expect(html).toContain("Catalog pieces:");
     expect(html).toContain("Selected piece:");
     expect(html).toMatch(/Board \((?:<!-- -->)?10(?:<!-- -->)?x(?:<!-- -->)?15(?:<!-- -->)?\)/);

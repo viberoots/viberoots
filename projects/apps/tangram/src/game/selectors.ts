@@ -58,6 +58,8 @@ export type GameViewModel = {
   };
 };
 
+export type GameViewSelector = (state: GameState) => GameViewModel;
+
 type OccupiedCell = {
   pieceId: string;
   instanceId: string;

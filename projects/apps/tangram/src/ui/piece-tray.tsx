@@ -4,7 +4,7 @@ import type { PixelPoint, PointerPoint } from "../game/interaction";
 import type { PieceTrayViewModel } from "../game/selectors";
 import { PieceView } from "./piece-view";
 
-export function PieceTray(props: {
+function PieceTrayBase(props: {
   tray: PieceTrayViewModel;
   onStartDrag: (
     pieceId: string,
@@ -32,6 +32,8 @@ export function PieceTray(props: {
     </View>
   );
 }
+
+export const PieceTray = React.memo(PieceTrayBase);
 
 const styles = StyleSheet.create({
   trayCard: {

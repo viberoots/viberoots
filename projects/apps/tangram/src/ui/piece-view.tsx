@@ -3,53 +3,14 @@ import { Pressable, StyleSheet, Text, View } from "react-native-web";
 import { BOARD_CELL_SIZE } from "../game/board";
 import type { PixelPoint, PointerPoint } from "../game/interaction";
 import type { PieceViewModel } from "../game/selectors";
+import {
+  grabbedOffsetFromPointer as grabbedOffsetFromPointerHelper,
+  pieceBounds,
+  pointerFromPressEvent,
+  texturedCellColor,
+} from "./piece-view-helpers";
 
-function pieceBounds(cells: readonly { x: number; y: number }[]): {
-  columns: number;
-  rows: number;
-} {
-  if (cells.length === 0) {
-    return { columns: 1, rows: 1 };
-  }
-  const maxX = Math.max(...cells.map((cell) => cell.x));
-  const maxY = Math.max(...cells.map((cell) => cell.y));
-  return {
-    columns: maxX + 1,
-    rows: maxY + 1,
-  };
-}
-
-function clampColor(value: number): number {
-  return Math.max(0, Math.min(255, value));
-}
-
-function shiftHexColor(hexColor: string, delta: number): string {
-  const match = /^#([0-9a-fA-F]{6})$/.exec(hexColor);
-  if (!match) {
-    return hexColor;
-  }
-
-  const color = match[1];
-  const red = parseInt(color.slice(0, 2), 16);
-  const green = parseInt(color.slice(2, 4), 16);
-  const blue = parseInt(color.slice(4, 6), 16);
-  const nextRed = clampColor(red + delta);
-  const nextGreen = clampColor(green + delta);
-  const nextBlue = clampColor(blue + delta);
-
-  return `#${nextRed.toString(16).padStart(2, "0")}${nextGreen
-    .toString(16)
-    .padStart(2, "0")}${nextBlue.toString(16).padStart(2, "0")}`;
-}
-
-function texturedCellColor(baseColor: string, x: number, y: number): string {
-  if ((x + y) % 2 === 0) {
-    return baseColor;
-  }
-  return shiftHexColor(baseColor, baseColor.toLowerCase() === "#000000" ? 18 : -10);
-}
-
-export function PieceView(props: {
+function PieceViewBase(props: {
   piece: PieceViewModel;
   isReturnTarget?: boolean;
   onStartDrag: (
@@ -74,68 +35,15 @@ export function PieceView(props: {
     return byPosition;
   }, [props.piece.cells]);
 
-  const pointerFromEvent = React.useCallback(
-    (event: {
-      nativeEvent: {
-        pageX?: number;
-        pageY?: number;
-        clientX?: number;
-        clientY?: number;
-        touches?: Array<{ pageX: number; pageY: number }>;
-        changedTouches?: Array<{ pageX: number; pageY: number }>;
-      };
-    }): PointerPoint => {
-      const native = event.nativeEvent;
-      const firstTouch = native.touches?.[0] ?? native.changedTouches?.[0];
-      if (firstTouch) {
-        return {
-          pageX: firstTouch.pageX,
-          pageY: firstTouch.pageY,
-        };
-      }
-      if (typeof native.clientX === "number" && typeof native.clientY === "number") {
-        return {
-          pageX: native.clientX + window.scrollX,
-          pageY: native.clientY + window.scrollY,
-        };
-      }
-      if (typeof native.pageX === "number" && typeof native.pageY === "number") {
-        return {
-          pageX: native.pageX,
-          pageY: native.pageY,
-        };
-      }
-      return {
-        pageX: 0,
-        pageY: 0,
-      };
-    },
-    [],
-  );
-
   const grabbedOffsetFromPointer = React.useCallback(
     (pointer: PointerPoint): PixelPoint | null => {
-      const spriteElement = spriteRef.current;
-      if (!spriteElement) {
-        return null;
-      }
-      const rect = spriteElement.getBoundingClientRect();
-      const localX = pointer.pageX - (rect.left + window.scrollX);
-      const localY = pointer.pageY - (rect.top + window.scrollY);
-      if (
-        localX < 0 ||
-        localY < 0 ||
-        localX >= bounds.columns * BOARD_CELL_SIZE ||
-        localY >= bounds.rows * BOARD_CELL_SIZE
-      ) {
-        return null;
-      }
-      const parsedX = Math.floor(localX / BOARD_CELL_SIZE);
-      const parsedY = Math.floor(localY / BOARD_CELL_SIZE);
-      if (!spriteCellsByPosition.has(`${parsedX},${parsedY}`)) {
-        return null;
-      }
-      return { x: localX, y: localY };
+      return grabbedOffsetFromPointerHelper({
+        pointer,
+        spriteElement: spriteRef.current,
+        columns: bounds.columns,
+        rows: bounds.rows,
+        spriteCellsByPosition,
+      });
     },
     [bounds.columns, bounds.rows, spriteCellsByPosition],
   );
@@ -156,21 +64,21 @@ export function PieceView(props: {
       if (!props.piece.canDrag) {
         return;
       }
-      const pointer = pointerFromEvent(event);
+      const pointer = pointerFromPressEvent(event);
       const grabbedOffsetPx = grabbedOffsetFromPointer(pointer);
       if (!grabbedOffsetPx) {
         return;
       }
       props.onStartDrag(props.piece.pieceId, pointer, grabbedOffsetPx, event.nativeEvent.button);
     },
-    [grabbedOffsetFromPointer, pointerFromEvent, props],
+    [grabbedOffsetFromPointer, props],
   );
 
   return (
     <Pressable
       onMouseDown={handleStartDrag}
       onTouchStart={handleStartDrag}
-      onMouseUp={(event) => props.onEndDrag(pointerFromEvent(event))}
+      onMouseUp={(event) => props.onEndDrag(pointerFromPressEvent(event))}
       onContextMenu={(event) => {
         event.preventDefault();
       }}
@@ -234,6 +142,8 @@ export function PieceView(props: {
     </Pressable>
   );
 }
+
+export const PieceView = React.memo(PieceViewBase);
 
 const styles = StyleSheet.create({
   card: {
