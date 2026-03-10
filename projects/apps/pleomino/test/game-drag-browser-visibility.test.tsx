@@ -62,9 +62,7 @@ describe("game drag browser small viewport visibility", () => {
       const trayInnerWidth = trayWidth - 8;
       const columnGap = 8;
       const rowGap = 14;
-      const resetButtonHeight = 28;
       const trayVerticalPadding = 4;
-      const trayHeaderGap = 10;
       const pagePadding = 2;
       const boardPadding = 6;
       const boardBorder = 1;
@@ -80,7 +78,7 @@ describe("game drag browser small viewport visibility", () => {
       const trayLeft = pagePadding + centeredOffset(viewportInnerWidth, trayWidth);
       const trayTop = boardTop + boardHeight + layoutGap;
       let trayRowsHeight = 0;
-      let currentRowTop = trayTop + 2 + resetButtonHeight + trayHeaderGap;
+      let currentRowTop = trayTop + 2;
       for (const row of trayRows) {
         const pieceViews = Array.from(
           row.querySelectorAll('[data-testid="pleomino-piece-view"]'),
@@ -109,11 +107,7 @@ describe("game drag browser small viewport visibility", () => {
         currentRowTop += rowHeight + rowGap;
       }
       const trayHeight =
-        trayVerticalPadding +
-        resetButtonHeight +
-        trayHeaderGap +
-        trayRowsHeight +
-        Math.max(0, trayRows.length - 1) * rowGap;
+        trayVerticalPadding + trayRowsHeight + Math.max(0, trayRows.length - 1) * rowGap;
       expect(2 * 2 + boardHeight + 4 + trayHeight).toBeLessThanOrEqual(window.innerHeight);
       expect(trayWidth).toBeLessThanOrEqual(window.innerWidth - 2 * 2);
     } finally {

@@ -212,6 +212,18 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
   - docs updated:
     - `build-tools/docs/build-system-design.md`
     - `docs/handbook/getting-started-on-a-pr.md`
+- PR-7 minimal toolbar shell and action wiring are implemented in `projects/apps/pleomino`:
+  - new toolbar component:
+    - `src/ui/game-toolbar.tsx`
+  - game-screen integration:
+    - `src/ui/game-screen.tsx`
+    - `src/ui/game-screen-styles.ts`
+    - `src/ui/piece-tray.tsx` (reset removed from tray; toolbar is canonical action surface)
+  - reducer placeholder action wiring:
+    - `src/game/reducer.ts` (`history/undo`, `history/redo`, `solve/request`)
+  - tests:
+    - `test/game-toolbar.test.tsx`
+    - `test/game-reducer.test.ts` (placeholder no-op contract)
 
 ## Domain Foundations (PR-1 Locked Conventions)
 

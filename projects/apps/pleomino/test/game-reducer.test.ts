@@ -17,7 +17,10 @@ function reduce(
       }
     | { type: "piece/flip"; pieceId: string; instanceId?: string | null }
     | { type: "piece/revert"; pieceId: string }
-    | { type: "board/reset" },
+    | { type: "board/reset" }
+    | { type: "history/undo" }
+    | { type: "history/redo" }
+    | { type: "solve/request" },
 ): GameState {
   return pleominoGameReducer(state, action);
 }
@@ -153,6 +156,16 @@ describe("game reducer", () => {
     expect(reset.board.placedPieces).toEqual([]);
     expect(reset.previewByPieceId["purple-2-1"]).toBeNull();
     expect(reset.pieceCatalog).toBe(state.pieceCatalog);
+  });
+
+  it("keeps state unchanged for PR-7 placeholder toolbar actions", () => {
+    const state = createInitialGameState();
+    const undo = reduce(state, { type: "history/undo" });
+    const redo = reduce(state, { type: "history/redo" });
+    const solve = reduce(state, { type: "solve/request" });
+    expect(undo).toBe(state);
+    expect(redo).toBe(state);
+    expect(solve).toBe(state);
   });
 
   it("consumes supply up to five placements per piece type", () => {

@@ -6,6 +6,7 @@ import { pleominoGameReducer } from "../game/reducer";
 import { createGameViewSelector } from "../game/view-selector";
 import { createInitialGameState } from "../game/state";
 import { BoardGrid } from "./board-grid";
+import { GameToolbar } from "./game-toolbar";
 import { pageToViewportPosition } from "./game-screen-interaction-helpers";
 import { gameScreenStyles as styles } from "./game-screen-styles";
 import { PieceTray } from "./piece-tray";
@@ -63,6 +64,15 @@ export function GameScreen(_props: { url: string }) {
     interactions.clearPendingTap();
     dispatch({ type: "board/reset" });
   }, [interactions]);
+  const handleUndo = React.useCallback(() => {
+    dispatch({ type: "history/undo" });
+  }, []);
+  const handleRedo = React.useCallback(() => {
+    dispatch({ type: "history/redo" });
+  }, []);
+  const handleSolve = React.useCallback(() => {
+    dispatch({ type: "solve/request" });
+  }, []);
 
   React.useEffect(() => {
     if (typeof window === "undefined") {
@@ -133,27 +143,42 @@ export function GameScreen(_props: { url: string }) {
         </View>
       ) : null}
       {isLandscapeBlocked ? null : (
-        <View style={[styles.layout, responsive.isStacked ? styles.layoutStacked : null]}>
-          <BoardGrid
-            board={viewModel.board}
-            cellSize={responsive.cellSize}
-            shakeToken={interactions.boardShakeToken}
-            onStartDragPlaced={interactions.handleStartDragPlaced}
-            snapTargetCellKeys={interactions.snapTargetKeySet}
-            onBoardGridElement={(element) => {
-              boardGridElementRef.current = element;
-            }}
-          />
-          <PieceTray
-            tray={viewModel.tray}
-            isStacked={responsive.isStacked}
-            cellSize={responsive.cellSize}
-            trayWidth={responsive.cardWidth}
-            onResetBoard={handleResetBoard}
-            returnTargetPieceId={interactions.trayReturnTargetPieceId}
-            onStartDrag={interactions.handleStartDrag}
-            onEndDrag={interactions.handleEndDrag}
-          />
+        <View style={styles.playArea}>
+          <View
+            style={[styles.toolbarWrap, responsive.isStacked ? styles.toolbarWrapStacked : null]}
+          >
+            <GameToolbar
+              isStacked={responsive.isStacked}
+              canUndo={false}
+              canRedo={false}
+              canSolve={true}
+              onReset={handleResetBoard}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+              onSolve={handleSolve}
+            />
+          </View>
+          <View style={[styles.layout, responsive.isStacked ? styles.layoutStacked : null]}>
+            <BoardGrid
+              board={viewModel.board}
+              cellSize={responsive.cellSize}
+              shakeToken={interactions.boardShakeToken}
+              onStartDragPlaced={interactions.handleStartDragPlaced}
+              snapTargetCellKeys={interactions.snapTargetKeySet}
+              onBoardGridElement={(element) => {
+                boardGridElementRef.current = element;
+              }}
+            />
+            <PieceTray
+              tray={viewModel.tray}
+              isStacked={responsive.isStacked}
+              cellSize={responsive.cellSize}
+              trayWidth={responsive.cardWidth}
+              returnTargetPieceId={interactions.trayReturnTargetPieceId}
+              onStartDrag={interactions.handleStartDrag}
+              onEndDrag={interactions.handleEndDrag}
+            />
+          </View>
         </View>
       )}
 

@@ -8,6 +8,18 @@ export const gameScreenStyles = StyleSheet.create({
     paddingVertical: 2,
     justifyContent: "flex-start",
   },
+  playArea: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+  },
+  toolbarWrap: {
+    width: "100%",
+    alignItems: "flex-end",
+  },
+  toolbarWrapStacked: {
+    alignItems: "center",
+  },
   layout: {
     display: "flex",
     flexDirection: "row",

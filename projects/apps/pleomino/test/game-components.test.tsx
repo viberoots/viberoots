@@ -30,14 +30,12 @@ describe("game components", () => {
         trayWidth={220}
         onStartDrag={() => {}}
         onEndDrag={() => {}}
-        onResetBoard={() => {}}
       />,
     );
 
     expect(html.match(/data-testid=\"pleomino-piece-view\"/g)?.length ?? 0).toBe(
       state.pieceCatalog.length,
     );
-    expect(html).toContain('data-testid="pleomino-action-reset"');
   });
 
   it("renders remaining supply counts for tray piece types", () => {
@@ -59,7 +57,6 @@ describe("game components", () => {
         trayWidth={220}
         onStartDrag={() => {}}
         onEndDrag={() => {}}
-        onResetBoard={() => {}}
       />,
     );
 
@@ -80,7 +77,6 @@ describe("game components", () => {
         trayWidth={260}
         onStartDrag={() => {}}
         onEndDrag={() => {}}
-        onResetBoard={() => {}}
       />,
     );
 

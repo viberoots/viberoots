@@ -11,6 +11,9 @@ import type { Cell, GameState } from "./types";
 
 export type GameAction =
   | { type: "state/replace"; state: GameState }
+  | { type: "history/undo" }
+  | { type: "history/redo" }
+  | { type: "solve/request" }
   | { type: "piece/select"; pieceId: string; instanceId?: string | null }
   | { type: "piece/preview"; pieceId: string; position: Cell | null }
   | {
@@ -28,6 +31,10 @@ export function pleominoGameReducer(state: GameState, action: GameAction): GameS
   switch (action.type) {
     case "state/replace":
       return action.state;
+    case "history/undo":
+    case "history/redo":
+    case "solve/request":
+      return state;
     case "piece/select":
       return reduceSelectPiece(state, action.pieceId, action.instanceId);
     case "piece/preview":

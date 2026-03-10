@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native-web";
+import { StyleSheet, View } from "react-native-web";
 import type { PixelPoint, PointerPoint } from "../game/interaction";
 import type { PieceTrayViewModel } from "../game/selectors";
 import { pieceBounds } from "./piece-view-helpers";
@@ -28,7 +28,6 @@ function PieceTrayBase(props: {
   ) => void;
   onEndDrag: (pointer?: PointerPoint | null, source?: "piece" | "global") => void;
   returnTargetPieceId?: string | null;
-  onResetBoard: () => void;
 }) {
   const rows = React.useMemo(() => {
     const ordered = orderedTrayPieces(props.tray.pieces, props.isStacked);
@@ -83,15 +82,6 @@ function PieceTrayBase(props: {
         },
       ]}
     >
-      <Pressable
-        style={[styles.resetButton, props.isStacked ? styles.resetButtonStacked : null]}
-        onPress={props.onResetBoard}
-        accessibilityRole="button"
-        accessibilityLabel="Reset board"
-        testID="pleomino-action-reset"
-      >
-        <Text style={styles.resetButtonText}>↺</Text>
-      </Pressable>
       <View
         style={props.isStacked ? styles.stackedRows : styles.desktopRows}
         testID="pleomino-piece-tray-grid"
@@ -123,28 +113,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingVertical: 2,
     gap: 10,
-  },
-  resetButton: {
-    alignSelf: "flex-end",
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: "#6e90bf",
-    backgroundColor: "#325786",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  resetButtonStacked: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-  },
-  resetButtonText: {
-    color: "#eef5ff",
-    fontSize: 18,
-    lineHeight: 18,
-    fontWeight: "700",
   },
   desktopRows: {
     display: "flex",
