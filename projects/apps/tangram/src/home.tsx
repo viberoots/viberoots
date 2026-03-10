@@ -1,6 +1,6 @@
 import React from "react";
-import { GameShell } from "./ui/game-shell";
+import { GameScreen } from "./ui/game-screen";
 
 export function Home(props: { url: string }) {
-  return <GameShell url={props.url} />;
+  return <GameScreen url={props.url} />;
 }

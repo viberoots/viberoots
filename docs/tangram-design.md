@@ -130,6 +130,27 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
   - `game-geometry.test.ts`
   - `game-placement.test.ts`
   - updated SSR smoke test: `entry-server.test.ts`
+- PR-2 piece catalog pipeline is implemented in `projects/apps/tangram`:
+  - static catalog source: `src/game/piece-catalog.ts`
+  - catalog validation: `src/game/piece-catalog-validation.ts`
+  - validated state wiring: `src/game/state.ts`
+  - tests:
+    - `test/game-piece-catalog.test.ts`
+    - `test/entry-server.test.ts` (catalog render assertion)
+- PR-3 board/tray rendering and reducer-driven state are implemented in
+  `projects/apps/tangram`:
+  - reducer/actions: `src/game/reducer.ts`
+  - selector-only view models: `src/game/selectors.ts`
+  - UI components:
+    - `src/ui/game-screen.tsx`
+    - `src/ui/board-grid.tsx`
+    - `src/ui/piece-tray.tsx`
+    - `src/ui/piece-view.tsx`
+    - `src/ui/toolbar.tsx`
+  - tests:
+    - `test/game-reducer.test.ts`
+    - `test/game-components.test.tsx`
+    - `test/entry-server.test.ts` (deterministic SSR markup handshake assertion)
 - PR-1.5 is implemented in verify preflight selection:
   - new selector utility: `build-tools/tools/lib/project-impact-selector.ts`
   - verify wiring: `build-tools/tools/dev/verify/template-test-scope.ts`
@@ -159,6 +180,100 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
   - `isPlacementValid(boardSize, occupiedSet, cells)` returns true only when:
     - every cell is within board bounds
     - no transformed cell key overlaps the occupied set
+
+## Piece Catalog Source of Truth (PR-2)
+
+The only runtime source of truth for piece geometry and color is
+`projects/apps/tangram/src/game/piece-catalog.ts`.
+All piece entries are validated by `validatePieceCatalog(...)` in
+`src/game/piece-catalog-validation.ts` before they are exposed through
+`createInitialGameState(...)`.
+
+### Manual extraction workflow
+
+1. Capture normalized top-down product photos with one piece-color mapping per piece ID.
+2. Transcribe piece cells in integer board-cell units into `piece-catalog.ts`.
+3. Min-anchor each piece to `(0,0)` and keep deterministic y-then-x cell ordering.
+4. Run catalog validation tests and confirm canonical signatures are unchanged unless the edit is intentional.
+
+### Normalization rules
+
+- Every piece must have non-empty integer `baseCells`.
+- No duplicate cells are allowed within a piece.
+- `pieceId` values are unique across the catalog.
+- Canonical signatures (from normalized cell ordering) are unique across pieces.
+
+### Update protocol
+
+1. Edit only `src/game/piece-catalog.ts` for geometry/color changes.
+2. Run `projects/apps/tangram/test/game-piece-catalog.test.ts` via `v //projects/apps/tangram:unit`.
+3. If a shape change is intentional, update the golden metadata/signature assertions in
+   `test/game-piece-catalog.test.ts` in the same PR.
+4. Keep `createInitialGameState()` wired to the validated catalog and do not duplicate catalog data in UI code.
+
+### Piece IDs and color tokens
+
+- `tan-large-a`: `#ef4444`
+- `tan-large-b`: `#f97316`
+- `tan-medium`: `#facc15`
+- `tan-small-a`: `#22c55e`
+- `tan-small-b`: `#06b6d4`
+- `tan-square`: `#3b82f6`
+- `tan-parallelogram`: `#a855f7`
+
+### Ownership expectations
+
+- Product-level catalog updates require a single owner-reviewed PR.
+- Any catalog edit must include validation test updates when signatures/metadata change.
+- Reducer/UI code must consume the validated catalog from state, not ad hoc piece constants.
+
+## Reducer + UI Architecture (PR-3)
+
+### Component tree and data flow
+
+```mermaid
+flowchart TD
+  A["GameScreen"] --> B["tangramGameReducer(state, action)"]
+  B --> C["GameState"]
+  C --> D["selectGameViewModel(state)"]
+  D --> E["BoardGrid"]
+  D --> F["PieceTray"]
+  D --> G["Toolbar"]
+  F --> H["PieceView"]
+```
+
+- Input flow: `PieceView`/`Toolbar` user events dispatch reducer actions in `GameScreen`.
+- State flow: reducer returns a new `GameState` deterministically.
+- Render flow: UI consumes only selector outputs (`selectGameViewModel`) and does not derive
+  mutable ad hoc view state.
+
+### Action contracts
+
+- `piece/select`:
+  - sets `selectedPieceId` for known pieces
+  - unknown `pieceId` is a no-op
+- `piece/preview`:
+  - stores board-cell preview origin for a piece (`previewByPieceId[pieceId]`)
+  - preview coordinates are integer-normalized
+- `piece/commit`:
+  - transforms candidate cells from catalog geometry + piece transform
+  - validates with `isPlacementValid(boardSize, occupiedSet, candidateCells)` using occupied cells
+    from all other placed pieces
+  - on success: upserts placed piece and clears preview
+  - on failure: applies deterministic revert to last committed position (or `null` for never-placed
+    pieces)
+- `piece/revert`:
+  - restores preview for selected piece to last committed placement position or `null`
+- `board/reset`:
+  - clears placements/selection/previews to deterministic initial values
+
+### Reducer invariants
+
+- Board occupancy is derived only from committed `board.placedPieces`; previews are non-committed.
+- Placement validity is centralized in existing geometry/placement utilities and never re-implemented
+  in UI.
+- Reducer updates are pure and deterministic; no timing-dependent or random behavior is allowed.
+- `BoardGrid`, `PieceTray`, and `Toolbar` render from selector output only.
 
 ## Appendix A: Development Plan (PR Sequence)
 

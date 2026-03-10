@@ -11,7 +11,7 @@ export type PieceTransform = {
 export type PieceDefinition = {
   pieceId: string;
   color: string;
-  baseCells: Cell[];
+  baseCells: readonly Cell[];
 };
 
 export type PlacedPiece = {
@@ -31,7 +31,11 @@ export type BoardState = {
   placedPieces: PlacedPiece[];
 };
 
+export type PiecePreviewMap = Record<string, Cell | null>;
+
 export type GameState = {
   board: BoardState;
-  pieceCatalog: PieceDefinition[];
+  pieceCatalog: readonly PieceDefinition[];
+  selectedPieceId: string | null;
+  previewByPieceId: PiecePreviewMap;
 };

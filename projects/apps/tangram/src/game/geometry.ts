@@ -17,7 +17,7 @@ function applyHorizontalFlip(cell: Cell): Cell {
   return { x: -cell.x, y: cell.y };
 }
 
-export function normalizeCells(cells: Cell[]): Cell[] {
+export function normalizeCells(cells: readonly Cell[]): Cell[] {
   if (cells.length === 0) {
     return [];
   }
@@ -35,7 +35,7 @@ export function normalizeCells(cells: Cell[]): Cell[] {
     });
 }
 
-export function transformCells(baseCells: Cell[], transform: PieceTransform): Cell[] {
+export function transformCells(baseCells: readonly Cell[], transform: PieceTransform): Cell[] {
   const transformed = baseCells.map((baseCell) => {
     const rotated = applyRotation(baseCell, transform.rotation);
     return transform.flipped ? applyHorizontalFlip(rotated) : rotated;
@@ -43,11 +43,11 @@ export function transformCells(baseCells: Cell[], transform: PieceTransform): Ce
   return normalizeCells(transformed);
 }
 
-export function translateCells(cells: Cell[], origin: Cell): Cell[] {
+export function translateCells(cells: readonly Cell[], origin: Cell): Cell[] {
   return cells.map((cell) => ({ x: cell.x + origin.x, y: cell.y + origin.y }));
 }
 
-export function canonicalCellSignature(cells: Cell[]): string {
+export function canonicalCellSignature(cells: readonly Cell[]): string {
   return normalizeCells(cells)
     .map((cell) => `${cell.x},${cell.y}`)
     .join(";");
