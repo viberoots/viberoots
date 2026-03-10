@@ -10,6 +10,14 @@ test("verify includes a bounded lint preflight (enforcement)", async () => {
     "expected build-tools/tools/bin/verify to include a lint preflight to avoid wasting time on verify when formatting/lint is dirty",
   );
   assert.ok(
+    txt.includes("collectChangedPaths"),
+    "expected verify lint preflight to scope lint/prettier to changed files by default",
+  );
+  assert.ok(
+    txt.includes("--no-warn-ignored"),
+    "expected verify lint preflight to suppress ignored-file warnings for explicit changed-file runs",
+  );
+  assert.ok(
     txt.includes("VERIFY_LINT_TIMEOUT_SECS"),
     "expected build-tools/tools/bin/verify to bound lint preflight runtime via VERIFY_LINT_TIMEOUT_SECS",
   );

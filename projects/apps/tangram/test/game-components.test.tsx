@@ -34,11 +34,11 @@ describe("game components", () => {
   it("renders selected-piece highlighting text in the tray", () => {
     const selectedState = tangramGameReducer(createInitialGameState(), {
       type: "piece/select",
-      pieceId: "tan-large-a",
+      pieceId: "purple-2-1",
     });
     const viewModel = selectGameViewModel(selectedState);
     const html = renderToStaticMarkup(<PieceTray tray={viewModel.tray} onSelectPiece={() => {}} />);
 
-    expect(html).toMatch(/data-testid=\"tangram-piece-status-tan-large-a\"[^>]*>Selected</);
+    expect(html).toMatch(/data-testid=\"tangram-piece-status-purple-2-1\"[^>]*>Selected</);
   });
 });

@@ -1,6 +1,8 @@
 import path from "node:path";
 import process from "node:process";
+import * as fsp from "node:fs/promises";
 import "zx/globals";
+import { collectChangedPaths } from "../../lib/build-system-test-scope.ts";
 import { runNodeWithZx } from "../../lib/node-run.ts";
 
 async function runVerifyFileSizePreflight(root: string, zxInitPath: string): Promise<void> {
@@ -54,6 +56,64 @@ async function runVerifyNixGapsPolicyPreflight(root: string, zxInitPath: string)
   }
 }
 
+function normalizeRepoPath(relPath: string): string {
+  return String(relPath || "")
+    .replace(/\\/g, "/")
+    .trim();
+}
+
+function shouldIgnoreLintPath(relPath: string): boolean {
+  if (!relPath) return true;
+  if (relPath.includes("/node_modules/") || relPath.startsWith("node_modules/")) return true;
+  if (relPath.includes("/buck-out/") || relPath.startsWith("buck-out/")) return true;
+  if (relPath.includes("/coverage/") || relPath.startsWith("coverage/")) return true;
+  if (relPath.includes("/.clinic/") || relPath.startsWith(".clinic/")) return true;
+  if (relPath.includes("/.vite-cache/") || relPath.startsWith(".vite-cache/")) return true;
+  return false;
+}
+
+function isEslintPath(relPath: string): boolean {
+  return relPath.endsWith(".ts") || relPath.endsWith(".tsx");
+}
+
+function isPrettierPath(relPath: string): boolean {
+  return (
+    relPath.endsWith(".ts") ||
+    relPath.endsWith(".tsx") ||
+    relPath.endsWith(".js") ||
+    relPath.endsWith(".mjs") ||
+    relPath.endsWith(".cjs") ||
+    relPath.endsWith(".md") ||
+    relPath.endsWith(".json") ||
+    relPath.endsWith(".yml") ||
+    relPath.endsWith(".yaml")
+  );
+}
+
+async function pathIsFile(root: string, relPath: string): Promise<boolean> {
+  try {
+    const stat = await fsp.stat(path.resolve(root, relPath));
+    return stat.isFile();
+  } catch {
+    return false;
+  }
+}
+
+async function resolveChangedLintPaths(root: string): Promise<string[]> {
+  const changedPaths = await collectChangedPaths(root, process.env);
+  const normalized = Array.from(
+    new Set(changedPaths.map((p) => normalizeRepoPath(p)).filter((p) => !shouldIgnoreLintPath(p))),
+  ).sort();
+  if (normalized.length === 0) {
+    return [];
+  }
+
+  const checks = await Promise.all(
+    normalized.map(async (relPath) => [relPath, await pathIsFile(root, relPath)] as const),
+  );
+  return checks.filter(([, isFile]) => isFile).map(([relPath]) => `./${relPath}`);
+}
+
 export async function runVerifyLintPreflight(
   root: string,
   zxInitPath: string,
@@ -79,23 +139,28 @@ export async function runVerifyLintPreflight(
   const lintFilters = Array.isArray(opts.lintFilters)
     ? opts.lintFilters.map((x) => String(x || "").trim()).filter(Boolean)
     : [];
-  const scoped = lintFilters.length > 0;
+  const changedLintPaths = lintFilters.length > 0 ? [] : await resolveChangedLintPaths(root);
+  const eslintTargets =
+    lintFilters.length > 0 ? lintFilters : changedLintPaths.filter(isEslintPath);
+  const prettierTargets =
+    lintFilters.length > 0 ? lintFilters : changedLintPaths.filter(isPrettierPath);
+  const scoped = lintFilters.length > 0 || changedLintPaths.length > 0;
+  if (!scoped) {
+    process.stderr.write("[verify] lint preflight: skipped (no changed lint/prettier files)\n");
+  }
   const lintCmd = scoped
-    ? `pnpm exec eslint ${lintFilters.join(" ")} --ext .ts --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern '**/.vite-cache/**' && pnpm exec prettier -c ${lintFilters.join(" ")}`
-    : "pnpm -s lint";
+    ? `${eslintTargets.length > 0 ? `pnpm exec eslint --no-warn-ignored ${eslintTargets.join(" ")} --ext .ts,.tsx --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern '**/.vite-cache/**' && ` : ""}pnpm exec prettier -c ${prettierTargets.join(" ")}`
+    : "skip (no changed lint/prettier files)";
   process.stderr.write(`[verify] lint preflight: timeout -k 10s ${secs}s ${lintCmd}\n`);
 
-  const eslintRes = scoped
-    ? await $({
-        stdio: "inherit",
-        cwd: root,
-        reject: false,
-      })`timeout -k 10s ${secs}s pnpm exec eslint ${lintFilters} --ext .ts --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern "**/.vite-cache/**"`
-    : await $({
-        stdio: "inherit",
-        cwd: root,
-        reject: false,
-      })`timeout -k 10s ${secs}s pnpm -s lint`;
+  const eslintRes =
+    scoped && eslintTargets.length > 0
+      ? await $({
+          stdio: "inherit",
+          cwd: root,
+          reject: false,
+        })`timeout -k 10s ${secs}s pnpm exec eslint --no-warn-ignored ${eslintTargets} --ext .ts,.tsx --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern "**/.vite-cache/**"`
+      : { exitCode: 0 };
   if (eslintRes.exitCode !== 0) {
     process.stderr.write(
       "error: lint preflight failed; refusing to run verify while formatting/lint is dirty\n" +
@@ -103,12 +168,12 @@ export async function runVerifyLintPreflight(
     );
     process.exit(2);
   }
-  if (scoped) {
+  if (scoped && prettierTargets.length > 0) {
     const prettierRes = await $({
       stdio: "inherit",
       cwd: root,
       reject: false,
-    })`timeout -k 10s ${secs}s pnpm exec prettier -c ${lintFilters}`;
+    })`timeout -k 10s ${secs}s pnpm exec prettier -c ${prettierTargets}`;
     if (prettierRes.exitCode !== 0) {
       process.stderr.write(
         "error: lint preflight failed; refusing to run verify while formatting/lint is dirty\n" +

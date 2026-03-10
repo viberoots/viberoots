@@ -3,8 +3,6 @@ import { StyleSheet, Text, View } from "react-native-web";
 import type { BoardViewModel } from "../game/selectors";
 
 const CELL_SIZE = 32;
-const GRID_LINE_WIDTH = 1;
-const CELL_CONTENT_SIZE = CELL_SIZE - GRID_LINE_WIDTH;
 
 export function BoardGrid(props: { board: BoardViewModel }) {
   const rows = [];
@@ -13,14 +11,16 @@ export function BoardGrid(props: { board: BoardViewModel }) {
     const rowCells = props.board.cells.slice(rowStart, rowStart + props.board.columns);
     rows.push(
       <View key={row} style={styles.boardRow} testID="tangram-board-row">
-        {rowCells.map((cell, column) => (
+        {rowCells.map((cell) => (
           <View
             key={cell.key}
             style={[
               styles.boardCell,
-              column < props.board.columns - 1 ? styles.boardCellDividerRight : null,
-              row < props.board.rows - 1 ? styles.boardCellDividerBottom : null,
-              cell.color ? { backgroundColor: cell.color } : styles.boardCellEmpty,
+              cell.color
+                ? { backgroundColor: cell.color }
+                : (cell.x + cell.y) % 2 === 0
+                  ? styles.boardCellEmptyA
+                  : styles.boardCellEmptyB,
             ]}
             testID="tangram-board-cell"
           />
@@ -61,26 +61,20 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     alignSelf: "flex-start",
     overflow: "hidden",
-    borderWidth: GRID_LINE_WIDTH,
-    borderColor: "#cbd5e1",
+    borderRadius: 6,
   },
   boardRow: {
     display: "flex",
     flexDirection: "row",
   },
   boardCell: {
-    width: CELL_CONTENT_SIZE,
-    height: CELL_CONTENT_SIZE,
+    width: CELL_SIZE,
+    height: CELL_SIZE,
   },
-  boardCellEmpty: {
-    backgroundColor: "#f1f5f9",
+  boardCellEmptyA: {
+    backgroundColor: "#e8d5b6",
   },
-  boardCellDividerRight: {
-    borderRightWidth: GRID_LINE_WIDTH,
-    borderColor: "#e2e8f0",
-  },
-  boardCellDividerBottom: {
-    borderBottomWidth: GRID_LINE_WIDTH,
-    borderColor: "#e2e8f0",
+  boardCellEmptyB: {
+    backgroundColor: "#e3cfad",
   },
 });

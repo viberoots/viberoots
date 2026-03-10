@@ -17,7 +17,7 @@ describe("render", () => {
     expect(html).toContain("/games/tangram");
     expect(html.match(/data-testid="tangram-board-row"/g)?.length ?? 0).toBe(15);
     expect(html.match(/data-testid="tangram-board-cell"/g)?.length ?? 0).toBe(150);
-    expect(html.match(/data-testid="tangram-piece-view"/g)?.length ?? 0).toBe(7);
+    expect(html.match(/data-testid="tangram-piece-view"/g)?.length ?? 0).toBe(8);
   });
 
   it("produces deterministic SSR markup for hydration handshake", () => {

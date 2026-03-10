@@ -213,13 +213,14 @@ All piece entries are validated by `validatePieceCatalog(...)` in
 
 ### Piece IDs and color tokens
 
-- `tan-large-a`: `#ef4444`
-- `tan-large-b`: `#f97316`
-- `tan-medium`: `#facc15`
-- `tan-small-a`: `#22c55e`
-- `tan-small-b`: `#06b6d4`
-- `tan-square`: `#3b82f6`
-- `tan-parallelogram`: `#a855f7`
+- `purple-2-1`: `#a855f7` (purple)
+- `red-2-2`: `#ef4444` (red)
+- `green-2-2`: `#22c55e` (green)
+- `blue-3-1`: `#3b82f6` (blue)
+- `yellow-1-2-1`: `#facc15` (yellow)
+- `orange-2-1-2`: `#f97316` (orange)
+- `black-1-1-1-1`: `#000000` (black)
+- `white-1-1`: `#ffffff` (white)
 
 ### Ownership expectations
 

@@ -17,7 +17,7 @@ export default [
     ],
   },
   {
-    files: ["**/*.ts"],
+    files: ["**/*.{ts,tsx}"],
     ignores: [
       "**/node_modules/**",
       "**/buck-out/**",
@@ -27,6 +27,7 @@ export default [
       "**/.vite-cache/**",
       "**/prelude/**",
       "**/._*.ts",
+      "**/._*.tsx",
       "build-tools/tools/scaffolding/templates/**",
     ],
     languageOptions: {

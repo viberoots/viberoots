@@ -29,6 +29,36 @@ function pieceStatusText(piece: PieceViewModel): string {
   return "Tray";
 }
 
+function clampColor(value: number): number {
+  return Math.max(0, Math.min(255, value));
+}
+
+function shiftHexColor(hexColor: string, delta: number): string {
+  const match = /^#([0-9a-fA-F]{6})$/.exec(hexColor);
+  if (!match) {
+    return hexColor;
+  }
+
+  const color = match[1];
+  const red = parseInt(color.slice(0, 2), 16);
+  const green = parseInt(color.slice(2, 4), 16);
+  const blue = parseInt(color.slice(4, 6), 16);
+  const nextRed = clampColor(red + delta);
+  const nextGreen = clampColor(green + delta);
+  const nextBlue = clampColor(blue + delta);
+
+  return `#${nextRed.toString(16).padStart(2, "0")}${nextGreen
+    .toString(16)
+    .padStart(2, "0")}${nextBlue.toString(16).padStart(2, "0")}`;
+}
+
+function texturedCellColor(baseColor: string, x: number, y: number): string {
+  if ((x + y) % 2 === 0) {
+    return baseColor;
+  }
+  return shiftHexColor(baseColor, baseColor.toLowerCase() === "#000000" ? 18 : -10);
+}
+
 export function PieceView(props: {
   piece: PieceViewModel;
   onSelectPiece: (pieceId: string) => void;
@@ -62,7 +92,7 @@ export function PieceView(props: {
               {
                 left: cell.x * MINI_CELL_SIZE,
                 top: cell.y * MINI_CELL_SIZE,
-                backgroundColor: props.piece.color,
+                backgroundColor: texturedCellColor(props.piece.color, cell.x, cell.y),
               },
             ]}
           />
@@ -82,7 +112,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#cbd5e1",
+    borderColor: "#d7dee7",
     backgroundColor: "#f8fafc",
     paddingVertical: 8,
     paddingHorizontal: 10,
@@ -100,8 +130,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: MINI_CELL_SIZE,
     height: MINI_CELL_SIZE,
-    borderWidth: 1,
-    borderColor: "#0f172a",
   },
   pieceId: {
     color: "#0f172a",

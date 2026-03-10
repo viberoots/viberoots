@@ -102,6 +102,8 @@ When adding or materially editing scaffold command guidance:
   - `nix build .#graph-generator`
 - Repo wrappers (preferred; thin shims that delegate into TypeScript and ensure the dev shell is loaded):
   - `i` (install deps), `b` (build), `v` (verify / full test suite)
+  - `v` lint/prettier preflight is changed-file scoped by default; `VERIFY_SKIP_LINT=1` still skips
+    the preflight when explicitly requested
 - `p` (run runnable target in `run.prod` mode), `d` (run runnable target in `run.dev` mode when available)
   - `v` includes a preflight run of the nix-gaps inventory/exception policy checker and fails fast on drift.
 - TypeScript scaffolding command surface (ts-only):
