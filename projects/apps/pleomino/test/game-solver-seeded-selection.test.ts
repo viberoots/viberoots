@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createSolverRequestFromGameState, solveBoardWithWasm } from "../src/game/solver/solver.ts";
+import { selectSeededRankedCandidate } from "../src/game/solver/seeded-selection.ts";
 import { createInitialGameState } from "../src/game/state.ts";
-import type { SolverRequest } from "../src/game/solver/solver-types.ts";
+import type { SolverRankedCandidate, SolverRequest } from "../src/game/solver/solver-types.ts";
 
 const UNIT_PIECES = [
   { pieceId: "a", color: "#101010", baseCells: [{ x: 0, y: 0 }] },
@@ -25,6 +26,29 @@ function makeSeededRequest(seed: number): SolverRequest {
 }
 
 describe("solver seeded selection", () => {
+  it("does not collapse sequential seeds to one index for small selection windows", () => {
+    const candidates: SolverRankedCandidate[] = [
+      { placements: [], interestingnessScore: 1, foundAtNode: 1, signature: "a" },
+      { placements: [], interestingnessScore: 0.9, foundAtNode: 2, signature: "b" },
+      { placements: [], interestingnessScore: 0.8, foundAtNode: 3, signature: "c" },
+    ];
+    const signatures = new Set<string>();
+    for (let seed = 1; seed <= 16; seed += 1) {
+      const selected = selectSeededRankedCandidate(candidates, {
+        boardSize: { columns: 2, rows: 2 },
+        pieceCatalog: [],
+        lockedPlacements: [],
+        remainingInventory: {},
+        maxNodeExpansions: 1,
+        maxWallClockMs: 1,
+        randomSeed: seed,
+        selectionWindowSize: 3,
+      });
+      signatures.add(selected?.signature ?? "");
+    }
+    expect(signatures.size).toBeGreaterThan(1);
+  });
+
   it("returns a stable selected signature for the same seed", async () => {
     const request = makeSeededRequest(7);
     const first = await solveBoardWithWasm(request);
