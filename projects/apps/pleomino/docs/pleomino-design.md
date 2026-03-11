@@ -224,6 +224,21 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
   - tests:
     - `test/game-toolbar.test.tsx`
     - `test/game-reducer.test.ts` (placeholder no-op contract)
+- PR-9 solver core with deterministic candidate generation and C++/WASM search is implemented in
+  `projects/apps/pleomino` and `projects/libs/pleomino-solver-wasm`:
+  - C++ wasm solver target + export wrapper:
+    - `projects/libs/pleomino-solver-wasm/src/solver.cc`
+    - `projects/libs/pleomino-solver-wasm/TARGETS`
+  - app wasm asset staging:
+    - `projects/apps/pleomino/TARGETS` (client/server wasm destinations)
+  - pure solver modules:
+    - `src/game/solver/solver-types.ts`
+    - `src/game/solver/candidate-generation.ts`
+    - `src/game/solver/wasm-runtime.ts`
+    - `src/game/solver/solver.ts`
+  - tests:
+    - `test/game-solver-candidates.test.ts`
+    - `test/game-solver-wasm.test.ts`
 
 ## Domain Foundations (PR-1 Locked Conventions)
 

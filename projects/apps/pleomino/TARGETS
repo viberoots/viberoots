@@ -8,7 +8,10 @@ node_webapp(
 node_asset_stage(
     name = "app",
     app = ":app_raw",
-    assets = [],
+    assets = [
+        {"src": "//projects/libs/pleomino-solver-wasm:app", "dest": "client/pleomino-solver.wasm"},
+        {"src": "//projects/libs/pleomino-solver-wasm:app", "dest": "server/wasm/pleomino-solver.wasm"},
+    ],
     labels = ["lang:node", "kind:app", "webapp:ssr", "framework:vite"],
     out = "dist",
 )
