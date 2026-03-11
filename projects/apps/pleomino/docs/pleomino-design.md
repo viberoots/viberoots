@@ -286,6 +286,18 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
     - `test/game-solve-latency-guardrail.test.tsx`
   - target wiring for focused PR validation:
     - `TARGETS` (`nix_node_test(name = "pr14_latency", ...)`)
+- PR-15 seeded solve randomness and explicit empty-board solve mode are implemented in
+  `projects/apps/pleomino`:
+  - seeded top-window candidate selection:
+    - `src/game/solver/seeded-selection.ts`
+    - `src/game/solver/solver.ts` (`SolverRequest.randomSeed`, `selectionWindowSize`)
+    - `src/ui/game-screen-solve.ts` (request-scoped explicit seeds)
+  - focused seeded + empty-board solve coverage:
+    - `test/game-solver-seeded-selection.test.ts`
+    - updated `test/game-solve-browser.test.tsx`
+    - updated `test/game-solver-runtime.test.ts`
+  - target wiring for focused PR validation:
+    - `TARGETS` (`nix_node_test(name = "pr15_seeded", ...)`)
 
 ## Domain Foundations (PR-1 Locked Conventions)
 
@@ -1376,3 +1388,50 @@ This is a design-only proposal (no implementation in this section). The goal is 
    - hard maxima remain enforced (`maxSolveTriggerLatencyMsP95`,
      `maxSolveApplyCommitLatencyMsP95`).
 4. Re-run `v //projects/apps/pleomino:pr14_latency` and verify no unrelated test contracts changed.
+
+---
+
+## PR-15: Add Seeded Solve Randomness and Empty-board Solve Mode
+
+### Scope
+
+- Add controlled randomness to solve result selection so repeated solves can yield varied valid layouts.
+- Preserve reproducibility by making randomness seed-driven (no unseeded/non-deterministic runtime behavior).
+- Explicitly support solve requests from an empty board state (no locked placements).
+- Keep worker/runtime and reducer contracts unchanged for solved/unsolved application semantics.
+
+### Solve Behavior
+
+- Randomness model:
+  - generate/rank a bounded solution pool as today.
+  - select from a top-ranked candidate window using a seeded PRNG.
+  - default seed source is request-scoped and explicit in solver request payload.
+- Determinism contract:
+  - same board state + same seed + same budget => same selected solution signature.
+  - different seeds may produce different valid signatures from the candidate pool.
+- Empty-board mode:
+  - when `lockedPlacements` is empty, solver runs full-board solve against inventory constraints.
+  - no special fallback path; success/failure remains budget-bounded and explicit.
+
+### Implementation Notes
+
+- Reuse existing candidate generation, ranking, and wasm search outputs before adding new helpers.
+- Keep randomness selection in orchestration layer (after feasibility/ranking), not in C++ search core.
+- Extend `SolverRequest` with optional/randomness fields without breaking current callers.
+- Ensure worker message contracts include any new solve randomness parameters.
+
+### Tests
+
+- Unit tests:
+  - seeded selection stability: same seed yields same selected signature.
+  - seed variation: different seeds can produce different selected signatures for multi-solution fixtures.
+  - empty-board request path returns solved result on known solvable fixture.
+- Runtime tests:
+  - worker and fallback runtime parity for seeded requests.
+  - solve/apply integration remains stable with randomized-but-seeded results.
+
+### Acceptance Criteria
+
+- Solve behavior supports controlled variety without sacrificing reproducibility.
+- Empty-board solve path is explicitly covered and validated.
+- Existing solve lifecycle contracts (undo/redo/hash/latency guardrails) remain green.

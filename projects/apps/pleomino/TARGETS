@@ -37,3 +37,12 @@ nix_node_test(
     name = "pr14_latency",
     patterns = ["test/game-solve-latency-guardrail.test.tsx"],
 )
+
+nix_node_test(
+    name = "pr15_seeded",
+    patterns = [
+        "test/game-solver-seeded-selection.test.ts",
+        "test/game-solver-runtime.test.ts",
+        "test/game-solve-browser.test.tsx",
+    ],
+)

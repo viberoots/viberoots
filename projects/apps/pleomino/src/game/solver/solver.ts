@@ -8,6 +8,7 @@ import {
   rankSolutionsByInterestingness,
   scoreInterestingness,
 } from "./interestingness";
+import { selectSeededRankedCandidate } from "./seeded-selection";
 import type {
   SolverPlacement,
   SolverRankedCandidate,
@@ -190,7 +191,7 @@ export async function solveBoardWithWasm(request: SolverRequest): Promise<Solver
     preparedCandidates: prepared.candidates,
     wasmSolutions: wasmResult.solutions,
   });
-  const selected = rankedSolutions[0];
+  const selected = selectSeededRankedCandidate(rankedSolutions, request);
   return {
     status: wasmResult.statusCode === 1 && selected ? "solved" : "unsolved",
     placements: selected ? selected.placements : lockedPlacements,
@@ -209,6 +210,7 @@ export function createSolverRequestFromGameState(
   state: GameState,
   maxNodeExpansions: number,
   maxWallClockMs: number,
+  randomSeed?: number,
 ): SolverRequest {
   const lockedCounts = new Map<string, number>();
   for (const placement of state.board.placedPieces) {
@@ -228,6 +230,8 @@ export function createSolverRequestFromGameState(
     remainingInventory,
     maxNodeExpansions: Math.max(1, Math.trunc(maxNodeExpansions)),
     maxWallClockMs: Math.max(1, Math.trunc(maxWallClockMs)),
+    randomSeed:
+      randomSeed === undefined ? undefined : Math.max(1, Math.trunc(Math.abs(randomSeed))),
   };
 }
 

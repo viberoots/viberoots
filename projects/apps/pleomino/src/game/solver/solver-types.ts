@@ -10,6 +10,8 @@ export type SolverRequest = {
   maxNodeExpansions: number;
   maxWallClockMs: number;
   solutionPoolSize?: number;
+  randomSeed?: number;
+  selectionWindowSize?: number;
 };
 
 export type SolverPlacement = {

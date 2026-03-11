@@ -19,6 +19,7 @@ export function useGameScreenSolve(args: {
 }) {
   const stateRef = React.useRef<GameState>(args.state.present);
   const requestTokenRef = React.useRef(0);
+  const solveSeedRef = React.useRef(0);
   const [solveState, setSolveState] = React.useState<SolveUiState>("idle");
   const [isApplyingSolve, setIsApplyingSolve] = React.useState(false);
 
@@ -33,6 +34,8 @@ export function useGameScreenSolve(args: {
     const startState = stateRef.current;
     const requestToken = requestTokenRef.current + 1;
     requestTokenRef.current = requestToken;
+    solveSeedRef.current += 1;
+    const solveSeed = solveSeedRef.current;
     args.dispatch({ type: "solve/request" });
     setSolveState("solving");
     await deferSolveStart();
@@ -43,6 +46,7 @@ export function useGameScreenSolve(args: {
           startState,
           SOLVER_MAX_NODE_EXPANSIONS,
           SOLVER_MAX_WALL_CLOCK_MS,
+          solveSeed,
         ),
       );
     } catch {

@@ -174,4 +174,38 @@ describe("game screen solve integration", () => {
     await waitFor(() => container !== null && currentSolveStatusLabel(container) === "Unsolved");
     expect(readPersisted()).toEqual(preSolveSnapshot);
   });
+
+  it("passes explicit request-scoped solve seeds to runtime", async () => {
+    const solveBoardWithRuntime = vi.mocked(solverRuntime.solveBoardWithRuntime);
+    solveBoardWithRuntime.mockResolvedValue({
+      status: "unsolved",
+      placements: [],
+      nodeExpansions: 10,
+      elapsedMs: 1,
+      interestingnessScore: 0,
+      selectedSignature: "",
+    });
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    root.render(<GameScreen url="/games/pleomino" />);
+    await flushUi();
+
+    const solveButton = document.querySelector('[data-testid="pleomino-action-solve"]');
+    if (!(solveButton instanceof HTMLElement)) {
+      throw new Error("expected solve button");
+    }
+
+    solveButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    await waitFor(() => container !== null && currentSolveStatusLabel(container) === "Unsolved");
+    solveButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    await waitFor(() => solveBoardWithRuntime.mock.calls.length === 2);
+
+    const firstSeed = solveBoardWithRuntime.mock.calls[0]?.[0]?.randomSeed;
+    const secondSeed = solveBoardWithRuntime.mock.calls[1]?.[0]?.randomSeed;
+    expect(typeof firstSeed).toBe("number");
+    expect(typeof secondSeed).toBe("number");
+    expect(secondSeed).toBeGreaterThan(firstSeed ?? 0);
+  });
 });

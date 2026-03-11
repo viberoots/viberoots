@@ -46,6 +46,8 @@ function makeRequest(overrides: Partial<SolverRequest>): SolverRequest {
     remainingInventory: { alpha: 1, beta: 1 },
     maxNodeExpansions: 1000,
     maxWallClockMs: 1000,
+    randomSeed: 1,
+    selectionWindowSize: 2,
     ...overrides,
   };
 }
