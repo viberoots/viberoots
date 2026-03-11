@@ -19,7 +19,7 @@ function makeSeededRequest(seed: number): SolverRequest {
     maxNodeExpansions: 10_000,
     maxWallClockMs: 1_000,
     solutionPoolSize: 24,
-    selectionWindowSize: 8,
+    selectionWindowSize: 3,
     randomSeed: seed,
   };
 }

@@ -15,11 +15,13 @@ function clampSelectionWindowSize(value: number | undefined): number {
   return Math.max(1, Math.min(32, Math.trunc(value)));
 }
 
-function xorshift32(seed: number): number {
+function mixSeed32(seed: number): number {
   let value = seed >>> 0;
-  value ^= value << 13;
-  value ^= value >>> 17;
-  value ^= value << 5;
+  value ^= value >>> 16;
+  value = Math.imul(value, 0x85ebca6b);
+  value ^= value >>> 13;
+  value = Math.imul(value, 0xc2b2ae35);
+  value ^= value >>> 16;
   return value >>> 0;
 }
 
@@ -37,7 +39,7 @@ export function selectSeededRankedCandidate(
     candidates.length,
     clampSelectionWindowSize(request.selectionWindowSize),
   );
-  const randomWord = xorshift32(normalizeSeed(request.randomSeed));
+  const randomWord = mixSeed32(normalizeSeed(request.randomSeed));
   const selectedIndex = randomWord % windowSize;
   return candidates[selectedIndex];
 }
