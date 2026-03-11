@@ -9,6 +9,7 @@ import { BoardGrid } from "./board-grid";
 import { GameToolbar } from "./game-toolbar";
 import { pageToViewportPosition } from "./game-screen-interaction-helpers";
 import { gameScreenStyles as styles } from "./game-screen-styles";
+import { useGameScreenSolve } from "./game-screen-solve";
 import { PieceTray } from "./piece-tray";
 import { pointerFromPressEvent } from "./piece-view-helpers";
 import { computeResponsiveMetrics } from "./game-screen-responsive";
@@ -25,6 +26,8 @@ export function GameScreen(_props: { url: string }) {
   const [viewport, setViewport] = React.useState({ width: 0, height: 0 });
   const selectGameView = React.useMemo(() => createGameViewSelector(), []);
   const viewModel = selectGameView(presentState);
+  const solve = useGameScreenSolve({ state, dispatch });
+  const interactionLocked = solve.isApplyingSolve;
   const boardGridElementRef = React.useRef<HTMLElement | null>(null);
   const persistenceReadyRef = React.useRef(false);
   const responsive = React.useMemo(
@@ -47,6 +50,7 @@ export function GameScreen(_props: { url: string }) {
     state: presentState,
     cellSize: responsive.cellSize,
     dispatch,
+    interactionLocked,
     pieceById,
     placedByInstanceId,
     boardGridElementRef,
@@ -55,6 +59,7 @@ export function GameScreen(_props: { url: string }) {
   useGameScreenKeyboard({
     dispatch,
     dragSessionRef: interactions.dragSessionRef,
+    interactionLocked,
     placedByInstanceId,
     selectedPieceId: viewModel.toolbar.selectedPieceId,
     selectedInstanceId: viewModel.toolbar.selectedInstanceId,
@@ -72,8 +77,9 @@ export function GameScreen(_props: { url: string }) {
     dispatch({ type: "history/redo" });
   }, []);
   const handleSolve = React.useCallback(() => {
-    dispatch({ type: "solve/request" });
-  }, []);
+    interactions.clearPendingTap();
+    void solve.handleSolve();
+  }, [interactions, solve]);
 
   React.useEffect(() => {
     if (typeof window === "undefined") {
@@ -134,6 +140,7 @@ export function GameScreen(_props: { url: string }) {
             ? "yes"
             : "no"
       }
+      data-solve-state={solve.solveState}
     >
       {isLandscapeBlocked ? (
         <View style={styles.orientationLockCard} testID="pleomino-orientation-lock">
@@ -153,6 +160,7 @@ export function GameScreen(_props: { url: string }) {
               canUndo={state.past.length > 0}
               canRedo={state.future.length > 0}
               canSolve={true}
+              solveState={solve.solveState}
               onReset={handleResetBoard}
               onUndo={handleUndo}
               onRedo={handleRedo}

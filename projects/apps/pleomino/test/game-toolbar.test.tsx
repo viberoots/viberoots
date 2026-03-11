@@ -53,6 +53,7 @@ describe("game toolbar", () => {
         canUndo={true}
         canRedo={true}
         canSolve={true}
+        solveState="idle"
         onReset={() => {}}
         onUndo={() => {}}
         onRedo={() => {}}
@@ -65,6 +66,7 @@ describe("game toolbar", () => {
         canUndo={true}
         canRedo={true}
         canSolve={true}
+        solveState="idle"
         onReset={() => {}}
         onUndo={() => {}}
         onRedo={() => {}}
@@ -134,6 +136,7 @@ describe("game toolbar", () => {
         canUndo={true}
         canRedo={true}
         canSolve={true}
+        solveState="idle"
         onReset={() => {}}
         onUndo={() => {
           undoCalls += 1;
@@ -172,6 +175,7 @@ describe("game toolbar", () => {
         canUndo={true}
         canRedo={true}
         canSolve={true}
+        solveState="idle"
         onReset={() => {}}
         onUndo={() => {}}
         onRedo={() => {}}

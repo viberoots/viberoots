@@ -8,6 +8,7 @@ import { startDragFromPlaced, startDragFromTray } from "./game-screen-drag-start
 export function useDragStartHandlers(args: {
   state: GameState;
   dispatch: React.Dispatch<GameAction>;
+  interactionLocked: boolean;
   placedByInstanceId: Map<string, PlacedPiece>;
   dragSessionRef: React.MutableRefObject<ActiveDragSession | null>;
 }) {
@@ -18,7 +19,7 @@ export function useDragStartHandlers(args: {
       grabbedOffsetPx: PixelPoint | null,
       mouseButton?: number,
     ) => {
-      if (!grabbedOffsetPx) {
+      if (!grabbedOffsetPx || args.interactionLocked) {
         return;
       }
       startDragFromTray({
@@ -42,6 +43,9 @@ export function useDragStartHandlers(args: {
       pointer: Pointer,
       mouseButton?: number,
     ) => {
+      if (args.interactionLocked) {
+        return;
+      }
       startDragFromPlaced({
         pieceId,
         instanceId,

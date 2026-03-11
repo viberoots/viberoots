@@ -24,6 +24,7 @@ export function useGameScreenInteractions(args: {
   state: GameState;
   cellSize: number;
   dispatch: React.Dispatch<GameAction>;
+  interactionLocked: boolean;
   pieceById: Map<string, PieceDefinition>;
   placedByInstanceId: Map<string, PlacedPiece>;
   boardGridElementRef: React.MutableRefObject<HTMLElement | null>;
@@ -41,6 +42,7 @@ export function useGameScreenInteractions(args: {
   const { handleStartDrag, handleStartDragPlaced } = useDragStartHandlers({
     state: args.state,
     dispatch: args.dispatch,
+    interactionLocked: args.interactionLocked,
     placedByInstanceId: args.placedByInstanceId,
     dragSessionRef,
   });

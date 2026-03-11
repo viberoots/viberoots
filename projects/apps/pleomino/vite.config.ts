@@ -10,6 +10,13 @@ type PackageJson = {
   optionalDependencies?: Record<string, string>;
 };
 
+type WasmModuleManifest = {
+  modules?: Array<{
+    sourcePath?: string;
+    runtimeDestinations?: { server?: string };
+  }>;
+};
+
 const appRoot = fileURLToPath(new URL(".", import.meta.url));
 const workspaceRoot = path.resolve(appRoot, "../../..");
 const defaultHost = process.env.HOST || "0.0.0.0";
@@ -49,6 +56,50 @@ const optimizeDepsInclude = [
   "react-native-web",
 ];
 
+function copyServerWasmContracts(outDir: string) {
+  const manifestPath = path.join(appRoot, "src", "wasm-modules.manifest.json");
+  if (!fsp.existsSync(manifestPath)) {
+    return;
+  }
+  let manifest: WasmModuleManifest;
+  try {
+    manifest = JSON.parse(fsp.readFileSync(manifestPath, "utf8")) as WasmModuleManifest;
+  } catch {
+    return;
+  }
+  for (const entry of manifest.modules ?? []) {
+    const sourcePath = String(entry.sourcePath ?? "").trim();
+    const serverDest = String(entry.runtimeDestinations?.server ?? "").trim();
+    if (!sourcePath || !serverDest) {
+      continue;
+    }
+    const sourceAbs = path.resolve(appRoot, sourcePath);
+    if (!fsp.existsSync(sourceAbs)) {
+      continue;
+    }
+    const outAbs = path.resolve(appRoot, outDir, serverDest);
+    fsp.mkdirSync(path.dirname(outAbs), { recursive: true });
+    fsp.copyFileSync(sourceAbs, outAbs);
+  }
+}
+
+function serverWasmContractPlugin(isSsrBuild: boolean) {
+  let outDir = "dist/server";
+  return {
+    name: "pleomino-server-wasm-contract",
+    apply: "build" as const,
+    configResolved(config: { build: { outDir: string } }) {
+      outDir = config.build.outDir;
+    },
+    closeBundle() {
+      if (!isSsrBuild) {
+        return;
+      }
+      copyServerWasmContracts(outDir);
+    },
+  };
+}
+
 export default defineConfig(({ isSsrBuild }) => ({
   appType: "custom",
   clearScreen: false,
@@ -85,4 +136,5 @@ export default defineConfig(({ isSsrBuild }) => ({
   ssr: {
     noExternal: optimizeDepsExclude,
   },
+  plugins: [serverWasmContractPlugin(Boolean(isSsrBuild))],
 }));

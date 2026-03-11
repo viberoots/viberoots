@@ -83,6 +83,38 @@ describe("game history reducer", () => {
     expect(previewed.future).toEqual([]);
   });
 
+  it("solve apply is atomic and undo/redo restore exact snapshots", () => {
+    const initial = createInitialGameHistoryState();
+    const previewed = reduce(initial, {
+      type: "piece/preview",
+      pieceId: "purple-2-1",
+      position: { x: 1, y: 1 },
+    });
+    const solved = reduce(previewed, {
+      type: "solve/apply",
+      placements: [
+        {
+          pieceId: "purple-2-1",
+          transform: { rotation: 0, flipped: false },
+          position: { x: 0, y: 0 },
+        },
+        {
+          pieceId: "red-2-2",
+          transform: { rotation: 90, flipped: false },
+          position: { x: 4, y: 0 },
+        },
+      ],
+    });
+    expect(current(solved).previewByPieceId["purple-2-1"]).toBeNull();
+    expect(solved.past.length).toBe(1);
+
+    const undone = reduce(solved, { type: "history/undo" });
+    expect(current(undone)).toEqual(current(initial));
+
+    const redone = reduce(undone, { type: "history/redo" });
+    expect(current(redone)).toEqual(current(solved));
+  });
+
   it("caps past history length to keep reducer snapshots bounded", () => {
     let state = createInitialGameHistoryState();
     for (let index = 0; index < 240; index += 1) {

@@ -239,6 +239,30 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
   - tests:
     - `test/game-solver-candidates.test.ts`
     - `test/game-solver-wasm.test.ts`
+- PR-10 interestingness scoring and ranked solution selection are implemented in
+  `projects/apps/pleomino`:
+  - scoring internals:
+    - `src/game/solver/interestingness-metrics.ts`
+    - `src/game/solver/interestingness.ts`
+  - orchestration updates:
+    - `src/game/solver/solver.ts` (top-K ranking and deterministic tie-breakers)
+  - tests:
+    - `test/game-solver-interestingness.test.ts`
+    - `test/game-solver-wasm.test.ts` (ranking determinism contract)
+- PR-11 solve UI integration and non-blocking orchestration are implemented in
+  `projects/apps/pleomino`:
+  - async solve orchestration + stale-request cancellation token:
+    - `src/ui/game-screen-solve.ts`
+    - `src/ui/game-screen.tsx`
+  - atomic solve apply reducer path with history integration:
+    - `src/game/reducer.ts` (`solve/apply`)
+  - toolbar solve-state feedback:
+    - `src/ui/game-toolbar.tsx`
+  - tests:
+    - `test/game-history-reducer.test.ts`
+    - `test/game-solve-browser.test.tsx`
+    - `test/game-solve-cancellation-browser.test.tsx`
+    - `test/game-toolbar.test.tsx`
 
 ## Domain Foundations (PR-1 Locked Conventions)
 
@@ -1241,3 +1265,78 @@ This is a design-only proposal (no implementation in this section). The goal is 
   - `direnv` load
   - `i && b && v <new-tests>`
   - do not run full-suite `v` unless explicitly requested.
+
+---
+
+## PR-12: Move Solve Execution to Worker-backed Runtime Path
+
+### Scope
+
+- Move solve execution to a dedicated worker-backed path for browser runtime.
+- Keep deterministic request/response contracts and stale-request cancellation semantics.
+- Preserve deterministic fallback behavior where workers are unavailable.
+
+### Responsiveness
+
+- Solver compute runs off the main thread via Web Worker in client runtime.
+- Main-thread interaction lock remains minimal:
+  - lock only during final solve apply commit boundary.
+  - no broad lock during background search.
+- Stale worker responses are ignored via deterministic request token checks.
+
+### Tests
+
+- Browser integration:
+  - worker solve request/response path applies solved result correctly.
+  - stale worker response is ignored after board mutation/cancel.
+- Determinism:
+  - worker and fallback path return equivalent solve-apply outcomes for fixed fixtures.
+
+### Acceptance Criteria
+
+- Solve primary path is worker-backed in browser runtime.
+- Stale-request cancellation remains deterministic and race-safe.
+
+---
+
+## PR-13: Add Explicit Solve/Undo/Redo Regression-proofing for Preview and Hash Contracts
+
+### Scope
+
+- Add explicit regression-proofing for post-solve UI cleanup and persistence contracts.
+- Guarantee no preview ghost artifacts after solve apply, undo, and redo transitions.
+- Preserve commit-driven URL hash behavior under solve lifecycle.
+
+### Tests
+
+- Regression tests:
+  - no ghost preview cells after solve apply + undo + redo cycle.
+  - URL hash remains unchanged during solve-in-flight.
+  - URL hash updates only after committed solve apply.
+
+### Acceptance Criteria
+
+- Dedicated regression tests prevent preview ghost and hash-contract regressions.
+- Solve lifecycle persistence behavior is deterministic and commit-bounded.
+
+---
+
+## PR-14: Add Solve Interaction Latency Guardrail and Baseline
+
+### Scope
+
+- Add explicit performance guardrails tied to solve interactions.
+- Introduce repeatable interaction-latency measurement around solve lifecycle and apply commit.
+- Enforce bounded threshold against a checked-in baseline fixture.
+- Update `Implementation Status` notes so PR-11 through PR-14 responsibilities are auditable.
+
+### Tests
+
+- Performance tests:
+  - solve-trigger interaction latency benchmark stays within target threshold.
+  - no measurable regression vs baseline fixture for primary solve path.
+
+### Acceptance Criteria
+
+- Performance guardrail suite demonstrates no measurable interaction-latency regression.
+- Baseline update process is deterministic and documented.

@@ -9,8 +9,16 @@ node_asset_stage(
     name = "app",
     app = ":app_raw",
     assets = [
-        {"src": "//projects/libs/pleomino-solver-wasm:app", "dest": "client/pleomino-solver.wasm"},
-        {"src": "//projects/libs/pleomino-solver-wasm:app", "dest": "server/wasm/pleomino-solver.wasm"},
+        {
+            "src": "src/wasm-contract/pleomino-solver.wasm",
+            "dest": "client/pleomino-solver.wasm",
+            "artifact_name": "pleomino-solver.wasm",
+        },
+        {
+            "src": "src/wasm-contract/pleomino-solver.wasm",
+            "dest": "server/wasm/pleomino-solver.wasm",
+            "artifact_name": "pleomino-solver.wasm",
+        },
     ],
     labels = ["lang:node", "kind:app", "webapp:ssr", "framework:vite"],
     out = "dist",

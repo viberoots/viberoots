@@ -10,16 +10,33 @@ type ToolbarAction = {
   onPress: () => void;
 };
 
+export type ToolbarSolveState = "idle" | "solving" | "solved-applied" | "unsolved";
+
+function solveStatusLabel(state: ToolbarSolveState): string {
+  switch (state) {
+    case "solving":
+      return "Solving";
+    case "solved-applied":
+      return "Solved";
+    case "unsolved":
+      return "Unsolved";
+    default:
+      return "Idle";
+  }
+}
+
 function GameToolbarBase(props: {
   isStacked: boolean;
   canUndo: boolean;
   canRedo: boolean;
   canSolve: boolean;
+  solveState: ToolbarSolveState;
   onReset: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onSolve: () => void;
 }) {
+  const solving = props.solveState === "solving";
   const actions: ToolbarAction[] = [
     {
       key: "reset",
@@ -47,9 +64,9 @@ function GameToolbarBase(props: {
     {
       key: "solve",
       icon: "◈",
-      label: "Solve",
+      label: solving ? "Solving" : "Solve",
       testId: "pleomino-action-solve",
-      disabled: !props.canSolve,
+      disabled: !props.canSolve || solving,
       onPress: props.onSolve,
     },
   ];
@@ -59,6 +76,7 @@ function GameToolbarBase(props: {
       style={[styles.row, props.isStacked ? styles.rowStacked : styles.rowDesktop]}
       testID="pleomino-game-toolbar"
       data-layout={props.isStacked ? "stacked" : "desktop"}
+      data-solve-state={props.solveState}
     >
       {actions.map((action) => (
         <Pressable
@@ -73,6 +91,23 @@ function GameToolbarBase(props: {
           <Text style={styles.buttonIcon}>{action.icon}</Text>
         </Pressable>
       ))}
+      <View
+        style={[
+          styles.solveStateChip,
+          props.solveState === "solving"
+            ? styles.solveStateChipSolving
+            : props.solveState === "solved-applied"
+              ? styles.solveStateChipSolved
+              : props.solveState === "unsolved"
+                ? styles.solveStateChipUnsolved
+                : null,
+        ]}
+        testID="pleomino-solve-state"
+        accessibilityRole="status"
+        accessibilityLabel={`Solve state: ${solveStatusLabel(props.solveState)}`}
+      >
+        <Text style={styles.solveStateText}>{solveStatusLabel(props.solveState)}</Text>
+      </View>
     </View>
   );
 }
@@ -115,5 +150,31 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 18,
     fontWeight: "700",
+  },
+  solveStateChip: {
+    marginLeft: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#6e90bf",
+    backgroundColor: "#325786",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 62,
+    alignItems: "center",
+  },
+  solveStateChipSolving: {
+    backgroundColor: "#2e67a8",
+  },
+  solveStateChipSolved: {
+    backgroundColor: "#2f7f45",
+  },
+  solveStateChipUnsolved: {
+    backgroundColor: "#87443d",
+  },
+  solveStateText: {
+    color: "#eef5ff",
+    fontSize: 11,
+    lineHeight: 12,
+    fontWeight: "600",
   },
 });

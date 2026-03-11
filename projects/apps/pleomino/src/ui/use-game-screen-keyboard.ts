@@ -5,6 +5,7 @@ import type { GameState, PlacedPiece } from "../game/types";
 export function useGameScreenKeyboard(args: {
   dispatch: React.Dispatch<GameAction>;
   dragSessionRef: React.MutableRefObject<unknown | null>;
+  interactionLocked: boolean;
   placedByInstanceId: Map<string, PlacedPiece>;
   selectedPieceId: string | null;
   selectedInstanceId: string | null;
@@ -16,7 +17,7 @@ export function useGameScreenKeyboard(args: {
     }
 
     function handleKeyboard(event: KeyboardEvent) {
-      if (args.dragSessionRef.current) {
+      if (args.dragSessionRef.current || args.interactionLocked) {
         return;
       }
       const key = event.key.toLowerCase();
@@ -121,6 +122,7 @@ export function useGameScreenKeyboard(args: {
   }, [
     args.dispatch,
     args.dragSessionRef,
+    args.interactionLocked,
     args.placedByInstanceId,
     args.previewByPieceId,
     args.selectedInstanceId,

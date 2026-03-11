@@ -7,7 +7,7 @@ import {
   reduceSelectPiece,
 } from "./reducer-actions";
 import { reduceCommitPiece } from "./reducer-commit";
-import type { Cell, GameHistoryState, GameState } from "./types";
+import type { Cell, GameHistoryState, GameState, PieceTransform } from "./types";
 
 const MAX_HISTORY_ENTRIES = 200;
 
@@ -15,7 +15,14 @@ export type GameAction =
   | { type: "state/replace"; state: GameState }
   | { type: "history/undo" }
   | { type: "history/redo" }
-  | { type: "solve/commit" }
+  | {
+      type: "solve/apply";
+      placements: readonly {
+        pieceId: string;
+        transform: PieceTransform;
+        position: Cell;
+      }[];
+    }
   | { type: "solve/request" }
   | { type: "piece/select"; pieceId: string; instanceId?: string | null }
   | { type: "piece/preview"; pieceId: string; position: Cell | null }
@@ -40,15 +47,81 @@ function isHistoryState(state: GameHistoryState | GameState): state is GameHisto
   );
 }
 
+function placementSignature(placement: {
+  pieceId: string;
+  transform: PieceTransform;
+  position: Cell;
+}): string {
+  const { pieceId, position, transform } = placement;
+  return `${pieceId}|${position.x},${position.y}|${transform.rotation}|${transform.flipped ? "1" : "0"}`;
+}
+
+function clearAllPreviews(state: GameState): GameState["previewByPieceId"] {
+  const cleared: GameState["previewByPieceId"] = {};
+  for (const pieceId of Object.keys(state.previewByPieceId)) {
+    cleared[pieceId] = null;
+  }
+  return cleared;
+}
+
+function applySolvedPlacements(
+  state: GameState,
+  placements: readonly {
+    pieceId: string;
+    transform: PieceTransform;
+    position: Cell;
+  }[],
+): GameState {
+  const validPieceIds = new Set(state.pieceCatalog.map((piece) => piece.pieceId));
+  const remainingInstanceIdsBySignature = new Map<string, string[]>();
+  for (const placed of state.board.placedPieces) {
+    const signature = placementSignature(placed);
+    const ids = remainingInstanceIdsBySignature.get(signature) ?? [];
+    ids.push(placed.instanceId);
+    remainingInstanceIdsBySignature.set(signature, ids);
+  }
+
+  let nextPlacedInstanceId = state.nextPlacedInstanceId;
+  const nextPlacedPieces: GameState["board"]["placedPieces"] = [];
+  for (const placement of placements) {
+    if (!validPieceIds.has(placement.pieceId)) {
+      continue;
+    }
+    const signature = placementSignature(placement);
+    const reusableIds = remainingInstanceIdsBySignature.get(signature);
+    const instanceId = reusableIds?.shift() ?? `${placement.pieceId}#${nextPlacedInstanceId++}`;
+    nextPlacedPieces.push({
+      instanceId,
+      pieceId: placement.pieceId,
+      transform: placement.transform,
+      position: placement.position,
+      isPlaced: true,
+    });
+  }
+
+  return {
+    ...state,
+    board: {
+      ...state.board,
+      placedPieces: nextPlacedPieces,
+    },
+    selectedPieceId: null,
+    selectedInstanceId: null,
+    previewByPieceId: clearAllPreviews(state),
+    nextPlacedInstanceId,
+  };
+}
+
 function reducePresentState(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "state/replace":
       return action.state;
     case "history/undo":
     case "history/redo":
-    case "solve/commit":
     case "solve/request":
       return state;
+    case "solve/apply":
+      return applySolvedPlacements(state, action.placements);
     case "piece/select":
       return reduceSelectPiece(state, action.pieceId, action.instanceId);
     case "piece/preview":
@@ -97,7 +170,7 @@ function shouldTrackInHistory(action: GameAction): boolean {
     case "piece/rotate":
     case "piece/flip":
     case "board/reset":
-    case "solve/commit":
+    case "solve/apply":
       return true;
     default:
       return false;
