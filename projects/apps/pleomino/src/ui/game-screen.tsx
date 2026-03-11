@@ -4,7 +4,7 @@ import { transformCells } from "../game/geometry";
 import { loadPersistedGameStateFromHash, savePersistedGameStateToHash } from "../game/persistence";
 import { pleominoGameReducer } from "../game/reducer";
 import { createGameViewSelector } from "../game/view-selector";
-import { createInitialGameState } from "../game/state";
+import { createInitialGameHistoryState, createInitialGameState } from "../game/state";
 import { BoardGrid } from "./board-grid";
 import { GameToolbar } from "./game-toolbar";
 import { pageToViewportPosition } from "./game-screen-interaction-helpers";
@@ -19,11 +19,12 @@ export function GameScreen(_props: { url: string }) {
   const [state, dispatch] = React.useReducer(
     pleominoGameReducer,
     undefined,
-    createInitialGameState,
+    createInitialGameHistoryState,
   );
+  const presentState = state.present;
   const [viewport, setViewport] = React.useState({ width: 0, height: 0 });
   const selectGameView = React.useMemo(() => createGameViewSelector(), []);
-  const viewModel = selectGameView(state);
+  const viewModel = selectGameView(presentState);
   const boardGridElementRef = React.useRef<HTMLElement | null>(null);
   const persistenceReadyRef = React.useRef(false);
   const responsive = React.useMemo(
@@ -34,16 +35,16 @@ export function GameScreen(_props: { url: string }) {
     responsive.isStacked && viewport.height > 0 && viewport.width > viewport.height;
 
   const pieceById = React.useMemo(
-    () => new Map(state.pieceCatalog.map((piece) => [piece.pieceId, piece])),
-    [state.pieceCatalog],
+    () => new Map(presentState.pieceCatalog.map((piece) => [piece.pieceId, piece])),
+    [presentState.pieceCatalog],
   );
   const placedByInstanceId = React.useMemo(
-    () => new Map(state.board.placedPieces.map((piece) => [piece.instanceId, piece])),
-    [state.board.placedPieces],
+    () => new Map(presentState.board.placedPieces.map((piece) => [piece.instanceId, piece])),
+    [presentState.board.placedPieces],
   );
 
   const interactions = useGameScreenInteractions({
-    state,
+    state: presentState,
     cellSize: responsive.cellSize,
     dispatch,
     pieceById,
@@ -57,7 +58,7 @@ export function GameScreen(_props: { url: string }) {
     placedByInstanceId,
     selectedPieceId: viewModel.toolbar.selectedPieceId,
     selectedInstanceId: viewModel.toolbar.selectedInstanceId,
-    previewByPieceId: state.previewByPieceId,
+    previewByPieceId: presentState.previewByPieceId,
   });
 
   const handleResetBoard = React.useCallback(() => {
@@ -91,7 +92,7 @@ export function GameScreen(_props: { url: string }) {
       return;
     }
     try {
-      const restored = loadPersistedGameStateFromHash(window.location, state);
+      const restored = loadPersistedGameStateFromHash(window.location, createInitialGameState());
       if (restored) {
         interactions.clearPendingTap();
         dispatch({ type: "state/replace", state: restored });
@@ -109,9 +110,9 @@ export function GameScreen(_props: { url: string }) {
       return;
     }
     try {
-      savePersistedGameStateToHash(window.history, window.location, state);
+      savePersistedGameStateToHash(window.history, window.location, presentState);
     } catch {}
-  }, [state]);
+  }, [presentState]);
 
   return (
     <View
@@ -149,8 +150,8 @@ export function GameScreen(_props: { url: string }) {
           >
             <GameToolbar
               isStacked={responsive.isStacked}
-              canUndo={false}
-              canRedo={false}
+              canUndo={state.past.length > 0}
+              canRedo={state.future.length > 0}
               canSolve={true}
               onReset={handleResetBoard}
               onUndo={handleUndo}

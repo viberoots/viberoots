@@ -19,6 +19,18 @@ export function useGameScreenKeyboard(args: {
       if (args.dragSessionRef.current) {
         return;
       }
+      const key = event.key.toLowerCase();
+      const hasCommandModifier = event.metaKey || event.ctrlKey;
+      if (hasCommandModifier && !event.altKey && key === "z") {
+        event.preventDefault();
+        args.dispatch({ type: event.shiftKey ? "history/redo" : "history/undo" });
+        return;
+      }
+      if (hasCommandModifier && !event.altKey && key === "y") {
+        event.preventDefault();
+        args.dispatch({ type: "history/redo" });
+        return;
+      }
       if (!args.selectedPieceId) {
         return;
       }

@@ -45,3 +45,11 @@ export type GameState = {
   transformByPieceId: PieceTransformMap;
   nextPlacedInstanceId: number;
 };
+
+export type GameStateSnapshot = GameState;
+
+export type GameHistoryState = {
+  past: readonly GameStateSnapshot[];
+  present: GameState;
+  future: readonly GameStateSnapshot[];
+};

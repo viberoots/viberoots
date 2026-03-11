@@ -121,6 +121,47 @@ describe("game toolbar", () => {
     );
   });
 
+  it("undo/redo controls dispatch when enabled", async () => {
+    let undoCalls = 0;
+    let redoCalls = 0;
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    root.render(
+      <GameToolbar
+        isStacked={false}
+        canUndo={true}
+        canRedo={true}
+        canSolve={true}
+        onReset={() => {}}
+        onUndo={() => {
+          undoCalls += 1;
+        }}
+        onRedo={() => {
+          redoCalls += 1;
+        }}
+        onSolve={() => {}}
+      />,
+    );
+    await flushUi();
+
+    const undo = document.querySelector('[data-testid="pleomino-action-undo"]');
+    if (!(undo instanceof HTMLElement)) {
+      throw new Error("expected undo action");
+    }
+    undo.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+
+    const redo = document.querySelector('[data-testid="pleomino-action-redo"]');
+    if (!(redo instanceof HTMLElement)) {
+      throw new Error("expected redo action");
+    }
+    redo.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+
+    expect(undoCalls).toBe(1);
+    expect(redoCalls).toBe(1);
+  });
+
   it("action controls expose accessibility labels and keyboard focus", async () => {
     container = document.createElement("div");
     document.body.appendChild(container);

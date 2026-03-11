@@ -125,6 +125,29 @@ describe("game keyboard flow", () => {
       const afterCommit = persistedState();
       expect(afterCommit.board.placedPieces.length).toBe(1);
 
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "z",
+          bubbles: true,
+          ctrlKey: true,
+        }),
+      );
+      await flushUi();
+      const afterUndo = persistedState();
+      expect(afterUndo.board.placedPieces.length).toBe(0);
+
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "z",
+          bubbles: true,
+          ctrlKey: true,
+          shiftKey: true,
+        }),
+      );
+      await flushUi();
+      const afterRedo = persistedState();
+      expect(afterRedo.board.placedPieces.length).toBe(1);
+
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "r", bubbles: true }));
       await flushUi();
       const afterRotate = persistedState();
