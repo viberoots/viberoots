@@ -32,3 +32,8 @@ nix_node_test(
     name = "pr13_regression",
     patterns = ["test/game-solve-preview-hash-regression.test.tsx"],
 )
+
+nix_node_test(
+    name = "pr14_latency",
+    patterns = ["test/game-solve-latency-guardrail.test.tsx"],
+)

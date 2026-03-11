@@ -278,6 +278,14 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
     - `test/game-solve-preview-hash-regression.test.tsx`
   - solve integration suite remains focused on primary solve/undo/redo and unsolved paths:
     - updated `test/game-solve-browser.test.tsx`
+- PR-14 solve interaction latency guardrail and baseline are implemented in
+  `projects/apps/pleomino`:
+  - checked-in latency baseline fixture:
+    - `test/fixtures/solve-interaction-latency-baseline.json`
+  - dedicated interaction latency guardrail regression suite:
+    - `test/game-solve-latency-guardrail.test.tsx`
+  - target wiring for focused PR validation:
+    - `TARGETS` (`nix_node_test(name = "pr14_latency", ...)`)
 
 ## Domain Foundations (PR-1 Locked Conventions)
 
@@ -1355,3 +1363,16 @@ This is a design-only proposal (no implementation in this section). The goal is 
 
 - Performance guardrail suite demonstrates no measurable interaction-latency regression.
 - Baseline update process is deterministic and documented.
+
+### Baseline Update Process
+
+1. Run the dedicated guardrail target:
+   - `v //projects/apps/pleomino:pr14_latency`
+2. If the threshold needs intentional adjustment, update only
+   `test/fixtures/solve-interaction-latency-baseline.json` in the same PR.
+3. Keep update policy deterministic:
+   - baseline fields store p95 measurements for the fixed fixture.
+   - regression budget (`maxRegressionVsBaselineMs`) is explicit and bounded.
+   - hard maxima remain enforced (`maxSolveTriggerLatencyMsP95`,
+     `maxSolveApplyCommitLatencyMsP95`).
+4. Re-run `v //projects/apps/pleomino:pr14_latency` and verify no unrelated test contracts changed.

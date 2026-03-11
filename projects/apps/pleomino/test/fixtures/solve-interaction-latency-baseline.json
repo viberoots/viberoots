@@ -1,0 +1,8 @@
+{
+  "sampleCount": 7,
+  "baselineSolveTriggerLatencyMsP95": 18,
+  "baselineSolveApplyCommitLatencyMsP95": 32,
+  "maxRegressionVsBaselineMs": 48,
+  "maxSolveTriggerLatencyMsP95": 90,
+  "maxSolveApplyCommitLatencyMsP95": 140
+}
