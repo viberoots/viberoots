@@ -1,6 +1,7 @@
 import React from "react";
 import type { GameAction } from "../game/reducer";
-import { createSolverRequestFromGameState, solveBoardWithWasm } from "../game/solver/solver";
+import { solveBoardWithRuntime } from "../game/solver/solver-runtime";
+import { createSolverRequestFromGameState } from "../game/solver/solver";
 import type { GameHistoryState, GameState } from "../game/types";
 
 const SOLVER_MAX_NODE_EXPANSIONS = 150_000;
@@ -35,9 +36,9 @@ export function useGameScreenSolve(args: {
     args.dispatch({ type: "solve/request" });
     setSolveState("solving");
     await deferSolveStart();
-    let result: Awaited<ReturnType<typeof solveBoardWithWasm>>;
+    let result: Awaited<ReturnType<typeof solveBoardWithRuntime>>;
     try {
-      result = await solveBoardWithWasm(
+      result = await solveBoardWithRuntime(
         createSolverRequestFromGameState(
           startState,
           SOLVER_MAX_NODE_EXPANSIONS,

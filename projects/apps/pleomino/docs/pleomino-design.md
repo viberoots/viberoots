@@ -263,6 +263,16 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
     - `test/game-solve-browser.test.tsx`
     - `test/game-solve-cancellation-browser.test.tsx`
     - `test/game-toolbar.test.tsx`
+- PR-12 worker-backed solve runtime path is implemented in `projects/apps/pleomino`:
+  - worker runtime orchestration + deterministic fallback:
+    - `src/game/solver/solver-runtime.ts`
+    - `src/game/solver/solver-runtime-worker.ts`
+    - `src/ui/game-screen-solve.ts` (runtime entrypoint switch)
+  - tests:
+    - `test/game-solve-worker-browser.test.tsx`
+    - `test/game-solver-runtime.test.ts`
+    - updated `test/game-solve-browser.test.tsx`
+    - updated `test/game-solve-cancellation-browser.test.tsx`
 
 ## Domain Foundations (PR-1 Locked Conventions)
 

@@ -118,6 +118,9 @@ export default defineConfig(({ isSsrBuild }) => ({
           },
         },
   },
+  worker: {
+    format: "es",
+  },
   server: {
     strictPort: true,
     host: defaultHost,

@@ -6,17 +6,17 @@ import {
   loadPersistedGameStateFromHash,
   savePersistedGameStateToHash,
 } from "../src/game/persistence.ts";
-import * as solverModule from "../src/game/solver/solver.ts";
+import * as solverRuntime from "../src/game/solver/solver-runtime.ts";
 import { createInitialGameState } from "../src/game/state.ts";
 import { GameScreen } from "../src/ui/game-screen.tsx";
 
-vi.mock("../src/game/solver/solver.ts", async () => {
-  const actual = await vi.importActual<typeof import("../src/game/solver/solver.ts")>(
-    "../src/game/solver/solver.ts",
+vi.mock("../src/game/solver/solver-runtime.ts", async () => {
+  const actual = await vi.importActual<typeof import("../src/game/solver/solver-runtime.ts")>(
+    "../src/game/solver/solver-runtime.ts",
   );
   return {
     ...actual,
-    solveBoardWithWasm: vi.fn(),
+    solveBoardWithRuntime: vi.fn(),
   };
 });
 
@@ -78,8 +78,8 @@ describe("game screen solve integration", () => {
     ];
     seeded.nextPlacedInstanceId = 2;
     savePersistedGameStateToHash(window.history, window.location, seeded);
-    const solveBoardWithWasm = vi.mocked(solverModule.solveBoardWithWasm);
-    solveBoardWithWasm.mockResolvedValue({
+    const solveBoardWithRuntime = vi.mocked(solverRuntime.solveBoardWithRuntime);
+    solveBoardWithRuntime.mockResolvedValue({
       status: "solved",
       placements: [
         {
@@ -136,10 +136,10 @@ describe("game screen solve integration", () => {
 
   it("keeps hash unchanged while solving and updates only after solve apply commit", async () => {
     let resolveSolve:
-      | ((value: Awaited<ReturnType<typeof solverModule.solveBoardWithWasm>>) => void)
+      | ((value: Awaited<ReturnType<typeof solverRuntime.solveBoardWithRuntime>>) => void)
       | null = null;
-    const solveBoardWithWasm = vi.mocked(solverModule.solveBoardWithWasm);
-    solveBoardWithWasm.mockImplementation(
+    const solveBoardWithRuntime = vi.mocked(solverRuntime.solveBoardWithRuntime);
+    solveBoardWithRuntime.mockImplementation(
       () =>
         new Promise((resolve) => {
           resolveSolve = resolve;
@@ -193,8 +193,8 @@ describe("game screen solve integration", () => {
     ];
     seeded.nextPlacedInstanceId = 2;
     savePersistedGameStateToHash(window.history, window.location, seeded);
-    const solveBoardWithWasm = vi.mocked(solverModule.solveBoardWithWasm);
-    solveBoardWithWasm.mockResolvedValue({
+    const solveBoardWithRuntime = vi.mocked(solverRuntime.solveBoardWithRuntime);
+    solveBoardWithRuntime.mockResolvedValue({
       status: "unsolved",
       placements: [],
       nodeExpansions: 100,
