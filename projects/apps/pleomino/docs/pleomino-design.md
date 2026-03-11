@@ -267,12 +267,17 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
   - worker runtime orchestration + deterministic fallback:
     - `src/game/solver/solver-runtime.ts`
     - `src/game/solver/solver-runtime-worker.ts`
-    - `src/ui/game-screen-solve.ts` (runtime entrypoint switch)
+  - `src/ui/game-screen-solve.ts` (runtime entrypoint switch)
   - tests:
     - `test/game-solve-worker-browser.test.tsx`
     - `test/game-solver-runtime.test.ts`
     - updated `test/game-solve-browser.test.tsx`
     - updated `test/game-solve-cancellation-browser.test.tsx`
+- PR-13 solve preview/hash regression-proofing is implemented in `projects/apps/pleomino`:
+  - explicit regression suite for solve lifecycle preview + hash contracts:
+    - `test/game-solve-preview-hash-regression.test.tsx`
+  - solve integration suite remains focused on primary solve/undo/redo and unsolved paths:
+    - updated `test/game-solve-browser.test.tsx`
 
 ## Domain Foundations (PR-1 Locked Conventions)
 

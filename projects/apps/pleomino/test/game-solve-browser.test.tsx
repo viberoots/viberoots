@@ -134,52 +134,6 @@ describe("game screen solve integration", () => {
     await waitFor(() => (readPersisted()?.board.placedPieces.length ?? 0) === 2);
   });
 
-  it("keeps hash unchanged while solving and updates only after solve apply commit", async () => {
-    let resolveSolve:
-      | ((value: Awaited<ReturnType<typeof solverRuntime.solveBoardWithRuntime>>) => void)
-      | null = null;
-    const solveBoardWithRuntime = vi.mocked(solverRuntime.solveBoardWithRuntime);
-    solveBoardWithRuntime.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          resolveSolve = resolve;
-        }),
-    );
-
-    container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-    root.render(<GameScreen url="/games/pleomino" />);
-    await flushUi();
-
-    const initialHash = window.location.hash;
-    const solveButton = document.querySelector('[data-testid="pleomino-action-solve"]');
-    if (!(solveButton instanceof HTMLElement)) {
-      throw new Error("expected solve button");
-    }
-    solveButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-    await waitFor(() => container !== null && currentSolveStatusLabel(container) === "Solving");
-    expect(window.location.hash).toBe(initialHash);
-
-    resolveSolve?.({
-      status: "solved",
-      placements: [
-        {
-          pieceId: "purple-2-1",
-          transform: { rotation: 0, flipped: false },
-          position: { x: 0, y: 0 },
-        },
-      ],
-      nodeExpansions: 1,
-      elapsedMs: 1,
-      interestingnessScore: 0.2,
-      selectedSignature: "resolved",
-    });
-
-    await waitFor(() => window.location.hash !== initialHash);
-    await waitFor(() => container !== null && currentSolveStatusLabel(container) === "Solved");
-  });
-
   it("shows unsolved status and preserves board when solve fails", async () => {
     const seeded = createInitialGameState();
     seeded.board.placedPieces = [

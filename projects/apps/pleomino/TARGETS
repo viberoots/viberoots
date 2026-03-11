@@ -27,3 +27,8 @@ node_asset_stage(
 nix_node_test(
     name = "unit",
 )
+
+nix_node_test(
+    name = "pr13_regression",
+    patterns = ["test/game-solve-preview-hash-regression.test.tsx"],
+)
