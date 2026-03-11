@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { solveBoardWithWasm } from "../src/game/solver/solver.ts";
+import { createSolverRequestFromGameState, solveBoardWithWasm } from "../src/game/solver/solver.ts";
+import { createInitialGameState } from "../src/game/state.ts";
 import type { SolverRequest } from "../src/game/solver/solver-types.ts";
 
 const UNIT_PIECES = [
@@ -69,5 +70,21 @@ describe("solver seeded selection", () => {
     expect(result.status).toBe("solved");
     expect(result.placements).toHaveLength(1);
     expect(result.selectedSignature.length).toBeGreaterThan(0);
+  });
+
+  it("can produce varied seeded solutions for the empty-board pleomino request", async () => {
+    const state = createInitialGameState();
+    const signatures = new Set<string>();
+    for (let seed = 1; seed <= 6; seed += 1) {
+      const request = createSolverRequestFromGameState(state, 300_000, 1_200, {
+        randomSeed: seed,
+        solutionPoolSize: 32,
+        selectionWindowSize: 12,
+      });
+      const result = await solveBoardWithWasm(request);
+      expect(result.status).toBe("solved");
+      signatures.add(result.selectedSignature);
+    }
+    expect(signatures.size).toBeGreaterThan(1);
   });
 });

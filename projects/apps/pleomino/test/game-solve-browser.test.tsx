@@ -207,5 +207,8 @@ describe("game screen solve integration", () => {
     expect(typeof firstSeed).toBe("number");
     expect(typeof secondSeed).toBe("number");
     expect(secondSeed).toBeGreaterThan(firstSeed ?? 0);
+    expect(solveBoardWithRuntime.mock.calls[0]?.[0]?.maxNodeExpansions).toBe(300000);
+    expect(solveBoardWithRuntime.mock.calls[0]?.[0]?.solutionPoolSize).toBe(32);
+    expect(solveBoardWithRuntime.mock.calls[0]?.[0]?.selectionWindowSize).toBe(12);
   });
 });

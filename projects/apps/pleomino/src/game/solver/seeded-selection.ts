@@ -41,3 +41,16 @@ export function selectSeededRankedCandidate(
   const selectedIndex = randomWord % windowSize;
   return candidates[selectedIndex];
 }
+
+export function dedupeRankedCandidatesBySignature(
+  candidates: readonly SolverRankedCandidate[],
+): SolverRankedCandidate[] {
+  const bySignature = new Map<string, SolverRankedCandidate>();
+  for (const candidate of candidates) {
+    if (bySignature.has(candidate.signature)) {
+      continue;
+    }
+    bySignature.set(candidate.signature, candidate);
+  }
+  return [...bySignature.values()];
+}

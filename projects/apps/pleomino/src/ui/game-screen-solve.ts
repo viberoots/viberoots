@@ -6,6 +6,9 @@ import type { GameHistoryState, GameState } from "../game/types";
 
 const SOLVER_MAX_NODE_EXPANSIONS = 150_000;
 const SOLVER_MAX_WALL_CLOCK_MS = 1_200;
+const EMPTY_BOARD_MAX_NODE_EXPANSIONS = 300_000;
+const EMPTY_BOARD_SOLUTION_POOL_SIZE = 32;
+const EMPTY_BOARD_SELECTION_WINDOW_SIZE = 12;
 
 export type SolveUiState = "idle" | "solving" | "solved-applied" | "unsolved";
 
@@ -39,14 +42,19 @@ export function useGameScreenSolve(args: {
     args.dispatch({ type: "solve/request" });
     setSolveState("solving");
     await deferSolveStart();
+    const isEmptyBoard = startState.board.placedPieces.length === 0;
     let result: Awaited<ReturnType<typeof solveBoardWithRuntime>>;
     try {
       result = await solveBoardWithRuntime(
         createSolverRequestFromGameState(
           startState,
-          SOLVER_MAX_NODE_EXPANSIONS,
+          isEmptyBoard ? EMPTY_BOARD_MAX_NODE_EXPANSIONS : SOLVER_MAX_NODE_EXPANSIONS,
           SOLVER_MAX_WALL_CLOCK_MS,
-          solveSeed,
+          {
+            randomSeed: solveSeed,
+            solutionPoolSize: isEmptyBoard ? EMPTY_BOARD_SOLUTION_POOL_SIZE : undefined,
+            selectionWindowSize: isEmptyBoard ? EMPTY_BOARD_SELECTION_WINDOW_SIZE : undefined,
+          },
         ),
       );
     } catch {

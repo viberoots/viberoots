@@ -8,7 +8,7 @@ import {
   rankSolutionsByInterestingness,
   scoreInterestingness,
 } from "./interestingness";
-import { selectSeededRankedCandidate } from "./seeded-selection";
+import { dedupeRankedCandidatesBySignature, selectSeededRankedCandidate } from "./seeded-selection";
 import type {
   SolverPlacement,
   SolverRankedCandidate,
@@ -185,12 +185,14 @@ export async function solveBoardWithWasm(request: SolverRequest): Promise<Solver
     request.maxWallClockMs,
     solutionPoolSize,
   );
-  const rankedSolutions = rankSolvedCandidates({
-    request,
-    lockedPlacements,
-    preparedCandidates: prepared.candidates,
-    wasmSolutions: wasmResult.solutions,
-  });
+  const rankedSolutions = dedupeRankedCandidatesBySignature(
+    rankSolvedCandidates({
+      request,
+      lockedPlacements,
+      preparedCandidates: prepared.candidates,
+      wasmSolutions: wasmResult.solutions,
+    }),
+  );
   const selected = selectSeededRankedCandidate(rankedSolutions, request);
   return {
     status: wasmResult.statusCode === 1 && selected ? "solved" : "unsolved",
@@ -210,7 +212,11 @@ export function createSolverRequestFromGameState(
   state: GameState,
   maxNodeExpansions: number,
   maxWallClockMs: number,
-  randomSeed?: number,
+  options?: {
+    randomSeed?: number;
+    solutionPoolSize?: number;
+    selectionWindowSize?: number;
+  },
 ): SolverRequest {
   const lockedCounts = new Map<string, number>();
   for (const placement of state.board.placedPieces) {
@@ -230,8 +236,12 @@ export function createSolverRequestFromGameState(
     remainingInventory,
     maxNodeExpansions: Math.max(1, Math.trunc(maxNodeExpansions)),
     maxWallClockMs: Math.max(1, Math.trunc(maxWallClockMs)),
+    solutionPoolSize: options?.solutionPoolSize,
+    selectionWindowSize: options?.selectionWindowSize,
     randomSeed:
-      randomSeed === undefined ? undefined : Math.max(1, Math.trunc(Math.abs(randomSeed))),
+      options?.randomSeed === undefined
+        ? undefined
+        : Math.max(1, Math.trunc(Math.abs(options.randomSeed))),
   };
 }
 
