@@ -3,7 +3,11 @@ load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_emscripten_lib")
 
 nix_cpp_wasm_emscripten_lib(
     name = "solver_emscripten",
-    srcs = ["src/solver.cc"],
+    srcs = [
+        "src/solver-search.cc",
+        "src/solver-search.h",
+        "src/solver.cc",
+    ],
     exported_functions = ["_solver_alloc", "_solver_free", "_solver_search"],
     visibility = ["PUBLIC"],
 )
@@ -12,6 +16,8 @@ genrule(
     name = "app",
     srcs = [
         ":solver_emscripten",
+        "src/solver-search.cc",
+        "src/solver-search.h",
         "src/solver.cc",
         "//build-tools/tools/wasm:export-wasm-from-nix",
     ],

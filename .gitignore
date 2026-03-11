@@ -68,3 +68,6 @@ projects/apps/**/src/wasm-modules.manifest.json
 projects/apps/**/src/ts-modules.manifest.json
 projects/apps/**/app/wasm-modules.manifest.json
 projects/apps/**/app/ts-modules.manifest.json
+
+# Generated wasm producer artifacts
+projects/apps/**/.wasm-producer/

@@ -3,8 +3,20 @@ import { transformCells, translateCells } from "../geometry";
 import { cellKey } from "../placement";
 import type { GameState, PieceDefinition } from "../types";
 import { buildSolverPreparedInput } from "./candidate-generation";
-import type { SolverPlacement, SolverRequest, SolverResult } from "./solver-types";
+import {
+  canonicalPlacementSignature,
+  rankSolutionsByInterestingness,
+  scoreInterestingness,
+} from "./interestingness";
+import type {
+  SolverPlacement,
+  SolverRankedCandidate,
+  SolverRequest,
+  SolverResult,
+} from "./solver-types";
 import { runSolverSearchInWasm } from "./wasm-runtime";
+
+const DEFAULT_SOLUTION_POOL_SIZE = 8;
 
 function countLockedByPieceId(
   lockedPlacements: SolverRequest["lockedPlacements"],
@@ -74,6 +86,41 @@ function mapCandidatesToPlacements(
   return placements;
 }
 
+function clampSolutionPoolSize(value: number | undefined): number {
+  if (value === undefined) {
+    return DEFAULT_SOLUTION_POOL_SIZE;
+  }
+  return Math.max(1, Math.min(32, Math.trunc(value)));
+}
+
+function rankSolvedCandidates(args: {
+  request: SolverRequest;
+  lockedPlacements: readonly SolverPlacement[];
+  preparedCandidates: ReturnType<typeof buildSolverPreparedInput>["candidates"];
+  wasmSolutions: readonly { foundAtNode: number; candidateIndices: Int32Array }[];
+}): SolverRankedCandidate[] {
+  const rankedCandidates: SolverRankedCandidate[] = [];
+  for (const wasmSolution of args.wasmSolutions) {
+    const solvedPlacements = mapCandidatesToPlacements(
+      wasmSolution.candidateIndices,
+      args.preparedCandidates,
+    );
+    const placements = [...args.lockedPlacements, ...solvedPlacements];
+    rankedCandidates.push({
+      placements,
+      foundAtNode: wasmSolution.foundAtNode,
+      interestingnessScore: scoreInterestingness({
+        boardColumns: args.request.boardSize.columns,
+        boardRows: args.request.boardSize.rows,
+        pieceCatalog: args.request.pieceCatalog,
+        placements,
+      }),
+      signature: canonicalPlacementSignature(placements),
+    });
+  }
+  return rankSolutionsByInterestingness(rankedCandidates);
+}
+
 function countSetBits(mask: Uint32Array): number {
   let count = 0;
   for (const word of mask) {
@@ -88,6 +135,7 @@ function countSetBits(mask: Uint32Array): number {
 
 export async function solveBoardWithWasm(request: SolverRequest): Promise<SolverResult> {
   const start = Date.now();
+  const solutionPoolSize = clampSolutionPoolSize(request.solutionPoolSize);
   if (!validateLockedPlacements(request) || !coversRequiredArea(request)) {
     return {
       status: "unsolved",
@@ -98,6 +146,8 @@ export async function solveBoardWithWasm(request: SolverRequest): Promise<Solver
       })),
       nodeExpansions: 0,
       elapsedMs: Date.now() - start,
+      interestingnessScore: 0,
+      selectedSignature: "",
     };
   }
 
@@ -113,6 +163,8 @@ export async function solveBoardWithWasm(request: SolverRequest): Promise<Solver
       placements: lockedPlacements,
       nodeExpansions: 0,
       elapsedMs: Date.now() - start,
+      interestingnessScore: 1,
+      selectedSignature: canonicalPlacementSignature(lockedPlacements),
     };
   }
   if (prepared.candidates.length === 0) {
@@ -121,6 +173,8 @@ export async function solveBoardWithWasm(request: SolverRequest): Promise<Solver
       placements: lockedPlacements,
       nodeExpansions: 0,
       elapsedMs: Date.now() - start,
+      interestingnessScore: 0,
+      selectedSignature: "",
     };
   }
 
@@ -128,17 +182,22 @@ export async function solveBoardWithWasm(request: SolverRequest): Promise<Solver
     prepared,
     request.maxNodeExpansions,
     request.maxWallClockMs,
+    solutionPoolSize,
   );
-  const solvedPlacements = mapCandidatesToPlacements(
-    wasmResult.candidateIndices,
-    prepared.candidates,
-  );
+  const rankedSolutions = rankSolvedCandidates({
+    request,
+    lockedPlacements,
+    preparedCandidates: prepared.candidates,
+    wasmSolutions: wasmResult.solutions,
+  });
+  const selected = rankedSolutions[0];
   return {
-    status: wasmResult.statusCode === 1 ? "solved" : "unsolved",
-    placements:
-      wasmResult.statusCode === 1 ? [...lockedPlacements, ...solvedPlacements] : lockedPlacements,
+    status: wasmResult.statusCode === 1 && selected ? "solved" : "unsolved",
+    placements: selected ? selected.placements : lockedPlacements,
     nodeExpansions: wasmResult.nodeExpansions,
     elapsedMs: Date.now() - start,
+    interestingnessScore: selected?.interestingnessScore ?? 0,
+    selectedSignature: selected?.signature ?? "",
   };
 }
 

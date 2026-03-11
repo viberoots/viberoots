@@ -9,6 +9,7 @@ export type SolverRequest = {
   remainingInventory: SolverInventory;
   maxNodeExpansions: number;
   maxWallClockMs: number;
+  solutionPoolSize?: number;
 };
 
 export type SolverPlacement = {
@@ -24,6 +25,15 @@ export type SolverResult = {
   placements: readonly SolverPlacement[];
   nodeExpansions: number;
   elapsedMs: number;
+  interestingnessScore: number;
+  selectedSignature: string;
+};
+
+export type SolverRankedCandidate = {
+  placements: readonly SolverPlacement[];
+  interestingnessScore: number;
+  foundAtNode: number;
+  signature: string;
 };
 
 export type SolverCandidate = {

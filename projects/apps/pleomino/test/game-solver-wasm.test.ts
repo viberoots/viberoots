@@ -44,6 +44,8 @@ describe("solver wasm search", () => {
       transform: { rotation: 0, flipped: false },
       position: { x: 0, y: 0 },
     });
+    expect(result.interestingnessScore).toBeGreaterThanOrEqual(0);
+    expect(result.selectedSignature.length).toBeGreaterThan(0);
     expect(result.nodeExpansions).toBeGreaterThanOrEqual(1);
   });
 
@@ -56,6 +58,8 @@ describe("solver wasm search", () => {
     );
     expect(result.status).toBe("unsolved");
     expect(result.placements).toEqual([]);
+    expect(result.interestingnessScore).toBe(0);
+    expect(result.selectedSignature).toBe("");
   });
 
   it("is deterministic across repeated runs", async () => {
@@ -65,6 +69,8 @@ describe("solver wasm search", () => {
     expect(second.status).toBe(first.status);
     expect(second.placements).toEqual(first.placements);
     expect(second.nodeExpansions).toBe(first.nodeExpansions);
+    expect(second.interestingnessScore).toBe(first.interestingnessScore);
+    expect(second.selectedSignature).toBe(first.selectedSignature);
   });
 
   it("completes the benchmark fixture within the test budget", async () => {
@@ -79,5 +85,23 @@ describe("solver wasm search", () => {
     const result = await solveBoardWithWasm(benchmarkRequest);
     expect(result.status).toBe("solved");
     expect(result.elapsedMs).toBeLessThan(500);
+  });
+
+  it("respects deterministic ranking across a multi-solution pool", async () => {
+    const request = makeRequest({
+      boardSize: { columns: 2, rows: 2 },
+      pieceCatalog: [
+        { pieceId: "alpha", color: "#aa1111", baseCells: [{ x: 0, y: 0 }] },
+        { pieceId: "beta", color: "#1111aa", baseCells: [{ x: 0, y: 0 }] },
+      ],
+      remainingInventory: { alpha: 2, beta: 2 },
+      solutionPoolSize: 8,
+    });
+    const first = await solveBoardWithWasm(request);
+    const second = await solveBoardWithWasm(request);
+    expect(first.status).toBe("solved");
+    expect(first.interestingnessScore).toBeGreaterThan(0);
+    expect(second.selectedSignature).toBe(first.selectedSignature);
+    expect(second.interestingnessScore).toBe(first.interestingnessScore);
   });
 });

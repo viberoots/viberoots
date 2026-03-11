@@ -12,9 +12,11 @@ type SolverWasmExports = {
 
 export type WasmSearchResult = {
   statusCode: number;
-  usedCandidateCount: number;
   nodeExpansions: number;
-  candidateIndices: Int32Array;
+  solutions: readonly {
+    foundAtNode: number;
+    candidateIndices: Int32Array;
+  }[];
 };
 
 let cachedExportsPromise: Promise<SolverWasmExports> | null = null;
@@ -40,11 +42,27 @@ async function readWasmBytes(): Promise<Uint8Array> {
 }
 
 function buildWasmImports(module: WebAssembly.Module): WebAssembly.Imports {
+  const wasiImport = (name: string): ((...args: number[]) => number) | null => {
+    if (name === "clock_time_get") {
+      return () => 52;
+    }
+    if (name === "fd_fdstat_get" || name === "fd_write" || name === "fd_read") {
+      return () => 8;
+    }
+    return null;
+  };
   const imports: Record<string, Record<string, unknown>> = {};
   for (const imp of WebAssembly.Module.imports(module)) {
     const moduleImports = imports[imp.module] ?? {};
     imports[imp.module] = moduleImports;
     if (imp.kind === "function") {
+      if (imp.module === "wasi_snapshot_preview1") {
+        const wasi = wasiImport(imp.name);
+        if (wasi) {
+          moduleImports[imp.name] = wasi;
+          continue;
+        }
+      }
       moduleImports[imp.name] = () => 0;
       continue;
     }
@@ -110,6 +128,7 @@ export async function runSolverSearchInWasm(
   prepared: SolverPreparedInput,
   maxNodeExpansions: number,
   maxWallClockMs: number,
+  solutionPoolSize: number,
 ): Promise<WasmSearchResult> {
   const exports = await loadSolverWasmExports();
   const solverAlloc = exports.solver_alloc ?? exports._solver_alloc;
@@ -126,6 +145,7 @@ export async function runSolverSearchInWasm(
   const cellCandidateIndices = prepared.cellCandidateIndices;
   const lockedMask = prepared.lockedMask;
   const outCandidatesCapacity = Math.max(0, prepared.boardCellCount);
+  const outSolutionCapacity = Math.max(1, Math.trunc(solutionPoolSize));
 
   const ptrs: number[] = [];
   const alloc = (bytes: number) => {
@@ -144,8 +164,10 @@ export async function runSolverSearchInWasm(
     const cellStartsPtr = alloc(byteLengthForArray(cellStarts));
     const cellCandidateIndicesPtr = alloc(byteLengthForArray(cellCandidateIndices));
     const lockedMaskPtr = alloc(byteLengthForArray(lockedMask));
-    const outCandidatesPtr = alloc(outCandidatesCapacity * 4);
-    const outUsedPtr = alloc(4);
+    const outCandidatesPtr = alloc(outCandidatesCapacity * outSolutionCapacity * 4);
+    const outUsedBySolutionPtr = alloc(outSolutionCapacity * 4);
+    const outNodesBySolutionPtr = alloc(outSolutionCapacity * 4);
+    const outSolutionCountPtr = alloc(4);
     const outNodesPtr = alloc(4);
 
     writeI32(exports.memory, pieceInventoryPtr, pieceInventory);
@@ -154,7 +176,9 @@ export async function runSolverSearchInWasm(
     writeI32(exports.memory, cellStartsPtr, cellStarts);
     writeI32(exports.memory, cellCandidateIndicesPtr, cellCandidateIndices);
     writeU32(exports.memory, lockedMaskPtr, lockedMask);
-    writeI32(exports.memory, outUsedPtr, new Int32Array([0]));
+    writeI32(exports.memory, outUsedBySolutionPtr, new Int32Array(outSolutionCapacity));
+    writeI32(exports.memory, outNodesBySolutionPtr, new Int32Array(outSolutionCapacity));
+    writeI32(exports.memory, outSolutionCountPtr, new Int32Array([0]));
     writeI32(exports.memory, outNodesPtr, new Int32Array([0]));
 
     const statusCode = solverSearch(
@@ -172,18 +196,39 @@ export async function runSolverSearchInWasm(
       Math.max(0, Math.trunc(maxWallClockMs)),
       outCandidatesPtr,
       outCandidatesCapacity,
-      outUsedPtr,
+      outUsedBySolutionPtr,
+      outNodesBySolutionPtr,
+      outSolutionCapacity,
+      outSolutionCountPtr,
       outNodesPtr,
     );
 
-    const usedCandidateCount = Math.max(0, readI32Value(exports.memory, outUsedPtr));
-    const nodeExpansions = Math.max(0, readI32Value(exports.memory, outNodesPtr));
-    const candidateIndices = new Int32Array(
+    const solutionCount = Math.max(0, readI32Value(exports.memory, outSolutionCountPtr));
+    const usedBySolution = new Int32Array(
       exports.memory.buffer,
-      outCandidatesPtr,
-      usedCandidateCount,
+      outUsedBySolutionPtr,
+      outSolutionCapacity,
     ).slice();
-    return { statusCode, usedCandidateCount, nodeExpansions, candidateIndices };
+    const nodesBySolution = new Int32Array(
+      exports.memory.buffer,
+      outNodesBySolutionPtr,
+      outSolutionCapacity,
+    ).slice();
+    const nodeExpansions = Math.max(0, readI32Value(exports.memory, outNodesPtr));
+    const solutions: { foundAtNode: number; candidateIndices: Int32Array }[] = [];
+    for (let index = 0; index < solutionCount; index += 1) {
+      const usedCandidateCount = Math.max(0, usedBySolution[index] ?? 0);
+      const slotPtr = outCandidatesPtr + index * outCandidatesCapacity * 4;
+      solutions.push({
+        foundAtNode: Math.max(0, nodesBySolution[index] ?? 0),
+        candidateIndices: new Int32Array(
+          exports.memory.buffer,
+          slotPtr,
+          usedCandidateCount,
+        ).slice(),
+      });
+    }
+    return { statusCode, nodeExpansions, solutions };
   } finally {
     for (const ptr of ptrs.reverse()) {
       solverFree(ptr);
