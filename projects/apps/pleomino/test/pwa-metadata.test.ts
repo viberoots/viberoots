@@ -21,6 +21,7 @@ describe("pwa metadata", () => {
     expect(entryClient).toContain("navigator.serviceWorker");
     expect(entryClient).toContain('register("/service-worker.js"');
     expect(entryClient).toContain('scope: "/"');
+    expect(entryClient).not.toContain('addEventListener("load"');
   });
 
   it("ships a manifest with expected install fields", () => {
@@ -43,8 +44,8 @@ describe("pwa metadata", () => {
   it("ships a service worker with offline app-shell and asset caching", () => {
     const serviceWorker = readFileSync(path.join(appRoot, "public/service-worker.js"), "utf8");
     expect(serviceWorker).toContain('const APP_SHELL_URL = "/games/pleomino"');
-    expect(serviceWorker).toContain('"/manifest.webmanifest"');
-    expect(serviceWorker).toContain('"/entry-client.js"');
+    expect(serviceWorker).toContain("__PLEOMINO_PRECACHED_ASSETS__");
+    expect(serviceWorker).toContain("__PLEOMINO_CACHE_VERSION__");
     expect(serviceWorker).toContain('event.request.mode === "navigate"');
     expect(serviceWorker).toContain('requestUrl.pathname.endsWith(".wasm")');
   });

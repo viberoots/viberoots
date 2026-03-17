@@ -1,5 +1,6 @@
 import React from "react";
 import { AppRegistry } from "react-native-web";
+import { prewarmSolverRuntimeAssets } from "./game/solver/solver-runtime";
 import { defaultTsModuleKey, loadTsModule } from "./ts-modules";
 import { Home } from "./home";
 
@@ -7,17 +8,15 @@ function registerServiceWorker() {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
     return;
   }
-  window.addEventListener("load", () => {
-    void navigator.serviceWorker
-      .register("/service-worker.js", {
-        scope: "/",
-        updateViaCache: "none",
-      })
-      .catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : String(error);
-        console.warn(`[pleomino] service worker registration failed: ${message}`);
-      });
-  });
+  void navigator.serviceWorker
+    .register("/service-worker.js", {
+      scope: "/",
+      updateViaCache: "none",
+    })
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[pleomino] service worker registration failed: ${message}`);
+    });
 }
 
 function App(props: { url: string }) {
@@ -36,6 +35,7 @@ if (root) {
     initialProps: { url },
   });
   root.setAttribute("data-client-hydrated", "true");
+  prewarmSolverRuntimeAssets();
   const moduleKey = defaultTsModuleKey();
   if (moduleKey !== "client-entry") {
     void loadTsModule(moduleKey).then(() => {

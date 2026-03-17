@@ -1,16 +1,8 @@
-const CACHE_VERSION = "pleomino-v1";
+const CACHE_VERSION = "__PLEOMINO_CACHE_VERSION__";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-app-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const APP_SHELL_URL = "/games/pleomino";
-const PRECACHE_URLS = [
-  APP_SHELL_URL,
-  "/manifest.webmanifest",
-  "/favicon.svg",
-  "/icons/apple-touch-icon.png",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
-  "/entry-client.js",
-];
+const PRECACHE_URLS = [APP_SHELL_URL, ...__PLEOMINO_PRECACHED_ASSETS__];
 
 function isCacheableAsset(requestUrl, request) {
   if (request.method !== "GET" || requestUrl.origin !== self.location.origin) {

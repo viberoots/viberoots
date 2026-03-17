@@ -1,5 +1,6 @@
 import { solveBoardWithWasm } from "./solver";
 import type { SolverRequest, SolverResult } from "./solver-types";
+import { prewarmSolverWasmAsset } from "./wasm-runtime";
 
 type SolveWorkerRequest = {
   type: "solve-request";
@@ -28,6 +29,7 @@ let workerFactory: (() => Worker) | null = null;
 let workerRef: Worker | null = null;
 let nextRequestId = 1;
 const pendingByRequestId = new Map<number, PendingSolve>();
+let prewarmStarted = false;
 
 function canUseWorkerRuntime(): boolean {
   return typeof window !== "undefined" && typeof Worker !== "undefined";
@@ -120,11 +122,28 @@ export async function solveBoardWithRuntime(request: SolverRequest): Promise<Sol
   }
 }
 
+export function prewarmSolverRuntimeAssets(): void {
+  if (prewarmStarted || typeof window === "undefined") {
+    return;
+  }
+  prewarmStarted = true;
+  prewarmSolverWasmAsset();
+  if (!canUseWorkerRuntime()) {
+    return;
+  }
+  try {
+    getOrCreateWorker();
+  } catch {
+    detachWorker();
+  }
+}
+
 export function resetSolverRuntimeForTests(): void {
   rejectPending(new Error("runtime reset"));
   detachWorker();
   nextRequestId = 1;
   workerFactory = null;
+  prewarmStarted = false;
 }
 
 export function setSolverWorkerFactoryForTests(factory: (() => Worker) | null): void {

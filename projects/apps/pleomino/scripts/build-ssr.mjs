@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import { cpSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { ensureDistServiceWorkerPrecache } from "./service-worker-precache.mjs";
 
 const contractsPaths = JSON.parse(
   execSync(
@@ -24,6 +25,7 @@ execSync(
 );
 
 execSync("vite build --outDir dist/client", { stdio: "inherit" });
+ensureDistServiceWorkerPrecache(path.join("dist", "client"));
 execSync("vite build --ssr src/entry-server.ts --outDir dist/server", { stdio: "inherit" });
 execSync("tsc -p tsconfig.server.json", { stdio: "inherit" });
 

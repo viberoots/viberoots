@@ -20,25 +20,40 @@ export type WasmSearchResult = {
 };
 
 let cachedExportsPromise: Promise<SolverWasmExports> | null = null;
+let cachedWasmBytesPromise: Promise<Uint8Array> | null = null;
 
 function resolveWasmUrl(): URL {
   return new URL("../../wasm-contract/pleomino-solver.wasm", import.meta.url);
 }
 
 async function readWasmBytes(): Promise<Uint8Array> {
-  const wasmUrl = resolveWasmUrl();
-  if (typeof window === "undefined") {
-    const fsp = await import("node:fs/promises");
-    return new Uint8Array(await fsp.readFile(wasmUrl));
+  if (!cachedWasmBytesPromise) {
+    cachedWasmBytesPromise = (async () => {
+      const wasmUrl = resolveWasmUrl();
+      if (typeof window === "undefined") {
+        const fsp = await import("node:fs/promises");
+        return new Uint8Array(await fsp.readFile(wasmUrl));
+      }
+      const response = await fetch(
+        wasmUrl.toString(),
+        import.meta.env.DEV ? { cache: "no-store" } : undefined,
+      );
+      if (!response.ok) {
+        throw new Error(`failed to load solver wasm: ${response.status}`);
+      }
+      return new Uint8Array(await response.arrayBuffer());
+    })().catch((error) => {
+      cachedWasmBytesPromise = null;
+      throw error;
+    });
   }
-  const response = await fetch(
-    wasmUrl.toString(),
-    import.meta.env.DEV ? { cache: "no-store" } : undefined,
-  );
-  if (!response.ok) {
-    throw new Error(`failed to load solver wasm: ${response.status}`);
-  }
-  return new Uint8Array(await response.arrayBuffer());
+  return cachedWasmBytesPromise;
+}
+
+export function prewarmSolverWasmAsset(): void {
+  void readWasmBytes().catch(() => {
+    // Ignore warmup failures so regular solve attempts can retry later.
+  });
 }
 
 function buildWasmImports(module: WebAssembly.Module): WebAssembly.Imports {
