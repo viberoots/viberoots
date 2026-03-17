@@ -236,10 +236,9 @@ const styles = StyleSheet.create({
   boardCard: {
     position: "relative",
     borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "#89b0de",
     backgroundColor: "#d9e8f7",
-    padding: 6,
+    padding: 8,
+    overflow: "hidden",
     boxShadow: "0 10px 18px rgba(56, 104, 168, 0.18)",
   },
   boardCardShake: {
@@ -255,15 +254,13 @@ const styles = StyleSheet.create({
     },
   },
   boardCardFailure: {
-    borderColor: "#cf6b6b",
     boxShadow: "0 0 0 2px rgba(207, 107, 107, 0.38), 0 10px 18px rgba(133, 54, 54, 0.24)",
   },
   boardGrid: {
     display: "flex",
     flexDirection: "column",
     alignSelf: "center",
-    overflow: "hidden",
-    borderRadius: 6,
+    overflow: "visible",
   },
   solveOverlay: {
     position: "absolute",

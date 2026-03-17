@@ -16,6 +16,13 @@ describe("pwa metadata", () => {
     expect(html).toContain('name="theme-color" content="#0b1324"');
   });
 
+  it("registers a service worker from the client entry", () => {
+    const entryClient = readFileSync(path.join(appRoot, "src/entry-client.ts"), "utf8");
+    expect(entryClient).toContain("navigator.serviceWorker");
+    expect(entryClient).toContain('register("/service-worker.js"');
+    expect(entryClient).toContain('scope: "/"');
+  });
+
   it("ships a manifest with expected install fields", () => {
     const raw = readFileSync(path.join(appRoot, "public/manifest.webmanifest"), "utf8");
     const manifest = JSON.parse(raw) as {
@@ -31,5 +38,14 @@ describe("pwa metadata", () => {
     expect(manifest.start_url).toBe("/games/pleomino");
     expect(manifest.icons?.some((icon) => icon.src === "/icons/icon-192.png")).toBe(true);
     expect(manifest.icons?.some((icon) => icon.src === "/icons/icon-512.png")).toBe(true);
+  });
+
+  it("ships a service worker with offline app-shell and asset caching", () => {
+    const serviceWorker = readFileSync(path.join(appRoot, "public/service-worker.js"), "utf8");
+    expect(serviceWorker).toContain('const APP_SHELL_URL = "/games/pleomino"');
+    expect(serviceWorker).toContain('"/manifest.webmanifest"');
+    expect(serviceWorker).toContain('"/entry-client.js"');
+    expect(serviceWorker).toContain('event.request.mode === "navigate"');
+    expect(serviceWorker).toContain('requestUrl.pathname.endsWith(".wasm")');
   });
 });

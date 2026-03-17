@@ -17,7 +17,7 @@ describe("game screen responsive sizing", () => {
 
   it("reserves at least a 5px desktop bottom gap in large mode", () => {
     const metrics = computeResponsiveMetrics(1280, 844);
-    const boardHeight = metrics.cellSize * 15 + 6 * 2 + 1 * 2;
+    const boardHeight = metrics.cellSize * 15 + 8 * 2 + 1 * 2;
     const totalHeight = 5 * 2 + 4 + 62 + boardHeight + 5;
     expect(totalHeight).toBeLessThanOrEqual(844);
   });

@@ -95,8 +95,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#5f83b3",
     backgroundColor: "rgba(25, 52, 86, 0.92)",
     paddingHorizontal: 8,
     paddingVertical: 6,
@@ -112,8 +110,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "#6e90bf",
     backgroundColor: "#325786",
     alignItems: "center",
     justifyContent: "center",
@@ -122,13 +118,11 @@ const styles = StyleSheet.create({
     opacity: 0.42,
   },
   buttonFailed: {
-    borderColor: "#d97979",
     backgroundColor: "#8f3d3d",
   },
   buttonPressed: {
     transform: [{ scale: 0.96 }],
     backgroundColor: "#274d77",
-    borderColor: "#8bb3e6",
   },
   buttonIcon: {
     color: "#eef5ff",

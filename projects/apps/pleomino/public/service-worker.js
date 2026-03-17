@@ -1,0 +1,91 @@
+const CACHE_VERSION = "pleomino-v1";
+const APP_SHELL_CACHE = `${CACHE_VERSION}-app-shell`;
+const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
+const APP_SHELL_URL = "/games/pleomino";
+const PRECACHE_URLS = [
+  APP_SHELL_URL,
+  "/manifest.webmanifest",
+  "/favicon.svg",
+  "/icons/apple-touch-icon.png",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/entry-client.js",
+];
+
+function isCacheableAsset(requestUrl, request) {
+  if (request.method !== "GET" || requestUrl.origin !== self.location.origin) {
+    return false;
+  }
+  if (request.mode === "navigate") {
+    return false;
+  }
+  if (request.destination === "script" || request.destination === "style") {
+    return true;
+  }
+  if (request.destination === "worker" || request.destination === "image") {
+    return true;
+  }
+  return requestUrl.pathname.endsWith(".wasm");
+}
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches
+      .open(APP_SHELL_CACHE)
+      .then((cache) => cache.addAll(PRECACHE_URLS))
+      .then(() => self.skipWaiting()),
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => key !== APP_SHELL_CACHE && key !== RUNTIME_CACHE)
+            .map((key) => caches.delete(key)),
+        ),
+      )
+      .then(() => self.clients.claim()),
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  const requestUrl = new URL(event.request.url);
+  if (event.request.mode === "navigate" && requestUrl.origin === self.location.origin) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const clone = response.clone();
+          void caches.open(APP_SHELL_CACHE).then((cache) => cache.put(APP_SHELL_URL, clone));
+          return response;
+        })
+        .catch(async () => {
+          const cache = await caches.open(APP_SHELL_CACHE);
+          return (await cache.match(event.request)) || (await cache.match(APP_SHELL_URL));
+        }),
+    );
+    return;
+  }
+
+  if (!isCacheableAsset(requestUrl, event.request)) {
+    return;
+  }
+
+  event.respondWith(
+    caches.open(RUNTIME_CACHE).then(async (cache) => {
+      const cached = await cache.match(event.request);
+      const networkFetch = fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            void cache.put(event.request, response.clone());
+          }
+          return response;
+        })
+        .catch(() => cached);
+      return cached || networkFetch;
+    }),
+  );
+});
