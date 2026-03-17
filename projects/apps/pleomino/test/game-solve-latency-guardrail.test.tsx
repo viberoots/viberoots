@@ -132,7 +132,7 @@ describe("game screen solve interaction latency guardrail", () => {
       root = createRoot(container);
       root.render(<GameScreen url="/games/pleomino" />);
       await flushUi();
-      await waitFor(() => container !== null && solveStatus(container) === "Idle");
+      await waitFor(() => container !== null && solveStatus(container) === "idle");
 
       const solveButton = document.querySelector('[data-testid="pleomino-action-solve"]');
       if (!(solveButton instanceof HTMLElement)) {
@@ -141,7 +141,7 @@ describe("game screen solve interaction latency guardrail", () => {
 
       const triggerStart = performance.now();
       solveButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-      await waitFor(() => container !== null && solveStatus(container) === "Solving");
+      await waitFor(() => container !== null && solveStatus(container) === "solving");
       triggerSamples.push(performance.now() - triggerStart);
 
       const applyStart = performance.now();
@@ -153,7 +153,7 @@ describe("game screen solve interaction latency guardrail", () => {
         interestingnessScore: 0.5,
         selectedSignature: "pr14-latency-baseline",
       });
-      await waitFor(() => container !== null && solveStatus(container) === "Solved");
+      await waitFor(() => container !== null && solveStatus(container) === "solved-applied");
       applySamples.push(performance.now() - applyStart);
 
       root.unmount();

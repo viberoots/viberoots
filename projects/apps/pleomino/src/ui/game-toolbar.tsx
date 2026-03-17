@@ -12,65 +12,19 @@ type ToolbarAction = {
 
 export type ToolbarSolveState = "idle" | "solving" | "solved-applied" | "unsolved";
 
-function solveStatusLabel(state: ToolbarSolveState): string {
-  switch (state) {
-    case "solving":
-      return "Solving";
-    case "solved-applied":
-      return "Solved";
-    case "unsolved":
-      return "Unsolved";
-    default:
-      return "Idle";
-  }
-}
-
-function InterestingnessControlBase(props: {
-  interestingnessThreshold: number;
-  onInterestingnessThresholdChange: (value: number) => void;
-}) {
-  return (
-    <View style={styles.thresholdWrap} testID="pleomino-interestingness-control">
-      <Text style={styles.thresholdLabel}>Interestingness</Text>
-      <input
-        data-testid="pleomino-interestingness-slider"
-        type="range"
-        min={0}
-        max={1}
-        step={0.01}
-        value={props.interestingnessThreshold}
-        onInput={(event) => {
-          props.onInterestingnessThresholdChange(Number(event.currentTarget.value));
-        }}
-        onChange={(event) => {
-          props.onInterestingnessThresholdChange(Number(event.currentTarget.value));
-        }}
-        aria-label="Interestingness threshold"
-        style={{ width: "100%", cursor: "pointer" }}
-      />
-      <Text style={styles.thresholdValue} testID="pleomino-interestingness-value">
-        {props.interestingnessThreshold.toFixed(2)}
-      </Text>
-    </View>
-  );
-}
-
-const InterestingnessControl = React.memo(InterestingnessControlBase);
-
 function GameToolbarBase(props: {
   isStacked: boolean;
   canUndo: boolean;
   canRedo: boolean;
   canSolve: boolean;
   solveState: ToolbarSolveState;
-  interestingnessThreshold: number;
-  onInterestingnessThresholdChange: (value: number) => void;
   onReset: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onSolve: () => void;
 }) {
   const solving = props.solveState === "solving";
+  const failed = props.solveState === "unsolved";
   const actions: ToolbarAction[] = [
     {
       key: "reset",
@@ -97,8 +51,8 @@ function GameToolbarBase(props: {
     },
     {
       key: "solve",
-      icon: "◈",
-      label: solving ? "Solving" : "Solve",
+      icon: failed ? "✕" : "◈",
+      label: solving ? "Solving" : failed ? "Solve failed" : "Solve",
       testId: "pleomino-action-solve",
       disabled: !props.canSolve || solving,
       onPress: props.onSolve,
@@ -115,7 +69,12 @@ function GameToolbarBase(props: {
       {actions.map((action) => (
         <Pressable
           key={action.key}
-          style={[styles.button, action.disabled ? styles.buttonDisabled : null]}
+          style={({ pressed }) => [
+            styles.button,
+            action.key === "solve" && failed ? styles.buttonFailed : null,
+            pressed && !action.disabled ? styles.buttonPressed : null,
+            action.disabled ? styles.buttonDisabled : null,
+          ]}
           onPress={action.onPress}
           disabled={action.disabled}
           accessibilityRole="button"
@@ -125,27 +84,6 @@ function GameToolbarBase(props: {
           <Text style={styles.buttonIcon}>{action.icon}</Text>
         </Pressable>
       ))}
-      <InterestingnessControl
-        interestingnessThreshold={props.interestingnessThreshold}
-        onInterestingnessThresholdChange={props.onInterestingnessThresholdChange}
-      />
-      <View
-        style={[
-          styles.solveStateChip,
-          props.solveState === "solving"
-            ? styles.solveStateChipSolving
-            : props.solveState === "solved-applied"
-              ? styles.solveStateChipSolved
-              : props.solveState === "unsolved"
-                ? styles.solveStateChipUnsolved
-                : null,
-        ]}
-        testID="pleomino-solve-state"
-        accessibilityRole="status"
-        accessibilityLabel={`Solve state: ${solveStatusLabel(props.solveState)}`}
-      >
-        <Text style={styles.solveStateText}>{solveStatusLabel(props.solveState)}</Text>
-      </View>
     </View>
   );
 }
@@ -165,15 +103,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   rowDesktop: {
-    alignSelf: "flex-end",
+    alignSelf: "center",
   },
   rowStacked: {
     alignSelf: "center",
   },
   button: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: "#6e90bf",
     backgroundColor: "#325786",
@@ -183,55 +121,19 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.42,
   },
+  buttonFailed: {
+    borderColor: "#d97979",
+    backgroundColor: "#8f3d3d",
+  },
+  buttonPressed: {
+    transform: [{ scale: 0.96 }],
+    backgroundColor: "#274d77",
+    borderColor: "#8bb3e6",
+  },
   buttonIcon: {
     color: "#eef5ff",
-    fontSize: 18,
-    lineHeight: 18,
+    fontSize: 20,
+    lineHeight: 20,
     fontWeight: "700",
-  },
-  solveStateChip: {
-    marginLeft: 2,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#6e90bf",
-    backgroundColor: "#325786",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    minWidth: 62,
-    alignItems: "center",
-  },
-  solveStateChipSolving: {
-    backgroundColor: "#2e67a8",
-  },
-  solveStateChipSolved: {
-    backgroundColor: "#2f7f45",
-  },
-  solveStateChipUnsolved: {
-    backgroundColor: "#87443d",
-  },
-  solveStateText: {
-    color: "#eef5ff",
-    fontSize: 11,
-    lineHeight: 12,
-    fontWeight: "600",
-  },
-  thresholdWrap: {
-    marginLeft: 4,
-    minWidth: 140,
-    alignItems: "stretch",
-    gap: 2,
-  },
-  thresholdLabel: {
-    color: "#d9eaff",
-    fontSize: 10,
-    lineHeight: 11,
-    fontWeight: "600",
-  },
-  thresholdValue: {
-    color: "#d9eaff",
-    fontSize: 10,
-    lineHeight: 11,
-    textAlign: "right",
-    fontVariant: ["tabular-nums"],
   },
 });

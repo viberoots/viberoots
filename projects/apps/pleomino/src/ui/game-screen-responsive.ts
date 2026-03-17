@@ -1,7 +1,7 @@
 import { BOARD_CELL_SIZE } from "../game/board";
 
 const PAGE_HORIZONTAL_PADDING = 2;
-const PAGE_VERTICAL_PADDING = 2;
+const PAGE_VERTICAL_PADDING = 5;
 const LAYOUT_GAP = 4;
 const BOARD_CARD_PADDING = 6;
 const BOARD_CARD_BORDER = 1;
@@ -14,9 +14,9 @@ const DESKTOP_MAX_CELL_SIZE = 72;
 const MOBILE_BREAKPOINT_PX = 900;
 const STACKED_TRAY_HEIGHT_CHROME = 58;
 const STACKED_TOTAL_CELL_ROWS = 24;
-const STACKED_BOTTOM_SAFE_PX = 2;
-const DESKTOP_TOOLBAR_HEIGHT_CHROME = 48;
-const DESKTOP_BOTTOM_SAFE_PX = 2;
+const STACKED_BOTTOM_SAFE_PX = 5;
+const DESKTOP_TOOLBAR_HEIGHT_CHROME = 62;
+const DESKTOP_BOTTOM_SAFE_PX = 5;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));

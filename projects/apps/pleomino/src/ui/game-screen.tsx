@@ -34,8 +34,6 @@ export function GameScreen(_props: { url: string }) {
     () => computeResponsiveMetrics(viewport.width, viewport.height),
     [viewport.height, viewport.width],
   );
-  const isLandscapeBlocked =
-    responsive.isStacked && viewport.height > 0 && viewport.width > viewport.height;
 
   const pieceById = React.useMemo(
     () => new Map(presentState.pieceCatalog.map((piece) => [piece.pieceId, piece])),
@@ -142,58 +140,49 @@ export function GameScreen(_props: { url: string }) {
       }
       data-solve-state={solve.solveState}
     >
-      {isLandscapeBlocked ? (
-        <View style={styles.orientationLockCard} testID="pleomino-orientation-lock">
-          <Text style={styles.orientationLockTitle}>Rotate to Portrait</Text>
-          <Text style={styles.orientationLockSubtitle}>
-            Landscape mode is disabled on smaller screens.
-          </Text>
+      <Text style={styles.visuallyHidden} testID="pleomino-solve-state" accessibilityRole="status">
+        {solve.solveState}
+      </Text>
+      <View style={styles.playArea}>
+        <View style={[styles.toolbarWrap, responsive.isStacked ? styles.toolbarWrapStacked : null]}>
+          <GameToolbar
+            isStacked={responsive.isStacked}
+            canUndo={state.past.length > 0}
+            canRedo={state.future.length > 0}
+            canSolve={true}
+            solveState={solve.solveState}
+            onReset={handleResetBoard}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            onSolve={handleSolve}
+          />
         </View>
-      ) : null}
-      {isLandscapeBlocked ? null : (
-        <View style={styles.playArea}>
-          <View
-            style={[styles.toolbarWrap, responsive.isStacked ? styles.toolbarWrapStacked : null]}
-          >
-            <GameToolbar
-              isStacked={responsive.isStacked}
-              canUndo={state.past.length > 0}
-              canRedo={state.future.length > 0}
-              canSolve={true}
-              solveState={solve.solveState}
-              interestingnessThreshold={solve.interestingnessThreshold}
-              onInterestingnessThresholdChange={solve.setInterestingnessThreshold}
-              onReset={handleResetBoard}
-              onUndo={handleUndo}
-              onRedo={handleRedo}
-              onSolve={handleSolve}
-            />
-          </View>
-          <View style={[styles.layout, responsive.isStacked ? styles.layoutStacked : null]}>
-            <BoardGrid
-              board={viewModel.board}
-              cellSize={responsive.cellSize}
-              shakeToken={interactions.boardShakeToken}
-              onStartDragPlaced={interactions.handleStartDragPlaced}
-              snapTargetCellKeys={interactions.snapTargetKeySet}
-              onBoardGridElement={(element) => {
-                boardGridElementRef.current = element;
-              }}
-            />
-            <PieceTray
-              tray={viewModel.tray}
-              isStacked={responsive.isStacked}
-              cellSize={responsive.cellSize}
-              trayWidth={responsive.cardWidth}
-              returnTargetPieceId={interactions.trayReturnTargetPieceId}
-              onStartDrag={interactions.handleStartDrag}
-              onEndDrag={interactions.handleEndDrag}
-            />
-          </View>
+        <View style={[styles.layout, responsive.isStacked ? styles.layoutStacked : null]}>
+          <BoardGrid
+            board={viewModel.board}
+            cellSize={responsive.cellSize}
+            shakeToken={interactions.boardShakeToken}
+            failureFeedbackToken={solve.solveFailureToken}
+            showSolveOverlay={solve.solveState === "solving"}
+            onStartDragPlaced={interactions.handleStartDragPlaced}
+            snapTargetCellKeys={interactions.snapTargetKeySet}
+            onBoardGridElement={(element) => {
+              boardGridElementRef.current = element;
+            }}
+          />
+          <PieceTray
+            tray={viewModel.tray}
+            isStacked={responsive.isStacked}
+            cellSize={responsive.cellSize}
+            trayWidth={responsive.cardWidth}
+            returnTargetPieceId={interactions.trayReturnTargetPieceId}
+            onStartDrag={interactions.handleStartDrag}
+            onEndDrag={interactions.handleEndDrag}
+          />
         </View>
-      )}
+      </View>
 
-      {interactions.dragVisual && !isLandscapeBlocked ? (
+      {interactions.dragVisual ? (
         <View
           style={styles.dragOverlay}
           testID="pleomino-drag-ghost"

@@ -82,4 +82,25 @@ describe("game screen persistence", () => {
     const persisted = loadPersistedGameStateFromHash(window.location, createInitialGameState());
     expect(persisted?.board.placedPieces.length ?? 0).toBe(0);
   });
+
+  it("does not block narrow landscape layouts behind a rotate gate", async () => {
+    const originalWidth = window.innerWidth;
+    const originalHeight = window.innerHeight;
+    try {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 844 });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: 390 });
+
+      container = document.createElement("div");
+      document.body.appendChild(container);
+      root = createRoot(container);
+      root.render(<GameScreen url="/games/pleomino" />);
+      await flushUi();
+
+      expect(document.querySelector('[data-testid="pleomino-orientation-lock"]')).toBeNull();
+      expect(document.querySelector('[data-testid="pleomino-board-grid"]')).not.toBeNull();
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: originalHeight });
+    }
+  });
 });

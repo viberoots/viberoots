@@ -39,7 +39,7 @@ function readPersisted() {
   return loadPersistedGameStateFromHash(window.location, createInitialGameState());
 }
 
-function currentSolveStatusLabel(container: HTMLDivElement): string {
+function currentSolveState(container: HTMLDivElement): string {
   const status = container.querySelector('[data-testid="pleomino-solve-state"]');
   if (!(status instanceof HTMLElement)) {
     throw new Error("expected solve status element");
@@ -113,7 +113,7 @@ describe("game screen solve integration", () => {
     }
     solveButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
 
-    await waitFor(() => container !== null && currentSolveStatusLabel(container) === "Solved");
+    await waitFor(() => container !== null && currentSolveState(container) === "solved-applied");
     const solvedState = readPersisted();
     expect(solvedState?.board.placedPieces.length).toBe(2);
     expect(solvedState?.previewByPieceId["purple-2-1"]).toBeNull();
@@ -171,11 +171,20 @@ describe("game screen solve integration", () => {
     }
     solveButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
 
-    await waitFor(() => container !== null && currentSolveStatusLabel(container) === "Unsolved");
+    await waitFor(() => container !== null && currentSolveState(container) === "unsolved");
+    const failedSolveButton = document.querySelector('[data-testid="pleomino-action-solve"]');
+    if (!(failedSolveButton instanceof HTMLElement)) {
+      throw new Error("expected solve button");
+    }
+    expect(failedSolveButton.textContent).toContain("✕");
+    await waitFor(
+      () => document.querySelector('[data-testid="pleomino-board-failure-flash"]') !== null,
+    );
     expect(readPersisted()).toEqual(preSolveSnapshot);
+    await waitFor(() => container !== null && currentSolveState(container) === "idle");
   });
 
-  it("passes explicit request-scoped solve seeds to runtime", async () => {
+  it("passes max interestingness and explicit request-scoped solve seeds to runtime", async () => {
     const solveBoardWithRuntime = vi.mocked(solverRuntime.solveBoardWithRuntime);
     solveBoardWithRuntime.mockResolvedValue({
       status: "unsolved",
@@ -196,24 +205,9 @@ describe("game screen solve integration", () => {
     if (!(solveButton instanceof HTMLElement)) {
       throw new Error("expected solve button");
     }
-    const thresholdSlider = document.querySelector(
-      '[data-testid="pleomino-interestingness-slider"]',
-    );
-    if (!(thresholdSlider instanceof HTMLInputElement)) {
-      throw new Error("expected interestingness slider");
-    }
-    thresholdSlider.value = "0.73";
-    thresholdSlider.dispatchEvent(new Event("input", { bubbles: true, cancelable: true }));
-    thresholdSlider.dispatchEvent(new Event("change", { bubbles: true, cancelable: true }));
-    await waitFor(() => {
-      const thresholdValue = document.querySelector(
-        '[data-testid="pleomino-interestingness-value"]',
-      );
-      return thresholdValue instanceof HTMLElement && thresholdValue.textContent === "0.73";
-    });
 
     solveButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-    await waitFor(() => container !== null && currentSolveStatusLabel(container) === "Unsolved");
+    await waitFor(() => container !== null && currentSolveState(container) === "unsolved");
     solveButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     await waitFor(() => solveBoardWithRuntime.mock.calls.length === 2);
 
@@ -225,6 +219,49 @@ describe("game screen solve integration", () => {
     expect(solveBoardWithRuntime.mock.calls[0]?.[0]?.maxNodeExpansions).toBe(300000);
     expect(solveBoardWithRuntime.mock.calls[0]?.[0]?.solutionPoolSize).toBe(96);
     expect(solveBoardWithRuntime.mock.calls[0]?.[0]?.selectionWindowSize).toBe(32);
-    expect(solveBoardWithRuntime.mock.calls[0]?.[0]?.interestingnessThreshold).toBe(0.73);
+    expect(solveBoardWithRuntime.mock.calls[0]?.[0]?.interestingnessThreshold).toBe(1);
+  });
+
+  it("shows a board overlay while solve is running", async () => {
+    let resolveSolve:
+      | ((value: Awaited<ReturnType<typeof solverRuntime.solveBoardWithRuntime>>) => void)
+      | null = null;
+    const solveBoardWithRuntime = vi.mocked(solverRuntime.solveBoardWithRuntime);
+    solveBoardWithRuntime.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSolve = resolve;
+        }),
+    );
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    root.render(<GameScreen url="/games/pleomino" />);
+    await flushUi();
+
+    const solveButton = document.querySelector('[data-testid="pleomino-action-solve"]');
+    if (!(solveButton instanceof HTMLElement)) {
+      throw new Error("expected solve button");
+    }
+
+    solveButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    await waitFor(
+      () =>
+        container?.querySelector('[data-testid="pleomino-solve-overlay"]') instanceof HTMLElement,
+    );
+
+    resolveSolve?.({
+      status: "unsolved",
+      placements: [],
+      nodeExpansions: 10,
+      elapsedMs: 1,
+      interestingnessScore: 0,
+      selectedSignature: "",
+    });
+
+    await waitFor(
+      () => container?.querySelector('[data-testid="pleomino-solve-overlay"]') === null,
+    );
   });
 });

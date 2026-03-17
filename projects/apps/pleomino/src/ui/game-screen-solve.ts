@@ -11,19 +11,13 @@ const SOLVER_MAX_WALL_CLOCK_MS = 1_200;
 const EMPTY_BOARD_MAX_NODE_EXPANSIONS = 300_000;
 const EMPTY_BOARD_SOLUTION_POOL_SIZE = 96;
 const EMPTY_BOARD_SELECTION_WINDOW_SIZE = 32;
-const DEFAULT_INTERESTINGNESS_THRESHOLD = 0;
+const MAX_INTERESTINGNESS_THRESHOLD = 1;
+const SOLVE_FAILURE_FEEDBACK_MS = 900;
 
 export type SolveUiState = "idle" | "solving" | "solved-applied" | "unsolved";
 
 function deferSolveStart(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-function clampInterestingnessThreshold(value: number): number {
-  if (Number.isNaN(value)) {
-    return DEFAULT_INTERESTINGNESS_THRESHOLD;
-  }
-  return Math.max(0, Math.min(1, value));
 }
 
 function boardPlacementSignature(state: GameState): string {
@@ -47,13 +41,21 @@ export function useGameScreenSolve(args: {
   const blockRegenerateUntilBoardClearsRef = React.useRef(false);
   const requestTokenRef = React.useRef(0);
   const solveSeedRef = React.useRef(0);
+  const clearFailureTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [solveState, setSolveState] = React.useState<SolveUiState>("idle");
   const [isApplyingSolve, setIsApplyingSolve] = React.useState(false);
-  const [interestingnessThreshold, setInterestingnessThreshold] = React.useState(
-    DEFAULT_INTERESTINGNESS_THRESHOLD,
-  );
-  const handleInterestingnessThresholdChange = React.useCallback((value: number) => {
-    setInterestingnessThreshold(clampInterestingnessThreshold(value));
+  const [solveFailureToken, setSolveFailureToken] = React.useState(0);
+
+  const triggerSolveFailureFeedback = React.useCallback(() => {
+    setSolveFailureToken((value) => value + 1);
+    setSolveState("unsolved");
+    if (clearFailureTimeoutRef.current) {
+      clearTimeout(clearFailureTimeoutRef.current);
+    }
+    clearFailureTimeoutRef.current = setTimeout(() => {
+      setSolveState((current) => (current === "unsolved" ? "idle" : current));
+      clearFailureTimeoutRef.current = null;
+    }, SOLVE_FAILURE_FEEDBACK_MS);
   }, []);
 
   React.useEffect(() => {
@@ -117,13 +119,13 @@ export function useGameScreenSolve(args: {
             randomSeed: solveSeed,
             solutionPoolSize: isEmptyBoard ? EMPTY_BOARD_SOLUTION_POOL_SIZE : undefined,
             selectionWindowSize: isEmptyBoard ? EMPTY_BOARD_SELECTION_WINDOW_SIZE : undefined,
-            interestingnessThreshold,
+            interestingnessThreshold: MAX_INTERESTINGNESS_THRESHOLD,
           },
         ),
       );
     } catch {
       if (requestToken === requestTokenRef.current) {
-        setSolveState("unsolved");
+        triggerSolveFailureFeedback();
       }
       return;
     }
@@ -135,7 +137,7 @@ export function useGameScreenSolve(args: {
       return;
     }
     if (result.status !== "solved") {
-      setSolveState("unsolved");
+      triggerSolveFailureFeedback();
       return;
     }
     const generatedAllPlacements = isEmptyBoard;
@@ -152,11 +154,14 @@ export function useGameScreenSolve(args: {
     args.dispatch({ type: "solve/apply", placements: result.placements });
     setIsApplyingSolve(false);
     setSolveState("solved-applied");
-  }, [args.dispatch, interestingnessThreshold, solveState]);
+  }, [args.dispatch, solveState]);
 
   React.useEffect(() => {
     return () => {
       requestTokenRef.current += 1;
+      if (clearFailureTimeoutRef.current) {
+        clearTimeout(clearFailureTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -164,7 +169,6 @@ export function useGameScreenSolve(args: {
     handleSolve,
     solveState,
     isApplyingSolve,
-    interestingnessThreshold,
-    setInterestingnessThreshold: handleInterestingnessThresholdChange,
+    solveFailureToken,
   };
 }

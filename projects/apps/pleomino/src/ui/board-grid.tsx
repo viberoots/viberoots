@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, View } from "react-native-web";
+import { ActivityIndicator, StyleSheet, View } from "react-native-web";
 import type { BoardViewModel } from "../game/selectors";
 import type { PixelPoint } from "../game/interaction";
 import { cellKey } from "../game/placement";
@@ -57,6 +57,8 @@ export function BoardGrid(props: {
   board: BoardViewModel;
   cellSize: number;
   shakeToken?: number;
+  failureFeedbackToken?: number;
+  showSolveOverlay?: boolean;
   onStartDragPlaced: (
     pieceId: string,
     instanceId: string,
@@ -68,6 +70,7 @@ export function BoardGrid(props: {
   snapTargetCellKeys?: ReadonlySet<string>;
 }) {
   const [isShaking, setIsShaking] = React.useState(false);
+  const [isFailureFlashing, setIsFailureFlashing] = React.useState(false);
   const snapTargetCellSet = props.snapTargetCellKeys ?? new Set<string>();
 
   React.useEffect(() => {
@@ -78,6 +81,20 @@ export function BoardGrid(props: {
     const timeoutId = setTimeout(() => setIsShaking(false), 240);
     return () => clearTimeout(timeoutId);
   }, [props.shakeToken]);
+
+  React.useEffect(() => {
+    if (!props.failureFeedbackToken) {
+      return;
+    }
+    setIsShaking(true);
+    setIsFailureFlashing(true);
+    const shakeTimeoutId = setTimeout(() => setIsShaking(false), 240);
+    const flashTimeoutId = setTimeout(() => setIsFailureFlashing(false), 720);
+    return () => {
+      clearTimeout(shakeTimeoutId);
+      clearTimeout(flashTimeoutId);
+    };
+  }, [props.failureFeedbackToken]);
 
   const snapOutlineStyleForCell = React.useCallback(
     (x: number, y: number) => {
@@ -186,7 +203,24 @@ export function BoardGrid(props: {
   }
 
   return (
-    <View style={[styles.boardCard, isShaking ? styles.boardCardShake : null]}>
+    <View
+      style={[
+        styles.boardCard,
+        isShaking ? styles.boardCardShake : null,
+        isFailureFlashing ? styles.boardCardFailure : null,
+      ]}
+      testID="pleomino-board-card"
+    >
+      {isFailureFlashing ? (
+        <View style={styles.failureMarker} testID="pleomino-board-failure-flash" />
+      ) : null}
+      {props.showSolveOverlay ? (
+        <View style={styles.solveOverlay} testID="pleomino-solve-overlay">
+          <View style={styles.solveOverlaySpinner}>
+            <ActivityIndicator color="#eef5ff" size="large" />
+          </View>
+        </View>
+      ) : null}
       <View
         ref={(element) => props.onBoardGridElement?.(element as HTMLElement | null)}
         style={styles.boardGrid}
@@ -200,6 +234,7 @@ export function BoardGrid(props: {
 
 const styles = StyleSheet.create({
   boardCard: {
+    position: "relative",
     borderRadius: 24,
     borderWidth: 1,
     borderColor: "#89b0de",
@@ -219,12 +254,44 @@ const styles = StyleSheet.create({
       "100%": { transform: "translateX(0px)" },
     },
   },
+  boardCardFailure: {
+    borderColor: "#cf6b6b",
+    boxShadow: "0 0 0 2px rgba(207, 107, 107, 0.38), 0 10px 18px rgba(133, 54, 54, 0.24)",
+  },
   boardGrid: {
     display: "flex",
     flexDirection: "column",
     alignSelf: "center",
     overflow: "hidden",
     borderRadius: 6,
+  },
+  solveOverlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 2,
+    borderRadius: 24,
+    backgroundColor: "rgba(76, 87, 102, 0.38)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  solveOverlaySpinner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    backgroundColor: "rgba(32, 43, 60, 0.52)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  failureMarker: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    opacity: 0,
   },
   boardRow: {
     display: "flex",

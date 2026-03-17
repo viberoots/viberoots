@@ -51,7 +51,7 @@ function readPersisted() {
   return loadPersistedGameStateFromHash(window.location, createInitialGameState());
 }
 
-function currentSolveStatusLabel(container: HTMLDivElement): string {
+function currentSolveState(container: HTMLDivElement): string {
   const status = container.querySelector('[data-testid="pleomino-solve-state"]');
   if (!(status instanceof HTMLElement)) {
     throw new Error("expected solve status element");
@@ -169,7 +169,7 @@ describe("game screen worker solve integration", () => {
       },
     });
 
-    await waitFor(() => container !== null && currentSolveStatusLabel(container) === "Solved");
+    await waitFor(() => container !== null && currentSolveState(container) === "solved-applied");
     expect(readPersisted()?.board.placedPieces.length).toBe(1);
     expect(readPersisted()?.board.placedPieces[0]?.pieceId).toBe("red-2-2");
   });
@@ -233,7 +233,7 @@ describe("game screen worker solve integration", () => {
       },
     });
 
-    await waitFor(() => container !== null && currentSolveStatusLabel(container) === "Idle");
+    await waitFor(() => container !== null && currentSolveState(container) === "idle");
     expect(readPersisted()?.board.placedPieces.length).toBe(0);
   });
 });

@@ -39,7 +39,7 @@ function readPersisted() {
   return loadPersistedGameStateFromHash(window.location, createInitialGameState());
 }
 
-function currentSolveStatusLabel(container: HTMLDivElement): string {
+function currentSolveState(container: HTMLDivElement): string {
   const status = container.querySelector('[data-testid="pleomino-solve-state"]');
   if (!(status instanceof HTMLElement)) {
     throw new Error("expected solve status element");
@@ -100,7 +100,7 @@ describe("game screen solve cancellation", () => {
       throw new Error("expected solve button");
     }
     solveButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-    await waitFor(() => container !== null && currentSolveStatusLabel(container) === "Solving");
+    await waitFor(() => container !== null && currentSolveState(container) === "solving");
 
     const resetButton = document.querySelector('[data-testid="pleomino-action-reset"]');
     if (!(resetButton instanceof HTMLElement)) {
@@ -124,7 +124,7 @@ describe("game screen solve cancellation", () => {
       selectedSignature: "stale",
     });
 
-    await waitFor(() => container !== null && currentSolveStatusLabel(container) === "Idle");
+    await waitFor(() => container !== null && currentSolveState(container) === "idle");
     expect(readPersisted()?.board.placedPieces.length).toBe(0);
   });
 });
