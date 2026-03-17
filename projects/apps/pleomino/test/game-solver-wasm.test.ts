@@ -104,4 +104,14 @@ describe("solver wasm search", () => {
     expect(second.selectedSignature).toBe(first.selectedSignature);
     expect(second.interestingnessScore).toBe(first.interestingnessScore);
   });
+
+  it("does not use static max-interestingness pool for non-canonical requests", async () => {
+    const result = await solveBoardWithWasm(
+      makeRequest({
+        interestingnessThreshold: 1,
+      }),
+    );
+    expect(result.status).toBe("solved");
+    expect(result.nodeExpansions).toBeGreaterThan(0);
+  });
 });

@@ -1,6 +1,7 @@
 import { canonicalCellSignature, transformCells, translateCells } from "../geometry";
 import { cellKey } from "../placement";
 import type { PieceTransform } from "../types";
+import { mixSeed32, normalizeSeed } from "./seeded-random";
 import type { SolverCandidate, SolverPreparedInput, SolverRequest } from "./solver-types";
 
 const TRANSFORMS: readonly PieceTransform[] = [
@@ -44,6 +45,20 @@ function placementMaskWords(cellIndices: readonly number[], wordCount: number): 
     words[wordIndex] |= 1 << bitIndex;
   }
   return words;
+}
+
+function shuffleInPlace(values: number[], seed: number): void {
+  if (values.length <= 1) {
+    return;
+  }
+  let state = normalizeSeed(seed);
+  for (let index = values.length - 1; index > 0; index -= 1) {
+    state = mixSeed32((state + index + 0x9e3779b9) >>> 0);
+    const swapIndex = state % (index + 1);
+    const current = values[index];
+    values[index] = values[swapIndex] ?? current;
+    values[swapIndex] = current;
+  }
 }
 
 export function buildSolverPreparedInput(request: SolverRequest): SolverPreparedInput {
@@ -169,6 +184,14 @@ export function buildSolverPreparedInput(request: SolverRequest): SolverPrepared
     }
     for (const cellIndex of candidate.cellIndices) {
       cellBuckets[cellIndex].push(candidate.candidateIndex);
+    }
+  }
+
+  if (request.randomSeed !== undefined) {
+    const baseSeed = normalizeSeed(request.randomSeed);
+    for (let cellIndex = 0; cellIndex < cellBuckets.length; cellIndex += 1) {
+      const cellSeed = mixSeed32((baseSeed ^ Math.imul((cellIndex + 1) >>> 0, 0x9e3779b9)) >>> 0);
+      shuffleInPlace(cellBuckets[cellIndex] ?? [], cellSeed);
     }
   }
 

@@ -161,6 +161,8 @@ export function GameScreen(_props: { url: string }) {
               canRedo={state.future.length > 0}
               canSolve={true}
               solveState={solve.solveState}
+              interestingnessThreshold={solve.interestingnessThreshold}
+              onInterestingnessThresholdChange={solve.setInterestingnessThreshold}
               onReset={handleResetBoard}
               onUndo={handleUndo}
               onRedo={handleRedo}

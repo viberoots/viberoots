@@ -12,6 +12,7 @@ export type SolverRequest = {
   solutionPoolSize?: number;
   randomSeed?: number;
   selectionWindowSize?: number;
+  interestingnessThreshold?: number;
 };
 
 export type SolverPlacement = {
@@ -36,6 +37,19 @@ export type SolverRankedCandidate = {
   interestingnessScore: number;
   foundAtNode: number;
   signature: string;
+  paretoFront: number;
+  structuralBucket: string;
+  objectives: {
+    symmetry: number;
+    repetition: number;
+    rhythm: number;
+    edgeAesthetic: number;
+    colorDistribution: number;
+    globalMotif: number;
+    intentionalContrast: number;
+    composition: number;
+    structuralNovelty: number;
+  };
 };
 
 export type SolverCandidate = {

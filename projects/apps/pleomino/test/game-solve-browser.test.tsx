@@ -196,6 +196,21 @@ describe("game screen solve integration", () => {
     if (!(solveButton instanceof HTMLElement)) {
       throw new Error("expected solve button");
     }
+    const thresholdSlider = document.querySelector(
+      '[data-testid="pleomino-interestingness-slider"]',
+    );
+    if (!(thresholdSlider instanceof HTMLInputElement)) {
+      throw new Error("expected interestingness slider");
+    }
+    thresholdSlider.value = "0.73";
+    thresholdSlider.dispatchEvent(new Event("input", { bubbles: true, cancelable: true }));
+    thresholdSlider.dispatchEvent(new Event("change", { bubbles: true, cancelable: true }));
+    await waitFor(() => {
+      const thresholdValue = document.querySelector(
+        '[data-testid="pleomino-interestingness-value"]',
+      );
+      return thresholdValue instanceof HTMLElement && thresholdValue.textContent === "0.73";
+    });
 
     solveButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     await waitFor(() => container !== null && currentSolveStatusLabel(container) === "Unsolved");
@@ -208,7 +223,8 @@ describe("game screen solve integration", () => {
     expect(typeof secondSeed).toBe("number");
     expect(secondSeed).toBeGreaterThan(firstSeed ?? 0);
     expect(solveBoardWithRuntime.mock.calls[0]?.[0]?.maxNodeExpansions).toBe(300000);
-    expect(solveBoardWithRuntime.mock.calls[0]?.[0]?.solutionPoolSize).toBe(32);
-    expect(solveBoardWithRuntime.mock.calls[0]?.[0]?.selectionWindowSize).toBe(12);
+    expect(solveBoardWithRuntime.mock.calls[0]?.[0]?.solutionPoolSize).toBe(96);
+    expect(solveBoardWithRuntime.mock.calls[0]?.[0]?.selectionWindowSize).toBe(32);
+    expect(solveBoardWithRuntime.mock.calls[0]?.[0]?.interestingnessThreshold).toBe(0.73);
   });
 });

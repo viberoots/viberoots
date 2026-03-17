@@ -54,6 +54,8 @@ describe("game toolbar", () => {
         canRedo={true}
         canSolve={true}
         solveState="idle"
+        interestingnessThreshold={0}
+        onInterestingnessThresholdChange={() => {}}
         onReset={() => {}}
         onUndo={() => {}}
         onRedo={() => {}}
@@ -67,6 +69,8 @@ describe("game toolbar", () => {
         canRedo={true}
         canSolve={true}
         solveState="idle"
+        interestingnessThreshold={0}
+        onInterestingnessThresholdChange={() => {}}
         onReset={() => {}}
         onUndo={() => {}}
         onRedo={() => {}}
@@ -137,6 +141,8 @@ describe("game toolbar", () => {
         canRedo={true}
         canSolve={true}
         solveState="idle"
+        interestingnessThreshold={0}
+        onInterestingnessThresholdChange={() => {}}
         onReset={() => {}}
         onUndo={() => {
           undoCalls += 1;
@@ -176,6 +182,8 @@ describe("game toolbar", () => {
         canRedo={true}
         canSolve={true}
         solveState="idle"
+        interestingnessThreshold={0}
+        onInterestingnessThresholdChange={() => {}}
         onReset={() => {}}
         onUndo={() => {}}
         onRedo={() => {}}
@@ -199,5 +207,40 @@ describe("game toolbar", () => {
       action.focus();
       expect(document.activeElement).toBe(action);
     }
+  });
+
+  it("exposes interestingness slider and change handler", async () => {
+    let seen = -1;
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    root.render(
+      <GameToolbar
+        isStacked={false}
+        canUndo={true}
+        canRedo={true}
+        canSolve={true}
+        solveState="idle"
+        interestingnessThreshold={0.25}
+        onInterestingnessThresholdChange={(value) => {
+          seen = value;
+        }}
+        onReset={() => {}}
+        onUndo={() => {}}
+        onRedo={() => {}}
+        onSolve={() => {}}
+      />,
+    );
+    await flushUi();
+
+    const slider = document.querySelector('[data-testid="pleomino-interestingness-slider"]');
+    if (!(slider instanceof HTMLInputElement)) {
+      throw new Error("expected interestingness slider");
+    }
+    expect(slider.value).toBe("0.25");
+    slider.value = "0.64";
+    slider.dispatchEvent(new Event("input", { bubbles: true, cancelable: true }));
+    slider.dispatchEvent(new Event("change", { bubbles: true, cancelable: true }));
+    expect(seen).toBe(0.64);
   });
 });

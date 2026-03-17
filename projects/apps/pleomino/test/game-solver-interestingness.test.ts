@@ -17,7 +17,7 @@ function score(placements: readonly SolverPlacement[]): number {
     boardRows: 2,
     pieceCatalog: MONOMINO_CATALOG,
     placements,
-  });
+  }).score;
 }
 
 describe("solver interestingness scoring", () => {
@@ -53,18 +53,57 @@ describe("solver interestingness scoring", () => {
         interestingnessScore: 0.8,
         foundAtNode: 6,
         signature: "z-last",
+        paretoFront: 0,
+        structuralBucket: "a",
+        objectives: {
+          symmetry: 0.8,
+          repetition: 0.8,
+          rhythm: 0.8,
+          edgeAesthetic: 0.8,
+          colorDistribution: 0.8,
+          globalMotif: 0.8,
+          intentionalContrast: 0.8,
+          composition: 0.8,
+          structuralNovelty: 0.8,
+        },
       },
       {
         placements: basePlacements,
         interestingnessScore: 0.8,
         foundAtNode: 3,
         signature: signatureA,
+        paretoFront: 0,
+        structuralBucket: "a",
+        objectives: {
+          symmetry: 0.8,
+          repetition: 0.8,
+          rhythm: 0.8,
+          edgeAesthetic: 0.8,
+          colorDistribution: 0.8,
+          globalMotif: 0.8,
+          intentionalContrast: 0.8,
+          composition: 0.8,
+          structuralNovelty: 0.8,
+        },
       },
       {
         placements: basePlacements,
         interestingnessScore: 0.8,
         foundAtNode: 3,
         signature: "a-first",
+        paretoFront: 0,
+        structuralBucket: "a",
+        objectives: {
+          symmetry: 0.8,
+          repetition: 0.8,
+          rhythm: 0.8,
+          edgeAesthetic: 0.8,
+          colorDistribution: 0.8,
+          globalMotif: 0.8,
+          intentionalContrast: 0.8,
+          composition: 0.8,
+          structuralNovelty: 0.8,
+        },
       },
     ]);
 

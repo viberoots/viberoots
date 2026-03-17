@@ -25,12 +25,46 @@ function solveStatusLabel(state: ToolbarSolveState): string {
   }
 }
 
+function InterestingnessControlBase(props: {
+  interestingnessThreshold: number;
+  onInterestingnessThresholdChange: (value: number) => void;
+}) {
+  return (
+    <View style={styles.thresholdWrap} testID="pleomino-interestingness-control">
+      <Text style={styles.thresholdLabel}>Interestingness</Text>
+      <input
+        data-testid="pleomino-interestingness-slider"
+        type="range"
+        min={0}
+        max={1}
+        step={0.01}
+        value={props.interestingnessThreshold}
+        onInput={(event) => {
+          props.onInterestingnessThresholdChange(Number(event.currentTarget.value));
+        }}
+        onChange={(event) => {
+          props.onInterestingnessThresholdChange(Number(event.currentTarget.value));
+        }}
+        aria-label="Interestingness threshold"
+        style={{ width: "100%", cursor: "pointer" }}
+      />
+      <Text style={styles.thresholdValue} testID="pleomino-interestingness-value">
+        {props.interestingnessThreshold.toFixed(2)}
+      </Text>
+    </View>
+  );
+}
+
+const InterestingnessControl = React.memo(InterestingnessControlBase);
+
 function GameToolbarBase(props: {
   isStacked: boolean;
   canUndo: boolean;
   canRedo: boolean;
   canSolve: boolean;
   solveState: ToolbarSolveState;
+  interestingnessThreshold: number;
+  onInterestingnessThresholdChange: (value: number) => void;
   onReset: () => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -91,6 +125,10 @@ function GameToolbarBase(props: {
           <Text style={styles.buttonIcon}>{action.icon}</Text>
         </Pressable>
       ))}
+      <InterestingnessControl
+        interestingnessThreshold={props.interestingnessThreshold}
+        onInterestingnessThresholdChange={props.onInterestingnessThresholdChange}
+      />
       <View
         style={[
           styles.solveStateChip,
@@ -176,5 +214,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 12,
     fontWeight: "600",
+  },
+  thresholdWrap: {
+    marginLeft: 4,
+    minWidth: 140,
+    alignItems: "stretch",
+    gap: 2,
+  },
+  thresholdLabel: {
+    color: "#d9eaff",
+    fontSize: 10,
+    lineHeight: 11,
+    fontWeight: "600",
+  },
+  thresholdValue: {
+    color: "#d9eaff",
+    fontSize: 10,
+    lineHeight: 11,
+    textAlign: "right",
+    fontVariant: ["tabular-nums"],
   },
 });
