@@ -52,9 +52,14 @@ describe("game screen persistence", () => {
     root = createRoot(container);
     root.render(<GameScreen url="/games/pleomino" />);
     await flushUi();
+    await flushUi();
 
     const persisted = loadPersistedGameStateFromHash(window.location, createInitialGameState());
     expect(persisted?.board.placedPieces.length ?? 0).toBe(1);
+    const placedCells = container.querySelectorAll(
+      '[data-testid="pleomino-board-cell"][style*="background-color"]',
+    );
+    expect(placedCells.length).toBeGreaterThan(0);
   });
 
   it("clear behavior with storage resets startup state to a clean board", async () => {
@@ -78,6 +83,7 @@ describe("game screen persistence", () => {
     document.body.appendChild(container);
     root = createRoot(container);
     root.render(<GameScreen url="/games/pleomino" />);
+    await flushUi();
     await flushUi();
     const persisted = loadPersistedGameStateFromHash(window.location, createInitialGameState());
     expect(persisted?.board.placedPieces.length ?? 0).toBe(0);

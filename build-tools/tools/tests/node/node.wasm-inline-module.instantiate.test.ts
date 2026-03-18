@@ -145,6 +145,24 @@ node_wasm_inline_module(
         const mod = await import(pathToFileURL(outputFile).href);
         assert.equal(typeof mod.wasmBytes, "function");
         const bytes = mod.wasmBytes();
+        const sourceBuild = await $({
+          cwd: tmp,
+          stdio: "pipe",
+          env: { ...process.env, WEB_WASM_BACKEND: "wasi_single" },
+        })`buck2 build --target-platforms prelude//platforms:default --show-output //projects/libs/demo-wasm:wasm`;
+        const sourceOutText = String(sourceBuild.stdout || sourceBuild.stderr || "").trim();
+        const sourceOutLine = sourceOutText.split(/\n+/).pop() || "";
+        const sourceOutPath = sourceOutLine.split(/\s+/).pop() || "";
+        if (!sourceOutPath) throw new Error("no output file from buck2 build for wasm source");
+        const sourceFile = path.isAbsolute(sourceOutPath)
+          ? sourceOutPath
+          : path.join(tmp, sourceOutPath);
+        const sourceBytes = await fs.readFile(sourceFile);
+        assert.deepEqual(
+          Array.from(bytes),
+          Array.from(sourceBytes),
+          "expected generated inline module bytes to match the source wasm artifact",
+        );
         const instance = await instantiateFromBytes(bytes);
         const exp = instance.exports as Record<string, any>;
         assert.equal(exp.add(2, 3), 5);

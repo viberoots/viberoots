@@ -115,7 +115,11 @@ export async function solveBoardWithRuntime(request: SolverRequest): Promise<Sol
     return solveBoardWithWasm(request);
   }
   try {
-    return await requestWorkerSolve(request);
+    const workerResult = await requestWorkerSolve(request);
+    if (workerResult.status === "unsolved" && request.lockedPlacements.length > 0) {
+      return solveBoardWithWasm(request);
+    }
+    return workerResult;
   } catch {
     detachWorker();
     return solveBoardWithWasm(request);

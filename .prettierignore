@@ -2,6 +2,7 @@ buck-out/
 node_modules/
 .direnv/
 .vite-cache/
+dist/
 .tmp/
 prelude/
 result

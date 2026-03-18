@@ -2,6 +2,7 @@
 import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
@@ -172,6 +173,15 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
     await fs.access(path.join(webappOut, "wasm-inline", "index.js"));
     await fs.access(path.join(webappOut, "wasm-inline", "cpp.js"));
     await fs.access(path.join(webappOut, "wasm-inline", "py.js"));
+    const inlineIndex = await import(
+      pathToFileURL(path.join(webappOut, "wasm-inline", "index.js")).href
+    );
+    assert.equal(typeof inlineIndex.wasmBytes, "function");
+    assert.deepEqual(
+      Array.from(inlineIndex.wasmBytes()),
+      Array.from(await fs.readFile(wasmPath)),
+      "expected scaffolded wasm-inline/index.js bytes to match top.wasm",
+    );
 
     const inlinePkgDir = path.join(tmp, "projects", "libs", `${name}-wasm-inline`);
     await fs.copy(

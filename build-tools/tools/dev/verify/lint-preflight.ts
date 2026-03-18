@@ -67,6 +67,7 @@ function shouldIgnoreLintPath(relPath: string): boolean {
   if (relPath.includes("/node_modules/") || relPath.startsWith("node_modules/")) return true;
   if (relPath.includes("/buck-out/") || relPath.startsWith("buck-out/")) return true;
   if (relPath.includes("/coverage/") || relPath.startsWith("coverage/")) return true;
+  if (relPath.includes("/dist/") || relPath.startsWith("dist/")) return true;
   if (relPath.includes("/.clinic/") || relPath.startsWith(".clinic/")) return true;
   if (relPath.includes("/.vite-cache/") || relPath.startsWith(".vite-cache/")) return true;
   return false;

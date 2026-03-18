@@ -3,60 +3,13 @@ import { createSolverRequestFromGameState, solveBoardWithWasm } from "../src/gam
 import { selectSeededRankedCandidate } from "../src/game/solver/seeded-selection.ts";
 import { STATIC_INTERESTING_SOLUTIONS } from "../src/game/solver/static-interesting-solutions.ts";
 import { createInitialGameState } from "../src/game/state.ts";
-import type { SolverRankedCandidate, SolverRequest } from "../src/game/solver/solver-types.ts";
-
-const UNIT_PIECES = [
-  { pieceId: "a", color: "#101010", baseCells: [{ x: 0, y: 0 }] },
-  { pieceId: "b", color: "#101010", baseCells: [{ x: 0, y: 0 }] },
-  { pieceId: "c", color: "#101010", baseCells: [{ x: 0, y: 0 }] },
-  { pieceId: "d", color: "#101010", baseCells: [{ x: 0, y: 0 }] },
-] as const;
-
-function makeSeededRequest(seed: number): SolverRequest {
-  return {
-    boardSize: { columns: 2, rows: 2 },
-    pieceCatalog: UNIT_PIECES,
-    lockedPlacements: [],
-    remainingInventory: { a: 1, b: 1, c: 1, d: 1 },
-    maxNodeExpansions: 10_000,
-    maxWallClockMs: 1_000,
-    solutionPoolSize: 24,
-    selectionWindowSize: 3,
-    randomSeed: seed,
-  };
-}
+import type { SolverRankedCandidate } from "../src/game/solver/solver-types.ts";
+import { makeRankedCandidate, makeSeededRequest } from "./game-solver-seeded-selection-helpers.ts";
 
 describe("solver seeded selection", () => {
   it("uses diversity ordering inside the seeded selection window", () => {
-    const candidate = (
-      signature: string,
-      placements: Array<{ pieceId: string; x: number; y: number }>,
-      score: number,
-    ): SolverRankedCandidate => ({
-      signature,
-      interestingnessScore: score,
-      foundAtNode: 1,
-      paretoFront: 0,
-      structuralBucket: "bucket-a",
-      objectives: {
-        symmetry: score,
-        repetition: score,
-        rhythm: score,
-        edgeAesthetic: score,
-        colorDistribution: score,
-        globalMotif: score,
-        intentionalContrast: score,
-        composition: score,
-        structuralNovelty: score,
-      },
-      placements: placements.map((placement) => ({
-        pieceId: placement.pieceId,
-        position: { x: placement.x, y: placement.y },
-        transform: { rotation: 0, flipped: false },
-      })),
-    });
     const ranked: SolverRankedCandidate[] = [
-      candidate(
+      makeRankedCandidate(
         "top",
         [
           { pieceId: "a", x: 0, y: 0 },
@@ -64,7 +17,7 @@ describe("solver seeded selection", () => {
         ],
         1,
       ),
-      candidate(
+      makeRankedCandidate(
         "near-1",
         [
           { pieceId: "a", x: 0, y: 0 },
@@ -72,7 +25,7 @@ describe("solver seeded selection", () => {
         ],
         0.99,
       ),
-      candidate(
+      makeRankedCandidate(
         "near-2",
         [
           { pieceId: "a", x: 0, y: 0 },
@@ -80,7 +33,7 @@ describe("solver seeded selection", () => {
         ],
         0.98,
       ),
-      candidate(
+      makeRankedCandidate(
         "far",
         [
           { pieceId: "c", x: 8, y: 8 },

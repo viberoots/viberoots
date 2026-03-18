@@ -109,20 +109,19 @@ export function useGameScreenSolve(args: {
     await deferSolveStart();
     const isEmptyBoard = requestState.board.placedPieces.length === 0;
     let result: Awaited<ReturnType<typeof solveBoardWithRuntime>>;
+    const solverRequest = createSolverRequestFromGameState(
+      requestState,
+      isEmptyBoard ? EMPTY_BOARD_MAX_NODE_EXPANSIONS : SOLVER_MAX_NODE_EXPANSIONS,
+      SOLVER_MAX_WALL_CLOCK_MS,
+      {
+        randomSeed: solveSeed,
+        solutionPoolSize: isEmptyBoard ? EMPTY_BOARD_SOLUTION_POOL_SIZE : undefined,
+        selectionWindowSize: isEmptyBoard ? EMPTY_BOARD_SELECTION_WINDOW_SIZE : undefined,
+        interestingnessThreshold: MAX_INTERESTINGNESS_THRESHOLD,
+      },
+    );
     try {
-      result = await solveBoardWithRuntime(
-        createSolverRequestFromGameState(
-          requestState,
-          isEmptyBoard ? EMPTY_BOARD_MAX_NODE_EXPANSIONS : SOLVER_MAX_NODE_EXPANSIONS,
-          SOLVER_MAX_WALL_CLOCK_MS,
-          {
-            randomSeed: solveSeed,
-            solutionPoolSize: isEmptyBoard ? EMPTY_BOARD_SOLUTION_POOL_SIZE : undefined,
-            selectionWindowSize: isEmptyBoard ? EMPTY_BOARD_SELECTION_WINDOW_SIZE : undefined,
-            interestingnessThreshold: MAX_INTERESTINGNESS_THRESHOLD,
-          },
-        ),
-      );
+      result = await solveBoardWithRuntime(solverRequest);
     } catch {
       if (requestToken === requestTokenRef.current) {
         triggerSolveFailureFeedback();

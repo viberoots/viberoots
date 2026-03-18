@@ -1,8 +1,53 @@
 import React from "react";
 import { AppRegistry } from "react-native-web";
+import { PLEOMINO_URL_STATE_HASH_KEY } from "./game/persistence";
 import { prewarmSolverRuntimeAssets } from "./game/solver/solver-runtime";
 import { defaultTsModuleKey, loadTsModule } from "./ts-modules";
 import { Home } from "./home";
+
+const SERVICE_WORKER_TAKEOVER_RELOAD_KEY = "pleomino-sw-takeover-reload";
+
+function ensureServiceWorkerControlsPage(): void {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+    return;
+  }
+  if (navigator.serviceWorker.controller) {
+    try {
+      window.sessionStorage.removeItem(SERVICE_WORKER_TAKEOVER_RELOAD_KEY);
+    } catch {
+      // Ignore session storage errors.
+    }
+    return;
+  }
+
+  const reloadOnce = () => {
+    if (navigator.serviceWorker.controller) {
+      return;
+    }
+    try {
+      if (window.sessionStorage.getItem(SERVICE_WORKER_TAKEOVER_RELOAD_KEY) === "1") {
+        return;
+      }
+      window.sessionStorage.setItem(SERVICE_WORKER_TAKEOVER_RELOAD_KEY, "1");
+    } catch {
+      // Continue even if session storage is unavailable.
+    }
+    window.location.reload();
+  };
+
+  const handleControllerChange = () => {
+    navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+    reloadOnce();
+  };
+
+  navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
+  void navigator.serviceWorker.ready.then(() => {
+    window.setTimeout(() => {
+      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+      reloadOnce();
+    }, 1500);
+  });
+}
 
 function registerServiceWorker() {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
@@ -17,10 +62,21 @@ function registerServiceWorker() {
       const message = error instanceof Error ? error.message : String(error);
       console.warn(`[pleomino] service worker registration failed: ${message}`);
     });
+  ensureServiceWorkerControlsPage();
 }
 
 function App(props: { url: string }) {
   return React.createElement(Home, { url: props.url });
+}
+
+function hasPersistedHashState(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const hash = window.location.hash.startsWith("#")
+    ? window.location.hash.slice(1)
+    : window.location.hash;
+  return new URLSearchParams(hash).has(PLEOMINO_URL_STATE_HASH_KEY);
 }
 
 AppRegistry.registerComponent("App", () => App);
@@ -29,9 +85,13 @@ registerServiceWorker();
 const root = document.getElementById("app");
 if (root) {
   const url = `${window.location.pathname}${window.location.search}`;
+  const shouldHydrate = !hasPersistedHashState();
+  if (!shouldHydrate) {
+    root.replaceChildren();
+  }
   AppRegistry.runApplication("App", {
     rootTag: root,
-    hydrate: true,
+    hydrate: shouldHydrate,
     initialProps: { url },
   });
   root.setAttribute("data-client-hydrated", "true");

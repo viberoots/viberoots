@@ -178,5 +178,6 @@ EOF
       set -euo pipefail
       mkdir -p "$out"
       cp -R dist "$out/dist"
+      ln -s "${nm}/node_modules" "$out/node_modules"
     '';
   }

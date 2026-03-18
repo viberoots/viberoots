@@ -1,7 +1,7 @@
 import React from "react";
 import { Text, View } from "react-native-web";
 import { transformCells } from "../game/geometry";
-import { loadPersistedGameStateFromHash, savePersistedGameStateToHash } from "../game/persistence";
+import { loadPersistedGameStateFromHash } from "../game/persistence";
 import { pleominoGameReducer } from "../game/reducer";
 import { createGameViewSelector } from "../game/view-selector";
 import { createInitialGameHistoryState, createInitialGameState } from "../game/state";
@@ -13,23 +13,46 @@ import { useGameScreenSolve } from "./game-screen-solve";
 import { PieceTray } from "./piece-tray";
 import { pointerFromPressEvent } from "./piece-view-helpers";
 import { computeResponsiveMetrics } from "./game-screen-responsive";
+import {
+  useGameScreenPersistence,
+  useGameScreenReveal,
+  useGameScreenViewport,
+} from "./use-game-screen-bootstrap";
 import { useGameScreenInteractions } from "./use-game-screen-interactions";
 import { useGameScreenKeyboard } from "./use-game-screen-keyboard";
 
 export function GameScreen(_props: { url: string }) {
+  const createInitialHistoryState = React.useCallback(() => {
+    const initialState = createInitialGameState();
+    if (typeof window === "undefined") {
+      return createInitialGameHistoryState();
+    }
+    try {
+      const restored = loadPersistedGameStateFromHash(window.location, initialState);
+      if (restored) {
+        return {
+          past: [],
+          present: restored,
+          future: [],
+        };
+      }
+    } catch {
+      // Fall through to the default empty board state.
+    }
+    return createInitialGameHistoryState();
+  }, []);
   const [state, dispatch] = React.useReducer(
     pleominoGameReducer,
     undefined,
-    createInitialGameHistoryState,
+    createInitialHistoryState,
   );
   const presentState = state.present;
-  const [viewport, setViewport] = React.useState({ width: 0, height: 0 });
+  const viewport = useGameScreenViewport();
   const selectGameView = React.useMemo(() => createGameViewSelector(), []);
   const viewModel = selectGameView(presentState);
   const solve = useGameScreenSolve({ state, dispatch });
   const interactionLocked = solve.isApplyingSolve;
   const boardGridElementRef = React.useRef<HTMLElement | null>(null);
-  const persistenceReadyRef = React.useRef(false);
   const responsive = React.useMemo(
     () => computeResponsiveMetrics(viewport.width, viewport.height),
     [viewport.height, viewport.width],
@@ -79,44 +102,8 @@ export function GameScreen(_props: { url: string }) {
     void solve.handleSolve();
   }, [interactions, solve]);
 
-  React.useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    const applyViewport = () => {
-      setViewport({ width: window.innerWidth, height: window.innerHeight });
-    };
-    applyViewport();
-    window.addEventListener("resize", applyViewport);
-    return () => window.removeEventListener("resize", applyViewport);
-  }, []);
-
-  React.useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    try {
-      const restored = loadPersistedGameStateFromHash(window.location, createInitialGameState());
-      if (restored) {
-        interactions.clearPendingTap();
-        dispatch({ type: "state/replace", state: restored });
-      }
-    } catch {}
-    persistenceReadyRef.current = true;
-    // hydration-safe restore runs once after mount
-  }, []);
-
-  React.useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    if (!persistenceReadyRef.current) {
-      return;
-    }
-    try {
-      savePersistedGameStateToHash(window.history, window.location, presentState);
-    } catch {}
-  }, [presentState]);
+  const persistenceReady = useGameScreenPersistence(presentState);
+  useGameScreenReveal({ persistenceReady, viewport });
 
   return (
     <View

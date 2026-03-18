@@ -1,57 +1,10 @@
 import React from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native-web";
+import { ActivityIndicator, View } from "react-native-web";
 import type { BoardViewModel } from "../game/selectors";
 import type { PixelPoint } from "../game/interaction";
 import { cellKey } from "../game/placement";
-
-function pointerFromEvent(event: {
-  nativeEvent: {
-    pageX?: number;
-    pageY?: number;
-    clientX?: number;
-    clientY?: number;
-    touches?: Array<{ pageX: number; pageY: number }>;
-    changedTouches?: Array<{ pageX: number; pageY: number }>;
-  };
-}): { pageX: number; pageY: number } {
-  const native = event.nativeEvent;
-  const touch = native.touches?.[0] ?? native.changedTouches?.[0];
-  if (touch) {
-    return { pageX: touch.pageX, pageY: touch.pageY };
-  }
-  if (typeof native.clientX === "number" && typeof native.clientY === "number") {
-    return {
-      pageX: native.clientX + window.scrollX,
-      pageY: native.clientY + window.scrollY,
-    };
-  }
-  if (typeof native.pageX === "number" && typeof native.pageY === "number") {
-    return { pageX: native.pageX, pageY: native.pageY };
-  }
-  return {
-    pageX: 0,
-    pageY: 0,
-  };
-}
-
-function grabbedOffsetFromBoardCellEvent(
-  event: { currentTarget: EventTarget | null; nativeEvent: unknown },
-  localCell: { x: number; y: number },
-  pointer: { pageX: number; pageY: number },
-  cellSize: number,
-): PixelPoint | null {
-  const target = event.currentTarget;
-  if (!(target instanceof HTMLElement)) {
-    return null;
-  }
-  const rect = target.getBoundingClientRect();
-  const localInCellX = pointer.pageX - (rect.left + window.scrollX);
-  const localInCellY = pointer.pageY - (rect.top + window.scrollY);
-  return {
-    x: localCell.x * cellSize + localInCellX,
-    y: localCell.y * cellSize + localInCellY,
-  };
-}
+import { grabbedOffsetFromBoardCellEvent, pointerFromBoardEvent } from "./board-grid-drag";
+import { boardGridStyles as styles } from "./board-grid-styles";
 
 export function BoardGrid(props: {
   board: BoardViewModel;
@@ -127,7 +80,7 @@ export function BoardGrid(props: {
                 onMouseDown={
                   cell.state === "placed" && cell.pieceId && cell.instanceId && cell.localCell
                     ? (event) => {
-                        const pointer = pointerFromEvent(event);
+                        const pointer = pointerFromBoardEvent(event);
                         event.preventDefault();
                         const grabbedOffsetPx = grabbedOffsetFromBoardCellEvent(
                           event,
@@ -151,7 +104,7 @@ export function BoardGrid(props: {
                 onTouchStart={
                   cell.state === "placed" && cell.pieceId && cell.instanceId && cell.localCell
                     ? (event) => {
-                        const pointer = pointerFromEvent(event);
+                        const pointer = pointerFromBoardEvent(event);
                         event.preventDefault();
                         const grabbedOffsetPx = grabbedOffsetFromBoardCellEvent(
                           event,
@@ -231,82 +184,3 @@ export function BoardGrid(props: {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  boardCard: {
-    position: "relative",
-    borderRadius: 24,
-    backgroundColor: "#d9e8f7",
-    padding: 8,
-    overflow: "hidden",
-    boxShadow: "0 10px 18px rgba(56, 104, 168, 0.18)",
-  },
-  boardCardShake: {
-    animationDuration: "240ms",
-    animationTimingFunction: "ease-in-out",
-    animationKeyframes: {
-      "0%": { transform: "translateX(0px)" },
-      "20%": { transform: "translateX(-7px)" },
-      "40%": { transform: "translateX(7px)" },
-      "60%": { transform: "translateX(-5px)" },
-      "80%": { transform: "translateX(5px)" },
-      "100%": { transform: "translateX(0px)" },
-    },
-  },
-  boardCardFailure: {
-    boxShadow: "0 0 0 2px rgba(207, 107, 107, 0.38), 0 10px 18px rgba(133, 54, 54, 0.24)",
-  },
-  boardGrid: {
-    display: "flex",
-    flexDirection: "column",
-    alignSelf: "center",
-    overflow: "visible",
-  },
-  solveOverlay: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: 2,
-    borderRadius: 24,
-    backgroundColor: "rgba(76, 87, 102, 0.38)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  solveOverlaySpinner: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.3)",
-    backgroundColor: "rgba(32, 43, 60, 0.52)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  failureMarker: {
-    position: "absolute",
-    width: 1,
-    height: 1,
-    opacity: 0,
-  },
-  boardRow: {
-    display: "flex",
-    flexDirection: "row",
-  },
-  boardCell: {
-    position: "relative",
-  },
-  previewCell: {
-    opacity: 0.78,
-  },
-  boardCellEmptyA: {
-    backgroundColor: "#cadcf0",
-  },
-  boardCellEmptyB: {
-    backgroundColor: "#bccfe6",
-  },
-  snapTargetCell: {
-    borderColor: "rgba(22, 101, 216, 0.85)",
-  },
-});

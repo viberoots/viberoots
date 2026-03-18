@@ -77,18 +77,8 @@ let
           else
             null;
 
-        defaultPatterns = ''
-          test/**/*.test.ts
-          test/**/*.test.js
-          __tests__/**/*.test.ts
-          __tests__/**/*.test.js
-          src/**/*.test.ts
-          src/**/*.test.js
-          **/*.test.ts
-          **/*.test.js
-        '';
         patternsEnv = builtins.getEnv "NIX_NODE_TEST_PATTERNS";
-        patternsValue = if patternsEnv != "" then patternsEnv else (builtins.replaceStrings [ "\n\n" ] [ "\n" ] defaultPatterns);
+        patternsValue = patternsEnv;
         coverageEnv = builtins.getEnv "COVERAGE";
       in
       if (!hasTestFiles) then
@@ -152,7 +142,7 @@ let
               export ADDON_NAME="${addonName}"
               export ADDON_SRC="${addonSrc}"
               export COVERAGE_ENV="${coverageEnv}"
-              export PATTERNS_VALUE=${builtins.toJSON patternsValue}
+              export PATTERNS_VALUE='${builtins.toJSON patternsValue}'
               ${builtins.readFile ./node-test-buildPhase.sh}
             '';
             installPhase = ''
@@ -167,5 +157,3 @@ let
           };
 in
 builtins.listToAttrs (map (imp: { name = sanitize imp; value = makeNodeTest imp; }) importerDirs)
-
-

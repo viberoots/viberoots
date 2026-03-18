@@ -12,6 +12,8 @@ const host = process.env.HOST || "0.0.0.0";
 const entryServerPath = path.resolve(__dirname, "entry-server.js");
 const baseShellStyles = [
   "html,body,#app{margin:0;min-height:100%;overflow:hidden;overscroll-behavior:none;}",
+  '#app[data-client-hydrated="false"]{visibility:hidden;}',
+  '#app[data-ui-ready="false"]{visibility:hidden;}',
   'body{background:#27446b;color:#f8fafc;user-select:none;-webkit-user-select:none;touch-action:none;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}',
 ].join("");
 const pwaHeadTags = [
@@ -78,7 +80,6 @@ const render = await loadRender();
 
 app.get("*", (req, res) => {
   const rendered = render(req.originalUrl);
-  const appHtml = rendered.appHtml;
   const styleHtml = rendered.styleHtml;
   const html = [
     "<!doctype html>",
@@ -93,7 +94,7 @@ app.get("*", (req, res) => {
     "  </head>",
     "  <body>",
     `    <div data-server-wasm-bytes="${serverWasmByteLength}"></div>`,
-    `    <div id="app" data-ssr-marker="vite">${appHtml}</div>`,
+    `    <div id="app" data-ssr-marker="vite" data-client-hydrated="false" data-ui-ready="false">${rendered.appHtml}</div>`,
     '    <script type="module" src="/entry-client.js"></script>',
     "  </body>",
     "</html>",

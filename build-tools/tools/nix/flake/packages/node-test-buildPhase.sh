@@ -12,9 +12,31 @@ fi
 
 VITEST_BIN=""
 PATTERNS_FILE="$TMPDIR/patterns.txt"
-cat > "$PATTERNS_FILE" <<'EOF_PAT'
-${PATTERNS_VALUE}
-EOF_PAT
+PATTERN_ARGS_FILE="$TMPDIR/pattern-args.txt"
+node -e '
+const raw = process.env.PATTERNS_VALUE ?? "\"\"";
+const parsed = JSON.parse(raw);
+if (typeof parsed !== "string") {
+  throw new Error("PATTERNS_VALUE must decode to a string");
+}
+process.stdout.write(parsed.replace(/\r\n/g, "\n"));
+' > "$PATTERNS_FILE"
+
+node -e '
+const fs = require("node:fs");
+const input = fs.readFileSync(process.argv[1], "utf8");
+const out = input
+  .split("\n")
+  .map((line) => line.trim())
+  .filter(Boolean)
+  .map((line) => JSON.stringify(line))
+  .join("\n");
+if (out.length > 0) {
+  fs.writeFileSync(process.argv[2], `${out}\n`);
+} else {
+  fs.writeFileSync(process.argv[2], "");
+}
+' "$PATTERNS_FILE" "$PATTERN_ARGS_FILE"
 
 FOUND=0
 if find . \
@@ -26,10 +48,17 @@ if find . \
   FOUND=1
 fi
 
-COVERAGE_ARGS=""
+COVERAGE_ARGS=()
 if [ "${COVERAGE_ENV}" = "1" ]; then
   export NODE_V8_COVERAGE="coverage/raw"
-  COVERAGE_ARGS="--coverage --coverage.provider=v8 --coverage.reporter=lcov --coverage.reporter=json-summary --coverage.reporter=html --coverage.reportsDirectory=coverage"
+  COVERAGE_ARGS=(
+    --coverage
+    --coverage.provider=v8
+    --coverage.reporter=lcov
+    --coverage.reporter=json-summary
+    --coverage.reporter=html
+    --coverage.reportsDirectory=coverage
+  )
 fi
 
 mkdir -p report
@@ -85,6 +114,21 @@ EOF_VITE_CFG
     export NODE_OPTIONS="--max-old-space-size=1536 ${NODE_OPTIONS:-}"
 
     VITEST_TIMEOUT_SECS=420
+    mapfile -t PATTERN_ARGS < <(node -e '
+const fs = require("node:fs");
+const file = process.argv[1];
+if (!fs.existsSync(file)) {
+  process.exit(0);
+}
+const lines = fs
+  .readFileSync(file, "utf8")
+  .split("\n")
+  .map((line) => line.trim())
+  .filter(Boolean);
+for (const line of lines) {
+  process.stdout.write(`${JSON.parse(line)}\n`);
+}
+' "$PATTERN_ARGS_FILE")
     if [ "$(basename "$VITEST_BIN")" = "vitest" ]; then
       timeout -k 15s ${VITEST_TIMEOUT_SECS}s "$VITEST_BIN" run \
         --pool forks \
@@ -95,7 +139,8 @@ EOF_VITE_CFG
         --reporter=junit \
         --outputFile=report/junit.xml \
         --passWithNoTests \
-        $COVERAGE_ARGS
+        "${COVERAGE_ARGS[@]}" \
+        "${PATTERN_ARGS[@]}"
     else
       timeout -k 15s ${VITEST_TIMEOUT_SECS}s node "$VITEST_BIN" run \
         --pool forks \
@@ -106,7 +151,8 @@ EOF_VITE_CFG
         --reporter=junit \
         --outputFile=report/junit.xml \
         --passWithNoTests \
-        $COVERAGE_ARGS
+        "${COVERAGE_ARGS[@]}" \
+        "${PATTERN_ARGS[@]}"
     fi
 
     if [ ! -s report/junit.xml ]; then
@@ -126,5 +172,3 @@ EOF_VITE_CFG
     exit 3
   fi
 fi
-
-

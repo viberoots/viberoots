@@ -67,17 +67,23 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    caches.open(RUNTIME_CACHE).then(async (cache) => {
-      const cached = await cache.match(event.request);
-      const networkFetch = fetch(event.request)
-        .then((response) => {
-          if (response.ok) {
-            void cache.put(event.request, response.clone());
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || networkFetch;
-    }),
+    Promise.all([caches.open(APP_SHELL_CACHE), caches.open(RUNTIME_CACHE)]).then(
+      async ([appShellCache, runtimeCache]) => {
+        const cached =
+          (await runtimeCache.match(event.request)) || (await appShellCache.match(event.request));
+        const targetCache = PRECACHE_URLS.includes(requestUrl.pathname)
+          ? appShellCache
+          : runtimeCache;
+        const networkFetch = fetch(event.request)
+          .then((response) => {
+            if (response.ok) {
+              void targetCache.put(event.request, response.clone());
+            }
+            return response;
+          })
+          .catch(() => cached);
+        return cached || networkFetch;
+      },
+    ),
   );
 });

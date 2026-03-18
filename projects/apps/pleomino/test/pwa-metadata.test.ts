@@ -22,6 +22,8 @@ describe("pwa metadata", () => {
     expect(entryClient).toContain('register("/service-worker.js"');
     expect(entryClient).toContain('scope: "/"');
     expect(entryClient).not.toContain('addEventListener("load"');
+    expect(entryClient).toContain("controllerchange");
+    expect(entryClient).toContain("window.location.reload()");
   });
 
   it("ships a manifest with expected install fields", () => {
@@ -48,5 +50,6 @@ describe("pwa metadata", () => {
     expect(serviceWorker).toContain("__PLEOMINO_CACHE_VERSION__");
     expect(serviceWorker).toContain('event.request.mode === "navigate"');
     expect(serviceWorker).toContain('requestUrl.pathname.endsWith(".wasm")');
+    expect(serviceWorker).toContain("caches.open(APP_SHELL_CACHE)");
   });
 });

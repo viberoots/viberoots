@@ -165,4 +165,31 @@ describe("game keyboard flow", () => {
       HTMLElement.prototype.getBoundingClientRect = originalRect;
     }
   });
+
+  it("does not rotate the selected piece on cmd-q", async () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    root.render(<GameScreen url="/games/pleomino" />);
+    await flushUi();
+
+    const pieceId = "purple-2-1";
+    leftClickCard(cardByPieceId(pieceId));
+    await wait(260);
+    await flushUi();
+
+    const before = persistedState();
+    const beforeTransform = before.transformByPieceId[pieceId];
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "q",
+        bubbles: true,
+        metaKey: true,
+      }),
+    );
+    await flushUi();
+
+    const after = persistedState();
+    expect(after.transformByPieceId[pieceId]).toEqual(beforeTransform);
+  });
 });

@@ -200,10 +200,10 @@ EOF
           phase_log "install-begin"
           mkdir -p $out
           if [ -d dist ]; then cp -R dist $out/; else echo "dist missing" >&2; exit 2; fi
+          ln -s "${nm}/node_modules" "$out/node_modules"
           phase_log "install-complete"
         '';
       };
 in
 builtins.listToAttrs (map (imp: { name = sanitize imp; value = makeWebapp imp; }) importerDirs)
-
 

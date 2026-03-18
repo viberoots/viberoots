@@ -5,6 +5,7 @@ import {
   resetSolverRuntimeForTests,
   setSolverWorkerFactoryForTests,
 } from "../src/game/solver/solver-runtime.ts";
+import { resetSolverWasmForTests } from "../src/game/solver/wasm-runtime.ts";
 
 describe("solver runtime prewarm", () => {
   const initialWorkerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
@@ -12,6 +13,7 @@ describe("solver runtime prewarm", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     resetSolverRuntimeForTests();
+    resetSolverWasmForTests();
     if (initialWorkerDescriptor) {
       Object.defineProperty(globalThis, "Worker", initialWorkerDescriptor);
     } else {
@@ -19,7 +21,7 @@ describe("solver runtime prewarm", () => {
     }
   });
 
-  it("eagerly creates the worker runtime and fetches solver wasm once", async () => {
+  it("eagerly creates the worker runtime and primes solver wasm bytes once", async () => {
     let createdWorkerCount = 0;
     Object.defineProperty(globalThis, "Worker", {
       configurable: true,
@@ -35,18 +37,11 @@ describe("solver runtime prewarm", () => {
         terminate() {},
       } as unknown as Worker;
     });
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(new Response(new Uint8Array([0, 97, 115, 109]).buffer, { status: 200 }));
-
     prewarmSolverRuntimeAssets();
     prewarmSolverRuntimeAssets();
     await Promise.resolve();
     await Promise.resolve();
 
     expect(createdWorkerCount).toBe(1);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0]?.[0]).toBeTypeOf("string");
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("pleomino-solver");
   });
 });

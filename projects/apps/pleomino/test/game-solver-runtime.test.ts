@@ -117,4 +117,63 @@ describe("solver runtime path", () => {
     const direct = await solveBoardWithWasm(request);
     expect(fromRuntime).toEqual(direct);
   });
+
+  it("falls back to direct solver when the worker returns unsolved for a partial board", async () => {
+    const restoreWorker = installWorkerGlobal();
+    const solverMock = vi.mocked(solveBoardWithWasm);
+    solverMock.mockResolvedValueOnce({
+      status: "solved",
+      placements: [
+        {
+          pieceId: "fallback",
+          transform: { rotation: 0, flipped: false },
+          position: { x: 0, y: 0 },
+        },
+      ],
+      nodeExpansions: 7,
+      elapsedMs: 1,
+      interestingnessScore: 0.7,
+      selectedSignature: "fallback-solved",
+    });
+    try {
+      setSolverWorkerFactoryForTests(() => {
+        return {
+          onmessage: null as ((event: MessageEvent<SolveWorkerResponse>) => void) | null,
+          onerror: null as ((event: Event) => void) | null,
+          postMessage(payload: SolveWorkerRequest) {
+            this.onmessage?.({
+              data: {
+                type: "solve-result",
+                requestId: payload.requestId,
+                result: {
+                  status: "unsolved",
+                  placements: [],
+                  nodeExpansions: 0,
+                  elapsedMs: 1,
+                  interestingnessScore: 0,
+                  selectedSignature: "",
+                },
+              },
+            } as MessageEvent<SolveWorkerResponse>);
+          },
+          terminate() {},
+        } as unknown as Worker;
+      });
+
+      const request = makeRequest({
+        lockedPlacements: [
+          {
+            pieceId: "alpha",
+            transform: { rotation: 0, flipped: false },
+            position: { x: 0, y: 0 },
+          },
+        ],
+      });
+      const result = await solveBoardWithRuntime(request);
+      expect(result.status).toBe("solved");
+      expect(result.selectedSignature).toBe("fallback-solved");
+    } finally {
+      restoreWorker();
+    }
+  });
 });

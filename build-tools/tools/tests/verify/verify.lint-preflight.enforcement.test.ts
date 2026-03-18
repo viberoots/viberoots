@@ -14,6 +14,10 @@ test("verify includes a bounded lint preflight (enforcement)", async () => {
     "expected verify lint preflight to scope lint/prettier to changed files by default",
   );
   assert.ok(
+    txt.includes("/dist/") && txt.includes('startsWith("dist/")'),
+    "expected verify lint preflight to ignore generated dist outputs",
+  );
+  assert.ok(
     txt.includes("--no-warn-ignored"),
     "expected verify lint preflight to suppress ignored-file warnings for explicit changed-file runs",
   );
