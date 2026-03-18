@@ -5,6 +5,45 @@ import type { GameState } from "../game/types";
 const useClientLayoutEffect =
   typeof window === "undefined" ? React.useEffect : React.useLayoutEffect;
 
+function appRootElement(): HTMLElement | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+  return document.getElementById("app");
+}
+
+function setAppRootReady(root: HTMLElement, ready: boolean): void {
+  root.setAttribute("data-ui-ready", ready ? "true" : "false");
+}
+
+function scheduleAppRootReveal(root: HTMLElement, onReveal: () => void): () => void {
+  let cancelled = false;
+  let firstFrame: number | null = null;
+  let secondFrame: number | null = null;
+
+  const reveal = () => {
+    if (cancelled) {
+      return;
+    }
+    setAppRootReady(root, true);
+    onReveal();
+  };
+
+  firstFrame = window.requestAnimationFrame(() => {
+    secondFrame = window.requestAnimationFrame(reveal);
+  });
+
+  return () => {
+    cancelled = true;
+    if (firstFrame !== null) {
+      window.cancelAnimationFrame(firstFrame);
+    }
+    if (secondFrame !== null) {
+      window.cancelAnimationFrame(secondFrame);
+    }
+  };
+}
+
 export function useGameScreenViewport(): { width: number; height: number } {
   const [viewport, setViewport] = React.useState({ width: 0, height: 0 });
 
@@ -46,39 +85,19 @@ export function useGameScreenReveal(args: {
   persistenceReady: boolean;
   viewport: { width: number; height: number };
 }): void {
+  const hasRevealedRef = React.useRef(false);
+
   useClientLayoutEffect(() => {
-    if (typeof document === "undefined") {
+    const root = appRootElement();
+    if (!root || hasRevealedRef.current) {
       return;
     }
+    setAppRootReady(root, false);
     if (args.viewport.width <= 0 || args.viewport.height <= 0 || !args.persistenceReady) {
       return;
     }
-    const root = document.getElementById("app");
-    if (!root) {
-      return;
-    }
-    let cancelled = false;
-    let firstFrame: number | null = null;
-    let secondFrame: number | null = null;
-
-    const reveal = () => {
-      if (!cancelled) {
-        root.setAttribute("data-ui-ready", "true");
-      }
-    };
-
-    firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(reveal);
+    return scheduleAppRootReveal(root, () => {
+      hasRevealedRef.current = true;
     });
-
-    return () => {
-      cancelled = true;
-      if (firstFrame !== null) {
-        window.cancelAnimationFrame(firstFrame);
-      }
-      if (secondFrame !== null) {
-        window.cancelAnimationFrame(secondFrame);
-      }
-    };
   }, [args.persistenceReady, args.viewport.height, args.viewport.width]);
 }

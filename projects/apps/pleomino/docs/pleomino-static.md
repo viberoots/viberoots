@@ -418,6 +418,18 @@ Implementation status:
 
 ## PR-4: Pleomino Static-PWA Parity Cleanup and Hardening
 
+Implementation status:
+
+- complete in `projects/apps/pleomino`
+- startup reveal now stays hidden until restored client state is rendered and the first paint
+  settles
+- dead app-local server residue is removed from the active app tree
+- focused PR-4 validation target is wired in `TARGETS` as `:pr4_static_pwa_hardening`
+- regression coverage includes:
+  - `test/game-screen-startup-browser.test.tsx`
+  - `test/game-screen-persistence-browser.test.tsx`
+  - `test/static-delivery-contract.test.ts`
+
 ### Scope
 
 - Remove dead SSR-era code and contracts after migration.
@@ -454,6 +466,113 @@ Implementation status:
 - Pleomino is cleanly aligned with the new static PWA template.
 - No dead SSR path remains in active use.
 - Static-PWA runtime behavior is regression-proofed and maintainable.
+
+---
+
+## PR-5: Complete Static-PWA Template Runtime Verification
+
+### Why This PR Exists
+
+The current migration and shared utility extraction cover scaffold shape, metadata, and precache
+generation, but the template plan still has one incomplete area:
+
+- Phase 4 requires template-level verification for:
+  - cold offline load after one online load
+  - local workspace dependency updates in dev
+
+Today those behaviors are better covered in Pleomino than in the reusable
+`ts/webapp-static-pwa` template itself. That leaves part of the reusable contract implied rather
+than proven in build-tools coverage.
+
+### Scope
+
+- Add missing build-tools template/runtime tests for `ts/webapp-static-pwa`.
+- Verify the generated template can:
+  - load offline after one successful online load
+  - preserve the production service-worker/offline contract at template level
+  - keep local-workspace Vite dependency behavior working in dev
+
+### Implementation Notes
+
+- Keep the new coverage in build-tools tests, not Pleomino-only tests.
+- Reuse existing temp-repo and scaffold runtime test helpers where possible.
+- Prefer deterministic local-origin validation over broad browser-only smoke tests.
+- Do not fold unrelated Pleomino app changes into this PR.
+
+### Tests
+
+- Build-tools runtime/scaffold tests:
+  - generated static-PWA app cold-loads offline after one online visit
+  - generated static-PWA app still registers and serves the app shell from the service worker
+  - generated static-PWA app still supports local-workspace dependency updates in dev
+
+### Verify Strategy
+
+- Keep this PR build-tools/template scoped.
+- Do not modify `projects/apps/pleomino` here except possibly doc references if needed.
+- Expected verify scope:
+  - build-system scoped
+  - no mixed-scoped PR run required if Pleomino app code stays untouched
+
+### Acceptance Criteria
+
+- The `ts/webapp-static-pwa` template satisfies all Phase 4 verification bullets in build-tools
+  coverage.
+- Template runtime correctness is proven without relying on Pleomino-only tests.
+
+---
+
+## PR-6: Project-Scoped Methodology Exceptions for Large Generated Artifacts
+
+### Why This PR Exists
+
+Pleomino currently includes a large generated interesting-solution pool source file. That is
+acceptable as an exception for this project, but the exception handling should be improved so that:
+
+- exceptions are declared at project scope rather than as broad repo-level policy
+- adding a project-local exception does not force a mixed-scope verify path across unrelated areas
+
+This keeps exception review surgical and aligns validation cost with the project that owns the
+exception.
+
+### Scope
+
+- Introduce project-scoped exception plumbing for methodology/file-size enforcement.
+- Allow Pleomino to declare its generated artifact exception at the project level.
+- Keep the default methodology policy strict for projects without explicit exceptions.
+
+### Implementation Notes
+
+- Prefer exception ownership keyed by project/importer path rather than one flat repo-wide list.
+- Ensure the validation and selector logic can distinguish:
+  - a project-local exception change
+  - a repo-wide methodology/build-system rule change
+- Keep the exception contract explicit, reviewed, and deterministic.
+- Do not weaken the default file-size policy for the rest of the repo.
+
+### Tests
+
+- Build-tools/tests for methodology exception routing:
+  - project-local exception changes select project-impact verification rather than mixed build-system
+    scope when no shared policy changes are involved
+  - unrelated projects do not inherit Pleomino’s exception
+  - file-size enforcement remains strict for projects without exceptions
+
+### Verify Strategy
+
+- Keep this PR focused on build-tools enforcement/selection logic plus Pleomino’s project-local
+  exception declaration.
+- Avoid unrelated scaffold or app-runtime refactors here.
+- Expected verify scope:
+  - mixed/build-system scoped while the exception-routing mechanism itself is introduced
+  - future project-local exception updates should then be project-impact scoped
+
+### Acceptance Criteria
+
+- Pleomino’s generated artifact exception is representable at project scope.
+- The repo can validate project-local exceptions without treating every exception change as a
+  repo-wide mixed-scope change.
+- Methodology enforcement remains strict by default everywhere else.
 
 ## Risks
 

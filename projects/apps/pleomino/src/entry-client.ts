@@ -2,7 +2,7 @@ import React from "react";
 import { AppRegistry } from "react-native-web";
 import { prewarmSolverRuntimeAssets } from "./game/solver/solver-runtime";
 import { defaultTsModuleKey, loadTsModule } from "./ts-modules";
-import { Home } from "./home";
+import { GameScreen } from "./ui/game-screen";
 
 const SERVICE_WORKER_TAKEOVER_RELOAD_KEY = "pleomino-sw-takeover-reload";
 
@@ -65,7 +65,7 @@ function registerServiceWorker() {
 }
 
 function App(props: { url: string }) {
-  return React.createElement(Home, { url: props.url });
+  return React.createElement(GameScreen, { url: props.url });
 }
 
 AppRegistry.registerComponent("App", () => App);

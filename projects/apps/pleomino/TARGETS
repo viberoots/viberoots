@@ -41,3 +41,12 @@ nix_node_test(
         "test/game-solve-browser.test.tsx",
     ],
 )
+
+nix_node_test(
+    name = "pr4_static_pwa_hardening",
+    patterns = [
+        "test/game-screen-startup-browser.test.tsx",
+        "test/game-screen-persistence-browser.test.tsx",
+        "test/static-delivery-contract.test.ts",
+    ],
+)

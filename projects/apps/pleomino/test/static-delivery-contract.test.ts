@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -37,5 +37,10 @@ describe("static delivery contract", () => {
     expect(pkg.scripts?.build).toBe("vite build");
     expect(pkg.scripts?.preview).toBe("vite preview");
     expect(pkg.scripts?.["dev:vite"]).toBe("vite");
+  });
+
+  it("keeps dead server-era runtime artifacts out of the app tree", () => {
+    expect(existsSync(path.join(appRoot, "server"))).toBe(false);
+    expect(existsSync(path.join(appRoot, "src", "entry-server.ts"))).toBe(false);
   });
 });
