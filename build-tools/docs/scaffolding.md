@@ -45,6 +45,7 @@ Examples:
 scaf new go lib[rary] greeter-utilities
 scaf new go cli-app greeter-cli
 scaf new ts webapp-ssr-vite demo-vite-ssr --yes
+scaf new ts webapp-static-pwa demo-pwa --yes
 ```
 
 For TypeScript SSR templates, framework-specific names are explicit:
@@ -53,6 +54,12 @@ For TypeScript SSR templates, framework-specific names are explicit:
 - `webapp-ssr-vite` for the Vite-first SSR scaffold baseline.
 
 Both examples create the destination under the canonical location for the chosen language/template. The CLI resolves synonyms (e.g., `lib`/`library`) and normalizes names.
+
+For static web delivery:
+
+- `webapp-static` is the minimal static Vite baseline.
+- `webapp-static-pwa` adds manifest, service worker, icon placeholders, and offline app-shell defaults.
+- `webapp-ssr-vite` and `webapp-ssr-next` remain the right choice when server-rendered HTML is still required.
 
 ### Local workspace TS dependency live updates (`ts/webapp-static`, `ts/webapp-ssr-vite`, `ts/webapp-ssr-next`)
 

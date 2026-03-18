@@ -1,0 +1,28 @@
+type WasmModuleEntry = {
+  sourcePath: string;
+};
+
+const DEFAULT_WASM_MODULE_KEY = "top";
+
+const wasmModuleEntries: Record<string, WasmModuleEntry> = {
+  [DEFAULT_WASM_MODULE_KEY]: {
+    sourcePath: "/top.wasm",
+  },
+};
+
+export function defaultWasmModuleKey(): string {
+  return DEFAULT_WASM_MODULE_KEY;
+}
+
+export async function readWasmModuleBytes(moduleKey: string): Promise<Uint8Array> {
+  const entry = wasmModuleEntries[moduleKey];
+  if (!entry) {
+    throw new Error(`unknown wasm module key: ${moduleKey}`);
+  }
+  const response = await fetch(entry.sourcePath);
+  if (!response.ok) {
+    throw new Error(`failed to load wasm module ${moduleKey}: ${response.status}`);
+  }
+  return new Uint8Array(await response.arrayBuffer());
+}
+

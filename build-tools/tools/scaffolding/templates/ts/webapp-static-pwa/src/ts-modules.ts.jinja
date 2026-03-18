@@ -1,0 +1,17 @@
+export type TsModule = {
+  moduleMessage?: () => string;
+};
+
+const DEFAULT_TS_MODULE_KEY = "default";
+
+export function defaultTsModuleKey(): string {
+  return DEFAULT_TS_MODULE_KEY;
+}
+
+export async function loadTsModule(moduleKey: string): Promise<TsModule> {
+  if (moduleKey !== DEFAULT_TS_MODULE_KEY) {
+    throw new Error(`unknown ts module key: ${moduleKey}`);
+  }
+  return import("./ts-modules/default.ts");
+}
+

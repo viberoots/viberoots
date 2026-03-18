@@ -1,0 +1,23 @@
+import { describe, expect, it, vi } from "vitest";
+import { readWasmModuleBytes } from "../src/wasm-contract.ts";
+
+describe("readWasmModuleBytes", () => {
+  it("loads wasm bytes from the staged static route", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(Uint8Array.from([0, 1, 2]), {
+        status: 200,
+        headers: { "content-type": "application/wasm" },
+      }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const bytes = await readWasmModuleBytes("top");
+      expect(bytes.byteLength).toBe(3);
+      expect(fetchMock).toHaveBeenCalledWith("/top.wasm");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+

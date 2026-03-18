@@ -22,6 +22,7 @@ CANONICAL_TEMPLATE_IDS = [
     "ts/webapp-ssr-next",
     "ts/webapp-ssr-vite",
     "ts/webapp-static",
+    "ts/webapp-static-pwa",
 ]
 
 CANONICAL_TEMPLATE_ID_SET = {template_id: True for template_id in CANONICAL_TEMPLATE_IDS}

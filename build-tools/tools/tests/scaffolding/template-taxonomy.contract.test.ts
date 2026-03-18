@@ -12,6 +12,7 @@ const EXPECTED_TS_TEMPLATE_IDS = [
   "ts/lib",
   "ts/cli",
   "ts/webapp-static",
+  "ts/webapp-static-pwa",
   "ts/webapp-ssr-next",
   "ts/webapp-ssr-vite",
   "ts/cpp-addon",

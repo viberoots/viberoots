@@ -56,6 +56,14 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static"],
         "classification": "template:contract",
     },
+    "build-tools/tools/tests/scaffolding/webapp-static-pwa.naming-contract.test.ts": {
+        "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static-pwa"],
+        "classification": "template:contract",
+    },
+    "build-tools/tools/tests/scaffolding/webapp-static-pwa.scaffold-contract.test.ts": {
+        "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static-pwa"],
+        "classification": "template:contract",
+    },
     "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-contract-and-runtime-smoke.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
         "classification": "template:shared",
@@ -359,6 +367,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
             "build-tools/tools/scaffolding/templates/ts/lib",
             "build-tools/tools/scaffolding/templates/ts/cli",
             "build-tools/tools/scaffolding/templates/ts/webapp-static",
+            "build-tools/tools/scaffolding/templates/ts/webapp-static-pwa",
             "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
             "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
             "build-tools/tools/scaffolding/templates/ts/cpp-addon",
@@ -449,4 +458,3 @@ def validate_template_convention(path, labels, template_inputs):
 
     if len(template_inputs) == 0:
         fail("template-owned test must declare template inputs: %s" % path)
-

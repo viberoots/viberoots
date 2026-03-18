@@ -29,5 +29,6 @@ export const TEMPLATE_TAXONOMY = {
     "webapp-ssr-next",
     "webapp-ssr-vite",
     "webapp-static",
+    "webapp-static-pwa",
   ],
 } as const;

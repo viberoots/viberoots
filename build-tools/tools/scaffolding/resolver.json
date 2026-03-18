@@ -26,6 +26,7 @@
     "wasm-linking-app": "projects",
     "webapp-ssr-next": "projects/apps/{name}",
     "webapp-ssr-vite": "projects/apps/{name}",
-    "webapp-static": "projects/apps/{name}"
+    "webapp-static": "projects/apps/{name}",
+    "webapp-static-pwa": "projects/apps/{name}"
   }
 }

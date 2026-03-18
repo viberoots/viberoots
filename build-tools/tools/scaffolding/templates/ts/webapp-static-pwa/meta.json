@@ -1,0 +1,22 @@
+{
+  "language": "ts",
+  "template": "webapp-static-pwa",
+  "resolverDestination": "projects/apps/{name}",
+  "description": "Vite + TypeScript static PWA webapp with manifest and service worker baseline",
+  "help": {
+    "usage": "scaf new ts webapp-static-pwa <name> [--importer=projects/apps/<name>] [--pkgScope=@apps]",
+    "notes": [
+      "Builds on the static webapp scaffold and adds a production-oriented PWA baseline: manifest, service worker, icon placeholders, and immediate client registration.",
+      "Choose webapp-static when you want a simple static site without installability or offline contracts baked in.",
+      "Choose webapp-static-pwa when offline app-shell behavior, install metadata, and zero-backend PWA delivery are part of the baseline contract.",
+      "Use webapp-ssr-vite or webapp-ssr-next when server-rendered HTML or request-time SSR behavior is still required.",
+      "Includes the same importer-scoped lockfile, Buck/Nix, local-workspace Vite, and wasm watcher contracts as webapp-static.",
+      "Labels include lockfile:projects/apps/<name>/pnpm-lock.yaml#projects/apps/<name> to auto-wire providers."
+    ],
+    "examples": [
+      "scaf new ts webapp-static-pwa demo-pwa --yes",
+      "scaf new ts webapp-static-pwa demo-pwa --yes --no-tests",
+      "scaf new ts webapp-static-pwa demo-pwa --importer=projects/apps/demo-pwa --pkgScope=@apps"
+    ]
+  }
+}

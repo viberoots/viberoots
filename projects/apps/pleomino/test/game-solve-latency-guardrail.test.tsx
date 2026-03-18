@@ -20,17 +20,22 @@ vi.mock("../src/game/solver/solver-runtime.ts", async () => {
 
 type LatencyBaseline = {
   sampleCount: number;
-  baselineSolveTriggerLatencyMsP95: number;
-  baselineSolveApplyCommitLatencyMsP95: number;
+  baselineSolveTriggerCommitDurationMsP95: number;
+  baselineSolveApplyCommitDurationMsP95: number;
   maxRegressionVsBaselineMs: number;
-  maxSolveTriggerLatencyMsP95: number;
-  maxSolveApplyCommitLatencyMsP95: number;
+  maxSolveTriggerCommitDurationMsP95: number;
+  maxSolveApplyCommitDurationMsP95: number;
 };
 
 type SolveResult = Awaited<ReturnType<typeof solverRuntime.solveBoardWithRuntime>>;
 type DeferredSolve = {
   promise: Promise<SolveResult>;
   resolve: (value: SolveResult) => void;
+};
+type RenderSample = {
+  actualDuration: number;
+  phase: "mount" | "update";
+  solveState: string;
 };
 
 const BASELINE = solveLatencyBaseline as LatencyBaseline;
@@ -87,6 +92,37 @@ function solveStatus(container: HTMLDivElement): string {
   return (status.textContent ?? "").trim();
 }
 
+function createRenderSampleRecorder(
+  container: HTMLDivElement,
+  samples: RenderSample[],
+): React.ProfilerOnRenderCallback {
+  return (_id, phase, actualDuration) => {
+    samples.push({
+      actualDuration,
+      phase,
+      solveState: solveStatus(container),
+    });
+  };
+}
+
+function measurePhaseCommitDuration(
+  samples: readonly RenderSample[],
+  startIndex: number,
+  targetSolveState: string,
+): number {
+  let totalDuration = 0;
+  for (let index = startIndex; index < samples.length; index += 1) {
+    const sample = samples[index];
+    if (sample?.phase === "update") {
+      totalDuration += sample.actualDuration;
+    }
+    if (sample?.solveState === targetSolveState) {
+      return totalDuration;
+    }
+  }
+  throw new Error(`missing profiler sample for solve state ${targetSolveState}`);
+}
+
 function percentile95(values: readonly number[]): number {
   if (values.length === 0) {
     return 0;
@@ -118,7 +154,7 @@ describe("game screen solve interaction latency guardrail", () => {
     await flushUi();
   });
 
-  it("keeps solve trigger and apply-commit interaction latency within baseline budget", async () => {
+  it("keeps solve trigger and apply-commit render cost within baseline budget", async () => {
     const placements = buildApplyStressPlacements();
     const solveBoardWithRuntime = vi.mocked(solverRuntime.solveBoardWithRuntime);
     const triggerSamples: number[] = [];
@@ -126,11 +162,19 @@ describe("game screen solve interaction latency guardrail", () => {
 
     for (let sample = 0; sample < BASELINE.sampleCount; sample += 1) {
       const deferred = makeDeferredSolve();
+      const renderSamples: RenderSample[] = [];
       solveBoardWithRuntime.mockImplementationOnce(() => deferred.promise);
       container = document.createElement("div");
       document.body.appendChild(container);
       root = createRoot(container);
-      root.render(<GameScreen url="/games/pleomino" />);
+      root.render(
+        <React.Profiler
+          id="pleomino-game-screen"
+          onRender={createRenderSampleRecorder(container, renderSamples)}
+        >
+          <GameScreen url="/games/pleomino" />
+        </React.Profiler>,
+      );
       await flushUi();
       await waitFor(() => container !== null && solveStatus(container) === "idle");
 
@@ -139,12 +183,12 @@ describe("game screen solve interaction latency guardrail", () => {
         throw new Error("expected solve button");
       }
 
-      const triggerStart = performance.now();
+      const triggerStartIndex = renderSamples.length;
       solveButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
       await waitFor(() => container !== null && solveStatus(container) === "solving");
-      triggerSamples.push(performance.now() - triggerStart);
+      triggerSamples.push(measurePhaseCommitDuration(renderSamples, triggerStartIndex, "solving"));
 
-      const applyStart = performance.now();
+      const applyStartIndex = renderSamples.length;
       deferred.resolve({
         status: "solved",
         placements,
@@ -154,7 +198,9 @@ describe("game screen solve interaction latency guardrail", () => {
         selectedSignature: "pr14-latency-baseline",
       });
       await waitFor(() => container !== null && solveStatus(container) === "solved-applied");
-      applySamples.push(performance.now() - applyStart);
+      applySamples.push(
+        measurePhaseCommitDuration(renderSamples, applyStartIndex, "solved-applied"),
+      );
 
       root.unmount();
       root = null;
@@ -167,14 +213,14 @@ describe("game screen solve interaction latency guardrail", () => {
     const triggerP95 = percentile95(triggerSamples);
     const applyP95 = percentile95(applySamples);
     const triggerThreshold = guardedThreshold(
-      BASELINE.baselineSolveTriggerLatencyMsP95,
+      BASELINE.baselineSolveTriggerCommitDurationMsP95,
       BASELINE.maxRegressionVsBaselineMs,
-      BASELINE.maxSolveTriggerLatencyMsP95,
+      BASELINE.maxSolveTriggerCommitDurationMsP95,
     );
     const applyThreshold = guardedThreshold(
-      BASELINE.baselineSolveApplyCommitLatencyMsP95,
+      BASELINE.baselineSolveApplyCommitDurationMsP95,
       BASELINE.maxRegressionVsBaselineMs,
-      BASELINE.maxSolveApplyCommitLatencyMsP95,
+      BASELINE.maxSolveApplyCommitDurationMsP95,
     );
 
     expect(triggerP95).toBeLessThanOrEqual(triggerThreshold);

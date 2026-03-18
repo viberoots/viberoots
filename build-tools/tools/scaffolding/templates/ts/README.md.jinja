@@ -45,6 +45,36 @@ Local dependency troubleshooting:
 - `pnpm run dev:wasm:watch` syncs generated contracts into `buck-out/tmp/module-contracts/<app-id>/` and loads manifests from that path.
 - If watcher failures persist, run the logged recovery command and confirm the generated wasm module destination exists under `src/wasm-contract/`.
 {% endif %}
+{% if template == "webapp-static-pwa" %}
+This is a static Vite + TypeScript PWA scaffold that keeps production serving zero-backend while shipping a manifest, service worker, and icon placeholders by default.
+
+Use this when installability and offline app-shell behavior are part of the baseline contract.
+
+Choose `webapp-static` for a simpler static site without PWA defaults. Choose `webapp-ssr-vite` or `webapp-ssr-next` when request-time SSR still matters.
+
+Dev mode with HMR:
+
+```bash
+pnpm dev
+```
+
+Offline and install surface included in the scaffold:
+
+- `public/manifest.webmanifest`
+- `public/service-worker.js`
+- `public/icons/icon-192.svg`
+- `public/icons/icon-512.svg`
+
+The client entry registers the service worker immediately and includes a one-time takeover reload path so offline navigation works after the first successful install/activation.
+
+Production build via Buck (Nix under the hood):
+
+```bash
+buck2 build //projects/apps/{{ name }}:app
+```
+
+The same local-workspace TypeScript dependency and wasm watcher contract from `webapp-static` remains in place.
+{% endif %}
 {% if template == "webapp-ssr-next" %}
 This is a Next.js SSR scaffold with an explicit Node server wrapper for production startup.
 

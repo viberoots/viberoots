@@ -1,0 +1,95 @@
+import "./style.css";
+import { defaultTsModuleKey, loadTsModule } from "./ts-modules";
+import { defaultWasmModuleKey, readWasmModuleBytes } from "./wasm-contract";
+
+const SERVICE_WORKER_RELOAD_KEY = "app-shell-pwa-takeover-reload";
+
+function ensureServiceWorkerControlsPage(): void {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+    return;
+  }
+  if (navigator.serviceWorker.controller) {
+    try {
+      window.sessionStorage.removeItem(SERVICE_WORKER_RELOAD_KEY);
+    } catch {}
+    return;
+  }
+  const reloadOnce = () => {
+    if (navigator.serviceWorker.controller) {
+      return;
+    }
+    try {
+      if (window.sessionStorage.getItem(SERVICE_WORKER_RELOAD_KEY) === "1") {
+        return;
+      }
+      window.sessionStorage.setItem(SERVICE_WORKER_RELOAD_KEY, "1");
+    } catch {}
+    window.location.reload();
+  };
+  const handleControllerChange = () => {
+    navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+    reloadOnce();
+  };
+  navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
+  void navigator.serviceWorker.ready.then(() => {
+    window.setTimeout(() => {
+      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+      reloadOnce();
+    }, 1500);
+  });
+}
+
+function registerServiceWorker(): void {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+    return;
+  }
+  void navigator.serviceWorker
+    .register("/service-worker.js", {
+      scope: "/",
+      updateViaCache: "none",
+    })
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[webapp-static-pwa] service worker registration failed: ${message}`);
+    });
+  ensureServiceWorkerControlsPage();
+}
+
+const root = document.getElementById("app");
+if (root) {
+  root.innerHTML = `
+    <main class="app-shell">
+      <p class="eyebrow">Static PWA</p>
+      <h1>{{ name }}</h1>
+      <p class="lede">Offline-ready scaffold wired for manifest, service worker, and static asset staging.</p>
+      <dl class="signals">
+        <div><dt>Wasm bytes</dt><dd data-wasm-bytes>pending</dd></div>
+        <div><dt>TS module</dt><dd data-ts-module>pending</dd></div>
+      </dl>
+    </main>
+  `;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const app = document.getElementById("app");
+  if (!app) {
+    return;
+  }
+  void readWasmModuleBytes(defaultWasmModuleKey()).then((bytes) => {
+    const slot = app.querySelector("[data-wasm-bytes]");
+    if (slot) {
+      slot.textContent = String(bytes.byteLength);
+    }
+  });
+  void loadTsModule(defaultTsModuleKey()).then((mod) => {
+    const slot = app.querySelector("[data-ts-module]");
+    if (slot) {
+      slot.textContent =
+        typeof mod.moduleMessage === "function"
+          ? String((mod.moduleMessage as () => string)())
+          : "missing";
+    }
+  });
+});
+
+registerServiceWorker();

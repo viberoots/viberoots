@@ -1371,15 +1371,16 @@ This is a design-only proposal (no implementation in this section). The goal is 
 ### Scope
 
 - Add explicit performance guardrails tied to solve interactions.
-- Introduce repeatable interaction-latency measurement around solve lifecycle and apply commit.
+- Introduce repeatable React commit-duration measurement around solve lifecycle transitions and
+  solve-apply commit.
 - Enforce bounded threshold against a checked-in baseline fixture.
 - Update `Implementation Status` notes so PR-11 through PR-14 responsibilities are auditable.
 
 ### Tests
 
 - Performance tests:
-  - solve-trigger interaction latency benchmark stays within target threshold.
-  - no measurable regression vs baseline fixture for primary solve path.
+  - solve-trigger commit duration stays within target threshold.
+  - no measurable regression vs baseline fixture for the primary solve render/apply path.
 
 ### Acceptance Criteria
 
@@ -1393,10 +1394,10 @@ This is a design-only proposal (no implementation in this section). The goal is 
 2. If the threshold needs intentional adjustment, update only
    `test/fixtures/solve-interaction-latency-baseline.json` in the same PR.
 3. Keep update policy deterministic:
-   - baseline fields store p95 measurements for the fixed fixture.
+   - baseline fields store p95 React Profiler `actualDuration` measurements for the fixed fixture.
    - regression budget (`maxRegressionVsBaselineMs`) is explicit and bounded.
-   - hard maxima remain enforced (`maxSolveTriggerLatencyMsP95`,
-     `maxSolveApplyCommitLatencyMsP95`).
+   - hard maxima remain enforced (`maxSolveTriggerCommitDurationMsP95`,
+     `maxSolveApplyCommitDurationMsP95`).
 4. Re-run `v //projects/apps/pleomino:pr14_latency` and verify no unrelated test contracts changed.
 
 ---

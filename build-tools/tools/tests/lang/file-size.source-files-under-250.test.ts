@@ -24,6 +24,7 @@ test("source files remain under the 250 LOC methodology gate", async () => {
       "**/*.rs",
     ],
     exclude: [
+      "**/dist/**",
       "build-tools/tools/tests/**",
       "docs/**",
       "test-logs/**",

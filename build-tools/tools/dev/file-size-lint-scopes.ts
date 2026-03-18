@@ -16,6 +16,7 @@ export const SOURCE_FILES_SCOPE: FileSizeScope = {
     "**/*.rs",
   ],
   exclude: [
+    "**/dist/**",
     "build-tools/tools/tests/**",
     "docs/**",
     "test-logs/**",
