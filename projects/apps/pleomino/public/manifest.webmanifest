@@ -1,9 +1,9 @@
 {
-  "id": "/games/pleomino",
+  "id": "/",
   "name": "Pleomino",
   "short_name": "Pleomino",
   "description": "A polished pleomino puzzle you can install as an app on iOS and macOS.",
-  "start_url": "/games/pleomino",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

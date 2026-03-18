@@ -1,4 +1,5 @@
 import * as fsp from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
@@ -8,13 +9,6 @@ type PackageJson = {
   devDependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   optionalDependencies?: Record<string, string>;
-};
-
-type WasmModuleManifest = {
-  modules?: Array<{
-    sourcePath?: string;
-    runtimeDestinations?: { server?: string };
-  }>;
 };
 
 const appRoot = fileURLToPath(new URL(".", import.meta.url));
@@ -55,68 +49,50 @@ const optimizeDepsInclude = [
   "react-dom",
   "react-native-web",
 ];
-
-function copyServerWasmContracts(outDir: string) {
-  const manifestPath = path.join(appRoot, "src", "wasm-modules.manifest.json");
-  if (!fsp.existsSync(manifestPath)) {
-    return;
-  }
-  let manifest: WasmModuleManifest;
-  try {
-    manifest = JSON.parse(fsp.readFileSync(manifestPath, "utf8")) as WasmModuleManifest;
-  } catch {
-    return;
-  }
-  for (const entry of manifest.modules ?? []) {
-    const sourcePath = String(entry.sourcePath ?? "").trim();
-    const serverDest = String(entry.runtimeDestinations?.server ?? "").trim();
-    if (!sourcePath || !serverDest) {
-      continue;
-    }
-    const sourceAbs = path.resolve(appRoot, sourcePath);
-    if (!fsp.existsSync(sourceAbs)) {
-      continue;
-    }
-    const outAbs = path.resolve(appRoot, outDir, serverDest);
-    fsp.mkdirSync(path.dirname(outAbs), { recursive: true });
-    fsp.copyFileSync(sourceAbs, outAbs);
-  }
-}
-
-function serverWasmContractPlugin(isSsrBuild: boolean) {
-  let outDir = "dist/server";
+function staticPwaPrecachePlugin() {
+  let outDir = "dist";
   return {
-    name: "pleomino-server-wasm-contract",
+    name: "pleomino-static-pwa-precache",
     apply: "build" as const,
     configResolved(config: { build: { outDir: string } }) {
       outDir = config.build.outDir;
     },
     closeBundle() {
-      if (!isSsrBuild) {
-        return;
-      }
-      copyServerWasmContracts(outDir);
+      execFileSync(
+        process.execPath,
+        [
+          "--experimental-top-level-await",
+          "--disable-warning=ExperimentalWarning",
+          "--experimental-strip-types",
+          "../../../build-tools/tools/dev/materialize-static-pwa-precache.ts",
+          "--client-dir",
+          path.resolve(appRoot, outDir),
+          "--cache-version-prefix",
+          "pleomino",
+        ],
+        {
+          cwd: appRoot,
+          stdio: "inherit",
+        },
+      );
     },
   };
 }
 
-export default defineConfig(({ isSsrBuild }) => ({
-  appType: "custom",
+export default defineConfig({
+  appType: "spa",
   clearScreen: false,
   logLevel: "info",
   build: {
     target: "es2022",
     sourcemap: false,
     cssMinify: true,
-    rollupOptions: isSsrBuild
-      ? undefined
-      : {
-          input: "src/entry-client.ts",
-          output: {
-            entryFileNames: "entry-client.js",
-            assetFileNames: "assets/[name][extname]",
-          },
-        },
+    rollupOptions: {
+      output: {
+        entryFileNames: "entry-client.js",
+        assetFileNames: "assets/[name][extname]",
+      },
+    },
   },
   worker: {
     format: "es",
@@ -136,8 +112,5 @@ export default defineConfig(({ isSsrBuild }) => ({
     include: optimizeDepsInclude,
     exclude: optimizeDepsExclude,
   },
-  ssr: {
-    noExternal: optimizeDepsExclude,
-  },
-  plugins: [serverWasmContractPlugin(Boolean(isSsrBuild))],
-}));
+  plugins: [staticPwaPrecachePlugin()],
+});

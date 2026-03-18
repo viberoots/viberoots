@@ -5,6 +5,11 @@
 Create a detailed design document for a `scaf`-generated `ts/webapp-ssr-vite` app that implements a single-player, sandbox-only virtual board puzzle using React Native Web components.  
 The doc will be implementation-ready and aligned to repo conventions (`METHODOLOGY.XML`, scaffold contracts, Starlark API usage, and PR workflow).
 
+Current runtime note: Pleomino has since migrated onto the static-PWA app shape in
+[`projects/apps/pleomino/docs/pleomino-static.md`](/Users/kiltyj/Code/bucknix-fresh/projects/apps/pleomino/docs/pleomino-static.md).
+The gameplay architecture in this document still applies, but delivery/runtime references should be
+read alongside that static-PWA migration plan.
+
 ## Key Changes / Design Content
 
 1. **Scaffold + Build Integration**
@@ -129,14 +134,14 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
 - PR-1 test coverage is wired in `projects/apps/pleomino/test`:
   - `game-geometry.test.ts`
   - `game-placement.test.ts`
-  - updated SSR smoke test: `entry-server.test.ts`
+  - static delivery contract coverage: `static-delivery-contract.test.ts`
 - PR-2 piece catalog pipeline is implemented in `projects/apps/pleomino`:
   - static catalog source: `src/game/piece-catalog.ts`
   - catalog validation: `src/game/piece-catalog-validation.ts`
   - validated state wiring: `src/game/state.ts`
   - tests:
     - `test/game-piece-catalog.test.ts`
-    - `test/entry-server.test.ts` (catalog render assertion)
+    - `test/static-delivery-contract.test.ts` (static shell contract assertion)
 - PR-3 board/tray rendering and reducer-driven state are implemented in
   `projects/apps/pleomino`:
   - reducer/actions: `src/game/reducer.ts`
@@ -149,7 +154,7 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
   - tests:
     - `test/game-reducer.test.ts`
     - `test/game-components.test.tsx`
-    - `test/entry-server.test.ts` (deterministic SSR markup handshake assertion)
+    - `test/static-delivery-contract.test.ts` (static shell delivery assertion)
 - PR-4 drag-and-drop with snapping and rollback is implemented in `projects/apps/pleomino`:
   - pure interaction helpers: `src/game/interaction.ts`
   - board cell-size constant shared by render + interaction: `src/game/board.ts`
@@ -202,7 +207,7 @@ The doc will be implementation-ready and aligned to repo conventions (`METHODOLO
     - `test/game-persistence.test.ts`
     - `test/game-screen-persistence-browser.test.tsx`
     - `test/game-stability.test.ts`
-    - updated `test/entry-server.test.ts` for release UI contract
+    - updated `test/pwa-metadata.test.ts` for release static-PWA contract
 - PR-1.5 is implemented in verify preflight selection:
   - new selector utility: `build-tools/tools/lib/project-impact-selector.ts`
   - verify wiring: `build-tools/tools/dev/verify/template-test-scope.ts`

@@ -14,13 +14,8 @@ node_asset_stage(
             "dest": "client/pleomino-solver.wasm",
             "artifact_name": "pleomino-solver.wasm",
         },
-        {
-            "src": "src/wasm-contract/pleomino-solver.wasm",
-            "dest": "server/wasm/pleomino-solver.wasm",
-            "artifact_name": "pleomino-solver.wasm",
-        },
     ],
-    labels = ["lang:node", "kind:app", "webapp:ssr", "framework:vite"],
+    labels = ["lang:node", "kind:app", "webapp:static", "webapp:pwa"],
     out = "dist",
 )
 

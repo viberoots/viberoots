@@ -16,7 +16,7 @@ export default {
     viewport: { width: 1400, height: 900 },
   },
   webServer: {
-    command: "pnpm run dev:ssr:only",
+    command: "pnpm run dev:vite -- --host 127.0.0.1 --port 4173",
     cwd: __dirname,
     url: "http://127.0.0.1:4173",
     reuseExistingServer: true,

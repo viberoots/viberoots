@@ -23,7 +23,7 @@ test("cold offline reopen can still solve partial board", async ({ browser }) =>
     "zsh",
     [
       "-lc",
-      "cd /Users/kiltyj/Code/bucknix-fresh/projects/apps/pleomino && direnv exec /Users/kiltyj/Code/bucknix-fresh pnpm run start:ssr",
+      "cd /Users/kiltyj/Code/bucknix-fresh/projects/apps/pleomino && direnv exec /Users/kiltyj/Code/bucknix-fresh pnpm run preview -- --host 127.0.0.1 --port 4173",
     ],
     {
       stdio: "inherit",

@@ -22,6 +22,9 @@
         overflow: hidden;
         overscroll-behavior: none;
       }
+      #app[data-ui-ready="false"] {
+        visibility: hidden;
+      }
       body {
         background: #27446b;
         color: #f8fafc;
@@ -32,10 +35,9 @@
           -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       }
     </style>
-    <!--app-head-->
   </head>
   <body>
-    <div id="app" data-ssr-marker="vite"><!--app-html--></div>
+    <div id="app" data-ui-ready="false"></div>
     <script type="module" src="/src/entry-client.ts"></script>
   </body>
 </html>

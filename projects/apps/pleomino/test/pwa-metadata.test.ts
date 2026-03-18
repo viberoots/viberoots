@@ -14,6 +14,8 @@ describe("pwa metadata", () => {
     expect(html).toContain('name="apple-mobile-web-app-title" content="Pleomino"');
     expect(html).toContain('rel="apple-touch-icon" href="/icons/apple-touch-icon.png"');
     expect(html).toContain('name="theme-color" content="#0b1324"');
+    expect(html).toContain('id="app" data-ui-ready="false"');
+    expect(html).not.toContain("data-ssr-marker");
   });
 
   it("registers a service worker from the client entry", () => {
@@ -24,6 +26,8 @@ describe("pwa metadata", () => {
     expect(entryClient).not.toContain('addEventListener("load"');
     expect(entryClient).toContain("controllerchange");
     expect(entryClient).toContain("window.location.reload()");
+    expect(entryClient).toContain("hydrate: false");
+    expect(entryClient).not.toContain("PLEOMINO_URL_STATE_HASH_KEY");
   });
 
   it("ships a manifest with expected install fields", () => {
@@ -38,16 +42,17 @@ describe("pwa metadata", () => {
     expect(manifest.name).toBe("Pleomino");
     expect(manifest.display).toBe("standalone");
     expect(manifest.orientation).toBe("portrait");
-    expect(manifest.start_url).toBe("/games/pleomino");
+    expect(manifest.start_url).toBe("/");
+    expect(manifest.id).toBe("/");
     expect(manifest.icons?.some((icon) => icon.src === "/icons/icon-192.png")).toBe(true);
     expect(manifest.icons?.some((icon) => icon.src === "/icons/icon-512.png")).toBe(true);
   });
 
   it("ships a service worker with offline app-shell and asset caching", () => {
     const serviceWorker = readFileSync(path.join(appRoot, "public/service-worker.js"), "utf8");
-    expect(serviceWorker).toContain('const APP_SHELL_URL = "/games/pleomino"');
-    expect(serviceWorker).toContain("__PLEOMINO_PRECACHED_ASSETS__");
-    expect(serviceWorker).toContain("__PLEOMINO_CACHE_VERSION__");
+    expect(serviceWorker).toContain('const APP_SHELL_URL = "/"');
+    expect(serviceWorker).toContain("__STATIC_PWA_PRECACHED_ASSETS__");
+    expect(serviceWorker).toContain("__STATIC_PWA_CACHE_VERSION__");
     expect(serviceWorker).toContain('event.request.mode === "navigate"');
     expect(serviceWorker).toContain('requestUrl.pathname.endsWith(".wasm")');
     expect(serviceWorker).toContain("caches.open(APP_SHELL_CACHE)");

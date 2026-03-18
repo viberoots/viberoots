@@ -19,9 +19,9 @@ What Pleomino does **not** appear to need:
 - backend APIs
 - user/session/auth logic
 
-The current server at
-[`projects/apps/pleomino/server/index.ts`](/Users/kiltyj/Code/bucknix-fresh/projects/apps/pleomino/server/index.ts)
-is effectively a delivery wrapper around static assets plus SSR shell generation. The actual game logic, persistence, worker runtime, wasm solver, and offline behavior all live on the client.
+Historically, Pleomino shipped with an app-local server wrapper that only handled static-asset
+delivery plus SSR shell generation. The actual game logic, persistence, worker runtime, wasm
+solver, and offline behavior all live on the client.
 
 That means Pleomino should be able to migrate off the current `ts/webapp-ssr-vite` app shape and onto a stronger `ts/webapp-static-pwa` scaffold, provided the new template bakes in the right contracts for:
 
@@ -365,6 +365,11 @@ Pleomino is considered successfully migrated when all of the following are true:
 ---
 
 ## PR-3: Migrate Pleomino from SSR Vite to Static PWA Template
+
+Implementation status:
+
+- complete in `projects/apps/pleomino`
+- app delivery is now static-PWA aligned and no longer depends on an app-local Express runtime
 
 ### Scope
 

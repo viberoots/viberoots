@@ -5,7 +5,7 @@ const child = spawn(
   [
     "../../../build-tools/tools/dev/dev-with-wasm-watch.ts",
     "--vite-cmd",
-    "pnpm run dev:ssr:only",
+    "pnpm run dev:vite",
     "--watch-cmd",
     "pnpm run dev:wasm:watch",
   ],

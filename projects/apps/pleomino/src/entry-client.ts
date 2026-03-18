@@ -1,6 +1,5 @@
 import React from "react";
 import { AppRegistry } from "react-native-web";
-import { PLEOMINO_URL_STATE_HASH_KEY } from "./game/persistence";
 import { prewarmSolverRuntimeAssets } from "./game/solver/solver-runtime";
 import { defaultTsModuleKey, loadTsModule } from "./ts-modules";
 import { Home } from "./home";
@@ -69,30 +68,15 @@ function App(props: { url: string }) {
   return React.createElement(Home, { url: props.url });
 }
 
-function hasPersistedHashState(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  const hash = window.location.hash.startsWith("#")
-    ? window.location.hash.slice(1)
-    : window.location.hash;
-  return new URLSearchParams(hash).has(PLEOMINO_URL_STATE_HASH_KEY);
-}
-
 AppRegistry.registerComponent("App", () => App);
 registerServiceWorker();
 
 const root = document.getElementById("app");
 if (root) {
-  const url = `${window.location.pathname}${window.location.search}`;
-  const shouldHydrate = !hasPersistedHashState();
-  if (!shouldHydrate) {
-    root.replaceChildren();
-  }
   AppRegistry.runApplication("App", {
     rootTag: root,
-    hydrate: shouldHydrate,
-    initialProps: { url },
+    hydrate: false,
+    initialProps: { url: `${window.location.pathname}${window.location.search}` },
   });
   root.setAttribute("data-client-hydrated", "true");
   prewarmSolverRuntimeAssets();
