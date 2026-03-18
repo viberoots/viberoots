@@ -6,13 +6,13 @@ const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
 test(
-  "webapp-static dev serves updated local TS dependency source without restart",
+  "webapp-static-pwa dev serves updated local TS dependency source without restart",
   { timeout: TEST_TIMEOUT_MS },
   async () =>
     await runWebappLocalTsDependencyTest({
-      appName: "demo-web",
-      tempName: "webapp-static-hmr-local-dep",
-      template: "webapp-static",
+      appName: "demo-pwa",
+      tempName: "webapp-static-pwa-hmr-local-dep",
+      template: "webapp-static-pwa",
     }),
 );
 

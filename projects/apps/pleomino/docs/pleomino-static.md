@@ -471,6 +471,14 @@ Implementation status:
 
 ## PR-5: Complete Static-PWA Template Runtime Verification
 
+Implementation status:
+
+- complete in `build-tools/tools/tests/scaffolding`
+- runtime verification now covers:
+  - offline cold-load from the generated `webapp-static-pwa` service-worker/app-shell contract
+  - local-workspace TypeScript dependency updates in a single dev session
+  - existing naming/scaffold contract coverage remains in place
+
 ### Why This PR Exists
 
 The current migration and shared utility extraction cover scaffold shape, metadata, and precache

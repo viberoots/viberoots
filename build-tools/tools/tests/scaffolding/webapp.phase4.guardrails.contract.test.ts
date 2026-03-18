@@ -43,10 +43,20 @@ const SOURCE_ONLY_EXPECTATIONS: InstallGuardrailExpectation[] = [
 const DEP_EDIT_EXPECTATIONS: InstallGuardrailExpectation[] = [
   {
     file: "build-tools/tools/tests/scaffolding/webapp-static.dev-hmr.local-ts-dep.test.ts",
+    required: ['from "./lib/webapp-local-ts-dep.ts"'],
+    forbidden: [],
+  },
+  {
+    file: "build-tools/tools/tests/scaffolding/webapp-static-pwa.dev-hmr.local-ts-dep.test.ts",
+    required: ['from "./lib/webapp-local-ts-dep.ts"'],
+    forbidden: [],
+  },
+  {
+    file: "build-tools/tools/tests/scaffolding/lib/webapp-local-ts-dep.ts",
     required: [
       "--skip-lockfile-gen",
       "pnpm install",
-      "--filter ./projects/apps/demo-web...",
+      "--filter ./projects/apps/${options.appName}...",
       "--no-frozen-lockfile",
       "--ignore-scripts",
     ],
