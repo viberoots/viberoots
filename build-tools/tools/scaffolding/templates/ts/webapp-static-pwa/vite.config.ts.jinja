@@ -1,4 +1,5 @@
 import * as fsp from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
@@ -30,17 +31,45 @@ function workspaceDependencyNames(pkg: PackageJson): string[] {
   };
   return Object.entries(specs)
     .filter(([, spec]) => {
-      return (
-        spec.startsWith("workspace:") ||
-        spec.startsWith("link:") ||
-        spec.startsWith("file:")
-      );
+      return spec.startsWith("workspace:") || spec.startsWith("link:") || spec.startsWith("file:");
     })
     .map(([name]) => name)
     .sort();
 }
 
-const optimizeDepsExclude = workspaceDependencyNames(readPackageJson(path.join(appRoot, "package.json")));
+const optimizeDepsExclude = workspaceDependencyNames(
+  readPackageJson(path.join(appRoot, "package.json")),
+);
+
+function staticPwaPrecachePlugin() {
+  let outDir = "dist";
+  return {
+    name: "{{ name }}-static-pwa-precache",
+    apply: "build" as const,
+    configResolved(config: { build: { outDir: string } }) {
+      outDir = config.build.outDir;
+    },
+    closeBundle() {
+      execFileSync(
+        process.execPath,
+        [
+          "--experimental-top-level-await",
+          "--disable-warning=ExperimentalWarning",
+          "--experimental-strip-types",
+          "../../../build-tools/tools/dev/materialize-static-pwa-precache.ts",
+          "--client-dir",
+          path.resolve(appRoot, outDir),
+          "--cache-version-prefix",
+          "{{ name }}",
+        ],
+        {
+          cwd: appRoot,
+          stdio: "inherit",
+        },
+      );
+    },
+  };
+}
 
 export default defineConfig({
   appType: "spa",
@@ -66,4 +95,5 @@ export default defineConfig({
     include: [],
     exclude: optimizeDepsExclude,
   },
+  plugins: [staticPwaPrecachePlugin()],
 });
