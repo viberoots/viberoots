@@ -725,6 +725,10 @@ changes that do not touch build-system paths.
     verify run
   - include changed projects plus full recursive downstream dependents
   - output stable, deduplicated project scopes (`//projects/.../<name>/...`)
+  - project-local methodology exception manifests live with the owning project at
+    `projects/apps/<name>/methodology-exceptions.json` or
+    `projects/libs/<name>/methodology-exceptions.json`, so exception-only edits stay on the same
+    project-impact path instead of expanding to build-system scope
 - Diagnostics contract:
   - template modes keep existing template diagnostics
   - project-impact diagnostics include:
@@ -737,6 +741,12 @@ changes that do not touch build-system paths.
   - if project-impact graph resolution fails (for example graph read failure), verify falls back to
     existing build-system scope and emits `mode: "fallback-build-system-scope"` with an explicit
     `reason`.
+- Methodology file-size exception contract:
+  - source-file exceptions are declared per project, not in a shared repo-wide allowlist
+  - the file-size gate reads `methodology-exceptions.json` from each project root and only exempts
+    the listed project-owned source files
+  - required verify/CI gates remain strict (`--scope=source --fail=true`) because the exception
+    contract is part of the policy, not a runtime bypass flag
 
 ## Verify project-closure selector contract (PR-1.6)
 

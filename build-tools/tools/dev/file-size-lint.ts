@@ -9,6 +9,7 @@ import {
   SSR_TEST_FILES_SCOPE,
   type FileSizeScope,
 } from "./file-size-lint-scopes.ts";
+import { resolveSourceFileSizeExceptionPaths } from "./file-size-lint-exceptions.ts";
 type Options = {
   root: string;
   changedOnly: boolean;
@@ -18,9 +19,6 @@ type Options = {
   scope: FileSizeScope;
 };
 export { SOURCE_FILES_SCOPE, SSR_TEST_FILES_SCOPE, type FileSizeScope };
-export const KNOWN_SOURCE_FILES_OVER_250_LOC: ReadonlyArray<string> = [
-  "projects/apps/pleomino/src/game/solver/static-interesting-solutions.ts",
-];
 
 function normalizeRelPath(p: string): string {
   return p.replaceAll("\\", "/").replace(/^\.\/+/, "");
@@ -156,16 +154,31 @@ async function listScopeMatches(root: string, scope: FileSizeScope): Promise<Set
   return new Set(matches.map(normalizeRelPath));
 }
 
+function sameList(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function isSourceFileScope(scope: FileSizeScope): boolean {
+  return (
+    sameList(scope.include, SOURCE_FILES_SCOPE.include) &&
+    sameList(scope.exclude, SOURCE_FILES_SCOPE.exclude)
+  );
+}
+
 export async function findFileSizeOffenders(opts: Options): Promise<FileOffender[]> {
   const root = opts.root;
   const base = opts.changedOnly
     ? await listChangedFilesFromRoot(root)
     : await listTrackedFilesFromRoot(root);
   const inScope = await listScopeMatches(root, opts.scope);
+  const projectExceptions = new Set(
+    isSourceFileScope(opts.scope) ? await resolveSourceFileSizeExceptionPaths(root) : [],
+  );
 
   const offenders: FileOffender[] = [];
   for (const rel of base) {
     if (!inScope.has(rel)) continue;
+    if (!opts.allowKnown && projectExceptions.has(rel)) continue;
     const abs = path.join(root, rel);
     const lines = await countLines(abs);
     if (lines > opts.threshold) offenders.push({ file: rel, lines });
@@ -191,16 +204,12 @@ async function runCli() {
   const opts = parseArgs();
   const offenders = await findFileSizeOffenders(opts);
   if (offenders.length === 0) return;
-
-  const knownSet = new Set(KNOWN_SOURCE_FILES_OVER_250_LOC);
-  const effectiveOffenders = offenders.filter((offender) => !knownSet.has(offender.file));
-  if (effectiveOffenders.length === 0) {
-    return;
-  }
-
+  const knownPaths = isSourceFileScope(opts.scope)
+    ? await resolveSourceFileSizeExceptionPaths(opts.root)
+    : [];
   const { unknown, known } = opts.allowKnown
-    ? splitKnownOffenders(effectiveOffenders, KNOWN_SOURCE_FILES_OVER_250_LOC)
-    : { unknown: effectiveOffenders, known: [] as FileOffender[] };
+    ? splitKnownOffenders(offenders, knownPaths)
+    : { unknown: offenders, known: [] as FileOffender[] };
 
   if (known.length > 0) {
     const knownLines = known.map(({ file, lines }) => `  ${file}: ${lines} lines`).join("\n");

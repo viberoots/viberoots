@@ -532,6 +532,16 @@ than proven in build-tools coverage.
 
 ## PR-6: Project-Scoped Methodology Exceptions for Large Generated Artifacts
 
+Implementation status:
+
+- complete in `build-tools/tools/dev/file-size-lint.ts` and
+  `build-tools/tools/dev/file-size-lint-exceptions.ts`
+- Pleomino declares its generated source-file exception in
+  `projects/apps/pleomino/methodology-exceptions.json`
+- regression coverage proves:
+  - only the owning project receives the exception
+  - project-local exception edits stay on the project-impact verify path
+
 ### Why This PR Exists
 
 Pleomino currently includes a large generated interesting-solution pool source file. That is
@@ -581,6 +591,172 @@ exception.
 - The repo can validate project-local exceptions without treating every exception change as a
   repo-wide mixed-scope change.
 - Methodology enforcement remains strict by default everywhere else.
+
+---
+
+## PR-7: Move `webapp-static-pwa` Onto Shared Precache Materialization
+
+### Why This PR Exists
+
+The reusable `ts/webapp-static-pwa` scaffold still leaves a core Pleomino learning only partially
+captured:
+
+- Pleomino now uses shared build-time precache materialization driven from built outputs
+- the template still keeps a handwritten service-worker cache version and static precache list
+
+That means the app-specific migration is ahead of the reusable template contract. The template
+should adopt the same shared static-PWA precache path so offline completeness does not depend on
+manual cache-list maintenance.
+
+### Scope
+
+- Update `ts/webapp-static-pwa` to use the shared static-PWA precache materialization flow.
+- Replace handwritten service-worker cache versioning and fixed precache lists with placeholder
+  injection driven from built output.
+- Keep the template runtime behavior framework-neutral and zero-backend by default.
+
+### Implementation Notes
+
+- Reuse the existing shared helper surfaces:
+  - `build-tools/tools/lib/static-pwa-precache.ts`
+  - `build-tools/tools/dev/materialize-static-pwa-precache.ts`
+- Add the same build-time materialization hook pattern Pleomino uses today rather than introducing
+  a second implementation path.
+- Keep the template service worker authored as a placeholder-based source template, not as a
+  generated checked-in artifact.
+
+### Tests
+
+- Scaffold/template contract tests:
+  - generated `vite.config.ts` invokes the shared materialization entrypoint during build
+  - generated `public/service-worker.js` uses shared cache-version and precache placeholders
+- Shared utility tests remain the authority for:
+  - emitted JS chunk inclusion
+  - worker/wasm inclusion
+  - deterministic service-worker output for fixed built inputs
+
+### Verify Strategy
+
+- Keep this PR build-tools/template scoped.
+- Do not modify Pleomino app code except for doc references if needed.
+- Expected verify scope:
+  - build-system scoped
+  - no mixed-scoped PR run required if app code remains untouched
+
+### Acceptance Criteria
+
+- `ts/webapp-static-pwa` no longer depends on handwritten precache lists.
+- Template build output uses the same shared precache materialization path as Pleomino.
+- Offline asset completeness is driven from built outputs rather than template-maintained lists.
+
+---
+
+## PR-8: Tighten Template Runtime Verification for Install-Time Offline Completeness
+
+### Why This PR Exists
+
+The current `webapp-static-pwa` runtime coverage proves offline behavior, but it does not yet
+strictly prove the strongest contract from this plan:
+
+- required runtime assets should already be available after service-worker install/activation
+- correctness should not depend on an extra online fetch warming runtime cache after install
+
+Today the template runtime test fetches script and wasm assets online before asserting offline
+availability, which can allow runtime-cache fallback to mask install-time precache gaps.
+
+### Scope
+
+- Strengthen template runtime verification so install-time offline completeness is explicitly
+  asserted.
+- Prove that required JS and wasm assets are available offline immediately after install/activate
+  and before any extra online asset fetches.
+- Keep the harness deterministic and local-origin based.
+
+### Implementation Notes
+
+- Reuse the existing static-PWA service-worker harness and precache-state helpers.
+- Assert both:
+  - the generated precache manifest contains required runtime assets
+  - offline script/wasm fetches succeed without prior online runtime warming fetches
+- Keep the test focused on contract behavior, not on Pleomino-specific app semantics.
+
+### Tests
+
+- Build-tools runtime test updates:
+  - generated static-PWA app cold-loads offline after one online shell visit and service-worker
+    install
+  - emitted JS entry/chunks remain offline-available without a prior online runtime fetch
+  - wasm runtime assets remain offline-available without a prior online runtime fetch
+- Negative-path assertions where useful:
+  - test should fail if service-worker placeholders are left unresolved
+  - test should fail if emitted runtime assets drop out of the precache set
+
+### Verify Strategy
+
+- Keep this PR build-tools test scoped.
+- Avoid unrelated scaffold or Pleomino app changes in the same PR.
+- Expected verify scope:
+  - build-system scoped
+  - no mixed-scoped PR run required
+
+### Acceptance Criteria
+
+- Template runtime verification proves install-time offline completeness rather than runtime-cache
+  fallback only.
+- Offline JS and wasm availability is enforced as part of the reusable template contract.
+- Phase 4 verification bullets are proven by template-level tests with no Pleomino-only reliance.
+
+---
+
+## PR-9: Complete Static-PWA Template Documentation Gaps
+
+### Why This PR Exists
+
+The template now has baseline selection/help text, but the original plan called for a fuller
+documentation contract that still has gaps:
+
+- limitations of hash-only client state for SSR apps
+- best practices for local-origin PWA validation
+- clearer guidance on when static PWA delivery is preferable to SSR
+
+Those lessons matter because Pleomino’s migration specifically benefited from moving away from
+SSR/hash mismatch complexity.
+
+### Scope
+
+- Expand `webapp-static-pwa` docs to cover the missing decision and validation guidance.
+- Document:
+  - when to choose `webapp-static` vs `webapp-static-pwa` vs SSR
+  - why hash-persisted client state is a poor fit for SSR-first ownership
+  - how to validate install/offline behavior on a real local origin
+  - how wasm producers and workers fit into the static-PWA contract safely
+
+### Implementation Notes
+
+- Prefer updating the existing scaffold-facing docs rather than creating parallel guidance.
+- Keep examples aligned with canonical repo commands and current template names.
+- Make the guidance generic and reusable; do not make the template docs Pleomino-branded.
+
+### Tests
+
+- Doc/metadata contract tests:
+  - template help and scaffold docs mention static-vs-SSR selection guidance accurately
+  - docs mention local-origin PWA validation guidance
+  - docs mention SSR/hash-state limitation guidance for client-owned persisted state
+
+### Verify Strategy
+
+- Keep this PR docs/template-metadata scoped.
+- Do not combine it with runtime behavior changes unless a tiny doc-follow-up is unavoidable.
+- Expected verify scope:
+  - template/build-system scoped
+  - no mixed-scoped PR run required if app code stays untouched
+
+### Acceptance Criteria
+
+- The static-PWA template docs satisfy the Phase 1 documentation bullets from this plan.
+- Engineers can choose between static, static-PWA, and SSR templates using documented criteria.
+- Local-origin PWA validation and SSR/hash-state limitations are explicitly documented.
 
 ## Risks
 

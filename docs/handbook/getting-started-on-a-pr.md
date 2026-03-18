@@ -32,6 +32,7 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
 - Use Conventional Commits and real newlines in commit messages.
 - Keep files small and focused (≤ 250 lines ideally); split modules when needed.
 - Required CI stage wiring enforces the methodology file-size gate in strict mode (`file-size-lint` runs `--scope=source --fail=true` and `--scope=ssr-tests --fail=true` without `--allow-known` bypass flags).
+- If a generated source artifact needs a reviewed file-size exception, declare it in the owning project’s `methodology-exceptions.json` instead of adding shared build-system policy.
 - For SSR contract changes, add negative-path checks in the same PR: invalid/missing framework discriminator, missing `serverEntry`, missing `clientDir`, and SSR static-fallback prevention.
 - Keep touched SSR test modules decomposed and below the methodology limit by splitting helpers into focused files, and keep the strict SSR test-module gate (`--scope=ssr-tests`) green.
 - Maintain determinism and low cyclomatic complexity; prefer small, well-named functions.
@@ -90,6 +91,7 @@ When adding or materially editing scaffold command guidance:
 - Verify project-impact default (PR-1.5):
   - default `v` behavior for non-build-system app/lib edits is dependency-aware project selection
   - selected test scope = changed projects + full recursive downstream dependents
+  - project-local methodology exception edits (for example `projects/apps/<name>/methodology-exceptions.json`) stay on this project-impact path
   - build-system edits still keep existing broad-scope/fallback behavior
 - Verify project-closure opt-in (PR-1.6):
   - use this only for compliance/release-gate runs that must verify one or more projects plus their full recursive dependency closure

@@ -1,11 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  findFileSizeOffenders,
-  KNOWN_SOURCE_FILES_OVER_250_LOC,
-  SOURCE_FILES_SCOPE,
-} from "../../dev/file-size-lint";
+import { findFileSizeOffenders, SOURCE_FILES_SCOPE } from "../../dev/file-size-lint";
+import { resolveSourceFileSizeExceptionPaths } from "../../dev/file-size-lint-exceptions.ts";
 
 test("source files remain under the 250 LOC methodology gate", async () => {
   const root = (process.env.WORKSPACE_ROOT || process.cwd()).trim();
@@ -44,9 +41,10 @@ test("source files remain under the 250 LOC methodology gate", async () => {
     scope: SOURCE_FILES_SCOPE,
   });
 
-  // Temporary: the source-files scope is enforced and only a small allowlist may remain while large
-  // files are split into focused modules.
   const offenderFiles = offenders.map((o) => o.file).sort();
-  const known = [...KNOWN_SOURCE_FILES_OVER_250_LOC].sort();
+  const known = await resolveSourceFileSizeExceptionPaths(root);
   assert.deepEqual(offenderFiles, known);
+  assert.deepEqual(known, [
+    "projects/apps/pleomino/src/game/solver/static-interesting-solutions.ts",
+  ]);
 });
