@@ -237,9 +237,16 @@ The design leaves some implementation details open, but the following behavioral
 - deployment hooks and substantive deployment automation must follow the repo-wide script policy
   - substantive automation is zx TypeScript with `#!/usr/bin/env zx-wrapper`
   - thin `build-tools/tools/bin/*` wrappers may delegate into that TypeScript entrypoint
+- each concrete deployment identifies one named live target in normal publish mode
+  - promotion reuses artifact identity across deployments; it does not make one deployment dynamically become many environments
+- protected or shared-environment mutating deploys must run through the shared deploy control plane
+  - local workflows may validate, build, resolve, or publish only to explicitly isolated local or preview targets
 - deployment metadata is authoritative for the repo deployment model
   - provider config files are provider-native inputs, not a second source of truth for core deployment facts
   - when the same conceptual value would otherwise appear in both places, generation or runtime injection is preferred over duplication
+- provider-target identity is part of the required deployment contract
+  - examples, extracted metadata, and deployment records should represent it consistently rather than treating it as optional shorthand
+  - if an example intentionally omits it for brevity, the text should say so explicitly
 
 If an implementation choice would break one of those contracts, the implementation should change rather than the operator workflow.
 
@@ -249,6 +256,8 @@ The following operating-model decisions are now part of the intended design dire
 treated as planned policy, not open brainstorming:
 
 - promotion should prefer reusing the exact previously built artifact rather than rebuilding per environment
+- promotion should move the same artifact across distinct deployment ids that each name one explicit live target
+  - one deployment should not implicitly select among multiple shared environments at publish time
 - promotion should use one-way fast-forward environment branches
   - later environments advance only after required checks pass for earlier environments
 - rollback for bad app releases should prefer redeploying a prior known-good artifact
@@ -266,10 +275,15 @@ treated as planned policy, not open brainstorming:
   - rollback, retry, and redeploy actions should take the same lock as the normal deploy path
   - preview should share the main deployment lock by default
   - preview runs may use separate lock scope only when they publish to isolated preview targets
+  - the shared lock implementation must provide lease expiry plus stale-holder protection such as fencing or an equivalent safety mechanism
 - deploy records should include first-class lineage identifiers
   - every run gets a globally unique `deploy_run_id`
   - retries, rollbacks, and promotions should set `parent_run_id`
   - promotions of the same built artifact across environments should carry an `artifact_lineage_id`
+- each component kind should resolve to a canonical provider-neutral data shape with required fields and artifact identity
+  - publishers consume that resolved data shape and must not rediscover artifact semantics ad hoc from build outputs
+- each deployment should declare explicit provider-target identity in deployment metadata
+  - adapters must not infer the live target from directory names, branch names, CLI defaults, or unchecked provider config drift
 - deploy records should distinguish operation kind from final outcome
   - operation kinds include at least normal deploy, preview deploy, retry, promotion, and rollback
   - success or failure outcome must remain separate from the kind of run being performed
@@ -282,6 +296,8 @@ treated as planned policy, not open brainstorming:
   - `publish` may auto-retry for clearly transient failures, up to 2 retries with backoff
   - `smoke` may auto-retry for transient readiness/network failures, up to 3 retries within an overall timeout budget
 - secrets should use `secretspec` as the repo-level contract layer and Vault as the initial production backend
+- protected or shared-environment deploys should be admitted only through CI or the shared control plane
+  - direct local mutating deploys to those environments are out of policy except for explicitly controlled emergency procedures
 - local-only fallback should be explicitly limited
   - shared environments must use the central Postgres control plane
   - personal local/dev workflows may use a local filesystem lock plus a local structured deployment record
@@ -291,6 +307,8 @@ treated as planned policy, not open brainstorming:
   - deployment-specific preview URL only when explicitly configured
   - timeout and retry policy should be explicit, not implicit
   - a production-facing deployment may omit or downgrade smoke only through an explicit documented exception
+- provisioners should be non-destructive by default during normal deploy flows
+  - delete or replace behavior that can remove owned live resources should require an explicit separate operator path or equivalent break-glass intent
 
 These decisions are now reflected in the detailed design sections below. The remaining work is to
 turn them into implementation-grade detail and execution plans without changing the policy
@@ -301,9 +319,11 @@ direction.
 This design is intentionally opinionated about the model, but still leaves some implementation policy choices open:
 
 - what diff base `--from-changes` compares against in CI and local use
-- the exact Postgres schema and lease mechanics for the shared deployment control plane
+- the exact Postgres schema and lease mechanics for the shared deployment control plane, while still preserving lease expiry and stale-holder protection
 - the exact timeout and retry defaults for each smoke-check class
 - the exact branch names, protection rules, and CI wiring for environment-branch promotion
+- the exact field names and per-kind payload details for canonical resolved component data, while preserving the rule that every kind resolves to one standard provider-neutral shape
+- the exact metadata field names used to declare provider-target identity and smoke exceptions, while preserving the rule that both are explicit first-class metadata
 
 Those are real decisions, but they are operational-policy details layered on top of this model rather than reasons to change the model itself.
 
@@ -624,6 +644,9 @@ Suggested low-level rule shape:
 deployment(
     name = "deploy",
     provider = "cloudflare-pages",
+    provider_target = {
+        "id": "pleomino-prod-pages",
+    },
     components = [
         {
             "id": "web",
@@ -647,6 +670,7 @@ Important design points:
 - `components` is plural on purpose
 - `provisioner` is optional
 - `publisher` is required
+- `provider_target` identifies the concrete live destination this deployment owns in normal publish mode
 - the package path is the deployment id
 - provider-specific config should remain explicit
 
@@ -697,6 +721,13 @@ It should not just mean:
 
 - "some string this team found descriptive"
 
+Each `kind` should also imply one canonical resolved output shape.
+
+Plain-language version:
+
+- `kind` does not just label the component
+- `kind` tells `resolve` what standard provider-neutral data shape must come out for publishers to consume
+
 Example:
 
 ```python
@@ -735,6 +766,27 @@ Example:
 - publishing tool: Wrangler
 
 That is why `provider` and `publisher` should stay separate.
+
+### Provider Target
+
+A provider target is the concrete live destination a deployment mutates in normal publish mode.
+
+Examples:
+
+- one Cloudflare Pages project
+- one S3 bucket plus related publish endpoint
+- one Kubernetes cluster/namespace/release tuple
+
+Plain-language version:
+
+- provider = what family of platform this is
+- provider target = the exact live thing this deployment changes
+
+Policy:
+
+- every concrete deployment should declare explicit provider-target identity in authoritative deployment metadata
+- normal promotion between environments should happen by reusing the same artifact across different deployment ids, each with its own provider target
+- adapters must not silently derive the live target from branch names, directory names, ambient CLI defaults, or unchecked duplication in provider-native config files
 
 ### Provisioner
 
@@ -1629,6 +1681,13 @@ The output of `resolve` should be provider-neutral deployment data such as:
 - concrete artifact path
 - optional metadata the publisher needs, such as a default entrypoint, image reference, or archive path
 
+Canonical contract rule:
+
+- each component kind should resolve to one standard provider-neutral data shape with required fields
+- that shape should include stable artifact identity appropriate to the kind, such as a content fingerprint, image digest, or equivalent strong reference
+- publishers consume the resolved data shape rather than rediscovering semantics from build outputs
+- provider adapters may validate that a resolved component kind is supported, but they should not invent a second artifact contract for the same kind
+
 Operational rule:
 
 - `resolve` is the point where Buck-specific artifact references become plain runtime inputs for provisioners, publishers, and smoke checks
@@ -1643,6 +1702,13 @@ Examples:
 
 - `cdktf deploy`
 - `terraform apply`
+
+Provisioner safety policy:
+
+- normal deploy flows should treat owned infrastructure convergence as non-destructive by default
+- create and in-place update are normal provisioner behavior
+- delete or replacement operations that can remove live owned resources should require an explicit separate operator action or equivalent break-glass intent
+- app artifact rollback should not imply destructive infra rollback
 
 ### Publish
 
@@ -1688,6 +1754,13 @@ Preview policy:
 
 - preview may use a lighter smoke policy only when that difference is explicitly documented by the deployment or provider adapter
 - preview does not change deployment identity; it only changes publish mode and, when configured, the smoke target
+- preview should not be used as a loophole to bypass the normal admission policy for protected or shared environments
+
+Exception representation policy:
+
+- a production-facing smoke omission or downgrade must be represented explicitly in deployment metadata
+- the exception metadata should identify at least the owner, reason, scope, and review or expiry boundary
+- silent omission of smoke wiring is not an acceptable way to waive production smoke
 
 Outcome guide:
 
@@ -1731,6 +1804,7 @@ Shared-environment locking policy:
 - only one active non-preview deploy should run for a lock scope at a time
 - different lock scopes may run in parallel
 - rollback, retry, promotion, and redeploy should take the same lock as a normal deploy against that target scope
+- the shared lock implementation must prevent stale holders from continuing to mutate a target after ownership is lost
 
 Preview locking policy:
 
@@ -1751,6 +1825,12 @@ Local-only fallback policy:
 - shared environments must use the central Postgres control plane
 - personal local or dev workflows may use a local filesystem lock plus a local structured deployment record
 - local-only fallback is non-authoritative and must not be used as the locking or record system for shared environments
+
+Admission policy:
+
+- mutating deploys for protected or shared environments should run only through CI or the shared deploy control plane
+- direct local mutation of those environments is out of policy except for explicitly controlled emergency procedures
+- local workflows remain valid for validation, build, resolve, and isolated preview or local targets
 
 Operator-facing states:
 
@@ -1800,6 +1880,7 @@ Planned promotion model:
 - use one-way fast-forward environment branches
 - a later environment should advance only after required checks pass for the earlier environment
 - promotion should preserve artifact identity across environments whenever the workflow is "prove once, promote forward"
+- promotion should operate across distinct deployment ids such as `pleomino-staging` and `pleomino-prod`, not by having one deployment dynamically retarget itself
 
 Plain-language version:
 
@@ -1842,6 +1923,7 @@ The deploy CLI should query Buck for deployment metadata rather than maintain a 
 The deployment rule should expose enough metadata for repo tooling to retrieve:
 
 - provider
+- provider-target identity
 - component list
 - provisioner config
 - publisher config
@@ -1858,6 +1940,7 @@ In other words:
 Precedence and consistency rules:
 
 - deployment metadata is authoritative for repo-level facts such as provider, components, provisioner or publisher shape, deployment id, and package-relative config references
+- deployment metadata is authoritative for provider-target identity used by mutating operations
 - provider config files are authoritative only for provider-native settings inside the tool they configure
 - if the same fact is represented in both places, the design should either:
   - generate one from the other to avoid duplication
@@ -1869,6 +1952,7 @@ Preferred pattern:
 - generation or runtime injection is better than duplication
 - for example, a provider project identifier such as Wrangler `name` should ideally come from deployment metadata and be rendered or injected into provider-native config at publish time
 - if the file must be checked in with that field duplicated, validation should fail on mismatch rather than silently picking one source
+- the same rule applies to any other provider-target identifier, such as bucket names, release identifiers, namespaces, or equivalent live-target selectors
 
 The exact extraction mechanism can be decided during implementation. The design goal is simple:
 
@@ -1937,6 +2021,7 @@ Minimum required fields:
 - source revision identifier
 - actor or trigger source, such as human, CI job, or automation
 - publish mode, such as normal or preview
+- provider-target identity
 - resolved component list
 - artifact identity for each published component
 - target provider and provider-instance identifier when applicable
@@ -1960,6 +2045,7 @@ Artifact identity rules:
 - publish should consume the resolved artifact from the build step, not rebuild implicitly
 - publish-only, promotion, retry, and rollback flows should accept a previously recorded artifact reference and should not rebuild unless the operator is intentionally creating a new artifact
 - provider-instance identifiers used during publish should come from authoritative deployment metadata or generated config, not from silently drift-prone duplicated checked-in fields
+- the deployment record should preserve the canonical resolved component data shape or a stable projection of it, rather than only loosely structured adapter-specific paths
 
 Nix-aligned guidance:
 
@@ -2733,22 +2819,28 @@ The most important implementation-planning follow-ups are:
 
 - immutable artifact identity and promotion
   - the design now requires artifact reuse for promotion-grade and rollback-grade flows
-  - implementation planning still needs to define how artifact references are persisted and selected in tooling
+  - implementation planning still needs to define the exact per-kind resolved schema fields and how artifact references are persisted and selected in tooling
 - rollback and redeploy procedure
   - the design now defines rollback direction and run classification
   - implementation planning still needs exact operator procedures and control-plane actions
 - locking and control-plane mechanics
-  - the design now defines lock-scope behavior and shared Postgres-backed coordination
+  - the design now defines lock-scope behavior, shared Postgres-backed coordination, and the need for stale-holder protection
   - implementation planning still needs lease, fencing, wait-vs-fail, and conflict-resolution details
 - secrets runtime wiring
   - the design now defines the metadata-versus-secret boundary and the `secretspec` and Vault direction
   - implementation planning still needs concrete runtime injection interfaces, names, and audit handling
 - smoke-check defaults
-  - the design now defines required-versus-exception policy for production and bounded retry semantics
-  - implementation planning still needs concrete timeout budgets and adapter-specific default values
+  - the design now defines required-versus-exception policy for production, explicit exception metadata, and bounded retry semantics
+  - implementation planning still needs concrete timeout budgets, exact metadata field names, and adapter-specific default values
 - provider-adapter enforcement
-  - the design now defines metadata precedence, drift ownership, and lock-scope expectations
-  - implementation planning still needs adapter-level validation hooks and helper conventions
+  - the design now defines metadata precedence, explicit provider-target identity, drift ownership, and lock-scope expectations
+  - implementation planning still needs adapter-level validation hooks, helper conventions, and exact provider-target field naming
+- shared-environment admission
+  - the design now defines that protected or shared-environment mutation goes through CI or the shared control plane
+  - implementation planning still needs the concrete approval, authentication, and emergency-procedure mechanics
+- provisioner safety boundaries
+  - the design now defines non-destructive-by-default normal deploy behavior
+  - implementation planning still needs the exact break-glass interface for destructive owned-resource operations
 
 These are not gaps in the deployment model.
 
@@ -2782,6 +2874,8 @@ Recommended final documentation tasks:
    - make clear that production requires smoke unless explicitly waived
 6. add one compact operator summary for lock scope
    - explain when `deployment-id` is sufficient and when multiple deployment ids must share a lock scope
+7. do one final example-consistency pass for provider-target identity
+   - make sure concrete deployment examples, metadata examples, and deployment-record examples either include `provider_target` consistently or explicitly state when it is omitted for brevity
 
 Success condition for the final design revision:
 
