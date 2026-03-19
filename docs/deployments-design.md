@@ -226,6 +226,14 @@ For protected or shared environments, the canonical `deploy` CLI should still be
 front door should submit or hand off mutating work to the shared control plane rather than performing
 provider-side mutation directly from an arbitrary local machine.
 
+Semantic contract for the canonical Buck `:deploy` target:
+
+- the canonical Buck `:deploy` target is a declaration and metadata target, not a live mutating action
+- it exists so repo tooling can discover deployments, validate structure, query metadata, and resolve artifacts
+- operators should not treat `buck2 run //projects/deployments/...:deploy` as the public deployment interface
+- the repo-level `deploy` CLI remains the only intended operator-facing entrypoint for live mutation
+- if an implementation uses `buck2` internally while servicing the deploy CLI, that is an implementation detail rather than a second supported workflow
+
 ## Required Contracts
 
 The design leaves some implementation details open, but the following behavioral contracts should be treated as fixed:
@@ -235,6 +243,8 @@ The design leaves some implementation details open, but the following behavioral
 - `TARGETS` is the source of truth for deployment metadata
 - Buck builds artifacts, but does not perform the live publish itself
 - the repo-level `deploy` command is the only public entrypoint operators are expected to learn
+- the canonical Buck `:deploy` target is for declaration, discovery, validation, and artifact resolution
+  - it is not a public live-mutation interface for operators
 - file paths inside deployment metadata are relative to the deployment package by default
 - deployment-local scripts are implementation hooks, not a second public workflow
 - provider adapters may impose narrower rules than the generic deployment model
@@ -665,6 +675,14 @@ Default diff-base policy:
 - CI pull-request use should compare against the merge-base with the PR target branch
 - post-merge automation should compare against the previous successful deploy baseline for the relevant environment branch when that data is available
 - if no upstream or baseline can be determined, the tool should fail explicitly and ask for an override instead of silently choosing an unsafe diff base
+
+Environment-lane policy:
+
+- each concrete deployment belongs to one environment branch lane for protected/shared mutation
+- the authoritative baseline for an environment-mutating `--from-changes` run is the last successful deploy baseline recorded for that lane
+- one mutating `--from-changes` invocation for protected or shared environments should stay within one environment lane
+- if the changed set affects deployments in multiple environment lanes, the selector should require explicit lane selection or split the result into separate non-mutating result sets rather than mutating all lanes at once
+- local or non-mutating inspection flows may still report deployments across multiple lanes when that is useful for visibility
 
 Impact-selection contract:
 
@@ -1753,6 +1771,26 @@ What changes:
 
 A deployment may represent a delivered system, not just one app.
 
+Multi-component lifecycle semantics:
+
+- components are still built and resolved independently
+- the provider adapter must define whether publish executes serially or in parallel for a supported multi-component deployment
+- unless a deployment or provider adapter explicitly documents stronger guarantees, the default deployment-level policy is `ordered_best_effort`
+- `ordered_best_effort` means:
+  - components publish in a deterministic adapter-defined order
+  - a later component does not start until the earlier component's publish step has returned
+  - true cross-component atomicity is not implied
+- adapters may explicitly support `parallel_best_effort` or `all_or_nothing`, but they must say so
+- partial publish success must be recorded per component in the deployment record
+- deployment-level smoke should run only after the publish phase completes according to the selected policy
+- retry and rollback must operate from recorded per-component artifact and publish state, not from guesses about what probably succeeded
+
+Operational consequence:
+
+- if one component publishes and a later component fails under a best-effort policy, the deployment run is a publish failure
+- the deployment record must preserve which components published successfully, which did not, and which artifact identity each component used
+- any follow-up retry or rollback must use that recorded state explicitly
+
 Example:
 
 ```python
@@ -1887,7 +1925,8 @@ Provisioner safety policy:
 
 - normal deploy flows should treat owned infrastructure convergence as non-destructive by default
 - create and in-place update are normal provisioner behavior
-- delete or replacement operations that can remove live owned resources should require an explicit separate operator action or equivalent break-glass intent
+- normal deploy flows must not delete, replace, rename, or transfer ownership of live resources
+- delete, replacement, rename, or ownership-transfer operations require an explicit separate migration path or equivalent break-glass intent
 - app artifact rollback should not imply destructive infra rollback
 
 ### Publish
@@ -2039,13 +2078,29 @@ Admission policy:
 - direct local mutation of those environments is out of policy except for explicitly controlled emergency procedures
 - local workflows remain valid for validation, build, resolve, and isolated preview or local targets
 
-Operator-facing states:
+Release-admission contract for protected/shared environments:
 
-- non-terminal states
+- a run is eligible to mutate a protected or shared environment only when all of the following are true:
+  - the source revision comes from the allowed environment branch for that deployment lane
+  - required checks for that environment have passed for the admitted revision or artifact
+  - any required human or policy approval has been granted
+  - artifact provenance and deployment metadata are present and valid for the intended target
+  - the selected artifact or revision still matches the environment's promotion and admission policy
+- after waiting in queue and revalidating, "still allowed" means at least:
+  - the environment branch still points to an allowed revision for this run
+  - the artifact identity still matches the approved revision or approved prior run
+  - the run has not been superseded by a later admitted run for the same lock scope
+  - any required approval has not been revoked, expired, or invalidated by newer policy state
+- if any of those checks fail after revalidation, the run must exit without mutating the target and report that it was superseded, stale, or no longer admitted
+
+Operator-facing lifecycle states:
+
+- in-progress states
   - `queued`
   - `running`
   - `waiting_for_lock`
   - `cancelling`
+- ended before canonical final outcome
   - `cancelled`
 - terminal states
   - `validation_failed`
@@ -2067,7 +2122,9 @@ Run classification:
   - `rollback`
 - `operation_kind` and `final outcome` answer different questions
   - operation kind says what sort of run this was
-  - final outcome says whether that run succeeded, failed, or was cancelled
+  - final outcome uses the canonical terminal outcome vocabulary for the run's completed result
+  - operator-facing state tracks lifecycle states such as `queued`, `waiting_for_lock`, `cancelling`, and `cancelled`
+  - `cancelled` is an operator-facing lifecycle state, not a canonical terminal `final outcome` value
 
 Why this matters:
 
