@@ -6,31 +6,13 @@ import {
   loadPersistedGameStateFromHash,
   savePersistedGameStateToHash,
 } from "../src/game/persistence.ts";
-import {
-  resetSolverRuntimeForTests,
-  setSolverWorkerFactoryForTests,
-} from "../src/game/solver/solver-runtime.ts";
 import type { SolverResult } from "../src/game/solver/solver-types.ts";
 import { createInitialGameState } from "../src/game/state.ts";
 import { GameScreen } from "../src/ui/game-screen.tsx";
-
-type SolveRequestMessage = {
-  type: "solve-request";
-  requestId: number;
-};
-
-type SolveResponseMessage = {
-  type: "solve-result";
-  requestId: number;
-  result: SolverResult;
-};
-
-type FakeWorkerControl = {
-  requests: SolveRequestMessage[];
-  respond: (message: SolveResponseMessage) => void;
-};
-
-const initialWorkerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
+import {
+  installWorkerBackedRuntime,
+  restoreWorkerForTests,
+} from "./game-solve-worker-browser-helpers.ts";
 
 function flushUi(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
@@ -59,52 +41,12 @@ function currentSolveState(container: HTMLDivElement): string {
   return (status.textContent ?? "").trim();
 }
 
-function installWorkerBackedRuntime(): { control: FakeWorkerControl } {
-  Object.defineProperty(globalThis, "Worker", {
-    configurable: true,
-    writable: true,
-    value: class WorkerShim {},
-  });
-
-  const requests: SolveRequestMessage[] = [];
-  let onmessage: ((event: MessageEvent<SolveResponseMessage>) => void) | null = null;
-  setSolverWorkerFactoryForTests(() => {
-    return {
-      get onmessage() {
-        return onmessage;
-      },
-      set onmessage(value) {
-        onmessage = value as ((event: MessageEvent<SolveResponseMessage>) => void) | null;
-      },
-      onerror: null,
-      postMessage(message: SolveRequestMessage) {
-        requests.push(message);
-      },
-      terminate() {},
-    } as unknown as Worker;
-  });
-
-  return {
-    control: {
-      requests,
-      respond(message) {
-        onmessage?.({ data: message } as MessageEvent<SolveResponseMessage>);
-      },
-    },
-  };
-}
-
 describe("game screen worker solve integration", () => {
   let container: HTMLDivElement | null = null;
   let root: Root | null = null;
 
   afterEach(async () => {
-    resetSolverRuntimeForTests();
-    if (initialWorkerDescriptor) {
-      Object.defineProperty(globalThis, "Worker", initialWorkerDescriptor);
-    } else {
-      Reflect.deleteProperty(globalThis, "Worker");
-    }
+    restoreWorkerForTests();
     if (root) {
       root.unmount();
       root = null;

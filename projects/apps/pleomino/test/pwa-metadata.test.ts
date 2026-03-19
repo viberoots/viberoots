@@ -20,12 +20,18 @@ describe("pwa metadata", () => {
 
   it("registers a service worker from the client entry", () => {
     const entryClient = readFileSync(path.join(appRoot, "src/entry-client.ts"), "utf8");
-    expect(entryClient).toContain("navigator.serviceWorker");
-    expect(entryClient).toContain('register("/service-worker.js"');
-    expect(entryClient).toContain('scope: "/"');
-    expect(entryClient).not.toContain('addEventListener("load"');
-    expect(entryClient).toContain("controllerchange");
-    expect(entryClient).toContain("window.location.reload()");
+    const registrationModule = readFileSync(
+      path.join(appRoot, "src/pwa/service-worker-registration.ts"),
+      "utf8",
+    );
+    expect(entryClient).toContain("registerServiceWorker({");
+    expect(entryClient).toContain("navigator: window.navigator");
+    expect(registrationModule).toContain("navigator.serviceWorker");
+    expect(registrationModule).toContain('register("/service-worker.js"');
+    expect(registrationModule).toContain('scope: "/"');
+    expect(registrationModule).not.toContain('addEventListener("load"');
+    expect(registrationModule).toContain("controllerchange");
+    expect(registrationModule).toContain("args.location.reload()");
     expect(entryClient).toContain("hydrate: false");
     expect(entryClient).not.toContain("PLEOMINO_URL_STATE_HASH_KEY");
   });

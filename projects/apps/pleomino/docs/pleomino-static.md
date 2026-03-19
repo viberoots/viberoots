@@ -762,6 +762,18 @@ SSR/hash mismatch complexity.
 
 ## PR-10: Lock Pleomino Offline Browser Acceptance Into Deterministic Verify Coverage
 
+Implementation status:
+
+- complete in `projects/apps/pleomino`
+- deterministic app-owned acceptance coverage is now wired through:
+  - `test/game-offline-relaunch-solve-browser.test.tsx`
+  - `test/pwa-service-worker-registration.test.ts`
+  - `test/wasm-runtime-offline-cache.test.ts`
+- focused target wiring:
+  - `TARGETS` → `:pr10_offline_acceptance`
+- the older temp Playwright repro scripts remain optional investigation aids, but the required
+  verify path is now the app-owned deterministic target above
+
 ### Why This PR Exists
 
 The static-PWA migration is functionally close to complete, but one final acceptance gap remains in

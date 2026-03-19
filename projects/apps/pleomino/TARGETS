@@ -50,3 +50,12 @@ nix_node_test(
         "test/static-delivery-contract.test.ts",
     ],
 )
+
+nix_node_test(
+    name = "pr10_offline_acceptance",
+    patterns = [
+        "test/game-offline-relaunch-solve-browser.test.tsx",
+        "test/pwa-service-worker-registration.test.ts",
+        "test/wasm-runtime-offline-cache.test.ts",
+    ],
+)
