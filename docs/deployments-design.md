@@ -300,7 +300,7 @@ treated as planned policy, not open brainstorming:
 - shared-environment locking should use an explicit lock scope
   - the default lock scope should be derived from canonical provider-target identity
   - explicit overrides are special-case escape hatches and must validate as at least as strict as the derived scope
-  - one active non-preview deploy should run per lock scope
+  - one active mutating run should run per lock scope
   - different lock scopes may run in parallel
   - rollback, retry, and redeploy actions should take the same lock as the normal deploy path
   - preview should share the main deployment lock by default
@@ -308,6 +308,8 @@ treated as planned policy, not open brainstorming:
   - the shared lock implementation must provide lease expiry plus stale-holder protection such as fencing or an equivalent safety mechanism
 - deployments may declare explicit prerequisites on other deployment ids
   - prerequisite modes should be narrow by default: `ordering_only` or `health_gated`
+  - prerequisites should be same-lane by default
+  - cross-lane prerequisites require explicit reviewed shared-platform semantics
   - admission, orchestration, and changed-based selection should consume the same prerequisite metadata
 - deploy records should include first-class lineage identifiers
   - every run gets a globally unique `deploy_run_id`
@@ -323,9 +325,9 @@ treated as planned policy, not open brainstorming:
 - deploy records should distinguish operation kind from final outcome
   - operation kinds include at least normal deploy, preview deploy, retry, promotion, and rollback
   - success or failure outcome must remain separate from the kind of run being performed
-- deploy outcomes should use a canonical vocabulary
-  - terminal states: `validation_failed`, `build_failed`, `resolve_failed`, `provision_failed`, `publish_failed`, `smoke_failed_after_publish`, `succeeded`
-  - non-terminal states: `queued`, `running`, `waiting_for_lock`, `cancelling`, `cancelled`
+- deploy records should use separate canonical vocabularies for final outcomes and lifecycle states
+  - terminal final outcomes: `validation_failed`, `build_failed`, `resolve_failed`, `provision_failed`, `publish_failed`, `smoke_failed_after_publish`, `succeeded`
+  - lifecycle states: `queued`, `running`, `waiting_for_lock`, `cancelling`, `cancelled`
 - automatic retry policy should be conservative and step-specific
   - `validate`, `build`, and `resolve` should not auto-retry
   - `provision` should not auto-retry by default; explicit operator rerun is preferred
@@ -345,6 +347,8 @@ treated as planned policy, not open brainstorming:
   - a production-facing deployment may omit or downgrade smoke only through an explicit documented exception
 - provisioners should be non-destructive by default during normal deploy flows
   - delete or replace behavior that can remove owned live resources should require an explicit separate operator path or equivalent break-glass intent
+- `--provision-only` should not build or consume artifact-derived inputs in v1
+- `protection_class` should use a closed enum: `local_only`, `preview_only`, `shared_nonprod`, `production_facing`
 
 These decisions are now reflected in the detailed design sections below. The remaining work is to
 turn them into implementation-grade detail and execution plans without changing the policy
@@ -355,8 +359,6 @@ direction.
 This design is intentionally opinionated about the model, but still leaves some implementation policy choices open:
 
 - the exact Postgres schema and lease mechanics for the shared deployment control plane, while still preserving lease expiry and stale-holder protection
-- the exact field names and per-kind payload details for canonical resolved component data, while preserving the rule that every kind resolves to one standard provider-neutral shape
-- the exact metadata field names used to declare provider-target identity and smoke exceptions, while preserving the rule that both are explicit first-class metadata
 
 Those are real decisions, but they are operational-policy details layered on top of this model rather than reasons to change the model itself.
 
@@ -476,7 +478,8 @@ Flag interaction rules:
 
 - default `deploy <id>` means `validate -> build -> resolve -> provision? -> publish -> smoke?`
 - `--validate-only` runs validation only
-- `--provision-only` still performs `validate`, and may build or resolve only if the chosen provisioner needs artifact metadata, but it must not publish
+- `--provision-only` still performs `validate`, but it must not build, resolve artifacts, or publish
+  - in v1, provisioners may consume only stable declared deployment metadata, not resolved build outputs or artifact-derived inputs
 - `--publish-only` still performs `validate` and `resolve`, but it must skip provisioning
   - it may build only when the caller did not provide or select an already-built artifact reference
   - promotion-grade, retry, and rollback-grade publish-only paths should prefer the exact previously resolved artifact rather than rebuilding
@@ -815,7 +818,7 @@ deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
-    protection_class = "production-facing",
+    protection_class = "production_facing",
     promotion_lane = "pleomino",
     components = [
         {
@@ -861,7 +864,7 @@ Suggested metadata shape conventions:
     - should be explicit deployment metadata rather than inferred only from naming convention
   - `protection_class`
     - required
-    - explicitly classifies whether the deployment is local-only, preview-only, shared-nonprod, production-facing, or equivalent validated repo policy class
+    - closed enum: `local_only`, `preview_only`, `shared_nonprod`, `production_facing`
     - this classification should drive admission, smoke expectations, and whether shared-control-plane execution is required
   - `components[*]`
     - required, non-empty list
@@ -1023,11 +1026,18 @@ Policy:
 Field-shape guidance:
 
 - `provider_target` should be represented as a structured metadata object, not as free-form prose or an opaque positional tuple
-- the minimum recommended field is `id`, meaning the stable provider-side target identifier for normal publish mode
+- the minimum required field is `id`, meaning the stable provider-side target identifier for normal publish mode
 - when additional qualifiers are needed to uniquely identify the live target, represent them as explicit named fields rather than encoding them into one ambiguous string
 - this is an intentional standardization decision for the document, not an accidental example style choice
 - the shared `id` field gives validation, deployment records, and adapter wiring one predictable canonical identifier while still allowing provider-specific qualifiers beside it
 - examples in this document use compact shapes for readability; production adapters may require additional validated fields, but should preserve the same explicit-object model
+
+Minimum smoke-exception fields:
+
+- `owner`
+- `reason`
+- `scope`
+- one review boundary field: `review_by` or `expires_at`
 
 ### Prerequisites
 
@@ -1050,6 +1060,8 @@ Policy:
 - prerequisites should be narrow and non-recursive by default
 - a deployment may declare zero or more prerequisites, but each prerequisite must name one concrete deployment id and one explicit mode
 - orchestration, admission, and `--from-changes` logic should all consume the same prerequisite metadata rather than inventing separate notions of dependency
+- prerequisites should be same-lane by default
+- cross-lane prerequisites are forbidden unless they are explicitly marked and reviewed as shared-platform dependencies with documented admission, locking, and health semantics
 - prerequisite graphs must be DAGs
 - self-dependencies are invalid
 - direct or indirect prerequisite cycles are invalid and must be rejected at validation time
@@ -2009,6 +2021,14 @@ Canonical contract rule:
 - publishers consume the resolved data shape rather than rediscovering semantics from build outputs
 - provider adapters may validate that a resolved component kind is supported, but they should not invent a second artifact contract for the same kind
 
+Minimum required resolved-component fields:
+
+- `id`
+- `kind`
+- `target`
+- `artifact_identity`
+- `artifact_ref`
+
 Operational rule:
 
 - `resolve` is the point where Buck-specific artifact references become plain runtime inputs for provisioners, publishers, and smoke checks
@@ -2067,14 +2087,14 @@ Smoke checks are post-publish validation, not a replacement for build, unit, or 
 
 Policy:
 
-- `production-facing` must come from authoritative deployment metadata such as `protection_class`, not from ad hoc team labeling
-- deployments classified as production-facing must have smoke checks unless an explicit documented exception says otherwise
-- deployments classified as production-facing should treat smoke checks as blocking by default
+- the English concept "production-facing" must come from authoritative deployment metadata such as `protection_class = "production_facing"`, not from ad hoc team labeling
+- deployments classified as `production_facing` must have smoke checks unless an explicit documented exception says otherwise
+- deployments classified as `production_facing` should treat smoke checks as blocking by default
 - `publish succeeded` and `smoke failed` must be reported as a distinct overall outcome
 - smoke checks should run against the canonical deployment URL by default
 - a deployment may explicitly configure a preview-specific smoke URL when preview mode publishes to an isolated preview target
 - smoke checks should consume resolved deployment outputs and runtime deployment context instead of rediscovering deployment facts ad hoc
-- deployments that intentionally omit smoke checks outside production-facing classifications should document that choice in deployment metadata or provider adapter policy rather than rely on silent absence
+- deployments that intentionally omit smoke checks outside non-`production_facing` classifications should document that choice in deployment metadata or provider adapter policy rather than rely on silent absence
 
 Timeout and retry policy:
 
@@ -2094,8 +2114,13 @@ Preview policy:
 
 Exception representation policy:
 
-- a production-facing smoke omission or downgrade must be represented explicitly in deployment metadata
-- the same authoritative classification that marks a deployment production-facing should also drive admission policy and local-mutation restrictions
+- a `production_facing` smoke omission or downgrade must be represented explicitly in deployment metadata
+- the same authoritative classification that marks a deployment as `production_facing` should also drive admission policy and local-mutation restrictions
+- the minimum smoke-exception fields are:
+  - `owner`
+  - `reason`
+  - `scope`
+  - one review boundary field: `review_by` or `expires_at`
 - the exception metadata should identify at least the owner, reason, scope, and review or expiry boundary
 - silent omission of smoke wiring is not an acceptable way to waive production smoke
 
@@ -2139,7 +2164,7 @@ Shared-environment locking policy:
 - the default lock scope should be derived from canonical provider-target identity
 - any explicit lock-scope override is a documented escape hatch for special cases, not the normal path
 - an override must validate as at least as strict as the provider-target-derived scope; it must not permit two runs that could mutate the same live target to proceed independently
-- only one active non-preview deploy should run for a lock scope at a time
+- only one active mutating run should run for a lock scope at a time
 - different lock scopes may run in parallel
 - rollback, retry, promotion, and redeploy should take the same lock as a normal deploy against that target scope
 - the shared lock implementation must prevent stale holders from continuing to mutate a target after ownership is lost
