@@ -226,6 +226,13 @@ For protected or shared environments, the canonical `deploy` CLI should still be
 front door should submit or hand off mutating work to the shared control plane rather than performing
 provider-side mutation directly from an arbitrary local machine.
 
+Shared-control-plane trust boundary:
+
+- protected or shared-environment credentials must be used only by vetted shared adapter or provisioner code running in the shared control plane
+- deployment-local hooks, repo-authored per-deployment scripts, or equivalent arbitrary package-local code must not run with protected/shared credentials in the shared control plane
+- deployment-local hooks may still be allowed for local workflows or explicitly isolated preview/local targets where those credentials and side effects are not shared-environment sensitive
+- if an implementation needs any exception to that rule, it should require explicit sandboxing, allowlisting, and separate policy review rather than silently reusing the normal control-plane path
+
 Semantic contract for the canonical Buck `:deploy` target:
 
 - the canonical Buck `:deploy` target is a declaration and metadata target, not a live mutating action
@@ -275,7 +282,7 @@ treated as planned policy, not open brainstorming:
 - promotion should move the same artifact across distinct deployment ids that each name one explicit live target
   - one deployment should not implicitly select among multiple shared environments at publish time
 - promotion should use one-way fast-forward environment branches
-  - later environments advance only after required checks pass for earlier environments
+  - later environments advance only after required checks pass for earlier environments within the same independently promoted lane
 - rollback for bad app releases should prefer redeploying a prior known-good artifact
   - if that is not available or not appropriate, rollback should use a new revert commit promoted forward through the same branch flow
   - moving environment branches backward should not be the normal rollback mechanism
@@ -682,6 +689,8 @@ Default diff-base policy:
 Environment-lane policy:
 
 - each concrete deployment belongs to one environment branch lane for protected/shared mutation
+- the unit of a lane is one independently promoted deployment family, not the whole repo and not one individual deployment id
+- a family lane may own branches such as `env/<family>/dev -> env/<family>/staging -> env/<family>/prod`
 - the authoritative baseline for an environment-mutating `--from-changes` run is the last successful deploy baseline recorded for that lane
 - one mutating `--from-changes` invocation for protected or shared environments should stay within one environment lane
 - if the changed set affects deployments in multiple environment lanes, the selector should require explicit lane selection or split the result into separate non-mutating result sets rather than mutating all lanes at once
@@ -697,6 +706,9 @@ Prerequisite expansion policy:
 Impact-selection contract:
 
 - `--from-changes` must use Buck-authoritative graph data to decide which deployments are impacted
+- every deployment-local file that can affect validation, provider-target identity, provisioning, publishing, smoke behavior, or target identity must either:
+  - be declared on the canonical deployment target and therefore participate in Buck-visible impact analysis
+  - or be covered by an explicit documented widening rule
 - the intended flow is:
   - collect changed files for the selected diff base
   - map those files to affected Buck targets using repo build metadata
@@ -704,6 +716,7 @@ Impact-selection contract:
   - de-duplicate the resulting deployment ids and then run the normal lifecycle for each selected deployment
 - the implementation must use a conservative expansion rule for repo-global inputs that can affect many deployments even when no single app target changed directly
   - examples include deployment macros and shared helper code under `build-tools/`, provider adapters, flake or toolchain inputs, and other repo-wide deployment/build wiring
+- deployment-local files such as `wrangler.jsonc`, `smoke.ts`, provisioner entrypoints, or generated provider-config inputs must not fall through an unmapped gap where they change deployment behavior without selecting the deployment
 - when a change touches such a repo-global input, the selector should widen the impacted set according to documented policy rather than silently under-selecting deployments
 - `--from-changes` is allowed to over-select for safety; it is not allowed to under-select because an implementation skipped Buck graph expansion or ignored repo-global inputs
 
@@ -1003,6 +1016,9 @@ Policy:
 - prerequisites should be narrow and non-recursive by default
 - a deployment may declare zero or more prerequisites, but each prerequisite must name one concrete deployment id and one explicit mode
 - orchestration, admission, and `--from-changes` logic should all consume the same prerequisite metadata rather than inventing separate notions of dependency
+- prerequisite graphs must be DAGs
+- self-dependencies are invalid
+- direct or indirect prerequisite cycles are invalid and must be rejected at validation time
 
 ### Provisioner
 
@@ -2207,20 +2223,20 @@ Artifact retention policy:
 Planned promotion model:
 
 - use one-way fast-forward environment branches
-- the standard branch sequence is `env/dev -> env/staging -> env/prod`
-- additional environment branches such as `env/<customer>` may extend from the appropriate upstream environment, but should follow the same fast-forward-only policy
+- each independently promoted deployment family should have its own lane such as `env/<family>/dev -> env/<family>/staging -> env/<family>/prod`
+- additional environment branches for that family may extend the lane when needed, but should follow the same fast-forward-only policy
 - a later environment should advance only after required checks pass for the earlier environment
 - promotion should preserve artifact identity across environments whenever the workflow is "prove once, promote forward"
 - promotion should operate across distinct deployment ids such as `pleomino-staging` and `pleomino-prod`, not by having one deployment dynamically retarget itself
 
 Plain-language version:
 
-- later environments should receive code and artifacts that were already proven earlier, starting with `env/dev`
+- later environments should receive code and artifacts that were already proven earlier, starting with the earlier branch in the same family lane
 - promotion should move forward through the branch flow, not invent a second release path
 
 Minimum branch-policy assumptions:
 
-- `env/dev`, `env/staging`, and `env/prod` should be protected branches
+- each family lane should have protected environment branches such as `env/<family>/dev`, `env/<family>/staging`, and `env/<family>/prod`
 - promotion should happen by fast-forwarding the next environment branch, not by rebuilding from an unrelated revision
 - direct pushes to later environment branches should be disallowed except for controlled emergency procedures
 - required checks for each environment should run before that environment branch advances
@@ -2371,6 +2387,7 @@ Minimum required fields:
 - deployment metadata fingerprint or stable snapshot reference
 - provider-native config fingerprint or stable snapshot reference for any checked-in provider config consumed by the run
 - target provider and provider-instance identifier when applicable
+- canonical remote publish identifier for each published component when the provider exposes one
 - start time and end time
 - final outcome
 
@@ -2401,6 +2418,7 @@ Artifact identity rules:
 - provider-instance identifiers used during publish should come from authoritative deployment metadata or generated config, not from silently drift-prone duplicated checked-in fields
 - the deployment record should preserve the canonical resolved component data shape or a stable projection of it, rather than only loosely structured adapter-specific paths
 - the deployment record should make it obvious when the same artifact identity was published under different deployment metadata or provider-config inputs
+- when a provider exposes a concrete release, deployment, version, or revision identifier, the deployment record must preserve that identifier per published component rather than burying it in optional adapter detail
 
 Recommended deployment-record field-shape guidance:
 
@@ -3272,6 +3290,9 @@ Recommended final documentation tasks:
    - explain when `deployment-id` is sufficient and when multiple deployment ids must share a lock scope
 7. do one final example-consistency pass for provider-target identity
    - make sure concrete deployment examples, metadata examples, and deployment-record examples either include `provider_target` consistently or explicitly state when it is omitted for brevity
+8. do one final editorial pass to keep normative policy visually dominant
+   - compress, relocate, or otherwise de-emphasize process-heavy planning text once it has served its design-refinement purpose
+   - keep the settled normative sections easy to scan without losing the historical design-completion guidance
 
 Success condition for the final design revision:
 
