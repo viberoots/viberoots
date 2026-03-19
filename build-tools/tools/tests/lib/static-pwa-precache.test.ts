@@ -37,6 +37,7 @@ test("static pwa precache lists emitted chunks plus worker and wasm assets", asy
       "assets/logo.svg",
       "icons/icon-192.png",
       "manifest.webmanifest",
+      "server/wasm/top.wasm",
       "service-worker.js",
       "README.txt",
     ]);
@@ -99,5 +100,17 @@ test("static pwa precache materialization is deterministic for fixed built outpu
       assert.match(outputA, /"\/assets\/solver\.wasm"/);
       assert.doesNotMatch(outputA, /__STATIC_PWA_(CACHE_VERSION|PRECACHED_ASSETS)__/);
     });
+  });
+});
+
+test("static pwa precache can include manifest-declared runtime urls before files are staged", async () => {
+  await withTempDir("static-pwa-precache-extra-", async (clientDir) => {
+    await writeFiles(clientDir, ["entry-client.js", "manifest.webmanifest", "service-worker.js"]);
+
+    assert.deepEqual(listStaticPwaPrecacheAssetUrls(clientDir, { extraUrls: ["/top.wasm"] }), [
+      "/entry-client.js",
+      "/manifest.webmanifest",
+      "/top.wasm",
+    ]);
   });
 });

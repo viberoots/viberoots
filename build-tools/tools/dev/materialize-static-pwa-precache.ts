@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getFlagStr } from "../lib/cli.ts";
+import { getFlagList, getFlagStr } from "../lib/cli.ts";
 import {
   ensureDistStaticPwaPrecache,
   STATIC_PWA_CACHE_VERSION_PLACEHOLDER,
@@ -18,6 +18,7 @@ const cacheVersionPlaceholder = getFlagStr(
   "cache-version-placeholder",
   STATIC_PWA_CACHE_VERSION_PLACEHOLDER,
 ).trim();
+const extraUrls = getFlagList("extra-urls");
 const precacheUrlsPlaceholder = getFlagStr(
   "precache-urls-placeholder",
   STATIC_PWA_PRECACHED_ASSETS_PLACEHOLDER,
@@ -26,6 +27,7 @@ const precacheUrlsPlaceholder = getFlagStr(
 const state = ensureDistStaticPwaPrecache(path.resolve(clientDir), {
   cacheVersionPlaceholder,
   cacheVersionPrefix,
+  extraUrls,
   precacheUrlsPlaceholder,
   serviceWorkerPath: serviceWorkerPath === "" ? undefined : path.resolve(serviceWorkerPath),
 });

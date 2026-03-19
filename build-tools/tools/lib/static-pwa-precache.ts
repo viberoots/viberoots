@@ -23,6 +23,7 @@ const DEFAULT_PRECACHED_EXTENSIONS = [
 export type StaticPwaPrecacheOptions = {
   cacheVersionPlaceholder?: string;
   cacheVersionPrefix?: string;
+  extraUrls?: readonly string[];
   precacheExtensions?: readonly string[];
   precacheUrlsPlaceholder?: string;
   serviceWorkerPath?: string;
@@ -54,11 +55,21 @@ function normalizeUrlPath(relativePath: string): string {
   return `/${relativePath.split(path.sep).join("/")}`;
 }
 
+function normalizeUrlList(urls: readonly string[]): string[] {
+  return [
+    ...new Set(urls.map((url) => readOptionString(url, "")).filter((url) => url !== "")),
+  ].sort();
+}
+
 function normalizeExtensions(extensions: readonly string[]): string[] {
   return [...new Set(extensions.map((extension) => extension.toLowerCase()))].sort();
 }
 
 function isPrecachableAsset(relativePath: string, extensions: readonly string[]): boolean {
+  const normalizedPath = relativePath.split(path.sep).join("/");
+  if (normalizedPath.startsWith("server/")) {
+    return false;
+  }
   if (relativePath === "service-worker.js") {
     return false;
   }
@@ -77,10 +88,12 @@ export function listStaticPwaPrecacheAssetUrls(
   const extensions = normalizeExtensions(
     options.precacheExtensions || DEFAULT_PRECACHED_EXTENSIONS,
   );
-  return collectFiles(clientDir)
-    .filter((relativePath) => isPrecachableAsset(relativePath, extensions))
-    .map(normalizeUrlPath)
-    .sort();
+  return normalizeUrlList([
+    ...collectFiles(clientDir)
+      .filter((relativePath) => isPrecachableAsset(relativePath, extensions))
+      .map(normalizeUrlPath),
+    ...(options.extraUrls || []),
+  ]);
 }
 
 export function createStaticPwaCacheVersion(

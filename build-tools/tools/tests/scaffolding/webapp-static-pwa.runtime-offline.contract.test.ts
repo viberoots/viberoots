@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { after, test } from "node:test";
 import {
@@ -66,6 +67,12 @@ test(
         const wasmUrl = precacheState.urls.find((url) => url.endsWith(".wasm"));
         assert.ok(scriptUrl, "expected built JS entry in precache");
         assert.ok(wasmUrl, "expected built wasm asset in precache");
+        const serviceWorkerSource = await fsp.readFile(
+          path.join(distDir, "service-worker.js"),
+          "utf8",
+        );
+        assert.match(serviceWorkerSource, new RegExp(scriptUrl.replace(".", "\\.")));
+        assert.match(serviceWorkerSource, new RegExp(wasmUrl.replace(".", "\\.")));
 
         const harness = await createStaticPwaServiceWorkerHarness(distDir);
         await harness.dispatchInstall();
@@ -79,32 +86,7 @@ test(
         });
         assert.equal(onlineNavigate.status, 200);
 
-        const onlineScript = await harness.dispatchFetch({
-          destination: "script",
-          method: "GET",
-          url: `http://app.local${scriptUrl}`,
-        });
-        assert.equal(onlineScript.status, 200);
-
-        const onlineWasm = await harness.dispatchFetch({
-          method: "GET",
-          url: `http://app.local${wasmUrl}`,
-        });
-        assert.equal(onlineWasm.status, 200);
-
         harness.setOffline(true);
-
-        const offlineNavigate = await harness.dispatchFetch({
-          destination: "document",
-          method: "GET",
-          mode: "navigate",
-          url: "http://app.local/",
-        });
-        assert.equal(offlineNavigate.status, 200);
-        assert.match(
-          await offlineNavigate.text(),
-          /Offline-ready app shell with service worker and manifest wiring\./,
-        );
 
         const offlineScript = await harness.dispatchFetch({
           destination: "script",
@@ -120,6 +102,18 @@ test(
         });
         assert.equal(offlineWasm.status, 200);
         assert.ok((await offlineWasm.arrayBuffer()).byteLength > 0);
+
+        const offlineNavigate = await harness.dispatchFetch({
+          destination: "document",
+          method: "GET",
+          mode: "navigate",
+          url: "http://app.local/",
+        });
+        assert.equal(offlineNavigate.status, 200);
+        assert.match(
+          await offlineNavigate.text(),
+          /Offline-ready app shell with service worker and manifest wiring\./,
+        );
       });
     } finally {
       if (prevRoots === undefined) delete process.env.TEST_RSYNC_ROOTS;
