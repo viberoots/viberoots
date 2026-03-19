@@ -233,6 +233,13 @@ Shared-control-plane trust boundary:
 - deployment-local hooks may still be allowed for local workflows or explicitly isolated preview/local targets where those credentials and side effects are not shared-environment sensitive
 - if an implementation needs any exception to that rule, it should require explicit sandboxing, allowlisting, and separate policy review rather than silently reusing the normal control-plane path
 
+Protected/shared extension model:
+
+- protected or shared-environment mutation may execute only vetted built-in adapter, provisioner, and smoke-runner code in the shared control plane
+- deployment-local `deploy.ts`, deployment-local provisioner entrypoints, deployment-local smoke entrypoints, or equivalent package-local executable hooks are not part of the normal protected/shared execution model
+- those deployment-local hooks remain available only for local workflows or explicitly isolated preview/local targets unless a separately reviewed sandboxed exception path is introduced
+- provider adapters should reject protected/shared deployment shapes that require package-local executable logic the shared control plane is not allowed to run
+
 Semantic contract for the canonical Buck `:deploy` target:
 
 - the canonical Buck `:deploy` target is a declaration and metadata target, not a live mutating action
@@ -690,6 +697,7 @@ Environment-lane policy:
 
 - each concrete deployment belongs to one environment branch lane for protected/shared mutation
 - the unit of a lane is one independently promoted deployment family, not the whole repo and not one individual deployment id
+- lane membership should be explicit deployment metadata, not only an implicit naming convention
 - a family lane may own branches such as `env/<family>/dev -> env/<family>/staging -> env/<family>/prod`
 - the authoritative baseline for an environment-mutating `--from-changes` run is the last successful deploy baseline recorded for that lane
 - one mutating `--from-changes` invocation for protected or shared environments should stay within one environment lane
@@ -709,6 +717,7 @@ Impact-selection contract:
 - every deployment-local file that can affect validation, provider-target identity, provisioning, publishing, smoke behavior, or target identity must either:
   - be declared on the canonical deployment target and therefore participate in Buck-visible impact analysis
   - or be covered by an explicit documented widening rule
+- this is a required contract of the deployment rule shape, not just a best-effort selector implementation detail
 - the intended flow is:
   - collect changed files for the selected diff base
   - map those files to affected Buck targets using repo build metadata
@@ -799,6 +808,8 @@ deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    protection_class = "production-facing",
+    promotion_lane = "pleomino",
     components = [
         {
             "id": "web",
@@ -817,6 +828,12 @@ deployment(
 )
 ```
 
+In this example:
+
+- `protection_class` is included because environment classification is part of the authoritative deployment contract
+- `promotion_lane` is included because this example represents a named environment that participates in protected/shared promotion policy
+- deployments that are truly local-only or otherwise outside protected/shared promotion policy may omit `promotion_lane`, but that omission should be intentional and explained by the deployment's policy class
+
 Suggested metadata shape conventions:
 
 - the deployment macro is the authoritative source for repo-level deployment metadata, even if the exact extraction mechanism evolves later
@@ -829,6 +846,14 @@ Suggested metadata shape conventions:
     - should be a structured object, not a bare string
     - should include at least a stable provider-side identifier under `id`
     - may include additional provider-neutral qualifiers when needed, such as account, namespace, region, or environment class
+  - `promotion_lane`
+    - required for deployments that participate in protected/shared promotion policy
+    - identifies the independently promoted deployment family this deployment belongs to
+    - should be explicit deployment metadata rather than inferred only from naming convention
+  - `protection_class`
+    - required
+    - explicitly classifies whether the deployment is local-only, preview-only, shared-nonprod, production-facing, or equivalent validated repo policy class
+    - this classification should drive admission, smoke expectations, and whether shared-control-plane execution is required
   - `components[*]`
     - required, non-empty list
     - each component should include `id`, `kind`, and `target`
@@ -2033,13 +2058,14 @@ Smoke checks are post-publish validation, not a replacement for build, unit, or 
 
 Policy:
 
-- production-facing deploys must have smoke checks unless an explicit documented exception says otherwise
-- production-facing deploys should treat smoke checks as blocking by default
+- `production-facing` must come from authoritative deployment metadata such as `protection_class`, not from ad hoc team labeling
+- deployments classified as production-facing must have smoke checks unless an explicit documented exception says otherwise
+- deployments classified as production-facing should treat smoke checks as blocking by default
 - `publish succeeded` and `smoke failed` must be reported as a distinct overall outcome
 - smoke checks should run against the canonical deployment URL by default
 - a deployment may explicitly configure a preview-specific smoke URL when preview mode publishes to an isolated preview target
 - smoke checks should consume resolved deployment outputs and runtime deployment context instead of rediscovering deployment facts ad hoc
-- deployments that intentionally omit smoke checks outside production should document that choice in deployment metadata or provider adapter policy rather than rely on silent absence
+- deployments that intentionally omit smoke checks outside production-facing classifications should document that choice in deployment metadata or provider adapter policy rather than rely on silent absence
 
 Timeout and retry policy:
 
@@ -2060,6 +2086,7 @@ Preview policy:
 Exception representation policy:
 
 - a production-facing smoke omission or downgrade must be represented explicitly in deployment metadata
+- the same authoritative classification that marks a deployment production-facing should also drive admission policy and local-mutation restrictions
 - the exception metadata should identify at least the owner, reason, scope, and review or expiry boundary
 - silent omission of smoke wiring is not an acceptable way to waive production smoke
 
@@ -2154,7 +2181,11 @@ Release-admission contract for protected/shared environments:
   - the source revision comes from the allowed environment branch for that deployment lane
   - required checks for that environment have passed for the admitted revision or artifact
   - any required human or policy approval has been granted
-  - artifact provenance and deployment metadata are present and valid for the intended target
+  - the deployment's explicit `promotion_lane` and `protection_class` metadata are present, valid, and match the intended target and admission path
+  - artifact provenance is present and valid for the intended target
+  - for protected/shared publish, the artifact was produced by trusted CI from the admitted source revision
+  - the attestation for that artifact binds artifact identity to source revision plus deployment metadata and provider-config fingerprints
+  - the shared control plane verifies that attestation before publish
   - the selected artifact or revision still matches the environment's promotion and admission policy
   - any explicit deployment prerequisites are satisfied according to their declared mode
     - for `health_gated`, that means a fresh health verdict at admission time unless explicitly documented provider-specific evidence is accepted as equivalent
@@ -2328,6 +2359,8 @@ Deployment metadata must remain non-secret.
 What belongs in deployment metadata:
 
 - provider
+- promotion lane or family membership
+- protection/environment classification
 - components
 - provisioner and publisher config references
 - package-relative file paths
