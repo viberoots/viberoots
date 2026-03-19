@@ -284,14 +284,17 @@ treated as planned policy, not open brainstorming:
   - it should back deployment-record storage
   - it should back shared-environment deploy locking
 - shared-environment locking should use an explicit lock scope
-  - the default lock scope is the `deployment-id`
-  - deployments that can mutate the same provider-side target must use the same lock scope even if they have different deployment ids
+  - the default lock scope should be derived from canonical provider-target identity
+  - explicit overrides are special-case escape hatches and must validate as at least as strict as the derived scope
   - one active non-preview deploy should run per lock scope
   - different lock scopes may run in parallel
   - rollback, retry, and redeploy actions should take the same lock as the normal deploy path
   - preview should share the main deployment lock by default
   - preview runs may use separate lock scope only when they publish to isolated preview targets
   - the shared lock implementation must provide lease expiry plus stale-holder protection such as fencing or an equivalent safety mechanism
+- deployments may declare explicit prerequisites on other deployment ids
+  - prerequisite modes should be narrow by default: `ordering_only` or `health_gated`
+  - admission, orchestration, and changed-based selection should consume the same prerequisite metadata
 - deploy records should include first-class lineage identifiers
   - every run gets a globally unique `deploy_run_id`
   - retries, rollbacks, and promotions should set `parent_run_id`
@@ -684,6 +687,13 @@ Environment-lane policy:
 - if the changed set affects deployments in multiple environment lanes, the selector should require explicit lane selection or split the result into separate non-mutating result sets rather than mutating all lanes at once
 - local or non-mutating inspection flows may still report deployments across multiple lanes when that is useful for visibility
 
+Prerequisite expansion policy:
+
+- `--from-changes` should understand explicit deployment prerequisites from deployment metadata
+- when a changed deployment is an explicit prerequisite of another deployment, the selector may widen the result set according to documented policy rather than leaving downstream prerequisite enforcement entirely to later orchestration
+- widening for prerequisites should be conservative and explainable, not ad hoc
+- prerequisite widening should respect environment-lane boundaries for mutating runs
+
 Impact-selection contract:
 
 - `--from-changes` must use Buck-authoritative graph data to decide which deployments are impacted
@@ -822,6 +832,11 @@ Suggested metadata shape conventions:
     - optional
     - when present, should explicitly describe how smoke runs, such as an `entry`, a named built-in smoke class, or other adapter-defined validated shape
     - production smoke exceptions should be represented explicitly in deployment metadata rather than by omitting the field and hoping readers infer intent
+  - `prerequisites`
+    - optional
+    - when present, should be an explicit list of deployment-id prerequisites rather than free-form prose
+    - each prerequisite should declare whether it is `ordering_only` or `health_gated`
+    - prerequisites should stay narrow and non-recursive by default
 
 Important design points:
 
@@ -850,6 +865,14 @@ It answers:
 Example:
 
 - `pleomino-prod`
+
+A deployment may also declare explicit prerequisites on other deployments when ordering or health gating
+must be part of the repo-owned release model.
+
+Plain-language version:
+
+- "deploy this thing"
+- and, when explicitly declared, "only after these other deployment units are in the required state"
 
 ### Component
 
@@ -958,6 +981,28 @@ Field-shape guidance:
 - this is an intentional standardization decision for the document, not an accidental example style choice
 - the shared `id` field gives validation, deployment records, and adapter wiring one predictable canonical identifier while still allowing provider-specific qualifiers beside it
 - examples in this document use compact shapes for readability; production adapters may require additional validated fields, but should preserve the same explicit-object model
+
+### Prerequisites
+
+A prerequisite is an explicit dependency from one deployment id to another deployment id.
+
+Allowed modes:
+
+- `ordering_only`
+  - the prerequisite deployment must have completed its required admission path before this deployment may mutate
+- `health_gated`
+  - the prerequisite deployment must both satisfy ordering requirements and currently meet its declared health or smoke contract
+  - by default this means a fresh admission-time or revalidation-time health check against the prerequisite deployment's declared smoke or health target
+  - provider-specific health evidence may satisfy the gate only when the adapter explicitly maps it to that health contract and documents equivalent or stronger freshness guarantees
+  - a historical last-successful smoke record is supporting context, not sufficient on its own for `health_gated`
+
+Policy:
+
+- prerequisites must be explicit deployment metadata, not inferred from naming conventions or tribal knowledge
+- prerequisites are deployment-to-deployment relationships, not arbitrary resource-level dependency scripts
+- prerequisites should be narrow and non-recursive by default
+- a deployment may declare zero or more prerequisites, but each prerequisite must name one concrete deployment id and one explicit mode
+- orchestration, admission, and `--from-changes` logic should all consume the same prerequisite metadata rather than inventing separate notions of dependency
 
 ### Provisioner
 
@@ -1785,6 +1830,14 @@ Multi-component lifecycle semantics:
 - deployment-level smoke should run only after the publish phase completes according to the selected policy
 - retry and rollback must operate from recorded per-component artifact and publish state, not from guesses about what probably succeeded
 
+First-class rollout-shape policy:
+
+- a multi-component deployment may explicitly declare component ordering, dependency barriers, or phased smoke checkpoints in deployment metadata
+- when such rollout metadata is present, adapters must either honor it or reject the deployment as unsupported
+- when rollout metadata is absent, the adapter-defined `ordered_best_effort` default applies
+- phased smoke checkpoints should be explicit about which component group they validate and whether later phases may proceed on failure
+- the same declared rollout shape should not silently change meaning across adapters
+
 Operational consequence:
 
 - if one component publishes and a later component fails under a best-effort policy, the deployment run is a publish failure
@@ -2031,8 +2084,9 @@ Shared-environment locking policy:
 
 - shared environments should use a central Postgres-backed control plane for deploy coordination
 - every deployment should resolve to a lock scope
-- the default lock scope should be the `deployment-id`
-- if multiple deployment ids can mutate the same live provider-side target, they must share the same lock scope
+- the default lock scope should be derived from canonical provider-target identity
+- any explicit lock-scope override is a documented escape hatch for special cases, not the normal path
+- an override must validate as at least as strict as the provider-target-derived scope; it must not permit two runs that could mutate the same live target to proceed independently
 - only one active non-preview deploy should run for a lock scope at a time
 - different lock scopes may run in parallel
 - rollback, retry, promotion, and redeploy should take the same lock as a normal deploy against that target scope
@@ -2086,11 +2140,14 @@ Release-admission contract for protected/shared environments:
   - any required human or policy approval has been granted
   - artifact provenance and deployment metadata are present and valid for the intended target
   - the selected artifact or revision still matches the environment's promotion and admission policy
+  - any explicit deployment prerequisites are satisfied according to their declared mode
+    - for `health_gated`, that means a fresh health verdict at admission time unless explicitly documented provider-specific evidence is accepted as equivalent
 - after waiting in queue and revalidating, "still allowed" means at least:
   - the environment branch still points to an allowed revision for this run
   - the artifact identity still matches the approved revision or approved prior run
   - the run has not been superseded by a later admitted run for the same lock scope
   - any required approval has not been revoked, expired, or invalidated by newer policy state
+  - any health-gated prerequisite still satisfies its declared health requirement, using a fresh revalidation-time health verdict unless explicitly documented equivalent provider evidence is accepted
 - if any of those checks fail after revalidation, the run must exit without mutating the target and report that it was superseded, stale, or no longer admitted
 
 Operator-facing lifecycle states:
@@ -2207,12 +2264,13 @@ The deployment rule should expose enough metadata for repo tooling to retrieve:
 - provider
 - provider-target identity
 - preview-target identity or preview-target derivation policy when preview is supported
+- explicit deployment prerequisites when present
 - component list
 - provisioner config
 - publisher config
 - admission or protection classification needed to decide whether mutation must go through the shared control plane
 - smoke policy metadata, including any explicit production exception
-- lock-scope override when it differs from `deployment-id`
+- lock-scope override when it differs from the provider-target-derived default
 - package path
 
 That metadata should be sufficient for the deploy CLI to assemble the whole lifecycle without scraping provider config files for core deployment facts.
@@ -2310,6 +2368,8 @@ Minimum required fields:
 - provider-target identity
 - resolved component list
 - artifact identity for each published component
+- deployment metadata fingerprint or stable snapshot reference
+- provider-native config fingerprint or stable snapshot reference for any checked-in provider config consumed by the run
 - target provider and provider-instance identifier when applicable
 - start time and end time
 - final outcome
@@ -2323,6 +2383,7 @@ Additional recommended fields:
 - smoke result
 - lock scope
 - provider-specific details added by the adapter
+- prerequisite evaluation details when explicit prerequisites affected admission or orchestration
 
 Lineage requirement:
 
@@ -2339,10 +2400,13 @@ Artifact identity rules:
 - a recorded artifact reference for a supported reuse flow must remain retrievable for the applicable retention window
 - provider-instance identifiers used during publish should come from authoritative deployment metadata or generated config, not from silently drift-prone duplicated checked-in fields
 - the deployment record should preserve the canonical resolved component data shape or a stable projection of it, rather than only loosely structured adapter-specific paths
+- the deployment record should make it obvious when the same artifact identity was published under different deployment metadata or provider-config inputs
 
 Recommended deployment-record field-shape guidance:
 
 - `provider_target` in the deployment record should preserve the same conceptual identity declared in deployment metadata, not a lossy human-only label
+- deployment metadata provenance should preserve a stable fingerprint or snapshot reference to the metadata evaluated for the run
+- provider-config provenance should preserve a stable fingerprint or snapshot reference for each provider-native config file that materially influenced publish behavior
 - `resolved component list` should preserve one entry per component id, not just an unordered blob of adapter output
 - each resolved component entry should keep at least:
   - component `id`
