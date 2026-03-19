@@ -776,6 +776,35 @@ deployment(
 )
 ```
 
+Suggested metadata shape conventions:
+
+- the deployment macro is the authoritative source for repo-level deployment metadata, even if the exact extraction mechanism evolves later
+- dictionary-valued fields should use stable, explicit keys rather than relying on positional meaning or provider-specific shorthand
+- this document intentionally standardizes a small shared outer shape now so adapter authors and reviewers do not keep reopening the same field-shape question later
+- the goal is to standardize the repo-level contract without overfitting every provider to one rigid semantic vocabulary
+- recommended conventions for the low-level deployment shape are:
+  - `provider_target`
+    - required
+    - should be a structured object, not a bare string
+    - should include at least a stable provider-side identifier under `id`
+    - may include additional provider-neutral qualifiers when needed, such as account, namespace, region, or environment class
+  - `components[*]`
+    - required, non-empty list
+    - each component should include `id`, `kind`, and `target`
+    - `id` should be stable within the deployment, not derived from list position
+  - `publisher`
+    - required
+    - should include a stable `type`
+    - file references such as `config` should be package-relative unless documented otherwise
+  - `provisioner`
+    - optional
+    - when present, should include a stable `type`
+    - file references such as `entry` or config paths should be package-relative unless documented otherwise
+  - `smoke`
+    - optional
+    - when present, should explicitly describe how smoke runs, such as an `entry`, a named built-in smoke class, or other adapter-defined validated shape
+    - production smoke exceptions should be represented explicitly in deployment metadata rather than by omitting the field and hoping readers infer intent
+
 Important design points:
 
 - `components` is plural on purpose
@@ -902,6 +931,15 @@ Policy:
   - either deployment metadata declares the preview target shape directly
   - or the provider adapter defines a deterministic, validated derivation from deployment metadata to an isolated preview target
   - falling back to the normal provider target is not an acceptable preview implementation
+
+Field-shape guidance:
+
+- `provider_target` should be represented as a structured metadata object, not as free-form prose or an opaque positional tuple
+- the minimum recommended field is `id`, meaning the stable provider-side target identifier for normal publish mode
+- when additional qualifiers are needed to uniquely identify the live target, represent them as explicit named fields rather than encoding them into one ambiguous string
+- this is an intentional standardization decision for the document, not an accidental example style choice
+- the shared `id` field gives validation, deployment records, and adapter wiring one predictable canonical identifier while still allowing provider-specific qualifiers beside it
+- examples in this document use compact shapes for readability; production adapters may require additional validated fields, but should preserve the same explicit-object model
 
 ### Provisioner
 
@@ -1049,6 +1087,7 @@ deployment(
     name = "deploy",
     provider = "s3-static",
     provider_target = {
+        "id": "docs-site-prod",
         "bucket": "docs-site-prod",
     },
     components = [
@@ -1089,6 +1128,7 @@ deployment(
     name = "deploy",
     provider = "kubernetes",
     provider_target = {
+        "id": "prod-us-west/api-prod/api",
         "cluster": "prod-us-west",
         "namespace": "api-prod",
         "release": "api",
@@ -1130,6 +1170,7 @@ deployment(
     name = "deploy",
     provider = "kubernetes",
     provider_target = {
+        "id": "prod-us-west/shared-observability/otel-collector",
         "cluster": "prod-us-west",
         "namespace": "shared-observability",
         "release": "otel-collector",
@@ -2216,7 +2257,7 @@ Minimum required fields:
 - start time and end time
 - final outcome
 
-Optional but strongly recommended fields:
+Additional recommended fields:
 
 - `parent_run_id`
   - when the run is a retry, rollback, or promotion derived from an earlier run
@@ -2241,6 +2282,19 @@ Artifact identity rules:
 - a recorded artifact reference for a supported reuse flow must remain retrievable for the applicable retention window
 - provider-instance identifiers used during publish should come from authoritative deployment metadata or generated config, not from silently drift-prone duplicated checked-in fields
 - the deployment record should preserve the canonical resolved component data shape or a stable projection of it, rather than only loosely structured adapter-specific paths
+
+Recommended deployment-record field-shape guidance:
+
+- `provider_target` in the deployment record should preserve the same conceptual identity declared in deployment metadata, not a lossy human-only label
+- `resolved component list` should preserve one entry per component id, not just an unordered blob of adapter output
+- each resolved component entry should keep at least:
+  - component `id`
+  - component `kind`
+  - source Buck `target`
+  - resolved artifact identity
+  - concrete artifact location or equivalent provider-neutral reference
+- `final outcome` should use the canonical vocabulary exactly rather than near-synonyms
+- `publish mode` and `operation_kind` should stay separate even when one implies the other in common cases
 
 Nix-aligned guidance:
 
@@ -2649,6 +2703,7 @@ deployment(
     name = "deploy",
     provider = "kubernetes",
     provider_target = {
+        "id": "prod-us-west/api-prod/api",
         "cluster": "prod-us-west",
         "namespace": "api-prod",
         "release": "api",
@@ -2932,6 +2987,7 @@ deployment(
     name = "deploy",
     provider = "kubernetes",
     provider_target = {
+        "id": "prod-us-west/shared-observability/shared-observability",
         "cluster": "prod-us-west",
         "namespace": "shared-observability",
         "release": "shared-observability",
