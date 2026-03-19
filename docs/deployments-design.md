@@ -222,6 +222,10 @@ This is the key harmony point:
 - Buck owns structure, graph, validation, and artifacts
 - the deploy CLI owns side effects
 
+For protected or shared environments, the canonical `deploy` CLI should still be the front door, but that
+front door should submit or hand off mutating work to the shared control plane rather than performing
+provider-side mutation directly from an arbitrary local machine.
+
 ## Required Contracts
 
 The design leaves some implementation details open, but the following behavioral contracts should be treated as fixed:
@@ -241,6 +245,8 @@ The design leaves some implementation details open, but the following behavioral
   - promotion reuses artifact identity across deployments; it does not make one deployment dynamically become many environments
 - protected or shared-environment mutating deploys must run through the shared deploy control plane
   - local workflows may validate, build, resolve, or publish only to explicitly isolated local or preview targets
+- preview publication must never silently reuse the normal live target
+  - preview targeting must be explicit in deployment metadata or explicit in provider-adapter policy for a safely isolated target class
 - deployment metadata is authoritative for the repo deployment model
   - provider config files are provider-native inputs, not a second source of truth for core deployment facts
   - when the same conceptual value would otherwise appear in both places, generation or runtime injection is preferred over duplication
@@ -284,6 +290,9 @@ treated as planned policy, not open brainstorming:
   - publishers consume that resolved data shape and must not rediscover artifact semantics ad hoc from build outputs
 - each deployment should declare explicit provider-target identity in deployment metadata
   - adapters must not infer the live target from directory names, branch names, CLI defaults, or unchecked provider config drift
+- protected or shared-environment `--publish-only` must identify the exact artifact being published
+  - it must not mean "publish whatever was most recently built on this machine"
+  - rebuilding during `--publish-only` is out of policy for those environments unless the operator is intentionally creating a new deploy run instead of reusing an existing artifact
 - deploy records should distinguish operation kind from final outcome
   - operation kinds include at least normal deploy, preview deploy, retry, promotion, and rollback
   - success or failure outcome must remain separate from the kind of run being performed
@@ -318,10 +327,7 @@ direction.
 
 This design is intentionally opinionated about the model, but still leaves some implementation policy choices open:
 
-- what diff base `--from-changes` compares against in CI and local use
 - the exact Postgres schema and lease mechanics for the shared deployment control plane, while still preserving lease expiry and stale-holder protection
-- the exact timeout and retry defaults for each smoke-check class
-- the exact branch names, protection rules, and CI wiring for environment-branch promotion
 - the exact field names and per-kind payload details for canonical resolved component data, while preserving the rule that every kind resolves to one standard provider-neutral shape
 - the exact metadata field names used to declare provider-target identity and smoke exceptions, while preserving the rule that both are explicit first-class metadata
 
@@ -383,6 +389,36 @@ Plain-language version:
 - staging is usually a different deployment
 - preview is usually a different way to publish one deployment
 
+### Preview Versus Lower Environments
+
+This is the simplest reliable distinction:
+
+- a lower environment is a named, long-lived deployment target
+- a preview is a short-lived or per-change publish mode for one deployment
+
+Examples of lower environments:
+
+- `pleomino-dev`
+- `pleomino-staging`
+- `pleomino-prod`
+
+Examples of previews:
+
+- "publish a preview for PR-184"
+- "publish a branch preview for `feature/new-nav`"
+- "publish a one-off review build for commit `abc1234`"
+
+Plain-language version:
+
+- lower environments are standing rooms in the building
+- previews are temporary demo rooms
+
+Policy boundary:
+
+- if the target is stable, named, long-lived, and repeatedly reused, it should usually be modeled as its own deployment id instead of as preview mode
+- preview mode is for isolated per-run or per-change targets derived from explicit policy
+- preview mode must not become a vague alias for "some non-prod place"
+
 ### Deployment-Local `deploy.ts` Files
 
 The repo-level `deploy` command should remain the canonical user-facing entrypoint.
@@ -412,6 +448,8 @@ Flag interaction rules:
 - `--publish-only` still performs `validate` and `resolve`, but it must skip provisioning
   - it may build only when the caller did not provide or select an already-built artifact reference
   - promotion-grade, retry, and rollback-grade publish-only paths should prefer the exact previously resolved artifact rather than rebuilding
+  - for protected or shared environments, `--publish-only` should require an explicit previously built artifact reference, prior deploy run reference, or equivalent immutable selection input
+  - for those environments it must not fall back to "latest local build output" or an implicit rebuild on the operator's machine
 - `--preview` changes the publish mode, not the deployment identity
 - `--list` does not mutate anything
 - `--from-changes` selects deployment ids first, then runs the same lifecycle each selected deployment would normally run
@@ -548,6 +586,59 @@ Plain-language version:
 
 - "Release this somewhere safe and inspectable, not as the main production publish."
 
+Safety rule:
+
+- preview must publish to an explicitly isolated preview target
+- if a provider cannot guarantee that isolation, the adapter should reject `--preview` for that deployment rather than silently publishing to the normal live target with preview-like labeling
+
+How preview target selection works:
+
+- preview target selection must be rule-based, not operator-invented per run
+- the deployment metadata may explicitly declare preview targeting behavior
+- or the provider adapter may define a deterministic derivation rule from deployment metadata plus run context such as PR number, branch name, or commit SHA
+- the rule must be validated before any mutating step
+
+What "explicit" means here:
+
+- acceptable: "for this deployment, preview publishes to a provider-managed branch-preview target derived from the git ref"
+- acceptable: "for this deployment, preview publishes to ephemeral namespace `preview-<pr-number>`"
+- not acceptable: "the engineer picks a bucket/project/namespace at runtime without a checked policy"
+
+Preview lifecycle examples:
+
+- CI-managed PR preview
+  - CI detects PR 184
+  - CI runs `deploy pleomino-prod --preview`
+  - the provider adapter derives an isolated target such as `preview-pr-184`
+  - smoke runs against the preview URL
+  - when the PR closes or the preview expires, CI or the control plane destroys that isolated target or asks the provider to expire it
+- Branch preview with provider-managed ephemeral target
+  - CI publishes a branch preview using the provider's native preview facility
+  - the provider owns most of the lifecycle
+  - repo policy still requires that the preview target be isolated from the normal live target
+- Manual local preview to a personal isolated target
+  - a developer may run preview locally only when the provider adapter supports a clearly isolated local or personal preview target
+  - that preview must not mutate any shared deployment target
+  - if isolation cannot be proven, local preview is out of policy
+
+Creation and destruction policy:
+
+- previews are usually created automatically by CI or the shared control plane in response to PRs, review requests, or other automation triggers
+- manual preview creation is allowed only for explicitly isolated local or personal preview targets
+- preview destruction should be automatic by default
+  - on PR close or merge
+  - on explicit preview expiry or TTL
+  - on manual cleanup through the control plane when automation cannot do it
+- preview cleanup must target only the isolated preview resources; it must not share destructive paths with the normal deployment
+
+Non-interference guarantees:
+
+- preview must use an isolated provider target, isolated publish path, and isolated smoke target
+- preview must not reuse the normal deployment's live project, bucket, namespace, release name, or equivalent mutable target identity
+- if preview and non-preview can still affect the same live target, they must share the same lock scope and preview must be treated as non-isolated
+- provider adapters must validate the isolation rule before publishing
+- if the adapter cannot prove isolation, it must reject preview mode for that deployment
+
 #### `--from-changes`
 
 Use this when you want the tool to select impacted deployments based on repo changes instead of naming each deployment manually.
@@ -567,6 +658,13 @@ When you would use it:
 Plain-language version:
 
 - "Figure out which deployments are impacted, then operate on those."
+
+Default diff-base policy:
+
+- local use should compare against `git merge-base HEAD @{upstream}`
+- CI pull-request use should compare against the merge-base with the PR target branch
+- post-merge automation should compare against the previous successful deploy baseline for the relevant environment branch when that data is available
+- if no upstream or baseline can be determined, the tool should fail explicitly and ask for an override instead of silently choosing an unsafe diff base
 
 #### `--list`
 
@@ -615,7 +713,7 @@ Typical uses:
 - `deploy pleomino-prod --provision-only`
   - create the Pages project and custom domain configuration if that is repo-owned
 - `deploy pleomino-prod --publish-only`
-  - upload the latest `dist` to an already-existing Pages project
+  - publish a selected previously built artifact, or a fresh artifact only when that environment's admission policy allows it, to an already-existing Pages project
 - `deploy pleomino-prod`
   - run the full lifecycle in order
 
@@ -787,6 +885,10 @@ Policy:
 - every concrete deployment should declare explicit provider-target identity in authoritative deployment metadata
 - normal promotion between environments should happen by reusing the same artifact across different deployment ids, each with its own provider target
 - adapters must not silently derive the live target from branch names, directory names, ambient CLI defaults, or unchecked duplication in provider-native config files
+- when preview mode is supported, preview target selection must also be explicit
+  - either deployment metadata declares the preview target shape directly
+  - or the provider adapter defines a deterministic, validated derivation from deployment metadata to an isolated preview target
+  - falling back to the normal provider target is not an acceptable preview implementation
 
 ### Provisioner
 
@@ -876,6 +978,9 @@ The examples below are intentionally simple and repetitive. The goal is to make 
 deployment(
     name = "deploy",
     provider = "cloudflare-pages",
+    provider_target = {
+        "id": "pleomino-prod-pages",
+    },
     components = [
         {
             "id": "web",
@@ -930,6 +1035,9 @@ Why you would want this:
 deployment(
     name = "deploy",
     provider = "s3-static",
+    provider_target = {
+        "bucket": "docs-site-prod",
+    },
     components = [
         {
             "id": "web",
@@ -967,6 +1075,11 @@ Why you would want this:
 deployment(
     name = "deploy",
     provider = "kubernetes",
+    provider_target = {
+        "cluster": "prod-us-west",
+        "namespace": "api-prod",
+        "release": "api",
+    },
     components = [
         {
             "id": "api",
@@ -1003,6 +1116,11 @@ Why you would want this:
 deployment(
     name = "deploy",
     provider = "kubernetes",
+    provider_target = {
+        "cluster": "prod-us-west",
+        "namespace": "shared-observability",
+        "release": "otel-collector",
+    },
     components = [
         {
             "id": "otel-collector",
@@ -1470,6 +1588,9 @@ load("//build-tools/deploy:defs.bzl", "deployment")
 deployment(
     name = "deploy",
     provider = "cloudflare-pages",
+    provider_target = {
+        "id": "pleomino-prod-pages",
+    },
     components = [
         {
             "id": "web",
@@ -1512,7 +1633,7 @@ Important note:
 Layer responsibility in this example:
 
 - `TARGETS`
-  - names the deployment, provider, component, and publisher wiring
+  - names the deployment, provider, provider target, component, and publisher wiring
 - `wrangler.jsonc`
   - contains provider-native Wrangler settings that are not already modeled authoritatively elsewhere
 - deploy CLI
@@ -1570,6 +1691,7 @@ What stays the same across those deployments:
 What changes:
 
 - deployment id
+- provider target identity
 - provider-native project selection, ideally injected or rendered from deployment metadata
 - any deployment-specific domain, smoke, or provisioning wiring
 
@@ -1583,6 +1705,9 @@ Example:
 deployment(
     name = "deploy",
     provider = "custom-platform",
+    provider_target = {
+        "id": "marketing-docs-prod",
+    },
     components = [
         {
             "id": "marketing",
@@ -1666,6 +1791,7 @@ Artifact contract:
 - the deploy CLI is responsible for resolving the built output path or paths from Buck
 - publishers consume resolved artifact paths; they should not assume a hand-created local `dist/` directory inside the deployment package unless that is explicitly part of the component contract
 - when a deploy path is intentionally reusing a previously built artifact, `build` may be skipped and `resolve` should instead load the recorded artifact reference and validate it against policy
+- for protected or shared environments, mutating publish flows should prefer previously recorded immutable artifact references over machine-local rebuilds
 
 ### Resolve
 
@@ -1747,6 +1873,10 @@ Policy:
 Timeout and retry policy:
 
 - smoke checks should use an explicit timeout budget
+- default smoke classes should be standardized
+  - `static-webapp`: 5 minute total budget, including retries
+  - `service` and `third-party-service`: 10 minute total budget, including retries
+  - adapters may define additional classes only when they document them explicitly
 - smoke may auto-retry for transient readiness or network failures, up to 3 retries within that timeout budget
 - retries should not hide a final smoke failure; they only reduce false negatives from brief propagation or readiness delays
 
@@ -1878,14 +2008,24 @@ re-ship a known artifact rather than create a new one.
 Planned promotion model:
 
 - use one-way fast-forward environment branches
+- the standard branch sequence is `env/dev -> env/staging -> env/prod`
+- additional environment branches such as `env/<customer>` may extend from the appropriate upstream environment, but should follow the same fast-forward-only policy
 - a later environment should advance only after required checks pass for the earlier environment
 - promotion should preserve artifact identity across environments whenever the workflow is "prove once, promote forward"
 - promotion should operate across distinct deployment ids such as `pleomino-staging` and `pleomino-prod`, not by having one deployment dynamically retarget itself
 
 Plain-language version:
 
-- later environments should receive code and artifacts that were already proven earlier
+- later environments should receive code and artifacts that were already proven earlier, starting with `env/dev`
 - promotion should move forward through the branch flow, not invent a second release path
+
+Minimum branch-policy assumptions:
+
+- `env/dev`, `env/staging`, and `env/prod` should be protected branches
+- promotion should happen by fast-forwarding the next environment branch, not by rebuilding from an unrelated revision
+- direct pushes to later environment branches should be disallowed except for controlled emergency procedures
+- required checks for each environment should run before that environment branch advances
+- deploy automation for a named environment should use the corresponding environment branch as its default source of truth
 
 Rollback policy for bad app releases:
 
@@ -1924,9 +2064,13 @@ The deployment rule should expose enough metadata for repo tooling to retrieve:
 
 - provider
 - provider-target identity
+- preview-target identity or preview-target derivation policy when preview is supported
 - component list
 - provisioner config
 - publisher config
+- admission or protection classification needed to decide whether mutation must go through the shared control plane
+- smoke policy metadata, including any explicit production exception
+- lock-scope override when it differs from `deployment-id`
 - package path
 
 That metadata should be sufficient for the deploy CLI to assemble the whole lifecycle without scraping provider config files for core deployment facts.
@@ -2249,10 +2393,11 @@ That belongs in `build-tools`.
 ```python
 load("//build-tools/deploy:defs.bzl", "deployment")
 
-def cloudflare_static_pwa_deployment(name, app_target, wrangler_config, provisioner = None):
+def cloudflare_static_pwa_deployment(name, app_target, provider_target, wrangler_config, provisioner = None):
     deployment(
         name = name,
         provider = "cloudflare-pages",
+        provider_target = provider_target,
         components = [
             {
                 "id": "web",
@@ -2276,6 +2421,9 @@ load("//build-tools/deploy:cloudflare.bzl", "cloudflare_static_pwa_deployment")
 cloudflare_static_pwa_deployment(
     name = "deploy",
     app_target = "//projects/apps/pleomino:app",
+    provider_target = {
+        "id": "pleomino-prod-pages",
+    },
     wrangler_config = "wrangler.jsonc",
 )
 ```
@@ -2300,10 +2448,11 @@ Helper:
 ```python
 load("//build-tools/deploy:cloudflare.bzl", "cloudflare_static_pwa_deployment")
 
-def puzzle_cloudflare_deployment(name, app_target, wrangler_config, provisioner = None):
+def puzzle_cloudflare_deployment(name, app_target, provider_target, wrangler_config, provisioner = None):
     cloudflare_static_pwa_deployment(
         name = name,
         app_target = app_target,
+        provider_target = provider_target,
         wrangler_config = wrangler_config,
         provisioner = provisioner,
     )
@@ -2317,6 +2466,9 @@ load("//projects/deployment-kits/puzzle-apps:defs.bzl", "puzzle_cloudflare_deplo
 puzzle_cloudflare_deployment(
     name = "deploy",
     app_target = "//projects/apps/pleomino:app",
+    provider_target = {
+        "id": "pleomino-prod-pages",
+    },
     wrangler_config = "wrangler.jsonc",
 )
 ```
@@ -2372,6 +2524,9 @@ load("//projects/deployment-kits/puzzle-apps:defs.bzl", "puzzle_cloudflare_deplo
 puzzle_cloudflare_deployment(
     name = "deploy",
     app_target = "//projects/apps/pleomino:app",
+    provider_target = {
+        "id": "pleomino-prod-pages",
+    },
     wrangler_config = "wrangler.jsonc",
 )
 ```
@@ -2442,6 +2597,11 @@ Example:
 deployment(
     name = "deploy",
     provider = "kubernetes",
+    provider_target = {
+        "cluster": "prod-us-west",
+        "namespace": "api-prod",
+        "release": "api",
+    },
     components = [
         {
             "id": "api",
@@ -2491,6 +2651,9 @@ Example:
 deployment(
     name = "deploy",
     provider = "cloudflare-pages",
+    provider_target = {
+        "id": "pleomino-prod-pages",
+    },
     components = [
         {
             "id": "web",
@@ -2717,6 +2880,11 @@ load("//build-tools/deploy:defs.bzl", "deployment")
 deployment(
     name = "deploy",
     provider = "kubernetes",
+    provider_target = {
+        "cluster": "prod-us-west",
+        "namespace": "shared-observability",
+        "release": "shared-observability",
+    },
     components = [
         {
             "id": "otel-collector",
@@ -2812,7 +2980,7 @@ The remaining work is not "decide the deployment model again."
 The remaining work is:
 
 - preserve this contract while designing implementation details
-- close the few still-open operational defaults that should be decided before implementation planning
+- implement the remaining control-plane and schema details without relaxing the now-decided operational defaults
 - turn this finished design into a separate implementation plan
 
 The most important implementation-planning follow-ups are:
@@ -2830,8 +2998,8 @@ The most important implementation-planning follow-ups are:
   - the design now defines the metadata-versus-secret boundary and the `secretspec` and Vault direction
   - implementation planning still needs concrete runtime injection interfaces, names, and audit handling
 - smoke-check defaults
-  - the design now defines required-versus-exception policy for production, explicit exception metadata, and bounded retry semantics
-  - implementation planning still needs concrete timeout budgets, exact metadata field names, and adapter-specific default values
+  - the design now defines required-versus-exception policy for production, explicit timeout classes, and bounded retry semantics
+  - implementation planning still needs exact metadata field names and any adapter-specific extensions beyond the default classes
 - provider-adapter enforcement
   - the design now defines metadata precedence, explicit provider-target identity, drift ownership, and lock-scope expectations
   - implementation planning still needs adapter-level validation hooks, helper conventions, and exact provider-target field naming
@@ -2959,21 +3127,21 @@ Implement.
 - Prompt the repository owner before landing any policy deviation from this design.
 - Prompt the repository owner when a meaningful ambiguity is discovered and the PR would otherwise have to choose a policy direction on its own.
 
-## PR-2: Tighten remaining explicit defaults that are still intentionally open
+## PR-2: Finalize the now-decided operator defaults in the design document
 
 ### Description
 
-This PR should close the small set of remaining operational defaults that the design still leaves
-open without changing the core model.
+This PR should make the design document internally complete and consistent around the
+now-decided operator defaults without changing the core model.
 
 ### Scope & Changes
 
 - Update [docs/deployments-design.md](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md):
-  - define the default diff base for `--from-changes` in local and CI contexts
-  - define default smoke timeout budgets by class or deployment category
+  - verify that the chosen default diff base for `--from-changes` is reflected consistently in all command and automation sections
+  - verify that the chosen default smoke timeout budgets by class are reflected consistently in smoke policy and examples
   - define any mandatory metadata fields needed to express explicit production smoke exceptions
-  - define the minimum branch and protection assumptions for the fast-forward promotion model
-  - optionally refine queue timeout values and stale-run detection details without changing the default queued-with-revalidation policy
+  - verify that the minimum branch and protection assumptions for the fast-forward promotion model are reflected consistently
+  - optionally refine queue timeout values and stale-run detection details in the design doc without changing the default queued-with-revalidation policy
 
 ### Tests (in this PR)
 
@@ -2987,17 +3155,16 @@ open without changing the core model.
 ### Docs (in this PR)
 
 - Update [docs/deployments-design.md](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) with:
-  - the chosen default diff-base rules
-  - the chosen default smoke timeout rules
-  - one short note on branch-protection assumptions for promotion
+  - any missing metadata field naming needed to support the chosen diff-base, smoke, and promotion policies
+  - one short note on branch-protection assumptions for promotion if implementation detail needs to be more concrete
   - one short note on how explicit smoke exceptions are represented
   - one short note on queue timeout and stale-run detection detail if more precision is needed
 
 ### Acceptance Criteria
 
-- The document has no remaining high-impact operator defaults left unspecified.
-- A reader can tell what happens by default for changed-based deploy selection, lock contention, and smoke timing.
-- The promotion model has enough branch-policy detail to support implementation planning.
+- The document consistently defines changed-based deploy selection, lock contention, and smoke timing defaults.
+- The promotion model has enough branch-policy detail to serve as input to later implementation planning.
+- No section of the design document quietly re-opens already decided operator defaults.
 
 ### Risks
 
@@ -3009,7 +3176,7 @@ Choose defaults that are explicit, conservative, and easy to override through la
 
 ### Consequence of Not Implementing
 
-Implementation planning still has to stop and make policy calls on a few important defaults and thresholds.
+The design document remains slightly incomplete at the handoff boundary into implementation planning, and later work may have to pause to restate defaults that should already be settled here.
 
 ### Downsides for Implementing
 
@@ -3030,7 +3197,7 @@ Complete the design document in phases:
 
 1. finalize the normative operational sections so they fully match the locked decisions in this document
 2. add compact summary tables and concrete examples for provenance, promotion, rollback, lock scope, metadata precedence, and smoke policy
-3. close the remaining explicit defaults that still need design-level decisions, such as `--from-changes` diff base, smoke timeout classes, and minimum branch-policy assumptions
+3. translate the now-decided defaults into implementation-planning detail without re-opening them
 4. run one final consistency pass across the whole document so examples, summaries, appendices, and normative sections all say the same thing
 5. declare the document ready for a separate implementation-planning phase
 
