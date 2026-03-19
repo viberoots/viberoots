@@ -371,7 +371,7 @@ deploy pleomino-prod
 deploy pleomino-prod --preview
 deploy pleomino-prod --validate-only
 deploy pleomino-prod --provision-only
-deploy pleomino-prod --publish-only
+deploy pleomino-prod --publish-only --run-id <deploy-run-id>
 deploy --from-changes
 deploy --list
 ```
@@ -452,6 +452,11 @@ The repo-level `deploy` command should remain the canonical user-facing entrypoi
 
 If a deployment package contains a local `deploy.ts`, that file should be treated as an internal adapter hook, not as a second public interface users are expected to memorize.
 
+Protected/shared clarification:
+
+- package-local executable hooks are out of policy for protected/shared deploys in v1
+- any example using a package-local executable hook should be read as local-only, isolated-preview-only, or illustrative legacy shape unless it explicitly says the hook is replaced by vetted built-in control-plane code
+
 Good pattern:
 
 - user runs `deploy pleomino-prod`
@@ -475,7 +480,9 @@ Flag interaction rules:
 - `--publish-only` still performs `validate` and `resolve`, but it must skip provisioning
   - it may build only when the caller did not provide or select an already-built artifact reference
   - promotion-grade, retry, and rollback-grade publish-only paths should prefer the exact previously resolved artifact rather than rebuilding
-  - for protected or shared environments, `--publish-only` should require an explicit previously built artifact reference, prior deploy run reference, or equivalent immutable selection input
+  - for protected or shared environments, `--publish-only` must require an explicit immutable selector
+  - the normal protected/shared selector should be `--run-id <deploy-run-id>`
+  - an optional lower-level `--artifact-ref <artifact-ref>` path may exist for vetted admin or automation use, but it must still identify one exact immutable artifact
   - for those environments it must not fall back to "latest local build output" or an implicit rebuild on the operator's machine
 - `--preview` changes the publish mode, not the deployment identity
 - `--list` does not mutate anything
@@ -573,12 +580,12 @@ When you would use it:
 Example:
 
 ```bash
-deploy pleomino-prod --publish-only
+deploy pleomino-prod --publish-only --run-id <deploy-run-id>
 ```
 
 Plain-language version:
 
-- "The place is already ready; just ship the build."
+- "The place is already ready; ship this exact previously recorded build."
 
 Why this matters:
 
@@ -591,7 +598,7 @@ Concrete example:
 - the Cloudflare Pages project already exists
 - DNS is already correct
 - the previous deploy failed during asset upload
-- you want to retry publication without touching infra
+- you want to retry publication for that exact recorded run without touching infra
 
 #### `--preview`
 
@@ -775,7 +782,7 @@ Typical uses:
   - verify that the deployment package, app target, and Wrangler config are wired correctly
 - `deploy pleomino-prod --provision-only`
   - create the Pages project and custom domain configuration if that is repo-owned
-- `deploy pleomino-prod --publish-only`
+- `deploy pleomino-prod --publish-only --run-id <deploy-run-id>`
   - publish a selected previously built artifact, or a fresh artifact only when that environment's admission policy allows it, to an already-existing Pages project
 - `deploy pleomino-prod`
   - run the full lifecycle in order
@@ -823,7 +830,8 @@ deployment(
         "config": "wrangler.jsonc",
     },
     smoke = {
-        "entry": "smoke.ts",
+        "type": "http-smoke",
+        "path": "/",
     },
 )
 ```
@@ -833,6 +841,7 @@ In this example:
 - `protection_class` is included because environment classification is part of the authoritative deployment contract
 - `promotion_lane` is included because this example represents a named environment that participates in protected/shared promotion policy
 - deployments that are truly local-only or otherwise outside protected/shared promotion policy may omit `promotion_lane`, but that omission should be intentional and explained by the deployment's policy class
+- the smoke block uses a built-in smoke runner shape instead of a package-local executable hook because this example is compatible with protected/shared policy
 
 Suggested metadata shape conventions:
 
@@ -1144,8 +1153,8 @@ deployment(
         },
     ],
     provisioner = {
-        "type": "cdktf",
-        "entry": "cdktf/main.ts",
+        "type": "cdktf-stack",
+        "config": "cdktf/stack.json",
     },
     publisher = {
         "type": "wrangler-pages",
@@ -1202,12 +1211,12 @@ deployment(
         },
     ],
     provisioner = {
-        "type": "terraform",
-        "entry": "terraform/main.tf",
+        "type": "terraform-stack",
+        "config": "terraform/main.tf.json",
     },
     publisher = {
         "type": "aws-s3-sync",
-        "entry": "deploy.ts",
+        "config": "publisher.json",
     },
 )
 ```
@@ -1245,12 +1254,12 @@ deployment(
         },
     ],
     provisioner = {
-        "type": "cdktf",
-        "entry": "cdktf/main.ts",
+        "type": "cdktf-stack",
+        "config": "cdktf/stack.json",
     },
     publisher = {
-        "type": "helm",
-        "entry": "deploy.ts",
+        "type": "helm-release",
+        "config": "helm/values.yaml",
     },
 )
 ```
@@ -1287,12 +1296,12 @@ deployment(
         },
     ],
     provisioner = {
-        "type": "terraform",
-        "entry": "terraform/main.tf",
+        "type": "terraform-stack",
+        "config": "terraform/main.tf.json",
     },
     publisher = {
-        "type": "helm",
-        "entry": "deploy.ts",
+        "type": "helm-release",
+        "config": "helm/values.yaml",
     },
 )
 ```
@@ -1360,7 +1369,7 @@ This is one of the reasons `--publish-only` exists.
 If the deployment has a provisioner but you do not want to run provisioning on a particular release, you can use:
 
 ```bash
-deploy pleomino-prod --publish-only
+deploy pleomino-prod --publish-only --run-id <deploy-run-id>
 ```
 
 That is an operational choice for one run.
@@ -1907,8 +1916,8 @@ deployment(
         },
     ],
     publisher = {
-        "type": "custom",
-        "entry": "deploy.ts",
+        "type": "custom-built-in",
+        "config": "publisher.json",
     },
 )
 ```
@@ -2153,6 +2162,7 @@ Cancellation policy:
 
 - cancellation before any mutating step begins should stop the run cleanly before side effects occur
 - the deployment record should preserve that a cancellation request stopped the run before mutation
+- for a clean pre-mutation cancellation, the deployment record should use `lifecycle_state = cancelled` and `final_outcome = null`
 - once a mutating step such as `provision` or `publish` has started, cancellation is best-effort rather than guaranteed interruption
 - a run must not report a clean `cancelled` outcome if provider-side mutation may already have happened and the system has not reconciled that state
 - if cancellation arrives during or after a mutating step, the run should:
@@ -2227,8 +2237,8 @@ Run classification:
 - `operation_kind` and `final outcome` answer different questions
   - operation kind says what sort of run this was
   - final outcome uses the canonical terminal outcome vocabulary for the run's completed result
-  - operator-facing state tracks lifecycle states such as `queued`, `waiting_for_lock`, `cancelling`, and `cancelled`
-  - `cancelled` is an operator-facing lifecycle state, not a canonical terminal `final outcome` value
+  - lifecycle state tracks run progress and cancellation states such as `queued`, `waiting_for_lock`, `cancelling`, and `cancelled`
+  - `cancelled` is a lifecycle state, not a canonical terminal `final outcome` value
 
 Why this matters:
 
@@ -2310,6 +2320,8 @@ The deployment rule should expose enough metadata for repo tooling to retrieve:
 
 - provider
 - provider-target identity
+- promotion lane or family membership
+- protection/environment classification
 - preview-target identity or preview-target derivation policy when preview is supported
 - explicit deployment prerequisites when present
 - component list
@@ -2411,6 +2423,8 @@ Minimum required fields:
 - Buck deployment label
 - `operation_kind`
   - such as `deploy`, `preview`, `retry`, `promotion`, or `rollback`
+- `lifecycle_state`
+  - such as `queued`, `running`, `waiting_for_lock`, `cancelling`, or `cancelled`
 - source revision identifier
 - actor or trigger source, such as human, CI job, or automation
 - publish mode, such as normal or preview
@@ -2423,6 +2437,8 @@ Minimum required fields:
 - canonical remote publish identifier for each published component when the provider exposes one
 - start time and end time
 - final outcome
+  - required only when the run reaches a canonical terminal outcome
+  - should be `null` for runs that end as `cancelled` before mutation reaches a canonical terminal outcome
 
 Additional recommended fields:
 
@@ -2474,7 +2490,7 @@ Nix-aligned guidance:
 - prefer publishers that accept explicit resolved artifact inputs instead of rebuilding or re-exporting artifacts internally
 - where a component kind naturally yields a digest, such as OCI images or fixed-output archives, that digest should be part of the deployment record
 
-Canonical outcome vocabulary:
+Canonical final-outcome vocabulary:
 
 - terminal
   - `validation_failed`
@@ -2484,11 +2500,17 @@ Canonical outcome vocabulary:
   - `publish_failed`
   - `smoke_failed_after_publish`
   - `succeeded`
+- `null`
+  - used when a run ends without reaching a canonical terminal outcome, such as clean pre-mutation cancellation
+
+Canonical lifecycle-state vocabulary:
+
 - non-terminal
   - `queued`
   - `running`
   - `waiting_for_lock`
   - `cancelling`
+- ended before canonical final outcome
   - `cancelled`
 
 Storage guidance:
@@ -2893,8 +2915,8 @@ deployment(
         },
     ],
     publisher = {
-        "type": "helm",
-        "entry": "deploy.ts",
+        "type": "helm-release",
+        "config": "helm/values.yaml",
     },
 )
 ```
@@ -2940,8 +2962,8 @@ deployment(
         },
     ],
     provisioner = {
-        "type": "cdktf",
-        "entry": "cdktf/main.ts",
+        "type": "cdktf-stack",
+        "config": "cdktf/stack.json",
     },
     publisher = {
         "type": "wrangler-pages",
@@ -3144,7 +3166,7 @@ projects/
   deployments/
     shared-observability-prod/
       TARGETS
-      deploy.ts
+      helm/values.yaml
     pleomino-prod/
       TARGETS
       wrangler.jsonc
@@ -3177,8 +3199,8 @@ deployment(
         },
     ],
     publisher = {
-        "type": "helm",
-        "entry": "deploy.ts",
+        "type": "helm-release",
+        "config": "helm/values.yaml",
     },
 )
 ```
