@@ -10,6 +10,27 @@ The design goals are:
 - support one app, many apps, one provider, or many instances of the same provider
 - make simple static-PWA deployment feel trivial without weakening support for more complex systems
 
+This document is a design for the intended deployment model, not a claim that every part is already implemented.
+
+The key promise of this document should be:
+
+- you can tell what belongs in a deployment package
+- you can tell which tool owns which part of the lifecycle
+- you can model a new deployment without guessing where concepts belong
+- you can understand what `deploy <deployment-id>` is expected to do end to end
+
+This document tries to answer three different questions at once:
+
+- what the deployment model is
+- what operator-facing behavior the repo should guarantee
+- what choices are still implementation details
+
+When those three get mixed together, onboarding gets muddy. So throughout this doc:
+
+- "contract" means behavior callers should be able to rely on
+- "example" means an illustration, not a mandatory implementation detail
+- "not fixed yet" means the model is decided, but some operational policy is still open
+
 ## Quick Reference
 
 | Term        | Simple question                              | Meaning                                                  | Example                                      |
@@ -18,7 +39,7 @@ The design goals are:
 | Component   | "What are we shipping?"                      | A deployable project artifact referenced by a deployment | `//projects/apps/pleomino:app`               |
 | Provider    | "Where does it live?"                        | The destination platform                                 | `cloudflare-pages`                           |
 | Provisioner | "Who sets up the place first?"               | The infra or platform setup step                         | CDKTF creating DNS and a Pages project       |
-| Publisher   | "Who releases the built artifact?"           | The artifact upload or publish step                      | `wrangler pages deploy dist`                 |
+| Publisher   | "Who releases the built artifact?"           | The artifact upload or publish step                      | `wrangler pages deploy <resolved-dist>`      |
 | Smoke check | "How do we confirm it works?"                | Lightweight post-deploy validation                       | verify `/manifest.webmanifest` returns `200` |
 
 Short version:
@@ -148,6 +169,16 @@ Plain-language version:
 
 - a deployment package should describe one release target, not become a mini framework
 
+Preference rule:
+
+- provider config should contain only provider-native settings that are not already modeled authoritatively in deployment metadata
+- if a provider-native file needs values such as provider project name or environment-specific identifiers, those should ideally be generated from or injected by deployment metadata rather than hand-maintained in multiple places
+
+Path rule:
+
+- any file path referenced from deployment metadata should be interpreted relative to that deployment package unless explicitly documented otherwise
+- for example, `wrangler.jsonc`, `smoke.ts`, and `cdktf/main.ts` all resolve from `projects/deployments/<deployment-id>/`
+
 ## One Source Of Truth
 
 I use `TARGETS` as the authoritative deployment definition.
@@ -191,6 +222,91 @@ This is the key harmony point:
 - Buck owns structure, graph, validation, and artifacts
 - the deploy CLI owns side effects
 
+## Required Contracts
+
+The design leaves some implementation details open, but the following behavioral contracts should be treated as fixed:
+
+- every concrete deployment lives at `projects/deployments/<deployment-id>/`
+- every concrete deployment exposes a canonical `:deploy` target
+- `TARGETS` is the source of truth for deployment metadata
+- Buck builds artifacts, but does not perform the live publish itself
+- the repo-level `deploy` command is the only public entrypoint operators are expected to learn
+- file paths inside deployment metadata are relative to the deployment package by default
+- deployment-local scripts are implementation hooks, not a second public workflow
+- provider adapters may impose narrower rules than the generic deployment model
+- deployment hooks and substantive deployment automation must follow the repo-wide script policy
+  - substantive automation is zx TypeScript with `#!/usr/bin/env zx-wrapper`
+  - thin `build-tools/tools/bin/*` wrappers may delegate into that TypeScript entrypoint
+- deployment metadata is authoritative for the repo deployment model
+  - provider config files are provider-native inputs, not a second source of truth for core deployment facts
+  - when the same conceptual value would otherwise appear in both places, generation or runtime injection is preferred over duplication
+
+If an implementation choice would break one of those contracts, the implementation should change rather than the operator workflow.
+
+## Decisions Locked Now
+
+The following operating-model decisions are now part of the intended design direction and should be
+treated as planned policy, not open brainstorming:
+
+- promotion should prefer reusing the exact previously built artifact rather than rebuilding per environment
+- promotion should use one-way fast-forward environment branches
+  - later environments advance only after required checks pass for earlier environments
+- rollback for bad app releases should prefer redeploying a prior known-good artifact
+  - if that is not available or not appropriate, rollback should use a new revert commit promoted forward through the same branch flow
+  - moving environment branches backward should not be the normal rollback mechanism
+- provider-native rollback should be treated as an emergency stabilization path, followed by control-plane and Git reconciliation
+- the shared deployment control plane should use a central Postgres-backed backend
+  - it should back deployment-record storage
+  - it should back shared-environment deploy locking
+- shared-environment locking should use an explicit lock scope
+  - the default lock scope is the `deployment-id`
+  - deployments that can mutate the same provider-side target must use the same lock scope even if they have different deployment ids
+  - one active non-preview deploy should run per lock scope
+  - different lock scopes may run in parallel
+  - rollback, retry, and redeploy actions should take the same lock as the normal deploy path
+  - preview should share the main deployment lock by default
+  - preview runs may use separate lock scope only when they publish to isolated preview targets
+- deploy records should include first-class lineage identifiers
+  - every run gets a globally unique `deploy_run_id`
+  - retries, rollbacks, and promotions should set `parent_run_id`
+  - promotions of the same built artifact across environments should carry an `artifact_lineage_id`
+- deploy records should distinguish operation kind from final outcome
+  - operation kinds include at least normal deploy, preview deploy, retry, promotion, and rollback
+  - success or failure outcome must remain separate from the kind of run being performed
+- deploy outcomes should use a canonical vocabulary
+  - terminal states: `validation_failed`, `build_failed`, `resolve_failed`, `provision_failed`, `publish_failed`, `smoke_failed_after_publish`, `succeeded`
+  - non-terminal states: `queued`, `running`, `waiting_for_lock`, `cancelling`, `cancelled`
+- automatic retry policy should be conservative and step-specific
+  - `validate`, `build`, and `resolve` should not auto-retry
+  - `provision` should not auto-retry by default; explicit operator rerun is preferred
+  - `publish` may auto-retry for clearly transient failures, up to 2 retries with backoff
+  - `smoke` may auto-retry for transient readiness/network failures, up to 3 retries within an overall timeout budget
+- secrets should use `secretspec` as the repo-level contract layer and Vault as the initial production backend
+- local-only fallback should be explicitly limited
+  - shared environments must use the central Postgres control plane
+  - personal local/dev workflows may use a local filesystem lock plus a local structured deployment record
+  - local-only fallback records are non-authoritative and must not be used for shared environments
+- production-facing smoke checks should be required and blocking by default
+  - canonical URL by default
+  - deployment-specific preview URL only when explicitly configured
+  - timeout and retry policy should be explicit, not implicit
+  - a production-facing deployment may omit or downgrade smoke only through an explicit documented exception
+
+These decisions are now reflected in the detailed design sections below. The remaining work is to
+turn them into implementation-grade detail and execution plans without changing the policy
+direction.
+
+## Deliberately Not Fixed Yet
+
+This design is intentionally opinionated about the model, but still leaves some implementation policy choices open:
+
+- what diff base `--from-changes` compares against in CI and local use
+- the exact Postgres schema and lease mechanics for the shared deployment control plane
+- the exact timeout and retry defaults for each smoke-check class
+- the exact branch names, protection rules, and CI wiring for environment-branch promotion
+
+Those are real decisions, but they are operational-policy details layered on top of this model rather than reasons to change the model itself.
+
 ## Repo-Level Deploy Command
 
 I want one canonical deploy entrypoint for everything under `projects/deployments/`.
@@ -199,7 +315,7 @@ Examples:
 
 ```bash
 deploy pleomino-prod
-deploy pleomino-staging --preview
+deploy pleomino-prod --preview
 deploy pleomino-prod --validate-only
 deploy pleomino-prod --provision-only
 deploy pleomino-prod --publish-only
@@ -229,6 +345,24 @@ This command should:
 
 That gives the user one command while keeping the internal responsibilities clear.
 
+### Deployment Id Versus Preview Run
+
+This distinction needs to stay explicit because it is one of the easiest places for a new engineer to get confused.
+
+- deployment id answers "which named release target is this?"
+- `--preview` answers "what publish mode should this run use?"
+
+So:
+
+- `pleomino-prod` and `pleomino-staging` are different deployments
+- `deploy pleomino-prod --preview` is still operating on `pleomino-prod`
+- preview should not silently invent a second deployment id or bypass the deployment package's validation rules
+
+Plain-language version:
+
+- staging is usually a different deployment
+- preview is usually a different way to publish one deployment
+
 ### Deployment-Local `deploy.ts` Files
 
 The repo-level `deploy` command should remain the canonical user-facing entrypoint.
@@ -249,6 +383,22 @@ Plain-language version:
 ### Why These Flags Exist
 
 These flags are not just convenience syntax. They exist because real deployment workflows often need one slice of the lifecycle without running the whole thing every time.
+
+Flag interaction rules:
+
+- default `deploy <id>` means `validate -> build -> resolve -> provision? -> publish -> smoke?`
+- `--validate-only` runs validation only
+- `--provision-only` still performs `validate`, and may build or resolve only if the chosen provisioner needs artifact metadata, but it must not publish
+- `--publish-only` still performs `validate` and `resolve`, but it must skip provisioning
+  - it may build only when the caller did not provide or select an already-built artifact reference
+  - promotion-grade, retry, and rollback-grade publish-only paths should prefer the exact previously resolved artifact rather than rebuilding
+- `--preview` changes the publish mode, not the deployment identity
+- `--list` does not mutate anything
+- `--from-changes` selects deployment ids first, then runs the same lifecycle each selected deployment would normally run
+
+Mutual-exclusion rule:
+
+- `--validate-only`, `--provision-only`, and `--publish-only` should be mutually exclusive
 
 #### `--validate-only`
 
@@ -533,8 +683,19 @@ Examples:
 Each component should declare:
 
 - `id`: stable name inside the deployment
-- `kind`: deployable artifact type
+- `kind`: deployable artifact contract, not just an arbitrary label
 - `target`: Buck target that produces or represents the artifact
+
+The important nuance is that `kind` should describe the artifact shape the publisher can consume.
+
+Examples:
+
+- `static-webapp` means "a publisher can expect a static-site artifact layout"
+- `service` means "a publisher can expect a service/image style artifact"
+
+It should not just mean:
+
+- "some string this team found descriptive"
 
 Example:
 
@@ -687,11 +848,28 @@ What this means in plain language:
 - CDKTF creates or updates DNS and domain configuration
 - after that, Wrangler uploads the built app
 
+Example `wrangler.jsonc`:
+
+```jsonc
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "compatibility_date": "2026-03-18",
+}
+```
+
+Why this file is intentionally small:
+
+- Buck deployment metadata says which component is being deployed and which publisher is used
+- the provisioner owns creation and reconciliation of the Pages project and DNS
+- `wrangler.jsonc` only carries provider-native publish settings for Wrangler itself
+- the deploy CLI still passes the resolved artifact path at runtime instead of relying on a checked-in output directory
+- if Wrangler needs a project identifier such as `name`, the preferred model is to inject or render it from deployment metadata rather than duplicate it by hand here
+
 Why you would want this:
 
 - the repo owns the environment setup
 - new environments should be reproducible
-- a new teammate should not have to click around in the Cloudflare dashboard by hand
+- an operator should not have to click around in the Cloudflare dashboard by hand
 - later runs can confirm the environment still matches what the repo expects
 
 #### Example: S3 Static Site With Bucket Setup
@@ -861,6 +1039,44 @@ That is an operational choice for one run.
 
 It is not a reason to edit the deployment definition.
 
+### Ownership And Drift
+
+Provisioners should only reconcile resources the deployment explicitly owns.
+
+There are three buckets:
+
+- repo-owned resources
+  - safe for the provisioner to create, update, and reconcile over time
+- validated external prerequisites
+  - must exist for the deployment to work, but should only be checked or referenced, not mutated by this deployment
+- forbidden out-of-band mutations
+  - things this deployment must not silently try to manage because ownership belongs elsewhere
+
+Plain-language rule:
+
+- if this deployment owns the resource lifecycle, the provisioner may reconcile it
+- if another system or team owns it, this deployment should validate or reference it, not take control of it
+
+Examples:
+
+- repo-owned
+  - a Pages project created by this repo
+  - bucket and policy defined by this repo
+  - namespace and ingress managed by this repo
+- validated external prerequisite
+  - a shared vendor endpoint the app talks to
+  - a shared platform service deployed elsewhere
+  - a bucket or domain managed by another team
+- forbidden out-of-band mutation
+  - mutating shared cluster resources from an app-local deployment
+  - changing a provider project that another repo owns
+
+Why this matters:
+
+- it keeps provisioners idempotent without turning them into unsafe "fix everything" tools
+- it preserves ownership boundaries between app deployments and shared platform systems
+- it reduces accidental drift fights between two control planes
+
 ### Common Deployment Shapes
 
 This table is meant to be a fast pattern-matching aid.
@@ -1028,7 +1244,7 @@ The concepts remain separate even if the implementation uses the same tool for b
 
 ## Onboarding Checklist: How To Model A New Deployment
 
-If I were onboarding a junior engineer, this is the checklist I would want them to follow.
+This is the checklist I would want a new reader to follow.
 
 ### Step 1: Is This Actually A Deployment We Own?
 
@@ -1157,6 +1373,26 @@ If no:
 
 - use the low-level `deployment(...)` primitive directly
 
+## New Deployment Happy Path
+
+If you are adding a new deployment for the first time, the shortest correct workflow should be:
+
+1. create `projects/deployments/<deployment-id>/`
+2. add a `TARGETS` file with a `deployment(name = "deploy", ...)`
+3. point `components[*].target` at existing Buck build targets
+4. add provider config files such as `wrangler.jsonc` only when that provider needs them
+5. decide whether setup is repo-owned
+6. set `provisioner = None` if setup is external, or configure a real provisioner if setup is repo-owned
+7. run `deploy <deployment-id> --validate-only`
+8. run `deploy <deployment-id>` once validation passes
+
+What you should not have to do:
+
+- invent a second manifest format
+- call provider CLIs directly as the primary workflow
+- copy build outputs by hand into the deployment package
+- guess whether Buck or the deploy CLI is responsible for a given step
+
 ## Fast Decision Tree
 
 This is the shortest practical classification guide in the document.
@@ -1209,11 +1445,26 @@ Suggested `wrangler.jsonc`:
 ```jsonc
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "pleomino-prod",
-  "pages_build_output_dir": "./dist",
   "compatibility_date": "2026-03-18",
 }
 ```
+
+Important note:
+
+- the deploy CLI should pass the resolved Buck output path to the publisher
+- this example intentionally does not rely on a checked-in `./dist` directory inside the deployment package
+- if a provider config format also has a local output-dir field for its own tooling, Buck-resolved artifact paths are still authoritative for the actual deployment flow
+- if a provider project identifier such as Wrangler `name` is needed, the preferred model is to derive it from deployment metadata instead of hand-maintaining it in both places
+- if duplication is temporarily kept, validation should fail on mismatch
+
+Layer responsibility in this example:
+
+- `TARGETS`
+  - names the deployment, provider, component, and publisher wiring
+- `wrangler.jsonc`
+  - contains provider-native Wrangler settings that are not already modeled authoritatively elsewhere
+- deploy CLI
+  - resolves the built artifact path, injects or renders any derived provider-native values, and invokes the publisher with that path
 
 Publish flow:
 
@@ -1239,6 +1490,36 @@ Each deployment may point to the same app target while differing in:
 - provisioning behavior
 
 The deployment id, not the app target, is what gives each release target its identity.
+
+If checked-in provider config files are kept separate per deployment, they should differ only in provider-native settings that are not already derived from deployment metadata:
+
+```jsonc
+// projects/deployments/pleomino-prod/wrangler.jsonc
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "compatibility_date": "2026-03-18",
+}
+```
+
+```jsonc
+// projects/deployments/pleomino-staging/wrangler.jsonc
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "compatibility_date": "2026-03-18",
+}
+```
+
+What stays the same across those deployments:
+
+- the app target may still be `//projects/apps/pleomino:app`
+- the deployment model still comes from `TARGETS`
+- the deploy CLI still resolves and passes the built artifact path
+
+What changes:
+
+- deployment id
+- provider-native project selection, ideally injected or rendered from deployment metadata
+- any deployment-specific domain, smoke, or provisioning wiring
 
 ## Multi-Component Example
 
@@ -1292,6 +1573,13 @@ Examples:
 - `kubernetes`
   - many components may be allowed
 
+The important split is:
+
+- the generic deployment model defines what is expressible in principle
+- each provider adapter defines what is actually supported right now
+
+That means a deployment may be valid in the abstract model but still rejected by a specific provider adapter. That is expected, not a contradiction.
+
 ## Deployment Lifecycle
 
 Every deployment should follow the same high-level lifecycle:
@@ -1320,11 +1608,32 @@ Use Buck to build referenced component targets.
 
 Buck remains authoritative here.
 
+Artifact contract:
+
+- each component target must produce a publishable artifact shape for its declared `kind`
+- the deploy CLI is responsible for resolving the built output path or paths from Buck
+- publishers consume resolved artifact paths; they should not assume a hand-created local `dist/` directory inside the deployment package unless that is explicitly part of the component contract
+- when a deploy path is intentionally reusing a previously built artifact, `build` may be skipped and `resolve` should instead load the recorded artifact reference and validate it against policy
+
 ### Resolve
 
 Resolve concrete output paths from built targets.
 
 This is the bridge between Buck artifact labels and provider-specific publisher tools.
+
+The output of `resolve` should be provider-neutral deployment data such as:
+
+- component id
+- component kind
+- Buck target label
+- concrete artifact path
+- optional metadata the publisher needs, such as a default entrypoint, image reference, or archive path
+
+Operational rule:
+
+- `resolve` is the point where Buck-specific artifact references become plain runtime inputs for provisioners, publishers, and smoke checks
+- after `resolve`, later steps should not have to re-query Buck just to rediscover the same artifact paths
+- `resolve` may work from either a freshly built target or a previously recorded artifact reference, but in both cases it must produce the same provider-neutral resolved deployment data shape
 
 ### Provision
 
@@ -1355,6 +1664,177 @@ Examples:
 - verify PWA shell and manifest are reachable
 - verify known route content
 
+### Smoke Check Policy
+
+Smoke checks are post-publish validation, not a replacement for build, unit, or integration tests.
+
+Policy:
+
+- production-facing deploys must have smoke checks unless an explicit documented exception says otherwise
+- production-facing deploys should treat smoke checks as blocking by default
+- `publish succeeded` and `smoke failed` must be reported as a distinct overall outcome
+- smoke checks should run against the canonical deployment URL by default
+- a deployment may explicitly configure a preview-specific smoke URL when preview mode publishes to an isolated preview target
+- smoke checks should consume resolved deployment outputs and runtime deployment context instead of rediscovering deployment facts ad hoc
+- deployments that intentionally omit smoke checks outside production should document that choice in deployment metadata or provider adapter policy rather than rely on silent absence
+
+Timeout and retry policy:
+
+- smoke checks should use an explicit timeout budget
+- smoke may auto-retry for transient readiness or network failures, up to 3 retries within that timeout budget
+- retries should not hide a final smoke failure; they only reduce false negatives from brief propagation or readiness delays
+
+Preview policy:
+
+- preview may use a lighter smoke policy only when that difference is explicitly documented by the deployment or provider adapter
+- preview does not change deployment identity; it only changes publish mode and, when configured, the smoke target
+
+Outcome guide:
+
+- publish failed
+  - smoke does not run
+- publish succeeded and smoke succeeded
+  - overall result is success
+- publish succeeded and smoke failed
+  - overall result is failure, specifically post-publish failure
+- preview publish succeeded and preview smoke failed
+  - overall result follows the documented preview policy, but the distinction from plain publish success must remain visible
+
+## Retry, Concurrency, And Locking
+
+The deployment system should be conservative about retries and explicit about concurrency.
+
+Retry policy by step:
+
+- `validate`
+  - no automatic retry
+- `build`
+  - no automatic retry by default
+- `resolve`
+  - no automatic retry
+- `provision`
+  - no automatic retry by default
+  - explicit operator rerun is preferred
+- `publish`
+  - may auto-retry for clearly transient provider or network failures
+  - up to 2 retries with backoff
+- `smoke`
+  - may auto-retry for transient readiness or network failures
+  - up to 3 retries within the overall smoke timeout budget
+
+Shared-environment locking policy:
+
+- shared environments should use a central Postgres-backed control plane for deploy coordination
+- every deployment should resolve to a lock scope
+- the default lock scope should be the `deployment-id`
+- if multiple deployment ids can mutate the same live provider-side target, they must share the same lock scope
+- only one active non-preview deploy should run for a lock scope at a time
+- different lock scopes may run in parallel
+- rollback, retry, promotion, and redeploy should take the same lock as a normal deploy against that target scope
+
+Preview locking policy:
+
+- preview shares the main deployment lock by default
+- preview may use separate lock scope only when the preview target, publisher path, and smoke target are all isolated from the non-preview target
+
+Default lock-acquisition behavior:
+
+- when a shared-environment lock is already held, the default behavior should be to wait in queue with a bounded timeout
+- entering the queue gives a run the right to re-check and proceed later, not the right to execute an old plan unchanged
+- after acquiring the lock, a queued run must revalidate current deployment state before any mutating step
+- that revalidation should at least confirm that the run is still allowed to publish the intended revision or artifact to that target
+- if the run's assumptions are stale after revalidation, it should exit without publishing and report that it was superseded or must be rerun
+- interactive or incident-response workflows may offer an explicit fail-fast mode, but queued-with-revalidation should be the shared-environment default
+
+Local-only fallback policy:
+
+- shared environments must use the central Postgres control plane
+- personal local or dev workflows may use a local filesystem lock plus a local structured deployment record
+- local-only fallback is non-authoritative and must not be used as the locking or record system for shared environments
+
+Operator-facing states:
+
+- non-terminal states
+  - `queued`
+  - `running`
+  - `waiting_for_lock`
+  - `cancelling`
+  - `cancelled`
+- terminal states
+  - `validation_failed`
+  - `build_failed`
+  - `resolve_failed`
+  - `provision_failed`
+  - `publish_failed`
+  - `smoke_failed_after_publish`
+  - `succeeded`
+
+Run classification:
+
+- every deployment record should include an `operation_kind`
+- minimum operation kinds:
+  - `deploy`
+  - `preview`
+  - `retry`
+  - `promotion`
+  - `rollback`
+- `operation_kind` and `final outcome` answer different questions
+  - operation kind says what sort of run this was
+  - final outcome says whether that run succeeded, failed, or was cancelled
+
+Why this matters:
+
+- it prevents overlapping publishes and confusing deploy history
+- it keeps retry behavior predictable and auditable
+- it makes shared environments safer without overcomplicating personal local workflows
+
+## Promotion And Rollback
+
+Promotion should prefer reusing the exact previously built artifact rather than rebuilding per environment.
+
+That rule also applies to rollback-grade redeploys and publish-only retries whenever the intent is to
+re-ship a known artifact rather than create a new one.
+
+Planned promotion model:
+
+- use one-way fast-forward environment branches
+- a later environment should advance only after required checks pass for the earlier environment
+- promotion should preserve artifact identity across environments whenever the workflow is "prove once, promote forward"
+
+Plain-language version:
+
+- later environments should receive code and artifacts that were already proven earlier
+- promotion should move forward through the branch flow, not invent a second release path
+
+Rollback policy for bad app releases:
+
+- first choice is redeploying a prior known-good artifact
+- if that is not available or not appropriate, create a revert commit and promote it forward through the same branch flow
+- moving environment branches backward should not be the normal rollback mechanism
+
+Operational distinction:
+
+- a rollback run is an operation kind, not a special success/failure outcome
+- a successful rollback run should still record `final outcome = succeeded`
+- the fact that it was a rollback should be visible through `operation_kind`, `parent_run_id`, and artifact lineage or replacement metadata
+
+Provider-native rollback policy:
+
+- provider-native rollback may be used as an emergency stabilization path
+- if it is used, the deployment control plane and Git history should be reconciled afterward so live state and declared state do not drift silently
+
+Boundary between app rollback and infra rollback:
+
+- rollback of published artifacts is not the same thing as rollback of provisioned infrastructure
+- infrastructure rollback may require a separate controlled change or reconcile step
+- the deployment system should not imply that every publish rollback automatically undoes infra changes
+
+Why this matters:
+
+- it keeps release history auditable
+- it makes rollback compatible with fast-forward promotion
+- it avoids hidden rebuilds or hidden branch rewrites
+
 ## Buck Metadata Extraction
 
 The deploy CLI should query Buck for deployment metadata rather than maintain a second handwritten manifest.
@@ -1367,10 +1847,148 @@ The deployment rule should expose enough metadata for repo tooling to retrieve:
 - publisher config
 - package path
 
+That metadata should be sufficient for the deploy CLI to assemble the whole lifecycle without scraping provider config files for core deployment facts.
+
+In other words:
+
+- provider config files contain provider-specific settings
+- deployment metadata contains the repo's deployment model
+- the deploy CLI should combine them, not guess one from the other
+
+Precedence and consistency rules:
+
+- deployment metadata is authoritative for repo-level facts such as provider, components, provisioner or publisher shape, deployment id, and package-relative config references
+- provider config files are authoritative only for provider-native settings inside the tool they configure
+- if the same fact is represented in both places, the design should either:
+  - generate one from the other to avoid duplication
+  - or require validation-time equality and fail on mismatch
+- the deploy CLI must not silently let provider config override Buck deployment metadata for core deployment facts
+
+Preferred pattern:
+
+- generation or runtime injection is better than duplication
+- for example, a provider project identifier such as Wrangler `name` should ideally come from deployment metadata and be rendered or injected into provider-native config at publish time
+- if the file must be checked in with that field duplicated, validation should fail on mismatch rather than silently picking one source
+
 The exact extraction mechanism can be decided during implementation. The design goal is simple:
 
 - define once in `TARGETS`
 - consume from Buck
+
+The external contract should stay stable even if the extraction mechanism changes. Callers should depend on deployment metadata fields, not on one particular Buck query implementation detail.
+
+### Secrets And Runtime Inputs
+
+Deployment metadata must remain non-secret.
+
+What belongs in deployment metadata:
+
+- provider
+- components
+- provisioner and publisher config references
+- package-relative file paths
+- non-secret identifiers such as project names, domains, or feature flags
+
+What does not belong in deployment metadata:
+
+- API tokens
+- cloud credentials
+- kube credentials
+- signing keys
+- long-lived secrets of any equivalent kind
+
+Input classes:
+
+- deployment metadata
+  - repo-defined, Buck-visible, non-secret
+- runtime configuration
+  - selected mode, resolved artifact paths, non-secret environment selection, runtime target selection
+- secrets
+  - sensitive values injected only at deploy-runtime boundaries
+
+Policy:
+
+- checked-in deployment files such as `TARGETS`, `wrangler.jsonc`, and `smoke.ts` must not contain credentials or secret values
+- publishers, provisioners, and smoke checks receive secrets only as runtime inputs
+- Buck metadata is not a secrets channel
+- `secretspec` should be the repo-level contract/interface for required secret inputs
+- Vault should be the initial production backend behind that contract
+- backend switching should remain possible without changing deployment metadata semantics
+- runtime-secret injection must avoid leaking secret material into Buck metadata, checked-in files, or durable deployment records
+
+Anti-patterns:
+
+- embedding credentials in `TARGETS`
+- embedding credentials in provider config files
+- teaching provider adapters to infer secrets from checked-in repo state
+
+## Deployment Record And Provenance
+
+Every deploy run should produce a provider-neutral deployment record.
+
+Minimum required fields:
+
+- `deploy_run_id`
+  - globally unique for every deploy attempt
+- `deployment_id`
+- Buck deployment label
+- `operation_kind`
+  - such as `deploy`, `preview`, `retry`, `promotion`, or `rollback`
+- source revision identifier
+- actor or trigger source, such as human, CI job, or automation
+- publish mode, such as normal or preview
+- resolved component list
+- artifact identity for each published component
+- target provider and provider-instance identifier when applicable
+- start time and end time
+- final outcome
+
+Optional but strongly recommended fields:
+
+- `parent_run_id`
+  - when the run is a retry, rollback, or promotion derived from an earlier run
+- `artifact_lineage_id`
+  - when the same built artifact is promoted across environments
+- smoke result
+- lock scope
+- provider-specific details added by the adapter
+
+Artifact identity rules:
+
+- if an artifact already has a strong native identity, such as an image digest or content-addressed store identity, record that directly
+- if an artifact is not produced through a fully content-addressed path, `resolve` should compute or surface a stable content fingerprint
+- publish should consume the resolved artifact from the build step, not rebuild implicitly
+- publish-only, promotion, retry, and rollback flows should accept a previously recorded artifact reference and should not rebuild unless the operator is intentionally creating a new artifact
+- provider-instance identifiers used during publish should come from authoritative deployment metadata or generated config, not from silently drift-prone duplicated checked-in fields
+
+Nix-aligned guidance:
+
+- prefer recording store path plus stable content fingerprint instead of only a mutable local path string
+- prefer publishers that accept explicit resolved artifact inputs instead of rebuilding or re-exporting artifacts internally
+- where a component kind naturally yields a digest, such as OCI images or fixed-output archives, that digest should be part of the deployment record
+
+Canonical outcome vocabulary:
+
+- terminal
+  - `validation_failed`
+  - `build_failed`
+  - `resolve_failed`
+  - `provision_failed`
+  - `publish_failed`
+  - `smoke_failed_after_publish`
+  - `succeeded`
+- non-terminal
+  - `queued`
+  - `running`
+  - `waiting_for_lock`
+  - `cancelling`
+  - `cancelled`
+
+Storage guidance:
+
+- shared deployment records should be persisted in the central Postgres-backed control plane
+- structured CLI output is still useful, but it is an interface, not the sole source of truth
+- the record contract should remain stable even if the storage schema evolves
 
 ## Higher-Level Deployment Helpers
 
@@ -2098,15 +2716,231 @@ Under the hood that may still mean:
 
 The user should not need to think about that wiring.
 
-## Initial Recommendation
+## Operational Best Practices And Remaining Work
 
-Implement this in phases:
+This design is now strong on both the structural model and the core operator-facing policy
+direction.
 
-1. add a `deployment(...)` primitive and the `projects/deployments/*` package convention
-2. add the repo-level `deploy` zx TypeScript command
-3. implement `cloudflare-pages` publisher support for one `static-webapp` component
-4. optionally add `cdktf` provisioner support
-5. add impact analysis and `deploy --from-changes`
-6. add higher-level helpers where repetition proves they are useful
+The remaining work is not "decide the deployment model again."
 
-That gives us an elegant deployment model now without blocking more complex systems later.
+The remaining work is:
+
+- preserve this contract while designing implementation details
+- close the few still-open operational defaults that should be decided before implementation planning
+- turn this finished design into a separate implementation plan
+
+The most important implementation-planning follow-ups are:
+
+- immutable artifact identity and promotion
+  - the design now requires artifact reuse for promotion-grade and rollback-grade flows
+  - implementation planning still needs to define how artifact references are persisted and selected in tooling
+- rollback and redeploy procedure
+  - the design now defines rollback direction and run classification
+  - implementation planning still needs exact operator procedures and control-plane actions
+- locking and control-plane mechanics
+  - the design now defines lock-scope behavior and shared Postgres-backed coordination
+  - implementation planning still needs lease, fencing, wait-vs-fail, and conflict-resolution details
+- secrets runtime wiring
+  - the design now defines the metadata-versus-secret boundary and the `secretspec` and Vault direction
+  - implementation planning still needs concrete runtime injection interfaces, names, and audit handling
+- smoke-check defaults
+  - the design now defines required-versus-exception policy for production and bounded retry semantics
+  - implementation planning still needs concrete timeout budgets and adapter-specific default values
+- provider-adapter enforcement
+  - the design now defines metadata precedence, drift ownership, and lock-scope expectations
+  - implementation planning still needs adapter-level validation hooks and helper conventions
+
+These are not gaps in the deployment model.
+
+They are the handoff points from design completion into implementation planning.
+
+### Design-Completion Goal
+
+When the design-document PRs in this area are complete, the repository should be in this state:
+
+- a reader can tell how to model a deployment in the repo
+- a reader can tell which operational behaviors are mandatory policy
+- a reader can tell which details are still implementation mechanics rather than open design questions
+- an implementation-planning effort can begin without first revisiting core policy
+
+### Remaining Design-Doc Work
+
+The remaining documentation work should focus on tightening summaries and examples around the
+already-chosen design, not inventing a second round of structural changes.
+
+Recommended final documentation tasks:
+
+1. add a compact operational policy summary table
+   - one row each for provenance, promotion, rollback, secrets, locking, metadata precedence, drift ownership, and smoke handling
+2. add one example deployment record
+   - include `deploy_run_id`, `operation_kind`, `parent_run_id`, artifact identity, lock scope, and final outcome
+3. add one short example of artifact reuse across promotion or rollback
+   - show the difference between "build new artifact" and "publish previously recorded artifact"
+4. add one short example of metadata-versus-provider-config precedence
+   - show a valid configuration and the expected behavior on mismatch
+5. add one short example of explicit smoke exception policy for a non-production deployment
+   - make clear that production requires smoke unless explicitly waived
+6. add one compact operator summary for lock scope
+   - explain when `deployment-id` is sufficient and when multiple deployment ids must share a lock scope
+
+Success condition for the final design revision:
+
+- the design is complete enough that implementation planning can focus on schema, commands, adapters, control-plane mechanics, and rollout order rather than reopening policy questions
+
+## Design-Doc PR Sequence
+
+These PRs are design-document PRs, not production implementation PRs.
+
+Their job is to make the completed design easier to implement faithfully.
+
+Any PR section added in the future should also explicitly state that:
+
+- any policy deviation from this design must be surfaced and discussed rather than silently introduced
+- any meaningful ambiguity discovered while refining the design should be brought to the repository owner for a decision before the PR scope is finalized
+
+## PR-1: Add operator-facing examples and summary tables for the completed design
+
+### Description
+
+This PR should make the now-chosen design easier to consume by adding compact summaries and concrete
+examples without changing policy direction.
+
+### Scope & Changes
+
+- Update [docs/deployments-design.md](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md):
+  - add a compact operational policy summary table
+  - add one concrete example deployment record
+  - add one concrete example of artifact reuse for promotion or rollback
+  - add one concrete example of lock scope where two deployment ids share one mutable provider-side target
+  - add one concrete example of metadata precedence versus provider config mismatch
+
+### Tests (in this PR)
+
+- Manual read-through for consistency with:
+  - `Deployment Lifecycle`
+  - `Promotion And Rollback`
+  - `Buck Metadata Extraction`
+  - `Deployment Record And Provenance`
+- Prompt the repository owner about any policy deviation, contradiction, or meaningful ambiguity discovered while preparing the PR.
+
+### Docs (in this PR)
+
+- Update [docs/deployments-design.md](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) with:
+  - one short operator-reference table
+  - one example deployment record
+  - one example artifact-lineage story
+  - one example lock-scope story
+  - one example metadata precedence story
+
+### Acceptance Criteria
+
+- A reader can quickly find the mandatory policies without re-reading the whole document.
+- A reader can see how operation kind differs from final outcome.
+- A reader can see how artifact reuse is supposed to work for promotion or rollback.
+- A reader can see how metadata precedence and lock scope work in concrete examples.
+
+### Risks
+
+The examples could accidentally introduce policy drift if they contradict the normative sections.
+
+### Mitigation
+
+Treat examples as explanatory material only and cross-check them against the normative sections.
+
+### Consequence of Not Implementing
+
+The design remains correct but harder to consume, making implementation planning slower and more
+error-prone.
+
+### Downsides for Implementing
+
+Adds more normative-adjacent examples that must stay in sync with the main design.
+
+### Recommendation
+
+Implement.
+
+### Collaboration Note
+
+- Prompt the repository owner before landing any policy deviation from this design.
+- Prompt the repository owner when a meaningful ambiguity is discovered and the PR would otherwise have to choose a policy direction on its own.
+
+## PR-2: Tighten remaining explicit defaults that are still intentionally open
+
+### Description
+
+This PR should close the small set of remaining operational defaults that the design still leaves
+open without changing the core model.
+
+### Scope & Changes
+
+- Update [docs/deployments-design.md](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md):
+  - define the default diff base for `--from-changes` in local and CI contexts
+  - define default smoke timeout budgets by class or deployment category
+  - define any mandatory metadata fields needed to express explicit production smoke exceptions
+  - define the minimum branch and protection assumptions for the fast-forward promotion model
+  - optionally refine queue timeout values and stale-run detection details without changing the default queued-with-revalidation policy
+
+### Tests (in this PR)
+
+- Manual read-through for consistency with:
+  - `Repo-Level Deploy Command`
+  - `Smoke Check Policy`
+  - `Retry, Concurrency, And Locking`
+  - `Promotion And Rollback`
+- Prompt the repository owner about any policy deviation, contradiction, or meaningful ambiguity discovered while preparing the PR.
+
+### Docs (in this PR)
+
+- Update [docs/deployments-design.md](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) with:
+  - the chosen default diff-base rules
+  - the chosen default smoke timeout rules
+  - one short note on branch-protection assumptions for promotion
+  - one short note on how explicit smoke exceptions are represented
+  - one short note on queue timeout and stale-run detection detail if more precision is needed
+
+### Acceptance Criteria
+
+- The document has no remaining high-impact operator defaults left unspecified.
+- A reader can tell what happens by default for changed-based deploy selection, lock contention, and smoke timing.
+- The promotion model has enough branch-policy detail to support implementation planning.
+
+### Risks
+
+The defaults could be chosen too early and later prove awkward in practice.
+
+### Mitigation
+
+Choose defaults that are explicit, conservative, and easy to override through later implementation configuration without changing the core design.
+
+### Consequence of Not Implementing
+
+Implementation planning still has to stop and make policy calls on a few important defaults and thresholds.
+
+### Downsides for Implementing
+
+Locks in more operator-facing defaults that later tooling must respect.
+
+### Recommendation
+
+Implement.
+
+### Collaboration Note
+
+- Prompt the repository owner before landing any policy deviation from this design.
+- Prompt the repository owner when a meaningful ambiguity is discovered and the PR would otherwise have to choose a policy direction on its own.
+
+## Design Completion Recommendation
+
+Complete the design document in phases:
+
+1. finalize the normative operational sections so they fully match the locked decisions in this document
+2. add compact summary tables and concrete examples for provenance, promotion, rollback, lock scope, metadata precedence, and smoke policy
+3. close the remaining explicit defaults that still need design-level decisions, such as `--from-changes` diff base, smoke timeout classes, and minimum branch-policy assumptions
+4. run one final consistency pass across the whole document so examples, summaries, appendices, and normative sections all say the same thing
+5. declare the document ready for a separate implementation-planning phase
+
+That gives us an implementation-ready design without mixing design completion and production implementation in the same plan.
+
+After those design-document phases are complete, the repository should be ready for a separate
+implementation-planning effort.
