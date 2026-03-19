@@ -758,6 +758,84 @@ SSR/hash mismatch complexity.
 - Engineers can choose between static, static-PWA, and SSR templates using documented criteria.
 - Local-origin PWA validation and SSR/hash-state limitations are explicitly documented.
 
+---
+
+## PR-10: Lock Pleomino Offline Browser Acceptance Into Deterministic Verify Coverage
+
+### Why This PR Exists
+
+The static-PWA migration is functionally close to complete, but one final acceptance gap remains in
+how Pleomino proves its browser-offline behavior:
+
+- the cold-offline partial-board solve check exists, but it appears flaky and is not yet treated as
+  a stable required verify path
+- the production offline reload check is too weak to prove that the app shell actually rehydrated
+  and stayed interactive after the server went away
+- these browser-offline acceptance checks are not currently wired into Pleomino-owned automated
+  targets in the same way the focused Vitest regression targets are
+
+Because later PRs closed most migration and template gaps, the remaining work here is not another
+delivery refactor. It is a validation lock-in PR that makes the final acceptance criteria reliable,
+deterministic, and enforced.
+
+### Scope
+
+- Investigate and de-flake Pleomino’s cold-offline solve acceptance path.
+- Strengthen the offline reload browser acceptance test so it proves hydrated interactive behavior
+  rather than just absence of a generic connection error page.
+- Wire the required offline browser acceptance checks into Pleomino-owned automated targets so they
+  are not optional/manual-only validation.
+
+### Implementation Notes
+
+- Treat `e2e/cold-offline-solve-temp.e2e.ts` as a flakiness investigation first, not as proof of a
+  product defect:
+  - determine whether startup timing, preview-server readiness, locator selection, localhost/origin
+    behavior, or service-worker takeover timing is causing nondeterminism
+  - keep the final assertion focused on the acceptance contract:
+    - partial-board state restores after warm online visit
+    - cold offline reopen succeeds
+    - solve still completes offline after relaunch
+- Tighten `e2e/prod-reload-offline-temp.e2e.ts` so it proves:
+  - the app shell is present
+  - client hydration completed
+  - interactive Pleomino UI is available after reload with the server offline
+- Prefer Pleomino-owned target wiring for these browser acceptance checks rather than leaving them
+  as ad hoc scripts only.
+- Keep this PR app/test wiring focused. Do not fold shared template/build-tools runtime changes into
+  it unless a tiny harness fix is required for deterministic execution.
+
+### Tests
+
+- Pleomino browser-offline acceptance coverage:
+  - cold offline relaunch with a partial board can still solve after one successful online visit
+  - production offline reload proves app-shell hydration/interactivity, not just generic offline
+    fallback rendering
+- Wiring/automation coverage:
+  - required offline browser checks run from Pleomino-owned test targets or equivalent enforced app
+    verification entrypoints
+  - test scripts/config stay aligned with local-origin preview validation guidance
+
+### Verify Strategy
+
+- Keep this PR limited to Pleomino app code, Pleomino browser acceptance tests, and Pleomino-owned
+  test wiring/docs.
+- Avoid mixing in scaffold/template/build-tools refactors unless needed to make the Pleomino
+  acceptance path deterministic.
+- Expected verify scope:
+  - default project-impact scoped verify for `projects/apps/pleomino` if ownership boundaries stay
+    app-local
+  - mixed-scoped verify only if shared build-system harness changes become necessary to close the
+    flake deterministically
+
+### Acceptance Criteria
+
+- The cold-offline partial-board solve acceptance test is deterministic enough to serve as required
+  validation and no longer behaves as a known flaky/manual-only check.
+- The offline reload acceptance test proves hydrated Pleomino interactivity after server shutdown.
+- Pleomino’s final browser-offline acceptance checks are wired into normal automated validation,
+  closing the remaining gap in the static-PWA migration proof.
+
 ## Risks
 
 ### Risk 1: We lose useful SSR-only metadata behavior

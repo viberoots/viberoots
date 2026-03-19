@@ -29,6 +29,15 @@ test("ts webapp-static-pwa naming contract", async () => {
     if (!helpText.includes("Use webapp-ssr-vite or webapp-ssr-next")) {
       throw new Error("expected help notes to mention SSR alternatives");
     }
+    if (!helpText.includes("URL hash or browser storage")) {
+      throw new Error("expected help notes to mention SSR/hash-state guidance");
+    }
+    if (!helpText.includes("real local origin")) {
+      throw new Error("expected help notes to mention local-origin validation guidance");
+    }
+    if (!helpText.includes("wasm producers and worker entrypoints")) {
+      throw new Error("expected help notes to mention wasm/worker asset guidance");
+    }
 
     await $`scaf new ts webapp-static-pwa demo-pwa --yes --dry-run`;
   });

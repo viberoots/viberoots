@@ -52,6 +52,18 @@ Use this when installability and offline app-shell behavior are part of the base
 
 Choose `webapp-static` for a simpler static site without PWA defaults. Choose `webapp-ssr-vite` or `webapp-ssr-next` when request-time SSR still matters.
 
+Selection guidance:
+
+- Choose `webapp-static` when all you need is static hosting and client rendering, with no install/offline requirement.
+- Choose `webapp-static-pwa` when the browser owns the long-lived state and you want offline app-shell behavior, install metadata, and zero-backend delivery by default.
+- Choose SSR only when the HTML must depend on request-time inputs such as auth, cookies, headers, crawler-visible content, or other server-owned data.
+
+SSR and hash-persisted client state do not mix well:
+
+- URL-hash state and browser-only persistence are invisible to the server on first render.
+- If that state materially changes the initial view, SSR has to guess, then patch on hydration, which creates avoidable mismatch complexity.
+- Prefer the static or static-PWA templates when the client is the true owner of persisted hash/local state.
+
 Dev mode with HMR:
 
 ```bash
@@ -67,11 +79,29 @@ Offline and install surface included in the scaffold:
 
 The client entry registers the service worker immediately and includes a one-time takeover reload path so offline navigation works after the first successful install/activation.
 
+Local-origin validation flow:
+
+```bash
+pnpm build
+pnpm run preview -- --host 127.0.0.1 --port 4173
+```
+
+- Validate install and offline behavior from `http://127.0.0.1:4173`, not `file://...`.
+- Visit once while online so the service worker installs and precache materializes.
+- Then switch the browser to offline mode and confirm reload plus in-app navigation still serve the app shell.
+- If the app uses wasm or web workers, confirm those requests are same-origin and still succeed offline after the online warm-up visit.
+
 Production build via Buck (Nix under the hood):
 
 ```bash
 buck2 build //projects/apps/{{ name }}:app
 ```
+
+Static runtime asset guidance:
+
+- Keep wasm producers on the generated module-contract path and let the shared static precache flow pick up their emitted runtime assets.
+- Keep worker entrypoints inside the Vite build so they emit hashed same-origin assets that the service worker can cache safely.
+- Do not hand-maintain service-worker cache lists for wasm or worker files.
 
 The same local-workspace TypeScript dependency and wasm watcher contract from `webapp-static` remains in place.
 {% endif %}

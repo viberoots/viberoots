@@ -61,6 +61,27 @@ For static web delivery:
 - `webapp-static-pwa` adds manifest, service worker, icon placeholders, and offline app-shell defaults.
 - `webapp-ssr-vite` and `webapp-ssr-next` remain the right choice when server-rendered HTML is still required.
 
+Static vs PWA vs SSR selection guidance:
+
+- Choose `webapp-static` when static hosting and client rendering are enough, and install/offline support is not part of the baseline contract.
+- Choose `webapp-static-pwa` when the browser is the long-lived state owner and you want offline app-shell behavior, install metadata, and zero-backend delivery by default.
+- Choose `webapp-ssr-vite` or `webapp-ssr-next` only when the initial HTML must depend on request-time inputs such as auth, cookies, headers, crawler-visible content, or other server-owned data.
+- Hash-only or browser-storage-only client state is a poor fit for SSR-first ownership: the server cannot read URL fragment state, and it should not guess at browser-only persisted state during first paint.
+- If that client-owned state materially changes the initial screen, prefer `webapp-static` or `webapp-static-pwa` so the runtime owns first render without hydration mismatch repair logic.
+
+Local-origin PWA validation guidance:
+
+- Validate install/offline behavior from a real local origin such as `pnpm run preview -- --host 127.0.0.1 --port 4173` or the built app runnable, not from `file://...`.
+- Perform one online visit first so the service worker installs and the shared static precache materializes.
+- Then switch the browser to offline mode and verify reload plus in-app navigation still serve the app shell.
+- If the app ships wasm or web workers, verify those runtime assets stay same-origin and still load offline after that warm-up visit.
+
+Static-PWA runtime asset guidance:
+
+- Wasm producers should publish runtime assets through the generated module-contract/static-asset-stage path instead of hardcoded source-tree copies.
+- Worker entrypoints should stay inside the Vite build so emitted worker chunks remain hashed same-origin assets.
+- Shared static-PWA precache materialization should remain authoritative; do not hand-maintain service-worker cache lists for wasm, worker, or manifest assets.
+
 ### Local workspace TS dependency live updates (`ts/webapp-static`, `ts/webapp-ssr-vite`, `ts/webapp-ssr-next`)
 
 Dev-update contract matrix for in-scope templates:
