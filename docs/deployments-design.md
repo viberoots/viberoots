@@ -666,6 +666,19 @@ Default diff-base policy:
 - post-merge automation should compare against the previous successful deploy baseline for the relevant environment branch when that data is available
 - if no upstream or baseline can be determined, the tool should fail explicitly and ask for an override instead of silently choosing an unsafe diff base
 
+Impact-selection contract:
+
+- `--from-changes` must use Buck-authoritative graph data to decide which deployments are impacted
+- the intended flow is:
+  - collect changed files for the selected diff base
+  - map those files to affected Buck targets using repo build metadata
+  - walk Buck reverse dependencies from those targets to concrete deployment targets
+  - de-duplicate the resulting deployment ids and then run the normal lifecycle for each selected deployment
+- the implementation must use a conservative expansion rule for repo-global inputs that can affect many deployments even when no single app target changed directly
+  - examples include deployment macros and shared helper code under `build-tools/`, provider adapters, flake or toolchain inputs, and other repo-wide deployment/build wiring
+- when a change touches such a repo-global input, the selector should widen the impacted set according to documented policy rather than silently under-selecting deployments
+- `--from-changes` is allowed to over-select for safety; it is not allowed to under-select because an implementation skipped Buck graph expansion or ignored repo-global inputs
+
 #### `--list`
 
 Use this when you want visibility into what deployment units exist.
@@ -1846,6 +1859,15 @@ Examples:
 - `wrangler deploy`
 - `aws s3 sync`
 
+Publish safety policy:
+
+- publishers must consume explicit resolved artifact inputs; they must not rediscover artifacts from mutable local working state
+- publish retries must be safe under ambiguous provider outcomes such as request timeout after the provider may already have accepted the release
+- when the provider supports idempotency keys, request correlation ids, version preconditions, or equivalent publish de-duplication controls, the publisher should use them
+- when the provider does not support a strong idempotency primitive, the adapter must reconcile remote state before retrying a publish after an ambiguous result
+- automatic retry is allowed only when the adapter can either prove the earlier attempt did not take effect or prove that retrying is idempotent for that provider operation
+- if the adapter cannot prove either of those conditions, it must stop and surface the run as a publish failure that requires explicit operator follow-up
+
 ### Smoke
 
 Run lightweight post-publish validation.
@@ -1950,6 +1972,20 @@ Default lock-acquisition behavior:
 - if the run's assumptions are stale after revalidation, it should exit without publishing and report that it was superseded or must be rerun
 - interactive or incident-response workflows may offer an explicit fail-fast mode, but queued-with-revalidation should be the shared-environment default
 
+Cancellation policy:
+
+- cancellation before any mutating step begins should stop the run cleanly before side effects occur
+- the deployment record should preserve that a cancellation request stopped the run before mutation
+- once a mutating step such as `provision` or `publish` has started, cancellation is best-effort rather than guaranteed interruption
+- a run must not report a clean `cancelled` outcome if provider-side mutation may already have happened and the system has not reconciled that state
+- if cancellation arrives during or after a mutating step, the run should:
+  - stop scheduling later steps when possible
+  - reconcile whether the current step changed remote state
+  - record the most accurate final outcome based on what actually happened, such as `provision_failed`, `publish_failed`, `smoke_failed_after_publish`, or `succeeded`
+  - preserve enough deployment-record detail to show that a cancellation request occurred during the run
+- provider adapters should document whether their provision and publish paths are interruptible, non-interruptible, or only safely cancellable between sub-steps
+- cancellation must not imply automatic rollback of infrastructure or published artifacts
+
 Local-only fallback policy:
 
 - shared environments must use the central Postgres control plane
@@ -2004,6 +2040,14 @@ Promotion should prefer reusing the exact previously built artifact rather than 
 
 That rule also applies to rollback-grade redeploys and publish-only retries whenever the intent is to
 re-ship a known artifact rather than create a new one.
+
+Artifact retention policy:
+
+- any workflow that depends on immutable artifact reuse must keep that artifact and its immutable reference retrievable for the full supported promotion, retry, and rollback window
+- for protected or shared environments, artifact retention is a required part of the deployment contract, not an optional implementation convenience
+- an implementation must not garbage-collect or otherwise lose the only approved artifact for an in-policy promotion or rollback path while that path is still expected to be available
+- if the artifact has expired or been intentionally removed, the system should surface that condition explicitly rather than silently rebuilding and treating the rebuild as equivalent
+- retention duration and storage mechanics may be decided during implementation, but the operator-facing policy is that a supported artifact-reuse path must remain practically usable
 
 Planned promotion model:
 
@@ -2182,12 +2226,19 @@ Optional but strongly recommended fields:
 - lock scope
 - provider-specific details added by the adapter
 
+Lineage requirement:
+
+- `parent_run_id` is required when the run is a retry, rollback, or promotion derived from an earlier run
+- `artifact_lineage_id` is required when the same built artifact is intentionally reused across environments or redeploy paths
+- these lineage fields are optional only for runs that truly have no parent or no artifact-lineage relationship
+
 Artifact identity rules:
 
 - if an artifact already has a strong native identity, such as an image digest or content-addressed store identity, record that directly
 - if an artifact is not produced through a fully content-addressed path, `resolve` should compute or surface a stable content fingerprint
 - publish should consume the resolved artifact from the build step, not rebuild implicitly
 - publish-only, promotion, retry, and rollback flows should accept a previously recorded artifact reference and should not rebuild unless the operator is intentionally creating a new artifact
+- a recorded artifact reference for a supported reuse flow must remain retrievable for the applicable retention window
 - provider-instance identifiers used during publish should come from authoritative deployment metadata or generated config, not from silently drift-prone duplicated checked-in fields
 - the deployment record should preserve the canonical resolved component data shape or a stable projection of it, rather than only loosely structured adapter-specific paths
 
