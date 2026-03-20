@@ -108,6 +108,8 @@ projects/
 ```
 
 The deployment id is the directory name under `projects/deployments/`.
+The `acme-platform-prod` example is illustrative of a local-only or isolated-preview-capable shape;
+protected/shared packages should normally stay closer to declarative metadata plus provider-native config.
 
 Recommended deployment-id style:
 
@@ -151,9 +153,8 @@ Typical contents:
   - the authoritative deployment definition
 - provider config files
   - for example `wrangler.jsonc`
-- optional smoke-check files
+- optional deployment-local executable files for local-only or isolated-preview-only flows
   - for example `smoke.ts`
-- optional infra entrypoints
   - for example `cdktf/main.ts`
 
 Things that should usually not live here:
@@ -173,6 +174,7 @@ Preference rule:
 
 - provider config should contain only provider-native settings that are not already modeled authoritatively in deployment metadata
 - if a provider-native file needs values such as provider project name or environment-specific identifiers, those should ideally be generated from or injected by deployment metadata rather than hand-maintained in multiple places
+- for `shared_nonprod` and `production_facing`, the preferred package shape is declarative deployment metadata plus provider-native config, not package-local executable deployment logic
 
 Path rule:
 
@@ -493,12 +495,13 @@ Good pattern:
 
 - user runs `deploy pleomino-prod`
 - the repo-level deploy tool resolves the deployment target
-- the repo-level deploy tool may delegate one step to a deployment-local script if needed
+- for `local_only` or isolated-preview flows, the repo-level deploy tool may delegate one step to a deployment-local script if needed
+- for `shared_nonprod` and `production_facing`, the normal path should stay within vetted built-in control-plane code plus declarative metadata and provider-native config
 
 Plain-language version:
 
 - `build-tools/tools/bin/deploy` is the front door
-- deployment-local scripts are allowed, but they are side doors the front door may call
+- deployment-local scripts are local-only or isolated-preview escape hatches, not the normal protected/shared shape
 
 ### Why These Flags Exist
 
@@ -518,6 +521,7 @@ Flag interaction rules:
   - the normal protected/shared selector should be `--run-id <deploy-run-id>`
   - an optional lower-level `--artifact-ref <artifact-ref>` path may exist for vetted admin or automation use, but it must still identify one exact immutable artifact
   - it must not fall back to "latest local build output" or an implicit rebuild on the operator's machine
+  - for protected or shared environments, immutable-artifact reuse operations should replay the recorded deployment snapshot for that run rather than silently reinterpreting current repo metadata or provider config
 - `--preview` changes the publish mode, not the deployment identity
 - `--list` does not mutate anything
 - `--from-changes` selects deployment ids first, then runs the same lifecycle each selected deployment would normally run
@@ -949,6 +953,10 @@ Suggested metadata shape conventions:
     - required, non-empty list
     - each component should include `id`, `kind`, and `target`
     - `id` should be stable within the deployment, not derived from list position
+  - `rollout_policy`
+    - optional for simple single-component or local-only deployments
+    - required for multi-component `shared_nonprod` and `production_facing` deployments
+    - should describe explicit publish ordering, dependency barriers, or phased smoke checkpoints when the deployment is more complex than the default common case
   - `publisher`
     - required
     - should include a stable `type`
@@ -1291,7 +1299,7 @@ Example `wrangler.jsonc`:
 
 ```jsonc
 {
-  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
   "compatibility_date": "2026-03-18",
 }
 ```
@@ -1915,7 +1923,7 @@ Suggested `wrangler.jsonc`:
 
 ```jsonc
 {
-  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
   "compatibility_date": "2026-03-18",
 }
 ```
@@ -1967,7 +1975,7 @@ If checked-in provider config files are kept separate per deployment, they shoul
 ```jsonc
 // projects/deployments/pleomino-prod/wrangler.jsonc
 {
-  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
   "compatibility_date": "2026-03-18",
 }
 ```
@@ -1975,7 +1983,7 @@ If checked-in provider config files are kept separate per deployment, they shoul
 ```jsonc
 // projects/deployments/pleomino-staging/wrangler.jsonc
 {
-  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
   "compatibility_date": "2026-03-18",
 }
 ```
@@ -2039,6 +2047,10 @@ deployment(
     admission_policy = "marketing-docs-prod-release",
     protection_class = "production_facing",
     promotion_lane = "marketing-docs",
+    rollout_policy = {
+        "mode": "ordered_best_effort",
+        "order": ["marketing", "docs"],
+    },
     components = [
         {
             "id": "marketing",
@@ -2396,6 +2408,7 @@ Release-admission contract for protected/shared environments:
     - the reusable artifact attestation binds artifact identity to source revision plus build inputs
     - the shared control plane verifies that artifact attestation before publish
     - the selected artifact or revision still matches the environment's promotion and admission policy
+    - for protected/shared `--publish-only`, retry, rollback, and other immutable-artifact reuse paths, the control plane should replay the recorded deployment snapshot for that run rather than silently re-reading current repo metadata or provider config as if it were the original deployment state
   - for `--provision-only` and other non-publishing mutating runs:
     - artifact attestation is not required
     - admission still requires branch, approval, lane, target, and locking policy to pass before mutation
@@ -2410,6 +2423,10 @@ Release-admission contract for protected/shared environments:
 - admission and revalidation should evaluate only the declared direct prerequisite edges for that deployment unless a future policy explicitly adds transitive prerequisite semantics
 - if any of those checks fail after revalidation, the run must exit without mutating the target and report that it was superseded, stale, or no longer admitted
   - in those cases, the deployment record should preserve `final_outcome = null` and a specific `termination_reason`
+- when replaying a recorded deployment snapshot for a protected/shared reuse flow, the system should still check narrow current invariants such as:
+  - the target is still owned by the same deployment id
+  - the deployment remains admitted under the same protection class and lane
+  - no reviewed migration or alias exception has invalidated the recorded target binding
 
 Operator-facing lifecycle states:
 
@@ -2506,6 +2523,10 @@ Provenance split for promotion-safe artifact reuse:
 
 - reusable artifact attestation should stay environment-agnostic so the same artifact can move forward through staging, production, and rollback flows without being redefined
 - that reusable artifact attestation should bind artifact identity to source revision plus build inputs
+- promotion-safe reusable artifacts must be environment-neutral
+  - staging/prod-specific URLs, flags, or other environment-specific values must not be baked into the artifact for a lane that claims same-artifact promotion semantics
+  - environment-specific values should instead come from deployment metadata, provider-native config, runtime injection, or secrets
+  - if a deployment family truly requires environment-specific build-time substitution, that family should be treated as an explicit exception with different promotion semantics rather than as a normal promotion-safe lane
 - deployment-run provenance should capture the environment-specific facts evaluated at publish time, including deployment metadata fingerprint, provider-config fingerprint, target identity, approvals, and publish result
 - promotion should therefore verify both:
   - the reusable artifact attestation for the artifact being promoted
@@ -2517,6 +2538,8 @@ Artifact retention policy:
 - for protected or shared environments, artifact retention is a required part of the deployment contract, not an optional implementation convenience
 - an implementation must not garbage-collect or otherwise lose the only approved artifact for an in-policy promotion or rollback path while that path is still expected to be available
 - if the artifact has expired or been intentionally removed, the system should surface that condition explicitly rather than silently rebuilding and treating the rebuild as equivalent
+- for protected/shared `--publish-only`, retry, rollback, and promotion-by-reuse flows, the system should replay the recorded deployment snapshot associated with the reused artifact/run
+- those flows should fail explicitly if the recorded snapshot is missing or if required current invariants no longer match that recorded snapshot
 - minimum operator-facing retention defaults should be:
   - `production_facing`: 90 days
   - `shared_nonprod`: 30 days
@@ -2826,6 +2849,7 @@ Artifact identity rules:
 - promotion, retry, and rollback flows should accept a previously recorded artifact reference and should prefer reusing that immutable artifact rather than rebuilding
 - a recorded artifact reference for a supported reuse flow must remain retrievable for the applicable retention window
 - reusable artifact attestation should bind artifact identity to source revision plus build inputs, not to environment-specific deployment metadata or provider config
+- for protected/shared `--publish-only`, retry, rollback, and promotion-by-reuse flows, the operator contract is "replay the recorded artifact plus recorded deployment snapshot", not "reinterpret today's repo state as if it were the original run"
 - provider-instance identifiers used during publish should come from authoritative deployment metadata or generated config, not from silently drift-prone duplicated checked-in fields
 - the deployment record should preserve the canonical resolved component data shape or a stable projection of it, rather than only loosely structured adapter-specific paths
 - the deployment record should make it obvious when the same artifact identity was published under different deployment metadata or provider-config inputs
