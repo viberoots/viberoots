@@ -1340,6 +1340,11 @@ deployment(
         "type": "wrangler-pages",
         "config": "wrangler.jsonc",
     },
+    smoke = {
+        "type": "http-smoke",
+        "path": "/",
+    },
+    secret_requirements = {},
 )
 ```
 
@@ -1383,7 +1388,7 @@ deployment(
         "id": "docs-site-prod",
         "bucket": "docs-site-prod",
     },
-    admission_policy = "docs-site-prod-release",
+    admission_policy = "//build-tools/deploy/policies:docs_site_prod_release_v1",
     environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "docs-site",
@@ -1402,6 +1407,11 @@ deployment(
         "type": "aws-s3-sync",
         "config": "publisher.json",
     },
+    smoke = {
+        "type": "http-smoke",
+        "path": "/",
+    },
+    secret_requirements = {},
 )
 ```
 
@@ -1430,7 +1440,7 @@ deployment(
         "namespace": "api-prod",
         "release": "api",
     },
-    admission_policy = "api-prod-release",
+    admission_policy = "//build-tools/deploy/policies:api_prod_release_v1",
     environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "api",
@@ -1449,6 +1459,11 @@ deployment(
         "type": "helm-release",
         "config": "helm/values.yaml",
     },
+    smoke = {
+        "type": "http-smoke",
+        "path": "/healthz",
+    },
+    secret_requirements = {},
 )
 ```
 
@@ -1476,7 +1491,7 @@ deployment(
         "namespace": "shared-observability",
         "release": "otel-collector",
     },
-    admission_policy = "shared-observability-prod-release",
+    admission_policy = "//build-tools/deploy/policies:shared_observability_prod_release_v1",
     environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "shared-observability",
@@ -1495,6 +1510,11 @@ deployment(
         "type": "helm-release",
         "config": "helm/values.yaml",
     },
+    smoke = {
+        "type": "http-smoke",
+        "path": "/ready",
+    },
+    secret_requirements = {},
 )
 ```
 
@@ -1585,6 +1605,12 @@ Plain-language rule:
 
 - if this deployment owns the resource lifecycle, the provisioner may reconcile it
 - if another system or team owns it, this deployment should validate or reference it, not take control of it
+
+Shared-resource coordination rule:
+
+- when a mutable shared resource is substantial enough to deserve ongoing ownership, it should usually be modeled as its own deployment and referenced through explicit prerequisites rather than by widening unrelated deployment locks ad hoc
+- widened lock scope should be an exception path for narrowly scoped shared mutations that cannot practically be split into their own owned deployment
+- if lock scope is widened for such an exception, that widened scope must be explicit, reviewed, and treated as part of the deployment's ownership contract rather than an adapter-local convenience
 
 Examples:
 
@@ -1952,7 +1978,7 @@ deployment(
         "id": "pleomino-prod-pages",
     },
     environment_stage = "prod",
-    admission_policy = "pleomino-prod-release",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     components = [
@@ -1966,6 +1992,11 @@ deployment(
         "type": "wrangler-pages",
         "config": "wrangler.jsonc",
     },
+    smoke = {
+        "type": "http-smoke",
+        "path": "/",
+    },
+    secret_requirements = {},
 )
 ```
 
@@ -2104,7 +2135,7 @@ deployment(
     provider_target = {
         "id": "marketing-docs-prod",
     },
-    admission_policy = "marketing-docs-prod-release",
+    admission_policy = "//build-tools/deploy/policies:marketing_docs_prod_release_v1",
     environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "marketing-docs",
@@ -2128,6 +2159,11 @@ deployment(
         "type": "custom-built-in",
         "config": "publisher.json",
     },
+    smoke = {
+        "type": "http-smoke",
+        "path": "/",
+    },
+    secret_requirements = {},
 )
 ```
 
@@ -2361,7 +2397,7 @@ deployment(
     provider_target = {
         "id": "pleomino-dev-pages",
     },
-    admission_policy = "pleomino-dev-release",
+    admission_policy = "//build-tools/deploy/policies:pleomino_dev_release_v1",
     environment_stage = "dev",
     protection_class = "shared_nonprod",
     promotion_lane = "pleomino",
@@ -2433,8 +2469,10 @@ Shared-environment locking policy:
 - shared environments should use a central Postgres-backed control plane for deploy coordination
 - every deployment should resolve to a lock scope
 - the default lock scope should be derived from `provider` plus a normalized canonical provider-target identity
+- if a deployment legitimately mutates a reviewed shared resource outside its normal publish target, the preferred model is to split that shared resource into its own deployment and use prerequisites rather than silently widening locks
 - any explicit lock-scope override is a documented escape hatch for special cases, not the normal path
 - an override must validate as at least as strict as the provider-target-derived scope; it must not permit two runs that could mutate the same live target to proceed independently
+- if an override exists because shared-resource mutation cannot practically be modeled as its own deployment, that widened scope must be explicit, reviewed, and tied to the deployment's ownership policy
 - all fields required to uniquely identify the mutable live target must participate in that normalized identity
 - only one active mutating run should run for a lock scope at a time
 - different lock scopes may run in parallel
@@ -2563,7 +2601,7 @@ deployment(
         "id": "pleomino-prod-pages",
     },
     environment_stage = "prod",
-    admission_policy = "pleomino-prod-release",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     components = [
@@ -2646,7 +2684,6 @@ Promotion-lane compatibility contract:
   - component ids
   - component kinds
   - publisher type
-  - provisioner type
   - rollout semantics
   - resolved-kind contract and artifact-identity semantics
 - the following environment-specific differences are normal and do not break promotion compatibility on their own:
@@ -2656,6 +2693,8 @@ Promotion-lane compatibility contract:
   - secrets and secret references
   - smoke endpoints, preview URLs, or equivalent health targets
   - provider-native non-identity settings that are intentionally derived from environment-specific target identity
+- provisioner differences are allowed by default as long as they do not change the meaning of the reused artifact, the publisher/runtime contract, or the lane's rollout semantics
+- a lane may explicitly opt into stricter infra-coupled promotion policy if matching provisioner behavior is part of its reviewed release contract
 - any other difference that changes how the same artifact would be interpreted, provisioned, or published across the lane should be treated as an explicit reviewed compatibility exception rather than as a silent default
 
 Mobile-store and SSR compatibility note:
@@ -3227,7 +3266,7 @@ cloudflare_static_pwa_deployment(
         "id": "pleomino-prod-pages",
     },
     environment_stage = "prod",
-    admission_policy = "pleomino-prod-release",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
@@ -3383,6 +3422,8 @@ def cloudflare_static_pwa_deployment(
     admission_policy = None,
     promotion_lane = None,
     provisioner = None,
+    smoke = None,
+    secret_requirements = None,
 ):
     deployment(
         name = name,
@@ -3404,6 +3445,8 @@ def cloudflare_static_pwa_deployment(
             "type": "wrangler-pages",
             "config": wrangler_config,
         },
+        smoke = smoke,
+        secret_requirements = secret_requirements,
     )
 ```
 
@@ -3419,10 +3462,15 @@ cloudflare_static_pwa_deployment(
         "id": "pleomino-prod-pages",
     },
     environment_stage = "prod",
-    admission_policy = "pleomino-prod-release",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
+    smoke = {
+        "type": "http-smoke",
+        "path": "/",
+    },
+    secret_requirements = {},
 )
 ```
 
@@ -3456,6 +3504,8 @@ def puzzle_cloudflare_deployment(
     admission_policy = None,
     promotion_lane = None,
     provisioner = None,
+    smoke = None,
+    secret_requirements = None,
 ):
     cloudflare_static_pwa_deployment(
         name = name,
@@ -3467,6 +3517,8 @@ def puzzle_cloudflare_deployment(
         protection_class = protection_class,
         promotion_lane = promotion_lane,
         provisioner = provisioner,
+        smoke = smoke,
+        secret_requirements = secret_requirements,
     )
 ```
 
@@ -3482,10 +3534,15 @@ puzzle_cloudflare_deployment(
         "id": "pleomino-prod-pages",
     },
     environment_stage = "prod",
-    admission_policy = "pleomino-prod-release",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
+    smoke = {
+        "type": "http-smoke",
+        "path": "/",
+    },
+    secret_requirements = {},
 )
 ```
 
@@ -3544,7 +3601,7 @@ puzzle_cloudflare_deployment(
         "id": "pleomino-prod-pages",
     },
     environment_stage = "prod",
-    admission_policy = "pleomino-prod-release",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
@@ -3623,7 +3680,7 @@ deployment(
         "namespace": "api-prod",
         "release": "api",
     },
-    admission_policy = "api-prod-release",
+    admission_policy = "//build-tools/deploy/policies:api_prod_release_v1",
     environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "api",
@@ -3643,6 +3700,11 @@ deployment(
         "type": "helm-release",
         "config": "helm/values.yaml",
     },
+    smoke = {
+        "type": "http-smoke",
+        "path": "/ready",
+    },
+    secret_requirements = {},
 )
 ```
 
@@ -3679,7 +3741,7 @@ deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
-    admission_policy = "pleomino-prod-release",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
     environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
@@ -3698,6 +3760,11 @@ deployment(
         "type": "wrangler-pages",
         "config": "wrangler.jsonc",
     },
+    smoke = {
+        "type": "http-smoke",
+        "path": "/",
+    },
+    secret_requirements = {},
 )
 ```
 
@@ -3915,7 +3982,7 @@ deployment(
         "namespace": "shared-observability",
         "release": "shared-observability",
     },
-    admission_policy = "shared-observability-prod-release",
+    admission_policy = "//build-tools/deploy/policies:shared_observability_prod_release_v1",
     environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "shared-observability",
@@ -3935,6 +4002,11 @@ deployment(
         "type": "helm-release",
         "config": "helm/values.yaml",
     },
+    smoke = {
+        "type": "http-smoke",
+        "path": "/ready",
+    },
+    secret_requirements = {},
 )
 ```
 
