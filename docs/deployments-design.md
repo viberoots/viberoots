@@ -1048,8 +1048,10 @@ A component is a deployable project artifact referenced by a deployment.
 Examples:
 
 - a static web app
+- an SSR web app
 - a docs site
 - a worker bundle
+- a mobile app package for store release
 - a future service image or runnable target
 
 Each component should declare:
@@ -1063,6 +1065,8 @@ The important nuance is that `kind` should describe the artifact shape the publi
 Examples:
 
 - `static-webapp` means "a publisher can expect a static-site artifact layout"
+- `ssr-webapp` means "a publisher can expect an SSR-capable web application artifact plus runtime contract"
+- `mobile-app` means "a publisher can expect a signed mobile release artifact suitable for store distribution"
 - `service` means "a publisher can expect a service/image style artifact"
 
 It should not just mean:
@@ -2193,6 +2197,8 @@ Initial canonical kind registry:
 | kind                  | required resolved fields                                    | artifact identity expectation                                                                            |
 | --------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | `static-webapp`       | `id`, `kind`, `target`, `artifact_identity`, `artifact_ref` | strong content digest or equivalent stable fingerprint for the publishable static asset tree or archive  |
+| `ssr-webapp`          | `id`, `kind`, `target`, `artifact_identity`, `artifact_ref` | strong immutable reference for the SSR application package or image plus any declared runtime contract   |
+| `mobile-app`          | `id`, `kind`, `target`, `artifact_identity`, `artifact_ref` | strong immutable reference for the signed store-release artifact such as `.ipa` or `.aab`                |
 | `service`             | `id`, `kind`, `target`, `artifact_identity`, `artifact_ref` | strong image digest or equivalent immutable deployable service artifact reference                        |
 | `third-party-service` | `id`, `kind`, `target`, `artifact_identity`, `artifact_ref` | strong immutable reference for the packaged external service artifact or image consumed by the publisher |
 
@@ -2201,6 +2207,12 @@ Registry rule:
 - built-in publishers and control-plane tooling must use this canonical kind registry when interpreting resolved components
 - adapters must not silently redefine the required fields or artifact-identity meaning for a shared `kind`
 - adding a new `kind` should update this authoritative registry before adapters start treating it as stable
+
+Mobile and SSR note:
+
+- `ssr-webapp` is for non-static web applications whose publish contract includes both deployable server/runtime code and the runtime expectations needed by the built-in publisher
+- `mobile-app` is for signed store-distributed application artifacts whose publish contract targets store tracks or release channels rather than a traditional live URL
+- those kinds should still obey the same repo-level rules around immutable artifact identity, admission, rollout policy, and deployment-run provenance
 
 Minimum required resolved-component fields:
 
@@ -2284,12 +2296,15 @@ Timeout and retry policy:
 - smoke checks should use an explicit timeout budget
 - default smoke classes should be standardized
   - `static-webapp`: 5 minute total budget, including retries
+  - `ssr-webapp`: 10 minute total budget, including retries
+  - `mobile-app`: adapter-defined validation or release-health checks rather than URL smoke by default
   - `service` and `third-party-service`: 10 minute total budget, including retries
   - adapters may define additional classes only when they document them explicitly
 - smoke may auto-retry for transient readiness or network failures, up to 3 retries within that timeout budget
 - retries should not hide a final smoke failure; they only reduce false negatives from brief propagation or readiness delays
 - validators should derive the default smoke budget from the declared component kind or explicit smoke runner class, not from ad hoc team convention
 - if a deployment declares a smoke timeout override, that override should be explicit deployment metadata or explicit built-in adapter policy, not an undocumented per-environment convention
+- `mobile-app` smoke should normally mean store-upload validation, processing success, staged-rollout health, or equivalent release-health evidence rather than a homepage probe
 
 Preview policy:
 
@@ -2615,6 +2630,12 @@ Promotion-lane compatibility contract:
   - smoke endpoints, preview URLs, or equivalent health targets
   - provider-native non-identity settings that are intentionally derived from environment-specific target identity
 - any other difference that changes how the same artifact would be interpreted, provisioned, or published across the lane should be treated as an explicit reviewed compatibility exception rather than as a silent default
+
+Mobile-store and SSR compatibility note:
+
+- for `mobile-app`, promotion-safe lanes should treat store track or channel progression, staged-rollout policy, signing model, and publisher type as part of the lane-compatibility contract
+- for `ssr-webapp`, promotion-safe lanes should treat runtime contract, publisher type, and any required serving topology assumptions as part of the lane-compatibility contract
+- if a deployment family needs environment-specific build-time substitution to produce a valid mobile or SSR artifact, it should not claim normal same-artifact promotion semantics without an explicit reviewed exception
 
 Planned promotion model:
 
@@ -2957,6 +2978,50 @@ Examples:
 - retiring `pleomino-staging` after the environment is intentionally decommissioned
 - migrating a deployment from one provider-native target name to another during a controlled cutover
 - transferring ownership of a reviewed alias target from one deployment id to its successor during a short-lived migration window
+
+## Mobile App Store And SSR Fit
+
+This design should be flexible enough to support both mobile-store releases and non-static SSR web apps
+without changing the core deployment model.
+
+### Mobile App Store Releases
+
+For Apple App Store and Google Play style releases:
+
+- the deployment id should still name one normal release target owned by the repo
+- `provider_target` should identify the concrete store app and default release track or channel
+- the built artifact should be a signed immutable mobile release artifact, typically an `.ipa` or `.aab`
+- the built-in publisher should own upload, processing, staged rollout, and release-track promotion semantics
+- `promotion_lane` and `environment_stage` should model track progression such as internal, beta, staging, or production-like release channels through explicit deployment ids rather than one deployment dynamically retargeting itself
+- store credentials and signing-related secret requirements should be explicit through `secret_requirements`
+- smoke should usually mean store-processing validation, installability checks, staged-rollout health, or other release-health evidence rather than a simple URL check
+
+Mobile defaulting philosophy:
+
+- the common case should still look like "build signed artifact once, promote that exact artifact through store tracks"
+- teams should not need a second deployment model just because the destination is a store instead of a URL
+
+### Non-Static SSR Web Apps
+
+For non-static SSR web applications:
+
+- use `kind = "ssr-webapp"` when the publisher consumes an SSR-capable application artifact rather than a purely static asset tree
+- the built artifact should remain environment-neutral for promotion-safe lanes
+- environment-specific values should be injected at publish or runtime from deployment metadata, provider config, runtime config, or secrets
+- the built-in publisher should own the hosting-platform-specific mechanics, such as packaging for the target runtime, deploying the server artifact, and wiring any declared runtime expectations
+- smoke should default to built-in HTTP or release-health checks appropriate to the SSR serving contract rather than being inferred ad hoc from app structure
+
+SSR defaulting philosophy:
+
+- use `static-webapp` when the common case is a static asset publish
+- use `ssr-webapp` when the common case is a server-rendered or edge-rendered app with an explicit runtime contract
+- do not collapse SSR into generic `service` unless the deployment is intentionally being treated as a general backend service rather than a first-class web app release
+
+Initial built-in publisher direction:
+
+- mobile-store support should come from built-in publishers such as App Store Connect or Google Play publishers rather than package-local release scripts
+- SSR support should come from built-in hosting publishers that explicitly document the `ssr-webapp` runtime contract they accept
+- adding those publishers is implementation work, but their fit is already within the contract this design defines
 
 Recommended deployment-record field-shape guidance:
 
