@@ -391,6 +391,26 @@ Defaulting philosophy:
 - local-only and single-component flows should remain easy to declare and reason about
 - protected/shared, multi-component, cross-lane, or exception-path flows should be explicit rather than relying on clever inference
 
+Common-case summary:
+
+- a simple local-only deployment should usually need only:
+  - `provider`
+  - `provider_target`
+  - one component
+  - one publisher
+- add a `provisioner` only when the destination really needs setup owned by the deployment
+- add `preview` only when preview is intentionally supported
+- add `rollout_policy` only when the deployment is multi-component or otherwise needs explicit staged behavior
+- for protected/shared deployments, the common single-component path should still stay compact:
+  - `promotion_lane`
+  - `environment_stage`
+  - `admission_policy`
+  - `protection_class`
+  - one built-in publisher
+  - explicit `smoke`
+  - explicit `secret_requirements` even when empty
+- when a repo-wide default can safely derive something such as `lane_policy` from `promotion_lane`, the document prefers that documented derivation over making every deployment restate the same fact
+
 ## Deliberately Not Fixed Yet
 
 This design is intentionally opinionated about the model, but still leaves some implementation policy choices open:
@@ -671,6 +691,7 @@ Safety rule:
 
 - preview must publish to an explicitly isolated preview target
 - if a provider cannot guarantee that isolation, the adapter should reject `--preview` for that deployment rather than silently publishing to the normal live target with preview-like labeling
+- preview should be considered supported only when the deployment metadata includes an explicit `preview` policy block or a documented provider-wide default that the deployment has opted into
 
 How preview target selection works:
 
@@ -678,6 +699,56 @@ How preview target selection works:
 - the deployment metadata may explicitly declare preview targeting behavior
 - or the provider adapter may define a deterministic derivation rule from deployment metadata plus run context such as PR number, branch name, or commit SHA
 - the rule must be validated before any mutating step
+
+Preview metadata defaults:
+
+- the common default is that preview is unsupported unless the deployment opts in
+- when preview is supported, the preview metadata may rely on provider-wide built-in defaults for cleanup TTL, smoke behavior, or lock-scope separation to reduce repetition
+- those defaults should still be part of one authoritative built-in preview policy, not adapter-local guesswork
+
+Concrete preview-enabled example:
+
+```python
+deployment(
+    name = "deploy",
+    provider = "cloudflare-pages",
+    provider_target = {
+        "id": "pleomino-prod-pages",
+    },
+    environment_stage = "prod",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
+    protection_class = "production_facing",
+    promotion_lane = "pleomino",
+    preview = {
+        "target_derivation": "run-scoped-provider-default",
+        "isolation_class": "provider-managed-isolated-preview",
+        "cleanup_ttl": "7d",
+        "smoke_policy_override": {
+            "use_preview_url": True,
+        },
+        "separate_lock_scope": True,
+    },
+    components = [
+        {
+            "id": "web",
+            "kind": "static-webapp",
+            "target": "//projects/apps/pleomino:app",
+        },
+    ],
+    publisher = {
+        "type": "wrangler-pages",
+        "config": "wrangler.jsonc",
+    },
+    smoke = {
+        "type": "http-smoke",
+        "path": "/",
+    },
+    secret_requirements = {},
+)
+```
+
+This example is intentionally explicit, but in the common case the preview block can still rely on one
+documented provider-wide default policy once the deployment opts in.
 
 What "explicit" means here:
 
@@ -754,6 +825,12 @@ Default diff-base policy:
 - post-merge automation should compare against the previous successful deploy baseline for the relevant environment branch when that data is available
 - if no upstream or baseline can be determined, the tool should fail explicitly and ask for an override instead of silently choosing an unsafe diff base
 
+Promotion-flow rule:
+
+- for later-stage protected/shared promotion flows, lane admission and immutable-artifact reuse are the primary control surfaces
+- `--from-changes` should not be the thing that decides which already-admitted artifact gets promoted into a later stage
+- in those flows, `--from-changes` may still help identify impacted deployments within the admitted lane revision, but it must remain subordinate to the lane policy, source-run selection, and recorded admitted artifact
+
 Operator default summary:
 
 - `deploy --from-changes` on a developer machine means "compare my current `HEAD` against `git merge-base HEAD @{upstream}`"
@@ -768,10 +845,12 @@ Environment-lane policy:
 - lane membership should be explicit deployment metadata, not only an implicit naming convention
 - `environment_stage` should be explicit deployment metadata for protected/shared deployments rather than inferred only from deployment id naming
 - a family lane may own branches such as `env/<family>/dev -> env/<family>/staging -> env/<family>/prod`
+- the authoritative stage ordering, branch mapping, and allowed promotion edges should come from the lane's central `lane_policy`, not from CI convention alone
 - the authoritative baseline for an environment-mutating `--from-changes` run is the last successful deploy baseline recorded for that lane
 - one mutating `--from-changes` invocation for protected or shared environments should stay within one environment lane
 - if the changed set affects deployments in multiple environment lanes, the selector should require explicit lane selection or split the result into separate non-mutating result sets rather than mutating all lanes at once
 - local or non-mutating inspection flows may still report deployments across multiple lanes when that is useful for visibility
+- later-stage protected/shared promotion runs should prefer `--source-run-id` or equivalent admitted-artifact selection over repo-diff-driven selection
 
 Monorepo clarification:
 
@@ -909,6 +988,7 @@ deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    lane_policy = "//build-tools/deploy/lanes:pleomino_v1",
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
     protection_class = "production_facing",
@@ -938,6 +1018,7 @@ In this example:
 - `environment_stage` is included because lane ordering and default branch selection should be explicit deployment metadata too
 - `protection_class` is included because environment classification is part of the authoritative deployment contract
 - `promotion_lane` is included because this example represents a named environment that participates in protected/shared promotion policy
+- `lane_policy` is shown explicitly here to make the authoritative lane object concrete for onboarding, even though some repos may derive it from `promotion_lane` through one documented default convention
 - deployments that are truly local-only or otherwise outside protected/shared promotion policy may omit `promotion_lane`, but that omission should be intentional and explained by the deployment's policy class
 - the smoke block uses a built-in smoke runner shape instead of a package-local executable hook because this example is compatible with protected/shared policy
 
@@ -960,11 +1041,16 @@ Suggested metadata shape conventions:
     - required for deployments that participate in protected/shared promotion policy
     - identifies the independently promoted deployment family this deployment belongs to
     - should be explicit deployment metadata rather than inferred only from naming convention
+  - `lane_policy`
+    - required for deployments that participate in protected/shared promotion policy unless a documented repo-default derivation from `promotion_lane` is in effect
+    - should be a Buck-visible, repo-owned reference to the authoritative lane-policy object for that deployment family
+    - should define ordered stages, branch mapping, allowed promotion edges, and any stricter lane-specific compatibility or admission rules
+    - the sensible common-case default may derive `lane_policy` from `promotion_lane`, for example through one canonical repo convention, but that derivation itself must be documented and authoritative
   - `environment_stage`
     - required for deployments that participate in protected/shared promotion policy
     - identifies where this deployment sits within its promotion lane
     - is not a repo-global closed enum
-    - must be a stage label defined by that lane's central ordered lane policy
+    - must be a stage label defined by that deployment's authoritative `lane_policy`
     - common lanes will often use values such as `dev`, `staging`, and `prod`, but lanes may define other ordered stages such as `internal` or `beta`
     - should drive default environment-branch selection and promotion ordering together with `promotion_lane`
   - `admission_policy`
@@ -1008,6 +1094,17 @@ Suggested metadata shape conventions:
     - for `shared_nonprod` and `production_facing`, must be explicit even when empty for vetted built-in-supported shapes so the absence of secret inputs is itself reviewable
     - should declare non-secret secret requirements by step or consumer, so validation and admission can fail early without revealing secret values
     - should remain Buck-visible metadata; secret material itself must not appear there
+  - `preview`
+    - optional
+    - when absent, preview should be treated as unsupported by default
+    - when present, should be the authoritative deployment metadata for preview behavior rather than leaving preview policy to prose or adapter convention
+    - should capture at least:
+      - target-derivation mode
+      - isolation class
+      - cleanup or TTL policy
+      - any smoke-policy override
+      - whether separate lock scope is allowed
+    - the common case may rely on provider-wide built-in defaults for some of those fields, but the deployment metadata must still opt into preview explicitly
   - `prerequisites`
     - optional
     - when present, should be an explicit list of deployment-id prerequisites rather than free-form prose
@@ -2114,6 +2211,10 @@ First-class rollout-shape policy:
 - when such rollout metadata is present, adapters must either honor it or reject the deployment as unsupported
 - when rollout metadata is absent, the adapter-defined `ordered_best_effort` default applies
 - for `shared_nonprod` and `production_facing`, multi-component deployments must declare an explicit rollout policy rather than relying on that default
+- for `shared_nonprod` and `production_facing`, a provider adapter must not accept plain `ordered_best_effort` as the effective v1 runtime behavior unless it can document stronger semantics than that label normally implies
+- in practice, the intended v1 default for protected/shared deployments is:
+  - single-component deployments
+  - or multi-component deployments whose adapter explicitly guarantees stronger semantics than best-effort partial rollout
 - in v1, the intended common case for protected/shared deployments remains a single-component deployment
 - phased smoke checkpoints should be explicit about which component group they validate and whether later phases may proceed on failure
 - the same declared rollout shape should not silently change meaning across adapters
@@ -2798,10 +2899,11 @@ The deployment rule should expose enough metadata for repo tooling to retrieve:
 - provider
 - provider-target identity
 - promotion lane or family membership
+- lane-policy reference
 - environment stage within that lane
 - admission-policy reference
 - protection/environment classification
-- preview-target identity or preview-target derivation policy when preview is supported
+- preview policy metadata and preview-target identity or derivation policy when preview is supported
 - non-secret secret-requirement metadata when secrets are needed by publish, provision, or smoke steps
 - explicit deployment prerequisites when present
 - component list
