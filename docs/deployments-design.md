@@ -362,6 +362,9 @@ treated as planned policy, not open brainstorming:
 - secrets should use `secretspec` as the repo-level contract layer and Vault as the initial production backend
 - protected or shared-environment deploys should be admitted only through CI or the shared control plane
   - direct local mutating deploys to those environments are out of policy except for explicitly controlled emergency procedures
+  - the CI system is intentionally not part of the authoritative deployment model
+  - Jenkins, GitHub Actions, or another CI system may satisfy the admission and trigger role as long as it obeys the same deployment metadata, admission-policy, provenance, and control-plane contracts
+  - a repo may use more than one CI system at once for different lanes or repo slices, provided they do not become competing sources of truth for deployment metadata or admission policy
 - local-only fallback should be explicitly limited
   - shared environments must use the central Postgres control plane
   - personal local/dev workflows may use a local filesystem lock plus a local structured deployment record
@@ -407,7 +410,7 @@ deploy pleomino-prod
 deploy pleomino-prod --preview
 deploy pleomino-prod --validate-only
 deploy pleomino-prod --provision-only
-deploy pleomino-prod --publish-only --run-id <deploy-run-id>
+deploy pleomino-prod --publish-only --source-run-id <deploy-run-id>
 deploy --from-changes
 deploy --list
 ```
@@ -521,7 +524,10 @@ Flag interaction rules:
   - it must not build or select an implicit local artifact on the caller's behalf
   - promotion-grade, retry, and rollback-grade publish-only paths should use the exact previously resolved artifact rather than rebuilding
   - for protected or shared environments, `--publish-only` must require an explicit immutable selector
-  - the normal protected/shared selector should be `--run-id <deploy-run-id>`
+  - the normal protected/shared selector should be `--source-run-id <deploy-run-id>`
+  - `--source-run-id` means "reuse the artifact plus recorded deployment snapshot from this earlier source run"
+  - that source run may come from the same deployment id or from another deployment in the same compatible `promotion_lane`, depending on the operation kind
+  - the control plane must validate operation-kind compatibility, promotion-lane compatibility, and target compatibility before allowing that reuse
   - an optional lower-level `--artifact-ref <artifact-ref>` path may exist for vetted admin or automation use, but it must still identify one exact immutable artifact
   - it must not fall back to "latest local build output" or an implicit rebuild on the operator's machine
   - for protected or shared environments, immutable-artifact reuse operations should replay the recorded deployment snapshot for that run rather than silently reinterpreting current repo metadata or provider config
@@ -621,7 +627,7 @@ When you would use it:
 Example:
 
 ```bash
-deploy pleomino-prod --publish-only --run-id <deploy-run-id>
+deploy pleomino-prod --publish-only --source-run-id <deploy-run-id>
 ```
 
 Plain-language version:
@@ -683,7 +689,7 @@ Preview lifecycle examples:
 
 - CI-managed preview of an already-admitted production artifact
   - CI or the shared control plane selects an already-admitted `pleomino-prod` run
-  - it runs `deploy pleomino-prod --preview --run-id <deploy-run-id>`
+  - it runs `deploy pleomino-prod --preview --source-run-id <deploy-run-id>`
   - the provider adapter derives an isolated target such as `preview-from-run-184`
   - smoke runs against the preview URL
   - when the preview expires, CI or the control plane destroys that isolated target or asks the provider to expire it
@@ -870,7 +876,7 @@ Typical uses:
   - verify that the deployment package, app target, and Wrangler config are wired correctly
 - `deploy pleomino-prod --provision-only`
   - create the Pages project and custom domain configuration if that is repo-owned
-- `deploy pleomino-prod --publish-only --run-id <deploy-run-id>`
+- `deploy pleomino-prod --publish-only --source-run-id <deploy-run-id>`
   - publish one selected previously built immutable artifact to an already-existing Pages project
 - `deploy pleomino-prod`
   - run the full lifecycle in order
@@ -904,7 +910,7 @@ deployment(
         "id": "pleomino-prod-pages",
     },
     environment_stage = "prod",
-    admission_policy = "pleomino-prod-release",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     components = [
@@ -956,12 +962,16 @@ Suggested metadata shape conventions:
     - should be explicit deployment metadata rather than inferred only from naming convention
   - `environment_stage`
     - required for deployments that participate in protected/shared promotion policy
-    - closed enum: `dev`, `staging`, `prod`
     - identifies where this deployment sits within its promotion lane
+    - is not a repo-global closed enum
+    - must be a stage label defined by that lane's central ordered lane policy
+    - common lanes will often use values such as `dev`, `staging`, and `prod`, but lanes may define other ordered stages such as `internal` or `beta`
     - should drive default environment-branch selection and promotion ordering together with `promotion_lane`
   - `admission_policy`
     - required for `shared_nonprod` and `production_facing`
-    - should be an explicit reference to the centrally defined branch/check/approval policy binding for that deployment
+    - should be an explicit reference to a versioned centrally defined branch/check/approval policy object for that deployment
+    - should be Buck-visible and repo-owned rather than an opaque free-form string
+    - should normally be represented as a Buck label or equivalent structured repo-owned policy reference, for example `//build-tools/deploy/policies:pleomino_prod_release_v1`
     - keeps the deploy rule authoritative for which admission policy applies, even if the policy definition itself lives outside the deployment package
   - `protection_class`
     - required
@@ -1151,23 +1161,39 @@ Policy:
 Field-shape guidance:
 
 - `provider_target` should be represented as a structured metadata object, not as free-form prose or an opaque positional tuple
-- the minimum required field is `id`, meaning the stable provider-side target identifier for normal publish mode
+- the minimum required field is `id`, meaning the stable repo-visible shorthand for the provider target used in normal publish mode
 - when additional qualifiers are needed to uniquely identify the live target, represent them as explicit named fields rather than encoding them into one ambiguous string
 - the exact identity field set for a built-in provider must be documented canonically and reviewed as part of the provider contract, not improvised per adapter callsite
 - this is an intentional standardization decision for the document, not an accidental example style choice
 - the shared `id` field gives validation, deployment records, and adapter wiring one predictable anchor identifier while still allowing provider-specific qualifiers beside it
+- for built-in providers, `id` should be a derived canonical shorthand for the full normalized provider-target identity, not a separate competing source of truth
 - examples in this document use compact shapes for readability; production adapters may require additional validated identity fields, but should preserve the same explicit-object model and canonical identity rule
+
+Normalization transform:
+
+- unless a provider-specific rule explicitly says otherwise, canonical identity normalization should:
+  - trim surrounding whitespace from each identity field
+  - reject empty identity fields after trimming
+  - preserve case exactly as declared rather than silently lowercasing or uppercasing
+  - preserve field order according to the provider's documented canonical identity tuple
+  - serialize the canonical lock-key shape exactly as documented in the provider table below
+- implementations must not invent additional case-folding, alias expansion, or punctuation rewriting rules outside that documented canonical transform
 
 Canonical provider-target identity rules for initial built-in providers:
 
-| Provider           | Required identity fields                | Canonical identity notes                                                                                                                                               |
-| ------------------ | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cloudflare-pages` | `id`                                    | `id` is the canonical mutable Pages project identity for normal publish mode. Preview targets must derive a different canonical identity when preview is enabled.      |
-| `s3-static`        | `id`, `bucket`                          | `bucket` participates in canonical live-target identity. `id` remains the stable repo-level anchor and must normalize consistently with the bucket-backed target.      |
-| `kubernetes`       | `id`, `cluster`, `namespace`, `release` | Canonical live-target identity is the cluster/namespace/release tuple. `id` must normalize to that same target identity rather than point at some broader human label. |
+| Provider           | Required identity fields                | Normalization rule                                                                                             | Canonical lock-key shape                     |
+| ------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `cloudflare-pages` | `id`                                    | canonical identity is the trimmed Pages project name; `id` must equal that canonical project identity          | `cloudflare-pages:<id>`                      |
+| `s3-static`        | `id`, `bucket`                          | canonical identity is the trimmed bucket name; `id` must be the derived shorthand for that same bucket target  | `s3-static:<bucket>`                         |
+| `kubernetes`       | `id`, `cluster`, `namespace`, `release` | canonical identity is the trimmed `cluster/namespace/release` tuple; `id` must be derived from that same tuple | `kubernetes:<cluster>/<namespace>/<release>` |
 
 For any built-in provider added later, this same table or its direct successor must be updated before the
 provider is considered fully in policy for protected/shared deployment use.
+
+Normalization rule:
+
+- locking, ownership checks, preview isolation, and deployment records must all use the same normalized canonical provider-target identity for a given provider
+- a built-in provider adapter must not treat `id` as advisory while separately locking or recording a different effective target identity
 
 Minimum `smoke.exception` fields:
 
@@ -1296,7 +1322,7 @@ deployment(
         "id": "pleomino-prod-pages",
     },
     environment_stage = "prod",
-    admission_policy = "pleomino-prod-release",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     components = [
@@ -1535,7 +1561,7 @@ This is one of the reasons `--publish-only` exists.
 If the deployment has a provisioner but you do not want to run provisioning on a particular release, you can use:
 
 ```bash
-deploy pleomino-prod --publish-only --run-id <deploy-run-id>
+deploy pleomino-prod --publish-only --source-run-id <deploy-run-id>
 ```
 
 That is an operational choice for one run.
@@ -2473,7 +2499,8 @@ Release-admission contract for protected/shared environments:
     - the reusable artifact attestation binds artifact identity to source revision plus build inputs
     - the shared control plane verifies that artifact attestation before publish
     - the selected artifact or revision still matches the environment's promotion and admission policy
-    - for protected/shared `--publish-only`, retry, rollback, and other immutable-artifact reuse paths, the control plane should replay the recorded deployment snapshot for that run rather than silently re-reading current repo metadata or provider config as if it were the original deployment state
+    - for protected/shared `--publish-only`, retry, rollback, and other immutable-artifact reuse paths, the control plane should replay the recorded deployment snapshot for the selected source run rather than silently re-reading current repo metadata or provider config as if it were the original deployment state
+    - for source-run reuse across deployments, the source run must come from the same compatible `promotion_lane`, and the requested operation kind must be valid for that source/target pairing
   - for `--provision-only` and other non-publishing mutating runs:
     - artifact attestation is not required
     - admission still requires branch, approval, lane, target, and locking policy to pass before mutation
@@ -2562,7 +2589,7 @@ Normal lock-scope story:
 - canonical provider-target identity for this deployment is `provider = cloudflare-pages` plus `provider_target.id = pleomino-prod-pages`
 - the derived shared-environment lock scope is therefore conceptually `cloudflare-pages:pleomino-prod-pages`
 - `deploy pleomino-prod`
-- `deploy pleomino-prod --publish-only --run-id <deploy-run-id>`
+- `deploy pleomino-prod --publish-only --source-run-id <deploy-run-id>`
 - `deploy pleomino-prod --preview`
 
 All three runs must contend on that same lock by default unless preview is explicitly configured to publish
@@ -2705,6 +2732,8 @@ Concrete promotion story:
 1. CI builds artifact `artifact_ref = nix:sha256-pleomino-web-7f3c2a` from source revision `abc1234` for `pleomino-staging`.
 2. The staging run publishes that exact artifact and records `artifact_lineage_id = pleomino-web/2026-03-19/abc1234`.
 3. Promotion to `pleomino-prod` reuses that same `artifact_ref` and `artifact_lineage_id` rather than rebuilding from `abc1234` on a different machine.
+   - the normal operator input for that reuse would be `--source-run-id <staging-run-id>`
+   - that source run is valid because it is a compatible run from the same `promotion_lane`
 4. The production deployment record differs from the staging record because deployment metadata, approvals, target identity, and publish result are environment-specific, even though artifact identity is unchanged.
 
 Concrete rollback story:
@@ -2712,6 +2741,7 @@ Concrete rollback story:
 1. `pleomino-prod` later ships a bad artifact from revision `def5678`.
 2. Operators choose an earlier known-good artifact with `artifact_ref = nix:sha256-pleomino-web-7f3c2a`.
 3. The rollback run records `operation_kind = rollback`, `parent_run_id` pointing at the failed or superseded production run, and the reused `artifact_lineage_id`.
+   - the normal operator input for that reuse would be `--source-run-id <known-good-production-run-id>`
 4. If that artifact is no longer retrievable, the correct behavior is to surface that retention failure explicitly, not to rebuild a lookalike artifact and pretend it is the same release.
 
 Operator summary:
@@ -2891,6 +2921,20 @@ The design intentionally separates reusable artifact attestation from deployment
   - it should bind the deployment metadata fingerprint, provider-config fingerprint, target identity, approvals, and publish result for one concrete run
   - it should make it obvious when the same artifact identity was published under different environment-specific deployment inputs
 
+Minimum replay-snapshot contract for immutable-artifact reuse:
+
+- any recorded deployment snapshot used for protected/shared `--publish-only`, retry, rollback, or promotion-by-reuse should preserve at least:
+  - resolved component data
+  - artifact refs and artifact identities
+  - declared normal target identity
+  - effective run target identity
+  - rendered provider-config snapshot or immutable provider-config reference
+  - rollout policy snapshot
+  - smoke policy snapshot
+  - non-secret secret-contract version or reference set
+  - the versioned `admission_policy` reference used for the source run
+- replay should use that recorded snapshot as the authoritative source for immutable-reuse semantics, with only narrow current-invariant checks layered on top
+
 Minimum required fields:
 
 - `deploy_run_id`
@@ -2992,7 +3036,7 @@ For Apple App Store and Google Play style releases:
 - `provider_target` should identify the concrete store app and default release track or channel
 - the built artifact should be a signed immutable mobile release artifact, typically an `.ipa` or `.aab`
 - the built-in publisher should own upload, processing, staged rollout, and release-track promotion semantics
-- `promotion_lane` and `environment_stage` should model track progression such as internal, beta, staging, or production-like release channels through explicit deployment ids rather than one deployment dynamically retargeting itself
+- `promotion_lane` and lane-defined `environment_stage` labels should model track progression such as internal, beta, staging, or production-like release channels through explicit deployment ids rather than one deployment dynamically retargeting itself
 - store credentials and signing-related secret requirements should be explicit through `secret_requirements`
 - smoke should usually mean store-processing validation, installability checks, staged-rollout health, or other release-health evidence rather than a simple URL check
 
