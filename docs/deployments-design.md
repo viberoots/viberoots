@@ -288,6 +288,9 @@ treated as planned policy, not open brainstorming:
 - promotion should prefer reusing the exact previously built artifact rather than rebuilding per environment
 - promotion should move the same artifact across distinct deployment ids that each name one explicit live target
   - one deployment should not implicitly select among multiple shared environments at publish time
+- reusable artifact attestation should be environment-agnostic
+  - it should bind artifact identity to source revision plus build inputs
+  - deployment-specific metadata, provider config, approvals, and publish results belong to the deployment-run record rather than the reusable artifact attestation
 - promotion should use one-way fast-forward environment branches
   - later environments advance only after required checks pass for earlier environments within the same independently promoted lane
 - rollback for bad app releases should prefer redeploying a prior known-good artifact
@@ -319,6 +322,8 @@ treated as planned policy, not open brainstorming:
   - publishers consume that resolved data shape and must not rediscover artifact semantics ad hoc from build outputs
 - each deployment should declare explicit provider-target identity in deployment metadata
   - adapters must not infer the live target from directory names, branch names, CLI defaults, or unchecked provider config drift
+  - one deployment id should own one normal mutable live target by default
+  - two deployment ids must not share the same normal mutable live target except through an explicit reviewed migration or alias exception
 - protected or shared-environment `--publish-only` must identify the exact artifact being published
   - it must not mean "publish whatever was most recently built on this machine"
   - rebuilding during `--publish-only` is out of policy for those environments unless the operator is intentionally creating a new deploy run instead of reusing an existing artifact
@@ -1017,6 +1022,8 @@ Policy:
 
 - every concrete deployment should declare explicit provider-target identity in authoritative deployment metadata
 - normal promotion between environments should happen by reusing the same artifact across different deployment ids, each with its own provider target
+- one deployment id should own one normal mutable live provider target by default
+- two deployment ids must not share the same normal mutable live provider target except through an explicit reviewed migration or alias exception
 - adapters must not silently derive the live target from branch names, directory names, ambient CLI defaults, or unchecked duplication in provider-native config files
 - when preview mode is supported, preview target selection must also be explicit
   - either deployment metadata declares the preview target shape directly
@@ -1157,6 +1164,8 @@ deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    protection_class = "production_facing",
+    promotion_lane = "pleomino",
     components = [
         {
             "id": "web",
@@ -1215,6 +1224,8 @@ deployment(
         "id": "docs-site-prod",
         "bucket": "docs-site-prod",
     },
+    protection_class = "production_facing",
+    promotion_lane = "docs-site",
     components = [
         {
             "id": "web",
@@ -1258,6 +1269,8 @@ deployment(
         "namespace": "api-prod",
         "release": "api",
     },
+    protection_class = "production_facing",
+    promotion_lane = "api",
     components = [
         {
             "id": "api",
@@ -1300,6 +1313,8 @@ deployment(
         "namespace": "shared-observability",
         "release": "otel-collector",
     },
+    protection_class = "production_facing",
+    promotion_lane = "shared-observability",
     components = [
         {
             "id": "otel-collector",
@@ -1771,6 +1786,8 @@ deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    protection_class = "production_facing",
+    promotion_lane = "pleomino",
     components = [
         {
             "id": "web",
@@ -1916,6 +1933,8 @@ deployment(
     provider_target = {
         "id": "marketing-docs-prod",
     },
+    protection_class = "production_facing",
+    promotion_lane = "marketing-docs",
     components = [
         {
             "id": "marketing",
@@ -2216,19 +2235,23 @@ Release-admission contract for protected/shared environments:
 
 - a run is eligible to mutate a protected or shared environment only when all of the following are true:
   - the source revision comes from the allowed environment branch for that deployment lane
-  - required checks for that environment have passed for the admitted revision or artifact
+  - required checks for that environment have passed for the admitted revision or admitted reusable artifact, as applicable to the run kind
   - any required human or policy approval has been granted
   - the deployment's explicit `promotion_lane` and `protection_class` metadata are present, valid, and match the intended target and admission path
-  - artifact provenance is present and valid for the intended target
-  - for protected/shared publish, the artifact was produced by trusted CI from the admitted source revision
-  - the attestation for that artifact binds artifact identity to source revision plus deployment metadata and provider-config fingerprints
-  - the shared control plane verifies that attestation before publish
-  - the selected artifact or revision still matches the environment's promotion and admission policy
+  - for runs that publish artifacts:
+    - artifact provenance is present and valid for the intended target
+    - for protected/shared publish, the artifact was produced by trusted CI from the admitted source revision
+    - the reusable artifact attestation binds artifact identity to source revision plus build inputs
+    - the shared control plane verifies that artifact attestation before publish
+    - the selected artifact or revision still matches the environment's promotion and admission policy
+  - for `--provision-only` and other non-publishing mutating runs:
+    - artifact attestation is not required
+    - admission still requires branch, approval, lane, target, and locking policy to pass before mutation
   - any explicit deployment prerequisites are satisfied according to their declared mode
     - for `health_gated`, that means a fresh health verdict at admission time unless explicitly documented provider-specific evidence is accepted as equivalent
 - after waiting in queue and revalidating, "still allowed" means at least:
   - the environment branch still points to an allowed revision for this run
-  - the artifact identity still matches the approved revision or approved prior run
+  - for publishing runs, the artifact identity still matches the approved revision or approved prior run
   - the run has not been superseded by a later admitted run for the same lock scope
   - any required approval has not been revoked, expired, or invalidated by newer policy state
   - any health-gated prerequisite still satisfies its declared health requirement, using a fresh revalidation-time health verdict unless explicitly documented equivalent provider evidence is accepted
@@ -2272,6 +2295,15 @@ Promotion should prefer reusing the exact previously built artifact rather than 
 
 That rule also applies to rollback-grade redeploys and publish-only retries whenever the intent is to
 re-ship a known artifact rather than create a new one.
+
+Provenance split for promotion-safe artifact reuse:
+
+- reusable artifact attestation should stay environment-agnostic so the same artifact can move forward through staging, production, and rollback flows without being redefined
+- that reusable artifact attestation should bind artifact identity to source revision plus build inputs
+- deployment-run provenance should capture the environment-specific facts evaluated at publish time, including deployment metadata fingerprint, provider-config fingerprint, target identity, approvals, and publish result
+- promotion should therefore verify both:
+  - the reusable artifact attestation for the artifact being promoted
+  - the deployment-run admission and provenance facts for the environment receiving that artifact
 
 Artifact retention policy:
 
@@ -2435,6 +2467,15 @@ Anti-patterns:
 
 Every deploy run should produce a provider-neutral deployment record.
 
+The design intentionally separates reusable artifact attestation from deployment-run provenance:
+
+- reusable artifact attestation is for build trust
+  - it should bind artifact identity to source revision plus build inputs
+  - it should remain valid when the same artifact is promoted across deployment ids and environments
+- deployment-run provenance is for release trust
+  - it should bind the deployment metadata fingerprint, provider-config fingerprint, target identity, approvals, and publish result for one concrete run
+  - it should make it obvious when the same artifact identity was published under different environment-specific deployment inputs
+
 Minimum required fields:
 
 - `deploy_run_id`
@@ -2487,6 +2528,7 @@ Artifact identity rules:
 - publish should consume the resolved artifact from the build step, not rebuild implicitly
 - publish-only, promotion, retry, and rollback flows should accept a previously recorded artifact reference and should not rebuild unless the operator is intentionally creating a new artifact
 - a recorded artifact reference for a supported reuse flow must remain retrievable for the applicable retention window
+- reusable artifact attestation should bind artifact identity to source revision plus build inputs, not to environment-specific deployment metadata or provider config
 - provider-instance identifiers used during publish should come from authoritative deployment metadata or generated config, not from silently drift-prone duplicated checked-in fields
 - the deployment record should preserve the canonical resolved component data shape or a stable projection of it, rather than only loosely structured adapter-specific paths
 - the deployment record should make it obvious when the same artifact identity was published under different deployment metadata or provider-config inputs
@@ -2497,6 +2539,7 @@ Recommended deployment-record field-shape guidance:
 - `provider_target` in the deployment record should preserve the same conceptual identity declared in deployment metadata, not a lossy human-only label
 - deployment metadata provenance should preserve a stable fingerprint or snapshot reference to the metadata evaluated for the run
 - provider-config provenance should preserve a stable fingerprint or snapshot reference for each provider-native config file that materially influenced publish behavior
+- deployment-run provenance should preserve the publish-time admission facts for that environment, such as approvals and admitted target identity, rather than pretending those were properties of the reusable artifact itself
 - `resolved component list` should preserve one entry per component id, not just an unordered blob of adapter output
 - each resolved component entry should keep at least:
   - component `id`
@@ -2579,11 +2622,17 @@ Better abstraction:
 cloudflare_static_pwa_deployment(
     name = "deploy",
     app_target = "//projects/apps/pleomino:app",
+    provider_target = {
+        "id": "pleomino-prod-pages",
+    },
+    protection_class = "production_facing",
+    promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
 )
 ```
 
-This is concise, but the important concepts remain visible.
+This is concise, but the important concepts remain visible, including the policy-critical
+target and environment-classification fields required for protected/shared deployments.
 
 ## Where Helpers Should Live
 
@@ -2721,11 +2770,21 @@ That belongs in `build-tools`.
 ```python
 load("//build-tools/deploy:defs.bzl", "deployment")
 
-def cloudflare_static_pwa_deployment(name, app_target, provider_target, wrangler_config, provisioner = None):
+def cloudflare_static_pwa_deployment(
+    name,
+    app_target,
+    provider_target,
+    wrangler_config,
+    protection_class,
+    promotion_lane = None,
+    provisioner = None,
+):
     deployment(
         name = name,
         provider = "cloudflare-pages",
         provider_target = provider_target,
+        protection_class = protection_class,
+        promotion_lane = promotion_lane,
         components = [
             {
                 "id": "web",
@@ -2752,6 +2811,8 @@ cloudflare_static_pwa_deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    protection_class = "production_facing",
+    promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
 )
 ```
@@ -2776,12 +2837,22 @@ Helper:
 ```python
 load("//build-tools/deploy:cloudflare.bzl", "cloudflare_static_pwa_deployment")
 
-def puzzle_cloudflare_deployment(name, app_target, provider_target, wrangler_config, provisioner = None):
+def puzzle_cloudflare_deployment(
+    name,
+    app_target,
+    provider_target,
+    wrangler_config,
+    protection_class,
+    promotion_lane = None,
+    provisioner = None,
+):
     cloudflare_static_pwa_deployment(
         name = name,
         app_target = app_target,
         provider_target = provider_target,
         wrangler_config = wrangler_config,
+        protection_class = protection_class,
+        promotion_lane = promotion_lane,
         provisioner = provisioner,
     )
 ```
@@ -2797,6 +2868,8 @@ puzzle_cloudflare_deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    protection_class = "production_facing",
+    promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
 )
 ```
@@ -2855,6 +2928,8 @@ puzzle_cloudflare_deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    protection_class = "production_facing",
+    promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
 )
 ```
@@ -2931,6 +3006,8 @@ deployment(
         "namespace": "api-prod",
         "release": "api",
     },
+    protection_class = "production_facing",
+    promotion_lane = "api",
     components = [
         {
             "id": "api",
@@ -2983,6 +3060,8 @@ deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    protection_class = "production_facing",
+    promotion_lane = "pleomino",
     components = [
         {
             "id": "web",
@@ -3215,6 +3294,8 @@ deployment(
         "namespace": "shared-observability",
         "release": "shared-observability",
     },
+    protection_class = "production_facing",
+    promotion_lane = "shared-observability",
     components = [
         {
             "id": "otel-collector",
@@ -3371,7 +3452,7 @@ Recommended final documentation tasks:
 5. add one short example of explicit smoke exception policy for a non-production deployment
    - make clear that production requires smoke unless explicitly waived
 6. add one compact operator summary for lock scope
-   - explain when `deployment-id` is sufficient and when multiple deployment ids must share a lock scope
+   - explain the normal one-deployment-id/one-live-target case and the explicit reviewed exception path for migrations or aliases
 7. do one final example-consistency pass for provider-target identity
    - make sure concrete deployment examples, metadata examples, and deployment-record examples either include `provider_target` consistently or explicitly state when it is omitted for brevity
 8. do one final editorial pass to keep normative policy visually dominant
@@ -3406,7 +3487,8 @@ examples without changing policy direction.
   - add a compact operational policy summary table
   - add one concrete example deployment record
   - add one concrete example of artifact reuse for promotion or rollback
-  - add one concrete example of lock scope where two deployment ids share one mutable provider-side target
+  - add one concrete example of lock scope derivation for a normal one-deployment-id/one-live-target case
+  - if needed, add one explicitly marked migration or alias exception example showing how shared-target locking is reviewed rather than normal
   - add one concrete example of metadata precedence versus provider config mismatch
 
 ### Tests (in this PR)
