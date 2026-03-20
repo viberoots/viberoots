@@ -444,6 +444,7 @@ So:
 - `pleomino-prod` and `pleomino-staging` are different deployments
 - `deploy pleomino-prod --preview` is still operating on `pleomino-prod`
 - preview should not silently invent a second deployment id or bypass the deployment package's validation rules
+- for `shared_nonprod` and `production_facing`, preview should not be used from unadmitted revisions or artifacts
 
 Plain-language version:
 
@@ -678,14 +679,14 @@ What "explicit" means here:
 
 Preview lifecycle examples:
 
-- CI-managed PR preview
-  - CI detects PR 184
-  - CI runs `deploy pleomino-prod --preview`
-  - the provider adapter derives an isolated target such as `preview-pr-184`
+- CI-managed preview of an already-admitted production artifact
+  - CI or the shared control plane selects an already-admitted `pleomino-prod` run
+  - it runs `deploy pleomino-prod --preview --run-id <deploy-run-id>`
+  - the provider adapter derives an isolated target such as `preview-from-run-184`
   - smoke runs against the preview URL
-  - when the PR closes or the preview expires, CI or the control plane destroys that isolated target or asks the provider to expire it
+  - when the preview expires, CI or the control plane destroys that isolated target or asks the provider to expire it
 - Branch preview with provider-managed ephemeral target
-  - CI publishes a branch preview using the provider's native preview facility
+  - CI publishes a branch preview for a local-only or explicitly preview-safe deployment using the provider's native preview facility
   - the provider owns most of the lifecycle
   - repo policy still requires that the preview target be isolated from the normal live target
 - Manual local preview to a personal isolated target
@@ -702,6 +703,13 @@ Creation and destruction policy:
   - on explicit preview expiry or TTL
   - on manual cleanup through the control plane when automation cannot do it
 - preview cleanup must target only the isolated preview resources; it must not share destructive paths with the normal deployment
+
+Protected/shared preview admission policy:
+
+- preview on `shared_nonprod` and `production_facing` deployments is allowed only from an already-admitted revision or immutable artifact
+- preview for those deployments must still publish to an explicitly isolated preview target class
+- preview for those deployments must not be used to preview unadmitted PR code or to bypass the lane's normal branch, check, or approval policy
+- if a workflow needs PR-driven previews for unadmitted revisions, that should use a different deployment classified for that purpose rather than piggybacking on a protected/shared deployment id
 
 Non-interference guarantees:
 
@@ -750,6 +758,7 @@ Environment-lane policy:
 - each concrete deployment belongs to one environment branch lane for protected/shared mutation
 - the unit of a lane is one independently promoted deployment family, not the whole repo and not one individual deployment id
 - lane membership should be explicit deployment metadata, not only an implicit naming convention
+- `environment_stage` should be explicit deployment metadata for protected/shared deployments rather than inferred only from deployment id naming
 - a family lane may own branches such as `env/<family>/dev -> env/<family>/staging -> env/<family>/prod`
 - the authoritative baseline for an environment-mutating `--from-changes` run is the last successful deploy baseline recorded for that lane
 - one mutating `--from-changes` invocation for protected or shared environments should stay within one environment lane
@@ -892,6 +901,7 @@ deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    environment_stage = "prod",
     admission_policy = "pleomino-prod-release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
@@ -917,6 +927,7 @@ deployment(
 In this example:
 
 - `admission_policy` is included because protected/shared admission policy binding should remain authoritative deployment metadata
+- `environment_stage` is included because lane ordering and default branch selection should be explicit deployment metadata too
 - `protection_class` is included because environment classification is part of the authoritative deployment contract
 - `promotion_lane` is included because this example represents a named environment that participates in protected/shared promotion policy
 - deployments that are truly local-only or otherwise outside protected/shared promotion policy may omit `promotion_lane`, but that omission should be intentional and explained by the deployment's policy class
@@ -941,6 +952,11 @@ Suggested metadata shape conventions:
     - required for deployments that participate in protected/shared promotion policy
     - identifies the independently promoted deployment family this deployment belongs to
     - should be explicit deployment metadata rather than inferred only from naming convention
+  - `environment_stage`
+    - required for deployments that participate in protected/shared promotion policy
+    - closed enum: `dev`, `staging`, `prod`
+    - identifies where this deployment sits within its promotion lane
+    - should drive default environment-branch selection and promotion ordering together with `promotion_lane`
   - `admission_policy`
     - required for `shared_nonprod` and `production_facing`
     - should be an explicit reference to the centrally defined branch/check/approval policy binding for that deployment
@@ -975,6 +991,10 @@ Suggested metadata shape conventions:
     - production smoke exceptions should be represented explicitly as a nested `smoke.exception` object rather than by omitting the field and hoping readers infer intent
     - for `shared_nonprod` and `production_facing`, smoke definitions must come from a vetted built-in smoke-runner registry
     - package-local executable smoke entries are invalid for `shared_nonprod` and `production_facing`
+  - `secret_requirements`
+    - optional, but recommended whenever a deployment step needs secrets
+    - should declare non-secret secret requirements by step or consumer, so validation and admission can fail early without revealing secret values
+    - should remain Buck-visible metadata; secret material itself must not appear there
   - `prerequisites`
     - optional
     - when present, should be an explicit list of deployment-id prerequisites rather than free-form prose
@@ -1268,6 +1288,7 @@ deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    environment_stage = "prod",
     admission_policy = "pleomino-prod-release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
@@ -1330,6 +1351,7 @@ deployment(
         "bucket": "docs-site-prod",
     },
     admission_policy = "docs-site-prod-release",
+    environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "docs-site",
     components = [
@@ -1376,6 +1398,7 @@ deployment(
         "release": "api",
     },
     admission_policy = "api-prod-release",
+    environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "api",
     components = [
@@ -1421,6 +1444,7 @@ deployment(
         "release": "otel-collector",
     },
     admission_policy = "shared-observability-prod-release",
+    environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "shared-observability",
     components = [
@@ -1894,6 +1918,7 @@ deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    environment_stage = "prod",
     admission_policy = "pleomino-prod-release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
@@ -2034,6 +2059,8 @@ Operational consequence:
 - if one component publishes and a later component fails under a best-effort policy, the deployment run is a publish failure
 - the deployment record must preserve which components published successfully, which did not, and which artifact identity each component used
 - any follow-up retry or rollback must use that recorded state explicitly
+- for `shared_nonprod` and `production_facing`, the deployment remains the operator-atomic unit in v1
+- partial component retry, rollback, or promotion is out of scope in v1 for those classifications even when partial publish state is recorded for audit and reconciliation
 
 Example:
 
@@ -2045,6 +2072,7 @@ deployment(
         "id": "marketing-docs-prod",
     },
     admission_policy = "marketing-docs-prod-release",
+    environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "marketing-docs",
     rollout_policy = {
@@ -2186,6 +2214,8 @@ Provisioner safety policy:
 - create and in-place update are normal provisioner behavior
 - normal deploy flows must not delete, replace, rename, or transfer ownership of live resources
 - delete, replacement, rename, or ownership-transfer operations require an explicit separate migration path or equivalent break-glass intent
+- a normal deploy invocation must fail closed if the provisioner detects a destructive plan
+- destructive provisioner actions require a separate reviewed workflow or explicit operator intent surface that is distinct from the normal deploy path
 - app artifact rollback should not imply destructive infra rollback
 
 ### Publish
@@ -2249,6 +2279,7 @@ Preview policy:
 - preview may use a lighter smoke policy only when that difference is explicitly documented by the deployment or provider adapter
 - preview does not change deployment identity; it only changes publish mode and, when configured, the smoke target
 - preview should not be used as a loophole to bypass the normal admission policy for protected or shared environments
+- for `shared_nonprod` and `production_facing`, preview is allowed only from an already-admitted revision or immutable artifact
 
 Exception representation policy:
 
@@ -2273,6 +2304,7 @@ deployment(
         "id": "pleomino-dev-pages",
     },
     admission_policy = "pleomino-dev-release",
+    environment_stage = "dev",
     protection_class = "shared_nonprod",
     promotion_lane = "pleomino",
     components = [
@@ -2402,6 +2434,7 @@ Release-admission contract for protected/shared environments:
   - required checks for that environment have passed for the admitted revision or admitted reusable artifact, as applicable to the run kind
   - any required human or policy approval has been granted
   - the deployment's explicit `promotion_lane`, `protection_class`, and `admission_policy` metadata are present, valid, and match the intended target and admission path
+  - the deployment's explicit `environment_stage` metadata is present, valid, and matches the intended lane role for this deployment
   - for runs that publish artifacts:
     - artifact provenance is present and valid for the intended target
     - for protected/shared publish, the artifact was produced by trusted CI from the admitted source revision
@@ -2470,6 +2503,7 @@ deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    environment_stage = "prod",
     admission_policy = "pleomino-prod-release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
@@ -2638,9 +2672,11 @@ The deployment rule should expose enough metadata for repo tooling to retrieve:
 - provider
 - provider-target identity
 - promotion lane or family membership
+- environment stage within that lane
 - admission-policy reference
 - protection/environment classification
 - preview-target identity or preview-target derivation policy when preview is supported
+- non-secret secret-requirement metadata when secrets are needed by publish, provision, or smoke steps
 - explicit deployment prerequisites when present
 - component list
 - provisioner config
@@ -2675,6 +2711,7 @@ Precedence and consistency rules:
   - generate one from the other to avoid duplication
   - or require validation-time equality and fail on mismatch
 - the deploy CLI must not silently let provider config override Buck deployment metadata for core deployment facts
+- for `shared_nonprod` and `production_facing`, mutable live-target identity must be injected or rendered from deployment metadata rather than duplicated as an independently editable checked-in provider-config field
 
 Preferred pattern:
 
@@ -2775,6 +2812,7 @@ Policy:
 - Vault should be the initial production backend behind that contract
 - backend switching should remain possible without changing deployment metadata semantics
 - runtime-secret injection must avoid leaking secret material into Buck metadata, checked-in files, or durable deployment records
+- deployments should expose non-secret `secret_requirements` metadata so validation, admission, and operator tooling can determine whether the secret contract is complete before mutation begins
 
 Anti-patterns:
 
@@ -2811,7 +2849,10 @@ Minimum required fields:
 - source revision identifier
 - actor or trigger source, such as human, CI job, or automation
 - publish mode, such as normal or preview
-- provider-target identity
+- declared normal provider-target identity
+- effective run target identity
+  - for normal publish this should match the declared normal provider target
+  - for preview this should preserve the isolated preview target that was actually mutated
 - resolved component list
 - artifact identity for each published component
 - deployment metadata fingerprint or stable snapshot reference
@@ -2858,6 +2899,7 @@ Artifact identity rules:
 Recommended deployment-record field-shape guidance:
 
 - `provider_target` in the deployment record should preserve the same conceptual identity declared in deployment metadata, not a lossy human-only label
+- preview records should preserve both the declared normal `provider_target` and the effective isolated preview target actually used by the run
 - deployment metadata provenance should preserve a stable fingerprint or snapshot reference to the metadata evaluated for the run
 - provider-config provenance should preserve a stable fingerprint or snapshot reference for each provider-native config file that materially influenced publish behavior
 - deployment-run provenance should preserve the publish-time admission facts for that environment, such as approvals and admitted target identity, rather than pretending those were properties of the reusable artifact itself
@@ -2911,6 +2953,9 @@ the vocabulary defined above:
   "publish_mode": "normal",
   "provider": "cloudflare-pages",
   "provider_target": {
+    "id": "pleomino-prod-pages"
+  },
+  "effective_run_target": {
     "id": "pleomino-prod-pages"
   },
   "lock_scope": "cloudflare-pages:pleomino-prod-pages",
@@ -3010,6 +3055,7 @@ cloudflare_static_pwa_deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    environment_stage = "prod",
     admission_policy = "pleomino-prod-release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
@@ -3162,6 +3208,7 @@ def cloudflare_static_pwa_deployment(
     provider_target,
     wrangler_config,
     protection_class,
+    environment_stage = None,
     admission_policy = None,
     promotion_lane = None,
     provisioner = None,
@@ -3170,6 +3217,7 @@ def cloudflare_static_pwa_deployment(
         name = name,
         provider = "cloudflare-pages",
         provider_target = provider_target,
+        environment_stage = environment_stage,
         admission_policy = admission_policy,
         protection_class = protection_class,
         promotion_lane = promotion_lane,
@@ -3199,6 +3247,7 @@ cloudflare_static_pwa_deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    environment_stage = "prod",
     admission_policy = "pleomino-prod-release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
@@ -3232,6 +3281,7 @@ def puzzle_cloudflare_deployment(
     provider_target,
     wrangler_config,
     protection_class,
+    environment_stage = None,
     admission_policy = None,
     promotion_lane = None,
     provisioner = None,
@@ -3241,6 +3291,7 @@ def puzzle_cloudflare_deployment(
         app_target = app_target,
         provider_target = provider_target,
         wrangler_config = wrangler_config,
+        environment_stage = environment_stage,
         admission_policy = admission_policy,
         protection_class = protection_class,
         promotion_lane = promotion_lane,
@@ -3259,6 +3310,7 @@ puzzle_cloudflare_deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    environment_stage = "prod",
     admission_policy = "pleomino-prod-release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
@@ -3320,6 +3372,7 @@ puzzle_cloudflare_deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    environment_stage = "prod",
     admission_policy = "pleomino-prod-release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
@@ -3400,6 +3453,7 @@ deployment(
         "release": "api",
     },
     admission_policy = "api-prod-release",
+    environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "api",
     components = [
@@ -3455,6 +3509,7 @@ deployment(
         "id": "pleomino-prod-pages",
     },
     admission_policy = "pleomino-prod-release",
+    environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     components = [
@@ -3690,6 +3745,7 @@ deployment(
         "release": "shared-observability",
     },
     admission_policy = "shared-observability-prod-release",
+    environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "shared-observability",
     components = [
