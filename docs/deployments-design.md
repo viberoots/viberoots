@@ -298,7 +298,7 @@ treated as planned policy, not open brainstorming:
   - it should back deployment-record storage
   - it should back shared-environment deploy locking
 - shared-environment locking should use an explicit lock scope
-  - the default lock scope should be derived from canonical provider-target identity
+  - the default lock scope should be derived from `provider` plus a normalized canonical provider-target identity
   - explicit overrides are special-case escape hatches and must validate as at least as strict as the derived scope
   - one active mutating run should run per lock scope
   - different lock scopes may run in parallel
@@ -348,7 +348,7 @@ treated as planned policy, not open brainstorming:
 - provisioners should be non-destructive by default during normal deploy flows
   - delete or replace behavior that can remove owned live resources should require an explicit separate operator path or equivalent break-glass intent
 - `--provision-only` should not build or consume artifact-derived inputs in v1
-- `protection_class` should use a closed enum: `local_only`, `preview_only`, `shared_nonprod`, `production_facing`
+- `protection_class` should use a closed enum: `local_only`, `shared_nonprod`, `production_facing`
 
 These decisions are now reflected in the detailed design sections below. The remaining work is to
 turn them into implementation-grade detail and execution plans without changing the policy
@@ -864,7 +864,7 @@ Suggested metadata shape conventions:
     - should be explicit deployment metadata rather than inferred only from naming convention
   - `protection_class`
     - required
-    - closed enum: `local_only`, `preview_only`, `shared_nonprod`, `production_facing`
+    - closed enum: `local_only`, `shared_nonprod`, `production_facing`
     - this classification should drive admission, smoke expectations, and whether shared-control-plane execution is required
   - `components[*]`
     - required, non-empty list
@@ -881,7 +881,7 @@ Suggested metadata shape conventions:
   - `smoke`
     - optional
     - when present, should explicitly describe how smoke runs, such as an `entry`, a named built-in smoke class, or other adapter-defined validated shape
-    - production smoke exceptions should be represented explicitly in deployment metadata rather than by omitting the field and hoping readers infer intent
+    - production smoke exceptions should be represented explicitly as a nested `smoke.exception` object rather than by omitting the field and hoping readers infer intent
   - `prerequisites`
     - optional
     - when present, should be an explicit list of deployment-id prerequisites rather than free-form prose
@@ -1032,7 +1032,7 @@ Field-shape guidance:
 - the shared `id` field gives validation, deployment records, and adapter wiring one predictable canonical identifier while still allowing provider-specific qualifiers beside it
 - examples in this document use compact shapes for readability; production adapters may require additional validated fields, but should preserve the same explicit-object model
 
-Minimum smoke-exception fields:
+Minimum `smoke.exception` fields:
 
 - `owner`
 - `reason`
@@ -1733,7 +1733,8 @@ If you are adding a new deployment for the first time, the shortest correct work
 5. decide whether setup is repo-owned
 6. set `provisioner = None` if setup is external, or configure a real provisioner if setup is repo-owned
 7. run `deploy <deployment-id> --validate-only`
-8. run `deploy <deployment-id>` once validation passes
+8. if the deployment is `local_only`, run `deploy <deployment-id>` once validation passes
+9. if the deployment is `shared_nonprod` or `production_facing`, submit the mutating run through CI or the shared control plane once validation passes
 
 What you should not have to do:
 
@@ -2114,14 +2115,14 @@ Preview policy:
 
 Exception representation policy:
 
-- a `production_facing` smoke omission or downgrade must be represented explicitly in deployment metadata
+- a `production_facing` smoke omission or downgrade must be represented explicitly in a nested `smoke.exception` object in deployment metadata
 - the same authoritative classification that marks a deployment as `production_facing` should also drive admission policy and local-mutation restrictions
-- the minimum smoke-exception fields are:
+- the minimum `smoke.exception` fields are:
   - `owner`
   - `reason`
   - `scope`
   - one review boundary field: `review_by` or `expires_at`
-- the exception metadata should identify at least the owner, reason, scope, and review or expiry boundary
+- the exception object may additionally include an explicit downgrade mode when smoke is reduced rather than omitted
 - silent omission of smoke wiring is not an acceptable way to waive production smoke
 
 Outcome guide:
@@ -2161,9 +2162,10 @@ Shared-environment locking policy:
 
 - shared environments should use a central Postgres-backed control plane for deploy coordination
 - every deployment should resolve to a lock scope
-- the default lock scope should be derived from canonical provider-target identity
+- the default lock scope should be derived from `provider` plus a normalized canonical provider-target identity
 - any explicit lock-scope override is a documented escape hatch for special cases, not the normal path
 - an override must validate as at least as strict as the provider-target-derived scope; it must not permit two runs that could mutate the same live target to proceed independently
+- all fields required to uniquely identify the mutable live target must participate in that normalized identity
 - only one active mutating run should run for a lock scope at a time
 - different lock scopes may run in parallel
 - rollback, retry, promotion, and redeploy should take the same lock as a normal deploy against that target scope
@@ -2231,6 +2233,7 @@ Release-admission contract for protected/shared environments:
   - any required approval has not been revoked, expired, or invalidated by newer policy state
   - any health-gated prerequisite still satisfies its declared health requirement, using a fresh revalidation-time health verdict unless explicitly documented equivalent provider evidence is accepted
 - if any of those checks fail after revalidation, the run must exit without mutating the target and report that it was superseded, stale, or no longer admitted
+  - in those cases, the deployment record should preserve `final_outcome = null` and a specific `termination_reason`
 
 Operator-facing lifecycle states:
 
@@ -2241,14 +2244,6 @@ Operator-facing lifecycle states:
   - `cancelling`
 - ended before canonical final outcome
   - `cancelled`
-- terminal states
-  - `validation_failed`
-  - `build_failed`
-  - `resolve_failed`
-  - `provision_failed`
-  - `publish_failed`
-  - `smoke_failed_after_publish`
-  - `succeeded`
 
 Run classification:
 
@@ -2450,6 +2445,9 @@ Minimum required fields:
   - such as `deploy`, `preview`, `retry`, `promotion`, or `rollback`
 - `lifecycle_state`
   - such as `queued`, `running`, `waiting_for_lock`, `cancelling`, or `cancelled`
+- `termination_reason`
+  - `cancelled`, `superseded`, or `no_longer_admitted` when the run ends without reaching a canonical terminal outcome
+  - should be `null` when the run does reach a canonical terminal outcome
 - source revision identifier
 - actor or trigger source, such as human, CI job, or automation
 - publish mode, such as normal or preview
@@ -2463,7 +2461,7 @@ Minimum required fields:
 - start time and end time
 - final outcome
   - required only when the run reaches a canonical terminal outcome
-  - should be `null` for runs that end as `cancelled` before mutation reaches a canonical terminal outcome
+  - should be `null` for runs that end without reaching a canonical terminal outcome
 
 Additional recommended fields:
 
@@ -2526,7 +2524,13 @@ Canonical final-outcome vocabulary:
   - `smoke_failed_after_publish`
   - `succeeded`
 - `null`
-  - used when a run ends without reaching a canonical terminal outcome, such as clean pre-mutation cancellation
+  - used when a run ends without reaching a canonical terminal outcome, such as clean pre-mutation cancellation or a non-mutating terminal exit after revalidation
+
+Canonical termination-reason vocabulary:
+
+- `cancelled`
+- `superseded`
+- `no_longer_admitted`
 
 Canonical lifecycle-state vocabulary:
 
@@ -3468,7 +3472,7 @@ now-decided operator defaults without changing the core model.
 - Update [docs/deployments-design.md](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md):
   - verify that the chosen default diff base for `--from-changes` is reflected consistently in all command and automation sections
   - verify that the chosen default smoke timeout budgets by class are reflected consistently in smoke policy and examples
-  - define any mandatory metadata fields needed to express explicit production smoke exceptions
+  - verify that the already-defined `smoke.exception` metadata shape is reflected consistently in policy, examples, and validation guidance
   - verify that the minimum branch and protection assumptions for the fast-forward promotion model are reflected consistently
   - optionally refine queue timeout values and stale-run detection details in the design doc without changing the default queued-with-revalidation policy
 
@@ -3486,7 +3490,7 @@ now-decided operator defaults without changing the core model.
 - Update [docs/deployments-design.md](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) with:
   - any missing metadata field naming needed to support the chosen diff-base, smoke, and promotion policies
   - one short note on branch-protection assumptions for promotion if implementation detail needs to be more concrete
-  - one short note on how explicit smoke exceptions are represented
+  - one short note confirming the `smoke.exception` shape and where validators should read it
   - one short note on queue timeout and stale-run detection detail if more precision is needed
 
 ### Acceptance Criteria
