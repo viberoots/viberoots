@@ -156,6 +156,7 @@ Typical contents:
 - optional deployment-local executable files for local-only or isolated-preview-only flows
   - for example `smoke.ts`
   - for example `cdktf/main.ts`
+  - these executable-hook examples are intentionally non-default and should not be read as the normal protected/shared deployment package shape
 
 Things that should usually not live here:
 
@@ -175,6 +176,7 @@ Preference rule:
 - provider config should contain only provider-native settings that are not already modeled authoritatively in deployment metadata
 - if a provider-native file needs values such as provider project name or environment-specific identifiers, those should ideally be generated from or injected by deployment metadata rather than hand-maintained in multiple places
 - for `shared_nonprod` and `production_facing`, the preferred package shape is declarative deployment metadata plus provider-native config, not package-local executable deployment logic
+- any package example that includes `deploy.ts`, `smoke.ts`, `cdktf/main.ts`, or similar executable files should be read as a non-default local-only or isolated-preview shape unless it explicitly says otherwise
 
 Path rule:
 
@@ -992,7 +994,8 @@ Suggested metadata shape conventions:
     - for `shared_nonprod` and `production_facing`, smoke definitions must come from a vetted built-in smoke-runner registry
     - package-local executable smoke entries are invalid for `shared_nonprod` and `production_facing`
   - `secret_requirements`
-    - optional, but recommended whenever a deployment step needs secrets
+    - required whenever any provision, publish, or smoke step consumes secrets
+    - for `shared_nonprod` and `production_facing`, must be explicit even when empty for vetted built-in-supported shapes so the absence of secret inputs is itself reviewable
     - should declare non-secret secret requirements by step or consumer, so validation and admission can fail early without revealing secret values
     - should remain Buck-visible metadata; secret material itself must not appear there
   - `prerequisites`
@@ -2185,6 +2188,20 @@ Canonical contract rule:
 - publishers consume the resolved data shape rather than rediscovering semantics from build outputs
 - provider adapters may validate that a resolved component kind is supported, but they should not invent a second artifact contract for the same kind
 
+Initial canonical kind registry:
+
+| kind                  | required resolved fields                                    | artifact identity expectation                                                                            |
+| --------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `static-webapp`       | `id`, `kind`, `target`, `artifact_identity`, `artifact_ref` | strong content digest or equivalent stable fingerprint for the publishable static asset tree or archive  |
+| `service`             | `id`, `kind`, `target`, `artifact_identity`, `artifact_ref` | strong image digest or equivalent immutable deployable service artifact reference                        |
+| `third-party-service` | `id`, `kind`, `target`, `artifact_identity`, `artifact_ref` | strong immutable reference for the packaged external service artifact or image consumed by the publisher |
+
+Registry rule:
+
+- built-in publishers and control-plane tooling must use this canonical kind registry when interpreting resolved components
+- adapters must not silently redefine the required fields or artifact-identity meaning for a shared `kind`
+- adding a new `kind` should update this authoritative registry before adapters start treating it as stable
+
 Minimum required resolved-component fields:
 
 - `id`
@@ -2580,6 +2597,25 @@ Artifact retention policy:
 - `local_only` retention may be implementation-defined unless a stricter team policy applies
 - storage mechanics may still be decided during implementation, but the operator-facing policy is that a supported artifact-reuse path must remain practically usable for at least those minimum windows
 
+Promotion-lane compatibility contract:
+
+- deployments in the same `promotion_lane` are expected to be promotion-compatible by default
+- that compatibility normally requires all of the following to match across the lane:
+  - component ids
+  - component kinds
+  - publisher type
+  - provisioner type
+  - rollout semantics
+  - resolved-kind contract and artifact-identity semantics
+- the following environment-specific differences are normal and do not break promotion compatibility on their own:
+  - `environment_stage`
+  - `admission_policy`
+  - normal provider-target identity
+  - secrets and secret references
+  - smoke endpoints, preview URLs, or equivalent health targets
+  - provider-native non-identity settings that are intentionally derived from environment-specific target identity
+- any other difference that changes how the same artifact would be interpreted, provisioned, or published across the lane should be treated as an explicit reviewed compatibility exception rather than as a silent default
+
 Planned promotion model:
 
 - use one-way fast-forward environment branches
@@ -2813,6 +2849,7 @@ Policy:
 - backend switching should remain possible without changing deployment metadata semantics
 - runtime-secret injection must avoid leaking secret material into Buck metadata, checked-in files, or durable deployment records
 - deployments should expose non-secret `secret_requirements` metadata so validation, admission, and operator tooling can determine whether the secret contract is complete before mutation begins
+- validation for `shared_nonprod` and `production_facing` should fail if a step consumes secrets but `secret_requirements` does not declare that requirement
 
 Anti-patterns:
 
@@ -2895,6 +2932,31 @@ Artifact identity rules:
 - the deployment record should preserve the canonical resolved component data shape or a stable projection of it, rather than only loosely structured adapter-specific paths
 - the deployment record should make it obvious when the same artifact identity was published under different deployment metadata or provider-config inputs
 - when a provider exposes a concrete release, deployment, version, or revision identifier, the deployment record must preserve that identifier per published component rather than burying it in optional adapter detail
+
+## Retire And Migrate Target
+
+Decommissioning a deployment, renaming a normal live target, or transferring target ownership between
+deployment ids should not happen through the normal deploy path.
+
+These operations should use a separate retire or migrate-target workflow because they intentionally cross
+the same safety boundary that normal deploys are designed not to cross.
+
+Policy:
+
+- retire or migrate-target is a first-class operator workflow, not an implicit side effect of `deploy`
+- it should require explicit operator intent and stronger review than a normal mutating deployment
+- it should take an exclusive lock covering every affected normal live target identity for the duration of the operation
+- it should record old target identity, new target identity when applicable, actor, approvals, and resulting ownership state in the control plane
+- it should fail closed if the workflow would leave two deployment ids simultaneously claiming the same normal live target outside an explicitly documented transitional alias window
+- once the migration or retirement completes, the steady-state invariant should return to:
+  - one deployment id owns one normal mutable live target
+  - normal deploy flows are again non-destructive and non-transferring
+
+Examples:
+
+- retiring `pleomino-staging` after the environment is intentionally decommissioned
+- migrating a deployment from one provider-native target name to another during a controlled cutover
+- transferring ownership of a reviewed alias target from one deployment id to its successor during a short-lived migration window
 
 Recommended deployment-record field-shape guidance:
 
