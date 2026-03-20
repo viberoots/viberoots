@@ -280,6 +280,22 @@ The design leaves some implementation details open, but the following behavioral
 
 If an implementation choice would break one of those contracts, the implementation should change rather than the operator workflow.
 
+## Operator Quick Reference
+
+The table below is intentionally redundant with the normative sections later in this document.
+Its job is to give operators and implementers one compact scan of the default policy shape before
+they dive into the detailed rationale.
+
+| Topic               | Default policy                                                                                                       | Operator takeaway                                                                                             |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Provenance          | Build trust and deployment-run trust are separate records.                                                           | Reusing the same artifact across environments is expected; the environment-specific run record still changes. |
+| Promotion           | Promote the same previously built artifact forward through distinct deployment ids in the same lane.                 | Do not rebuild just because you are moving from staging to prod.                                              |
+| Rollback            | Prefer redeploying a prior known-good artifact; otherwise promote a revert commit forward.                           | A rollback is a new run with `operation_kind = rollback`, not a special outcome code.                         |
+| Locking             | Shared-environment mutation locks on `provider` plus canonical provider-target identity.                             | One live target gets one active mutating run at a time unless there is an explicit reviewed exception.        |
+| Metadata precedence | Buck deployment metadata is authoritative for repo deployment facts and provider-target identity.                    | Provider config may add provider-native settings, but it must not silently override the deployment contract.  |
+| Drift ownership     | `TARGETS` is the source of truth; checked-in provider config should be generated, injected, or validated against it. | If the same target identity appears in two places and disagrees, validation should fail.                      |
+| Smoke               | `production_facing` deploys require blocking smoke by default unless an explicit `smoke.exception` says otherwise.   | A publish can succeed and the overall deploy can still fail on smoke.                                         |
+
 ## Decisions Locked Now
 
 The following operating-model decisions are now part of the intended design direction and should be
@@ -359,6 +375,14 @@ treated as planned policy, not open brainstorming:
 These decisions are now reflected in the detailed design sections below. The remaining work is to
 turn them into implementation-grade detail and execution plans without changing the policy
 direction.
+
+Defaulting philosophy:
+
+- the common case should stay straightforward
+- safe defaults should carry as much of the operational burden as possible
+- the design should require extra metadata only when a deployment shape introduces extra risk, ambiguity, or coordination cost
+- local-only and single-component flows should remain easy to declare and reason about
+- protected/shared, multi-component, cross-lane, or exception-path flows should be explicit rather than relying on clever inference
 
 ## Deliberately Not Fixed Yet
 
@@ -710,6 +734,13 @@ Default diff-base policy:
 - post-merge automation should compare against the previous successful deploy baseline for the relevant environment branch when that data is available
 - if no upstream or baseline can be determined, the tool should fail explicitly and ask for an override instead of silently choosing an unsafe diff base
 
+Operator default summary:
+
+- `deploy --from-changes` on a developer machine means "compare my current `HEAD` against `git merge-base HEAD @{upstream}`"
+- `deploy --from-changes` in pull-request CI means "compare against the PR target branch merge-base"
+- environment-mutating automation should not diff against an arbitrary Git merge-base when a lane-specific last-successful deploy baseline exists; that recorded lane baseline is the authoritative default
+- when automation cannot determine the authoritative baseline, it should stop and ask for an explicit override rather than mutating from a guessed change set
+
 Environment-lane policy:
 
 - each concrete deployment belongs to one environment branch lane for protected/shared mutation
@@ -721,12 +752,44 @@ Environment-lane policy:
 - if the changed set affects deployments in multiple environment lanes, the selector should require explicit lane selection or split the result into separate non-mutating result sets rather than mutating all lanes at once
 - local or non-mutating inspection flows may still report deployments across multiple lanes when that is useful for visibility
 
+Monorepo clarification:
+
+- this branch model is lane-scoped, not repo-global
+- a fast-forward on one lane branch must not be interpreted as "deploy the whole monorepo"
+- the lane branch controls which revision is eligible for promotion in that lane
+- Buck metadata plus change selection still control which deployments within that lane actually run
+
+Concrete examples:
+
+- `env/pleomino/dev -> env/pleomino/staging -> env/pleomino/prod`
+  - governs only deployments with `promotion_lane = "pleomino"`
+- `env/shared-observability/dev -> env/shared-observability/staging -> env/shared-observability/prod`
+  - governs only deployments with `promotion_lane = "shared-observability"`
+- `env/customer-a-portal/dev -> env/customer-a-portal/staging -> env/customer-a-portal/prod`
+  - governs only deployments with `promotion_lane = "customer-a-portal"`
+
+What that means in practice:
+
+- a monorepo revision may be admitted for one lane without being promoted for unrelated lanes
+- if a change only affects `pleomino`, promotion of `env/pleomino/staging` should not trigger deployment of unrelated lanes such as `shared-observability`
+- a lane may still contain more than one deployment id, but the actual deploy set for that lane is selected from authoritative metadata plus change impact, not from "everything in the repo"
+
 Prerequisite expansion policy:
 
 - `--from-changes` should understand explicit deployment prerequisites from deployment metadata
 - when a changed deployment is an explicit prerequisite of another deployment, the selector may widen the result set according to documented policy rather than leaving downstream prerequisite enforcement entirely to later orchestration
 - widening for prerequisites should be conservative and explainable, not ad hoc
 - prerequisite widening should respect environment-lane boundaries for mutating runs
+
+Execution semantics after selection:
+
+- for mutating runs, the default execution order should be deterministic and simple:
+  - serial
+  - lane-scoped
+  - topological with respect to declared direct prerequisites
+- when no prerequisite ordering applies, the default should still be serial in stable deployment-id order rather than opportunistic parallel mutation
+- the default failure policy should halt later mutating deployments in the same invocation after the first failure
+- non-mutating inspection or reporting flows may parallelize independently if that does not change semantics
 
 Impact-selection contract:
 
@@ -793,7 +856,7 @@ Typical uses:
 - `deploy pleomino-prod --provision-only`
   - create the Pages project and custom domain configuration if that is repo-owned
 - `deploy pleomino-prod --publish-only --run-id <deploy-run-id>`
-  - publish a selected previously built artifact, or a fresh artifact only when that environment's admission policy allows it, to an already-existing Pages project
+  - publish one selected previously built immutable artifact to an already-existing Pages project
 - `deploy pleomino-prod`
   - run the full lifecycle in order
 
@@ -825,6 +888,7 @@ deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    admission_policy = "pleomino-prod-release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     components = [
@@ -848,6 +912,7 @@ deployment(
 
 In this example:
 
+- `admission_policy` is included because protected/shared admission policy binding should remain authoritative deployment metadata
 - `protection_class` is included because environment classification is part of the authoritative deployment contract
 - `promotion_lane` is included because this example represents a named environment that participates in protected/shared promotion policy
 - deployments that are truly local-only or otherwise outside protected/shared promotion policy may omit `promotion_lane`, but that omission should be intentional and explained by the deployment's policy class
@@ -872,6 +937,10 @@ Suggested metadata shape conventions:
     - required for deployments that participate in protected/shared promotion policy
     - identifies the independently promoted deployment family this deployment belongs to
     - should be explicit deployment metadata rather than inferred only from naming convention
+  - `admission_policy`
+    - required for `shared_nonprod` and `production_facing`
+    - should be an explicit reference to the centrally defined branch/check/approval policy binding for that deployment
+    - keeps the deploy rule authoritative for which admission policy applies, even if the policy definition itself lives outside the deployment package
   - `protection_class`
     - required
     - closed enum: `local_only`, `shared_nonprod`, `production_facing`
@@ -1054,6 +1123,17 @@ Field-shape guidance:
 - the shared `id` field gives validation, deployment records, and adapter wiring one predictable anchor identifier while still allowing provider-specific qualifiers beside it
 - examples in this document use compact shapes for readability; production adapters may require additional validated identity fields, but should preserve the same explicit-object model and canonical identity rule
 
+Canonical provider-target identity rules for initial built-in providers:
+
+| Provider           | Required identity fields                | Canonical identity notes                                                                                                                                               |
+| ------------------ | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cloudflare-pages` | `id`                                    | `id` is the canonical mutable Pages project identity for normal publish mode. Preview targets must derive a different canonical identity when preview is enabled.      |
+| `s3-static`        | `id`, `bucket`                          | `bucket` participates in canonical live-target identity. `id` remains the stable repo-level anchor and must normalize consistently with the bucket-backed target.      |
+| `kubernetes`       | `id`, `cluster`, `namespace`, `release` | Canonical live-target identity is the cluster/namespace/release tuple. `id` must normalize to that same target identity rather than point at some broader human label. |
+
+For any built-in provider added later, this same table or its direct successor must be updated before the
+provider is considered fully in policy for protected/shared deployment use.
+
 Minimum `smoke.exception` fields:
 
 - `owner`
@@ -1180,6 +1260,7 @@ deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    admission_policy = "pleomino-prod-release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     components = [
@@ -1240,6 +1321,7 @@ deployment(
         "id": "docs-site-prod",
         "bucket": "docs-site-prod",
     },
+    admission_policy = "docs-site-prod-release",
     protection_class = "production_facing",
     promotion_lane = "docs-site",
     components = [
@@ -1285,6 +1367,7 @@ deployment(
         "namespace": "api-prod",
         "release": "api",
     },
+    admission_policy = "api-prod-release",
     protection_class = "production_facing",
     promotion_lane = "api",
     components = [
@@ -1329,6 +1412,7 @@ deployment(
         "namespace": "shared-observability",
         "release": "otel-collector",
     },
+    admission_policy = "shared-observability-prod-release",
     protection_class = "production_facing",
     promotion_lane = "shared-observability",
     components = [
@@ -1802,6 +1886,7 @@ deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    admission_policy = "pleomino-prod-release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     components = [
@@ -1931,6 +2016,8 @@ First-class rollout-shape policy:
 - a multi-component deployment may explicitly declare component ordering, dependency barriers, or phased smoke checkpoints in deployment metadata
 - when such rollout metadata is present, adapters must either honor it or reject the deployment as unsupported
 - when rollout metadata is absent, the adapter-defined `ordered_best_effort` default applies
+- for `shared_nonprod` and `production_facing`, multi-component deployments must declare an explicit rollout policy rather than relying on that default
+- in v1, the intended common case for protected/shared deployments remains a single-component deployment
 - phased smoke checkpoints should be explicit about which component group they validate and whether later phases may proceed on failure
 - the same declared rollout shape should not silently change meaning across adapters
 
@@ -1949,6 +2036,7 @@ deployment(
     provider_target = {
         "id": "marketing-docs-prod",
     },
+    admission_policy = "marketing-docs-prod-release",
     protection_class = "production_facing",
     promotion_lane = "marketing-docs",
     components = [
@@ -2141,6 +2229,8 @@ Timeout and retry policy:
   - adapters may define additional classes only when they document them explicitly
 - smoke may auto-retry for transient readiness or network failures, up to 3 retries within that timeout budget
 - retries should not hide a final smoke failure; they only reduce false negatives from brief propagation or readiness delays
+- validators should derive the default smoke budget from the declared component kind or explicit smoke runner class, not from ad hoc team convention
+- if a deployment declares a smoke timeout override, that override should be explicit deployment metadata or explicit built-in adapter policy, not an undocumented per-environment convention
 
 Preview policy:
 
@@ -2159,6 +2249,49 @@ Exception representation policy:
   - one review boundary field: `review_by` or `expires_at`
 - the exception object may additionally include an explicit downgrade mode when smoke is reduced rather than omitted
 - silent omission of smoke wiring is not an acceptable way to waive production smoke
+- validators should read `smoke.exception` from authoritative deployment metadata on the deployment target, not from provider config files or deployment-local executable hooks
+
+Example non-production smoke exception:
+
+```python
+deployment(
+    name = "deploy",
+    provider = "cloudflare-pages",
+    provider_target = {
+        "id": "pleomino-dev-pages",
+    },
+    admission_policy = "pleomino-dev-release",
+    protection_class = "shared_nonprod",
+    promotion_lane = "pleomino",
+    components = [
+        {
+            "id": "web",
+            "kind": "static-webapp",
+            "target": "//projects/apps/pleomino:app",
+        },
+    ],
+    publisher = {
+        "type": "wrangler-pages",
+        "config": "wrangler.jsonc",
+    },
+    smoke = {
+        "type": "http-smoke",
+        "path": "/",
+        "exception": {
+            "owner": "web-platform",
+            "reason": "Shared nonprod preview host is intermittently recycled during daily fixture reseeding.",
+            "scope": "downgrade-to-nonblocking",
+            "review_by": "2026-04-30",
+        },
+    },
+)
+```
+
+This example is intentionally non-production:
+
+- it shows the exception shape in authoritative deployment metadata
+- it does not waive smoke silently
+- it does not weaken the rule that `production_facing` deployments require explicit documented exceptions for omission or downgrade
 
 Outcome guide:
 
@@ -2214,10 +2347,13 @@ Preview locking policy:
 Default lock-acquisition behavior:
 
 - when a shared-environment lock is already held, the default behavior should be to wait in queue with a bounded timeout
+- the default shared-environment queue timeout should be 30 minutes unless a tighter operator-facing policy is documented for that target class
 - entering the queue gives a run the right to re-check and proceed later, not the right to execute an old plan unchanged
 - after acquiring the lock, a queued run must revalidate current deployment state before any mutating step
 - that revalidation should at least confirm that the run is still allowed to publish the intended revision or artifact to that target
 - if the run's assumptions are stale after revalidation, it should exit without publishing and report that it was superseded or must be rerun
+- a run should also be treated as stale if its lock lease or fencing token is no longer current, even if the local process is still alive
+- if the queue timeout expires before the run acquires the lock, the run should exit without mutation and preserve `final_outcome = null` plus `termination_reason = lock_timeout`
 - interactive or incident-response workflows may offer an explicit fail-fast mode, but queued-with-revalidation should be the shared-environment default
 
 Cancellation policy:
@@ -2253,7 +2389,7 @@ Release-admission contract for protected/shared environments:
   - the source revision comes from the allowed environment branch for that deployment lane
   - required checks for that environment have passed for the admitted revision or admitted reusable artifact, as applicable to the run kind
   - any required human or policy approval has been granted
-  - the deployment's explicit `promotion_lane` and `protection_class` metadata are present, valid, and match the intended target and admission path
+  - the deployment's explicit `promotion_lane`, `protection_class`, and `admission_policy` metadata are present, valid, and match the intended target and admission path
   - for runs that publish artifacts:
     - artifact provenance is present and valid for the intended target
     - for protected/shared publish, the artifact was produced by trusted CI from the admitted source revision
@@ -2306,6 +2442,59 @@ Why this matters:
 - it keeps retry behavior predictable and auditable
 - it makes shared environments safer without overcomplicating personal local workflows
 
+### Example: Lock Scope In The Normal One-Deployment-One-Target Case
+
+Suppose `pleomino-prod` declares:
+
+```python
+deployment(
+    name = "deploy",
+    provider = "cloudflare-pages",
+    provider_target = {
+        "id": "pleomino-prod-pages",
+    },
+    admission_policy = "pleomino-prod-release",
+    protection_class = "production_facing",
+    promotion_lane = "pleomino",
+    components = [
+        {
+            "id": "web",
+            "kind": "static-webapp",
+            "target": "//projects/apps/pleomino:app",
+        },
+    ],
+    publisher = {
+        "type": "wrangler-pages",
+        "config": "wrangler.jsonc",
+    },
+    smoke = {
+        "type": "http-smoke",
+        "path": "/",
+    },
+)
+```
+
+Normal lock-scope story:
+
+- canonical provider-target identity for this deployment is `provider = cloudflare-pages` plus `provider_target.id = pleomino-prod-pages`
+- the derived shared-environment lock scope is therefore conceptually `cloudflare-pages:pleomino-prod-pages`
+- `deploy pleomino-prod`
+- `deploy pleomino-prod --publish-only --run-id <deploy-run-id>`
+- `deploy pleomino-prod --preview`
+
+All three runs must contend on that same lock by default unless preview is explicitly configured to publish
+to a fully isolated preview target with a different canonical provider-target identity.
+
+That is the normal case this design optimizes for:
+
+- one deployment id
+- one normal mutable live target
+- one derived lock scope
+
+If a migration or alias exception temporarily lets two deployment ids point at one normal live target, that
+must be treated as an explicit reviewed exception with shared locking, not as the default interpretation of
+multiple ids.
+
 ## Promotion And Rollback
 
 Promotion should prefer reusing the exact previously built artifact rather than rebuilding per environment.
@@ -2328,7 +2517,11 @@ Artifact retention policy:
 - for protected or shared environments, artifact retention is a required part of the deployment contract, not an optional implementation convenience
 - an implementation must not garbage-collect or otherwise lose the only approved artifact for an in-policy promotion or rollback path while that path is still expected to be available
 - if the artifact has expired or been intentionally removed, the system should surface that condition explicitly rather than silently rebuilding and treating the rebuild as equivalent
-- retention duration and storage mechanics may be decided during implementation, but the operator-facing policy is that a supported artifact-reuse path must remain practically usable
+- minimum operator-facing retention defaults should be:
+  - `production_facing`: 90 days
+  - `shared_nonprod`: 30 days
+- `local_only` retention may be implementation-defined unless a stricter team policy applies
+- storage mechanics may still be decided during implementation, but the operator-facing policy is that a supported artifact-reuse path must remain practically usable for at least those minimum windows
 
 Planned promotion model:
 
@@ -2344,11 +2537,21 @@ Plain-language version:
 - later environments should receive code and artifacts that were already proven earlier, starting with the earlier branch in the same family lane
 - promotion should move forward through the branch flow, not invent a second release path
 
+Monorepo release-scope clarification:
+
+- in a monorepo, these lane branches are not repo-wide release branches
+- a fast-forward of `env/pleomino/prod` means "the `pleomino` lane may now promote this admitted repo revision"
+- it does not mean "deploy every deployment defined anywhere in the repo"
+- deploy automation for that lane should still use authoritative deployment metadata plus impact selection to choose which `pleomino` deployments actually run
+- unrelated lanes such as `shared-observability` or `customer-a-portal` should remain untouched unless their own lane branches advance
+
 Minimum branch-policy assumptions:
 
 - each family lane should have protected environment branches such as `env/<family>/dev`, `env/<family>/staging`, and `env/<family>/prod`
 - promotion should happen by fast-forwarding the next environment branch, not by rebuilding from an unrelated revision
 - direct pushes to later environment branches should be disallowed except for controlled emergency procedures
+- protected environment branches should require branch protection or equivalent server-side policy that enforces reviewed changes, required checks, and fast-forward-only advancement for the lane
+- the normal path should be PR merge or automation-driven fast-forward, not ad hoc branch mutation from an operator workstation
 - required checks for each environment should run before that environment branch advances
 - deploy automation for a named environment should use the corresponding environment branch as its default source of truth
 
@@ -2381,6 +2584,28 @@ Why this matters:
 - it makes rollback compatible with fast-forward promotion
 - it avoids hidden rebuilds or hidden branch rewrites
 
+### Example: Artifact Reuse Across Promotion And Rollback
+
+Concrete promotion story:
+
+1. CI builds artifact `artifact_ref = nix:sha256-pleomino-web-7f3c2a` from source revision `abc1234` for `pleomino-staging`.
+2. The staging run publishes that exact artifact and records `artifact_lineage_id = pleomino-web/2026-03-19/abc1234`.
+3. Promotion to `pleomino-prod` reuses that same `artifact_ref` and `artifact_lineage_id` rather than rebuilding from `abc1234` on a different machine.
+4. The production deployment record differs from the staging record because deployment metadata, approvals, target identity, and publish result are environment-specific, even though artifact identity is unchanged.
+
+Concrete rollback story:
+
+1. `pleomino-prod` later ships a bad artifact from revision `def5678`.
+2. Operators choose an earlier known-good artifact with `artifact_ref = nix:sha256-pleomino-web-7f3c2a`.
+3. The rollback run records `operation_kind = rollback`, `parent_run_id` pointing at the failed or superseded production run, and the reused `artifact_lineage_id`.
+4. If that artifact is no longer retrievable, the correct behavior is to surface that retention failure explicitly, not to rebuild a lookalike artifact and pretend it is the same release.
+
+Operator summary:
+
+- promotion-safe reuse means "publish the exact already-proven artifact"
+- rollback-safe reuse means "redeploy the exact earlier artifact when available"
+- rebuilding from the same Git revision is not equivalent to artifact reuse for protected/shared flows
+
 ## Buck Metadata Extraction
 
 The deploy CLI should query Buck for deployment metadata rather than maintain a second handwritten manifest.
@@ -2390,6 +2615,7 @@ The deployment rule should expose enough metadata for repo tooling to retrieve:
 - provider
 - provider-target identity
 - promotion lane or family membership
+- admission-policy reference
 - protection/environment classification
 - preview-target identity or preview-target derivation policy when preview is supported
 - explicit deployment prerequisites when present
@@ -2440,6 +2666,51 @@ The exact extraction mechanism can be decided during implementation. The design 
 - consume from Buck
 
 The external contract should stay stable even if the extraction mechanism changes. Callers should depend on deployment metadata fields, not on one particular Buck query implementation detail.
+
+### Example: Metadata Precedence Versus Provider Config Mismatch
+
+Suppose deployment metadata says:
+
+```python
+deployment(
+    name = "deploy",
+    provider = "cloudflare-pages",
+    provider_target = {
+        "id": "pleomino-prod-pages",
+    },
+    publisher = {
+        "type": "wrangler-pages",
+        "config": "wrangler.jsonc",
+    },
+    components = [
+        {
+            "id": "web",
+            "kind": "static-webapp",
+            "target": "//projects/apps/pleomino:app",
+        },
+    ],
+)
+```
+
+And `wrangler.jsonc` says:
+
+```jsonc
+{
+  "name": "pleomino-staging-pages",
+}
+```
+
+Expected behavior:
+
+- Buck deployment metadata remains authoritative for the normal live target identity
+- the deploy CLI must not silently publish to `pleomino-staging-pages`
+- a good implementation either injects the authoritative provider-target identity into provider-native config at runtime or fails validation on the mismatch before any publish begins
+
+This is a mismatch error, not a precedence tie:
+
+- deployment metadata answers "which live target does this deployment own?"
+- provider config answers "how does the provider tool run once the target identity is already known?"
+- if those two disagree about target identity, the run should stop and surface the drift explicitly
 
 ### Secrets And Runtime Inputs
 
@@ -2595,9 +2866,73 @@ Canonical final-outcome vocabulary:
 - `null`
   - used when a run ends without reaching a canonical terminal outcome, such as clean pre-mutation cancellation or a non-mutating terminal exit after revalidation
 
+### Example Deployment Record
+
+Illustrative provider-neutral record for a successful promotion.
+This example intentionally omits `lifecycle_state` to avoid implying any new terminal-state policy beyond
+the vocabulary defined above:
+
+```json
+{
+  "deploy_run_id": "dr_2026_03_19_pleomino_prod_00017",
+  "deployment_id": "pleomino-prod",
+  "deployment_label": "//projects/deployments/pleomino-prod:deploy",
+  "operation_kind": "promotion",
+  "termination_reason": null,
+  "source_revision": "abc1234",
+  "actor": {
+    "type": "ci",
+    "id": "jenkins/promote-pleomino-prod/481"
+  },
+  "publish_mode": "normal",
+  "provider": "cloudflare-pages",
+  "provider_target": {
+    "id": "pleomino-prod-pages"
+  },
+  "lock_scope": "cloudflare-pages:pleomino-prod-pages",
+  "parent_run_id": "dr_2026_03_19_pleomino_staging_00052",
+  "artifact_lineage_id": "pleomino-web/2026-03-19/abc1234",
+  "resolved_components": [
+    {
+      "id": "web",
+      "kind": "static-webapp",
+      "target": "//projects/apps/pleomino:app",
+      "artifact_identity": {
+        "type": "content_digest",
+        "value": "sha256:7f3c2a9d1b6d7f42"
+      },
+      "artifact_ref": "nix:sha256-pleomino-web-7f3c2a"
+    }
+  ],
+  "deployment_metadata_fingerprint": "sha256:meta-pleomino-prod-v3",
+  "provider_config_fingerprint": "sha256:wrangler-pleomino-prod-v2",
+  "remote_publish_ids": [
+    {
+      "component_id": "web",
+      "provider_release_id": "cloudflare-pages-deployment-01HQY6Y6K9V"
+    }
+  ],
+  "smoke_result": {
+    "status": "passed",
+    "url": "https://pleomino.example.com/"
+  },
+  "started_at": "2026-03-19T17:04:11Z",
+  "ended_at": "2026-03-19T17:07:42Z",
+  "final_outcome": "succeeded"
+}
+```
+
+This example is intentionally shaped to highlight the policy distinctions:
+
+- `operation_kind = promotion` explains what kind of run this was
+- `final_outcome = succeeded` explains how that run ended
+- `parent_run_id` and `artifact_lineage_id` show why this run is linked to an earlier staging publication
+- `provider_target` and `lock_scope` preserve the concrete live-target identity used for admission and coordination
+
 Canonical termination-reason vocabulary:
 
 - `cancelled`
+- `lock_timeout`
 - `superseded`
 - `no_longer_admitted`
 
@@ -2651,6 +2986,7 @@ cloudflare_static_pwa_deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    admission_policy = "pleomino-prod-release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
@@ -2802,6 +3138,7 @@ def cloudflare_static_pwa_deployment(
     provider_target,
     wrangler_config,
     protection_class,
+    admission_policy = None,
     promotion_lane = None,
     provisioner = None,
 ):
@@ -2809,6 +3146,7 @@ def cloudflare_static_pwa_deployment(
         name = name,
         provider = "cloudflare-pages",
         provider_target = provider_target,
+        admission_policy = admission_policy,
         protection_class = protection_class,
         promotion_lane = promotion_lane,
         components = [
@@ -2837,6 +3175,7 @@ cloudflare_static_pwa_deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    admission_policy = "pleomino-prod-release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
@@ -2869,6 +3208,7 @@ def puzzle_cloudflare_deployment(
     provider_target,
     wrangler_config,
     protection_class,
+    admission_policy = None,
     promotion_lane = None,
     provisioner = None,
 ):
@@ -2877,6 +3217,7 @@ def puzzle_cloudflare_deployment(
         app_target = app_target,
         provider_target = provider_target,
         wrangler_config = wrangler_config,
+        admission_policy = admission_policy,
         protection_class = protection_class,
         promotion_lane = promotion_lane,
         provisioner = provisioner,
@@ -2894,6 +3235,7 @@ puzzle_cloudflare_deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    admission_policy = "pleomino-prod-release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
@@ -2954,6 +3296,7 @@ puzzle_cloudflare_deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    admission_policy = "pleomino-prod-release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
@@ -3032,6 +3375,7 @@ deployment(
         "namespace": "api-prod",
         "release": "api",
     },
+    admission_policy = "api-prod-release",
     protection_class = "production_facing",
     promotion_lane = "api",
     components = [
@@ -3086,6 +3430,7 @@ deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    admission_policy = "pleomino-prod-release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     components = [
@@ -3320,6 +3665,7 @@ deployment(
         "namespace": "shared-observability",
         "release": "shared-observability",
     },
+    admission_policy = "shared-observability-prod-release",
     protection_class = "production_facing",
     promotion_lane = "shared-observability",
     components = [
@@ -3407,242 +3753,17 @@ Under the hood that may still mean:
 
 The user should not need to think about that wiring.
 
-## Operational Best Practices And Remaining Work
+## Implementation Handoff
 
-This design is now strong on both the structural model and the core operator-facing policy
-direction.
+This document now defines the repository deployment model and the default operator-facing policy strongly
+enough for separate implementation planning to proceed without reopening the core design.
 
-The remaining work is not "decide the deployment model again."
+The remaining work is implementation work, not another design pass:
 
-The remaining work is:
+- define the exact Buck extraction and deploy-control-plane schemas
+- implement provider adapters, admission flows, and lock handling to match this contract
+- implement artifact retention and artifact-selection flows for promotion, retry, and rollback
+- implement secret injection, smoke execution, and provider-config validation without creating a second source of truth
 
-- preserve this contract while designing implementation details
-- implement the remaining control-plane and schema details without relaxing the now-decided operational defaults
-- turn this finished design into a separate implementation plan
-
-The most important implementation-planning follow-ups are:
-
-- immutable artifact identity and promotion
-  - the design now requires artifact reuse for promotion-grade and rollback-grade flows
-  - implementation planning still needs to define the exact per-kind resolved schema fields and how artifact references are persisted and selected in tooling
-- rollback and redeploy procedure
-  - the design now defines rollback direction and run classification
-  - implementation planning still needs exact operator procedures and control-plane actions
-- locking and control-plane mechanics
-  - the design now defines lock-scope behavior, shared Postgres-backed coordination, and the need for stale-holder protection
-  - implementation planning still needs lease, fencing, wait-vs-fail, and conflict-resolution details
-- secrets runtime wiring
-  - the design now defines the metadata-versus-secret boundary and the `secretspec` and Vault direction
-  - implementation planning still needs concrete runtime injection interfaces, names, and audit handling
-- smoke-check defaults
-  - the design now defines required-versus-exception policy for production, explicit timeout classes, and bounded retry semantics
-  - implementation planning still needs exact metadata field names and any adapter-specific extensions beyond the default classes
-- provider-adapter enforcement
-  - the design now defines metadata precedence, explicit provider-target identity, drift ownership, and lock-scope expectations
-  - implementation planning still needs adapter-level validation hooks, helper conventions, and exact provider-target field naming
-- shared-environment admission
-  - the design now defines that protected or shared-environment mutation goes through CI or the shared control plane
-  - implementation planning still needs the concrete approval, authentication, and emergency-procedure mechanics
-- provisioner safety boundaries
-  - the design now defines non-destructive-by-default normal deploy behavior
-  - implementation planning still needs the exact break-glass interface for destructive owned-resource operations
-
-These are not gaps in the deployment model.
-
-They are the handoff points from design completion into implementation planning.
-
-### Design-Completion Goal
-
-When the design-document PRs in this area are complete, the repository should be in this state:
-
-- a reader can tell how to model a deployment in the repo
-- a reader can tell which operational behaviors are mandatory policy
-- a reader can tell which details are still implementation mechanics rather than open design questions
-- an implementation-planning effort can begin without first revisiting core policy
-
-### Remaining Design-Doc Work
-
-The remaining documentation work should focus on tightening summaries and examples around the
-already-chosen design, not inventing a second round of structural changes.
-
-Recommended final documentation tasks:
-
-1. add a compact operational policy summary table
-   - one row each for provenance, promotion, rollback, secrets, locking, metadata precedence, drift ownership, and smoke handling
-2. add one example deployment record
-   - include `deploy_run_id`, `operation_kind`, `parent_run_id`, artifact identity, lock scope, and final outcome
-3. add one short example of artifact reuse across promotion or rollback
-   - show the difference between "build new artifact" and "publish previously recorded artifact"
-4. add one short example of metadata-versus-provider-config precedence
-   - show a valid configuration and the expected behavior on mismatch
-5. add one short example of explicit smoke exception policy for a non-production deployment
-   - make clear that production requires smoke unless explicitly waived
-6. add one compact operator summary for lock scope
-   - explain the normal one-deployment-id/one-live-target case and the explicit reviewed exception path for migrations or aliases
-7. do one final example-consistency pass for provider-target identity
-   - make sure concrete deployment examples, metadata examples, and deployment-record examples either include `provider_target` consistently or explicitly state when it is omitted for brevity
-8. do one final editorial pass to keep normative policy visually dominant
-   - compress, relocate, or otherwise de-emphasize process-heavy planning text once it has served its design-refinement purpose
-   - keep the settled normative sections easy to scan without losing the historical design-completion guidance
-
-Success condition for the final design revision:
-
-- the design is complete enough that implementation planning can focus on schema, commands, adapters, control-plane mechanics, and rollout order rather than reopening policy questions
-
-## Design-Doc PR Sequence
-
-These PRs are design-document PRs, not production implementation PRs.
-
-Their job is to make the completed design easier to implement faithfully.
-
-Any PR section added in the future should also explicitly state that:
-
-- any policy deviation from this design must be surfaced and discussed rather than silently introduced
-- any meaningful ambiguity discovered while refining the design should be brought to the repository owner for a decision before the PR scope is finalized
-
-## PR-1: Add operator-facing examples and summary tables for the completed design
-
-### Description
-
-This PR should make the now-chosen design easier to consume by adding compact summaries and concrete
-examples without changing policy direction.
-
-### Scope & Changes
-
-- Update [docs/deployments-design.md](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md):
-  - add a compact operational policy summary table
-  - add one concrete example deployment record
-  - add one concrete example of artifact reuse for promotion or rollback
-  - add one concrete example of lock scope derivation for a normal one-deployment-id/one-live-target case
-  - if needed, add one explicitly marked migration or alias exception example showing how shared-target locking is reviewed rather than normal
-  - add one concrete example of metadata precedence versus provider config mismatch
-
-### Tests (in this PR)
-
-- Manual read-through for consistency with:
-  - `Deployment Lifecycle`
-  - `Promotion And Rollback`
-  - `Buck Metadata Extraction`
-  - `Deployment Record And Provenance`
-- Prompt the repository owner about any policy deviation, contradiction, or meaningful ambiguity discovered while preparing the PR.
-
-### Docs (in this PR)
-
-- Update [docs/deployments-design.md](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) with:
-  - one short operator-reference table
-  - one example deployment record
-  - one example artifact-lineage story
-  - one example lock-scope story
-  - one example metadata precedence story
-
-### Acceptance Criteria
-
-- A reader can quickly find the mandatory policies without re-reading the whole document.
-- A reader can see how operation kind differs from final outcome.
-- A reader can see how artifact reuse is supposed to work for promotion or rollback.
-- A reader can see how metadata precedence and lock scope work in concrete examples.
-
-### Risks
-
-The examples could accidentally introduce policy drift if they contradict the normative sections.
-
-### Mitigation
-
-Treat examples as explanatory material only and cross-check them against the normative sections.
-
-### Consequence of Not Implementing
-
-The design remains correct but harder to consume, making implementation planning slower and more
-error-prone.
-
-### Downsides for Implementing
-
-Adds more normative-adjacent examples that must stay in sync with the main design.
-
-### Recommendation
-
-Implement.
-
-### Collaboration Note
-
-- Prompt the repository owner before landing any policy deviation from this design.
-- Prompt the repository owner when a meaningful ambiguity is discovered and the PR would otherwise have to choose a policy direction on its own.
-
-## PR-2: Finalize the now-decided operator defaults in the design document
-
-### Description
-
-This PR should make the design document internally complete and consistent around the
-now-decided operator defaults without changing the core model.
-
-### Scope & Changes
-
-- Update [docs/deployments-design.md](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md):
-  - verify that the chosen default diff base for `--from-changes` is reflected consistently in all command and automation sections
-  - verify that the chosen default smoke timeout budgets by class are reflected consistently in smoke policy and examples
-  - verify that the already-defined `smoke.exception` metadata shape is reflected consistently in policy, examples, and validation guidance
-  - verify that the minimum branch and protection assumptions for the fast-forward promotion model are reflected consistently
-  - optionally refine queue timeout values and stale-run detection details in the design doc without changing the default queued-with-revalidation policy
-
-### Tests (in this PR)
-
-- Manual read-through for consistency with:
-  - `Repo-Level Deploy Command`
-  - `Smoke Check Policy`
-  - `Retry, Concurrency, And Locking`
-  - `Promotion And Rollback`
-- Prompt the repository owner about any policy deviation, contradiction, or meaningful ambiguity discovered while preparing the PR.
-
-### Docs (in this PR)
-
-- Update [docs/deployments-design.md](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) with:
-  - any missing metadata field naming needed to support the chosen diff-base, smoke, and promotion policies
-  - one short note on branch-protection assumptions for promotion if implementation detail needs to be more concrete
-  - one short note confirming the `smoke.exception` shape and where validators should read it
-  - one short note on queue timeout and stale-run detection detail if more precision is needed
-
-### Acceptance Criteria
-
-- The document consistently defines changed-based deploy selection, lock contention, and smoke timing defaults.
-- The promotion model has enough branch-policy detail to serve as input to later implementation planning.
-- No section of the design document quietly re-opens already decided operator defaults.
-
-### Risks
-
-The defaults could be chosen too early and later prove awkward in practice.
-
-### Mitigation
-
-Choose defaults that are explicit, conservative, and easy to override through later implementation configuration without changing the core design.
-
-### Consequence of Not Implementing
-
-The design document remains slightly incomplete at the handoff boundary into implementation planning, and later work may have to pause to restate defaults that should already be settled here.
-
-### Downsides for Implementing
-
-Locks in more operator-facing defaults that later tooling must respect.
-
-### Recommendation
-
-Implement.
-
-### Collaboration Note
-
-- Prompt the repository owner before landing any policy deviation from this design.
-- Prompt the repository owner when a meaningful ambiguity is discovered and the PR would otherwise have to choose a policy direction on its own.
-
-## Design Completion Recommendation
-
-Complete the design document in phases:
-
-1. finalize the normative operational sections so they fully match the locked decisions in this document
-2. add compact summary tables and concrete examples for provenance, promotion, rollback, lock scope, metadata precedence, and smoke policy
-3. translate the now-decided defaults into implementation-planning detail without re-opening them
-4. run one final consistency pass across the whole document so examples, summaries, appendices, and normative sections all say the same thing
-5. declare the document ready for a separate implementation-planning phase
-
-That gives us an implementation-ready design without mixing design completion and production implementation in the same plan.
-
-After those design-document phases are complete, the repository should be ready for a separate
-implementation-planning effort.
+Any later implementation choice that would weaken or contradict the contract in this document should be
+surfaced explicitly rather than introduced implicitly.
