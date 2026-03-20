@@ -349,11 +349,11 @@ treated as planned policy, not open brainstorming:
   - it must not mean "publish whatever was most recently built on this machine"
   - rebuilding during `--publish-only` is out of policy
 - deploy records should distinguish operation kind from final outcome
-  - operation kinds include at least normal deploy, preview deploy, retry, promotion, and rollback
+  - operation kinds should use one canonical enum: `deploy`, `preview`, `retry`, `promotion`, `rollback`
   - success or failure outcome must remain separate from the kind of run being performed
 - deploy records should use separate canonical vocabularies for final outcomes and lifecycle states
   - terminal final outcomes: `validation_failed`, `build_failed`, `resolve_failed`, `provision_failed`, `publish_failed`, `smoke_failed_after_publish`, `succeeded`
-  - lifecycle states: `queued`, `running`, `waiting_for_lock`, `cancelling`, `cancelled`
+  - lifecycle states: `queued`, `waiting_for_lock`, `running`, `cancelling`, `finished`, `cancelled`
 - automatic retry policy should be conservative and step-specific
   - `validate`, `build`, and `resolve` should not auto-retry
   - `provision` should not auto-retry by default; explicit operator rerun is preferred
@@ -427,7 +427,7 @@ Examples:
 
 ```bash
 deploy pleomino-prod
-deploy pleomino-prod --preview
+deploy pleomino-prod --preview --source-run-id <deploy-run-id>
 deploy pleomino-prod --validate-only
 deploy pleomino-prod --provision-only
 deploy pleomino-prod --publish-only --source-run-id <deploy-run-id>
@@ -457,6 +457,12 @@ This command should:
 
 That gives the user one command while keeping the internal responsibilities clear.
 
+Execution-mode rule:
+
+- `deploy <id>` is one public front door with two execution modes
+- for `local_only`, it may execute mutating steps locally
+- for `shared_nonprod` and `production_facing`, it may validate or select locally, but mutating work should be submitted to the shared control plane rather than executed directly on the operator workstation
+
 ### Deployment Id Versus Preview Run
 
 This distinction needs to stay explicit because it is one of the easiest places for a new engineer to get confused.
@@ -467,9 +473,10 @@ This distinction needs to stay explicit because it is one of the easiest places 
 So:
 
 - `pleomino-prod` and `pleomino-staging` are different deployments
-- `deploy pleomino-prod --preview` is still operating on `pleomino-prod`
+- `deploy pleomino-prod --preview --source-run-id <deploy-run-id>` is still operating on `pleomino-prod`
 - preview should not silently invent a second deployment id or bypass the deployment package's validation rules
 - for `shared_nonprod` and `production_facing`, preview should not be used from unadmitted revisions or artifacts
+- bare `--preview` should therefore be treated as valid only for `local_only` or other explicitly preview-safe non-protected flows
 
 Plain-language version:
 
@@ -786,6 +793,7 @@ Creation and destruction policy:
 Protected/shared preview admission policy:
 
 - preview on `shared_nonprod` and `production_facing` deployments is allowed only from an already-admitted revision or immutable artifact
+- preview on those deployments should therefore require `--source-run-id` or an equivalent explicit admitted immutable selector
 - preview for those deployments must still publish to an explicitly isolated preview target class
 - preview for those deployments must not be used to preview unadmitted PR code or to bypass the lane's normal branch, check, or approval policy
 - if a workflow needs PR-driven previews for unadmitted revisions, that should use a different deployment classified for that purpose rather than piggybacking on a protected/shared deployment id
@@ -1009,6 +1017,7 @@ deployment(
         "type": "http-smoke",
         "path": "/",
     },
+    secret_requirements = {},
 )
 ```
 
@@ -1090,8 +1099,9 @@ Suggested metadata shape conventions:
     - for `shared_nonprod` and `production_facing`, smoke definitions must come from a vetted built-in smoke-runner registry
     - package-local executable smoke entries are invalid for `shared_nonprod` and `production_facing`
   - `secret_requirements`
-    - required whenever any provision, publish, or smoke step consumes secrets
-    - for `shared_nonprod` and `production_facing`, must be explicit even when empty for vetted built-in-supported shapes so the absence of secret inputs is itself reviewable
+    - required for all deployments
+    - `{}` is the sensible default when a deployment has no secret inputs
+    - for `shared_nonprod` and `production_facing`, that explicit empty value is part of the reviewable contract, not optional boilerplate
     - should declare non-secret secret requirements by step or consumer, so validation and admission can fail early without revealing secret values
     - should remain Buck-visible metadata; secret material itself must not appear there
   - `preview`
@@ -2663,9 +2673,11 @@ Operator-facing lifecycle states:
 
 - in-progress states
   - `queued`
-  - `running`
   - `waiting_for_lock`
+  - `running`
   - `cancelling`
+- finished with canonical final outcome
+  - `finished`
 - ended before canonical final outcome
   - `cancelled`
 
@@ -2729,7 +2741,7 @@ Normal lock-scope story:
 - the derived shared-environment lock scope is therefore conceptually `cloudflare-pages:pleomino-prod-pages`
 - `deploy pleomino-prod`
 - `deploy pleomino-prod --publish-only --source-run-id <deploy-run-id>`
-- `deploy pleomino-prod --preview`
+- `deploy pleomino-prod --preview --source-run-id <deploy-run-id>`
 
 All three runs must contend on that same lock by default unless preview is explicitly configured to publish
 to a fully isolated preview target with a different canonical provider-target identity.
@@ -3040,7 +3052,7 @@ Policy:
 - Vault should be the initial production backend behind that contract
 - backend switching should remain possible without changing deployment metadata semantics
 - runtime-secret injection must avoid leaking secret material into Buck metadata, checked-in files, or durable deployment records
-- deployments should expose non-secret `secret_requirements` metadata so validation, admission, and operator tooling can determine whether the secret contract is complete before mutation begins
+- deployments should expose non-secret `secret_requirements` metadata, with `{}` as the normal explicit value when no secrets are required, so validation, admission, and operator tooling can determine whether the secret contract is complete before mutation begins
 - validation for `shared_nonprod` and `production_facing` should fail if a step consumes secrets but `secret_requirements` does not declare that requirement
 
 Anti-patterns:
@@ -3085,7 +3097,7 @@ Minimum required fields:
 - `operation_kind`
   - such as `deploy`, `preview`, `retry`, `promotion`, or `rollback`
 - `lifecycle_state`
-  - such as `queued`, `running`, `waiting_for_lock`, `cancelling`, or `cancelled`
+  - such as `queued`, `waiting_for_lock`, `running`, `cancelling`, `finished`, or `cancelled`
 - `termination_reason`
   - `cancelled`, `superseded`, or `no_longer_admitted` when the run ends without reaching a canonical terminal outcome
   - should be `null` when the run does reach a canonical terminal outcome
@@ -3247,8 +3259,8 @@ Canonical final-outcome vocabulary:
 ### Example Deployment Record
 
 Illustrative provider-neutral record for a successful promotion.
-This example intentionally omits `lifecycle_state` to avoid implying any new terminal-state policy beyond
-the vocabulary defined above:
+This example uses the canonical `operation_kind`, `lifecycle_state`, `termination_reason`, and
+`final_outcome` vocabularies defined above:
 
 ```json
 {
@@ -3256,6 +3268,7 @@ the vocabulary defined above:
   "deployment_id": "pleomino-prod",
   "deployment_label": "//projects/deployments/pleomino-prod:deploy",
   "operation_kind": "promotion",
+  "lifecycle_state": "finished",
   "termination_reason": null,
   "source_revision": "abc1234",
   "actor": {
@@ -3321,9 +3334,11 @@ Canonical lifecycle-state vocabulary:
 
 - non-terminal
   - `queued`
-  - `running`
   - `waiting_for_lock`
+  - `running`
   - `cancelling`
+- terminal
+  - `finished`
 - ended before canonical final outcome
   - `cancelled`
 
@@ -3525,7 +3540,7 @@ def cloudflare_static_pwa_deployment(
     promotion_lane = None,
     provisioner = None,
     smoke = None,
-    secret_requirements = None,
+    secret_requirements = {},
 ):
     deployment(
         name = name,
@@ -3607,7 +3622,7 @@ def puzzle_cloudflare_deployment(
     promotion_lane = None,
     provisioner = None,
     smoke = None,
-    secret_requirements = None,
+    secret_requirements = {},
 ):
     cloudflare_static_pwa_deployment(
         name = name,
@@ -3707,6 +3722,11 @@ puzzle_cloudflare_deployment(
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
+    smoke = {
+        "type": "http-smoke",
+        "path": "/",
+    },
+    secret_requirements = {},
 )
 ```
 
@@ -4169,12 +4189,16 @@ For a static PWA, the final developer experience should be simple:
 deploy pleomino-prod
 ```
 
+For a `production_facing` deployment, that command should be read as the one public submission interface,
+not as permission for the operator workstation to execute protected mutation locally.
+
 Under the hood that may still mean:
 
-1. Buck builds `//projects/apps/pleomino:app`
-2. the deploy tool resolves the built `dist`
-3. the publisher uploads it to Cloudflare Pages
-4. optional smoke checks run
+1. the CLI validates the deployment and submits the run to the shared control plane
+2. Buck builds `//projects/apps/pleomino:app`
+3. the deploy tool resolves the built `dist`
+4. the publisher uploads it to Cloudflare Pages
+5. optional smoke checks run
 
 The user should not need to think about that wiring.
 
