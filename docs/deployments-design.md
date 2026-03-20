@@ -313,7 +313,8 @@ treated as planned policy, not open brainstorming:
   - prerequisite modes should be narrow by default: `ordering_only` or `health_gated`
   - prerequisites should be same-lane by default
   - cross-lane prerequisites require explicit reviewed shared-platform semantics
-  - admission, orchestration, and changed-based selection should consume the same prerequisite metadata
+  - prerequisite graphs must be DAGs
+  - admission, orchestration, and changed-based selection should consume the same declared direct-edge prerequisite metadata
 - deploy records should include first-class lineage identifiers
   - every run gets a globally unique `deploy_run_id`
   - retries, rollbacks, and promotions should set `parent_run_id`
@@ -326,7 +327,7 @@ treated as planned policy, not open brainstorming:
   - two deployment ids must not share the same normal mutable live target except through an explicit reviewed migration or alias exception
 - protected or shared-environment `--publish-only` must identify the exact artifact being published
   - it must not mean "publish whatever was most recently built on this machine"
-  - rebuilding during `--publish-only` is out of policy for those environments unless the operator is intentionally creating a new deploy run instead of reusing an existing artifact
+  - rebuilding during `--publish-only` is out of policy
 - deploy records should distinguish operation kind from final outcome
   - operation kinds include at least normal deploy, preview deploy, retry, promotion, and rollback
   - success or failure outcome must remain separate from the kind of run being performed
@@ -486,12 +487,13 @@ Flag interaction rules:
 - `--provision-only` still performs `validate`, but it must not build, resolve artifacts, or publish
   - in v1, provisioners may consume only stable declared deployment metadata, not resolved build outputs or artifact-derived inputs
 - `--publish-only` still performs `validate` and `resolve`, but it must skip provisioning
-  - it may build only when the caller did not provide or select an already-built artifact reference
-  - promotion-grade, retry, and rollback-grade publish-only paths should prefer the exact previously resolved artifact rather than rebuilding
+  - it must publish one explicitly selected immutable artifact
+  - it must not build or select an implicit local artifact on the caller's behalf
+  - promotion-grade, retry, and rollback-grade publish-only paths should use the exact previously resolved artifact rather than rebuilding
   - for protected or shared environments, `--publish-only` must require an explicit immutable selector
   - the normal protected/shared selector should be `--run-id <deploy-run-id>`
   - an optional lower-level `--artifact-ref <artifact-ref>` path may exist for vetted admin or automation use, but it must still identify one exact immutable artifact
-  - for those environments it must not fall back to "latest local build output" or an implicit rebuild on the operator's machine
+  - it must not fall back to "latest local build output" or an implicit rebuild on the operator's machine
 - `--preview` changes the publish mode, not the deployment identity
 - `--list` does not mutate anything
 - `--from-changes` selects deployment ids first, then runs the same lifecycle each selected deployment would normally run
@@ -862,7 +864,10 @@ Suggested metadata shape conventions:
     - required
     - should be a structured object, not a bare string
     - should include at least a stable provider-side identifier under `id`
-    - may include additional provider-neutral qualifiers when needed, such as account, namespace, region, or environment class
+    - built-in providers must publish one canonical identity-field set and normalization rule in a single normative repo table or equivalent canonical design section
+    - the default lock scope, normal live-target ownership rule, preview isolation, and deployment-record target identity must all key off that same provider-specific canonical identity rule
+    - a provider adapter must treat all fields required by that canonical identity rule as part of the mutable live-target identity, not as optional commentary
+    - additional non-identity provider metadata may exist, but must not silently participate in canonical target identity unless the provider's documented identity rule says so
   - `promotion_lane`
     - required for deployments that participate in protected/shared promotion policy
     - identifies the independently promoted deployment family this deployment belongs to
@@ -879,19 +884,26 @@ Suggested metadata shape conventions:
     - required
     - should include a stable `type`
     - file references such as `config` should be package-relative unless documented otherwise
+    - for `shared_nonprod` and `production_facing`, `type` must come from a vetted built-in publisher registry
+    - package-local executable publisher entries are invalid for `shared_nonprod` and `production_facing`
   - `provisioner`
     - optional
     - when present, should include a stable `type`
     - file references such as `entry` or config paths should be package-relative unless documented otherwise
+    - for `shared_nonprod` and `production_facing`, `type` must come from a vetted built-in provisioner registry
+    - package-local executable provisioner entries are invalid for `shared_nonprod` and `production_facing`
   - `smoke`
     - optional
-    - when present, should explicitly describe how smoke runs, such as an `entry`, a named built-in smoke class, or other adapter-defined validated shape
+    - when present, should explicitly describe how smoke runs, such as a named built-in smoke class or other adapter-defined validated built-in shape
     - production smoke exceptions should be represented explicitly as a nested `smoke.exception` object rather than by omitting the field and hoping readers infer intent
+    - for `shared_nonprod` and `production_facing`, smoke definitions must come from a vetted built-in smoke-runner registry
+    - package-local executable smoke entries are invalid for `shared_nonprod` and `production_facing`
   - `prerequisites`
     - optional
     - when present, should be an explicit list of deployment-id prerequisites rather than free-form prose
     - each prerequisite should declare whether it is `ordering_only` or `health_gated`
-    - prerequisites should stay narrow and non-recursive by default
+    - prerequisites should stay narrow and direct-edge-only by default
+    - cycles and self-dependencies are invalid
 
 Important design points:
 
@@ -1025,6 +1037,8 @@ Policy:
 - one deployment id should own one normal mutable live provider target by default
 - two deployment ids must not share the same normal mutable live provider target except through an explicit reviewed migration or alias exception
 - adapters must not silently derive the live target from branch names, directory names, ambient CLI defaults, or unchecked duplication in provider-native config files
+- built-in providers must define one canonical provider-target identity rule that names the required identity fields and their normalization behavior
+- lock scope, normal live-target ownership, preview-target isolation, and deployment-record target identity must all use that same canonical provider-target identity rule
 - when preview mode is supported, preview target selection must also be explicit
   - either deployment metadata declares the preview target shape directly
   - or the provider adapter defines a deterministic, validated derivation from deployment metadata to an isolated preview target
@@ -1035,9 +1049,10 @@ Field-shape guidance:
 - `provider_target` should be represented as a structured metadata object, not as free-form prose or an opaque positional tuple
 - the minimum required field is `id`, meaning the stable provider-side target identifier for normal publish mode
 - when additional qualifiers are needed to uniquely identify the live target, represent them as explicit named fields rather than encoding them into one ambiguous string
+- the exact identity field set for a built-in provider must be documented canonically and reviewed as part of the provider contract, not improvised per adapter callsite
 - this is an intentional standardization decision for the document, not an accidental example style choice
-- the shared `id` field gives validation, deployment records, and adapter wiring one predictable canonical identifier while still allowing provider-specific qualifiers beside it
-- examples in this document use compact shapes for readability; production adapters may require additional validated fields, but should preserve the same explicit-object model
+- the shared `id` field gives validation, deployment records, and adapter wiring one predictable anchor identifier while still allowing provider-specific qualifiers beside it
+- examples in this document use compact shapes for readability; production adapters may require additional validated identity fields, but should preserve the same explicit-object model and canonical identity rule
 
 Minimum `smoke.exception` fields:
 
@@ -1064,13 +1079,14 @@ Policy:
 
 - prerequisites must be explicit deployment metadata, not inferred from naming conventions or tribal knowledge
 - prerequisites are deployment-to-deployment relationships, not arbitrary resource-level dependency scripts
-- prerequisites should be narrow and non-recursive by default
+- prerequisites should be narrow and direct-edge-only by default
 - a deployment may declare zero or more prerequisites, but each prerequisite must name one concrete deployment id and one explicit mode
-- orchestration, admission, and `--from-changes` logic should all consume the same prerequisite metadata rather than inventing separate notions of dependency
+- orchestration, admission, and `--from-changes` logic should all consume the same declared direct-edge prerequisite metadata rather than inventing separate notions of dependency
 - prerequisites should be same-lane by default
 - cross-lane prerequisites are forbidden unless they are explicitly marked and reviewed as shared-platform dependencies with documented admission, locking, and health semantics
 - prerequisite graphs must be DAGs
-- self-dependencies are invalid
+- transitive prerequisite closure is not part of the default contract; a future explicit policy would need to add it deliberately
+- self-dependencies are invalid and must be rejected at validation time
 - direct or indirect prerequisite cycles are invalid and must be rejected at validation time
 
 ### Provisioner
@@ -2255,6 +2271,7 @@ Release-admission contract for protected/shared environments:
   - the run has not been superseded by a later admitted run for the same lock scope
   - any required approval has not been revoked, expired, or invalidated by newer policy state
   - any health-gated prerequisite still satisfies its declared health requirement, using a fresh revalidation-time health verdict unless explicitly documented equivalent provider evidence is accepted
+- admission and revalidation should evaluate only the declared direct prerequisite edges for that deployment unless a future policy explicitly adds transitive prerequisite semantics
 - if any of those checks fail after revalidation, the run must exit without mutating the target and report that it was superseded, stale, or no longer admitted
   - in those cases, the deployment record should preserve `final_outcome = null` and a specific `termination_reason`
 
@@ -2385,6 +2402,14 @@ The deployment rule should expose enough metadata for repo tooling to retrieve:
 - package path
 
 That metadata should be sufficient for the deploy CLI to assemble the whole lifecycle without scraping provider config files for core deployment facts.
+
+For built-in providers, the deployment design should also maintain one canonical provider-target identity reference that defines:
+
+- the required identity fields for that provider
+- how those fields normalize into canonical target identity
+- which fields participate in lock-scope derivation, normal live-target ownership, preview isolation, and deployment-record target identity
+
+An adapter must not invent a narrower or wider identity rule ad hoc for one of those consumers.
 
 In other words:
 
@@ -2526,7 +2551,8 @@ Artifact identity rules:
 - if an artifact already has a strong native identity, such as an image digest or content-addressed store identity, record that directly
 - if an artifact is not produced through a fully content-addressed path, `resolve` should compute or surface a stable content fingerprint
 - publish should consume the resolved artifact from the build step, not rebuild implicitly
-- publish-only, promotion, retry, and rollback flows should accept a previously recorded artifact reference and should not rebuild unless the operator is intentionally creating a new artifact
+- publish-only flows should accept a previously recorded artifact reference and must not rebuild
+- promotion, retry, and rollback flows should accept a previously recorded artifact reference and should prefer reusing that immutable artifact rather than rebuilding
 - a recorded artifact reference for a supported reuse flow must remain retrievable for the applicable retention window
 - reusable artifact attestation should bind artifact identity to source revision plus build inputs, not to environment-specific deployment metadata or provider config
 - provider-instance identifiers used during publish should come from authoritative deployment metadata or generated config, not from silently drift-prone duplicated checked-in fields
