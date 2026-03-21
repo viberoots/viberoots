@@ -37,6 +37,24 @@ When those three get mixed together, onboarding gets muddy. So throughout this d
 - "example" means an illustration, not a mandatory implementation detail
 - "not fixed yet" means the model is decided, but some operational policy is still open
 
+## Normative Invariants
+
+Future edits should not weaken or silently contradict the following invariants without an explicit design decision to change the policy:
+
+- `TARGETS` is the authoritative source of deployment metadata; provider config files are provider-native inputs, not a second source of truth for core deployment facts.
+- every concrete deployment lives under `projects/deployments/<deployment-id>/` and exposes a canonical `:deploy` target.
+- Buck owns deployment structure, validation, dependency graph, and build artifacts; live deployment side effects belong to the repo-level `deploy` workflow, not ordinary Buck actions.
+- every deployment must declare explicit provider-target identity in authoritative metadata; adapters must not infer the normal live target from naming convention, ambient defaults, or unchecked provider-config drift.
+- one deployment id owns one normal mutable live target by default; sharing a normal live target across deployment ids is allowed only through an explicit reviewed migration or alias exception.
+- preview is a publish mode, not a deployment identity and not a peer `operation_kind`; preview must publish only to an explicitly isolated preview target or be rejected.
+- protected/shared mutation must go through the shared control plane; trusted CI may build, attest, and trigger submissions, but it is not a peer mutating authority. Direct local mutation of `shared_nonprod` and `production_facing` targets is out of policy except for explicitly controlled emergency procedures.
+- for `shared_nonprod` and `production_facing`, the mutating publish phase must consume an admitted immutable artifact or an admitted source-run selector that resolves to that previously admitted artifact plus recorded snapshot metadata; workstation builds and ad hoc mutating rebuilds are out of policy.
+- promotion reuses the same admitted artifact across distinct deployment ids in the same compatible `promotion_lane`; it must not retarget one deployment dynamically across environments.
+- for promotion, the lane policy and environment-branch state are authoritative for what is currently promotable; `--source-run-id` is a selector within that admitted policy boundary, not an override around it.
+- rollback is a new run classified by `operation_kind = rollback`; it should prefer redeploying a prior known-good artifact rather than rebuilding or moving environment branches backward.
+- deployment records must keep `operation_kind`, `publish_mode`, lifecycle state, and final outcome as separate concepts with canonical vocabularies.
+- `protection_class` is a trust-and-sensitivity tier that drives admission, smoke expectations, and execution boundary policy; it is not merely a label for whether end users directly see the target.
+
 ## Quick Reference
 
 | Term        | Simple question                              | Meaning                                                  | Example                                      |
@@ -301,15 +319,15 @@ The table below is intentionally redundant with the normative sections later in 
 Its job is to give operators and implementers one compact scan of the default policy shape before
 they dive into the detailed rationale.
 
-| Topic               | Default policy                                                                                                       | Operator takeaway                                                                                             |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Provenance          | Build trust and deployment-run trust are separate records.                                                           | Reusing the same artifact across environments is expected; the environment-specific run record still changes. |
-| Promotion           | Promote the same previously built artifact forward through distinct deployment ids in the same lane.                 | Do not rebuild just because you are moving from staging to prod.                                              |
-| Rollback            | Prefer redeploying a prior known-good artifact; otherwise promote a revert commit forward.                           | A rollback is a new run with `operation_kind = rollback`, not a special outcome code.                         |
-| Locking             | Shared-environment mutation locks on `provider` plus canonical provider-target identity.                             | One live target gets one active mutating run at a time unless there is an explicit reviewed exception.        |
-| Metadata precedence | Buck deployment metadata is authoritative for repo deployment facts and provider-target identity.                    | Provider config may add provider-native settings, but it must not silently override the deployment contract.  |
-| Drift ownership     | `TARGETS` is the source of truth; checked-in provider config should be generated, injected, or validated against it. | If the same target identity appears in two places and disagrees, validation should fail.                      |
-| Smoke               | `production_facing` deploys require blocking smoke by default unless an explicit `smoke.exception` says otherwise.   | A publish can succeed and the overall deploy can still fail on smoke.                                         |
+| Topic               | Default policy                                                                                                                                                                  | Operator takeaway                                                                                             |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Provenance          | Build trust and deployment-run trust are separate records.                                                                                                                      | Reusing the same artifact across environments is expected; the environment-specific run record still changes. |
+| Promotion           | Promote the same previously built artifact forward through distinct deployment ids in the same lane.                                                                            | Do not rebuild just because you are moving from staging to prod.                                              |
+| Rollback            | Prefer redeploying a prior known-good artifact; otherwise promote a revert commit forward.                                                                                      | A rollback is a new run with `operation_kind = rollback`, not a special outcome code.                         |
+| Locking             | Shared-environment mutation locks on `provider` plus canonical provider-target identity.                                                                                        | One live target gets one active mutating run at a time unless there is an explicit reviewed exception.        |
+| Metadata precedence | Buck deployment metadata is authoritative for repo deployment facts and provider-target identity.                                                                               | Provider config may add provider-native settings, but it must not silently override the deployment contract.  |
+| Drift ownership     | `TARGETS` is the source of truth; checked-in provider config should be generated, injected, or validated against it.                                                            | If the same target identity appears in two places and disagrees, validation should fail.                      |
+| Smoke               | `shared_nonprod` and `production_facing` deploys must declare smoke explicitly; `production_facing` is blocking by default unless an explicit `smoke.exception` says otherwise. | A publish can succeed and the overall deploy can still fail on smoke.                                         |
 
 ## Decisions Locked Now
 
@@ -360,7 +378,8 @@ treated as planned policy, not open brainstorming:
   - it must not mean "publish whatever was most recently built on this machine"
   - rebuilding during `--publish-only` is out of policy
 - deploy records should distinguish operation kind from final outcome
-  - operation kinds should use one canonical enum: `deploy`, `preview`, `retry`, `promotion`, `rollback`
+  - operation kinds should use one canonical enum: `deploy`, `retry`, `promotion`, `rollback`
+  - preview should be modeled through `publish_mode`, not as a peer `operation_kind`
   - success or failure outcome must remain separate from the kind of run being performed
 - deploy records should use separate canonical vocabularies for final outcomes and lifecycle states
   - terminal final outcomes: `validation_failed`, `build_failed`, `resolve_failed`, `provision_failed`, `publish_failed`, `smoke_failed_after_publish`, `succeeded`
@@ -371,11 +390,18 @@ treated as planned policy, not open brainstorming:
   - `publish` may auto-retry for clearly transient failures, up to 2 retries with backoff
   - `smoke` may auto-retry for transient readiness/network failures, up to 3 retries within an overall timeout budget
 - secrets should use `secretspec` as the repo-level contract layer and Vault as the initial production backend
-- protected or shared-environment deploys should be admitted only through CI or the shared control plane
+- protected or shared-environment deploys should be admitted only by the shared control plane
   - direct local mutating deploys to those environments are out of policy except for explicitly controlled emergency procedures
-  - the CI system is intentionally not part of the authoritative deployment model
-  - Jenkins, GitHub Actions, or another CI system may satisfy the admission and trigger role as long as it obeys the same deployment metadata, admission-policy, provenance, and control-plane contracts
-  - a repo may use more than one CI system at once for different lanes or repo slices, provided they do not become competing sources of truth for deployment metadata or admission policy
+  - the CI system is intentionally not part of the authoritative mutating deployment model
+  - Jenkins, GitHub Actions, or another CI system may build, attest, and trigger submissions as long as the shared control plane remains the sole authority for admission, lock acquisition, mutation orchestration, smoke execution, and deploy records
+  - a repo may use more than one CI system at once for different lanes or repo slices, provided they do not become competing sources of truth for deployment metadata, admission decisions, or deployment history
+- break-glass emergency procedures should be explicitly bounded
+  - only named emergency roles may invoke them
+  - they should still prefer exact admitted-artifact reuse over rebuild
+  - any exceptional rebuild path should require a separately documented higher-bar approval
+  - they must record actor, reason, affected target, approval source, artifact-selection path, and reconciliation owner
+  - they must be incident-bounded rather than a standing alternate workflow
+  - they must require post-incident reconciliation back to the normal branch, admission, and deployment path
 - local-only fallback should be explicitly limited
   - shared environments must use the central Postgres control plane
   - personal local/dev workflows may use a local filesystem lock plus a local structured deployment record
@@ -390,6 +416,7 @@ treated as planned policy, not open brainstorming:
 - `--provision-only` should not build or publish
   - the simple default is `metadata_only`
   - a reviewed provisioner may use `immutable_resolved_inputs`, but it must not trigger a rebuild or depend on mutable local build state
+  - for `shared_nonprod` and `production_facing`, that reviewed path should require an explicit immutable source selector; without one, the supported path remains `metadata_only`
 - `protection_class` should use a closed enum: `local_only`, `shared_nonprod`, `production_facing`
 
 These decisions are now reflected in the detailed design sections below. The remaining work is to
@@ -448,6 +475,8 @@ deploy --from-changes
 deploy --list
 ```
 
+For `shared_nonprod` and `production_facing`, those CLI examples describe authenticated submission to the shared control plane, not local mutation on the caller's workstation or a peer CI mutation endpoint.
+
 Suggested layout:
 
 ```text
@@ -463,7 +492,7 @@ CLI/front-door responsibilities:
 2. query Buck for deployment metadata
 3. validate provider and component rules
 4. for `local_only`, build referenced Buck targets and resolve concrete output paths directly
-5. for `shared_nonprod` and `production_facing`, submit a mutating request that must resolve to an admitted immutable artifact or source run
+5. for `shared_nonprod` and `production_facing`, act only as a thin authenticated submitter to the shared control-plane API for a mutating request that must resolve to an admitted immutable artifact or source run
 
 Control-plane worker responsibilities for protected/shared mutation:
 
@@ -473,13 +502,17 @@ Control-plane worker responsibilities for protected/shared mutation:
 4. run publishing
 5. run optional smoke checks
 
+For protected/shared mutation, "load the admitted immutable artifact or source-run snapshot" means
+"load the previously admitted immutable artifact plus the recorded source-run snapshot metadata needed
+for replay"; it does not authorize a new build or rebuild by replay.
+
 That gives the user one command while keeping the execution boundary clear.
 
 Execution-mode rule:
 
 - `deploy <id>` is one public front door with two execution modes
 - for `local_only`, it may execute mutating steps locally
-- for `shared_nonprod` and `production_facing`, it may validate or select locally, but mutating work should be submitted through authenticated control-plane or CI paths rather than executed directly on the operator workstation
+- for `shared_nonprod` and `production_facing`, it may validate or select locally, but any mutating submission path is just an authenticated thin client to the control plane or CI rather than a local mutator
 - human-triggered protected/shared mutation should therefore go through the control-plane UI or API with explicit authz and audit, not through arbitrary local CLI execution
 
 ### Deployment Id Versus Preview Run
@@ -561,7 +594,12 @@ These flags are not just convenience syntax. They exist because real deployment 
 
 Flag interaction rules:
 
-- default `deploy <id>` means `validate -> build -> resolve -> provision? -> publish -> smoke?`
+- default `deploy <id>` means `validate -> build -> resolve -> provision? -> publish -> smoke?` for `local_only`
+- for `shared_nonprod` and `production_facing`, default `deploy <id>` means `validate -> submit trusted build-admit-or-reuse request -> provision? -> publish -> smoke?`
+  - CI may perform the trusted build-and-attest step before mutation begins
+  - the shared control plane remains the sole authority that admits the run, selects the admitted artifact, acquires the lock, orchestrates mutation, runs smoke, and records deployment history
+  - the mutating publish phase must consume only the resulting admitted immutable artifact
+  - it must not mutate directly from a workstation build or an ad hoc control-plane rebuild
 - `--validate-only` runs validation only
 - `--provision-only` still performs `validate`, but it must not build, resolve artifacts, or publish
   - the default provisioner input class is `metadata_only`
@@ -569,6 +607,7 @@ Flag interaction rules:
   - a reviewed provisioner may instead declare `immutable_resolved_inputs`
     - it may consume already-built immutable artifact descriptors or recorded resolved inputs
     - it must not trigger a rebuild or rely on mutable local build state
+    - for `shared_nonprod` and `production_facing`, that reviewed path must require an explicit immutable source selector such as `--source-run-id <deploy-run-id>`; otherwise the run stays in `metadata_only`
 - `--publish-only` still performs `validate` and `resolve`, but it must skip provisioning
   - it must publish one explicitly selected immutable artifact
   - it must not build or select an implicit local artifact on the caller's behalf
@@ -576,6 +615,7 @@ Flag interaction rules:
   - for protected or shared environments, `--publish-only` must require an explicit immutable selector
   - the normal protected/shared selector should be `--source-run-id <deploy-run-id>`
   - `--source-run-id` means "reuse the artifact plus recorded source-run snapshot inputs from this earlier run"
+  - for `shared_nonprod` and `production_facing`, `--source-run-id` is only a selector for a previously admitted immutable artifact plus recorded snapshot metadata; it does not authorize a rebuild
   - for `retry` and `rollback`, that source run should normally come from the same deployment id
   - for `promotion`, that source run may come from another deployment in the same compatible `promotion_lane`
   - the control plane must validate operation-kind compatibility, promotion-lane compatibility, and target compatibility before allowing that reuse
@@ -644,6 +684,10 @@ Example:
 ```bash
 deploy pleomino-prod --provision-only
 ```
+
+If a reviewed protected/shared provisioner needs `immutable_resolved_inputs` rather than plain
+`metadata_only`, the operator contract should add an explicit immutable selector such as
+`deploy pleomino-prod --provision-only --source-run-id <deploy-run-id>`.
 
 Plain-language version:
 
@@ -748,6 +792,7 @@ deployment(
     provider = "cloudflare-pages",
     provider_target = {
         "id": "pleomino-prod-pages",
+        "account": "web-platform-prod",
     },
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
@@ -793,11 +838,11 @@ What "explicit" means here:
 Preview lifecycle examples:
 
 - CI-managed preview of an already-admitted production artifact
-  - CI or the shared control plane selects an already-admitted `pleomino-prod` run
+  - CI or another automation trigger asks the shared control plane to select an already-admitted `pleomino-prod` run
   - it runs `deploy pleomino-prod --preview --source-run-id <deploy-run-id>`
   - the provider adapter derives an isolated target such as `preview-from-run-184`
   - smoke runs against the preview URL
-  - when the preview expires, CI or the control plane destroys that isolated target or asks the provider to expire it
+  - when the preview expires, the control plane destroys that isolated target or asks the provider to expire it
 - Branch preview with provider-managed ephemeral target
   - CI publishes a branch preview for a local-only or explicitly preview-safe deployment using the provider's native preview facility
   - the provider owns most of the lifecycle
@@ -809,7 +854,7 @@ Preview lifecycle examples:
 
 Creation and destruction policy:
 
-- previews are usually created automatically by CI or the shared control plane in response to PRs, review requests, or other automation triggers
+- previews are usually created automatically by the shared control plane in response to CI, PR, review, or other automation triggers
 - manual preview creation is allowed only for explicitly isolated local or personal preview targets
 - preview destruction should be automatic by default
   - on PR close or merge
@@ -859,7 +904,7 @@ Default diff-base policy:
 
 - local use should compare against `git merge-base HEAD @{upstream}`
 - CI pull-request use should compare against the merge-base with the PR target branch
-- post-merge automation should compare against the previous successful deploy baseline for the relevant environment branch when that data is available
+- post-merge automation should compare against the previous successful deploy baseline for the relevant environment branch, or the narrower per-deployment target baseline when that data is available
 - if no upstream or baseline can be determined, the tool should fail explicitly and ask for an override instead of silently choosing an unsafe diff base
 
 Promotion-flow rule:
@@ -872,7 +917,7 @@ Operator default summary:
 
 - `deploy --from-changes` on a developer machine means "compare my current `HEAD` against `git merge-base HEAD @{upstream}`"
 - `deploy --from-changes` in pull-request CI means "compare against the PR target branch merge-base"
-- environment-mutating automation should not diff against an arbitrary Git merge-base when a lane-specific last-successful deploy baseline exists; that recorded lane baseline is the authoritative default
+- environment-mutating automation should not diff against an arbitrary Git merge-base when an environment-branch or per-target last-successful deploy baseline exists; that recorded baseline is the authoritative default
 - when automation cannot determine the authoritative baseline, it should stop and ask for an explicit override rather than mutating from a guessed change set
 
 Environment-lane policy:
@@ -883,7 +928,7 @@ Environment-lane policy:
 - `environment_stage` should be explicit deployment metadata for protected/shared deployments rather than inferred only from deployment id naming
 - a family lane may own branches such as `env/<family>/dev -> env/<family>/staging -> env/<family>/prod`
 - the authoritative stage ordering, branch mapping, and allowed promotion edges should come from the lane's central `lane_policy`, not from CI convention alone
-- the authoritative baseline for an environment-mutating `--from-changes` run is the last successful deploy baseline recorded for that lane
+- the authoritative baseline for an environment-mutating `--from-changes` run is the last successful deploy baseline recorded for the specific environment branch being mutated, or the narrower per-deployment target baseline when tracked
 - one mutating `--from-changes` invocation for protected or shared environments should stay within one environment lane
 - if the changed set affects deployments in multiple environment lanes, the selector should require explicit lane selection or split the result into separate non-mutating result sets rather than mutating all lanes at once
 - local or non-mutating inspection flows may still report deployments across multiple lanes when that is useful for visibility
@@ -1025,6 +1070,7 @@ deployment(
     provider = "cloudflare-pages",
     provider_target = {
         "id": "pleomino-prod-pages",
+        "account": "web-platform-prod",
     },
     lane_policy = "//build-tools/deploy/lanes:pleomino_v1",
     environment_stage = "prod",
@@ -1128,6 +1174,10 @@ Policy evaluation order:
   - `protection_class`
     - required
     - closed enum: `local_only`, `shared_nonprod`, `production_facing`
+    - this classification is a trust-and-sensitivity tier, not merely a statement about whether end users see the target directly
+    - `local_only` means operator-owned local mutation without a shared control-plane trust boundary
+    - `shared_nonprod` means shared-control-plane or shared-credential mutation for non-production targets that still need centralized safeguards
+    - `production_facing` means the highest-sensitivity shared target class, where mistakes have production-grade blast radius and therefore require the strongest admission and smoke posture
     - this classification should drive admission, smoke expectations, and whether shared-control-plane execution is required
   - `components[*]`
     - required, non-empty list
@@ -1151,9 +1201,10 @@ Policy evaluation order:
     - for `shared_nonprod` and `production_facing`, `type` must come from a vetted built-in provisioner registry
     - package-local executable provisioner entries are invalid for `shared_nonprod` and `production_facing`
   - `smoke`
-    - optional
-    - when present, should explicitly describe how smoke runs, such as a named built-in smoke class or other adapter-defined validated built-in shape
-    - production smoke exceptions should be represented explicitly as a nested `smoke.exception` object rather than by omitting the field and hoping readers infer intent
+    - optional for `local_only`
+    - required for `shared_nonprod` and `production_facing`
+    - should explicitly describe how smoke runs, such as a named built-in smoke class or other adapter-defined validated built-in shape
+    - protected/shared smoke relaxations should be represented explicitly as a nested `smoke.exception` object rather than by omitting the field and hoping readers infer intent
     - for `shared_nonprod` and `production_facing`, smoke definitions must come from a vetted built-in smoke-runner registry
     - package-local executable smoke entries are invalid for `shared_nonprod` and `production_facing`
   - `secret_requirements`
@@ -1338,6 +1389,8 @@ Field-shape guidance:
 - this is an intentional standardization decision for the document, not an accidental example style choice
 - the shared `id` field gives validation, deployment records, and adapter wiring one predictable anchor identifier while still allowing provider-specific qualifiers beside it
 - for built-in providers, `id` should be a derived canonical shorthand for the full normalized provider-target identity, not a separate competing source of truth
+- for `shared_nonprod` and `production_facing`, `provider_target` must include every field required by the built-in provider's canonical identity rule; shorthand `id` alone is not sufficient when the provider is account-scoped or otherwise multi-tenant
+- for `local_only`, a shorthand-only `id` may still be accepted when validation proves that the omitted qualifiers cannot change locking, ownership, preview isolation, or record identity
 - examples in this document use compact shapes for readability; production adapters may require additional validated identity fields, but should preserve the same explicit-object model and canonical identity rule
 
 Normalization transform:
@@ -1352,11 +1405,11 @@ Normalization transform:
 
 Canonical provider-target identity rules for initial built-in providers:
 
-| Provider           | Required identity fields                | Normalization rule                                                                                                                                                                                                                                                        | Canonical lock-key shape                                     |
-| ------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `cloudflare-pages` | `id`, `account` when non-empty          | canonical identity is the trimmed Pages project name plus trimmed account scope whenever the provider account is part of the mutable live target; `id` must be derived from that canonical target identity rather than standing alone as an under-scoped alias            | `cloudflare-pages:<account>/<id>` or `cloudflare-pages:<id>` |
-| `s3-static`        | `id`, `bucket`, `prefix` when non-empty | canonical identity is the trimmed bucket name; if the mutable live target uses a configured publish prefix, `provider_target` must include that trimmed non-empty `prefix` and it becomes part of canonical identity; `id` must be derived from the same canonical target | `s3-static:<bucket>` or `s3-static:<bucket>/<prefix>`        |
-| `kubernetes`       | `id`, `cluster`, `namespace`, `release` | canonical identity is the trimmed `cluster/namespace/release` tuple; `id` must be derived from that same tuple                                                                                                                                                            | `kubernetes:<cluster>/<namespace>/<release>`                 |
+| Provider           | Required identity fields                | Normalization rule                                                                                                                                                                                                                                                         | Canonical lock-key shape                              |
+| ------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `cloudflare-pages` | `id`, `account`                         | canonical identity is the trimmed Pages project name plus trimmed account scope; for `shared_nonprod` and `production_facing`, `account` is required and `id` must be derived from that full canonical target identity rather than standing alone as an under-scoped alias | `cloudflare-pages:<account>/<id>`                     |
+| `s3-static`        | `id`, `bucket`, `prefix` when non-empty | canonical identity is the trimmed bucket name; if the mutable live target uses a configured publish prefix, `provider_target` must include that trimmed non-empty `prefix` and it becomes part of canonical identity; `id` must be derived from the same canonical target  | `s3-static:<bucket>` or `s3-static:<bucket>/<prefix>` |
+| `kubernetes`       | `id`, `cluster`, `namespace`, `release` | canonical identity is the trimmed `cluster/namespace/release` tuple; `id` must be derived from that same tuple                                                                                                                                                             | `kubernetes:<cluster>/<namespace>/<release>`          |
 
 For any built-in provider added later, this same table or its direct successor must be updated before the
 provider is considered fully in policy for protected/shared deployment use.
@@ -1491,6 +1544,7 @@ deployment(
     provider = "cloudflare-pages",
     provider_target = {
         "id": "pleomino-prod-pages",
+        "account": "web-platform-prod",
     },
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
@@ -1804,15 +1858,15 @@ Why this matters:
 
 This table is meant to be a fast pattern-matching aid.
 
-| Shape                                   | Provider                            | Provisioner            | Publisher           | Typical use case                                                          |
-| --------------------------------------- | ----------------------------------- | ---------------------- | ------------------- | ------------------------------------------------------------------------- |
-| Existing Cloudflare Pages project       | `cloudflare-pages`                  | `None`                 | `wrangler-pages`    | Normal static-site or PWA releases where the Pages project already exists |
-| Repo-owned Cloudflare Pages environment | `cloudflare-pages`                  | `cdktf` or `terraform` | `wrangler-pages`    | Create or update the Pages project and DNS, then publish the app          |
-| Existing S3 static site                 | `s3-static`                         | `None`                 | `aws-s3-sync`       | Upload a new build to an already-prepared bucket                          |
-| Repo-owned S3 static site               | `s3-static`                         | `terraform`            | `aws-s3-sync`       | Create bucket, policy, and CDN wiring, then upload the build              |
-| Kubernetes service rollout              | `kubernetes`                        | `cdktf` or `terraform` | `helm` or `kubectl` | Prepare namespace and ingress, then release app workloads                 |
-| Shared observability stack              | `kubernetes`                        | `terraform` or `cdktf` | `helm`              | Roll out shared collectors, agents, or platform monitoring services       |
-| External vendor dependency              | not usually modeled as a deployment | usually none           | none                | A service we depend on but do not deploy from this repo                   |
+| Shape                                   | Provider                            | Provisioner                        | Publisher                             | Typical use case                                                          |
+| --------------------------------------- | ----------------------------------- | ---------------------------------- | ------------------------------------- | ------------------------------------------------------------------------- |
+| Existing Cloudflare Pages project       | `cloudflare-pages`                  | `None`                             | `wrangler-pages`                      | Normal static-site or PWA releases where the Pages project already exists |
+| Repo-owned Cloudflare Pages environment | `cloudflare-pages`                  | `cdktf-stack` or `terraform-stack` | `wrangler-pages`                      | Create or update the Pages project and DNS, then publish the app          |
+| Existing S3 static site                 | `s3-static`                         | `None`                             | `aws-s3-sync`                         | Upload a new build to an already-prepared bucket                          |
+| Repo-owned S3 static site               | `s3-static`                         | `terraform-stack`                  | `aws-s3-sync`                         | Create bucket, policy, and CDN wiring, then upload the build              |
+| Kubernetes service rollout              | `kubernetes`                        | `cdktf-stack` or `terraform-stack` | `helm-release` or documented built-in | Prepare namespace and ingress, then release app workloads                 |
+| Shared observability stack              | `kubernetes`                        | `terraform-stack` or `cdktf-stack` | `helm-release`                        | Roll out shared collectors, agents, or platform monitoring services       |
+| External vendor dependency              | not usually modeled as a deployment | usually none                       | none                                  | A service we depend on but do not deploy from this repo                   |
 
 Plain-language reading guide:
 
@@ -1835,7 +1889,7 @@ Examples:
 - `wrangler-workers-assets`
 - `aws-s3-sync`
 - `rsync`
-- a future Helm- or kubectl-based publisher
+- a future `helm-release`-like or other documented built-in publisher
 
 Plain-language version:
 
@@ -1896,7 +1950,7 @@ Model:
 - provider: `cloudflare-pages`
 - component: one static web app
 - provisioner: none
-- publisher: Wrangler uploads `dist`
+- publisher: `wrangler-pages` uploads the built assets
 
 Why the split matters:
 
@@ -1911,13 +1965,13 @@ Model:
 
 - provider: `cloudflare-pages`
 - component: one static web app
-- provisioner: CDKTF or Terraform
-- publisher: Wrangler
+- provisioner: `cdktf-stack` or `terraform-stack`
+- publisher: `wrangler-pages`
 
 Why the split matters:
 
-- CDKTF or Terraform is good at durable config
-- Wrangler is often the best artifact publication path
+- `cdktf-stack` or `terraform-stack` is good at durable config
+- `wrangler-pages` is often the best artifact publication path
 
 ### Scenario 3: S3 Static Site
 
@@ -1927,8 +1981,8 @@ Model:
 
 - provider: `s3-static`
 - component: one static web app
-- provisioner: Terraform creates bucket, policy, domain wiring
-- publisher: `aws s3 sync`
+- provisioner: `terraform-stack` creates bucket, policy, domain wiring
+- publisher: `aws-s3-sync`
 
 Why the split matters:
 
@@ -1943,8 +1997,8 @@ Model:
 
 - provider: `kubernetes`
 - components: several deployable artifacts
-- provisioner: Terraform or CDKTF prepares cluster-side resources
-- publisher: Helm or kubectl updates workloads
+- provisioner: `terraform-stack` or `cdktf-stack` prepares cluster-side resources
+- publisher: `helm-release` or another documented built-in publisher updates workloads
 
 Why the split matters:
 
@@ -2108,7 +2162,7 @@ If you are adding a new deployment for the first time, the shortest correct work
 6. set `provisioner = None` if setup is external, or configure a real provisioner if setup is repo-owned
 7. run `deploy <deployment-id> --validate-only`
 8. if the deployment is `local_only`, run `deploy <deployment-id>` once validation passes
-9. if the deployment is `shared_nonprod` or `production_facing`, submit the mutating run through CI or the shared control plane once validation passes
+9. if the deployment is `shared_nonprod` or `production_facing`, submit the mutating run to the shared control plane once validation passes
 
 What you should not have to do:
 
@@ -2144,6 +2198,7 @@ deployment(
     provider = "cloudflare-pages",
     provider_target = {
         "id": "pleomino-prod-pages",
+        "account": "web-platform-prod",
     },
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
@@ -2364,7 +2419,7 @@ Registry rule:
 
 ## Deployment Lifecycle
 
-Every deployment should follow the same high-level lifecycle:
+Every deployment should follow the same logical high-level lifecycle:
 
 1. `validate`
 2. `build`
@@ -2372,6 +2427,19 @@ Every deployment should follow the same high-level lifecycle:
 4. `provision`
 5. `publish`
 6. `smoke`
+
+Execution responsibility by mode:
+
+| Step        | `local_only` default actor | `shared_nonprod` / `production_facing` default actor                             |
+| ----------- | -------------------------- | -------------------------------------------------------------------------------- |
+| `validate`  | local CLI                  | local CLI for preflight validation; control plane revalidates before mutation    |
+| `build`     | local CLI via Buck         | trusted CI via Buck                                                              |
+| `resolve`   | local CLI                  | control plane loading the selected admitted artifact or recorded resolved inputs |
+| `provision` | local CLI                  | control plane                                                                    |
+| `publish`   | local CLI                  | control plane                                                                    |
+| `smoke`     | local CLI                  | control plane                                                                    |
+
+This table defines who executes each logical step in the common supported modes; it does not change the underlying logical lifecycle.
 
 ### Validate
 
@@ -2393,7 +2461,8 @@ Buck remains authoritative here.
 Artifact contract:
 
 - each component target must produce a publishable artifact shape for its declared `kind`
-- the deploy CLI is responsible for resolving the built output path or paths from Buck
+- for `local_only`, the deploy CLI is responsible for resolving the built output path or paths from Buck
+- for protected/shared immutable-artifact flows, the control plane should resolve the selected admitted artifact reference or recorded resolved inputs instead of asking the operator workstation to rediscover them
 - publishers consume resolved artifact paths; they should not assume a hand-created local `dist/` directory inside the deployment package unless that is explicitly part of the component contract
 - when a deploy path is intentionally reusing a previously built artifact, `build` may be skipped and `resolve` should instead load the recorded artifact reference and validate it against policy
 - for protected or shared environments, mutating publish flows should prefer previously recorded immutable artifact references over machine-local rebuilds
@@ -2510,13 +2579,15 @@ Smoke checks are post-publish validation, not a replacement for build, unit, or 
 Policy:
 
 - the English concept "production-facing" must come from authoritative deployment metadata such as `protection_class = "production_facing"`, not from ad hoc team labeling
+- deployments classified as `shared_nonprod` or `production_facing` must declare smoke checks explicitly
 - deployments classified as `production_facing` must have smoke checks unless an explicit documented exception says otherwise
 - deployments classified as `production_facing` should treat smoke checks as blocking by default
+- deployments classified as `shared_nonprod` may downgrade or waive smoke only through an explicit `smoke.exception`, not by omitting the `smoke` block
 - `publish succeeded` and `smoke failed` must be reported as a distinct overall outcome
 - smoke checks should run against the canonical deployment URL by default
 - a deployment may explicitly configure a preview-specific smoke URL when preview mode publishes to an isolated preview target
 - smoke checks should consume resolved deployment outputs and runtime deployment context instead of rediscovering deployment facts ad hoc
-- deployments that intentionally omit smoke checks outside non-`production_facing` classifications should document that choice in deployment metadata or provider adapter policy rather than rely on silent absence
+- local-only deployments may still omit smoke when that choice is intentional and documented by deployment metadata or provider adapter policy
 
 Timeout and retry policy:
 
@@ -2542,7 +2613,7 @@ Preview policy:
 
 Exception representation policy:
 
-- a `production_facing` smoke omission or downgrade must be represented explicitly in a nested `smoke.exception` object in deployment metadata
+- a protected/shared smoke omission or downgrade must be represented explicitly in a nested `smoke.exception` object in deployment metadata
 - the same authoritative classification that marks a deployment as `production_facing` should also drive admission policy and local-mutation restrictions
 - the minimum `smoke.exception` fields are:
   - `owner`
@@ -2550,7 +2621,7 @@ Exception representation policy:
   - `scope`
   - one review boundary field: `review_by` or `expires_at`
 - the exception object may additionally include an explicit downgrade mode when smoke is reduced rather than omitted
-- silent omission of smoke wiring is not an acceptable way to waive production smoke
+- silent omission of smoke wiring is not an acceptable way to waive protected/shared smoke
 - validators should read `smoke.exception` from authoritative deployment metadata on the deployment target, not from provider config files or deployment-local executable hooks
 
 Example non-production smoke exception:
@@ -2561,6 +2632,7 @@ deployment(
     provider = "cloudflare-pages",
     provider_target = {
         "id": "pleomino-dev-pages",
+        "account": "web-platform-dev",
     },
     admission_policy = "//build-tools/deploy/policies:pleomino_dev_release_v1",
     environment_stage = "dev",
@@ -2587,6 +2659,7 @@ deployment(
             "review_by": "2026-04-30",
         },
     },
+    secret_requirements = {},
 )
 ```
 
@@ -2704,9 +2777,11 @@ Release-admission contract for protected/shared environments:
     - the selected artifact or revision still matches the environment's promotion and admission policy
     - for protected/shared `--publish-only`, retry, rollback, and other immutable-artifact reuse paths, the control plane should replay the recorded deployment snapshot for the selected source run rather than silently re-reading current repo metadata or provider config as if it were the original deployment state
     - for source-run reuse across deployments, the source run must come from the same compatible `promotion_lane`, and the requested operation kind must be valid for that source/target pairing
+    - for `promotion`, the target lane policy and environment-branch state are authoritative for what is currently promotable; `--source-run-id` is valid only when it names the admitted run currently nominated by that branch/lane policy, not an arbitrary retained historical run in the lane
   - for `--provision-only` and other non-publishing mutating runs:
     - artifact attestation is not required
     - admission still requires branch, approval, lane, target, and locking policy to pass before mutation
+    - if a reviewed provisioner input class uses `immutable_resolved_inputs`, the run must carry an explicit immutable source selector such as `--source-run-id <deploy-run-id>`; otherwise the supported path remains `metadata_only`
   - any explicit deployment prerequisites are satisfied according to their declared mode
     - for `health_gated`, that means a fresh health verdict at admission time unless explicitly documented provider-specific evidence is accepted as equivalent
 - after waiting in queue and revalidating, "still allowed" means at least:
@@ -2740,10 +2815,10 @@ Run classification:
 - every deployment record should include an `operation_kind`
 - minimum operation kinds:
   - `deploy`
-  - `preview`
   - `retry`
   - `promotion`
   - `rollback`
+- preview should instead be recorded through `publish_mode = preview`
 - `operation_kind` and `final outcome` answer different questions
   - operation kind says what sort of run this was
   - final outcome uses the canonical terminal outcome vocabulary for the run's completed result
@@ -2766,6 +2841,7 @@ deployment(
     provider = "cloudflare-pages",
     provider_target = {
         "id": "pleomino-prod-pages",
+        "account": "web-platform-prod",
     },
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
@@ -2786,13 +2862,14 @@ deployment(
         "type": "http-smoke",
         "path": "/",
     },
+    secret_requirements = {},
 )
 ```
 
 Normal lock-scope story:
 
-- canonical provider-target identity for this deployment is `provider = cloudflare-pages` plus `provider_target.id = pleomino-prod-pages`
-- the derived shared-environment lock scope is therefore conceptually `cloudflare-pages:pleomino-prod-pages`
+- canonical provider-target identity for this deployment is `provider = cloudflare-pages` plus `provider_target.account = web-platform-prod` and `provider_target.id = pleomino-prod-pages`
+- the derived shared-environment lock scope is therefore conceptually `cloudflare-pages:web-platform-prod/pleomino-prod-pages`
 - `deploy pleomino-prod`
 - `deploy pleomino-prod --publish-only --source-run-id <deploy-run-id>`
 - `deploy pleomino-prod --preview --source-run-id <deploy-run-id>`
@@ -3037,6 +3114,7 @@ deployment(
     provider = "cloudflare-pages",
     provider_target = {
         "id": "pleomino-prod-pages",
+        "account": "web-platform-prod",
     },
     publisher = {
         "type": "wrangler-pages",
@@ -3207,11 +3285,11 @@ Minimum required fields:
 - `deployment_id`
 - Buck deployment label
 - `operation_kind`
-  - such as `deploy`, `preview`, `retry`, `promotion`, or `rollback`
+  - such as `deploy`, `retry`, `promotion`, or `rollback`
 - `lifecycle_state`
   - such as `queued`, `waiting_for_lock`, `running`, `cancelling`, `finished`, or `cancelled`
 - `termination_reason`
-  - `cancelled`, `superseded`, or `no_longer_admitted` when the run ends without reaching a canonical terminal outcome
+  - `cancelled`, `superseded`, `no_longer_admitted`, or `lock_timeout` when the run ends without reaching a canonical terminal outcome
   - should be `null` when the run does reach a canonical terminal outcome
 - source revision identifier
 - actor or trigger source, such as human, CI job, or automation
@@ -3390,12 +3468,14 @@ This example uses the canonical `operation_kind`, `lifecycle_state`, `terminatio
   "publish_mode": "normal",
   "provider": "cloudflare-pages",
   "provider_target": {
-    "id": "pleomino-prod-pages"
+    "id": "pleomino-prod-pages",
+    "account": "web-platform-prod"
   },
   "effective_run_target": {
-    "id": "pleomino-prod-pages"
+    "id": "pleomino-prod-pages",
+    "account": "web-platform-prod"
   },
-  "lock_scope": "cloudflare-pages:pleomino-prod-pages",
+  "lock_scope": "cloudflare-pages:web-platform-prod/pleomino-prod-pages",
   "parent_run_id": "dr_2026_03_19_pleomino_staging_00052",
   "artifact_lineage_id": "pleomino-web/2026-03-19/abc1234",
   "resolved_components": [
@@ -3493,17 +3573,24 @@ cloudflare_static_pwa_deployment(
     app_target = "//projects/apps/pleomino:app",
     provider_target = {
         "id": "pleomino-prod-pages",
+        "account": "web-platform-prod",
     },
+    lane_policy = "//build-tools/deploy/lanes:pleomino_v1",
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
+    smoke = {
+        "type": "http-smoke",
+        "path": "/",
+    },
+    secret_requirements = {},
 )
 ```
 
 This is concise, but the important concepts remain visible, including the policy-critical
-target and environment-classification fields required for protected/shared deployments.
+target, environment-classification, smoke, and secret-contract fields required for protected/shared deployments.
 
 ## Where Helpers Should Live
 
@@ -3691,6 +3778,7 @@ cloudflare_static_pwa_deployment(
     app_target = "//projects/apps/pleomino:app",
     provider_target = {
         "id": "pleomino-prod-pages",
+        "account": "web-platform-prod",
     },
     lane_policy = "//build-tools/deploy/lanes:pleomino_v1",
     environment_stage = "prod",
@@ -3766,6 +3854,7 @@ puzzle_cloudflare_deployment(
     app_target = "//projects/apps/pleomino:app",
     provider_target = {
         "id": "pleomino-prod-pages",
+        "account": "web-platform-prod",
     },
     lane_policy = "//build-tools/deploy/lanes:pleomino_v1",
     environment_stage = "prod",
@@ -3834,7 +3923,9 @@ puzzle_cloudflare_deployment(
     app_target = "//projects/apps/pleomino:app",
     provider_target = {
         "id": "pleomino-prod-pages",
+        "account": "web-platform-prod",
     },
+    lane_policy = "//build-tools/deploy/lanes:pleomino_v1",
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
     protection_class = "production_facing",
@@ -3978,6 +4069,7 @@ deployment(
     provider = "cloudflare-pages",
     provider_target = {
         "id": "pleomino-prod-pages",
+        "account": "web-platform-prod",
     },
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
     environment_stage = "prod",
