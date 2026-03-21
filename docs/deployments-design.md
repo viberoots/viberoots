@@ -888,9 +888,10 @@ What that means in practice:
 Prerequisite expansion policy:
 
 - `--from-changes` should understand explicit deployment prerequisites from deployment metadata
-- when a changed deployment is an explicit prerequisite of another deployment, the selector may widen the result set according to documented policy rather than leaving downstream prerequisite enforcement entirely to later orchestration
-- widening for prerequisites should be conservative and explainable, not ad hoc
+- for mutating runs, when a changed deployment is an explicit direct prerequisite of another deployment, the selector should widen the result set deterministically rather than leaving downstream prerequisite enforcement entirely to later orchestration
+- widening for prerequisites should be conservative, direct-edge-only, and explainable, not ad hoc
 - prerequisite widening should respect environment-lane boundaries for mutating runs
+- non-mutating or reporting flows may still show both the direct impacted set and the widened prerequisite-aware set for visibility
 
 Execution semantics after selection:
 
@@ -1253,7 +1254,6 @@ A provider is the destination platform family.
 Examples:
 
 - `cloudflare-pages`
-- `cloudflare-workers-assets`
 - `s3-static`
 - `netlify`
 - `kubernetes`
@@ -1325,11 +1325,11 @@ Normalization transform:
 
 Canonical provider-target identity rules for initial built-in providers:
 
-| Provider           | Required identity fields                | Normalization rule                                                                                             | Canonical lock-key shape                     |
-| ------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `cloudflare-pages` | `id`                                    | canonical identity is the trimmed Pages project name; `id` must equal that canonical project identity          | `cloudflare-pages:<id>`                      |
-| `s3-static`        | `id`, `bucket`                          | canonical identity is the trimmed bucket name; `id` must be the derived shorthand for that same bucket target  | `s3-static:<bucket>`                         |
-| `kubernetes`       | `id`, `cluster`, `namespace`, `release` | canonical identity is the trimmed `cluster/namespace/release` tuple; `id` must be derived from that same tuple | `kubernetes:<cluster>/<namespace>/<release>` |
+| Provider           | Required identity fields                | Normalization rule                                                                                                                                                                                                                                                        | Canonical lock-key shape                              |
+| ------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `cloudflare-pages` | `id`                                    | canonical identity is the trimmed Pages project name; `id` must equal that canonical project identity                                                                                                                                                                     | `cloudflare-pages:<id>`                               |
+| `s3-static`        | `id`, `bucket`, `prefix` when non-empty | canonical identity is the trimmed bucket name; if the mutable live target uses a configured publish prefix, `provider_target` must include that trimmed non-empty `prefix` and it becomes part of canonical identity; `id` must be derived from the same canonical target | `s3-static:<bucket>` or `s3-static:<bucket>/<prefix>` |
+| `kubernetes`       | `id`, `cluster`, `namespace`, `release` | canonical identity is the trimmed `cluster/namespace/release` tuple; `id` must be derived from that same tuple                                                                                                                                                            | `kubernetes:<cluster>/<namespace>/<release>`          |
 
 For any built-in provider added later, this same table or its direct successor must be updated before the
 provider is considered fully in policy for protected/shared deployment use.
@@ -2321,17 +2321,16 @@ The deployment macro and deploy CLI should validate provider-specific capability
 
 Initial provider capability registry:
 
-| Provider                    | Supported component kinds                             | Preview support                                   | Protected/shared rollout support                 | Allowed built-in publisher types       | Allowed built-in provisioner types     | Default smoke class guidance             |
-| --------------------------- | ----------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------ | -------------------------------------- | -------------------------------------- | ---------------------------------------- |
-| `cloudflare-pages`          | exactly one `static-webapp`                           | yes, only with explicit preview policy            | single-component only in v1                      | `wrangler-pages`                       | `cdktf-stack`, `terraform-stack`       | `static-webapp` HTTP smoke               |
-| `cloudflare-workers-assets` | one `static-webapp` plus documented worker-side shape | yes, only with explicit preview policy            | single-component only in v1                      | provider-specific built-in worker type | documented built-in only               | provider-defined built-in smoke class    |
-| `s3-static`                 | exactly one `static-webapp`                           | provider-dependent; unsupported unless documented | single-component only in v1                      | `aws-s3-sync`                          | `terraform-stack`, documented built-in | `static-webapp` HTTP smoke               |
-| `kubernetes`                | `service`, `third-party-service`                      | yes, only with explicit preview policy            | single-component only for protected/shared in v1 | `helm-release`, documented built-in    | `cdktf-stack`, `terraform-stack`       | `service` or `third-party-service` smoke |
-| `custom-platform`           | provider-defined built-in subset only                 | only when the provider capability entry says so   | single-component only for protected/shared in v1 | documented built-in only               | documented built-in only               | documented built-in smoke class only     |
+| Provider           | Supported component kinds             | Preview support                                   | Protected/shared rollout support                                             | Allowed built-in publisher types    | Allowed built-in provisioner types     | Default smoke class guidance             |
+| ------------------ | ------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------- | ---------------------------------------- |
+| `cloudflare-pages` | exactly one `static-webapp`           | yes, only with explicit preview policy            | single-component only in the current supported contract                      | `wrangler-pages`                    | `cdktf-stack`, `terraform-stack`       | `static-webapp` HTTP smoke               |
+| `s3-static`        | exactly one `static-webapp`           | provider-dependent; unsupported unless documented | single-component only in the current supported contract                      | `aws-s3-sync`                       | `terraform-stack`, documented built-in | `static-webapp` HTTP smoke               |
+| `kubernetes`       | `service`, `third-party-service`      | yes, only with explicit preview policy            | single-component only for protected/shared in the current supported contract | `helm-release`, documented built-in | `cdktf-stack`, `terraform-stack`       | `service` or `third-party-service` smoke |
+| `custom-platform`  | provider-defined built-in subset only | only when the provider capability entry says so   | single-component only for protected/shared in the current supported contract | documented built-in only            | documented built-in only               | documented built-in smoke class only     |
 
 Registry rule:
 
-- this registry is authoritative for what each built-in provider supports in v1
+- this registry is authoritative for what each built-in provider supports in the current design contract
 - a provider adapter must not widen support beyond this registry without updating the canonical design contract
 - the generic deployment model defines what is expressible in principle, but this registry defines what is actually supported right now
 - a deployment may therefore be valid in the abstract model but still rejected by a specific provider capability entry; that is expected, not a contradiction
@@ -3144,6 +3143,20 @@ Minimum replay-snapshot contract for immutable-artifact reuse:
   - the versioned `admission_policy` reference used for the source run
 - replay should use that recorded snapshot as the authoritative source for immutable-reuse semantics, with only narrow current-invariant checks layered on top
 
+Required current replay invariants:
+
+- immutable-reuse flows should fail if any of the following current invariants no longer match the allowed reuse contract:
+  - `deployment_id`
+  - `provider`
+  - canonical provider-target identity
+  - publisher type
+  - component ids
+  - component kinds
+  - `promotion_lane` compatibility
+  - `lane_policy` compatibility
+  - `admission_policy` compatibility
+- everything else needed to execute the reuse flow should come from the recorded snapshot rather than from opportunistic reinterpretation of current repo state
+
 Minimum required fields:
 
 - `deploy_run_id`
@@ -3858,10 +3871,7 @@ deployment(
         "namespace": "api-prod",
         "release": "api",
     },
-    admission_policy = "//build-tools/deploy/policies:api_prod_release_v1",
-    environment_stage = "prod",
-    protection_class = "production_facing",
-    promotion_lane = "api",
+    protection_class = "local_only",
     components = [
         {
             "id": "api",
