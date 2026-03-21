@@ -12,6 +12,12 @@ The design goals are:
 
 This document is a design for the intended deployment model, not a claim that every part is already implemented.
 
+Current supported-contract boundary:
+
+- `local_only` deployments may be single-component or multi-component
+- `shared_nonprod` and `production_facing` deployments are currently single-component only
+- broader protected/shared multi-component support should be treated as a later design expansion, not as an implied current capability
+
 The key promise of this document should be:
 
 - you can tell what belongs in a deployment package
@@ -50,6 +56,11 @@ Short version:
 - provisioner = who prepares the destination
 - publisher = who ships the built artifact there
 - smoke check = how we confirm it worked
+
+Scope note:
+
+- the abstract deployment model can describe multi-component systems
+- the current protected/shared supported contract is intentionally narrower: single-component only
 
 ## Why Deployments Need Their Own Model
 
@@ -376,7 +387,9 @@ treated as planned policy, not open brainstorming:
   - a production-facing deployment may omit or downgrade smoke only through an explicit documented exception
 - provisioners should be non-destructive by default during normal deploy flows
   - delete or replace behavior that can remove owned live resources should require an explicit separate operator path or equivalent break-glass intent
-- `--provision-only` should not build or consume artifact-derived inputs in v1
+- `--provision-only` should not build or publish
+  - the simple default is `metadata_only`
+  - a reviewed provisioner may use `immutable_resolved_inputs`, but it must not trigger a rebuild or depend on mutable local build state
 - `protection_class` should use a closed enum: `local_only`, `shared_nonprod`, `production_facing`
 
 These decisions are now reflected in the detailed design sections below. The remaining work is to
@@ -444,18 +457,23 @@ build-tools/tools/deploy/provisioners/cdktf.ts
 build-tools/tools/bin/deploy
 ```
 
-This command should:
+CLI/front-door responsibilities:
 
 1. resolve a deployment id to a Buck deployment target
 2. query Buck for deployment metadata
 3. validate provider and component rules
 4. for `local_only`, build referenced Buck targets and resolve concrete output paths directly
 5. for `shared_nonprod` and `production_facing`, submit a mutating request that must resolve to an admitted immutable artifact or source run
-6. run optional provisioning
-7. run publishing
-8. run optional smoke checks
 
-That gives the user one command while keeping the internal responsibilities clear.
+Control-plane worker responsibilities for protected/shared mutation:
+
+1. acquire the shared lock
+2. load the admitted immutable artifact or source-run snapshot
+3. run optional provisioning
+4. run publishing
+5. run optional smoke checks
+
+That gives the user one command while keeping the execution boundary clear.
 
 Execution-mode rule:
 
@@ -545,7 +563,11 @@ Flag interaction rules:
 - default `deploy <id>` means `validate -> build -> resolve -> provision? -> publish -> smoke?`
 - `--validate-only` runs validation only
 - `--provision-only` still performs `validate`, but it must not build, resolve artifacts, or publish
-  - in v1, provisioners may consume only stable declared deployment metadata, not resolved build outputs or artifact-derived inputs
+  - the default provisioner input class is `metadata_only`
+    - provisioners consume only stable declared deployment metadata
+  - a reviewed provisioner may instead declare `immutable_resolved_inputs`
+    - it may consume already-built immutable artifact descriptors or recorded resolved inputs
+    - it must not trigger a rebuild or rely on mutable local build state
 - `--publish-only` still performs `validate` and `resolve`, but it must skip provisioning
   - it must publish one explicitly selected immutable artifact
   - it must not build or select an implicit local artifact on the caller's behalf
@@ -2837,6 +2859,11 @@ Promotion-lane compatibility contract:
 - a lane may explicitly opt into stricter infra-coupled promotion policy if matching provisioner behavior is part of its reviewed release contract
 - any other difference that changes how the same artifact would be interpreted, provisioned, or published across the lane should be treated as an explicit reviewed compatibility exception rather than as a silent default
 
+Validation gate:
+
+- promotion compatibility should be enforced by an explicit validation gate before promotion mutates the target environment
+- that validation should compare the canonical compatibility inputs for the source and target deployments rather than discovering incompatibility only during publish
+
 Mobile-store and SSR compatibility note:
 
 - for `mobile-app`, promotion-safe lanes should treat store track or channel progression, staged-rollout policy, signing model, and publisher type as part of the lane-compatibility contract
@@ -3145,17 +3172,21 @@ Minimum replay-snapshot contract for immutable-artifact reuse:
 
 Required current replay invariants:
 
-- immutable-reuse flows should fail if any of the following current invariants no longer match the allowed reuse contract:
+- all immutable-reuse flows should fail if any of the following execution-safety invariants no longer match:
   - `deployment_id`
   - `provider`
   - canonical provider-target identity
   - publisher type
   - component ids
   - component kinds
-  - `promotion_lane` compatibility
-  - `lane_policy` compatibility
-  - `admission_policy` compatibility
+- promotion additionally requires current `promotion_lane`, `lane_policy`, and `admission_policy` compatibility for the target deployment
 - everything else needed to execute the reuse flow should come from the recorded snapshot rather than from opportunistic reinterpretation of current repo state
+
+Operation-kind replay rule:
+
+- `retry` and `rollback` should replay the recorded snapshot and enforce only narrow current invariants needed for safe execution, such as target ownership, protection class, lock scope, provider identity, and publisher compatibility
+- `promotion` should replay the recorded source snapshot for artifact execution inputs, but it must also satisfy the target deployment's current lane and admission policy before mutating that later environment
+- normal policy edits should not silently invalidate an otherwise in-window `retry` or `rollback` unless they change one of those narrow execution-safety invariants
 
 Minimum required fields:
 
