@@ -449,8 +449,8 @@ This command should:
 1. resolve a deployment id to a Buck deployment target
 2. query Buck for deployment metadata
 3. validate provider and component rules
-4. build referenced Buck targets
-5. resolve concrete output paths
+4. for `local_only`, build referenced Buck targets and resolve concrete output paths directly
+5. for `shared_nonprod` and `production_facing`, submit a mutating request that must resolve to an admitted immutable artifact or source run
 6. run optional provisioning
 7. run publishing
 8. run optional smoke checks
@@ -558,6 +558,9 @@ Flag interaction rules:
   - an optional lower-level `--artifact-ref <artifact-ref>` path may exist for vetted admin or automation use, but it must still identify one exact immutable artifact
   - it must not fall back to "latest local build output" or an implicit rebuild on the operator's machine
   - for protected or shared environments, immutable-artifact reuse operations should replay the recorded deployment snapshot for that run rather than silently reinterpreting current repo metadata or provider config
+- for `shared_nonprod` and `production_facing`, any mutating publish path should operate on an admitted immutable artifact or admitted source run
+  - fresh workstation builds are out of policy
+  - ad hoc control-plane rebuilds are out of policy
 - `--preview` changes the publish mode, not the deployment identity
 - `--list` does not mutate anything
 - `--from-changes` selects deployment ids first, then runs the same lifecycle each selected deployment would normally run
@@ -584,7 +587,7 @@ When you would use it:
 - in CI checks that should never touch real infrastructure
 - when debugging deployment metadata or wiring
 
-Example:
+Local-only example:
 
 ```bash
 deploy pleomino-prod --validate-only
@@ -1037,6 +1040,33 @@ Suggested metadata shape conventions:
 - dictionary-valued fields should use stable, explicit keys rather than relying on positional meaning or provider-specific shorthand
 - this document intentionally standardizes a small shared outer shape now so adapter authors and reviewers do not keep reopening the same field-shape question later
 - the goal is to standardize the repo-level contract without overfitting every provider to one rigid semantic vocabulary
+
+Typed policy-object minimums:
+
+- `lane_policy` should resolve to one authoritative typed policy object with at least:
+  - ordered stage list
+  - stage-to-branch mapping
+  - allowed promotion edges
+  - any stricter lane-specific compatibility rules
+- `admission_policy` should resolve to one authoritative typed policy object with at least:
+  - allowed source refs or branches
+  - required checks
+  - required approvals
+  - artifact-attestation requirements for publishing runs
+  - any preview-admission constraints
+- repo validation should verify that referenced policy objects exist and are structurally valid
+- the shared control plane should be the final enforcer for mutating admission using those same referenced objects
+
+Policy evaluation order:
+
+- resolve the deployment's `promotion_lane`
+- resolve or derive the authoritative `lane_policy`
+- validate that the deployment's `environment_stage` is allowed by that `lane_policy`
+- resolve the deployment's `admission_policy`
+- validate the requested operation against both policy objects in that order:
+  - `lane_policy` governs stage ordering, branch mapping, and allowed promotion edges
+  - `admission_policy` governs allowed refs, required checks, approvals, and attestation requirements for the requested run kind
+- the shared control plane is the final mutating-policy gate and must not silently reinterpret these referenced policy objects differently from repo validation
 - recommended conventions for the low-level deployment shape are:
   - `provider_target`
     - required
@@ -1078,7 +1108,8 @@ Suggested metadata shape conventions:
     - `id` should be stable within the deployment, not derived from list position
   - `rollout_policy`
     - optional for simple single-component or local-only deployments
-    - required for multi-component `shared_nonprod` and `production_facing` deployments
+    - required for multi-component local-only deployments
+    - protected/shared multi-component support is out of scope in v1, so this field mainly exists there for local-only use today and for future closed rollout-mode support later
     - should describe explicit publish ordering, dependency barriers, or phased smoke checkpoints when the deployment is more complex than the default common case
   - `publisher`
     - required
@@ -1102,7 +1133,13 @@ Suggested metadata shape conventions:
     - required for all deployments
     - `{}` is the sensible default when a deployment has no secret inputs
     - for `shared_nonprod` and `production_facing`, that explicit empty value is part of the reviewable contract, not optional boilerplate
-    - should declare non-secret secret requirements by step or consumer, so validation and admission can fail early without revealing secret values
+    - should declare non-secret secret requirements in one canonical step-oriented, backend-agnostic shape so validation and admission can fail early without revealing secret values
+    - each entry should include at least:
+      - `step`
+      - `name`
+      - `contract_id`
+      - `required`
+      - optional environment or preview qualifier when requirements differ by run mode
     - should remain Buck-visible metadata; secret material itself must not appear there
   - `preview`
     - optional
@@ -1547,10 +1584,7 @@ deployment(
         "namespace": "api-prod",
         "release": "api",
     },
-    admission_policy = "//build-tools/deploy/policies:api_prod_release_v1",
-    environment_stage = "prod",
-    protection_class = "production_facing",
-    promotion_lane = "api",
+    protection_class = "local_only",
     components = [
         {
             "id": "api",
@@ -2220,12 +2254,9 @@ First-class rollout-shape policy:
 - a multi-component deployment may explicitly declare component ordering, dependency barriers, or phased smoke checkpoints in deployment metadata
 - when such rollout metadata is present, adapters must either honor it or reject the deployment as unsupported
 - when rollout metadata is absent, the adapter-defined `ordered_best_effort` default applies
-- for `shared_nonprod` and `production_facing`, multi-component deployments must declare an explicit rollout policy rather than relying on that default
-- for `shared_nonprod` and `production_facing`, a provider adapter must not accept plain `ordered_best_effort` as the effective v1 runtime behavior unless it can document stronger semantics than that label normally implies
-- in practice, the intended v1 default for protected/shared deployments is:
-  - single-component deployments
-  - or multi-component deployments whose adapter explicitly guarantees stronger semantics than best-effort partial rollout
-- in v1, the intended common case for protected/shared deployments remains a single-component deployment
+- for `shared_nonprod` and `production_facing`, multi-component deployments are out of scope in v1
+- the intended v1 protected/shared default is therefore a single-component deployment
+- multi-component protected/shared rollout semantics may be added later only through a closed centrally defined rollout-mode set rather than adapter-local invention
 - phased smoke checkpoints should be explicit about which component group they validate and whether later phases may proceed on failure
 - the same declared rollout shape should not silently change meaning across adapters
 
@@ -2246,10 +2277,7 @@ deployment(
     provider_target = {
         "id": "marketing-docs-prod",
     },
-    admission_policy = "//build-tools/deploy/policies:marketing_docs_prod_release_v1",
-    environment_stage = "prod",
-    protection_class = "production_facing",
-    promotion_lane = "marketing-docs",
+    protection_class = "local_only",
     rollout_policy = {
         "mode": "ordered_best_effort",
         "order": ["marketing", "docs"],
@@ -2278,12 +2306,12 @@ deployment(
 )
 ```
 
-The model allows many components, but each provider adapter may restrict what it supports.
+The model allows many components in general, but protected/shared v1 support should stay single-component.
 
 Examples:
 
 - `cloudflare-pages` v1 may require exactly one `static-webapp` component
-- a future `kubernetes` adapter may allow many components
+- a future provider revision may expand protected/shared support only after this document defines a closed rollout-mode set for that use case
 
 That keeps the model future-proof without forcing every provider to support every topology immediately.
 
@@ -2291,22 +2319,22 @@ That keeps the model future-proof without forcing every provider to support ever
 
 The deployment macro and deploy CLI should validate provider-specific capability rules before publication begins.
 
-Examples:
+Initial provider capability registry:
 
-- `cloudflare-pages`
-  - exactly one component
-  - component kind must be `static-webapp`
-- `cloudflare-workers-assets`
-  - one static web component plus optional worker-specific config
-- `kubernetes`
-  - many components may be allowed
+| Provider                    | Supported component kinds                             | Preview support                                   | Protected/shared rollout support                 | Allowed built-in publisher types       | Allowed built-in provisioner types     | Default smoke class guidance             |
+| --------------------------- | ----------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------ | -------------------------------------- | -------------------------------------- | ---------------------------------------- |
+| `cloudflare-pages`          | exactly one `static-webapp`                           | yes, only with explicit preview policy            | single-component only in v1                      | `wrangler-pages`                       | `cdktf-stack`, `terraform-stack`       | `static-webapp` HTTP smoke               |
+| `cloudflare-workers-assets` | one `static-webapp` plus documented worker-side shape | yes, only with explicit preview policy            | single-component only in v1                      | provider-specific built-in worker type | documented built-in only               | provider-defined built-in smoke class    |
+| `s3-static`                 | exactly one `static-webapp`                           | provider-dependent; unsupported unless documented | single-component only in v1                      | `aws-s3-sync`                          | `terraform-stack`, documented built-in | `static-webapp` HTTP smoke               |
+| `kubernetes`                | `service`, `third-party-service`                      | yes, only with explicit preview policy            | single-component only for protected/shared in v1 | `helm-release`, documented built-in    | `cdktf-stack`, `terraform-stack`       | `service` or `third-party-service` smoke |
+| `custom-platform`           | provider-defined built-in subset only                 | only when the provider capability entry says so   | single-component only for protected/shared in v1 | documented built-in only               | documented built-in only               | documented built-in smoke class only     |
 
-The important split is:
+Registry rule:
 
-- the generic deployment model defines what is expressible in principle
-- each provider adapter defines what is actually supported right now
-
-That means a deployment may be valid in the abstract model but still rejected by a specific provider adapter. That is expected, not a contradiction.
+- this registry is authoritative for what each built-in provider supports in v1
+- a provider adapter must not widen support beyond this registry without updating the canonical design contract
+- the generic deployment model defines what is expressible in principle, but this registry defines what is actually supported right now
+- a deployment may therefore be valid in the abstract model but still rejected by a specific provider capability entry; that is expected, not a contradiction
 
 ## Deployment Lifecycle
 
@@ -3054,6 +3082,34 @@ Policy:
 - runtime-secret injection must avoid leaking secret material into Buck metadata, checked-in files, or durable deployment records
 - deployments should expose non-secret `secret_requirements` metadata, with `{}` as the normal explicit value when no secrets are required, so validation, admission, and operator tooling can determine whether the secret contract is complete before mutation begins
 - validation for `shared_nonprod` and `production_facing` should fail if a step consumes secrets but `secret_requirements` does not declare that requirement
+
+Canonical `secret_requirements` shape:
+
+- `secret_requirements` should be a dictionary keyed by stable logical secret name
+- each entry should include:
+  - `step`
+  - `contract_id`
+  - `required`
+- entries may additionally include:
+  - `preview_variant`
+  - `notes`
+- example:
+
+```json
+{
+  "cloudflare_api_token": {
+    "step": "publish",
+    "contract_id": "cloudflare/api-token",
+    "required": true
+  },
+  "preview_basic_auth_password": {
+    "step": "smoke",
+    "contract_id": "preview/basic-auth-password",
+    "required": false,
+    "preview_variant": "isolated-preview"
+  }
+}
+```
 
 Anti-patterns:
 
@@ -3834,6 +3890,7 @@ What this means:
 
 - the API and the OpenTelemetry sidecar are part of the same delivered system
 - publishing this deployment should release both together
+- this example is intentionally `local_only` because multi-component protected/shared deployments are not part of the current supported contract
 
 ### 2. Provisioned Dependency
 
@@ -4104,10 +4161,7 @@ deployment(
         "namespace": "shared-observability",
         "release": "shared-observability",
     },
-    admission_policy = "//build-tools/deploy/policies:shared_observability_prod_release_v1",
-    environment_stage = "prod",
-    protection_class = "production_facing",
-    promotion_lane = "shared-observability",
+    protection_class = "local_only",
     components = [
         {
             "id": "otel-collector",
@@ -4137,6 +4191,7 @@ What this means:
 - observability is treated as a real deployment target
 - it can be reviewed, validated, and released on its own
 - app deployments do not have to re-own it
+- this example is intentionally `local_only` because multi-component protected/shared deployments are not part of the current supported contract
 
 ## Why This Fits The Overall Design
 
