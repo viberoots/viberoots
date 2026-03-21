@@ -479,7 +479,8 @@ Execution-mode rule:
 
 - `deploy <id>` is one public front door with two execution modes
 - for `local_only`, it may execute mutating steps locally
-- for `shared_nonprod` and `production_facing`, it may validate or select locally, but mutating work should be submitted to the shared control plane rather than executed directly on the operator workstation
+- for `shared_nonprod` and `production_facing`, it may validate or select locally, but mutating work should be submitted through authenticated control-plane or CI paths rather than executed directly on the operator workstation
+- human-triggered protected/shared mutation should therefore go through the control-plane UI or API with explicit authz and audit, not through arbitrary local CLI execution
 
 ### Deployment Id Versus Preview Run
 
@@ -825,8 +826,9 @@ Protected/shared preview admission policy:
 
 Non-interference guarantees:
 
-- preview must use an isolated provider target, isolated publish path, and isolated smoke target
-- preview must not reuse the normal deployment's live project, bucket, namespace, release name, or equivalent mutable target identity
+- preview must use an isolated effective mutable publish target, isolated publish path, and isolated smoke target
+- that isolated effective target may be a provider-defined preview slot under the same top-level project or account if the provider contract gives it a distinct effective target identity for locking, smoke, cleanup, and records
+- preview must not reuse the normal deployment's effective mutable target identity even when the top-level provider resource is shared
 - if preview and non-preview can still affect the same live target, they must share the same lock scope and preview must be treated as non-isolated
 - provider adapters must validate the isolation rule before publishing
 - if the adapter cannot prove isolation, it must reject preview mode for that deployment
@@ -1157,9 +1159,10 @@ Policy evaluation order:
     - `{}` is the sensible default when a deployment has no secret inputs
     - for `shared_nonprod` and `production_facing`, that explicit empty value is part of the reviewable contract, not optional boilerplate
     - should declare non-secret secret requirements in one canonical step-oriented, backend-agnostic shape so validation and admission can fail early without revealing secret values
+    - `secret_requirements` should be a dictionary keyed by stable logical secret name, and each entry should still include that same `name` explicitly so extractors, validators, and records all see one self-describing shape
     - each entry should include at least:
-      - `step`
       - `name`
+      - `step`
       - `contract_id`
       - `required`
       - optional environment or preview qualifier when requirements differ by run mode
@@ -3113,6 +3116,7 @@ Canonical `secret_requirements` shape:
 
 - `secret_requirements` should be a dictionary keyed by stable logical secret name
 - each entry should include:
+  - `name`
   - `step`
   - `contract_id`
   - `required`
@@ -3124,11 +3128,13 @@ Canonical `secret_requirements` shape:
 ```json
 {
   "cloudflare_api_token": {
+    "name": "cloudflare_api_token",
     "step": "publish",
     "contract_id": "cloudflare/api-token",
     "required": true
   },
   "preview_basic_auth_password": {
+    "name": "preview_basic_auth_password",
     "step": "smoke",
     "contract_id": "preview/basic-auth-password",
     "required": false,
@@ -3155,6 +3161,7 @@ The design intentionally separates reusable artifact attestation from deployment
 - deployment-run provenance is for release trust
   - it should bind the deployment metadata fingerprint, provider-config fingerprint, target identity, approvals, and publish result for one concrete run
   - it should make it obvious when the same artifact identity was published under different environment-specific deployment inputs
+  - it should preserve a stable fingerprint or snapshot reference for the resolved `lane_policy` and `admission_policy` contents used by that run, not just mutable label strings
 
 Minimum replay-snapshot contract for immutable-artifact reuse:
 
@@ -3635,6 +3642,7 @@ def cloudflare_static_pwa_deployment(
     provider_target,
     wrangler_config,
     protection_class,
+    lane_policy = None,
     environment_stage = None,
     admission_policy = None,
     promotion_lane = None,
@@ -3646,6 +3654,7 @@ def cloudflare_static_pwa_deployment(
         name = name,
         provider = "cloudflare-pages",
         provider_target = provider_target,
+        lane_policy = lane_policy,
         environment_stage = environment_stage,
         admission_policy = admission_policy,
         protection_class = protection_class,
@@ -3678,6 +3687,7 @@ cloudflare_static_pwa_deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    lane_policy = "//build-tools/deploy/lanes:pleomino_v1",
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
     protection_class = "production_facing",
@@ -3717,6 +3727,7 @@ def puzzle_cloudflare_deployment(
     provider_target,
     wrangler_config,
     protection_class,
+    lane_policy = None,
     environment_stage = None,
     admission_policy = None,
     promotion_lane = None,
@@ -3729,6 +3740,7 @@ def puzzle_cloudflare_deployment(
         app_target = app_target,
         provider_target = provider_target,
         wrangler_config = wrangler_config,
+        lane_policy = lane_policy,
         environment_stage = environment_stage,
         admission_policy = admission_policy,
         protection_class = protection_class,
@@ -3750,6 +3762,7 @@ puzzle_cloudflare_deployment(
     provider_target = {
         "id": "pleomino-prod-pages",
     },
+    lane_policy = "//build-tools/deploy/lanes:pleomino_v1",
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
     protection_class = "production_facing",
