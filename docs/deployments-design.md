@@ -575,8 +575,9 @@ Flag interaction rules:
   - promotion-grade, retry, and rollback-grade publish-only paths should use the exact previously resolved artifact rather than rebuilding
   - for protected or shared environments, `--publish-only` must require an explicit immutable selector
   - the normal protected/shared selector should be `--source-run-id <deploy-run-id>`
-  - `--source-run-id` means "reuse the artifact plus recorded deployment snapshot from this earlier source run"
-  - that source run may come from the same deployment id or from another deployment in the same compatible `promotion_lane`, depending on the operation kind
+  - `--source-run-id` means "reuse the artifact plus recorded source-run snapshot inputs from this earlier run"
+  - for `retry` and `rollback`, that source run should normally come from the same deployment id
+  - for `promotion`, that source run may come from another deployment in the same compatible `promotion_lane`
   - the control plane must validate operation-kind compatibility, promotion-lane compatibility, and target compatibility before allowing that reuse
   - an optional lower-level `--artifact-ref <artifact-ref>` path may exist for vetted admin or automation use, but it must still identify one exact immutable artifact
   - it must not fall back to "latest local build output" or an implicit rebuild on the operator's machine
@@ -822,7 +823,8 @@ Protected/shared preview admission policy:
 - preview on those deployments should therefore require `--source-run-id` or an equivalent explicit admitted immutable selector
 - preview for those deployments must still publish to an explicitly isolated preview target class
 - preview for those deployments must not be used to preview unadmitted PR code or to bypass the lane's normal branch, check, or approval policy
-- if a workflow needs PR-driven previews for unadmitted revisions, that should use a different deployment classified for that purpose rather than piggybacking on a protected/shared deployment id
+- PR-driven shared previews of unadmitted code are out of scope for the current supported contract
+- if a workflow needs previews for unadmitted revisions, that should use `local_only` or another explicitly preview-safe deployment shape rather than piggybacking on a protected/shared deployment id
 
 Non-interference guarantees:
 
@@ -1350,11 +1352,11 @@ Normalization transform:
 
 Canonical provider-target identity rules for initial built-in providers:
 
-| Provider           | Required identity fields                | Normalization rule                                                                                                                                                                                                                                                        | Canonical lock-key shape                              |
-| ------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `cloudflare-pages` | `id`                                    | canonical identity is the trimmed Pages project name; `id` must equal that canonical project identity                                                                                                                                                                     | `cloudflare-pages:<id>`                               |
-| `s3-static`        | `id`, `bucket`, `prefix` when non-empty | canonical identity is the trimmed bucket name; if the mutable live target uses a configured publish prefix, `provider_target` must include that trimmed non-empty `prefix` and it becomes part of canonical identity; `id` must be derived from the same canonical target | `s3-static:<bucket>` or `s3-static:<bucket>/<prefix>` |
-| `kubernetes`       | `id`, `cluster`, `namespace`, `release` | canonical identity is the trimmed `cluster/namespace/release` tuple; `id` must be derived from that same tuple                                                                                                                                                            | `kubernetes:<cluster>/<namespace>/<release>`          |
+| Provider           | Required identity fields                | Normalization rule                                                                                                                                                                                                                                                        | Canonical lock-key shape                                     |
+| ------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `cloudflare-pages` | `id`, `account` when non-empty          | canonical identity is the trimmed Pages project name plus trimmed account scope whenever the provider account is part of the mutable live target; `id` must be derived from that canonical target identity rather than standing alone as an under-scoped alias            | `cloudflare-pages:<account>/<id>` or `cloudflare-pages:<id>` |
+| `s3-static`        | `id`, `bucket`, `prefix` when non-empty | canonical identity is the trimmed bucket name; if the mutable live target uses a configured publish prefix, `provider_target` must include that trimmed non-empty `prefix` and it becomes part of canonical identity; `id` must be derived from the same canonical target | `s3-static:<bucket>` or `s3-static:<bucket>/<prefix>`        |
+| `kubernetes`       | `id`, `cluster`, `namespace`, `release` | canonical identity is the trimmed `cluster/namespace/release` tuple; `id` must be derived from that same tuple                                                                                                                                                            | `kubernetes:<cluster>/<namespace>/<release>`                 |
 
 For any built-in provider added later, this same table or its direct successor must be updated before the
 provider is considered fully in policy for protected/shared deployment use.
@@ -2822,7 +2824,8 @@ Provenance split for promotion-safe artifact reuse:
 - promotion-safe reusable artifacts must be environment-neutral
   - staging/prod-specific URLs, flags, or other environment-specific values must not be baked into the artifact for a lane that claims same-artifact promotion semantics
   - environment-specific values should instead come from deployment metadata, provider-native config, runtime injection, or secrets
-  - if a deployment family truly requires environment-specific build-time substitution, that family should be treated as an explicit exception with different promotion semantics rather than as a normal promotion-safe lane
+  - rebuild-per-stage lanes are out of scope for the current supported contract
+  - if a deployment family truly requires environment-specific build-time substitution, that family should not claim normal same-artifact promotion semantics until the design is explicitly expanded
 - deployment-run provenance should capture the environment-specific facts evaluated at publish time, including deployment metadata fingerprint, provider-config fingerprint, target identity, approvals, and publish result
 - promotion should therefore verify both:
   - the reusable artifact attestation for the artifact being promoted
@@ -2871,7 +2874,7 @@ Mobile-store and SSR compatibility note:
 
 - for `mobile-app`, promotion-safe lanes should treat store track or channel progression, staged-rollout policy, signing model, and publisher type as part of the lane-compatibility contract
 - for `ssr-webapp`, promotion-safe lanes should treat runtime contract, publisher type, and any required serving topology assumptions as part of the lane-compatibility contract
-- if a deployment family needs environment-specific build-time substitution to produce a valid mobile or SSR artifact, it should not claim normal same-artifact promotion semantics without an explicit reviewed exception
+- if a deployment family needs environment-specific build-time substitution to produce a valid mobile or SSR artifact, it is outside the current supported same-artifact promotion contract
 
 Planned promotion model:
 
@@ -3179,20 +3182,22 @@ Minimum replay-snapshot contract for immutable-artifact reuse:
 
 Required current replay invariants:
 
-- all immutable-reuse flows should fail if any of the following execution-safety invariants no longer match:
+- `retry` and `rollback` should fail if any of the following execution-safety invariants no longer match:
   - `deployment_id`
   - `provider`
   - canonical provider-target identity
   - publisher type
   - component ids
   - component kinds
-- promotion additionally requires current `promotion_lane`, `lane_policy`, and `admission_policy` compatibility for the target deployment
+- `promotion` should instead validate:
+  - source-run artifact compatibility from the recorded source snapshot
+  - current target deployment compatibility for `provider`, publisher type, component ids and kinds, `promotion_lane`, `lane_policy`, and `admission_policy`
 - everything else needed to execute the reuse flow should come from the recorded snapshot rather than from opportunistic reinterpretation of current repo state
 
 Operation-kind replay rule:
 
 - `retry` and `rollback` should replay the recorded snapshot and enforce only narrow current invariants needed for safe execution, such as target ownership, protection class, lock scope, provider identity, and publisher compatibility
-- `promotion` should replay the recorded source snapshot for artifact execution inputs, but it must also satisfy the target deployment's current lane and admission policy before mutating that later environment
+- `promotion` should replay the recorded source snapshot for source-run artifact inputs, but it must use the target deployment's current admitted execution and policy context before mutating that later environment
 - normal policy edits should not silently invalidate an otherwise in-window `retry` or `rollback` unless they change one of those narrow execution-safety invariants
 
 Minimum required fields:
@@ -3252,7 +3257,7 @@ Artifact identity rules:
 - promotion, retry, and rollback flows should accept a previously recorded artifact reference and should prefer reusing that immutable artifact rather than rebuilding
 - a recorded artifact reference for a supported reuse flow must remain retrievable for the applicable retention window
 - reusable artifact attestation should bind artifact identity to source revision plus build inputs, not to environment-specific deployment metadata or provider config
-- for protected/shared `--publish-only`, retry, rollback, and promotion-by-reuse flows, the operator contract is "replay the recorded artifact plus recorded deployment snapshot", not "reinterpret today's repo state as if it were the original run"
+- for protected/shared immutable-reuse flows, the operator contract is "reuse the recorded artifact plus the correct recorded source-run snapshot inputs, then apply only the current target-execution context required by that operation kind", not "reinterpret today's repo state as if it were the original run"
 - provider-instance identifiers used during publish should come from authoritative deployment metadata or generated config, not from silently drift-prone duplicated checked-in fields
 - the deployment record should preserve the canonical resolved component data shape or a stable projection of it, rather than only loosely structured adapter-specific paths
 - the deployment record should make it obvious when the same artifact identity was published under different deployment metadata or provider-config inputs
