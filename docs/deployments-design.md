@@ -496,11 +496,15 @@ CLI/front-door responsibilities:
 
 Control-plane worker responsibilities for protected/shared mutation:
 
-1. acquire the shared lock
-2. load the admitted immutable artifact or source-run snapshot
-3. run optional provisioning
-4. run publishing
-5. run optional smoke checks
+1. revalidate admission, lane, prerequisite, and target-ownership policy before mutation
+2. acquire the shared lock
+3. revalidate under the acquired lock that the run is still admitted, not superseded, and still bound to the intended target
+4. load the admitted immutable artifact or source-run snapshot
+5. record lifecycle progress in the authoritative deployment record
+6. run optional provisioning
+7. run publishing
+8. run optional smoke checks
+9. finalize the authoritative deployment record with the correct lifecycle state, termination reason, and final outcome
 
 For protected/shared mutation, "load the admitted immutable artifact or source-run snapshot" means
 "load the previously admitted immutable artifact plus the recorded source-run snapshot metadata needed
@@ -512,7 +516,7 @@ Execution-mode rule:
 
 - `deploy <id>` is one public front door with two execution modes
 - for `local_only`, it may execute mutating steps locally
-- for `shared_nonprod` and `production_facing`, it may validate or select locally, but any mutating submission path is just an authenticated thin client to the control plane or CI rather than a local mutator
+- for `shared_nonprod` and `production_facing`, it may validate or select locally, but any mutating submission path is only an authenticated thin client to the shared control plane rather than a local mutator or a peer mutating CI path
 - human-triggered protected/shared mutation should therefore go through the control-plane UI or API with explicit authz and audit, not through arbitrary local CLI execution
 
 ### Deployment Id Versus Preview Run
@@ -608,6 +612,7 @@ Flag interaction rules:
     - it may consume already-built immutable artifact descriptors or recorded resolved inputs
     - it must not trigger a rebuild or rely on mutable local build state
     - for `shared_nonprod` and `production_facing`, that reviewed path must require an explicit immutable source selector such as `--source-run-id <deploy-run-id>`; otherwise the run stays in `metadata_only`
+    - for `local_only`, the same reviewed path should require an explicit immutable selector such as `--artifact-ref <artifact-ref>` or an equivalent exact local record reference; it must not implicitly reuse "whatever was built most recently"
 - `--publish-only` still performs `validate` and `resolve`, but it must skip provisioning
   - it must publish one explicitly selected immutable artifact
   - it must not build or select an implicit local artifact on the caller's behalf
@@ -616,10 +621,13 @@ Flag interaction rules:
   - the normal protected/shared selector should be `--source-run-id <deploy-run-id>`
   - `--source-run-id` means "reuse the artifact plus recorded source-run snapshot inputs from this earlier run"
   - for `shared_nonprod` and `production_facing`, `--source-run-id` is only a selector for a previously admitted immutable artifact plus recorded snapshot metadata; it does not authorize a rebuild
+  - for `local_only`, the default exact-artifact selector should be `--artifact-ref <artifact-ref>` or an equivalent exact local record reference
+  - local-only `--publish-only` should remain exact-artifact reuse, not shorthand for "publish my latest local build output"
   - for `retry` and `rollback`, that source run should normally come from the same deployment id
   - for `promotion`, that source run may come from another deployment in the same compatible `promotion_lane`
   - the control plane must validate operation-kind compatibility, promotion-lane compatibility, and target compatibility before allowing that reuse
-  - an optional lower-level `--artifact-ref <artifact-ref>` path may exist for vetted admin or automation use, but it must still identify one exact immutable artifact
+  - `--artifact-ref <artifact-ref>` is the first-class exact-artifact selector when the operator contract is "publish or replay this exact immutable artifact" rather than "select by prior admitted run"
+  - for protected/shared mutation, `--source-run-id` remains the normal higher-level selector because it carries both artifact identity and the recorded source-run snapshot needed for policy-safe replay
   - it must not fall back to "latest local build output" or an implicit rebuild on the operator's machine
   - for protected or shared environments, immutable-artifact reuse operations should replay the recorded deployment snapshot for that run rather than silently reinterpreting current repo metadata or provider config
 - for `shared_nonprod` and `production_facing`, any mutating publish path should operate on an admitted immutable artifact or admitted source run
@@ -2727,7 +2735,7 @@ Default lock-acquisition behavior:
 - when a shared-environment lock is already held, the default behavior should be to wait in queue with a bounded timeout
 - the default shared-environment queue timeout should be 30 minutes unless a tighter operator-facing policy is documented for that target class
 - entering the queue gives a run the right to re-check and proceed later, not the right to execute an old plan unchanged
-- after acquiring the lock, a queued run must revalidate current deployment state before any mutating step
+- after acquiring the lock, every mutating run must revalidate current deployment state before any mutating step
 - that revalidation should at least confirm that the run is still allowed to publish the intended revision or artifact to that target
 - if the run's assumptions are stale after revalidation, it should exit without publishing and report that it was superseded or must be rerun
 - a run should also be treated as stale if its lock lease or fencing token is no longer current, even if the local process is still alive
@@ -2757,7 +2765,8 @@ Local-only fallback policy:
 
 Admission policy:
 
-- mutating deploys for protected or shared environments should run only through CI or the shared deploy control plane
+- mutating deploys for protected or shared environments should run only through the shared deploy control plane
+- trusted CI may build, attest, and submit runs for admission, but it is not a peer mutating authority
 - direct local mutation of those environments is out of policy except for explicitly controlled emergency procedures
 - local workflows remain valid for validation, build, resolve, and isolated preview or local targets
 
@@ -3292,7 +3301,12 @@ Minimum required fields:
   - `cancelled`, `superseded`, `no_longer_admitted`, or `lock_timeout` when the run ends without reaching a canonical terminal outcome
   - should be `null` when the run does reach a canonical terminal outcome
 - source revision identifier
-- actor or trigger source, such as human, CI job, or automation
+- `requested_by`
+  - the human, CI job, or automation that requested or triggered the run
+- `submitted_by`
+  - the client identity that created the control-plane run request, when that differs from `requested_by`
+- `executed_by`
+  - the shared control-plane service or worker identity that actually performed protected/shared mutation
 - publish mode, such as normal or preview
 - declared normal provider-target identity
 - effective run target identity
@@ -3319,6 +3333,15 @@ Additional recommended fields:
 - lock scope
 - provider-specific details added by the adapter
 - prerequisite evaluation details when explicit prerequisites affected admission or orchestration
+
+Identity-field defaulting policy:
+
+- `requested_by` should always be present
+- `submitted_by` should default to `requested_by` semantically and may be omitted from the stored record when they are identical
+- `executed_by` is required for `shared_nonprod` and `production_facing`
+- `executed_by` may be omitted for `local_only` runs when the same local actor both initiated and executed the mutation
+- implementations should prefer omission over redundant duplication when a field would add no new information in the common local-only case
+- operator-facing views may still render omitted identity fields as inherited defaults for readability
 
 Lineage requirement:
 
@@ -3417,6 +3440,7 @@ Recommended deployment-record field-shape guidance:
 - deployment metadata provenance should preserve a stable fingerprint or snapshot reference to the metadata evaluated for the run
 - provider-config provenance should preserve a stable fingerprint or snapshot reference for each provider-native config file that materially influenced publish behavior
 - deployment-run provenance should preserve the publish-time admission facts for that environment, such as approvals and admitted target identity, rather than pretending those were properties of the reusable artifact itself
+- protected/shared records should distinguish who requested the run from which control-plane identity executed the mutation
 - `resolved component list` should preserve one entry per component id, not just an unordered blob of adapter output
 - each resolved component entry should keep at least:
   - component `id`
@@ -3452,6 +3476,9 @@ Illustrative provider-neutral record for a successful promotion.
 This example uses the canonical `operation_kind`, `lifecycle_state`, `termination_reason`, and
 `final_outcome` vocabularies defined above:
 
+- here `submitted_by` is shown explicitly even though it matches `requested_by`, to make the protected/shared field roles concrete
+- a local-only record would normally omit redundant `submitted_by` and `executed_by` fields unless they add distinct audit value
+
 ```json
 {
   "deploy_run_id": "dr_2026_03_19_pleomino_prod_00017",
@@ -3461,9 +3488,17 @@ This example uses the canonical `operation_kind`, `lifecycle_state`, `terminatio
   "lifecycle_state": "finished",
   "termination_reason": null,
   "source_revision": "abc1234",
-  "actor": {
+  "requested_by": {
     "type": "ci",
     "id": "jenkins/promote-pleomino-prod/481"
+  },
+  "submitted_by": {
+    "type": "ci",
+    "id": "jenkins/promote-pleomino-prod/481"
+  },
+  "executed_by": {
+    "type": "control-plane-worker",
+    "id": "deploy-api/worker-17"
   },
   "publish_mode": "normal",
   "provider": "cloudflare-pages",
@@ -4401,10 +4436,10 @@ not as permission for the operator workstation to execute protected mutation loc
 Under the hood that may still mean:
 
 1. the CLI validates the deployment and submits the run to the shared control plane
-2. Buck builds `//projects/apps/pleomino:app`
-3. the deploy tool resolves the built `dist`
-4. the publisher uploads it to Cloudflare Pages
-5. optional smoke checks run
+2. trusted CI builds `//projects/apps/pleomino:app` and records attested immutable artifact metadata
+3. the shared control plane selects the admitted artifact and replays the recorded deployment snapshot needed for this run
+4. the control-plane publisher uploads that exact artifact to Cloudflare Pages
+5. optional control-plane smoke checks run
 
 The user should not need to think about that wiring.
 
