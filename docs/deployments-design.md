@@ -399,7 +399,7 @@ treated as planned policy, not open brainstorming:
   - only named emergency roles may invoke them
   - they should still prefer exact admitted-artifact reuse over rebuild
   - any exceptional rebuild path should require a separately documented higher-bar approval
-  - they must record actor, reason, affected target, approval source, artifact-selection path, and reconciliation owner
+  - they must record the requesting identity, the executing identity, reason, affected target, approval source, artifact-selection path, and reconciliation owner
   - they must be incident-bounded rather than a standing alternate workflow
   - they must require post-incident reconciliation back to the normal branch, admission, and deployment path
 - local-only fallback should be explicitly limited
@@ -833,6 +833,10 @@ deployment(
     secret_requirements = {},
 )
 ```
+
+This example intentionally relies on the repo-default derivation of `lane_policy` from
+`promotion_lane = "pleomino"`; a repo without that documented default should include an explicit
+`lane_policy` field here.
 
 This example is intentionally explicit, but in the common case the preview block can still rely on one
 documented provider-wide default policy once the deployment opts in.
@@ -1581,6 +1585,10 @@ deployment(
 )
 ```
 
+This example intentionally relies on the repo-default derivation of `lane_policy` from
+`promotion_lane = "pleomino"`; a repo without that documented default should include an explicit
+`lane_policy` field here.
+
 What this means in plain language:
 
 - CDKTF creates or updates the Cloudflare Pages project
@@ -1647,6 +1655,10 @@ deployment(
     secret_requirements = {},
 )
 ```
+
+This example intentionally relies on the repo-default derivation of `lane_policy` from
+`promotion_lane = "docs-site"`; a repo without that documented default should include an explicit
+`lane_policy` field here.
 
 What this means in plain language:
 
@@ -1747,6 +1759,10 @@ deployment(
     secret_requirements = {},
 )
 ```
+
+This example intentionally relies on the repo-default derivation of `lane_policy` from
+`promotion_lane = "shared-observability"`; a repo without that documented default should include an
+explicit `lane_policy` field here.
 
 What this means in plain language:
 
@@ -2231,6 +2247,10 @@ deployment(
 )
 ```
 
+This example intentionally relies on the repo-default derivation of `lane_policy` from
+`promotion_lane = "pleomino"`; a repo without that documented default should include an explicit
+`lane_policy` field here.
+
 Suggested package files:
 
 ```text
@@ -2267,9 +2287,8 @@ Layer responsibility in this example:
 
 Publish flow:
 
-1. Buck builds `//projects/apps/pleomino:app`
-2. the deploy tool resolves the built `dist`
-3. the publisher uploads `dist` to Cloudflare Pages
+1. for `local_only`, Buck builds `//projects/apps/pleomino:app`, the local deploy tool resolves the built `dist`, and the local publisher uploads it
+2. for `shared_nonprod` and `production_facing`, trusted CI builds and attests the artifact, the shared control plane resolves the admitted artifact and recorded snapshot, and the control-plane publisher uploads that exact artifact
 
 ## Multi-Instance Example: Same App, Same Provider
 
@@ -2671,6 +2690,10 @@ deployment(
 )
 ```
 
+This example intentionally relies on the repo-default derivation of `lane_policy` from
+`promotion_lane = "pleomino"`; a repo without that documented default should include an explicit
+`lane_policy` field here.
+
 This example is intentionally non-production:
 
 - it shows the exception shape in authoritative deployment metadata
@@ -2746,7 +2769,7 @@ Cancellation policy:
 
 - cancellation before any mutating step begins should stop the run cleanly before side effects occur
 - the deployment record should preserve that a cancellation request stopped the run before mutation
-- for a clean pre-mutation cancellation, the deployment record should use `lifecycle_state = cancelled` and `final_outcome = null`
+- for a clean pre-mutation cancellation, the deployment record should use `lifecycle_state = cancelled`, `termination_reason = cancelled`, and `final_outcome = null`
 - once a mutating step such as `provision` or `publish` has started, cancellation is best-effort rather than guaranteed interruption
 - a run must not report a clean `cancelled` outcome if provider-side mutation may already have happened and the system has not reconciled that state
 - if cancellation arrives during or after a mutating step, the run should:
@@ -2874,6 +2897,10 @@ deployment(
     secret_requirements = {},
 )
 ```
+
+This example intentionally relies on the repo-default derivation of `lane_policy` from
+`promotion_lane = "pleomino"`; a repo without that documented default should include an explicit
+`lane_policy` field here.
 
 Normal lock-scope story:
 
@@ -3278,7 +3305,8 @@ Required current replay invariants:
   - component kinds
 - `promotion` should instead validate:
   - source-run artifact compatibility from the recorded source snapshot
-  - current target deployment compatibility for `provider`, publisher type, component ids and kinds, `promotion_lane`, `lane_policy`, and `admission_policy`
+  - current target deployment compatibility for `provider`, publisher type, component ids and kinds, `promotion_lane`, and `lane_policy`
+  - that the target deployment's current `admission_policy` is present, valid for the target environment, and satisfied for this promotion run
 - everything else needed to execute the reuse flow should come from the recorded snapshot rather than from opportunistic reinterpretation of current repo state
 
 Operation-kind replay rule:
@@ -3287,7 +3315,7 @@ Operation-kind replay rule:
 - `promotion` should replay the recorded source snapshot for source-run artifact inputs, but it must use the target deployment's current admitted execution and policy context before mutating that later environment
 - normal policy edits should not silently invalidate an otherwise in-window `retry` or `rollback` unless they change one of those narrow execution-safety invariants
 
-Minimum required fields:
+Minimum required fields for every run:
 
 - `deploy_run_id`
   - globally unique for every deploy attempt
@@ -3303,25 +3331,36 @@ Minimum required fields:
 - source revision identifier
 - `requested_by`
   - the human, CI job, or automation that requested or triggered the run
-- `submitted_by`
-  - the client identity that created the control-plane run request, when that differs from `requested_by`
-- `executed_by`
-  - the shared control-plane service or worker identity that actually performed protected/shared mutation
 - publish mode, such as normal or preview
 - declared normal provider-target identity
 - effective run target identity
   - for normal publish this should match the declared normal provider target
   - for preview this should preserve the isolated preview target that was actually mutated
-- resolved component list
-- artifact identity for each published component
 - deployment metadata fingerprint or stable snapshot reference
-- provider-native config fingerprint or stable snapshot reference for any checked-in provider config consumed by the run
-- target provider and provider-instance identifier when applicable
-- canonical remote publish identifier for each published component when the provider exposes one
 - start time and end time
 - final outcome
   - required only when the run reaches a canonical terminal outcome
   - should be `null` for runs that end without reaching a canonical terminal outcome
+
+Conditionally required fields:
+
+- `submitted_by`
+  - required when a distinct client identity creates a control-plane run request
+  - may be omitted when it would be identical to `requested_by`
+- `executed_by`
+  - required for `shared_nonprod` and `production_facing`
+  - may be omitted for `local_only` runs when the same local actor both initiated and executed the mutation
+
+Fields required once `resolve` succeeds:
+
+- resolved component list
+- artifact identity for each resolved or published component
+- provider-native config fingerprint or stable snapshot reference for any checked-in provider config consumed by the run
+- target provider and provider-instance identifier when applicable
+
+Fields required once publish succeeds and the provider exposes them:
+
+- canonical remote publish identifier for each published component
 
 Additional recommended fields:
 
@@ -3377,7 +3416,7 @@ Policy:
 - retire or migrate-target is a first-class operator workflow, not an implicit side effect of `deploy`
 - it should require explicit operator intent and stronger review than a normal mutating deployment
 - it should take an exclusive lock covering every affected normal live target identity for the duration of the operation
-- it should record old target identity, new target identity when applicable, actor, approvals, and resulting ownership state in the control plane
+- it should record old target identity, new target identity when applicable, the requesting identity, the executing identity, approvals, and resulting ownership state in the control plane
 - it should fail closed if the workflow would leave two deployment ids simultaneously claiming the same normal live target outside an explicitly documented transitional alias window
 - once the migration or retirement completes, the steady-state invariant should return to:
   - one deployment id owns one normal mutable live target
@@ -3777,6 +3816,15 @@ def cloudflare_static_pwa_deployment(
     smoke = None,
     secret_requirements = {},
 ):
+    if protection_class != "local_only":
+        if promotion_lane == None:
+            fail("protected/shared deployments must set promotion_lane")
+        if environment_stage == None:
+            fail("protected/shared deployments must set environment_stage")
+        if admission_policy == None:
+            fail("protected/shared deployments must set admission_policy")
+        if lane_policy == None:
+            lane_policy = "//build-tools/deploy/lanes:%s_v1" % promotion_lane
     deployment(
         name = name,
         provider = "cloudflare-pages",
@@ -3802,6 +3850,10 @@ def cloudflare_static_pwa_deployment(
         secret_requirements = secret_requirements,
     )
 ```
+
+This helper shape keeps the local-only callsite lightweight while making the protected/shared path safe
+by default: required protected/shared policy fields must be present, and `lane_policy` is derived from
+`promotion_lane` only through one documented repo convention.
 
 Use in a deployment package:
 
@@ -3878,6 +3930,9 @@ def puzzle_cloudflare_deployment(
         secret_requirements = secret_requirements,
     )
 ```
+
+This project-owned wrapper intentionally inherits the same protected/shared safety defaults instead of
+reintroducing looser optional behavior at the product-family layer.
 
 Concrete deployment:
 
@@ -4132,6 +4187,10 @@ deployment(
     secret_requirements = {},
 )
 ```
+
+This example intentionally relies on the repo-default derivation of `lane_policy` from
+`promotion_lane = "pleomino"`; a repo without that documented default should include an explicit
+`lane_policy` field here.
 
 What this means:
 
