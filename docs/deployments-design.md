@@ -49,8 +49,10 @@ Future edits should not weaken or silently contradict the following invariants w
 - preview is a publish mode, not a deployment identity and not a peer `operation_kind`; preview must publish only to an explicitly isolated preview target or be rejected.
 - protected/shared mutation must go through the shared control plane; trusted CI may build, attest, and trigger submissions, but it is not a peer mutating authority. Direct local mutation of `shared_nonprod` and `production_facing` targets is out of policy except for explicitly controlled emergency procedures.
 - every `shared_nonprod` and `production_facing` mutating run must freeze an immutable execution snapshot at admission before waiting, locking, or mutation; later execution revalidates only narrow current invariants instead of silently consuming drifted repo or provider config state.
-- for `shared_nonprod` and `production_facing`, the mutating publish phase must consume an admitted immutable artifact or an admitted source-run selector that resolves to that previously admitted artifact plus recorded snapshot metadata; workstation builds and ad hoc mutating rebuilds are out of policy.
-- promotion reuses the same admitted artifact across distinct deployment ids in the same compatible `promotion_lane`; it must not retarget one deployment dynamically across environments.
+- for `shared_nonprod` and `production_facing`, the mutating publish phase must consume an admitted immutable artifact; a `--source-run-id` selector may nominate the earlier admitted run that provides the artifact or promoted source revision for that operation kind, but it does not authorize workstation builds or ad hoc mutating rebuilds.
+- promotion across distinct deployment ids in the same compatible `promotion_lane` must follow the lane's declared `artifact_reuse_mode`; it must not retarget one deployment dynamically across environments.
+- lanes with `artifact_reuse_mode = "same_artifact"` promote by reusing the same admitted artifact across environments.
+- lanes with `artifact_reuse_mode = "rebuild_per_stage"` promote by advancing the same admitted source revision across environments, producing a new admitted stage-specific artifact before each protected/shared publish.
 - for promotion, the lane policy and environment-branch state are authoritative for what is currently promotable; `--source-run-id` is a selector within that admitted policy boundary, not an override around it.
 - rollback is a new run classified by `operation_kind = rollback`; it should prefer redeploying a prior known-good artifact rather than rebuilding or moving environment branches backward.
 - destructive cleanup of isolated preview targets must be a first-class audited control-plane operation rather than an implicit side effect with no lifecycle or authorization model.
@@ -321,23 +323,27 @@ The table below is intentionally redundant with the normative sections later in 
 Its job is to give operators and implementers one compact scan of the default policy shape before
 they dive into the detailed rationale.
 
-| Topic               | Default policy                                                                                                                                                                  | Operator takeaway                                                                                             |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Provenance          | Build trust and deployment-run trust are separate records.                                                                                                                      | Reusing the same artifact across environments is expected; the environment-specific run record still changes. |
-| Promotion           | Promote the same previously built artifact forward through distinct deployment ids in the same lane.                                                                            | Do not rebuild just because you are moving from staging to prod.                                              |
-| Rollback            | Prefer redeploying a prior known-good artifact; otherwise promote a revert commit forward.                                                                                      | A rollback is a new run with `operation_kind = rollback`, not a special outcome code.                         |
-| Locking             | Shared-environment mutation locks on `provider` plus canonical provider-target identity.                                                                                        | One live target gets one active mutating run at a time unless there is an explicit reviewed exception.        |
-| Metadata precedence | Buck deployment metadata is authoritative for repo deployment facts and provider-target identity.                                                                               | Provider config may add provider-native settings, but it must not silently override the deployment contract.  |
-| Drift ownership     | `TARGETS` is the source of truth; checked-in provider config should be generated, injected, or validated against it.                                                            | If the same target identity appears in two places and disagrees, validation should fail.                      |
-| Smoke               | `shared_nonprod` and `production_facing` deploys must declare smoke explicitly; `production_facing` is blocking by default unless an explicit `smoke.exception` says otherwise. | A publish can succeed and the overall deploy can still fail on smoke.                                         |
+| Topic               | Default policy                                                                                                                                                                                        | Operator takeaway                                                                                             |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Provenance          | Build trust and deployment-run trust are separate records.                                                                                                                                            | Reusing the same artifact across environments is expected; the environment-specific run record still changes. |
+| Promotion           | Promote through distinct deployment ids in the same lane according to the lane's `artifact_reuse_mode`: `same_artifact` reuses one artifact; `rebuild_per_stage` rebuilds from the promoted revision. | Reuse is the default common case; rebuild only when the lane explicitly says it must.                         |
+| Rollback            | Prefer redeploying a prior known-good artifact; otherwise promote a revert commit forward.                                                                                                            | A rollback is a new run with `operation_kind = rollback`, not a special outcome code.                         |
+| Locking             | Shared-environment mutation locks on `provider` plus canonical provider-target identity.                                                                                                              | One live target gets one active mutating run at a time unless there is an explicit reviewed exception.        |
+| Metadata precedence | Buck deployment metadata is authoritative for repo deployment facts and provider-target identity.                                                                                                     | Provider config may add provider-native settings, but it must not silently override the deployment contract.  |
+| Drift ownership     | `TARGETS` is the source of truth; checked-in provider config should be generated, injected, or validated against it.                                                                                  | If the same target identity appears in two places and disagrees, validation should fail.                      |
+| Smoke               | `shared_nonprod` and `production_facing` deploys must declare smoke explicitly and treat it as blocking by default unless an explicit `smoke.exception` says otherwise.                               | A publish can succeed and the overall deploy can still fail on smoke.                                         |
 
 ## Decisions Locked Now
 
 The following operating-model decisions are now part of the intended design direction and should be
 treated as planned policy, not open brainstorming:
 
-- promotion should prefer reusing the exact previously built artifact rather than rebuilding per environment
-- promotion should move the same artifact across distinct deployment ids that each name one explicit live target
+- promotion should follow the lane's declared `artifact_reuse_mode`
+  - the sensible default is `same_artifact`, which reuses the exact previously built artifact across environments
+  - `rebuild_per_stage` is an explicit lane exception mode for environments that genuinely require stage-specific build-time substitution
+- promotion should move one admitted release forward across distinct deployment ids that each name one explicit live target
+  - for `same_artifact`, the admitted release is one immutable artifact
+  - for `rebuild_per_stage`, the admitted release is one promoted source revision that yields a distinct admitted immutable artifact per stage before publish
   - one deployment should not implicitly select among multiple shared environments at publish time
 - reusable artifact attestation should be environment-agnostic
   - it should bind artifact identity to source revision plus build inputs
@@ -369,7 +375,8 @@ treated as planned policy, not open brainstorming:
 - deploy records should include first-class lineage identifiers
   - every run gets a globally unique `deploy_run_id`
   - retries, rollbacks, and promotions should set `parent_run_id`
-  - promotions of the same built artifact across environments should carry an `artifact_lineage_id`
+  - runs that belong to the same promoted release lineage across environments should carry a `release_lineage_id`, whether or not the artifact is rebuilt per stage
+  - promotions of the same built artifact across environments should also carry an `artifact_lineage_id`
 - each component kind should resolve to a canonical provider-neutral data shape with required fields and artifact identity
   - publishers consume that resolved data shape and must not rediscover artifact semantics ad hoc from build outputs
 - service-like, SSR, and other non-trivial deployments may declare explicit built-in `release_actions` around publish
@@ -411,11 +418,11 @@ treated as planned policy, not open brainstorming:
   - shared environments must use the central Postgres control plane
   - personal local/dev workflows may use a local filesystem lock plus a local structured deployment record
   - local-only fallback records are non-authoritative and must not be used for shared environments
-- production-facing smoke checks should be required and blocking by default
+- protected/shared smoke checks should be required and blocking by default
   - canonical URL by default
   - deployment-specific preview URL only when explicitly configured
   - timeout and retry policy should be explicit, not implicit
-  - a production-facing deployment may omit or downgrade smoke only through an explicit documented exception
+  - a protected/shared deployment may omit or downgrade smoke only through an explicit documented exception
 - protected/shared control-plane permissions should follow one explicit minimum role model
   - separate normal submit, approve, operate, and break-glass powers rather than leaving privileged actions to adapter-local convention
 - provisioners should be non-destructive by default during normal deploy flows
@@ -423,7 +430,7 @@ treated as planned policy, not open brainstorming:
 - `--provision-only` should not build or publish
   - the simple default is `metadata_only`
   - a reviewed provisioner may use `immutable_resolved_inputs`, but it must not trigger a rebuild or depend on mutable local build state
-  - for `shared_nonprod` and `production_facing`, that reviewed path should require an explicit immutable source selector; without one, the supported path remains `metadata_only`
+  - for `shared_nonprod` and `production_facing`, that reviewed path should require an explicit admitted source-run selector; without one, the supported path remains `metadata_only`
 - `protection_class` should use a closed enum: `local_only`, `shared_nonprod`, `production_facing`
 
 These decisions are now reflected in the detailed design sections below. The remaining work is to
@@ -512,7 +519,8 @@ Control-plane worker responsibilities for protected/shared mutation:
    - it must not silently replace the frozen execution snapshot with newer repo metadata, newer provider config contents, or different resolved policy objects
 5. load the execution inputs required for this run kind
    - for a first-run protected/shared publish, load the admitted frozen execution snapshot for that run
-   - for publish, retry, rollback, promotion, preview, or any provisioner using `immutable_resolved_inputs`, load the admitted immutable artifact plus the recorded source-run snapshot metadata needed for replay
+   - for `retry`, `rollback`, `preview`, or any provisioner using `immutable_resolved_inputs`, load the admitted immutable artifact plus the recorded source-run snapshot metadata needed for replay
+   - for `promotion`, load the admitted immutable artifact and any source-run compatibility evidence needed for promotion validation, but mutate using the target deployment's own admitted execution snapshot and current target-environment policy context
    - for `metadata_only` provision-only runs, load only the frozen metadata and policy context captured for that run
 6. record lifecycle progress in the authoritative deployment record
 7. run optional provisioning
@@ -524,8 +532,16 @@ Control-plane worker responsibilities for protected/shared mutation:
 13. finalize the authoritative deployment record with the correct lifecycle state, termination reason, and final outcome
 
 For protected/shared mutation, loading immutable replay inputs means "load the previously admitted immutable
-artifact plus the recorded source-run snapshot metadata needed for replay"; it does not authorize a new
+artifact plus the exact recorded context needed for the requested reuse flow"; it does not authorize a new
 build or rebuild by replay.
+
+Promotion clarification:
+
+- `retry`, `rollback`, and same-deployment replay reuse the recorded source-run execution snapshot for that deployment
+- `promotion` reuses the source artifact identity, but it must not replay the source environment's provider config, approvals, or target identity into the target environment
+- `promotion` must instead combine:
+  - the recorded source-run artifact and source compatibility evidence
+  - the target deployment's own admitted execution snapshot and target-environment policy context
 
 That gives the user one command while keeping the execution boundary clear.
 
@@ -629,29 +645,30 @@ Flag interaction rules:
   - a reviewed provisioner may instead declare `immutable_resolved_inputs`
     - it may consume already-built immutable artifact descriptors or recorded resolved inputs
     - it must not trigger a rebuild or rely on mutable local build state
-    - for `shared_nonprod` and `production_facing`, that reviewed path must require an explicit immutable source selector such as `--source-run-id <deploy-run-id>`; otherwise the run stays in `metadata_only`
+    - for `shared_nonprod` and `production_facing`, that reviewed path must require an explicit admitted source-run selector such as `--source-run-id <deploy-run-id>`; otherwise the run stays in `metadata_only`
     - for `local_only`, the same reviewed path should require an explicit immutable selector such as `--artifact-ref <artifact-ref>` or an equivalent exact local record reference; it must not implicitly reuse "whatever was built most recently"
 - `--publish-only` still performs `validate` and `resolve`, but it must skip provisioning
-  - it should still execute any declared `release_actions` whose phase placement is part of the publish lifecycle being run:
-    - `pre_publish`
-    - `post_publish_pre_smoke`
-    - `post_smoke`
+  - it should still run smoke by default, because the publish lifecycle is not considered complete until post-publish validation has either passed or failed under the deployment's documented smoke policy
+  - it should evaluate declared `release_actions` for the publish lifecycle being run, but must execute them only according to each action type's explicit replay policy for `publish_only`
+    - if a required action is not declared replay-safe for `publish_only`, the run must fail clearly rather than guess
   - it must publish one explicitly selected immutable artifact
   - it must not build or select an implicit local artifact on the caller's behalf
   - promotion-grade, retry, and rollback-grade publish-only paths should use the exact previously resolved artifact rather than rebuilding
-  - for protected or shared environments, `--publish-only` must require an explicit immutable selector
+  - for protected or shared environments, `--publish-only` must require an explicit admitted source-run selector or exact artifact selector, depending on the replay contract being used
   - the normal protected/shared selector should be `--source-run-id <deploy-run-id>`
-  - `--source-run-id` means "reuse the artifact plus recorded source-run snapshot inputs from this earlier run"
-  - for `shared_nonprod` and `production_facing`, `--source-run-id` is only a selector for a previously admitted immutable artifact plus recorded snapshot metadata; it does not authorize a rebuild
+  - `--source-run-id` means "select this earlier admitted run as the immutable replay or promotion source for the requested operation kind"
+  - for `same_artifact` replay or promotion flows, that earlier run contributes the reused immutable artifact plus operation-appropriate recorded context
+  - for `rebuild_per_stage` promotion flows, that earlier run contributes the promoted source revision, lineage, and compatibility evidence used to build and admit the target-stage artifact
+  - for `shared_nonprod` and `production_facing`, `--source-run-id` is only a selector for an earlier admitted run plus operation-appropriate recorded context; it does not authorize a rebuild outside the lane's declared policy
   - for `local_only`, the default exact-artifact selector should be `--artifact-ref <artifact-ref>` or an equivalent exact local record reference
   - local-only `--publish-only` should remain exact-artifact reuse, not shorthand for "publish my latest local build output"
   - for `retry` and `rollback`, that source run should normally come from the same deployment id
   - for `promotion`, that source run may come from another deployment in the same compatible `promotion_lane`
   - the control plane must validate operation-kind compatibility, promotion-lane compatibility, and target compatibility before allowing that reuse
   - `--artifact-ref <artifact-ref>` is the first-class exact-artifact selector when the operator contract is "publish or replay this exact immutable artifact" rather than "select by prior admitted run"
-  - for protected/shared mutation, `--source-run-id` remains the normal higher-level selector because it carries both artifact identity and the recorded source-run snapshot needed for policy-safe replay
+  - for protected/shared mutation, `--source-run-id` remains the normal higher-level selector because it carries the earlier admitted run identity plus the recorded context needed for policy-safe replay or promotion
   - it must not fall back to "latest local build output" or an implicit rebuild on the operator's machine
-  - for protected or shared environments, immutable-artifact reuse operations should replay the recorded deployment snapshot for that run rather than silently reinterpreting current repo metadata or provider config
+  - for protected or shared environments, immutable-artifact reuse operations should use the recorded snapshot semantics for that operation kind rather than silently reinterpreting current repo metadata or provider config
 - for `shared_nonprod` and `production_facing`, any mutating publish path should operate on an admitted immutable artifact or admitted source run
   - fresh workstation builds are out of policy
   - ad hoc control-plane rebuilds are out of policy
@@ -716,13 +733,13 @@ deploy pleomino-prod --provision-only
 ```
 
 If a reviewed protected/shared provisioner needs `immutable_resolved_inputs` rather than plain
-`metadata_only`, the operator contract should add an explicit immutable selector such as
+`metadata_only`, the operator contract should add an explicit admitted source-run selector such as
 `deploy pleomino-prod --provision-only --source-run-id <deploy-run-id>`.
 
 Execution rule:
 
 - `--provision-only` loads no artifact by default
-- it loads an admitted immutable artifact plus recorded source-run snapshot only when the provisioner's declared input class is `immutable_resolved_inputs`
+- it loads the admitted source-run context required by the provisioner's declared input class only when that input class is `immutable_resolved_inputs`
 
 Plain-language version:
 
@@ -903,8 +920,8 @@ Creation and destruction policy:
 
 Protected/shared preview admission policy:
 
-- preview on `shared_nonprod` and `production_facing` deployments is allowed only from an already-admitted revision or immutable artifact
-- preview on those deployments should therefore require `--source-run-id` or an equivalent explicit admitted immutable selector
+- preview on `shared_nonprod` and `production_facing` deployments is allowed only from an already-admitted revision or admitted artifact lineage
+- preview on those deployments should therefore require `--source-run-id` or an equivalent explicit admitted source-run selector
 - preview for those deployments must still publish to an explicitly isolated preview target class
 - preview for those deployments must not be used to preview unadmitted PR code or to bypass the lane's normal branch, check, or approval policy
 - PR-driven shared previews of unadmitted code are out of policy
@@ -988,7 +1005,7 @@ Environment-lane policy:
 - one mutating `--from-changes` invocation for protected or shared environments should stay within one environment lane
 - if the changed set affects deployments in multiple environment lanes, the selector should require explicit lane selection or split the result into separate non-mutating result sets rather than mutating all lanes at once
 - local or non-mutating inspection flows may still report deployments across multiple lanes when that is useful for visibility
-- later-stage protected/shared promotion runs should prefer `--source-run-id` or equivalent admitted-artifact selection over repo-diff-driven selection
+- later-stage protected/shared promotion runs should prefer `--source-run-id` or an equivalent admitted source-run selector over repo-diff-driven selection
 
 Monorepo clarification:
 
@@ -1177,6 +1194,7 @@ Typed policy-object minimums:
   - ordered stage list
   - stage-to-branch mapping
   - allowed promotion edges
+  - artifact reuse mode for the lane, with `same_artifact` as the sensible default unless the lane explicitly declares `rebuild_per_stage`
   - any stricter lane-specific compatibility rules
 - `admission_policy` should resolve to one authoritative typed policy object with at least:
   - allowed source refs or branches
@@ -1187,6 +1205,38 @@ Typed policy-object minimums:
 - repo validation should verify that referenced policy objects exist and are structurally valid
 - the shared control plane should be the final enforcer for mutating admission using those same referenced objects
 
+Common-case note:
+
+- `artifact_reuse_mode` is a lane-policy concern, not extra per-deployment boilerplate
+- most deployment authors should experience the sensible default `same_artifact` indirectly through the lane policy they already reference
+- only lanes that truly need environment-specific build-time substitution should have to say anything more by declaring `rebuild_per_stage`
+
+Illustrative lane-policy example:
+
+```python
+lane_policy(
+    name = "pleomino",
+    stages = ["dev", "staging", "prod"],
+    stage_branches = {
+        "dev": "env/pleomino/dev",
+        "staging": "env/pleomino/staging",
+        "prod": "env/pleomino/prod",
+    },
+    allowed_promotion_edges = [
+        ("dev", "staging"),
+        ("staging", "prod"),
+    ],
+    artifact_reuse_mode = "same_artifact",
+)
+```
+
+How to read this:
+
+- this is the common-case lane shape the document is optimizing for
+- most repos should keep `artifact_reuse_mode = "same_artifact"` and never need to mention it outside the lane definition
+- a lane that genuinely requires environment-specific build-time substitution would change only that field to `rebuild_per_stage` and keep the rest of the promotion model explicit
+- the exact Starlark helper signature is still an implementation detail; the important contract is that one authoritative lane-policy object exposes these semantics
+
 Policy evaluation order:
 
 - resolve the deployment's `promotion_lane`
@@ -1194,7 +1244,7 @@ Policy evaluation order:
 - validate that the deployment's `environment_stage` is allowed by that `lane_policy`
 - resolve the deployment's `admission_policy`
 - validate the requested operation against both policy objects in that order:
-  - `lane_policy` governs stage ordering, branch mapping, and allowed promotion edges
+  - `lane_policy` governs stage ordering, branch mapping, allowed promotion edges, artifact reuse mode, and any lane-specific compatibility rules that affect promotion behavior
   - `admission_policy` governs allowed refs, required checks, approvals, and attestation requirements for the requested run kind
 - the shared control plane is the final mutating-policy gate and must not silently reinterpret these referenced policy objects differently from repo validation
 - recommended conventions for the low-level deployment shape are:
@@ -1213,7 +1263,9 @@ Policy evaluation order:
   - `lane_policy`
     - required for deployments that participate in protected/shared promotion policy unless a documented repo-default derivation from `promotion_lane` is in effect
     - should be a Buck-visible, repo-owned reference to the authoritative lane-policy object for that deployment family
-    - should define ordered stages, branch mapping, allowed promotion edges, and any stricter lane-specific compatibility or admission rules
+    - should define ordered stages, branch mapping, allowed promotion edges, artifact reuse mode, and any stricter lane-specific compatibility or admission rules
+    - the sensible common-case default is `artifact_reuse_mode = "same_artifact"`
+    - lanes that require environment-specific build-time substitution must declare `artifact_reuse_mode = "rebuild_per_stage"` explicitly rather than inheriting same-artifact semantics by accident
     - the sensible common-case default may derive `lane_policy` from `promotion_lane`, for example through one canonical repo convention, but that derivation itself must be documented and authoritative
   - `environment_stage`
     - required for deployments that participate in protected/shared promotion policy
@@ -2455,6 +2507,8 @@ Multi-component lifecycle semantics:
 - rollout may interleave publish and smoke when the declared rollout policy requires per-phase validation
 - deployment-level final smoke should run after the publish phase completes according to the selected policy whenever the rollout contract requires final smoke
 - retry and rollback must operate from recorded per-component artifact and publish state, not from guesses about what probably succeeded
+- when a deployment resolves more than one component, unchanged components should not be republished blindly if the adapter can prove their resolved artifact identity already matches the live published identity
+- the deployment still remains the default operator-atomic unit, but publishers may treat unchanged components as per-component no-ops when identity comparison is reliable and no declared rollout or `release_action` requires an actual re-publish
 
 First-class rollout-shape policy:
 
@@ -2728,6 +2782,7 @@ Policy:
   - `pre_publish`
   - `post_publish_pre_smoke`
   - `post_smoke`
+    - `post_smoke` means after the smoke step completes, regardless of whether smoke passed or failed
 - each action should declare:
   - stable built-in type
   - abort behavior
@@ -2738,6 +2793,9 @@ Policy:
   - `retry`
   - `rollback`
   - `promotion`
+- the common-case default should stay simple:
+  - fresh `deploy <id>` runs the declared lifecycle actions in phase order
+  - immutable-reuse flows such as `publish_only`, `retry`, `rollback`, and `promotion` are fail-closed and only re-run actions whose built-in type explicitly declares replay safety for that operation kind
 - the protected/shared default is fail-closed:
   - a `release_action` does not re-run during `publish_only`, `retry`, `rollback`, or `promotion` unless that action type explicitly declares that replay is safe and intended for that operation kind
   - if the requested replay flow would require an action whose replay behavior is not explicitly allowed, the run must fail clearly rather than guess
@@ -2759,11 +2817,17 @@ Examples:
 Publish safety policy:
 
 - publishers must consume explicit resolved artifact inputs; they must not rediscover artifacts from mutable local working state
+- when the provider exposes enough identity to compare the current live release with the resolved artifact identity, publishers should treat an exact identity match as a no-op by default rather than forcing a redundant re-publish
+- when one component in a multi-component deployment changes and another does not, the unchanged component should normally be skipped rather than re-deployed, provided:
+  - the adapter can prove the live artifact identity match
+  - the deployment's rollout policy does not require re-publishing the unchanged component as part of one coherent provider-side release boundary
+  - no declared `release_action` or provider contract requires a full republish of the unchanged component
 - publish retries must be safe under ambiguous provider outcomes such as request timeout after the provider may already have accepted the release
 - when the provider supports idempotency keys, request correlation ids, version preconditions, or equivalent publish de-duplication controls, the publisher should use them
 - when the provider does not support a strong idempotency primitive, the adapter must reconcile remote state before retrying a publish after an ambiguous result
 - automatic retry is allowed only when the adapter can either prove the earlier attempt did not take effect or prove that retrying is idempotent for that provider operation
 - if the adapter cannot prove either of those conditions, it must stop and surface the run as a publish failure that requires explicit operator follow-up
+- if the adapter cannot reliably determine whether the live identity already matches, it may republish conservatively, but it must not claim that the component was proven unchanged
 
 ### Smoke
 
@@ -2785,6 +2849,7 @@ Policy:
 - deployments classified as `shared_nonprod` or `production_facing` must declare smoke checks explicitly
 - deployments classified as `production_facing` must have smoke checks unless an explicit documented exception says otherwise
 - deployments classified as `production_facing` should treat smoke checks as blocking by default
+- deployments classified as `shared_nonprod` should also treat smoke checks as blocking by default
 - deployments classified as `shared_nonprod` may downgrade or waive smoke only through an explicit `smoke.exception`, not by omitting the `smoke` block
 - `publish succeeded` and `smoke failed` must be reported as a distinct overall outcome
 - smoke checks should run against the canonical deployment URL by default
@@ -3011,7 +3076,7 @@ Release-admission contract for protected/shared environments:
   - for `--provision-only` and other non-publishing mutating runs:
     - artifact attestation is not required
     - admission still requires branch, approval, lane, target, and locking policy to pass before mutation
-    - if a reviewed provisioner input class uses `immutable_resolved_inputs`, the run must carry an explicit immutable source selector such as `--source-run-id <deploy-run-id>`; otherwise the supported path remains `metadata_only`
+    - if a reviewed provisioner input class uses `immutable_resolved_inputs`, the run must carry an explicit admitted source-run selector such as `--source-run-id <deploy-run-id>`; otherwise the supported path remains `metadata_only`
   - any explicit deployment prerequisites are satisfied according to their declared mode
     - for `health_gated`, that means a fresh health verdict at admission time unless explicitly documented provider-specific evidence is accepted as equivalent
 - after waiting in queue and revalidating, "still allowed" means at least:
@@ -3127,20 +3192,36 @@ multiple ids.
 
 ## Promotion And Rollback
 
-Promotion should prefer reusing the exact previously built artifact rather than rebuilding per environment.
+Promotion should prefer reusing the exact previously built artifact rather than rebuilding per environment
+when the lane's `artifact_reuse_mode` is `same_artifact`.
 
 That rule also applies to rollback-grade redeploys and publish-only retries whenever the intent is to
 re-ship a known artifact rather than create a new one.
 
+Sensible default:
+
+- most promotion lanes should keep `artifact_reuse_mode = "same_artifact"`
+- choose `rebuild_per_stage` only when environment-specific build-time substitution is genuinely unavoidable
+
+`rebuild_per_stage` end-state contract:
+
+- the lane still promotes one admitted source revision forward through explicit deployment ids and one-way environment branches
+- the source selector for promotion identifies the admitted source revision or parent run being promoted, not a source artifact to reuse verbatim
+- for a protected/shared stage using `rebuild_per_stage`, trusted CI must build a new stage-specific immutable artifact from that exact promoted revision under the target stage's declared build inputs and policy
+- the shared control plane must admit that target-stage artifact before publish, just as it would for any other protected/shared mutating run
+- the mutating publish phase still consumes only an admitted immutable artifact; `rebuild_per_stage` does not authorize ad hoc workstation rebuilds or control-plane mutation from a mutable worktree
+- `release_lineage_id`, `parent_run_id`, and the promoted source revision preserve promotion lineage across stages
+- `artifact_lineage_id` tracks exact artifact reuse only, so a rebuild-per-stage promotion should record a new artifact lineage for the newly built stage artifact or omit `artifact_lineage_id` when there is no exact-artifact lineage relationship to preserve
+- approvals, provider config, target identity, and deployment metadata remain environment-specific deployment-run facts for each stage, even when the promoted source revision is the same
+
 Provenance split for promotion-safe artifact reuse:
 
 - reusable artifact attestation should stay environment-agnostic so the same artifact can move forward through staging, production, and rollback flows without being redefined
-- that reusable artifact attestation should bind artifact identity to source revision plus build inputs
-- promotion-safe reusable artifacts must be environment-neutral
+  - that reusable artifact attestation should bind artifact identity to source revision plus build inputs
+- lanes whose `lane_policy.artifact_reuse_mode = "same_artifact"` must produce environment-neutral reusable artifacts
   - staging/prod-specific URLs, flags, or other environment-specific values must not be baked into the artifact for a lane that claims same-artifact promotion semantics
   - environment-specific values should instead come from deployment metadata, provider-native config, runtime injection, or secrets
-  - rebuild-per-stage lanes are a different release model and must not claim same-artifact promotion semantics
-  - if a deployment family truly requires environment-specific build-time substitution, that family should not claim normal same-artifact promotion semantics until the design is explicitly expanded
+  - lanes that require environment-specific build-time substitution are a different release model and must declare `artifact_reuse_mode = "rebuild_per_stage"`
 - deployment-run provenance should capture the environment-specific facts evaluated at publish time, including deployment metadata fingerprint, provider-config fingerprint, target identity, approvals, and publish result
 - promotion should therefore verify both:
   - the reusable artifact attestation for the artifact being promoted
@@ -3152,7 +3233,8 @@ Artifact retention policy:
 - for protected or shared environments, artifact retention is a required part of the deployment contract, not an optional implementation convenience
 - an implementation must not garbage-collect or otherwise lose the only approved artifact for an in-policy promotion or rollback path while that path is still expected to be available
 - if the artifact has expired or been intentionally removed, the system should surface that condition explicitly rather than silently rebuilding and treating the rebuild as equivalent
-- for protected/shared `--publish-only`, retry, rollback, and promotion-by-reuse flows, the system should replay the recorded deployment snapshot associated with the reused artifact/run
+- for protected/shared `--publish-only`, retry, and rollback reuse flows, the system should replay the recorded deployment snapshot associated with the reused artifact/run
+- for protected/shared `promotion` reuse flows, the system should replay only the source-run artifact and compatibility evidence from the reused run, while using the target deployment's own admitted execution snapshot for target-environment mutation
 - those flows should fail explicitly if the recorded snapshot is missing or if required current invariants no longer match that recorded snapshot
 - minimum operator-facing retention defaults should be:
   - `production_facing`: 90 days
@@ -3162,13 +3244,16 @@ Artifact retention policy:
 
 Promotion-lane compatibility contract:
 
-- deployments in the same `promotion_lane` are expected to be promotion-compatible by default
+- deployments in the same `promotion_lane` are expected to be promotion-compatible according to that lane's declared `artifact_reuse_mode`
 - that compatibility normally requires all of the following to match across the lane:
   - component ids
   - component kinds
   - publisher type
   - rollout semantics
   - resolved-kind contract and artifact-identity semantics
+- when `artifact_reuse_mode = "same_artifact"`, compatibility also requires that the artifact remain environment-neutral across the lane
+- when `artifact_reuse_mode = "rebuild_per_stage"`, the lane is still one promotion family, but it must not use source-run artifact reuse as its normal promotion mechanism
+  - promotion compatibility is instead about whether the same admitted source revision can be rebuilt under each stage's declared build inputs without changing the lane's reviewed publisher/runtime contract
 - the following environment-specific differences are normal and do not break promotion compatibility on their own:
   - `environment_stage`
   - `admission_policy`
@@ -3184,12 +3269,15 @@ Validation gate:
 
 - promotion compatibility should be enforced by an explicit validation gate before promotion mutates the target environment
 - that validation should compare the canonical compatibility inputs for the source and target deployments rather than discovering incompatibility only during publish
+- if the lane declares `artifact_reuse_mode = "rebuild_per_stage"`, validation should reject exact-artifact promotion semantics for that lane and require the reviewed rebuild-per-stage promotion flow
+  - that flow should verify that the selected source run identifies an admitted source revision that is currently promotable under the lane policy
+  - it should verify that target-stage build inputs and build-time substitutions remain within the lane's reviewed compatibility contract before building the target-stage artifact
 
 Mobile-store and SSR compatibility note:
 
 - for `mobile-app`, promotion-safe lanes should treat store track or channel progression, staged-rollout policy, signing model, and publisher type as part of the lane-compatibility contract
 - for `ssr-webapp`, promotion-safe lanes should treat runtime contract, publisher type, and any required serving topology assumptions as part of the lane-compatibility contract
-- if a deployment family needs environment-specific build-time substitution to produce a valid mobile or SSR artifact, it is outside the current supported same-artifact promotion contract
+- if a deployment family needs environment-specific build-time substitution to produce a valid mobile or SSR artifact, it must declare `artifact_reuse_mode = "rebuild_per_stage"` rather than claiming same-artifact promotion semantics
 
 Planned promotion model:
 
@@ -3512,7 +3600,9 @@ Minimum replay-snapshot contract for immutable-artifact reuse:
   - non-secret secret-contract version or reference set
   - the versioned `lane_policy` reference used for the source run
   - the versioned `admission_policy` reference used for the source run
-- replay should use that recorded snapshot as the authoritative source for immutable-reuse semantics, with only narrow current-invariant checks layered on top
+- for `retry`, `rollback`, and same-deployment `publish_only`, replay should use that recorded snapshot as the authoritative source for immutable-reuse semantics, with only narrow current-invariant checks layered on top
+- for `promotion`, the recorded source snapshot is preserved as source artifact and compatibility evidence, not as the target environment's execution snapshot
+  - promotion must still use the target deployment's own admitted execution snapshot, target identity, current target-environment approvals, and target-environment provider-config context before mutation
 
 Required current replay invariants:
 
@@ -3561,6 +3651,7 @@ Minimum required fields for every run:
 - effective run target identity
   - for normal publish this should match the declared normal provider target
   - for preview this should preserve the isolated preview target that was actually mutated
+- `lock_scope`
 - deployment metadata fingerprint or stable snapshot reference
 - frozen execution-snapshot reference for protected/shared mutating runs
 - stable fingerprint or snapshot reference for the resolved `lane_policy` contents used by the run
@@ -3578,6 +3669,8 @@ Conditionally required fields:
 - `executed_by`
   - required for `shared_nonprod` and `production_facing`
   - may be omitted for `local_only` runs when the same local actor both initiated and executed the mutation
+- smoke result
+  - required when a smoke step was declared and reached
 
 Fields required once `resolve` succeeds:
 
@@ -3604,15 +3697,9 @@ Fields required once any `release_actions` step starts:
 - action phase placement such as `pre_publish`, `post_publish_pre_smoke`, or `post_smoke`
 - enough detail to reconstruct which release actions ran, which gate or abort rule they triggered, and which later lifecycle steps were allowed to proceed
 
-Additional recommended fields:
+Additional recommended fields beyond the required contract fields:
 
-- `parent_run_id`
-  - when the run is a retry, rollback, or promotion derived from an earlier run
-- `artifact_lineage_id`
-  - when the same built artifact is promoted across environments
-- smoke result
 - release-action results when present
-- lock scope
 - provider-specific details added by the adapter
 - prerequisite evaluation details when explicit prerequisites affected admission or orchestration
 
@@ -3628,8 +3715,9 @@ Identity-field defaulting policy:
 Lineage requirement:
 
 - `parent_run_id` is required when the run is a retry, rollback, or promotion derived from an earlier run
+- `release_lineage_id` is required when the run belongs to a multi-run promoted release lineage across environments
 - `artifact_lineage_id` is required when the same built artifact is intentionally reused across environments or redeploy paths
-- these lineage fields are optional only for runs that truly have no parent or no artifact-lineage relationship
+- these lineage fields are optional only for runs that truly have no parent, no promoted-release-lineage relationship, or no artifact-lineage relationship
 
 Artifact identity rules:
 
@@ -3795,6 +3883,7 @@ This example uses the canonical `operation_kind`, `lifecycle_state`, `terminatio
   },
   "lock_scope": "cloudflare-pages:web-platform-prod/pleomino-prod-pages",
   "parent_run_id": "dr_2026_03_19_pleomino_staging_00052",
+  "release_lineage_id": "pleomino/2026-03-19/abc1234",
   "artifact_lineage_id": "pleomino-web/2026-03-19/abc1234",
   "resolved_components": [
     {
@@ -3830,7 +3919,7 @@ This example is intentionally shaped to highlight the policy distinctions:
 
 - `operation_kind = promotion` explains what kind of run this was
 - `final_outcome = succeeded` explains how that run ended
-- `parent_run_id` and `artifact_lineage_id` show why this run is linked to an earlier staging publication
+- `parent_run_id`, `release_lineage_id`, and `artifact_lineage_id` show why this run is linked to an earlier staging publication
 - `provider_target` and `lock_scope` preserve the concrete live-target identity used for admission and coordination
 
 Canonical termination-reason vocabulary:
