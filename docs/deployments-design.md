@@ -12,6 +12,14 @@ The design goals are:
 
 This document is a design for the intended deployment model, not a claim that every part is already implemented.
 
+Companion docs:
+
+- [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
+- [Deployment Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md)
+- [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+- [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md)
+- [Deployment Implementation Plan](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-implementation-plan.md)
+
 Deployment scope:
 
 - deployments may be single-component or multi-component
@@ -55,6 +63,8 @@ Future edits should not weaken or silently contradict the following invariants w
 - lanes with `artifact_reuse_mode = "rebuild_per_stage"` promote by advancing the same admitted source revision across environments, producing a new admitted stage-specific artifact before each protected/shared publish.
 - for promotion, the lane policy and environment-branch state are authoritative for what is currently promotable; `--source-run-id` is a selector within that admitted policy boundary, not an override around it.
 - rollback is a new run classified by `operation_kind = rollback`; it should prefer redeploying a prior known-good artifact rather than rebuilding or moving environment branches backward.
+  - default meaning of "known good" is: a prior run for the same deployment, against the same normal live target and `publish_mode = normal`, with `final_outcome = succeeded` and all required blocking smoke or release-health checks passed for that run
+  - stricter lane-specific rollback-candidate policy, such as soak windows or manual pinning, may layer on later but is not part of the base deployment contract
 - destructive cleanup of isolated preview targets must be a first-class audited control-plane operation rather than an implicit side effect with no lifecycle or authorization model.
 - deployment records must keep `operation_kind`, `publish_mode`, lifecycle state, and final outcome as separate concepts with canonical vocabularies.
 - `protection_class` is a trust-and-sensitivity tier that drives admission, smoke expectations, and execution boundary policy; it is not merely a label for whether end users directly see the target.
@@ -351,6 +361,8 @@ treated as planned policy, not open brainstorming:
 - promotion should use one-way fast-forward environment branches
   - later environments advance only after required checks pass for earlier environments within the same independently promoted lane
 - rollback for bad app releases should prefer redeploying a prior known-good artifact
+  - default meaning of "known good" is a prior run for the same deployment, against the same normal live target and `publish_mode = normal`, with `final_outcome = succeeded` and all required blocking smoke or release-health checks passed for that run
+  - a lane may later add stricter rollback-candidate policy such as soak-time requirements or manual pinning, but that is an explicit lane policy extension rather than the default rule
   - if that is not available or not appropriate, rollback should use a new revert commit promoted forward through the same branch flow
   - moving environment branches backward should not be the normal rollback mechanism
 - provider-native rollback should be treated as an emergency stabilization path, followed by control-plane and Git reconciliation
@@ -485,6 +497,7 @@ deploy pleomino-prod --preview --source-run-id <deploy-run-id>
 deploy pleomino-prod --validate-only
 deploy pleomino-prod --provision-only
 deploy pleomino-prod --publish-only --source-run-id <deploy-run-id>
+deploy pleomino-prod --publish-only --source-run-id <deploy-run-id> --rollback
 deploy --from-changes
 deploy --list
 ```
@@ -519,7 +532,7 @@ Control-plane worker responsibilities for protected/shared mutation:
    - it must not silently replace the frozen execution snapshot with newer repo metadata, newer provider config contents, or different resolved policy objects
 5. load the execution inputs required for this run kind
    - for a first-run protected/shared publish, load the admitted frozen execution snapshot for that run
-   - for `retry`, `rollback`, `preview`, or any provisioner using `immutable_resolved_inputs`, load the admitted immutable artifact plus the recorded source-run snapshot metadata needed for replay
+   - for `retry`, `rollback`, or any provisioner using `immutable_resolved_inputs`, load the admitted immutable artifact plus the recorded source-run snapshot metadata needed for replay
    - for `promotion`, load the admitted immutable artifact and any source-run compatibility evidence needed for promotion validation, but mutate using the target deployment's own admitted execution snapshot and current target-environment policy context
    - for `metadata_only` provision-only runs, load only the frozen metadata and policy context captured for that run
 6. record lifecycle progress in the authoritative deployment record
@@ -551,6 +564,14 @@ Execution-mode rule:
 - for `local_only`, it may execute mutating steps locally
 - for `shared_nonprod` and `production_facing`, it may validate or select locally, but any mutating submission path is only an authenticated thin client to the shared control plane rather than a local mutator or a peer mutating CI path
 - human-triggered protected/shared mutation should therefore go through the control-plane UI or API with explicit authz and audit, not through arbitrary local CLI execution
+
+Operation-kind classification rule for source-run reuse:
+
+- preview remains `publish_mode = preview`; it is never a peer `operation_kind`
+- when a run reuses a source run from a different deployment id in the same compatible `promotion_lane`, the run is `operation_kind = promotion`
+- when a run reuses a source run from the same deployment id and the operator explicitly requests `--rollback`, the run is `operation_kind = rollback`
+- when a run reuses a source run from the same deployment id without `--rollback`, the run is `operation_kind = retry`
+- the control plane must reject ambiguous or policy-incompatible source-run reuse rather than infer a different operation kind from timing, recency, or guesswork
 
 ### Deployment Id Versus Preview Run
 
@@ -648,21 +669,26 @@ Flag interaction rules:
     - for `shared_nonprod` and `production_facing`, that reviewed path must require an explicit admitted source-run selector such as `--source-run-id <deploy-run-id>`; otherwise the run stays in `metadata_only`
     - for `local_only`, the same reviewed path should require an explicit immutable selector such as `--artifact-ref <artifact-ref>` or an equivalent exact local record reference; it must not implicitly reuse "whatever was built most recently"
 - `--publish-only` still performs `validate` and `resolve`, but it must skip provisioning
+  - for protected/shared immutable-reuse flows, `validate` means checking selector validity plus narrow current invariants such as deployment ownership, lock scope, provider identity, publisher compatibility, and current admission status
+  - for those protected/shared immutable-reuse flows, `resolve` means loading the recorded source-run snapshot and immutable artifact references required for that operation kind
+  - it must not silently reinterpret current repo metadata, current provider config, or current release-action declarations as if they were the original source-run inputs
   - it should still run smoke by default, because the publish lifecycle is not considered complete until post-publish validation has either passed or failed under the deployment's documented smoke policy
   - it should evaluate declared `release_actions` for the publish lifecycle being run, but must execute them only according to each action type's explicit replay policy for `publish_only`
     - if a required action is not declared replay-safe for `publish_only`, the run must fail clearly rather than guess
   - it must publish one explicitly selected immutable artifact
   - it must not build or select an implicit local artifact on the caller's behalf
-  - promotion-grade, retry, and rollback-grade publish-only paths should use the exact previously resolved artifact rather than rebuilding
-  - for protected or shared environments, `--publish-only` must require an explicit admitted source-run selector or exact artifact selector, depending on the replay contract being used
-  - the normal protected/shared selector should be `--source-run-id <deploy-run-id>`
-  - `--source-run-id` means "select this earlier admitted run as the immutable replay or promotion source for the requested operation kind"
+- promotion-grade, retry, and rollback-grade publish-only paths should use the exact previously resolved artifact rather than rebuilding
+- for protected or shared environments, `--publish-only` must require an explicit admitted source-run selector or exact artifact selector, depending on the replay contract being used
+- the normal protected/shared selector should be `--source-run-id <deploy-run-id>`
+- `--rollback` is the explicit operator signal that same-deployment source-run reuse is a rollback rather than a retry
+- `--source-run-id` means "select this earlier admitted run as the immutable replay or promotion source for the requested operation kind"
   - for `same_artifact` replay or promotion flows, that earlier run contributes the reused immutable artifact plus operation-appropriate recorded context
   - for `rebuild_per_stage` promotion flows, that earlier run contributes the promoted source revision, lineage, and compatibility evidence used to build and admit the target-stage artifact
   - for `shared_nonprod` and `production_facing`, `--source-run-id` is only a selector for an earlier admitted run plus operation-appropriate recorded context; it does not authorize a rebuild outside the lane's declared policy
   - for `local_only`, the default exact-artifact selector should be `--artifact-ref <artifact-ref>` or an equivalent exact local record reference
   - local-only `--publish-only` should remain exact-artifact reuse, not shorthand for "publish my latest local build output"
   - for `retry` and `rollback`, that source run should normally come from the same deployment id
+  - same-deployment reuse should require explicit `--rollback` when the operator intends rollback semantics rather than retry semantics
   - for `promotion`, that source run may come from another deployment in the same compatible `promotion_lane`
   - the control plane must validate operation-kind compatibility, promotion-lane compatibility, and target compatibility before allowing that reuse
   - `--artifact-ref <artifact-ref>` is the first-class exact-artifact selector when the operator contract is "publish or replay this exact immutable artifact" rather than "select by prior admitted run"
@@ -763,14 +789,15 @@ Use this when the destination is already provisioned and you only want to releas
 
 What it is for:
 
-- uploading a fresh static build
 - re-running publication after a transient provider-side failure
+- replaying one explicitly selected immutable artifact without reprovisioning
 - promoting the same artifact into an already-prepared environment
+- separating a prior admit/build step from a later exact-artifact publish step
 
 When you would use it:
 
-- normal day-to-day static site releases
 - retrying after a failed upload
+- publishing an already-admitted artifact chosen by exact selector rather than rebuilding
 - environments where infra is intentionally managed elsewhere
 - environments that were already provisioned in a previous step
 
@@ -787,7 +814,7 @@ Plain-language version:
 Why this matters:
 
 - most releases should not need to re-run infra convergence
-- publish is often the most common operational path
+- exact-artifact replay and delayed publish are operationally different from a fresh full deploy
 - keeping it separate makes retries and incident response much cleaner
 
 Concrete example:
@@ -926,6 +953,7 @@ Protected/shared preview admission policy:
 - preview for those deployments must not be used to preview unadmitted PR code or to bypass the lane's normal branch, check, or approval policy
 - PR-driven shared previews of unadmitted code are out of policy
 - if a workflow needs previews for unadmitted revisions, that should use `local_only` or another explicitly preview-safe deployment shape rather than piggybacking on a protected/shared deployment id
+- preview remains a `publish_mode` on top of the underlying run kind chosen by the source-run classification rule; it does not introduce a separate replay or operation-kind category
 
 Preview cleanup contract:
 
@@ -1579,9 +1607,10 @@ Allowed modes:
 - `ordering_only`
   - the prerequisite deployment must have completed its required admission path before this deployment may mutate
 - `health_gated`
-  - the prerequisite deployment must both satisfy ordering requirements and currently meet its declared health or smoke contract
-  - by default this means a fresh admission-time or revalidation-time health check against the prerequisite deployment's declared smoke or health target
-  - provider-specific health evidence may satisfy the gate only when the adapter explicitly maps it to that health contract and documents equivalent or stronger freshness guarantees
+  - the prerequisite deployment must both satisfy ordering requirements and currently meet its declared post-deploy validation contract
+  - by default that contract is the prerequisite deployment's declared `smoke` policy, including built-in release-health checks for component kinds where smoke is not a simple HTTP probe
+  - by default this means a fresh admission-time or revalidation-time check against that declared smoke or release-health target
+  - provider-specific health evidence may satisfy the gate only when the adapter explicitly maps it to that declared validation contract and documents equivalent or stronger freshness guarantees
   - a historical last-successful smoke record is supporting context, not sufficient on its own for `health_gated`
 
 Policy:
@@ -3042,7 +3071,7 @@ Minimum protected/shared RBAC model:
 
 - the control plane should define at least these distinct role capabilities:
   - `submitter`
-    - may create normal deploy, preview, retry, or rollback requests within the policies already attached to a deployment
+    - may create normal deploy requests, preview-mode deploy requests, retry requests, or rollback requests within the policies already attached to a deployment
   - `approver`
     - may grant required human approval where the referenced admission policy requires it
   - `operator`
@@ -3059,7 +3088,8 @@ Release-admission contract for protected/shared environments:
 - a run is eligible to mutate a protected or shared environment only when all of the following are true:
   - one immutable execution snapshot has been frozen for that admitted run before any waiting or mutating step begins
     - the snapshot should preserve the admitted deployment metadata, provider-config snapshot or fingerprint, resolved policy contents, and any selected artifact inputs needed for execution
-  - the source revision comes from the allowed environment branch for that deployment lane
+  - for `deploy`, `retry`, and `promotion`, the source revision comes from the allowed environment branch for that deployment lane
+  - for `rollback`, the current lane policy and environment-branch state must authorize performing a rollback for that deployment, but the selected rollback source run may be an earlier retained admitted run for the same deployment rather than the current branch head revision
   - required checks for that environment have passed for the admitted revision or admitted reusable artifact, as applicable to the run kind
   - any required human or policy approval has been granted
   - the deployment's explicit `promotion_lane`, `protection_class`, and `admission_policy` metadata are present, valid, and match the intended target and admission path
@@ -3080,7 +3110,8 @@ Release-admission contract for protected/shared environments:
   - any explicit deployment prerequisites are satisfied according to their declared mode
     - for `health_gated`, that means a fresh health verdict at admission time unless explicitly documented provider-specific evidence is accepted as equivalent
 - after waiting in queue and revalidating, "still allowed" means at least:
-  - the environment branch still points to an allowed revision for this run
+  - for `deploy`, `retry`, and `promotion`, the environment branch still points to an allowed revision for this run
+  - for `rollback`, the current branch and lane state still authorize rollback for this deployment even though the selected rollback source run may remain an earlier admitted run
   - for publishing runs, the artifact identity still matches the approved revision or approved prior run
   - the run has not been superseded by a later admitted run for the same lock scope
   - any required approval has not been revoked, expired, or invalidated by newer policy state
@@ -3356,7 +3387,7 @@ Concrete rollback story:
 1. `pleomino-prod` later ships a bad artifact from revision `def5678`.
 2. Operators choose an earlier known-good artifact with `artifact_ref = nix:sha256-pleomino-web-7f3c2a`.
 3. The rollback run records `operation_kind = rollback`, `parent_run_id` pointing at the failed or superseded production run, and the reused `artifact_lineage_id`.
-   - the normal operator input for that reuse would be `--source-run-id <known-good-production-run-id>`
+   - the normal operator input for that reuse would be `--source-run-id <known-good-production-run-id> --rollback`
 4. If that artifact is no longer retrievable, the correct behavior is to surface that retention failure explicitly, not to rebuild a lookalike artifact and pretend it is the same release.
 
 Operator summary:
@@ -4836,6 +4867,22 @@ Under the hood that may still mean:
 The user should not need to think about that wiring.
 
 ## Implementation Handoff
+
+The design should be handed off together with these companion documents:
+
+- [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
+- [Deployment Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md)
+- [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+- [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md)
+- [Deployment Implementation Plan](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-implementation-plan.md)
+
+Use them as follows:
+
+- the contract doc is the short non-negotiable checklist
+- the schema doc is the minimum field contract for metadata, policy objects, replay snapshots, and records
+- the provider-capabilities doc is the reviewable contract for built-in providers
+- the scenarios doc is the acceptance set for policy interpretation
+- the implementation-plan doc is the narrow phased rollout plan
 
 This document now defines the repository deployment model and the default operator-facing policy strongly
 enough for separate implementation planning to proceed without reopening the core design.
