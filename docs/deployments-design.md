@@ -48,10 +48,12 @@ Future edits should not weaken or silently contradict the following invariants w
 - one deployment id owns one normal mutable live target by default; sharing a normal live target across deployment ids is allowed only through an explicit reviewed migration or alias exception.
 - preview is a publish mode, not a deployment identity and not a peer `operation_kind`; preview must publish only to an explicitly isolated preview target or be rejected.
 - protected/shared mutation must go through the shared control plane; trusted CI may build, attest, and trigger submissions, but it is not a peer mutating authority. Direct local mutation of `shared_nonprod` and `production_facing` targets is out of policy except for explicitly controlled emergency procedures.
+- every `shared_nonprod` and `production_facing` mutating run must freeze an immutable execution snapshot at admission before waiting, locking, or mutation; later execution revalidates only narrow current invariants instead of silently consuming drifted repo or provider config state.
 - for `shared_nonprod` and `production_facing`, the mutating publish phase must consume an admitted immutable artifact or an admitted source-run selector that resolves to that previously admitted artifact plus recorded snapshot metadata; workstation builds and ad hoc mutating rebuilds are out of policy.
 - promotion reuses the same admitted artifact across distinct deployment ids in the same compatible `promotion_lane`; it must not retarget one deployment dynamically across environments.
 - for promotion, the lane policy and environment-branch state are authoritative for what is currently promotable; `--source-run-id` is a selector within that admitted policy boundary, not an override around it.
 - rollback is a new run classified by `operation_kind = rollback`; it should prefer redeploying a prior known-good artifact rather than rebuilding or moving environment branches backward.
+- destructive cleanup of isolated preview targets must be a first-class audited control-plane operation rather than an implicit side effect with no lifecycle or authorization model.
 - deployment records must keep `operation_kind`, `publish_mode`, lifecycle state, and final outcome as separate concepts with canonical vocabularies.
 - `protection_class` is a trust-and-sensitivity tier that drives admission, smoke expectations, and execution boundary policy; it is not merely a label for whether end users directly see the target.
 
@@ -370,6 +372,9 @@ treated as planned policy, not open brainstorming:
   - promotions of the same built artifact across environments should carry an `artifact_lineage_id`
 - each component kind should resolve to a canonical provider-neutral data shape with required fields and artifact identity
   - publishers consume that resolved data shape and must not rediscover artifact semantics ad hoc from build outputs
+- service-like, SSR, and other non-trivial deployments may declare explicit built-in `release_actions` around publish
+  - those actions should cover controlled release-time work such as schema migrations, cache warmups, or post-publish verification jobs when the deployment contract needs them
+  - for `shared_nonprod` and `production_facing`, `release_actions` must come from a vetted built-in registry rather than package-local executable hooks
 - each deployment should declare explicit provider-target identity in deployment metadata
   - adapters must not infer the live target from directory names, branch names, CLI defaults, or unchecked provider config drift
   - one deployment id should own one normal mutable live target by default
@@ -378,7 +383,7 @@ treated as planned policy, not open brainstorming:
   - it must not mean "publish whatever was most recently built on this machine"
   - rebuilding during `--publish-only` is out of policy
 - deploy records should distinguish operation kind from final outcome
-  - operation kinds should use one canonical enum: `deploy`, `retry`, `promotion`, `rollback`
+  - operation kinds should use one canonical enum: `deploy`, `retry`, `promotion`, `rollback`, `preview_cleanup`
   - preview should be modeled through `publish_mode`, not as a peer `operation_kind`
   - success or failure outcome must remain separate from the kind of run being performed
 - deploy records should use separate canonical vocabularies for final outcomes and lifecycle states
@@ -411,6 +416,8 @@ treated as planned policy, not open brainstorming:
   - deployment-specific preview URL only when explicitly configured
   - timeout and retry policy should be explicit, not implicit
   - a production-facing deployment may omit or downgrade smoke only through an explicit documented exception
+- protected/shared control-plane permissions should follow one explicit minimum role model
+  - separate normal submit, approve, operate, and break-glass powers rather than leaving privileged actions to adapter-local convention
 - provisioners should be non-destructive by default during normal deploy flows
   - delete or replace behavior that can remove owned live resources should require an explicit separate operator path or equivalent break-glass intent
 - `--provision-only` should not build or publish
@@ -496,17 +503,25 @@ CLI/front-door responsibilities:
 
 Control-plane worker responsibilities for protected/shared mutation:
 
-1. revalidate admission, lane, prerequisite, and target-ownership policy before mutation
-2. acquire the shared lock
-3. revalidate under the acquired lock that the run is still admitted, not superseded, and still bound to the intended target
-4. load the execution inputs required for this run kind
+1. resolve admission for the requested protected/shared run and freeze one immutable execution snapshot for that run before any waiting or mutation begins
+   - the snapshot should preserve the deployment metadata, provider-config snapshot or fingerprint, resolved policy contents, selected artifact inputs when applicable, and any other non-secret execution inputs needed to replay the admitted decision faithfully
+2. revalidate admission, lane, prerequisite, and target-ownership policy before mutation
+3. acquire the shared lock
+4. revalidate under the acquired lock that the run is still admitted, not superseded, and still bound to the intended target
+   - this revalidation should check only narrow current invariants such as target ownership, lock scope, approval freshness, prerequisite health, and whether the admitted run has been superseded
+   - it must not silently replace the frozen execution snapshot with newer repo metadata, newer provider config contents, or different resolved policy objects
+5. load the execution inputs required for this run kind
+   - for a first-run protected/shared publish, load the admitted frozen execution snapshot for that run
    - for publish, retry, rollback, promotion, preview, or any provisioner using `immutable_resolved_inputs`, load the admitted immutable artifact plus the recorded source-run snapshot metadata needed for replay
-   - for `metadata_only` provision-only runs, load only the metadata and policy context required to mutate infrastructure safely
-5. record lifecycle progress in the authoritative deployment record
-6. run optional provisioning
-7. run publishing
-8. run optional smoke checks
-9. finalize the authoritative deployment record with the correct lifecycle state, termination reason, and final outcome
+   - for `metadata_only` provision-only runs, load only the frozen metadata and policy context captured for that run
+6. record lifecycle progress in the authoritative deployment record
+7. run optional provisioning
+8. run optional `release_actions` declared for the `pre_publish` phase
+9. run publishing
+10. run optional `release_actions` declared for the `post_publish_pre_smoke` phase
+11. run optional smoke checks
+12. run optional `release_actions` declared for the `post_smoke` phase
+13. finalize the authoritative deployment record with the correct lifecycle state, termination reason, and final outcome
 
 For protected/shared mutation, loading immutable replay inputs means "load the previously admitted immutable
 artifact plus the recorded source-run snapshot metadata needed for replay"; it does not authorize a new
@@ -600,14 +615,15 @@ These flags are not just convenience syntax. They exist because real deployment 
 
 Flag interaction rules:
 
-- default `deploy <id>` means `validate -> build -> resolve -> provision? -> publish -> smoke?` for `local_only`
-- for `shared_nonprod` and `production_facing`, default `deploy <id>` means `validate -> submit trusted build-admit-or-reuse request -> provision? -> publish -> smoke?`
+- default `deploy <id>` means `validate -> build -> resolve -> provision? -> release_actions(pre_publish)? -> publish -> release_actions(post_publish_pre_smoke)? -> smoke? -> release_actions(post_smoke)?` for `local_only`
+- for `shared_nonprod` and `production_facing`, default `deploy <id>` means `validate -> submit trusted build-admit-or-reuse request -> provision? -> release_actions(pre_publish)? -> publish -> release_actions(post_publish_pre_smoke)? -> smoke? -> release_actions(post_smoke)?`
   - CI may perform the trusted build-and-attest step before mutation begins
   - the shared control plane remains the sole authority that admits the run, selects the admitted artifact, acquires the lock, orchestrates mutation, runs smoke, and records deployment history
   - the mutating publish phase must consume only the resulting admitted immutable artifact
   - it must not mutate directly from a workstation build or an ad hoc control-plane rebuild
 - `--validate-only` runs validation only
 - `--provision-only` still performs `validate`, but it must not build, resolve artifacts, or publish
+  - it must not run `release_actions`, because no publish-phase lifecycle is being executed
   - the default provisioner input class is `metadata_only`
     - provisioners consume only stable declared deployment metadata
   - a reviewed provisioner may instead declare `immutable_resolved_inputs`
@@ -616,6 +632,10 @@ Flag interaction rules:
     - for `shared_nonprod` and `production_facing`, that reviewed path must require an explicit immutable source selector such as `--source-run-id <deploy-run-id>`; otherwise the run stays in `metadata_only`
     - for `local_only`, the same reviewed path should require an explicit immutable selector such as `--artifact-ref <artifact-ref>` or an equivalent exact local record reference; it must not implicitly reuse "whatever was built most recently"
 - `--publish-only` still performs `validate` and `resolve`, but it must skip provisioning
+  - it should still execute any declared `release_actions` whose phase placement is part of the publish lifecycle being run:
+    - `pre_publish`
+    - `post_publish_pre_smoke`
+    - `post_smoke`
   - it must publish one explicitly selected immutable artifact
   - it must not build or select an implicit local artifact on the caller's behalf
   - promotion-grade, retry, and rollback-grade publish-only paths should use the exact previously resolved artifact rather than rebuilding
@@ -890,6 +910,23 @@ Protected/shared preview admission policy:
 - PR-driven shared previews of unadmitted code are out of policy
 - if a workflow needs previews for unadmitted revisions, that should use `local_only` or another explicitly preview-safe deployment shape rather than piggybacking on a protected/shared deployment id
 
+Preview cleanup contract:
+
+- destruction of isolated preview targets is a first-class control-plane workflow, not an unrecorded housekeeping side effect
+- preview cleanup should be modeled as its own audited operation kind:
+  - `preview_cleanup`
+- preview cleanup must record at least:
+  - the deployment id
+  - the declared normal target identity
+  - the isolated preview target identity being destroyed
+  - the requesting identity
+  - the executing identity
+  - the reason for cleanup such as TTL expiry, PR close, manual cleanup, or superseding preview
+  - the final outcome
+- preview cleanup must use the same explicit authz boundary as other destructive protected/shared actions
+- preview cleanup must acquire the lock for the isolated preview target it destroys
+- if the preview is not isolated enough to have its own safe cleanup path, that preview shape is out of policy
+
 Non-interference guarantees:
 
 - preview must use an isolated effective mutable publish target, isolated publish path, and isolated smoke target
@@ -1078,6 +1115,7 @@ Each deployment target should define:
 - a provider
 - one or more components
 - an optional provisioner
+- optional `release_actions`
 - a required publisher
 - optional smoke-check wiring
 
@@ -1253,19 +1291,27 @@ Policy evaluation order:
     - protected/shared smoke relaxations should be represented explicitly as a nested `smoke.exception` object rather than by omitting the field and hoping readers infer intent
     - for `shared_nonprod` and `production_facing`, smoke definitions must come from a vetted built-in smoke-runner registry
     - package-local executable smoke entries are invalid for `shared_nonprod` and `production_facing`
-  - `secret_requirements`
-    - required for all deployments
-    - `{}` is the sensible default when a deployment has no secret inputs
-    - for `shared_nonprod` and `production_facing`, that explicit empty value is part of the reviewable contract, not optional boilerplate
-    - should declare non-secret secret requirements in one canonical step-oriented, backend-agnostic shape so validation and admission can fail early without revealing secret values
-    - `secret_requirements` should be a dictionary keyed by stable logical secret name, and each entry should still include that same `name` explicitly so extractors, validators, and records all see one self-describing shape
-    - each entry should include at least:
-      - `name`
-      - `step`
-      - `contract_id`
-      - `required`
-      - optional environment or preview qualifier when requirements differ by run mode
-    - should remain Buck-visible metadata; secret material itself must not appear there
+- `secret_requirements`
+  - required for all deployments
+  - `{}` is the sensible default when a deployment has no secret inputs
+  - for `shared_nonprod` and `production_facing`, that explicit empty value is part of the reviewable contract, not optional boilerplate
+  - should declare non-secret secret requirements in one canonical step-oriented, backend-agnostic shape so validation and admission can fail early without revealing secret values
+  - `secret_requirements` should be a dictionary keyed by stable logical secret name, and each entry should still include that same `name` explicitly so extractors, validators, and records all see one self-describing shape
+  - each entry should include at least:
+    - `name`
+    - `step`
+    - `contract_id`
+    - `required`
+    - optional environment or preview qualifier when requirements differ by run mode
+  - should remain Buck-visible metadata; secret material itself must not appear there
+  - `release_actions`
+    - optional
+    - when present, should describe controlled release-time actions that are neither infrastructure convergence nor ordinary publish nor smoke
+    - examples include schema migrations, cache warmups, search-index swaps, release-flag activation, or post-publish verification jobs
+    - should be explicit about phase placement such as `pre_publish`, `post_publish_pre_smoke`, or `post_smoke`
+    - should declare ordering, abort behavior, and whether later lifecycle steps may proceed on failure
+    - for `shared_nonprod` and `production_facing`, actions must come from a vetted built-in registry
+    - package-local executable release-action entries are invalid for `shared_nonprod` and `production_facing`
   - `preview`
     - optional
     - when absent, preview should be treated as unsupported by default
@@ -2179,7 +2225,24 @@ Examples:
 
 That becomes the `publisher`.
 
-### Step 7: Is This A Shared Platform Deployment Instead?
+### Step 7: Are Release Actions Needed?
+
+Ask:
+
+- do we need controlled release-time work beyond provision, publish, and smoke?
+
+If yes, add `release_actions`.
+
+Examples:
+
+- schema migration job
+- cache warmup
+- cutover job
+- post-publish verification job heavier than smoke
+
+If no, omit `release_actions`.
+
+### Step 8: Is This A Shared Platform Deployment Instead?
 
 Ask:
 
@@ -2193,7 +2256,7 @@ Examples:
 - shared ingress deployment
 - shared telemetry collectors
 
-### Step 8: Should I Use A Helper Macro?
+### Step 9: Should I Use A Helper Macro?
 
 Ask:
 
@@ -2492,12 +2555,12 @@ The deployment macro and deploy CLI should validate provider-specific capability
 
 Initial provider capability registry:
 
-| Provider           | Supported component kinds                      | Component cardinality                                       | Mixed-kind rules                                                                                               | Preview support                                   | Protected/shared rollout support                                       | Default rollout mode     | Effective target boundary                                                          | Allowed built-in publisher types    | Allowed built-in provisioner types     | Default smoke class guidance             |
-| ------------------ | ---------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------- | ---------------------------------------- |
-| `cloudflare-pages` | exactly one `static-webapp`                    | exactly 1 component                                         | no mixed kinds; exactly one `static-webapp`                                                                    | yes, only with explicit preview policy            | `all_at_once`                                                          | `all_at_once`            | one Pages project identity from canonical `provider_target`                        | `wrangler-pages`                    | `cdktf-stack`, `terraform-stack`       | `static-webapp` HTTP smoke               |
-| `s3-static`        | exactly one `static-webapp`                    | exactly 1 component                                         | no mixed kinds; exactly one `static-webapp`                                                                    | provider-dependent; unsupported unless documented | `all_at_once`                                                          | `all_at_once`            | one bucket or bucket-plus-prefix identity from canonical `provider_target`         | `aws-s3-sync`                       | `terraform-stack`, documented built-in | `static-webapp` HTTP smoke               |
-| `kubernetes`       | `service`, `third-party-service`, `ssr-webapp` | one or more components when they share one release boundary | mixed kinds allowed only when all components publish through one Helm release and one effective mutable target | yes, only with explicit preview policy            | `all_at_once`, `phased`, `canary`, `blue_green`, `ordered_best_effort` | `all_at_once`            | one release boundary defined by the canonical `cluster/namespace/release` identity | `helm-release`, documented built-in | `cdktf-stack`, `terraform-stack`       | `service` or `third-party-service` smoke |
-| `custom-platform`  | provider-defined built-in subset only          | documented built-in subset only                             | documented built-in subset only                                                                                | only when the provider capability entry says so   | documented built-in subset only                                        | documented built-in only | documented built-in target boundary only                                           | documented built-in only            | documented built-in only               | documented built-in smoke class only     |
+| Provider           | Supported component kinds                      | Component cardinality                                       | Mixed-kind rules                                                                                               | Preview support                                   | Protected/shared rollout support                                       | Default rollout mode     | Effective target boundary                                                          | Allowed built-in publisher types    | Allowed built-in provisioner types     | Allowed built-in `release_actions`                            | Default smoke class guidance             |
+| ------------------ | ---------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------- | ------------------------------------------------------------- | ---------------------------------------- |
+| `cloudflare-pages` | exactly one `static-webapp`                    | exactly 1 component                                         | no mixed kinds; exactly one `static-webapp`                                                                    | yes, only with explicit preview policy            | `all_at_once`                                                          | `all_at_once`            | one Pages project identity from canonical `provider_target`                        | `wrangler-pages`                    | `cdktf-stack`, `terraform-stack`       | none by default                                               | `static-webapp` HTTP smoke               |
+| `s3-static`        | exactly one `static-webapp`                    | exactly 1 component                                         | no mixed kinds; exactly one `static-webapp`                                                                    | provider-dependent; unsupported unless documented | `all_at_once`                                                          | `all_at_once`            | one bucket or bucket-plus-prefix identity from canonical `provider_target`         | `aws-s3-sync`                       | `terraform-stack`, documented built-in | none by default                                               | `static-webapp` HTTP smoke               |
+| `kubernetes`       | `service`, `third-party-service`, `ssr-webapp` | one or more components when they share one release boundary | mixed kinds allowed only when all components publish through one Helm release and one effective mutable target | yes, only with explicit preview policy            | `all_at_once`, `phased`, `canary`, `blue_green`, `ordered_best_effort` | `all_at_once`            | one release boundary defined by the canonical `cluster/namespace/release` identity | `helm-release`, documented built-in | `cdktf-stack`, `terraform-stack`       | documented built-in subset such as migration, warmup, cutover | `service` or `third-party-service` smoke |
+| `custom-platform`  | provider-defined built-in subset only          | documented built-in subset only                             | documented built-in subset only                                                                                | only when the provider capability entry says so   | documented built-in subset only                                        | documented built-in only | documented built-in target boundary only                                           | documented built-in only            | documented built-in only               | documented built-in subset only                               | documented built-in smoke class only     |
 
 Registry rule:
 
@@ -2505,7 +2568,7 @@ Registry rule:
 - a provider adapter must not widen support beyond this registry without updating the canonical design contract
 - the generic deployment model defines what is expressible in principle, but this registry defines what each built-in provider actually supports
 - a deployment may therefore be valid in the abstract model but still rejected by a specific provider capability entry; that is expected, not a contradiction
-- the registry must define the provider's default rollout mode, component cardinality, mixed-kind rules, and effective target boundary whenever those facts matter to validation, locking, replay, or rollout semantics
+- the registry must define the provider's default rollout mode, component cardinality, mixed-kind rules, effective target boundary, and allowed built-in `release_actions` whenever those facts matter to validation, locking, replay, or rollout semantics
 
 ## Deployment Lifecycle
 
@@ -2515,19 +2578,23 @@ Every deployment should follow the same logical high-level lifecycle:
 2. `build`
 3. `resolve`
 4. `provision`
-5. `publish`
-6. `smoke`
+5. optional `release_actions(pre_publish)`
+6. `publish`
+7. optional `release_actions(post_publish_pre_smoke)`
+8. `smoke`
+9. optional `release_actions(post_smoke)`
 
 Execution responsibility by mode:
 
-| Step        | `local_only` default actor | `shared_nonprod` / `production_facing` default actor                             |
-| ----------- | -------------------------- | -------------------------------------------------------------------------------- |
-| `validate`  | local CLI                  | local CLI for preflight validation; control plane revalidates before mutation    |
-| `build`     | local CLI via Buck         | trusted CI via Buck                                                              |
-| `resolve`   | local CLI                  | control plane loading the selected admitted artifact or recorded resolved inputs |
-| `provision` | local CLI                  | control plane                                                                    |
-| `publish`   | local CLI                  | control plane                                                                    |
-| `smoke`     | local CLI                  | control plane                                                                    |
+| Step              | `local_only` default actor | `shared_nonprod` / `production_facing` default actor                             |
+| ----------------- | -------------------------- | -------------------------------------------------------------------------------- |
+| `validate`        | local CLI                  | local CLI for preflight validation; control plane revalidates before mutation    |
+| `build`           | local CLI via Buck         | trusted CI via Buck                                                              |
+| `resolve`         | local CLI                  | control plane loading the selected admitted artifact or recorded resolved inputs |
+| `provision`       | local CLI                  | control plane                                                                    |
+| `release_actions` | local CLI                  | control plane                                                                    |
+| `publish`         | local CLI                  | control plane                                                                    |
+| `smoke`           | local CLI                  | control plane                                                                    |
 
 This table defines who executes each logical step in the common supported modes; it does not change the underlying logical lifecycle.
 
@@ -2535,6 +2602,7 @@ Rollout clarification:
 
 - the lifecycle above is logical, not strictly linear in wall-clock execution
 - progressive rollout policies may interleave publish and smoke checkpoints within the publish phase
+- when declared, `release_actions` may also interleave with rollout phases, but only according to explicit phase placement in deployment metadata
 - the final recorded lifecycle still uses the same top-level step vocabulary, but rollout sub-steps must be visible in provider-specific detail or rollout-state records
 
 ### Validate
@@ -2638,6 +2706,45 @@ Provisioner safety policy:
 - a normal deploy invocation must fail closed if the provisioner detects a destructive plan
 - destructive provisioner actions require a separate reviewed workflow or explicit operator intent surface that is distinct from the normal deploy path
 - app artifact rollback should not imply destructive infra rollback
+
+### Release Actions
+
+Run optional controlled release-time actions that are part of the deployment contract but are not the same
+thing as infrastructure convergence, artifact publication, or smoke.
+
+Examples:
+
+- schema migration job
+- cache warmup job
+- index swap or search backfill cutover
+- release-flag activation under change control
+- provider-specific post-publish verification job that is heavier than smoke
+
+Policy:
+
+- `release_actions` exist because many service-like and SSR rollouts need vetted release-time work beyond `provision -> publish -> smoke`
+- these actions should be explicit deployment metadata, not tribal knowledge or ad hoc operator steps
+- `release_actions` must declare phase placement such as:
+  - `pre_publish`
+  - `post_publish_pre_smoke`
+  - `post_smoke`
+- each action should declare:
+  - stable built-in type
+  - abort behavior
+  - whether later lifecycle steps may proceed on failure
+  - any artifact or runtime inputs it consumes
+- each built-in action type must declare replay behavior explicitly for:
+  - `publish_only`
+  - `retry`
+  - `rollback`
+  - `promotion`
+- the protected/shared default is fail-closed:
+  - a `release_action` does not re-run during `publish_only`, `retry`, `rollback`, or `promotion` unless that action type explicitly declares that replay is safe and intended for that operation kind
+  - if the requested replay flow would require an action whose replay behavior is not explicitly allowed, the run must fail clearly rather than guess
+- for `shared_nonprod` and `production_facing`, `release_actions` must come from a vetted built-in registry
+- package-local executable release hooks are out of policy for protected/shared runs
+- `release_actions` may use secrets only through declared `secret_requirements`
+- destructive data or infrastructure change remains subject to the same non-destructive defaulting philosophy as provisioners unless a separately reviewed workflow says otherwise
 
 ### Publish
 
@@ -2866,9 +2973,27 @@ Admission policy:
 - direct local mutation of those environments is out of policy except for explicitly controlled emergency procedures
 - local workflows remain valid for validation, build, resolve, and isolated preview or local targets
 
+Minimum protected/shared RBAC model:
+
+- the control plane should define at least these distinct role capabilities:
+  - `submitter`
+    - may create normal deploy, preview, retry, or rollback requests within the policies already attached to a deployment
+  - `approver`
+    - may grant required human approval where the referenced admission policy requires it
+  - `operator`
+    - may execute or administer routine control-plane operations such as cancelling queued runs, inspecting run state, or invoking documented preview cleanup
+  - `break_glass`
+    - may invoke explicitly documented emergency-only paths with incident-bounded audit requirements
+- normal protected/shared policy should separate approval authority from ordinary run submission when an admission policy requires human approval
+- destructive or high-risk operations such as target migration, retirement, emergency mutation, or preview cleanup should require `operator` or stronger authority
+- no built-in adapter should rely on ambient infrastructure credentials as a substitute for control-plane authorization
+- implementations may add finer-grained roles, but they must not collapse these minimum trust boundaries silently
+
 Release-admission contract for protected/shared environments:
 
 - a run is eligible to mutate a protected or shared environment only when all of the following are true:
+  - one immutable execution snapshot has been frozen for that admitted run before any waiting or mutating step begins
+    - the snapshot should preserve the admitted deployment metadata, provider-config snapshot or fingerprint, resolved policy contents, and any selected artifact inputs needed for execution
   - the source revision comes from the allowed environment branch for that deployment lane
   - required checks for that environment have passed for the admitted revision or admitted reusable artifact, as applicable to the run kind
   - any required human or policy approval has been granted
@@ -2895,6 +3020,8 @@ Release-admission contract for protected/shared environments:
   - the run has not been superseded by a later admitted run for the same lock scope
   - any required approval has not been revoked, expired, or invalidated by newer policy state
   - any health-gated prerequisite still satisfies its declared health requirement, using a fresh revalidation-time health verdict unless explicitly documented equivalent provider evidence is accepted
+- after revalidation succeeds, execution must continue from the frozen admitted snapshot for that run
+  - it must not silently swap in newer deployment metadata, provider config contents, or policy-object resolutions just because repo state has changed while the run was queued
 - admission and revalidation should evaluate only the declared direct prerequisite edges for that deployment unless a future policy explicitly adds transitive prerequisite semantics
 - if any of those checks fail after revalidation, the run must exit without mutating the target and report that it was superseded, stale, or no longer admitted
   - in those cases, the deployment record should preserve `final_outcome = null` and a specific `termination_reason`
@@ -2923,6 +3050,8 @@ Run classification:
   - `retry`
   - `promotion`
   - `rollback`
+- additional first-class destructive housekeeping operation:
+  - `preview_cleanup`
 - preview should instead be recorded through `publish_mode = preview`
 - `operation_kind` and `final outcome` answer different questions
   - operation kind says what sort of run this was
@@ -3166,6 +3295,7 @@ The deployment rule should expose enough metadata for repo tooling to retrieve:
 - explicit deployment prerequisites when present
 - component list
 - provisioner config
+- `release_actions` metadata when present
 - publisher config
 - admission or protection classification needed to decide whether mutation must go through the shared control plane
 - smoke policy metadata, including any explicit production exception
@@ -3363,6 +3493,7 @@ The design intentionally separates reusable artifact attestation from deployment
   - it should bind the deployment metadata fingerprint, provider-config fingerprint, target identity, approvals, and publish result for one concrete run
   - it should make it obvious when the same artifact identity was published under different environment-specific deployment inputs
   - it should preserve a stable fingerprint or snapshot reference for the resolved `lane_policy` and `admission_policy` contents used by that run, not just mutable label strings
+  - for every protected/shared mutating run, it should preserve the frozen admitted execution-snapshot reference used for actual mutation
 
 Minimum replay-snapshot contract for immutable-artifact reuse:
 
@@ -3376,6 +3507,7 @@ Minimum replay-snapshot contract for immutable-artifact reuse:
   - stable fingerprint or snapshot reference for the resolved `lane_policy` contents used by the source run
   - stable fingerprint or snapshot reference for the resolved `admission_policy` contents used by the source run
   - rollout policy snapshot
+  - `release_actions` plan snapshot, including declared replay behavior for the operation kinds relevant to that source run
   - smoke policy snapshot
   - non-secret secret-contract version or reference set
   - the versioned `lane_policy` reference used for the source run
@@ -3401,6 +3533,9 @@ Operation-kind replay rule:
 
 - `retry` and `rollback` should replay the recorded snapshot and enforce only narrow current invariants needed for safe execution, such as target ownership, protection class, lock scope, provider identity, and publisher compatibility
 - `promotion` should replay the recorded source snapshot for source-run artifact inputs, but it must use the target deployment's current admitted execution and policy context before mutating that later environment
+- `release_actions` during replay must follow the recorded action-plan snapshot and the declared replay behavior of each action type
+  - protected/shared replay must not silently re-run release actions just because the current deployment metadata still names them
+  - when the recorded action plan says an action is non-replayable for the requested operation kind, the system must skip it or fail according to that recorded action policy rather than improvising
 - normal policy edits should not silently invalidate an otherwise in-window `retry` or `rollback` unless they change one of those narrow execution-safety invariants
 
 Minimum required fields for every run:
@@ -3412,7 +3547,7 @@ Minimum required fields for every run:
 - `deployment_id`
 - Buck deployment label
 - `operation_kind`
-  - such as `deploy`, `retry`, `promotion`, or `rollback`
+  - such as `deploy`, `retry`, `promotion`, `rollback`, or `preview_cleanup`
 - `lifecycle_state`
   - such as `queued`, `waiting_for_lock`, `running`, `cancelling`, `finished`, or `cancelled`
 - `termination_reason`
@@ -3427,6 +3562,7 @@ Minimum required fields for every run:
   - for normal publish this should match the declared normal provider target
   - for preview this should preserve the isolated preview target that was actually mutated
 - deployment metadata fingerprint or stable snapshot reference
+- frozen execution-snapshot reference for protected/shared mutating runs
 - stable fingerprint or snapshot reference for the resolved `lane_policy` contents used by the run
 - stable fingerprint or snapshot reference for the resolved `admission_policy` contents used by the run
 - start time and end time
@@ -3462,6 +3598,12 @@ Fields required once publish starts for multi-component or progressive rollout r
 - rollout-phase result history, including phase name, advance gate result, and abort or completion decision
 - enough phase or component detail to reconstruct which parts of the intended release were published, which were not, and which gate stopped or advanced the rollout
 
+Fields required once any `release_actions` step starts:
+
+- per-action execution result history
+- action phase placement such as `pre_publish`, `post_publish_pre_smoke`, or `post_smoke`
+- enough detail to reconstruct which release actions ran, which gate or abort rule they triggered, and which later lifecycle steps were allowed to proceed
+
 Additional recommended fields:
 
 - `parent_run_id`
@@ -3469,6 +3611,7 @@ Additional recommended fields:
 - `artifact_lineage_id`
   - when the same built artifact is promoted across environments
 - smoke result
+- release-action results when present
 - lock scope
 - provider-specific details added by the adapter
 - prerequisite evaluation details when explicit prerequisites affected admission or orchestration
