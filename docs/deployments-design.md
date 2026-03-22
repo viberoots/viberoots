@@ -12,11 +12,11 @@ The design goals are:
 
 This document is a design for the intended deployment model, not a claim that every part is already implemented.
 
-Current supported-contract boundary:
+Deployment scope:
 
-- `local_only` deployments may be single-component or multi-component
-- `shared_nonprod` and `production_facing` deployments are currently single-component only
-- broader protected/shared multi-component support should be treated as a later design expansion, not as an implied current capability
+- deployments may be single-component or multi-component
+- `shared_nonprod` and `production_facing` deployments may use multi-component or advanced rollout behavior only when their provider capability entry and declared `rollout_policy` support that shape
+- when a deployment does not declare `rollout_policy`, the provider's documented default rollout mode applies
 
 The key promise of this document should be:
 
@@ -78,7 +78,7 @@ Short version:
 Scope note:
 
 - the abstract deployment model can describe multi-component systems
-- the current protected/shared supported contract is intentionally narrower: single-component only
+- protected/shared deployments may also be multi-component, but only through explicit provider capability plus explicit rollout policy rather than ad hoc adapter behavior
 
 ## Why Deployments Need Their Own Model
 
@@ -499,16 +499,18 @@ Control-plane worker responsibilities for protected/shared mutation:
 1. revalidate admission, lane, prerequisite, and target-ownership policy before mutation
 2. acquire the shared lock
 3. revalidate under the acquired lock that the run is still admitted, not superseded, and still bound to the intended target
-4. load the admitted immutable artifact or source-run snapshot
+4. load the execution inputs required for this run kind
+   - for publish, retry, rollback, promotion, preview, or any provisioner using `immutable_resolved_inputs`, load the admitted immutable artifact plus the recorded source-run snapshot metadata needed for replay
+   - for `metadata_only` provision-only runs, load only the metadata and policy context required to mutate infrastructure safely
 5. record lifecycle progress in the authoritative deployment record
 6. run optional provisioning
 7. run publishing
 8. run optional smoke checks
 9. finalize the authoritative deployment record with the correct lifecycle state, termination reason, and final outcome
 
-For protected/shared mutation, "load the admitted immutable artifact or source-run snapshot" means
-"load the previously admitted immutable artifact plus the recorded source-run snapshot metadata needed
-for replay"; it does not authorize a new build or rebuild by replay.
+For protected/shared mutation, loading immutable replay inputs means "load the previously admitted immutable
+artifact plus the recorded source-run snapshot metadata needed for replay"; it does not authorize a new
+build or rebuild by replay.
 
 That gives the user one command while keeping the execution boundary clear.
 
@@ -577,7 +579,7 @@ If a deployment package contains a local `deploy.ts`, that file should be treate
 
 Protected/shared clarification:
 
-- package-local executable hooks are out of policy for protected/shared deploys in v1
+- package-local executable hooks are out of policy for normal protected/shared deploys
 - any example using a package-local executable hook should be read as local-only, isolated-preview-only, or illustrative legacy shape unless it explicitly says the hook is replaced by vetted built-in control-plane code
 
 Good pattern:
@@ -697,6 +699,11 @@ If a reviewed protected/shared provisioner needs `immutable_resolved_inputs` rat
 `metadata_only`, the operator contract should add an explicit immutable selector such as
 `deploy pleomino-prod --provision-only --source-run-id <deploy-run-id>`.
 
+Execution rule:
+
+- `--provision-only` loads no artifact by default
+- it loads an admitted immutable artifact plus recorded source-run snapshot only when the provisioner's declared input class is `immutable_resolved_inputs`
+
 Plain-language version:
 
 - "Set up the place, but do not release a new build yet."
@@ -803,7 +810,7 @@ deployment(
         "account": "web-platform-prod",
     },
     environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     preview = {
@@ -880,7 +887,7 @@ Protected/shared preview admission policy:
 - preview on those deployments should therefore require `--source-run-id` or an equivalent explicit admitted immutable selector
 - preview for those deployments must still publish to an explicitly isolated preview target class
 - preview for those deployments must not be used to preview unadmitted PR code or to bypass the lane's normal branch, check, or approval policy
-- PR-driven shared previews of unadmitted code are out of scope for the current supported contract
+- PR-driven shared previews of unadmitted code are out of policy
 - if a workflow needs previews for unadmitted revisions, that should use `local_only` or another explicitly preview-safe deployment shape rather than piggybacking on a protected/shared deployment id
 
 Non-interference guarantees:
@@ -1084,9 +1091,9 @@ deployment(
         "id": "pleomino-prod-pages",
         "account": "web-platform-prod",
     },
-    lane_policy = "//build-tools/deploy/lanes:pleomino_v1",
+    lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     components = [
@@ -1181,7 +1188,7 @@ Policy evaluation order:
     - required for `shared_nonprod` and `production_facing`
     - should be an explicit reference to a versioned centrally defined branch/check/approval policy object for that deployment
     - should be Buck-visible and repo-owned rather than an opaque free-form string
-    - should normally be represented as a Buck label or equivalent structured repo-owned policy reference, for example `//build-tools/deploy/policies:pleomino_prod_release_v1`
+    - should normally be represented as a Buck label or equivalent structured repo-owned policy reference, for example `//build-tools/deploy/policies:pleomino_prod_release`
     - keeps the deploy rule authoritative for which admission policy applies, even if the policy definition itself lives outside the deployment package
   - `protection_class`
     - required
@@ -1196,10 +1203,37 @@ Policy evaluation order:
     - each component should include `id`, `kind`, and `target`
     - `id` should be stable within the deployment, not derived from list position
   - `rollout_policy`
-    - optional for simple single-component or local-only deployments
-    - required for multi-component local-only deployments
-    - protected/shared multi-component support is out of scope in v1, so this field mainly exists there for local-only use today and for future closed rollout-mode support later
-    - should describe explicit publish ordering, dependency barriers, or phased smoke checkpoints when the deployment is more complex than the default common case
+    - optional when the provider's default rollout mode is sufficient for the deployment
+    - required for any deployment whose intended behavior differs from the provider default, including multi-component ordering, phased release gates, canary behavior, blue/green cutover, or staged store rollout
+    - should describe explicit publish ordering, dependency barriers, phase boundaries, traffic-shift semantics, or smoke checkpoints when the deployment is more complex than the default common case
+    - must use one closed rollout-mode set for provider-neutral intent:
+      - `all_at_once`
+      - `all_or_nothing`
+      - `ordered_best_effort`
+      - `parallel_best_effort`
+      - `phased`
+      - `canary`
+      - `blue_green`
+      - `store_staged`
+    - provider-neutral mode meaning is:
+      - `all_at_once`: publish the full intended release in one step, then evaluate any final gates
+      - `all_or_nothing`: publish as one unit and fail the run if the provider cannot keep the release coherent as one unit
+      - `ordered_best_effort`: publish in deterministic order, stopping on failure, without implying cross-component atomicity
+      - `parallel_best_effort`: publish concurrently where allowed, without implying cross-component atomicity
+      - `phased`: publish in explicit ordered phases, each with its own advance gate
+      - `canary`: increase exposure to the same live target population in measured increments before full rollout
+      - `blue_green`: publish to an alternate full environment or slot and then cut traffic or primary selection over explicitly
+      - `store_staged`: advance exposure through store-managed track, channel, or rollout-percentage stages
+    - provider adapters may support only a subset of those modes, but they must reject unsupported modes explicitly rather than silently changing meaning
+    - for any mode other than `all_at_once`, `all_or_nothing`, `ordered_best_effort`, or `parallel_best_effort`, the policy should declare at least:
+      - ordered `phases` or `steps`
+      - the advance gate for each phase
+      - abort behavior
+      - smoke execution mode: `per_phase`, `final_only`, or `both`
+    - rollout modes that shift user traffic or release exposure should additionally declare:
+      - traffic or exposure increments
+      - bake duration or stabilization window between increments
+      - the condition that marks the rollout complete
   - `publisher`
     - required
     - should include a stable `type`
@@ -1559,7 +1593,7 @@ deployment(
         "account": "web-platform-prod",
     },
     environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     components = [
@@ -1629,7 +1663,7 @@ deployment(
         "id": "docs-site-prod",
         "bucket": "docs-site-prod",
     },
-    admission_policy = "//build-tools/deploy/policies:docs_site_prod_release_v1",
+    admission_policy = "//build-tools/deploy/policies:docs_site_prod_release",
     environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "docs-site",
@@ -1733,7 +1767,7 @@ deployment(
         "namespace": "shared-observability",
         "release": "otel-collector",
     },
-    admission_policy = "//build-tools/deploy/policies:shared_observability_prod_release_v1",
+    admission_policy = "//build-tools/deploy/policies:shared_observability_prod_release",
     environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "shared-observability",
@@ -2225,7 +2259,7 @@ deployment(
         "account": "web-platform-prod",
     },
     environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     components = [
@@ -2348,34 +2382,61 @@ Multi-component lifecycle semantics:
 
 - components are still built and resolved independently
 - the provider adapter must define whether publish executes serially or in parallel for a supported multi-component deployment
-- unless a deployment or provider adapter explicitly documents stronger guarantees, the default deployment-level policy is `ordered_best_effort`
+- unless a deployment or provider capability entry explicitly documents a different default, the fallback deployment-level policy is `ordered_best_effort`
 - `ordered_best_effort` means:
   - components publish in a deterministic adapter-defined order
   - a later component does not start until the earlier component's publish step has returned
   - true cross-component atomicity is not implied
 - adapters may explicitly support `parallel_best_effort` or `all_or_nothing`, but they must say so
 - partial publish success must be recorded per component in the deployment record
-- deployment-level smoke should run only after the publish phase completes according to the selected policy
+- rollout may interleave publish and smoke when the declared rollout policy requires per-phase validation
+- deployment-level final smoke should run after the publish phase completes according to the selected policy whenever the rollout contract requires final smoke
 - retry and rollback must operate from recorded per-component artifact and publish state, not from guesses about what probably succeeded
 
 First-class rollout-shape policy:
 
 - a multi-component deployment may explicitly declare component ordering, dependency barriers, or phased smoke checkpoints in deployment metadata
+- a single-component deployment may also declare rollout semantics when publication is intentionally more sophisticated than the provider default, such as canary, blue/green, phased traffic shift, or staged store release
 - when such rollout metadata is present, adapters must either honor it or reject the deployment as unsupported
-- when rollout metadata is absent, the adapter-defined `ordered_best_effort` default applies
-- for `shared_nonprod` and `production_facing`, multi-component deployments are out of scope in v1
-- the intended v1 protected/shared default is therefore a single-component deployment
-- multi-component protected/shared rollout semantics may be added later only through a closed centrally defined rollout-mode set rather than adapter-local invention
+- when rollout metadata is absent, the provider capability entry's documented default rollout mode applies; if it does not name one, the fallback is `ordered_best_effort`
+- the rollout-mode vocabulary is closed and shared across providers:
+  - `all_at_once`
+  - `all_or_nothing`
+  - `ordered_best_effort`
+  - `parallel_best_effort`
+  - `phased`
+  - `canary`
+  - `blue_green`
+  - `store_staged`
+- the canonical provider-neutral meaning of those modes is:
+  - `all_at_once`: publish the full intended release in one step, then evaluate any final gates
+  - `all_or_nothing`: publish as one unit and fail the run if the provider cannot keep the release coherent as one unit
+  - `ordered_best_effort`: publish in deterministic order, stopping on failure, without implying cross-component atomicity
+  - `parallel_best_effort`: publish concurrently where allowed, without implying cross-component atomicity
+  - `phased`: publish in explicit ordered phases, each with its own advance gate
+  - `canary`: increase exposure to the same live target population in measured increments before full rollout
+  - `blue_green`: publish to an alternate full environment or slot and then cut traffic or primary selection over explicitly
+  - `store_staged`: advance exposure through store-managed track, channel, or rollout-percentage stages
+- protected/shared deployments may use only the rollout modes explicitly allowed by their provider capability entry
 - phased smoke checkpoints should be explicit about which component group they validate and whether later phases may proceed on failure
 - the same declared rollout shape should not silently change meaning across adapters
+- the minimum rollout-policy contract for progressive modes is:
+  - `phases` or `steps` in explicit execution order
+  - an advance gate for each phase
+  - an abort rule
+  - smoke mode: `per_phase`, `final_only`, or `both`
+- rollout modes that shift traffic, audience, or store exposure must additionally define:
+  - exposure increments
+  - bake duration or stabilization window between increments
+  - the explicit completion condition
 
 Operational consequence:
 
 - if one component publishes and a later component fails under a best-effort policy, the deployment run is a publish failure
 - the deployment record must preserve which components published successfully, which did not, and which artifact identity each component used
 - any follow-up retry or rollback must use that recorded state explicitly
-- for `shared_nonprod` and `production_facing`, the deployment remains the operator-atomic unit in v1
-- partial component retry, rollback, or promotion is out of scope in v1 for those classifications even when partial publish state is recorded for audit and reconciliation
+- unless a deployment's declared rollout mode and provider capability entry explicitly allow a narrower replay unit, the deployment remains the operator-atomic unit for retry, rollback, and promotion
+- partial component retry, rollback, or promotion is therefore disallowed by default even when partial publish state is recorded for audit and reconciliation
 
 Example:
 
@@ -2415,12 +2476,13 @@ deployment(
 )
 ```
 
-The model allows many components in general, but protected/shared v1 support should stay single-component.
+The model allows many components, but each provider capability entry still decides which rollout shapes it
+actually supports for protected/shared use.
 
 Examples:
 
-- `cloudflare-pages` v1 may require exactly one `static-webapp` component
-- a future provider revision may expand protected/shared support only after this document defines a closed rollout-mode set for that use case
+- `cloudflare-pages` may require exactly one `static-webapp` component
+- a provider that wants to support richer protected/shared rollout behavior must name the allowed rollout modes explicitly in the provider capability registry
 
 That keeps the model future-proof without forcing every provider to support every topology immediately.
 
@@ -2430,19 +2492,20 @@ The deployment macro and deploy CLI should validate provider-specific capability
 
 Initial provider capability registry:
 
-| Provider           | Supported component kinds             | Preview support                                   | Protected/shared rollout support                                             | Allowed built-in publisher types    | Allowed built-in provisioner types     | Default smoke class guidance             |
-| ------------------ | ------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------- | ---------------------------------------- |
-| `cloudflare-pages` | exactly one `static-webapp`           | yes, only with explicit preview policy            | single-component only in the current supported contract                      | `wrangler-pages`                    | `cdktf-stack`, `terraform-stack`       | `static-webapp` HTTP smoke               |
-| `s3-static`        | exactly one `static-webapp`           | provider-dependent; unsupported unless documented | single-component only in the current supported contract                      | `aws-s3-sync`                       | `terraform-stack`, documented built-in | `static-webapp` HTTP smoke               |
-| `kubernetes`       | `service`, `third-party-service`      | yes, only with explicit preview policy            | single-component only for protected/shared in the current supported contract | `helm-release`, documented built-in | `cdktf-stack`, `terraform-stack`       | `service` or `third-party-service` smoke |
-| `custom-platform`  | provider-defined built-in subset only | only when the provider capability entry says so   | single-component only for protected/shared in the current supported contract | documented built-in only            | documented built-in only               | documented built-in smoke class only     |
+| Provider           | Supported component kinds                      | Component cardinality                                       | Mixed-kind rules                                                                                               | Preview support                                   | Protected/shared rollout support                                       | Default rollout mode     | Effective target boundary                                                          | Allowed built-in publisher types    | Allowed built-in provisioner types     | Default smoke class guidance             |
+| ------------------ | ---------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------- | ---------------------------------------- |
+| `cloudflare-pages` | exactly one `static-webapp`                    | exactly 1 component                                         | no mixed kinds; exactly one `static-webapp`                                                                    | yes, only with explicit preview policy            | `all_at_once`                                                          | `all_at_once`            | one Pages project identity from canonical `provider_target`                        | `wrangler-pages`                    | `cdktf-stack`, `terraform-stack`       | `static-webapp` HTTP smoke               |
+| `s3-static`        | exactly one `static-webapp`                    | exactly 1 component                                         | no mixed kinds; exactly one `static-webapp`                                                                    | provider-dependent; unsupported unless documented | `all_at_once`                                                          | `all_at_once`            | one bucket or bucket-plus-prefix identity from canonical `provider_target`         | `aws-s3-sync`                       | `terraform-stack`, documented built-in | `static-webapp` HTTP smoke               |
+| `kubernetes`       | `service`, `third-party-service`, `ssr-webapp` | one or more components when they share one release boundary | mixed kinds allowed only when all components publish through one Helm release and one effective mutable target | yes, only with explicit preview policy            | `all_at_once`, `phased`, `canary`, `blue_green`, `ordered_best_effort` | `all_at_once`            | one release boundary defined by the canonical `cluster/namespace/release` identity | `helm-release`, documented built-in | `cdktf-stack`, `terraform-stack`       | `service` or `third-party-service` smoke |
+| `custom-platform`  | provider-defined built-in subset only          | documented built-in subset only                             | documented built-in subset only                                                                                | only when the provider capability entry says so   | documented built-in subset only                                        | documented built-in only | documented built-in target boundary only                                           | documented built-in only            | documented built-in only               | documented built-in smoke class only     |
 
 Registry rule:
 
-- this registry is authoritative for what each built-in provider supports in the current design contract
+- this registry is authoritative for what each built-in provider supports in the deployment contract
 - a provider adapter must not widen support beyond this registry without updating the canonical design contract
-- the generic deployment model defines what is expressible in principle, but this registry defines what is actually supported right now
+- the generic deployment model defines what is expressible in principle, but this registry defines what each built-in provider actually supports
 - a deployment may therefore be valid in the abstract model but still rejected by a specific provider capability entry; that is expected, not a contradiction
+- the registry must define the provider's default rollout mode, component cardinality, mixed-kind rules, and effective target boundary whenever those facts matter to validation, locking, replay, or rollout semantics
 
 ## Deployment Lifecycle
 
@@ -2467,6 +2530,12 @@ Execution responsibility by mode:
 | `smoke`     | local CLI                  | control plane                                                                    |
 
 This table defines who executes each logical step in the common supported modes; it does not change the underlying logical lifecycle.
+
+Rollout clarification:
+
+- the lifecycle above is logical, not strictly linear in wall-clock execution
+- progressive rollout policies may interleave publish and smoke checkpoints within the publish phase
+- the final recorded lifecycle still uses the same top-level step vocabulary, but rollout sub-steps must be visible in provider-specific detail or rollout-state records
 
 ### Validate
 
@@ -2661,7 +2730,7 @@ deployment(
         "id": "pleomino-dev-pages",
         "account": "web-platform-dev",
     },
-    admission_policy = "//build-tools/deploy/policies:pleomino_dev_release_v1",
+    admission_policy = "//build-tools/deploy/policies:pleomino_dev_release",
     environment_stage = "dev",
     protection_class = "shared_nonprod",
     promotion_lane = "pleomino",
@@ -2736,8 +2805,12 @@ Retry policy by step:
 Shared-environment locking policy:
 
 - shared environments should use a central Postgres-backed control plane for deploy coordination
-- every deployment should resolve to a lock scope
+- every deployment should resolve to one effective mutable live target for ownership and coordination purposes
+- by default that effective mutable target is exactly the deployment's canonical provider-target identity
+- every deployment should therefore resolve to one lock scope derived from that effective mutable target
 - the default lock scope should be derived from `provider` plus a normalized canonical provider-target identity
+- a deployment may touch many underlying resources only when they are part of that same inseparable effective mutable target and are always coordinated under the same lock
+- if a workflow needs separately mutable live targets, it should be modeled as separate deployments with prerequisites rather than one deployment silently spanning multiple independent lock domains
 - if a deployment legitimately mutates a reviewed shared resource outside its normal publish target, the preferred model is to split that shared resource into its own deployment and use prerequisites rather than silently widening locks
 - any explicit lock-scope override is a documented escape hatch for special cases, not the normal path
 - an override must validate as at least as strict as the provider-target-derived scope; it must not permit two runs that could mutate the same live target to proceed independently
@@ -2876,7 +2949,7 @@ deployment(
         "account": "web-platform-prod",
     },
     environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     components = [
@@ -2937,7 +3010,7 @@ Provenance split for promotion-safe artifact reuse:
 - promotion-safe reusable artifacts must be environment-neutral
   - staging/prod-specific URLs, flags, or other environment-specific values must not be baked into the artifact for a lane that claims same-artifact promotion semantics
   - environment-specific values should instead come from deployment metadata, provider-native config, runtime injection, or secrets
-  - rebuild-per-stage lanes are out of scope for the current supported contract
+  - rebuild-per-stage lanes are a different release model and must not claim same-artifact promotion semantics
   - if a deployment family truly requires environment-specific build-time substitution, that family should not claim normal same-artifact promotion semantics until the design is explicitly expanded
 - deployment-run provenance should capture the environment-specific facts evaluated at publish time, including deployment metadata fingerprint, provider-config fingerprint, target identity, approvals, and publish result
 - promotion should therefore verify both:
@@ -3270,6 +3343,17 @@ Anti-patterns:
 
 Every deploy run should produce a provider-neutral deployment record.
 
+Versioning contract:
+
+- every persisted deployment record must include a `schema_version`
+- every persisted replay snapshot used for immutable-artifact reuse must include its own `schema_version`
+- schema versions must be explicit values in the stored payload, not only implied by table names, code versions, or migration timestamps
+- replay or record readers must either:
+  - handle the stored `schema_version` explicitly
+  - migrate it to a supported schema before execution
+  - or fail closed with a clear incompatibility error
+- a schema change must not silently reinterpret old replay snapshots or deployment records
+
 The design intentionally separates reusable artifact attestation from deployment-run provenance:
 
 - reusable artifact attestation is for build trust
@@ -3283,14 +3367,18 @@ The design intentionally separates reusable artifact attestation from deployment
 Minimum replay-snapshot contract for immutable-artifact reuse:
 
 - any recorded deployment snapshot used for protected/shared `--publish-only`, retry, rollback, or promotion-by-reuse should preserve at least:
+  - `schema_version`
   - resolved component data
   - artifact refs and artifact identities
   - declared normal target identity
   - effective run target identity
   - rendered provider-config snapshot or immutable provider-config reference
+  - stable fingerprint or snapshot reference for the resolved `lane_policy` contents used by the source run
+  - stable fingerprint or snapshot reference for the resolved `admission_policy` contents used by the source run
   - rollout policy snapshot
   - smoke policy snapshot
   - non-secret secret-contract version or reference set
+  - the versioned `lane_policy` reference used for the source run
   - the versioned `admission_policy` reference used for the source run
 - replay should use that recorded snapshot as the authoritative source for immutable-reuse semantics, with only narrow current-invariant checks layered on top
 
@@ -3317,6 +3405,8 @@ Operation-kind replay rule:
 
 Minimum required fields for every run:
 
+- `schema_version`
+  - explicit deployment-record schema identifier
 - `deploy_run_id`
   - globally unique for every deploy attempt
 - `deployment_id`
@@ -3337,6 +3427,8 @@ Minimum required fields for every run:
   - for normal publish this should match the declared normal provider target
   - for preview this should preserve the isolated preview target that was actually mutated
 - deployment metadata fingerprint or stable snapshot reference
+- stable fingerprint or snapshot reference for the resolved `lane_policy` contents used by the run
+- stable fingerprint or snapshot reference for the resolved `admission_policy` contents used by the run
 - start time and end time
 - final outcome
   - required only when the run reaches a canonical terminal outcome
@@ -3361,6 +3453,14 @@ Fields required once `resolve` succeeds:
 Fields required once publish succeeds and the provider exposes them:
 
 - canonical remote publish identifier for each published component
+
+Fields required once publish starts for multi-component or progressive rollout runs:
+
+- per-component publish outcome state
+- per-component remote publish identifier once exposed by the provider
+- per-component or per-phase artifact identity actually published
+- rollout-phase result history, including phase name, advance gate result, and abort or completion decision
+- enough phase or component detail to reconstruct which parts of the intended release were published, which were not, and which gate stopped or advanced the rollout
 
 Additional recommended fields:
 
@@ -3520,6 +3620,7 @@ This example uses the canonical `operation_kind`, `lifecycle_state`, `terminatio
 
 ```json
 {
+  "schema_version": "deploy-record@2026-03-01",
   "deploy_run_id": "dr_2026_03_19_pleomino_prod_00017",
   "deployment_id": "pleomino-prod",
   "deployment_label": "//projects/deployments/pleomino-prod:deploy",
@@ -3649,9 +3750,9 @@ cloudflare_static_pwa_deployment(
         "id": "pleomino-prod-pages",
         "account": "web-platform-prod",
     },
-    lane_policy = "//build-tools/deploy/lanes:pleomino_v1",
+    lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
@@ -3824,7 +3925,7 @@ def cloudflare_static_pwa_deployment(
         if admission_policy == None:
             fail("protected/shared deployments must set admission_policy")
         if lane_policy == None:
-            lane_policy = "//build-tools/deploy/lanes:%s_v1" % promotion_lane
+            lane_policy = "//build-tools/deploy/lanes:%s" % promotion_lane
     deployment(
         name = name,
         provider = "cloudflare-pages",
@@ -3867,9 +3968,9 @@ cloudflare_static_pwa_deployment(
         "id": "pleomino-prod-pages",
         "account": "web-platform-prod",
     },
-    lane_policy = "//build-tools/deploy/lanes:pleomino_v1",
+    lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
@@ -3946,9 +4047,9 @@ puzzle_cloudflare_deployment(
         "id": "pleomino-prod-pages",
         "account": "web-platform-prod",
     },
-    lane_policy = "//build-tools/deploy/lanes:pleomino_v1",
+    lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
@@ -4015,9 +4116,9 @@ puzzle_cloudflare_deployment(
         "id": "pleomino-prod-pages",
         "account": "web-platform-prod",
     },
-    lane_policy = "//build-tools/deploy/lanes:pleomino_v1",
+    lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
@@ -4130,7 +4231,7 @@ What this means:
 
 - the API and the OpenTelemetry sidecar are part of the same delivered system
 - publishing this deployment should release both together
-- this example is intentionally `local_only` because multi-component protected/shared deployments are not part of the current supported contract
+- this example is intentionally `local_only` to keep the sidecar example simple; a protected/shared version would need a provider capability entry and explicit rollout policy that support the same multi-component shape
 
 ### 2. Provisioned Dependency
 
@@ -4161,7 +4262,7 @@ deployment(
         "id": "pleomino-prod-pages",
         "account": "web-platform-prod",
     },
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release_v1",
+    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     environment_stage = "prod",
     protection_class = "production_facing",
     promotion_lane = "pleomino",
@@ -4436,7 +4537,7 @@ What this means:
 - observability is treated as a real deployment target
 - it can be reviewed, validated, and released on its own
 - app deployments do not have to re-own it
-- this example is intentionally `local_only` because multi-component protected/shared deployments are not part of the current supported contract
+- this example is intentionally `local_only` to keep the shared platform example compact; a protected/shared version would need a provider capability entry and explicit rollout policy that support the same multi-component shape
 
 ## Why This Fits The Overall Design
 
