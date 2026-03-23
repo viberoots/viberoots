@@ -14,9 +14,11 @@ This document is a design for the intended deployment model, not a claim that ev
 
 Normative-source note:
 
-- [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) is the single fail-closed normative source for operator and implementation guarantees
+- [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) is the fail-closed normative source for shared operator and implementation guarantees across the deployment model
+- [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md) is the authoritative normative source for provider-specific support and constraints
 - this design doc explains rationale, structure, examples, and policy intent
-- when this document restates a contract rule for readability, the contract doc remains authoritative if wording ever drifts
+- when this document restates a cross-cutting contract rule for readability, the contract doc remains authoritative if wording ever drifts
+- when this document summarizes provider support for readability, the provider-capabilities doc remains authoritative if wording ever drifts
 
 Companion docs:
 
@@ -30,7 +32,7 @@ Deployment scope:
 
 - deployments may be single-component or multi-component
 - `shared_nonprod` and `production_facing` deployments may use multi-component or advanced rollout behavior only when their provider capability entry and declared `rollout_policy` support that shape
-- when a deployment does not declare `rollout_policy`, the provider's documented default rollout mode applies
+- when a deployment does not declare `rollout_policy`, the reviewed provider capability entry's explicit default rollout mode applies
 
 The key promise of this document should be:
 
@@ -71,6 +73,8 @@ Future edits should not weaken or silently contradict the following invariants w
 - lanes with `artifact_reuse_mode = "same_artifact"` promote by reusing the same admitted artifact across environments.
 - lanes with `artifact_reuse_mode = "rebuild_per_stage"` promote by advancing the same admitted source revision across environments, producing a new admitted stage-specific artifact before each protected/shared publish.
 - for promotion, the lane policy and environment-branch state are authoritative for what is currently promotable; `--source-run-id` is a selector within that admitted policy boundary, not an override around it.
+  - the operator may select any earlier admitted source run that is still eligible under the lane's current promotion policy
+  - the system must reject source runs that are no longer promotable under current lane policy, even if they remain retained in history
 - rollback is a new run classified by `operation_kind = rollback`; it should prefer redeploying a prior known-good artifact rather than rebuilding or moving environment branches backward.
   - default meaning of "known good" is: a prior run for the same deployment, against the same normal live target and `publish_mode = normal`, with `final_outcome = succeeded` and all required blocking smoke or release-health checks passed for that run
   - stricter lane-specific rollback-candidate policy, such as soak windows or manual pinning, may layer on later but is not part of the base deployment contract
@@ -363,6 +367,7 @@ treated as planned policy, not open brainstorming:
 
 - promotion should follow the lane's declared `artifact_reuse_mode`
   - the sensible default is `same_artifact`, which reuses the exact previously built artifact across environments
+  - `same_artifact` is in policy only when the promoted artifact is environment-agnostic at build time; environment-specific values must be injected at deploy/runtime rather than baked into the artifact
   - `rebuild_per_stage` is an explicit lane exception mode for environments that genuinely require stage-specific build-time substitution
 - promotion should move one admitted release forward across distinct deployment ids that each name one explicit live target
   - for `same_artifact`, the admitted release is one immutable artifact
@@ -492,13 +497,22 @@ Common-case summary:
 - add `rollout_policy` only when the deployment is multi-component or otherwise needs explicit staged behavior
 - for protected/shared deployments, the common single-component path should still stay compact:
   - `promotion_lane`
+  - `lane_policy`
   - `environment_stage`
   - `admission_policy`
   - `protection_class`
   - one built-in publisher
   - explicit `smoke`
   - explicit `secret_requirements` even when empty
-- when a repo-wide default can safely derive something such as `lane_policy` from `promotion_lane`, the document prefers that documented derivation over making every deployment restate the same fact
+- for `shared_nonprod` and `production_facing`, `lane_policy` should be explicit deployment metadata rather than an implicit repo-default derivation
+
+Artifact portability rule:
+
+- `same_artifact` means the exact immutable artifact built for an admitted source revision is expected to be deployable in every stage of that lane without rebuilding
+- a lane must not declare `same_artifact` when stage-specific build-time substitution changes the emitted artifact, such as embedding different API origins, secrets, account ids, or feature wiring per stage
+- stage-specific values that differ across environments should instead come from deploy-time or runtime configuration resolved through authoritative deployment metadata, provider-native config, or approved secret/config backends
+- if a deployment family genuinely requires stage-specific build outputs, the lane should declare `artifact_reuse_mode = "rebuild_per_stage"` explicitly rather than relying on convention or hoping the artifacts are "close enough"
+- repo validation and design review should treat accidental stage-specific build inputs in a `same_artifact` lane as a policy violation, because that would make promotion semantics misleading even if the publish step still technically succeeds
 
 ## Deliberately Not Fixed Yet
 
@@ -589,6 +603,16 @@ Promotion clarification:
 - `promotion` must instead combine:
   - the recorded source-run artifact and source compatibility evidence
   - the target deployment's own admitted execution snapshot and target-environment policy context
+
+Minimum promotion-compatibility rule:
+
+- sharing a `promotion_lane` is necessary but not sufficient for cross-deployment promotion
+- the control plane should reject promotion unless source and target are compatible in the ways that matter for safe reuse:
+  - resolved component shape and artifact contract
+  - provider and publisher compatibility for the target publish path
+  - rollout semantics required by the target deployment
+  - any target-side `release_actions` or admission constraints that govern whether promotion is allowed
+- in other words, lane membership says two deployments participate in the same release flow; it does not by itself prove that any artifact from one deployment is valid for another without the target deployment's own compatibility checks
 
 That gives the user one command while keeping the execution boundary clear.
 
@@ -908,6 +932,14 @@ How preview target selection works:
   - for protected/shared release-path previews, that run context should derive from admitted-run identity or equivalent admitted lineage context rather than unadmitted branch state
 - the rule must be validated before any mutating step
 
+Preview identity rule:
+
+- a preview policy should define one deterministic preview derivation key, such as admitted run id, PR number, or branch name, rather than leaving preview identity ambiguous per invocation
+- by default, one derivation key maps to one active preview slot
+- a new publish to the same preview slot should supersede the prior preview for that slot rather than silently creating multiple indistinguishable previews
+- if a provider or workflow intentionally supports multiple concurrent previews for one deployment, the distinguishing key must still be explicit in policy so records, cleanup, URLs, and lock scope remain understandable
+- preview URLs, isolated target identity, cleanup ownership, and lock scope should all derive from that same policy-defined preview identity rather than from ad hoc implementation choices
+
 Preview metadata defaults:
 
 - the common default is that preview is unsupported unless the deployment opts in
@@ -935,6 +967,7 @@ deployment(
         "id": "pleomino-prod-pages",
         "account": "web-platform-prod",
     },
+    lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
@@ -967,9 +1000,8 @@ deployment(
 )
 ```
 
-This example intentionally relies on the repo-default derivation of `lane_policy` from
-`promotion_lane = "pleomino"`; a repo without that documented default should include an explicit
-`lane_policy` field here.
+This example includes `lane_policy` explicitly because protected/shared deployments should bind
+directly to the authoritative lane-policy object rather than rely on implicit repo defaults.
 
 This example is intentionally explicit, but in the common case the preview block can still rely on one
 documented provider-wide default policy once the deployment opts in.
@@ -1073,6 +1105,14 @@ Default diff-base policy:
 - CI pull-request use should compare against the merge-base with the PR target branch
 - post-merge automation should compare against the previous successful deploy baseline for the relevant environment branch, or the narrower per-deployment target baseline when that data is available
 - if no upstream or baseline can be determined, the tool should fail explicitly and ask for an override instead of silently choosing an unsafe diff base
+
+Baseline advancement rule:
+
+- for mutating `--from-changes`, the safer authoritative default is the narrower per-deployment last-successful baseline when that data is available
+- a successful run should advance the recorded baseline only for the deployment ids that actually completed successfully
+- a failed, cancelled, superseded, or skipped deployment must not have its baseline advanced just because another deployment in the same lane or batch succeeded
+- if the system also records a lane-level or batch-level marker for operator visibility, that marker must not replace the per-deployment baseline for future impact selection
+- this avoids the common monorepo failure mode where a partially successful batch causes later runs to diff past a deployment that still has never successfully received the relevant change
 
 Promotion-flow rule:
 
@@ -1271,7 +1311,7 @@ In this example:
 - `environment_stage` is included because lane ordering and default branch selection should be explicit deployment metadata too
 - `protection_class` is included because environment classification is part of the authoritative deployment contract
 - `promotion_lane` is included because this example represents a named environment that participates in protected/shared promotion policy
-- `lane_policy` is shown explicitly here to make the authoritative lane object concrete for onboarding, even though some repos may derive it from `promotion_lane` through one documented default convention
+- `lane_policy` is shown explicitly here because protected/shared deployments should bind directly to the authoritative lane object
 - deployments that are truly local-only or otherwise outside protected/shared promotion policy may omit `promotion_lane`, but that omission should be intentional and explained by the deployment's policy class
 - the smoke block uses a built-in smoke runner shape instead of a package-local executable hook because this example is compatible with protected/shared policy
 
@@ -1334,7 +1374,7 @@ How to read this:
 Policy evaluation order:
 
 - resolve the deployment's `promotion_lane`
-- resolve or derive the authoritative `lane_policy`
+- resolve the authoritative `lane_policy`
 - validate that the deployment's `environment_stage` is allowed by that `lane_policy`
 - resolve the deployment's `admission_policy`
 - validate the requested operation against both policy objects in that order:
@@ -1346,7 +1386,7 @@ Policy evaluation order:
     - required
     - should be a structured object, not a bare string
     - should include at least a stable provider-side identifier under `id`
-    - built-in providers must publish one canonical identity-field set and normalization rule in a single normative repo table or equivalent canonical design section
+    - built-in providers must publish one canonical identity-field set and normalization rule in the authoritative provider-capabilities contract
     - the default lock scope, normal live-target ownership rule, preview isolation, and deployment-record target identity must all key off that same provider-specific canonical identity rule
     - a provider adapter must treat all fields required by that canonical identity rule as part of the mutable live-target identity, not as optional commentary
     - additional non-identity provider metadata may exist, but must not silently participate in canonical target identity unless the provider's documented identity rule says so
@@ -1355,12 +1395,11 @@ Policy evaluation order:
     - identifies the independently promoted deployment family this deployment belongs to
     - should be explicit deployment metadata rather than inferred only from naming convention
   - `lane_policy`
-    - required for deployments that participate in protected/shared promotion policy unless a documented repo-default derivation from `promotion_lane` is in effect
+    - required for `shared_nonprod` and `production_facing`
     - should be a Buck-visible, repo-owned reference to the authoritative lane-policy object for that deployment family
     - should define ordered stages, branch mapping, allowed promotion edges, artifact reuse mode, and any stricter lane-specific compatibility or admission rules
     - the sensible common-case default is `artifact_reuse_mode = "same_artifact"`
     - lanes that require environment-specific build-time substitution must declare `artifact_reuse_mode = "rebuild_per_stage"` explicitly rather than inheriting same-artifact semantics by accident
-    - the sensible common-case default may derive `lane_policy` from `promotion_lane`, for example through one canonical repo convention, but that derivation itself must be documented and authoritative
   - `environment_stage`
     - required for deployments that participate in protected/shared promotion policy
     - identifies where this deployment sits within its promotion lane
@@ -1641,16 +1680,21 @@ Normalization transform:
   - serialize the canonical lock-key shape exactly as documented in the provider table below
 - implementations must not invent additional case-folding, alias expansion, or punctuation rewriting rules outside that documented canonical transform
 
-Canonical provider-target identity rules for initial built-in providers:
+Canonical provider-target identity rules:
 
-| Provider           | Required identity fields                | Normalization rule                                                                                                                                                                                                                                                         | Canonical lock-key shape                              |
-| ------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `cloudflare-pages` | `id`, `account`                         | canonical identity is the trimmed Pages project name plus trimmed account scope; for `shared_nonprod` and `production_facing`, `account` is required and `id` must be derived from that full canonical target identity rather than standing alone as an under-scoped alias | `cloudflare-pages:<account>/<id>`                     |
-| `s3-static`        | `id`, `bucket`, `prefix` when non-empty | canonical identity is the trimmed bucket name; if the mutable live target uses a configured publish prefix, `provider_target` must include that trimmed non-empty `prefix` and it becomes part of canonical identity; `id` must be derived from the same canonical target  | `s3-static:<bucket>` or `s3-static:<bucket>/<prefix>` |
-| `kubernetes`       | `id`, `cluster`, `namespace`, `release` | canonical identity is the trimmed `cluster/namespace/release` tuple; `id` must be derived from that same tuple                                                                                                                                                             | `kubernetes:<cluster>/<namespace>/<release>`          |
+- reviewed provider-capability entries are the normative source for provider-specific identity and lock-key semantics
+- the table below is authoritative only for providers that currently have reviewed capability entries
+- rows for future providers may appear here as provisional design illustrations, but they are not in-policy until the provider-capabilities doc says so explicitly
 
-For any built-in provider added later, this same table or its direct successor must be updated before the
-provider is considered fully in policy for protected/shared deployment use.
+| Provider           | Required identity fields                 | Normalization rule                                                                                                                                                                                                                                                         | Canonical lock-key shape                 |
+| ------------------ | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `cloudflare-pages` | `id`, `account`                          | canonical identity is the trimmed Pages project name plus trimmed account scope; for `shared_nonprod` and `production_facing`, `account` is required and `id` must be derived from that full canonical target identity rather than standing alone as an under-scoped alias | `cloudflare-pages:<account>/<id>`        |
+| `s3-static`        | provisional future-provider illustration | provisional future-provider illustration                                                                                                                                                                                                                                   | provisional future-provider illustration |
+| `kubernetes`       | provisional future-provider illustration | provisional future-provider illustration                                                                                                                                                                                                                                   | provisional future-provider illustration |
+
+For any built-in provider added later, the reviewed provider-capabilities doc must be updated before the
+provider is considered fully in policy for protected/shared deployment use, and this table should be kept
+consistent with that reviewed entry when the provider becomes normative here.
 
 Normalization rule:
 
@@ -1785,6 +1829,7 @@ deployment(
         "id": "pleomino-prod-pages",
         "account": "web-platform-prod",
     },
+    lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
@@ -1812,9 +1857,8 @@ deployment(
 )
 ```
 
-This example intentionally relies on the repo-default derivation of `lane_policy` from
-`promotion_lane = "pleomino"`; a repo without that documented default should include an explicit
-`lane_policy` field here.
+This example includes `lane_policy` explicitly because protected/shared deployments should bind
+directly to the authoritative lane-policy object rather than rely on implicit repo defaults.
 
 What this means in plain language:
 
@@ -1848,6 +1892,10 @@ Why you would want this:
 
 #### Example: S3 Static Site With Bucket Setup
 
+This example is intentionally illustrative of a future reviewed provider shape.
+It shows how the deployment model could represent a protected/shared `s3-static` deployment, but it
+should not be read as claiming that `s3-static` is currently a reviewed in-policy protected/shared provider.
+
 ```python
 deployment(
     name = "deploy",
@@ -1856,6 +1904,7 @@ deployment(
         "id": "docs-site-prod",
         "bucket": "docs-site-prod",
     },
+    lane_policy = "//build-tools/deploy/lanes:docs-site",
     admission_policy = "//build-tools/deploy/policies:docs_site_prod_release",
     environment_stage = "prod",
     protection_class = "production_facing",
@@ -1883,9 +1932,8 @@ deployment(
 )
 ```
 
-This example intentionally relies on the repo-default derivation of `lane_policy` from
-`promotion_lane = "docs-site"`; a repo without that documented default should include an explicit
-`lane_policy` field here.
+This example includes `lane_policy` explicitly because protected/shared deployments should bind
+directly to the authoritative lane-policy object rather than rely on implicit repo defaults.
 
 What this means in plain language:
 
@@ -1950,6 +1998,10 @@ Why you would want this:
 
 #### Example: Shared Observability Deployment With Platform Setup
 
+This example is intentionally illustrative of a future reviewed provider shape.
+It shows how the deployment model could represent a protected/shared `kubernetes` deployment, but it
+should not be read as claiming that `kubernetes` is currently a reviewed in-policy protected/shared provider.
+
 ```python
 deployment(
     name = "deploy",
@@ -1960,6 +2012,7 @@ deployment(
         "namespace": "shared-observability",
         "release": "otel-collector",
     },
+    lane_policy = "//build-tools/deploy/lanes:shared-observability",
     admission_policy = "//build-tools/deploy/policies:shared_observability_prod_release",
     environment_stage = "prod",
     protection_class = "production_facing",
@@ -1987,9 +2040,8 @@ deployment(
 )
 ```
 
-This example intentionally relies on the repo-default derivation of `lane_policy` from
-`promotion_lane = "shared-observability"`; a repo without that documented default should include an
-explicit `lane_policy` field here.
+This example includes `lane_policy` explicitly because protected/shared deployments should bind
+directly to the authoritative lane-policy object rather than rely on implicit repo defaults.
 
 What this means in plain language:
 
@@ -2109,15 +2161,19 @@ Why this matters:
 
 This table is meant to be a fast pattern-matching aid.
 
-| Shape                                   | Provider                            | Provisioner                        | Publisher                             | Typical use case                                                          |
-| --------------------------------------- | ----------------------------------- | ---------------------------------- | ------------------------------------- | ------------------------------------------------------------------------- |
-| Existing Cloudflare Pages project       | `cloudflare-pages`                  | `None`                             | `wrangler-pages`                      | Normal static-site or PWA releases where the Pages project already exists |
-| Repo-owned Cloudflare Pages environment | `cloudflare-pages`                  | `cdktf-stack` or `terraform-stack` | `wrangler-pages`                      | Create or update the Pages project and DNS, then publish the app          |
-| Existing S3 static site                 | `s3-static`                         | `None`                             | `aws-s3-sync`                         | Upload a new build to an already-prepared bucket                          |
-| Repo-owned S3 static site               | `s3-static`                         | `terraform-stack`                  | `aws-s3-sync`                         | Create bucket, policy, and CDN wiring, then upload the build              |
-| Kubernetes service rollout              | `kubernetes`                        | `cdktf-stack` or `terraform-stack` | `helm-release` or documented built-in | Prepare namespace and ingress, then release app workloads                 |
-| Shared observability stack              | `kubernetes`                        | `terraform-stack` or `cdktf-stack` | `helm-release`                        | Roll out shared collectors, agents, or platform monitoring services       |
-| External vendor dependency              | not usually modeled as a deployment | usually none                       | none                                  | A service we depend on but do not deploy from this repo                   |
+Only the rows backed by reviewed provider-capability entries should be read as currently reviewed
+protected/shared shapes. The `s3-static` and `kubernetes` rows below are illustrative future provider
+shapes until the provider-capabilities doc says otherwise.
+
+| Shape                                   | Provider                            | Provisioner                        | Publisher                             | Typical use case                                                                                        |
+| --------------------------------------- | ----------------------------------- | ---------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Existing Cloudflare Pages project       | `cloudflare-pages`                  | `None`                             | `wrangler-pages`                      | Normal static-site or PWA releases where the Pages project already exists                               |
+| Repo-owned Cloudflare Pages environment | `cloudflare-pages`                  | `cdktf-stack` or `terraform-stack` | `wrangler-pages`                      | Create or update the Pages project and DNS, then publish the app                                        |
+| Existing S3 static site                 | `s3-static`                         | `None`                             | `aws-s3-sync`                         | Illustrative future provider shape: upload a new build to an already-prepared bucket                    |
+| Repo-owned S3 static site               | `s3-static`                         | `terraform-stack`                  | `aws-s3-sync`                         | Illustrative future provider shape: create bucket, policy, and CDN wiring, then upload the build        |
+| Kubernetes service rollout              | `kubernetes`                        | `cdktf-stack` or `terraform-stack` | `helm-release` or documented built-in | Illustrative future provider shape: prepare namespace and ingress, then release app workloads           |
+| Shared observability stack              | `kubernetes`                        | `terraform-stack` or `cdktf-stack` | `helm-release`                        | Illustrative future provider shape: roll out shared collectors, agents, or platform monitoring services |
+| External vendor dependency              | not usually modeled as a deployment | usually none                       | none                                  | A service we depend on but do not deploy from this repo                                                 |
 
 Plain-language reading guide:
 
@@ -2468,6 +2524,7 @@ deployment(
         "id": "pleomino-prod-pages",
         "account": "web-platform-prod",
     },
+    lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
@@ -2491,9 +2548,8 @@ deployment(
 )
 ```
 
-This example intentionally relies on the repo-default derivation of `lane_policy` from
-`promotion_lane = "pleomino"`; a repo without that documented default should include an explicit
-`lane_policy` field here.
+This example includes `lane_policy` explicitly because protected/shared deployments should bind
+directly to the authoritative lane-policy object rather than rely on implicit repo defaults.
 
 Suggested package files:
 
@@ -2592,7 +2648,6 @@ Multi-component lifecycle semantics:
 
 - components are still built and resolved independently
 - the provider adapter must define whether publish executes serially or in parallel for a supported multi-component deployment
-- unless a deployment or provider capability entry explicitly documents a different default, the fallback deployment-level policy is `ordered_best_effort`
 - `ordered_best_effort` means:
   - components publish in a deterministic adapter-defined order
   - a later component does not start until the earlier component's publish step has returned
@@ -2610,7 +2665,7 @@ First-class rollout-shape policy:
 - a multi-component deployment may explicitly declare component ordering, dependency barriers, or phased smoke checkpoints in deployment metadata
 - a single-component deployment may also declare rollout semantics when publication is intentionally more sophisticated than the provider default, such as canary, blue/green, phased traffic shift, or staged store release
 - when such rollout metadata is present, adapters must either honor it or reject the deployment as unsupported
-- when rollout metadata is absent, the provider capability entry's documented default rollout mode applies; if it does not name one, the fallback is `ordered_best_effort`
+- when rollout metadata is absent, the reviewed provider capability entry's explicit default rollout mode applies
 - the rollout-mode vocabulary is closed and shared across providers:
   - `all_at_once`
   - `all_or_nothing`
@@ -2702,22 +2757,25 @@ That keeps the model future-proof without forcing every provider to support ever
 
 The deployment macro and deploy CLI should validate provider-specific capability rules before publication begins.
 
-Initial provider capability registry:
+Illustrative provider capability summary:
 
-| Provider           | Supported component kinds                      | Component cardinality                                       | Mixed-kind rules                                                                                               | Preview support                                   | Protected/shared rollout support                                       | Default rollout mode     | Effective target boundary                                                          | Allowed built-in publisher types    | Allowed built-in provisioner types     | Allowed built-in `release_actions`                            | Default smoke class guidance             |
-| ------------------ | ---------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------- | ------------------------------------------------------------- | ---------------------------------------- |
-| `cloudflare-pages` | exactly one `static-webapp`                    | exactly 1 component                                         | no mixed kinds; exactly one `static-webapp`                                                                    | yes, only with explicit preview policy            | `all_at_once`                                                          | `all_at_once`            | one Pages project identity from canonical `provider_target`                        | `wrangler-pages`                    | `cdktf-stack`, `terraform-stack`       | none by default                                               | `static-webapp` HTTP smoke               |
-| `s3-static`        | exactly one `static-webapp`                    | exactly 1 component                                         | no mixed kinds; exactly one `static-webapp`                                                                    | provider-dependent; unsupported unless documented | `all_at_once`                                                          | `all_at_once`            | one bucket or bucket-plus-prefix identity from canonical `provider_target`         | `aws-s3-sync`                       | `terraform-stack`, documented built-in | none by default                                               | `static-webapp` HTTP smoke               |
-| `kubernetes`       | `service`, `third-party-service`, `ssr-webapp` | one or more components when they share one release boundary | mixed kinds allowed only when all components publish through one Helm release and one effective mutable target | yes, only with explicit preview policy            | `all_at_once`, `phased`, `canary`, `blue_green`, `ordered_best_effort` | `all_at_once`            | one release boundary defined by the canonical `cluster/namespace/release` identity | `helm-release`, documented built-in | `cdktf-stack`, `terraform-stack`       | documented built-in subset such as migration, warmup, cutover | `service` or `third-party-service` smoke |
-| `custom-platform`  | provider-defined built-in subset only          | documented built-in subset only                             | documented built-in subset only                                                                                | only when the provider capability entry says so   | documented built-in subset only                                        | documented built-in only | documented built-in target boundary only                                           | documented built-in only            | documented built-in only               | documented built-in subset only                               | documented built-in smoke class only     |
+- the reviewed initial provider for protected/shared Phase 1 is `cloudflare-pages`
+- additional rows below illustrate how the model can express other providers, but they should not be read as reviewed in-policy support unless the provider-capabilities doc says so explicitly
 
-Registry rule:
+| Provider           | Supported component kinds        | Component cardinality            | Mixed-kind rules                            | Preview support                        | Protected/shared rollout support | Default rollout mode | Effective target boundary                                   | Allowed built-in publisher types | Allowed built-in provisioner types | Allowed built-in `release_actions` | Default smoke class guidance     |
+| ------------------ | -------------------------------- | -------------------------------- | ------------------------------------------- | -------------------------------------- | -------------------------------- | -------------------- | ----------------------------------------------------------- | -------------------------------- | ---------------------------------- | ---------------------------------- | -------------------------------- |
+| `cloudflare-pages` | exactly one `static-webapp`      | exactly 1 component              | no mixed kinds; exactly one `static-webapp` | yes, only with explicit preview policy | `all_at_once`                    | `all_at_once`        | one Pages project identity from canonical `provider_target` | `wrangler-pages`                 | `cdktf-stack`, `terraform-stack`   | none by default                    | `static-webapp` HTTP smoke       |
+| `s3-static`        | illustrative only until reviewed | illustrative only until reviewed | illustrative only until reviewed            | illustrative only until reviewed       | illustrative only until reviewed | illustrative only    | illustrative only until reviewed                            | illustrative only until reviewed | illustrative only until reviewed   | illustrative only until reviewed   | illustrative only until reviewed |
+| `kubernetes`       | illustrative only until reviewed | illustrative only until reviewed | illustrative only until reviewed            | illustrative only until reviewed       | illustrative only until reviewed | illustrative only    | illustrative only until reviewed                            | illustrative only until reviewed | illustrative only until reviewed   | illustrative only until reviewed   | illustrative only until reviewed |
+| `custom-platform`  | illustrative only until reviewed | illustrative only until reviewed | illustrative only until reviewed            | illustrative only until reviewed       | illustrative only until reviewed | illustrative only    | illustrative only until reviewed                            | illustrative only until reviewed | illustrative only until reviewed   | illustrative only until reviewed   | illustrative only until reviewed |
 
-- this registry is authoritative for what each built-in provider supports in the deployment contract
-- a provider adapter must not widen support beyond this registry without updating the canonical design contract
-- the generic deployment model defines what is expressible in principle, but this registry defines what each built-in provider actually supports
+Summary-table rule:
+
+- this table is an onboarding summary, not the normative capability registry
+- [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md) is the authoritative reviewed contract for built-in provider support
+- a provider adapter must not widen support beyond that capability contract without updating the authoritative provider-capability entry first
+- the generic deployment model defines what is expressible in principle, but the provider-capabilities doc defines what each built-in provider actually supports
 - a deployment may therefore be valid in the abstract model but still rejected by a specific provider capability entry; that is expected, not a contradiction
-- the registry must define the provider's default rollout mode, component cardinality, mixed-kind rules, effective target boundary, and allowed built-in `release_actions` whenever those facts matter to validation, locking, replay, or rollout semantics
 
 ## Deployment Lifecycle
 
@@ -3021,6 +3079,7 @@ deployment(
         "id": "pleomino-dev-pages",
         "account": "web-platform-dev",
     },
+    lane_policy = "//build-tools/deploy/lanes:pleomino",
     admission_policy = "//build-tools/deploy/policies:pleomino_dev_release",
     environment_stage = "dev",
     protection_class = "shared_nonprod",
@@ -3050,9 +3109,8 @@ deployment(
 )
 ```
 
-This example intentionally relies on the repo-default derivation of `lane_policy` from
-`promotion_lane = "pleomino"`; a repo without that documented default should include an explicit
-`lane_policy` field here.
+This example includes `lane_policy` explicitly because protected/shared deployments should bind
+directly to the authoritative lane-policy object rather than rely on implicit repo defaults.
 
 This example is intentionally non-production:
 
@@ -3220,7 +3278,7 @@ Release-admission contract for protected/shared environments:
     - the selected artifact or revision still matches the environment's promotion and admission policy
     - for protected/shared `--publish-only`, retry, rollback, and other immutable-artifact reuse paths, the control plane should replay the recorded deployment snapshot for the selected source run rather than silently re-reading current repo metadata or provider config as if it were the original deployment state
     - for source-run reuse across deployments, the source run must come from the same compatible `promotion_lane`, and the requested operation kind must be valid for that source/target pairing
-    - for `promotion`, the target lane policy and environment-branch state are authoritative for what is currently promotable; `--source-run-id` is valid only when it names the admitted run currently nominated by that branch/lane policy, not an arbitrary retained historical run in the lane
+    - for `promotion`, the target lane policy and environment-branch state are authoritative for what is currently promotable; `--source-run-id` is valid only when it names an earlier admitted run that remains eligible under the lane's current promotion policy
   - for `--provision-only` and other non-publishing mutating runs:
     - artifact attestation is not required
     - admission still requires branch, approval, lane, target, and locking policy to pass before mutation
@@ -3335,9 +3393,8 @@ deployment(
 )
 ```
 
-This example intentionally relies on the repo-default derivation of `lane_policy` from
-`promotion_lane = "pleomino"`; a repo without that documented default should include an explicit
-`lane_policy` field here.
+This example includes `lane_policy` explicitly because protected/shared deployments should bind
+directly to the authoritative lane-policy object rather than rely on implicit repo defaults.
 
 Normal lock-scope story:
 
@@ -4385,7 +4442,7 @@ def cloudflare_static_pwa_deployment(
         if admission_policy == None:
             fail("protected/shared deployments must set admission_policy")
         if lane_policy == None:
-            lane_policy = "//build-tools/deploy/lanes:%s" % promotion_lane
+            fail("protected/shared deployments must set lane_policy")
     deployment(
         name = name,
         provider = "cloudflare-pages",
@@ -4413,8 +4470,8 @@ def cloudflare_static_pwa_deployment(
 ```
 
 This helper shape keeps the local-only callsite lightweight while making the protected/shared path safe
-by default: required protected/shared policy fields must be present, and `lane_policy` is derived from
-`promotion_lane` only through one documented repo convention.
+by default: required protected/shared policy fields must be present, including an explicit
+authoritative `lane_policy` reference.
 
 Use in a deployment package:
 
@@ -4749,9 +4806,8 @@ deployment(
 )
 ```
 
-This example intentionally relies on the repo-default derivation of `lane_policy` from
-`promotion_lane = "pleomino"`; a repo without that documented default should include an explicit
-`lane_policy` field here.
+This example includes `lane_policy` explicitly because protected/shared deployments should bind
+directly to the authoritative lane-policy object rather than rely on implicit repo defaults.
 
 What this means:
 
