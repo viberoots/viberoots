@@ -26,6 +26,7 @@ design has been explicitly updated first.
 - One deployment id owns one normal mutable live target by default.
 - Reviewed migration or alias exceptions must be first-class control-plane objects with explicit scope, lock sharing, and expiry or completion semantics.
 - `--publish-only` is exact-artifact reuse or delayed exact-artifact publish, never implicit rebuild.
+- For protected/shared mutation, `--provision-only` must still bind to one admitted source revision and frozen execution snapshot, even when no artifact is required.
 - For `shared_nonprod` and `production_facing`, immutable-reuse publish paths must resolve to one authoritative admitted source run and its frozen execution snapshot.
 - Protected/shared rollback requires an explicit `--source-run-id` selecting the prior admitted run to reuse.
 - Same-deployment source-run reuse with `publish_mode = normal` is `retry` unless the operator explicitly requests `--rollback`.
@@ -34,6 +35,7 @@ design has been explicitly updated first.
 - Default rollback candidates are usable only when any already-applied stateful `release_actions` remain rollback-compatible under their declared data-compatibility posture.
 - Protected/shared immutable-reuse flows must replay the recorded execution snapshot rather than reinterpret current repo state.
 - Protected/shared replay snapshots must record non-secret secret/config contract references or versions, not secret values.
+- Protected/shared deployment metadata must declare both secret and non-secret runtime-config requirements explicitly, with `{}` as the reviewable empty value for each contract surface.
 - Same-deployment protected/shared `retry` and `rollback` reuse the recorded admitted secret/config references by default; `promotion` uses the target deployment's newly admitted target-environment references.
 - Protected/shared exact-artifact selectors are in policy only when they deterministically resolve to exactly one admitted source run plus its recorded execution snapshot.
 - Promotion between deployment ids that resolve to the same authoritative compatible `lane_policy` must follow that lane's declared `artifact_reuse_mode`.
@@ -79,8 +81,10 @@ design has been explicitly updated first.
 - Every protected/shared mutating run freezes one immutable execution snapshot at admission before queueing or locking.
 - Protected/shared first-run deploys use two admission stages: source admission establishes the admissible revision and trusted artifact; target-environment run admission freezes the execution snapshot for the mutating publish run.
 - The mutating publish phase consumes an admitted immutable artifact.
+- Protected/shared non-publishing mutation, including `--provision-only`, still consumes an admitted source revision plus the frozen execution snapshot for that run; it is not an unbound mutable metadata action.
 - Fresh workstation builds are out of policy for protected/shared mutation.
 - Ad hoc control-plane rebuilds for mutation are out of policy unless the lane explicitly uses reviewed `rebuild_per_stage` promotion flow.
+- Artifact attestation verification must enforce the admission policy's reviewed trust contract for accepted builder identities, provenance format, and artifact-to-source binding.
 - Rollback may use an earlier retained admitted run even when the branch head has moved forward, but the current branch/lane state must still authorize performing rollback.
 - Rollback must also honor the recorded data-compatibility posture of any already-applied stateful `release_actions`; unsafe rollback must fail closed rather than re-publish an older artifact by default.
 - Admission must preserve enough approval evidence to explain why the run was authorized.

@@ -491,7 +491,8 @@ treated as settled policy, not open brainstorming:
 - `--provision-only` should not build or publish
   - the simple default is `metadata_only`
   - a reviewed provisioner may use `immutable_resolved_inputs`, but it must not trigger a rebuild or depend on mutable local build state
-  - for `shared_nonprod` and `production_facing`, that reviewed path should require an explicit admitted source-run selector; without one, the supported path remains `metadata_only`
+  - for `shared_nonprod` and `production_facing`, every mutating `--provision-only` run must still bind to one admitted source revision and one frozen execution snapshot
+  - for `shared_nonprod` and `production_facing`, a reviewed `immutable_resolved_inputs` path should require an explicit admitted source-run selector; for `metadata_only`, the control plane may derive the admitted source revision from the current lane/admission state for that run, but it must still freeze and record that revision explicitly before mutation
 - `protection_class` should use a closed enum: `local_only`, `shared_nonprod`, `production_facing`
 
 These decisions are now reflected in the detailed design sections below. The remaining work is to
@@ -513,6 +514,10 @@ Common-case summary:
   - `provider_target`
   - one component
   - one publisher
+  - plus the schema-required outer fields that usually stay at safe defaults:
+    - `protection_class = "local_only"`
+    - `secret_requirements = {}`
+    - `runtime_config_requirements = {}`
 - add a `provisioner` only when the destination really needs setup owned by the deployment
 - add `preview` only when preview is intentionally supported
 - add `rollout_policy` only when the deployment is multi-component or otherwise needs explicit staged behavior
@@ -524,6 +529,7 @@ Common-case summary:
   - one built-in publisher
   - explicit `smoke`
   - explicit `secret_requirements` even when empty
+  - explicit `runtime_config_requirements` even when empty
 - for `shared_nonprod` and `production_facing`, `lane_policy` should be explicit deployment metadata rather than an implicit repo-default derivation
 
 Artifact portability rule:
@@ -595,7 +601,7 @@ Control-plane worker responsibilities for protected/shared mutation:
    - for a first-run protected/shared publish, load the admitted frozen execution snapshot for that run
    - for `retry`, `rollback`, or any provisioner using `immutable_resolved_inputs`, load the admitted immutable artifact plus the recorded source-run snapshot metadata needed for replay
    - for `promotion`, load the admitted immutable artifact and any source-run compatibility evidence needed for promotion validation, but mutate using the target deployment's own admitted execution snapshot and current target-environment policy context
-   - for `metadata_only` provision-only runs, load only the frozen metadata and policy context captured for that run
+   - for `metadata_only` provision-only runs, load the frozen metadata, admitted source revision, and admitted secret/runtime-config contract references captured for that run, but no artifact
 7. record lifecycle progress in the authoritative deployment record
 8. run optional provisioning
 9. run optional `release_actions` declared for the `pre_publish` phase
@@ -738,11 +744,14 @@ Flag interaction rules:
 - `--provision-only` still performs `validate`, but it must not build, resolve artifacts, or publish
   - it must not run `release_actions`, because no publish-phase lifecycle is being executed
   - the default provisioner input class is `metadata_only`
-    - provisioners consume only stable declared deployment metadata
+    - provisioners consume only stable declared deployment metadata plus the admitted source revision and admitted secret/runtime-config contract references frozen for that run
   - a reviewed provisioner may instead declare `immutable_resolved_inputs`
     - it may consume already-built immutable artifact descriptors or recorded resolved inputs
     - it must not trigger a rebuild or rely on mutable local build state
-    - for `shared_nonprod` and `production_facing`, that reviewed path must require an explicit admitted source-run selector such as `--source-run-id <deploy-run-id>`; otherwise the run stays in `metadata_only`
+    - for `shared_nonprod` and `production_facing`, that reviewed path must require an explicit admitted source-run selector such as `--source-run-id <deploy-run-id>`
+    - for `shared_nonprod` and `production_facing`, `metadata_only` does not mean "unbound to source"; it means "no artifact input"
+      - the control plane must still admit one source revision under the deployment's lane and admission policy
+      - it must freeze one execution snapshot for that exact provision-only run before queueing or mutation
     - for `local_only`, the same reviewed path should require an explicit immutable selector such as `--artifact-ref <artifact-ref>` or an equivalent exact local record reference; it must not implicitly reuse "whatever was built most recently"
 - `--publish-only` still performs `validate` and `resolve`, but it must skip provisioning
   - for protected/shared immutable-reuse flows, `validate` means checking selector validity plus narrow current invariants such as deployment ownership, lock scope, provider identity, publisher compatibility, and current admission status
@@ -842,10 +851,15 @@ If a reviewed protected/shared provisioner needs `immutable_resolved_inputs` rat
 `metadata_only`, the operator contract should add an explicit admitted source-run selector such as
 `deploy pleomino-prod --provision-only --source-run-id <deploy-run-id>`.
 
+Even in the default protected/shared `metadata_only` case, the control plane must still admit and record
+one concrete source revision for the provision-only run before mutation begins. The difference is that the
+run does not require an artifact input, not that it becomes detached from revision-backed provenance.
+
 Execution rule:
 
 - `--provision-only` loads no artifact by default
-- it loads the admitted source-run context required by the provisioner's declared input class only when that input class is `immutable_resolved_inputs`
+- for protected/shared mutation, it still loads the admitted source revision, frozen execution snapshot, and admitted runtime-config/secret contract references for that run
+- it loads artifact-derived source-run context only when the provisioner's declared input class is `immutable_resolved_inputs`
 
 Plain-language version:
 
@@ -1076,6 +1090,7 @@ Preview cleanup contract:
   - `publish_mode = preview`
   - the declared normal target identity
   - the isolated preview target identity being destroyed
+  - either the source revision that created that preview or a stable reference to the preview lineage or source run being cleaned up
   - the requesting identity
   - the executing identity
   - the reason for cleanup such as TTL expiry, PR close, manual cleanup, or superseding preview
@@ -1356,6 +1371,11 @@ Typed policy-object minimums:
   - required approvals
   - artifact-attestation requirements for publishing runs
   - any preview-admission constraints
+  - the artifact-attestation requirements should define the minimum trust contract for publishing runs:
+    - which builder identity or identity set is trusted to produce admissible artifacts
+    - which provenance or predicate format is accepted
+    - how artifact identity must bind back to source revision plus build inputs
+    - what verifier behavior is required when attestation material is expired, revoked, or no longer trusted
 - repo validation should verify that referenced policy objects exist and are structurally valid
 - the shared control plane should be the final enforcer for mutating admission using those same referenced objects
 
@@ -1402,6 +1422,7 @@ Policy evaluation order:
 - the shared control plane is the final mutating-policy gate and must not silently reinterpret these referenced policy objects differently from repo validation
 - unless `admission_policy` explicitly defines narrower preview rules, protected/shared preview runs should inherit the same target-environment branch/check/approval requirements as normal publishes for that deployment
 - recommended conventions for the low-level deployment shape are:
+  - illustrative snippets later in this document may omit `runtime_config_requirements = {}` when the example is focused on another concept, but the schema and contract still treat that explicit empty object as the normal no-runtime-config value
   - `provider_target`
     - required
     - should be a structured object, not a bare string
@@ -1506,6 +1527,19 @@ Policy evaluation order:
     - `required`
     - optional environment or preview qualifier when requirements differ by run mode
   - should remain Buck-visible metadata; secret material itself must not appear there
+- `runtime_config_requirements`
+  - required for all deployments
+  - `{}` is the sensible default when a deployment has no admitted non-secret runtime-config inputs
+  - for `shared_nonprod` and `production_facing`, that explicit empty value is part of the reviewable contract, not optional boilerplate
+  - should declare the non-secret runtime configuration contracts whose resolved selectors or fingerprints must be admitted for deterministic publish, provision, smoke, and replay behavior
+  - should be a dictionary keyed by stable logical config name, and each entry should still include that same `name` explicitly so extractors, validators, and records all see one self-describing shape
+  - each entry should include at least:
+    - `name`
+    - `step`
+    - `contract_id`
+    - `required`
+    - optional source, mode, or preview qualifier when requirements differ by run mode
+  - should remain Buck-visible metadata; secret values still belong in secret backends, not here
   - `release_actions`
     - optional
     - when present, should describe controlled release-time actions that are neither infrastructure convergence nor ordinary publish nor smoke
@@ -3296,8 +3330,8 @@ Release-admission contract for protected/shared environments:
 
 - a run is eligible to mutate a protected or shared environment only when all of the following are true:
   - one immutable execution snapshot has been frozen for that admitted run before any waiting or mutating step begins
-    - the snapshot should preserve the admitted deployment metadata, provider-config snapshot or fingerprint, resolved policy contents, and any selected artifact inputs needed for execution
-  - for `deploy` and `promotion`, the source revision comes from the allowed environment branch for that deployment lane
+    - the snapshot should preserve the admitted deployment metadata, provider-config snapshot or fingerprint, resolved policy contents, admitted secret/runtime-config contract references, and any selected artifact inputs needed for execution
+  - for `deploy`, `promotion`, and protected/shared `metadata_only` `--provision-only`, the admitted source revision comes from the allowed environment branch for that deployment lane
   - for `retry`, the selected source run is an earlier admitted run for the same deployment and target environment, and replay remains branch-independent unless the admission policy explicitly sets `retry_branch_policy = branch_coupled`
   - for `rollback`, the current lane policy and environment-branch state must authorize performing a rollback for that deployment, but the selected rollback source run may be an earlier retained admitted run for the same deployment rather than the current branch head revision
 - required checks for that environment have passed for the admitted revision or admitted reusable artifact, as applicable to the run kind
@@ -3308,15 +3342,17 @@ Release-admission contract for protected/shared environments:
     - artifact provenance is present and valid for the intended target
     - for protected/shared publish, the artifact was produced by trusted CI from the source-admitted revision
     - the reusable artifact attestation binds artifact identity to source revision plus build inputs
-    - the shared control plane verifies that artifact attestation before publish
+    - the shared control plane verifies that artifact attestation before publish against the admission policy's reviewed trust contract for builder identity, accepted provenance format, and artifact-to-source binding
     - the selected artifact or revision still matches the environment's promotion and admission policy
     - for protected/shared `--publish-only`, retry, rollback, and other immutable-artifact reuse paths, the control plane should replay the recorded deployment snapshot for the selected source run rather than silently re-reading current repo metadata or provider config as if it were the original deployment state
     - for source-run reuse across deployments, the source run must come from another deployment in the same authoritative compatible `lane_policy`, and the requested operation kind must be valid for that source/target pairing
     - for `promotion`, the target lane policy and environment-branch state are authoritative for what is currently promotable; `--source-run-id` is valid only when it names an earlier admitted run that remains eligible under the lane's current promotion policy
   - for `--provision-only` and other non-publishing mutating runs:
     - artifact attestation is not required
-    - admission still requires branch, approval, lane, target, and locking policy to pass before mutation
-    - if a reviewed provisioner input class uses `immutable_resolved_inputs`, the run must carry an explicit admitted source-run selector such as `--source-run-id <deploy-run-id>`; otherwise the supported path remains `metadata_only`
+    - admission still requires branch, approval, lane, target, locking policy, and admitted runtime-config/secret contract completeness to pass before mutation
+    - even in `metadata_only`, the run must carry one admitted source revision and one frozen execution snapshot for that specific provision-only mutation
+    - if a reviewed provisioner input class uses `immutable_resolved_inputs`, the run must carry an explicit admitted source-run selector such as `--source-run-id <deploy-run-id>`
+      - that selector must identify an admitted run that remains valid for the current lane/admission state of the target deployment
   - any explicit deployment prerequisites are satisfied according to their declared mode
     - for `health_gated`, that means a fresh health verdict at admission time unless explicitly documented provider-specific evidence is accepted as equivalent
 - approval evaluation should be operation-kind-aware:
@@ -3671,6 +3707,7 @@ The deployment rule should expose enough metadata for repo tooling to retrieve:
 - protection/environment classification
 - preview policy metadata and preview-target identity or derivation policy when preview is supported
 - non-secret secret-requirement metadata when secrets are needed by publish, provision, or smoke steps
+- non-secret runtime-config requirement metadata when publish, provision, smoke, or replay semantics depend on admitted runtime config
 - explicit deployment prerequisites when present
 - component list
 - provisioner config
@@ -3780,6 +3817,7 @@ What belongs in deployment metadata:
 - protection/environment classification
 - components
 - provisioner and publisher config references
+- non-secret runtime-config contract requirements
 - package-relative file paths
 - non-secret identifiers such as project names, domains, or feature flags
 
@@ -3807,6 +3845,16 @@ Replay rule for runtime inputs:
 - same-deployment `retry` and `rollback` should, by default, reuse the recorded secret/config references from the admitted source-run snapshot so replay semantics stay deterministic
 - `promotion` should use the target deployment's own newly admitted target-environment secret/config references rather than replaying the source deployment's environment-specific refs
 - if a referenced secret/config version is no longer available at execution time, the run should fail closed rather than silently substituting a newer version
+
+Policy for non-secret runtime config:
+
+- deployments should expose non-secret `runtime_config_requirements` metadata, with `{}` as the normal explicit value when no admitted runtime-config contract is required
+- validation for `shared_nonprod` and `production_facing` should fail if a step consumes non-secret runtime config but `runtime_config_requirements` does not declare that requirement
+- same-artifact promotion depends on this contract surface being explicit:
+  - environment-specific runtime config is allowed
+  - undeclared environment-specific build-time substitution in a `same_artifact` lane is not
+- protected/shared admission and replay should preserve the admitted runtime-config selector, version, or fingerprint that was actually used for the run
+- if a required non-secret runtime-config version is no longer available at execution time, the run should fail closed rather than silently substituting a newer value
 
 Policy:
 
@@ -3851,11 +3899,45 @@ Canonical `secret_requirements` shape:
 }
 ```
 
+Canonical `runtime_config_requirements` shape:
+
+- `runtime_config_requirements` should be a dictionary keyed by stable logical config name
+- each entry should include:
+  - `name`
+  - `step`
+  - `contract_id`
+  - `required`
+- entries may additionally include:
+  - `source`
+  - `preview_variant`
+  - `notes`
+- example:
+
+```json
+{
+  "public_api_origin": {
+    "name": "public_api_origin",
+    "step": "publish",
+    "contract_id": "runtime/public-api-origin",
+    "required": true,
+    "source": "deployment-metadata-derived"
+  },
+  "smoke_host_header": {
+    "name": "smoke_host_header",
+    "step": "smoke",
+    "contract_id": "runtime/smoke-host-header",
+    "required": false,
+    "preview_variant": "isolated-preview"
+  }
+}
+```
+
 Anti-patterns:
 
 - embedding credentials in `TARGETS`
 - embedding credentials in provider config files
 - teaching provider adapters to infer secrets from checked-in repo state
+- teaching publishers or smoke runners to depend on undeclared non-secret runtime configuration that admission and replay never recorded
 
 ## Deployment Record And Provenance
 
@@ -3877,6 +3959,7 @@ The design intentionally separates reusable artifact attestation from deployment
 - reusable artifact attestation is for build trust
   - it should bind artifact identity to source revision plus build inputs
   - it should remain valid when the same artifact is promoted across deployment ids and environments
+  - the admission policy should define the minimum trust contract for accepting that attestation, including trusted builder identity, accepted provenance format, required artifact-to-source binding, and verifier behavior on expired, revoked, or no-longer-trusted attestations
 - deployment-run provenance is for release trust
   - it should bind the deployment metadata fingerprint, provider-config fingerprint, target identity, approvals, and publish result for one concrete run
   - it should make it obvious when the same artifact identity was published under different environment-specific deployment inputs
@@ -3898,6 +3981,7 @@ Minimum replay-snapshot contract for immutable-artifact reuse:
   - `release_actions` plan snapshot, including declared replay behavior for the replay contexts relevant to that source run and the data-compatibility posture needed for rollback-safety decisions
   - smoke policy snapshot
   - non-secret secret-contract version or reference set
+  - non-secret runtime-config reference or fingerprint set when runtime-config admission was relevant to that run
   - the `lane_policy` reference used for the source run
   - the `admission_policy` reference used for the source run
 - for `retry`, `rollback`, and same-deployment `--publish-only`, replay should use that recorded snapshot as the authoritative source for immutable-reuse semantics, with only narrow current-invariant checks layered on top
@@ -3946,6 +4030,8 @@ Minimum required fields for every run:
   - `cancelled`, `superseded`, `no_longer_admitted`, or `lock_timeout` when the run ends without reaching a canonical terminal outcome
   - should be `null` when the run does reach a canonical terminal outcome
 - source revision identifier
+  - required for all run kinds except `preview_cleanup`
+  - `preview_cleanup` should instead preserve either the preview's originating source revision or a stable lineage/reference to the preview-producing run when no single revision is the most meaningful audit key
 - `requested_by`
   - the human, CI job, or automation that requested or triggered the run
 - publish mode, such as normal or preview

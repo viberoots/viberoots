@@ -12,24 +12,25 @@ Authoritative source: the canonical deployment rule in `projects/deployments/<de
 
 Minimum fields:
 
-| Field                 | Required                                         | Notes                                                   |
-| --------------------- | ------------------------------------------------ | ------------------------------------------------------- |
-| `name`                | yes                                              | Canonical target name, normally `deploy`.               |
-| `provider`            | yes                                              | Provider family identifier.                             |
-| `provider_target`     | yes                                              | Structured provider-target identity object.             |
-| `components`          | yes                                              | Non-empty list of deployable component descriptors.     |
-| `publisher`           | yes                                              | Structured publish contract.                            |
-| `protection_class`    | yes                                              | `local_only`, `shared_nonprod`, or `production_facing`. |
-| `secret_requirements` | yes                                              | `{}` allowed and reviewable.                            |
-| `provisioner`         | no                                               | Present only when provisioning is deployment-owned.     |
-| `release_actions`     | no                                               | Present only when release-time actions are needed.      |
-| `smoke`               | yes for protected/shared                         | Optional for `local_only`.                              |
-| `preview`             | no                                               | Explicit opt-in only.                                   |
-| `prerequisites`       | no                                               | Explicit direct-edge deployment prerequisites.          |
-| `lane_policy`         | yes for `shared_nonprod` and `production_facing` | Must resolve to authoritative policy object.            |
-| `environment_stage`   | yes for `shared_nonprod` and `production_facing` | Must be defined by the lane policy.                     |
-| `admission_policy`    | yes for `shared_nonprod` and `production_facing` | Repo-owned policy reference.                            |
-| `rollout_policy`      | no                                               | Required when behavior differs from provider default.   |
+| Field                         | Required                                         | Notes                                                    |
+| ----------------------------- | ------------------------------------------------ | -------------------------------------------------------- |
+| `name`                        | yes                                              | Canonical target name, normally `deploy`.                |
+| `provider`                    | yes                                              | Provider family identifier.                              |
+| `provider_target`             | yes                                              | Structured provider-target identity object.              |
+| `components`                  | yes                                              | Non-empty list of deployable component descriptors.      |
+| `publisher`                   | yes                                              | Structured publish contract.                             |
+| `protection_class`            | yes                                              | `local_only`, `shared_nonprod`, or `production_facing`.  |
+| `secret_requirements`         | yes                                              | `{}` allowed and reviewable.                             |
+| `runtime_config_requirements` | yes                                              | `{}` allowed; declares non-secret runtime config inputs. |
+| `provisioner`                 | no                                               | Present only when provisioning is deployment-owned.      |
+| `release_actions`             | no                                               | Present only when release-time actions are needed.       |
+| `smoke`                       | yes for protected/shared                         | Optional for `local_only`.                               |
+| `preview`                     | no                                               | Explicit opt-in only.                                    |
+| `prerequisites`               | no                                               | Explicit direct-edge deployment prerequisites.           |
+| `lane_policy`                 | yes for `shared_nonprod` and `production_facing` | Must resolve to authoritative policy object.             |
+| `environment_stage`           | yes for `shared_nonprod` and `production_facing` | Must be defined by the lane policy.                      |
+| `admission_policy`            | yes for `shared_nonprod` and `production_facing` | Repo-owned policy reference.                             |
+| `rollout_policy`              | no                                               | Required when behavior differs from provider default.    |
 
 Single-provider invariant:
 
@@ -73,6 +74,27 @@ Optional keys:
 
 - package-relative config or entry references
 - declared input class such as `metadata_only` or `immutable_resolved_inputs`
+
+### `runtime_config_requirements`
+
+Required shape:
+
+- dictionary keyed by stable logical runtime-config name
+- `{}` is the explicit no-runtime-config value
+- each entry should declare the non-secret config contract that must be admitted for deterministic execution or replay
+
+Minimum per-entry keys:
+
+- `name`
+- `step`
+- `contract_id`
+- `required`
+
+Optional per-entry keys:
+
+- `source`
+- `preview_variant`
+- `notes`
 
 ### `release_actions[*]`
 
@@ -236,6 +258,14 @@ Optional fields:
 - `retry_branch_policy`, using the closed enum `branch_independent` or `branch_coupled`
 - whether fresh approval is required for rollback by protection class
 
+Minimum `artifact_attestation_requirements` contract:
+
+- accepted builder identity or identity set
+- accepted provenance or predicate type
+- required binding from artifact identity to source revision plus build inputs
+- verification rule for the signing or attesting authority
+- failure behavior for revoked, expired, or no-longer-trusted attestation material
+
 ## 5. Migration / Alias Exception Object
 
 Used when target ownership or target naming is temporarily in transition.
@@ -288,28 +318,28 @@ Minimum fields:
 
 Minimum required fields for every run:
 
-| Field                                           | Required                               | Notes                                                                                        |
-| ----------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `schema_version`                                | yes                                    | Explicit record schema id.                                                                   |
-| `deploy_run_id`                                 | yes                                    | Globally unique.                                                                             |
-| `deployment_id`                                 | yes                                    | Concrete deployment id.                                                                      |
-| `deployment_label`                              | yes                                    | Buck deployment label.                                                                       |
-| `operation_kind`                                | yes                                    | `deploy`, `retry`, `promotion`, `rollback`, `preview_cleanup`.                               |
-| `lifecycle_state`                               | yes                                    | `queued`, `waiting_for_lock`, `running`, `cancelling`, `finished`, `cancelled`.              |
-| `termination_reason`                            | yes                                    | Nullable when canonical terminal outcome exists; otherwise uses the closed vocabulary below. |
-| source revision identifier                      | yes                                    | Revision associated with the run.                                                            |
-| `requested_by`                                  | yes                                    | Requesting actor identity.                                                                   |
-| publish mode                                    | yes                                    | `normal` or `preview`; `preview_cleanup` records should use `preview`.                       |
-| declared normal provider-target identity        | yes                                    | Normal live target identity.                                                                 |
-| effective run target identity                   | yes                                    | Actual mutated target identity.                                                              |
-| `lock_scope`                                    | yes                                    | Canonical lock scope.                                                                        |
-| deployment metadata fingerprint or snapshot ref | yes                                    | Resolved metadata used by the run.                                                           |
-| execution-snapshot reference                    | yes for protected/shared mutating runs | Frozen snapshot actually used.                                                               |
-| `lane_policy` fingerprint or snapshot ref       | yes when applicable                    | Authoritative lane context.                                                                  |
-| `admission_policy` fingerprint or snapshot ref  | yes when applicable                    | Authoritative admission context.                                                             |
-| approval evidence or approval record ref        | yes when human approval is required    | Must explain why the run was admitted.                                                       |
-| start time and end time                         | yes                                    | Audit timeline.                                                                              |
-| `final_outcome`                                 | nullable                               | Canonical terminal outcome when reached.                                                     |
+| Field                                           | Required                               | Notes                                                                                                            |
+| ----------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `schema_version`                                | yes                                    | Explicit record schema id.                                                                                       |
+| `deploy_run_id`                                 | yes                                    | Globally unique.                                                                                                 |
+| `deployment_id`                                 | yes                                    | Concrete deployment id.                                                                                          |
+| `deployment_label`                              | yes                                    | Buck deployment label.                                                                                           |
+| `operation_kind`                                | yes                                    | `deploy`, `retry`, `promotion`, `rollback`, `preview_cleanup`.                                                   |
+| `lifecycle_state`                               | yes                                    | `queued`, `waiting_for_lock`, `running`, `cancelling`, `finished`, `cancelled`.                                  |
+| `termination_reason`                            | yes                                    | Nullable when canonical terminal outcome exists; otherwise uses the closed vocabulary below.                     |
+| source revision identifier                      | yes except `preview_cleanup`           | Revision associated with the run; `preview_cleanup` may instead point to preview lineage or source-run ancestry. |
+| `requested_by`                                  | yes                                    | Requesting actor identity.                                                                                       |
+| publish mode                                    | yes                                    | `normal` or `preview`; `preview_cleanup` records should use `preview`.                                           |
+| declared normal provider-target identity        | yes                                    | Normal live target identity.                                                                                     |
+| effective run target identity                   | yes                                    | Actual mutated target identity.                                                                                  |
+| `lock_scope`                                    | yes                                    | Canonical lock scope.                                                                                            |
+| deployment metadata fingerprint or snapshot ref | yes                                    | Resolved metadata used by the run.                                                                               |
+| execution-snapshot reference                    | yes for protected/shared mutating runs | Frozen snapshot actually used.                                                                                   |
+| `lane_policy` fingerprint or snapshot ref       | yes when applicable                    | Authoritative lane context.                                                                                      |
+| `admission_policy` fingerprint or snapshot ref  | yes when applicable                    | Authoritative admission context.                                                                                 |
+| approval evidence or approval record ref        | yes when human approval is required    | Must explain why the run was admitted.                                                                           |
+| start time and end time                         | yes                                    | Audit timeline.                                                                                                  |
+| `final_outcome`                                 | nullable                               | Canonical terminal outcome when reached.                                                                         |
 
 Conditionally required:
 
