@@ -19,6 +19,7 @@ design has been explicitly updated first.
 - Preview is `publish_mode = preview`, not a peer `operation_kind`.
 - Preview must publish only to an explicitly isolated preview target or be rejected.
 - Every deployment must declare explicit provider-target identity in authoritative metadata.
+- `shared_nonprod` and `production_facing` deployments must declare explicit `promotion_lane`, `lane_policy`, `environment_stage`, and `admission_policy` metadata.
 - Provider config is provider-native input, not a second source of truth for core deployment facts.
 - One deployment id owns one normal mutable live target by default.
 - Reviewed migration or alias exceptions must be first-class control-plane objects with explicit scope, lock sharing, and expiry or completion semantics.
@@ -34,6 +35,7 @@ design has been explicitly updated first.
 - Promotion between deployment ids must follow the lane's declared `artifact_reuse_mode`.
 - `same_artifact` lanes reuse the same admitted artifact across environments.
 - `rebuild_per_stage` lanes promote the admitted source revision and build a new admitted stage artifact before publish.
+- For promotion, `--source-run-id` may select any earlier admitted run that remains eligible under the lane's current promotion policy; it is not limited to the latest candidate, and it is not an override around lane policy.
 - Protected/shared smoke is required and blocking by default unless there is an explicit `smoke.exception`.
 - Protected/shared package-local executable hooks are out of policy for normal mutation paths.
 - Protected/shared approvals are target-environment run-admission facts, not reusable artifact facts.
@@ -62,7 +64,7 @@ design has been explicitly updated first.
 - Replay must use the recorded source-run snapshot plus narrow current invariant checks.
 - Narrow current invariants include target ownership, lock scope, provider identity, publisher compatibility, and current admission validity.
 - Replay must not silently load newer deployment metadata, provider config, or release-action definitions as if they were part of the original run.
-- Recorded `release_actions` replay policy must use one closed disposition per operation kind: `rerun`, `skip`, or `fail`.
+- Recorded `release_actions` replay policy must use one closed disposition per replay context: `rerun`, `skip`, or `fail`.
 - Protected/shared replay by exact artifact ref is valid only when the artifact ref resolves unambiguously to one admitted source-run snapshot.
 
 ## Protected/Shared Admission Rules

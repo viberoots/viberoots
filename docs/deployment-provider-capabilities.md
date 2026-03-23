@@ -7,22 +7,28 @@ The goal is to keep provider behavior explicit, reviewable, and consistent acros
 Every built-in provider intended for protected/shared deployment use should have one reviewed entry
 covering the fields below before it is considered fully in policy.
 
+Normative-source note:
+
+- this document is the authoritative reviewed registry for built-in provider capability support
+- [Deployment Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) may summarize provider support for onboarding, but this document owns the normative provider-capability contract
+
 ## Required Capability Fields
 
-| Field                            | Purpose                                                                                 |
-| -------------------------------- | --------------------------------------------------------------------------------------- |
-| `provider`                       | Stable provider family identifier.                                                      |
-| canonical target identity fields | Defines which `provider_target` fields establish live-target identity.                  |
-| canonical lock-key rule          | Defines how lock scope is derived from canonical identity.                              |
-| supported component kinds        | Defines which component shapes the provider can publish.                                |
-| supported rollout modes          | Defines which `rollout_policy` modes are valid.                                         |
-| preview support                  | States whether preview is unsupported, supported with restrictions, or fully supported. |
-| preview isolation model          | Defines how preview target isolation is proven.                                         |
-| smoke or release-health model    | Defines how built-in smoke/health checks work for this provider.                        |
-| retry/idempotency assumptions    | Defines when publish retry is safe.                                                     |
-| partial publish observability    | Defines whether partial publish state can be observed and recorded.                     |
-| multi-component support          | Defines whether multi-component deployments are supported.                              |
-| protected/shared eligibility     | States whether the provider is in policy for protected/shared use.                      |
+| Field                            | Purpose                                                                                           |
+| -------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `provider`                       | Stable provider family identifier.                                                                |
+| canonical target identity fields | Defines which `provider_target` fields establish live-target identity.                            |
+| canonical lock-key rule          | Defines how lock scope is derived from canonical identity.                                        |
+| supported component kinds        | Defines which component shapes the provider can publish.                                          |
+| supported rollout modes          | Defines which `rollout_policy` modes are valid.                                                   |
+| default rollout mode             | Defines the provider's default rollout semantics when deployment metadata omits `rollout_policy`. |
+| preview support                  | States whether preview is unsupported, supported with restrictions, or fully supported.           |
+| preview isolation model          | Defines how preview target isolation is proven.                                                   |
+| smoke or release-health model    | Defines how built-in smoke/health checks work for this provider.                                  |
+| retry/idempotency assumptions    | Defines when publish retry is safe.                                                               |
+| partial publish observability    | Defines whether partial publish state can be observed and recorded.                               |
+| multi-component support          | Defines whether multi-component deployments are supported.                                        |
+| protected/shared eligibility     | States whether the provider is in policy for protected/shared use.                                |
 
 ## Review Questions For Every Provider
 
@@ -42,10 +48,10 @@ This is a draft capability entry for the common initial provider discussed in th
 
 - `provider`: `cloudflare-pages`
 - canonical target identity fields:
-  - `id`
+  - `project`
   - `account`
 - canonical lock-key shape:
-  - `cloudflare-pages:<account>/<id>`
+  - `cloudflare-pages:<account>/<project>`
 
 ### Component Support
 
@@ -107,11 +113,17 @@ Before adding a new built-in provider for protected/shared use:
 1. Define canonical target identity and lock-key semantics.
 2. State supported component kinds.
 3. State supported rollout modes.
-4. Define preview isolation rules.
-5. Define smoke/release-health rules.
-6. Define retry/idempotency rules.
-7. State whether partial publish state is observable.
-8. State whether the provider is approved for protected/shared use in the current phase.
+4. State the default rollout mode.
+5. Define preview isolation rules.
+6. Define smoke/release-health rules.
+7. Define retry/idempotency rules.
+8. State whether partial publish state is observable.
+9. State whether the provider is approved for protected/shared use in the current phase.
+
+Change-control rule:
+
+- a built-in adapter must not widen provider support beyond the reviewed capability entry in this document
+- when provider behavior changes materially, update this document first or in the same change
 
 ## Companion Docs
 

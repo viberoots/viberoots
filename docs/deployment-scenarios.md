@@ -61,6 +61,7 @@ Situation:
 
 - `pleomino-staging` and `pleomino-prod` are in the same compatible `promotion_lane`
 - the lane uses `artifact_reuse_mode = "same_artifact"`
+- the selected staging run is an earlier admitted candidate that is still eligible under the lane's current promotion policy
 
 Expected behavior:
 

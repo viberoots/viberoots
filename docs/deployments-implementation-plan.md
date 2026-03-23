@@ -35,6 +35,7 @@ Explicitly out of initial scope:
 Must reject:
 
 - missing required deployment metadata for protected/shared deployments
+- missing explicit `promotion_lane`, `lane_policy`, or `environment_stage` for protected/shared deployments
 - missing canonical provider-target identity fields
 - protected/shared deployment-local executable mutation hooks
 - unsupported rollout modes for the selected provider
@@ -74,10 +75,10 @@ Must enforce:
 1. Implement deployment metadata extraction for canonical deployment targets.
 2. Implement provider-target identity normalization for the first provider.
 3. Implement lane-policy and admission-policy resolution.
-4. Implement deployment-record and replay-snapshot persistence contracts.
-5. Implement control-plane admission, approval, and lock flow.
+4. Implement deployment-record, replay-snapshot, and migration/alias-exception persistence contracts.
+5. Implement control-plane admission, approval, lock flow, and migration/alias-exception lookup.
 6. Implement one built-in publisher and smoke runner for the first provider.
-7. Implement `retry`, `rollback`, and `promotion` classification from source-run selectors.
+7. Implement `retry`, `rollback`, and `promotion` classification from source-run selectors, including promotion eligibility checks for earlier admitted candidates.
 8. Implement grouped `--from-changes` submission as per-deployment runs plus optional batch grouping.
 9. Add policy-focused validation tests before broadening provider or rollout support.
 
@@ -87,6 +88,7 @@ Must enforce:
 - reject protected/shared package-local mutation hooks
 - reject ambiguous same-deployment source-run reuse without `--rollback`
 - reject promotion across incompatible lanes
+- reject promotion from an admitted source run that is retained but no longer eligible under current lane policy
 - reject rollback sourced from preview-only success
 - reject replay paths that would rebuild implicitly
 - reject protected/shared exact-artifact replay that cannot be mapped to one admitted source-run snapshot
@@ -101,6 +103,7 @@ Phase 1 is complete when all of the following are true:
 
 - one provider works end to end for normal protected/shared deploy
 - replay snapshot persistence is implemented for immutable-reuse flows
+- migration and alias exceptions are represented as first-class persisted control-plane objects
 - `retry`, `rollback`, and `promotion` are recorded with canonical `operation_kind`
 - smoke is enforced and blocking by default for protected/shared paths
 - provider-target identity, lock scope, and record identity use one canonical rule

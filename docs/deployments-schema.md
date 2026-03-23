@@ -26,9 +26,9 @@ Minimum fields:
 | `smoke`               | yes for protected/shared                         | Optional for `local_only`.                              |
 | `preview`             | no                                               | Explicit opt-in only.                                   |
 | `prerequisites`       | no                                               | Explicit direct-edge deployment prerequisites.          |
-| `promotion_lane`      | yes for protected/shared promotion               | Optional otherwise.                                     |
-| `lane_policy`         | yes unless canonically derived                   | Must resolve to authoritative policy object.            |
-| `environment_stage`   | yes for protected/shared promotion               | Must be defined by the lane policy.                     |
+| `promotion_lane`      | yes for `shared_nonprod` and `production_facing` | Optional for `local_only`.                              |
+| `lane_policy`         | yes for `shared_nonprod` and `production_facing` | Must resolve to authoritative policy object.            |
+| `environment_stage`   | yes for `shared_nonprod` and `production_facing` | Must be defined by the lane policy.                     |
 | `admission_policy`    | yes for `shared_nonprod` and `production_facing` | Repo-owned policy reference.                            |
 | `rollout_policy`      | no                                               | Required when behavior differs from provider default.   |
 
@@ -37,8 +37,8 @@ Minimum fields:
 Required shape:
 
 - structured object, not free-form prose
-- minimum key `id`
-- for protected/shared use, includes every field required by the provider's canonical identity rule
+- includes every field required by the provider's canonical identity rule
+- optional shorthand fields such as `id` are allowed only as non-authoritative display metadata unless the provider capability entry explicitly makes them part of canonical identity
 
 ### `components[*]`
 
@@ -78,7 +78,7 @@ Required keys when present:
 - `run_condition`
 - `abort_behavior`
 - data-compatibility posture
-- replay policy by operation kind
+- replay policy by replay context
 
 Allowed `phase` values:
 
@@ -94,11 +94,11 @@ Allowed `run_condition` values:
 
 Minimum replay-policy contract:
 
-- explicit behavior for `publish_only`
+- explicit behavior for `deploy_publish_slice`
 - explicit behavior for `retry`
 - explicit behavior for `rollback`
 - explicit behavior for `promotion`
-- one closed disposition per operation kind from:
+- one closed disposition per replay context from:
   - `rerun`
   - `skip`
   - `fail`
@@ -226,7 +226,32 @@ Optional fields:
 - `retry_branch_policy`, using the closed enum `branch_independent` or `branch_coupled`
 - whether fresh approval is required for rollback by protection class
 
-## 5. Replay Snapshot
+## 5. Migration / Alias Exception Object
+
+Used when target ownership or target naming is temporarily in transition.
+
+Minimum fields:
+
+| Field                       | Required | Notes                                                                 |
+| --------------------------- | -------- | --------------------------------------------------------------------- |
+| stable exception id         | yes      | Control-plane object identity.                                        |
+| affected deployment ids     | yes      | One or more deployment ids participating in the exception.            |
+| exception kind              | yes      | `migration` or `alias`.                                               |
+| old normal target identity  | yes      | Prior canonical live-target binding when applicable.                  |
+| new normal target identity  | no       | Required for migrations that transfer or rename live-target identity. |
+| enforced shared lock scope  | yes      | Lock scope that all affected runs must share during the exception.    |
+| approval authority/evidence | yes      | Review ticket, approval record, or equivalent justification.          |
+| effective start time        | yes      | Start of validity window.                                             |
+| expiry or completion signal | yes      | Explicit expiry time or completion condition.                         |
+| reconciliation owner        | yes      | Named owner for cleanup and return to steady state.                   |
+
+Validation expectations:
+
+- admission and replay must consult this object when deciding whether a recorded target binding is still valid
+- an expired or completed exception must no longer authorize replay against a stale binding
+- the steady-state goal remains one deployment id owning one normal mutable live target
+
+## 6. Replay Snapshot
 
 Used for protected/shared immutable-artifact reuse.
 
@@ -248,7 +273,7 @@ Minimum fields:
 | smoke policy snapshot                     | yes when relevant | Source-run validation contract.                          |
 | secret-contract version/reference         | yes               | Non-secret contract metadata only.                       |
 
-## 6. Deployment Record
+## 7. Deployment Record
 
 Minimum required fields for every run:
 
@@ -316,7 +341,7 @@ Notes:
 - The schema keeps a compact `final_outcome` enum; step-level failure location belongs in `failed_step` rather than expanding `final_outcome` for every phase.
 - `termination_reason` is intentionally separate from `final_outcome`; it explains non-canonical terminal exits rather than publish/provision/smoke success or failure.
 
-## 7. Validation Expectations
+## 8. Validation Expectations
 
 Repo validation should reject:
 

@@ -736,8 +736,8 @@ Flag interaction rules:
   - for those protected/shared immutable-reuse flows, `resolve` means loading the recorded source-run snapshot and immutable artifact references required for that operation kind
   - it must not silently reinterpret current repo metadata, current provider config, or current release-action declarations as if they were the original source-run inputs
   - it should still run smoke by default, because the publish lifecycle is not considered complete until post-publish validation has either passed or failed under the deployment's documented smoke policy
-  - it should evaluate declared `release_actions` for the publish lifecycle being run, but must execute them only according to each action type's explicit replay policy for `publish_only`
-    - if a required action is not declared replay-safe for `publish_only`, the run must fail clearly rather than guess
+  - it should evaluate declared `release_actions` for the publish lifecycle being run, but must execute them only according to each action type's explicit replay policy for `deploy_publish_slice`
+    - if a required action is not declared replay-safe for `deploy_publish_slice`, the run must fail clearly rather than guess
   - it must publish one explicitly selected immutable artifact
   - it must not build or select an implicit local artifact on the caller's behalf
 - promotion-grade, retry, and rollback-grade publish-only paths should use the exact previously resolved artifact rather than rebuilding
@@ -964,8 +964,9 @@ deployment(
     name = "deploy",
     provider = "cloudflare-pages",
     provider_target = {
-        "id": "pleomino-prod-pages",
+        "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
+        "id": "pleomino-prod-pages",
     },
     lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
@@ -1131,6 +1132,9 @@ Environment-lane policy:
 
 - each concrete deployment belongs to one environment branch lane for protected/shared mutation
 - the unit of a lane is one independently promoted deployment family, not the whole repo and not one individual deployment id
+- lane membership constrains compatibility, stage ordering, and promotability, but the default promotion unit within a lane is still one deployment id at a time
+- the base contract does not require whole-lane atomic advancement
+- if a repo later needs several deployment ids to advance as one coordinated release set, that should be modeled through an explicit future release-set policy rather than inferred from lane membership alone
 - lane membership should be explicit deployment metadata, not only an implicit naming convention
 - `environment_stage` should be explicit deployment metadata for protected/shared deployments rather than inferred only from deployment id naming
 - a family lane may own branches such as `env/<family>/dev -> env/<family>/staging -> env/<family>/prod`
@@ -1162,6 +1166,7 @@ What that means in practice:
 - a monorepo revision may be admitted for one lane without being promoted for unrelated lanes
 - if a change only affects `pleomino`, promotion of `env/pleomino/staging` should not trigger deployment of unrelated lanes such as `shared-observability`
 - a lane may still contain more than one deployment id, but the actual deploy set for that lane is selected from authoritative metadata plus change impact, not from "everything in the repo"
+- within one lane, promotion eligibility is evaluated per deployment id by default unless an explicit reviewed release-set policy says otherwise
 
 Prerequisite expansion policy:
 
@@ -1277,8 +1282,9 @@ deployment(
     name = "deploy",
     provider = "cloudflare-pages",
     provider_target = {
-        "id": "pleomino-prod-pages",
+        "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
+        "id": "pleomino-prod-pages",
     },
     lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
@@ -1660,14 +1666,14 @@ Policy:
 Field-shape guidance:
 
 - `provider_target` should be represented as a structured metadata object, not as free-form prose or an opaque positional tuple
-- the minimum required field is `id`, meaning the stable repo-visible shorthand for the provider target used in normal publish mode
+- canonical target identity is the provider-defined required field tuple published by the reviewed provider capability entry
+- validation, locking, ownership, preview isolation, and deployment records must key off that canonical tuple rather than off any shorthand display field
 - when additional qualifiers are needed to uniquely identify the live target, represent them as explicit named fields rather than encoding them into one ambiguous string
 - the exact identity field set for a built-in provider must be documented canonically and reviewed as part of the provider contract, not improvised per adapter callsite
 - this is an intentional standardization decision for the document, not an accidental example style choice
-- the shared `id` field gives validation, deployment records, and adapter wiring one predictable anchor identifier while still allowing provider-specific qualifiers beside it
-- for built-in providers, `id` should be a derived canonical shorthand for the full normalized provider-target identity, not a separate competing source of truth
-- for `shared_nonprod` and `production_facing`, `provider_target` must include every field required by the built-in provider's canonical identity rule; shorthand `id` alone is not sufficient when the provider is account-scoped or otherwise multi-tenant
-- for `local_only`, a shorthand-only `id` may still be accepted when validation proves that the omitted qualifiers cannot change locking, ownership, preview isolation, or record identity
+- an implementation may additionally carry a human-friendly shorthand field such as `id` when that improves readability, but that shorthand is descriptive metadata unless the provider capability entry explicitly makes it part of canonical identity
+- for `shared_nonprod` and `production_facing`, `provider_target` must include every field required by the built-in provider's canonical identity rule
+- for `local_only`, adapters may accept a reduced shape only when validation proves that omitted qualifiers cannot change locking, ownership, preview isolation, or record identity
 - examples in this document use compact shapes for readability; production adapters may require additional validated identity fields, but should preserve the same explicit-object model and canonical identity rule
 
 Normalization transform:
@@ -1686,11 +1692,11 @@ Canonical provider-target identity rules:
 - the table below is authoritative only for providers that currently have reviewed capability entries
 - rows for future providers may appear here as provisional design illustrations, but they are not in-policy until the provider-capabilities doc says so explicitly
 
-| Provider           | Required identity fields                 | Normalization rule                                                                                                                                                                                                                                                         | Canonical lock-key shape                 |
-| ------------------ | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| `cloudflare-pages` | `id`, `account`                          | canonical identity is the trimmed Pages project name plus trimmed account scope; for `shared_nonprod` and `production_facing`, `account` is required and `id` must be derived from that full canonical target identity rather than standing alone as an under-scoped alias | `cloudflare-pages:<account>/<id>`        |
-| `s3-static`        | provisional future-provider illustration | provisional future-provider illustration                                                                                                                                                                                                                                   | provisional future-provider illustration |
-| `kubernetes`       | provisional future-provider illustration | provisional future-provider illustration                                                                                                                                                                                                                                   | provisional future-provider illustration |
+| Provider           | Required identity fields                 | Normalization rule                                                                                                                                                                                                                                                      | Canonical lock-key shape                 |
+| ------------------ | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `cloudflare-pages` | `project`, `account`                     | canonical identity is the trimmed Pages project name plus trimmed account scope; for `shared_nonprod` and `production_facing`, both fields are required; an optional shorthand such as `id` may exist for display, but it must not replace the canonical identity tuple | `cloudflare-pages:<account>/<project>`   |
+| `s3-static`        | provisional future-provider illustration | provisional future-provider illustration                                                                                                                                                                                                                                | provisional future-provider illustration |
+| `kubernetes`       | provisional future-provider illustration | provisional future-provider illustration                                                                                                                                                                                                                                | provisional future-provider illustration |
 
 For any built-in provider added later, the reviewed provider-capabilities doc must be updated before the
 provider is considered fully in policy for protected/shared deployment use, and this table should be kept
@@ -1699,7 +1705,7 @@ consistent with that reviewed entry when the provider becomes normative here.
 Normalization rule:
 
 - locking, ownership checks, preview isolation, and deployment records must all use the same normalized canonical provider-target identity for a given provider
-- a built-in provider adapter must not treat `id` as advisory while separately locking or recording a different effective target identity
+- a built-in provider adapter must not treat a shorthand field such as `id` as authoritative while separately locking or recording a different effective target identity
 
 Minimum `smoke.exception` fields:
 
@@ -1826,8 +1832,9 @@ deployment(
     name = "deploy",
     provider = "cloudflare-pages",
     provider_target = {
-        "id": "pleomino-prod-pages",
+        "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
+        "id": "pleomino-prod-pages",
     },
     lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
@@ -2521,8 +2528,9 @@ deployment(
     name = "deploy",
     provider = "cloudflare-pages",
     provider_target = {
-        "id": "pleomino-prod-pages",
+        "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
+        "id": "pleomino-prod-pages",
     },
     lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
@@ -2943,12 +2951,12 @@ Policy:
   - abort behavior
   - whether later lifecycle steps may proceed on failure
   - any artifact or runtime inputs it consumes
-- each built-in action type must declare replay behavior explicitly for:
-  - `publish_only`
+- each built-in action type must declare replay behavior explicitly for the replay contexts it supports:
+  - `deploy_publish_slice`
   - `retry`
   - `rollback`
   - `promotion`
-- each operation kind in that replay policy must use one closed disposition:
+- each replay context in that policy must use one closed disposition:
   - `rerun`
   - `skip`
   - `fail`
@@ -2966,9 +2974,9 @@ Policy:
   - cleanup, forensic capture, or incident notification actions may intentionally use `failure_only` or `always`
 - the common-case default should stay simple:
   - fresh `deploy <id>` runs the declared lifecycle actions in phase order
-  - immutable-reuse flows such as `publish_only`, `retry`, `rollback`, and `promotion` are fail-closed and only re-run actions whose built-in type explicitly declares replay safety for that operation kind
+  - immutable-reuse flows such as `deploy_publish_slice`, `retry`, `rollback`, and `promotion` are fail-closed and only re-run actions whose built-in type explicitly declares replay safety for that replay context
 - the protected/shared default is fail-closed:
-  - a `release_action` does not re-run during `publish_only`, `retry`, `rollback`, or `promotion` unless that action type explicitly declares that replay is safe and intended for that operation kind
+  - a `release_action` does not re-run during `deploy_publish_slice`, `retry`, `rollback`, or `promotion` unless that action type explicitly declares that replay is safe and intended for that replay context
   - if the requested replay flow would require an action whose replay behavior is not explicitly allowed, the run must fail clearly rather than guess
 - rollback admission must also evaluate the recorded data-compatibility posture of already-applied stateful actions:
   - `backward_compatible` means an earlier compatible artifact may be redeployed without extra rollback-specific state repair
@@ -3076,8 +3084,9 @@ deployment(
     name = "deploy",
     provider = "cloudflare-pages",
     provider_target = {
-        "id": "pleomino-dev-pages",
+        "project": "pleomino-dev-pages",
         "account": "web-platform-dev",
+        "id": "pleomino-dev-pages",
     },
     lane_policy = "//build-tools/deploy/lanes:pleomino",
     admission_policy = "//build-tools/deploy/policies:pleomino_dev_release",
@@ -3367,8 +3376,9 @@ deployment(
     name = "deploy",
     provider = "cloudflare-pages",
     provider_target = {
-        "id": "pleomino-prod-pages",
+        "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
+        "id": "pleomino-prod-pages",
     },
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
@@ -3681,8 +3691,9 @@ deployment(
     name = "deploy",
     provider = "cloudflare-pages",
     provider_target = {
-        "id": "pleomino-prod-pages",
+        "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
+        "id": "pleomino-prod-pages",
     },
     publisher = {
         "type": "wrangler-pages",
@@ -3836,12 +3847,12 @@ Minimum replay-snapshot contract for immutable-artifact reuse:
   - stable fingerprint or snapshot reference for the resolved `lane_policy` contents used by the source run
   - stable fingerprint or snapshot reference for the resolved `admission_policy` contents used by the source run
   - rollout policy snapshot
-  - `release_actions` plan snapshot, including declared replay behavior for the operation kinds relevant to that source run and the data-compatibility posture needed for rollback-safety decisions
+  - `release_actions` plan snapshot, including declared replay behavior for the replay contexts relevant to that source run and the data-compatibility posture needed for rollback-safety decisions
   - smoke policy snapshot
   - non-secret secret-contract version or reference set
   - the `lane_policy` reference used for the source run
   - the `admission_policy` reference used for the source run
-- for `retry`, `rollback`, and same-deployment `publish_only`, replay should use that recorded snapshot as the authoritative source for immutable-reuse semantics, with only narrow current-invariant checks layered on top
+- for `retry`, `rollback`, and same-deployment `--publish-only`, replay should use that recorded snapshot as the authoritative source for immutable-reuse semantics, with only narrow current-invariant checks layered on top
 - for `promotion`, the recorded source snapshot is preserved as source artifact and compatibility evidence, not as the target environment's execution snapshot
   - promotion must still use the target deployment's own admitted execution snapshot, target identity, current target-environment approvals, and target-environment provider-config context before mutation
 
@@ -3860,14 +3871,14 @@ Required current replay invariants:
   - that the target deployment's current `admission_policy` is present, valid for the target environment, and satisfied for this promotion run
 - everything else needed to execute the reuse flow should come from the recorded snapshot rather than from opportunistic reinterpretation of current repo state
 
-Operation-kind replay rule:
+Replay-context rule:
 
 - `retry` and `rollback` should replay the recorded snapshot and enforce only narrow current invariants needed for safe execution, such as target ownership, protection class, lock scope, provider identity, and publisher compatibility
 - `promotion` should replay the recorded source snapshot for source-run artifact inputs, but it must use the target deployment's current admitted execution and policy context before mutating that later environment
 - `release_actions` during replay must follow the recorded action-plan snapshot and the declared replay behavior of each action type
   - protected/shared replay must not silently re-run release actions just because the current deployment metadata still names them
-  - when the recorded action plan says `rerun`, the system may run the action again for that operation kind
-  - when the recorded action plan says `skip`, the system must not run the action again for that operation kind
+  - when the recorded action plan says `rerun`, the system may run the action again for that replay context
+  - when the recorded action plan says `skip`, the system must not run the action again for that replay context
   - when the recorded action plan says `fail`, the run must fail clearly rather than improvising
 - normal policy edits should not silently invalidate an otherwise in-window `retry` or `rollback` unless they change one of those narrow execution-safety invariants
 
@@ -4143,12 +4154,14 @@ This example uses the canonical `operation_kind`, `lifecycle_state`, `terminatio
   "publish_mode": "normal",
   "provider": "cloudflare-pages",
   "provider_target": {
-    "id": "pleomino-prod-pages",
-    "account": "web-platform-prod"
+    "project": "pleomino-prod-pages",
+    "account": "web-platform-prod",
+    "id": "pleomino-prod-pages"
   },
   "effective_run_target": {
-    "id": "pleomino-prod-pages",
-    "account": "web-platform-prod"
+    "project": "pleomino-prod-pages",
+    "account": "web-platform-prod",
+    "id": "pleomino-prod-pages"
   },
   "lock_scope": "cloudflare-pages:web-platform-prod/pleomino-prod-pages",
   "parent_run_id": "dr_2026_03_19_pleomino_staging_00052",
@@ -4264,8 +4277,9 @@ cloudflare_static_pwa_deployment(
     name = "deploy",
     app_target = "//projects/apps/pleomino:app",
     provider_target = {
-        "id": "pleomino-prod-pages",
+        "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
+        "id": "pleomino-prod-pages",
     },
     lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
@@ -4482,8 +4496,9 @@ cloudflare_static_pwa_deployment(
     name = "deploy",
     app_target = "//projects/apps/pleomino:app",
     provider_target = {
-        "id": "pleomino-prod-pages",
+        "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
+        "id": "pleomino-prod-pages",
     },
     lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
@@ -4561,8 +4576,9 @@ puzzle_cloudflare_deployment(
     name = "deploy",
     app_target = "//projects/apps/pleomino:app",
     provider_target = {
-        "id": "pleomino-prod-pages",
+        "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
+        "id": "pleomino-prod-pages",
     },
     lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
@@ -4630,8 +4646,9 @@ puzzle_cloudflare_deployment(
     name = "deploy",
     app_target = "//projects/apps/pleomino:app",
     provider_target = {
-        "id": "pleomino-prod-pages",
+        "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
+        "id": "pleomino-prod-pages",
     },
     lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
@@ -4776,8 +4793,9 @@ deployment(
     name = "deploy",
     provider = "cloudflare-pages",
     provider_target = {
-        "id": "pleomino-prod-pages",
+        "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
+        "id": "pleomino-prod-pages",
     },
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     environment_stage = "prod",
