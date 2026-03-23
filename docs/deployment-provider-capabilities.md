@@ -57,15 +57,23 @@ This is a draft capability entry for the common initial provider discussed in th
 
 - supported component kinds:
   - `static-webapp`
+- multi-component support:
+  - not supported in the initial reviewed protected/shared phase
+  - deployments must contain exactly one `static-webapp` component
 - out of scope for the initial phase:
   - complex multi-component systems
   - provider-specific arbitrary executable hooks in protected/shared paths
 
 ### Rollout Support
 
+- default rollout mode:
+  - `all_at_once`
 - supported rollout modes for the initial phase:
   - `all_at_once`
 - explicitly not part of the initial phase:
+  - `all_or_nothing`
+  - `ordered_best_effort`
+  - `parallel_best_effort`
   - `canary`
   - `blue_green`
   - `phased`

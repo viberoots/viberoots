@@ -1391,7 +1391,7 @@ Policy evaluation order:
   - `provider_target`
     - required
     - should be a structured object, not a bare string
-    - should include at least a stable provider-side identifier under `id`
+    - may include a stable provider-side display identifier under `id`, but that field is descriptive unless the provider capability entry explicitly makes it canonical
     - built-in providers must publish one canonical identity-field set and normalization rule in the authoritative provider-capabilities contract
     - the default lock scope, normal live-target ownership rule, preview isolation, and deployment-record target identity must all key off that same provider-specific canonical identity rule
     - a provider adapter must treat all fields required by that canonical identity rule as part of the mutable live-target identity, not as optional commentary
@@ -2725,7 +2725,9 @@ deployment(
     protection_class = "local_only",
     rollout_policy = {
         "mode": "ordered_best_effort",
-        "order": ["marketing", "docs"],
+        "abort": "stop_on_first_failure",
+        "smoke": "final_only",
+        "steps": ["marketing", "docs"],
     },
     components = [
         {
@@ -3408,7 +3410,7 @@ directly to the authoritative lane-policy object rather than rely on implicit re
 
 Normal lock-scope story:
 
-- canonical provider-target identity for this deployment is `provider = cloudflare-pages` plus `provider_target.account = web-platform-prod` and `provider_target.id = pleomino-prod-pages`
+- canonical provider-target identity for this deployment is `provider = cloudflare-pages` plus `provider_target.account = web-platform-prod` and `provider_target.project = pleomino-prod-pages`
 - the derived shared-environment lock scope is therefore conceptually `cloudflare-pages:web-platform-prod/pleomino-prod-pages`
 - `deploy pleomino-prod`
 - `deploy pleomino-prod --publish-only --source-run-id <deploy-run-id>`
