@@ -12,25 +12,25 @@ Authoritative source: the canonical deployment rule in `projects/deployments/<de
 
 Minimum fields:
 
-| Field                         | Required                                         | Notes                                                    |
-| ----------------------------- | ------------------------------------------------ | -------------------------------------------------------- |
-| `name`                        | yes                                              | Canonical target name, normally `deploy`.                |
-| `provider`                    | yes                                              | Provider family identifier.                              |
-| `provider_target`             | yes                                              | Structured provider-target identity object.              |
-| `components`                  | yes                                              | Non-empty list of deployable component descriptors.      |
-| `publisher`                   | yes                                              | Structured publish contract.                             |
-| `protection_class`            | yes                                              | `local_only`, `shared_nonprod`, or `production_facing`.  |
-| `secret_requirements`         | yes                                              | `{}` allowed and reviewable.                             |
-| `runtime_config_requirements` | yes                                              | `{}` allowed; declares non-secret runtime config inputs. |
-| `provisioner`                 | no                                               | Present only when provisioning is deployment-owned.      |
-| `release_actions`             | no                                               | Present only when release-time actions are needed.       |
-| `smoke`                       | yes for protected/shared                         | Optional for `local_only`.                               |
-| `preview`                     | no                                               | Explicit opt-in only.                                    |
-| `prerequisites`               | no                                               | Explicit direct-edge deployment prerequisites.           |
-| `lane_policy`                 | yes for `shared_nonprod` and `production_facing` | Must resolve to authoritative policy object.             |
-| `environment_stage`           | yes for `shared_nonprod` and `production_facing` | Must be defined by the lane policy.                      |
-| `admission_policy`            | yes for `shared_nonprod` and `production_facing` | Repo-owned policy reference.                             |
-| `rollout_policy`              | no                                               | Required when behavior differs from provider default.    |
+| Field                         | Required                                         | Notes                                                                                                                                                               |
+| ----------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                        | yes                                              | Canonical target name, normally `deploy`.                                                                                                                           |
+| `provider`                    | yes                                              | Provider family identifier.                                                                                                                                         |
+| `provider_target`             | yes                                              | Structured provider-target identity object.                                                                                                                         |
+| `components`                  | yes                                              | Non-empty list of deployable component descriptors.                                                                                                                 |
+| `publisher`                   | yes                                              | Structured publish contract.                                                                                                                                        |
+| `protection_class`            | yes                                              | `local_only`, `shared_nonprod`, or `production_facing`.                                                                                                             |
+| `secret_requirements`         | yes                                              | `{}` allowed and reviewable.                                                                                                                                        |
+| `runtime_config_requirements` | yes                                              | `{}` allowed; declares non-secret runtime config inputs.                                                                                                            |
+| `provisioner`                 | no                                               | Present only when provisioning is deployment-owned.                                                                                                                 |
+| `release_actions`             | no                                               | Present only when release-time actions are needed.                                                                                                                  |
+| `smoke`                       | yes for protected/shared                         | Optional for `local_only`.                                                                                                                                          |
+| `preview`                     | no                                               | Explicit opt-in only.                                                                                                                                               |
+| `prerequisites`               | no                                               | Explicit direct-edge deployment prerequisites.                                                                                                                      |
+| `lane_policy`                 | yes for `shared_nonprod` and `production_facing` | Must resolve to authoritative policy object.                                                                                                                        |
+| `environment_stage`           | yes for `shared_nonprod` and `production_facing` | Must be defined by the lane policy.                                                                                                                                 |
+| `admission_policy`            | yes for `shared_nonprod` and `production_facing` | Repo-owned policy reference.                                                                                                                                        |
+| `rollout_policy`              | no                                               | Required when behavior differs from provider default, and also required for protected/shared multi-component deployments even when they match the provider default. |
 
 Single-provider invariant:
 

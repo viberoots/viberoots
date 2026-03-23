@@ -35,8 +35,9 @@ for the deployment model itself.
 Deployment scope:
 
 - deployments may be single-component or multi-component
-- `shared_nonprod` and `production_facing` deployments may use multi-component or advanced rollout behavior only when their provider capability entry and declared `rollout_policy` support that shape
-- when a deployment does not declare `rollout_policy`, the reviewed provider capability entry's explicit default rollout mode applies
+- `shared_nonprod` and `production_facing` deployments may use multi-component or advanced rollout behavior only when their provider capability entry and explicit declared `rollout_policy` support that shape
+- when a deployment does not declare `rollout_policy`, the reviewed provider capability entry's explicit default rollout mode applies only for deployment shapes where omission is in policy
+- protected/shared multi-component deployments should still declare `rollout_policy` explicitly even when the intended behavior matches the provider default, so ordering, failure semantics, and replay expectations remain reviewable
 
 The key promise of this document is:
 
@@ -543,7 +544,7 @@ Common-case summary:
     - `runtime_config_requirements = {}`
 - add a `provisioner` only when the destination really needs setup owned by the deployment
 - add `preview` only when preview is intentionally supported
-- add `rollout_policy` only when the deployment is multi-component or otherwise needs explicit staged behavior
+- add `rollout_policy` whenever the deployment is multi-component or otherwise needs explicit staged behavior
 - for protected/shared deployments, the common single-component path should still stay compact:
   - `lane_policy`
   - `environment_stage`
@@ -789,8 +790,12 @@ Flag interaction rules:
   - for those protected/shared immutable-reuse flows, `resolve` means loading the recorded source-run snapshot and immutable artifact references required for that operation kind
   - it must not silently reinterpret current repo metadata, current provider config, or current release-action declarations as if they were the original source-run inputs
   - it should still run smoke by default, because the publish lifecycle is not considered complete until post-publish validation has either passed or failed under the deployment's documented smoke policy
-  - it should evaluate declared `release_actions` for the publish lifecycle being run, but must execute them only according to each action type's explicit replay policy for `deploy_publish_slice`
-    - if a required action is not declared replay-safe for `deploy_publish_slice`, the run must fail clearly rather than guess
+  - it should evaluate declared `release_actions` for the publish lifecycle being run, but must execute them only according to the replay context that matches the run's operation kind
+    - same-deployment delayed publish without retry, rollback, or promotion semantics uses `deploy_publish_slice`
+    - `retry` uses the `retry` replay context
+    - `rollback` uses the `rollback` replay context
+    - `promotion` uses the `promotion` replay context
+    - if a required action is not declared replay-safe for the relevant replay context, the run must fail clearly rather than guess
   - it must publish one explicitly selected immutable artifact
   - it must not build or select an implicit local artifact on the caller's behalf
 - `--publish-only` is valid only for exact-artifact reuse flows such as retry, rollback, same-deployment delayed publish, or `same_artifact` promotion
@@ -1041,7 +1046,6 @@ deployment(
         "smoke_policy_override": {
             "use_preview_url": True,
         },
-        "separate_lock_scope": True,
     },
     components = [
         {
@@ -1068,6 +1072,9 @@ directly to the authoritative lane-policy object rather than rely on implicit re
 
 This example is intentionally explicit, but in the common case the preview block can rely on one
 documented provider-wide default policy once the deployment opts in.
+
+This example also follows the provider-default shared-lock posture for preview rather than opting
+into a separate preview lock scope.
 
 What "explicit" means here:
 
@@ -1096,7 +1103,8 @@ Preview lifecycle examples:
 Creation and destruction policy:
 
 - previews are usually created automatically by the shared control plane in response to CI, PR, review, or other automation triggers
-- manual preview creation is allowed only for explicitly isolated local or personal preview targets
+- manual preview creation for `shared_nonprod` and `production_facing` is allowed only through approved control-plane clients acting under normal authz and audit policy
+- direct local or ad hoc provider-side preview mutation remains allowed only for explicitly isolated local or personal preview targets
 - preview destruction should be automatic by default
   - on PR close or merge
   - on explicit preview expiry or TTL
@@ -1506,7 +1514,8 @@ Policy evaluation order:
     - each component should include `id`, `kind`, and `target`
     - `id` should be stable within the deployment, not derived from list position
   - `rollout_policy`
-    - optional when the provider's default rollout mode is sufficient for the deployment
+    - optional only when the provider's default rollout mode is sufficient for the deployment and the deployment is not a protected/shared multi-component shape
+    - protected/shared multi-component deployments should declare `rollout_policy` explicitly even when the intended behavior matches the provider default, so ordering, failure semantics, and replay expectations remain reviewable
     - required for any deployment whose intended behavior differs from the provider default, including multi-component ordering, phased release gates, canary behavior, blue/green cutover, or staged store rollout
     - should describe explicit publish ordering, dependency barriers, phase boundaries, traffic-shift semantics, or smoke checkpoints when the deployment is more complex than the default common case
     - must use one closed rollout-mode set for provider-neutral intent:
