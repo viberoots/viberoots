@@ -31,6 +31,12 @@ Minimum fields:
 | `admission_policy`    | yes for `shared_nonprod` and `production_facing` | Repo-owned policy reference.                            |
 | `rollout_policy`      | no                                               | Required when behavior differs from provider default.   |
 
+Single-provider invariant:
+
+- a deployment has exactly one `provider` and one authoritative `provider_target` model
+- multi-component deployments are allowed within that provider boundary
+- systems that span multiple provider families must be represented as multiple coordinated deployments
+
 ### `provider_target`
 
 Required shape:
@@ -157,7 +163,7 @@ Allowed `mode` values:
 
 Validation rule:
 
-- prerequisites must stay within the same lane in the current design; cross-lane prerequisites are out of scope and should be rejected
+- prerequisites must stay within the same lane; cross-lane prerequisites are rejected
 
 ## 2. Lane Policy Object
 

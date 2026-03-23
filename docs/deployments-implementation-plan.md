@@ -1,9 +1,12 @@
 # Deployment Implementation Plan
 
-This document translates the deployment design into a narrow first implementation plan.
+This document describes one implementation rollout plan for the finalized deployment design.
+
+It is intentionally subordinate to the design, contract, schema, and provider-capabilities documents.
+If this plan ever conflicts with those documents, the plan should change.
 
 The goal is to implement the common safe path first, with validation gates that prevent accidental
-policy drift while broader capability is still under construction.
+policy drift while the broader finalized design is rolled out in stages.
 
 ## Phase 1 Scope
 
@@ -35,7 +38,7 @@ Explicitly out of initial scope:
 Must reject:
 
 - missing required deployment metadata for protected/shared deployments
-- missing explicit `promotion_lane`, `lane_policy`, or `environment_stage` for protected/shared deployments
+- missing explicit `lane_policy` or `environment_stage` for protected/shared deployments
 - missing canonical provider-target identity fields
 - protected/shared deployment-local executable mutation hooks
 - unsupported rollout modes for the selected provider
@@ -62,7 +65,7 @@ Must enforce:
 - immutable execution snapshot frozen before queueing/locking
 - explicit two-stage protected/shared first-run admission: source admission for revision/artifact, then target-environment run admission for mutation
 - admitted immutable artifact for protected/shared publish
-- rollback authorization from current branch/lane policy
+- rollback authorization from the current branch-backed `lane_policy` and environment-branch state
 - replay from recorded snapshot for immutable-reuse flows
 - exact-artifact semantics for publish-only, retry, rollback, and same-artifact promotion
 - target-environment approval semantics for deploy, retry, rollback, and promotion
@@ -74,7 +77,7 @@ Must enforce:
 
 1. Implement deployment metadata extraction for canonical deployment targets.
 2. Implement provider-target identity normalization for the first provider.
-3. Implement lane-policy and admission-policy resolution.
+3. Implement branch-backed `lane_policy` and admission-policy resolution.
 4. Implement deployment-record, replay-snapshot, and migration/alias-exception persistence contracts.
 5. Implement control-plane admission, approval, lock flow, and migration/alias-exception lookup.
 6. Implement one built-in publisher and smoke runner for the first provider.

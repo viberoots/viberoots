@@ -4,8 +4,8 @@ This document defines the required contract for each built-in deployment provide
 
 The goal is to keep provider behavior explicit, reviewable, and consistent across adapters.
 
-Every built-in provider intended for protected/shared deployment use should have one reviewed entry
-covering the fields below before it is considered fully in policy.
+Every built-in provider intended for protected/shared deployment use should have one authoritative entry
+covering the fields below before it is considered in policy.
 
 Normative-source note:
 
@@ -40,9 +40,7 @@ Normative-source note:
 - Can the provider surface concrete publish identifiers and partial publish state?
 - Does the provider require package-local executable hooks, or can it stay inside the built-in registry model?
 
-## Seed Entry: `cloudflare-pages`
-
-This is a draft capability entry for the common initial provider discussed in the deployment design.
+## Capability Entry: `cloudflare-pages`
 
 ### Identity
 
@@ -58,9 +56,9 @@ This is a draft capability entry for the common initial provider discussed in th
 - supported component kinds:
   - `static-webapp`
 - multi-component support:
-  - not supported in the initial reviewed protected/shared phase
+  - not supported for protected/shared use
   - deployments must contain exactly one `static-webapp` component
-- out of scope for the initial phase:
+- additional unsupported shapes:
   - complex multi-component systems
   - provider-specific arbitrary executable hooks in protected/shared paths
 
@@ -68,9 +66,9 @@ This is a draft capability entry for the common initial provider discussed in th
 
 - default rollout mode:
   - `all_at_once`
-- supported rollout modes for the initial phase:
+- supported rollout modes:
   - `all_at_once`
-- explicitly not part of the initial phase:
+- unsupported rollout modes:
   - `all_or_nothing`
   - `ordered_best_effort`
   - `parallel_best_effort`
@@ -111,7 +109,7 @@ This is a draft capability entry for the common initial provider discussed in th
 
 ### Protected/Shared Eligibility
 
-- intended to be in policy for protected/shared single-component static-webapp deployments
+- in policy for protected/shared single-component static-webapp deployments
 - protected/shared execution must stay inside vetted built-in publisher, preview, and smoke-runner code
 
 ## Adding Another Provider
@@ -126,7 +124,7 @@ Before adding a new built-in provider for protected/shared use:
 6. Define smoke/release-health rules.
 7. Define retry/idempotency rules.
 8. State whether partial publish state is observable.
-9. State whether the provider is approved for protected/shared use in the current phase.
+9. State whether the provider is approved for protected/shared use.
 
 Change-control rule:
 

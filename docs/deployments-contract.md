@@ -18,8 +18,10 @@ design has been explicitly updated first.
 - Trusted CI may build, attest, and submit, but it is not a peer mutating authority.
 - Preview is `publish_mode = preview`, not a peer `operation_kind`.
 - Preview must publish only to an explicitly isolated preview target or be rejected.
+- Deployments are single-provider by design; systems that span multiple provider families must be represented as multiple coordinated deployments.
 - Every deployment must declare explicit provider-target identity in authoritative metadata.
 - `shared_nonprod` and `production_facing` deployments must declare explicit `lane_policy`, `environment_stage`, and `admission_policy` metadata.
+- Protected/shared `lane_policy` is branch-backed and must define explicit stage-to-branch mappings that govern promotion for that lane.
 - Provider config is provider-native input, not a second source of truth for core deployment facts.
 - One deployment id owns one normal mutable live target by default.
 - Reviewed migration or alias exceptions must be first-class control-plane objects with explicit scope, lock sharing, and expiry or completion semantics.
