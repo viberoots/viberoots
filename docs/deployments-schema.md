@@ -26,7 +26,6 @@ Minimum fields:
 | `smoke`               | yes for protected/shared                         | Optional for `local_only`.                              |
 | `preview`             | no                                               | Explicit opt-in only.                                   |
 | `prerequisites`       | no                                               | Explicit direct-edge deployment prerequisites.          |
-| `promotion_lane`      | yes for `shared_nonprod` and `production_facing` | Optional for `local_only`.                              |
 | `lane_policy`         | yes for `shared_nonprod` and `production_facing` | Must resolve to authoritative policy object.            |
 | `environment_stage`   | yes for `shared_nonprod` and `production_facing` | Must be defined by the lane policy.                     |
 | `admission_policy`    | yes for `shared_nonprod` and `production_facing` | Repo-owned policy reference.                            |
@@ -142,6 +141,7 @@ Minimum fields when present:
 - either explicit cleanup or TTL policy or a provider-defaulted cleanup policy marker
 - any smoke override when deviating from the provider default
 - whether separate lock scope is allowed, when overriding the provider default
+- optional preview-specific admission constraints only when intentionally narrower than the deployment's normal admission policy
 
 ### `prerequisites[*]`
 
@@ -154,6 +154,10 @@ Allowed `mode` values:
 
 - `ordering_only`
 - `health_gated`
+
+Validation rule:
+
+- prerequisites must stay within the same lane in the current design; cross-lane prerequisites are out of scope and should be rejected
 
 ## 2. Lane Policy Object
 
@@ -257,21 +261,22 @@ Used for protected/shared immutable-artifact reuse.
 
 Minimum fields:
 
-| Field                                     | Required          | Notes                                                    |
-| ----------------------------------------- | ----------------- | -------------------------------------------------------- |
-| `schema_version`                          | yes               | Explicit replay schema id.                               |
-| `deployment_id`                           | yes               | Source deployment id.                                    |
-| resolved component data                   | yes               | Canonical resolved component projection.                 |
-| artifact refs and identities              | yes               | Exact immutable artifact identity.                       |
-| declared normal target identity           | yes               | Normal live target.                                      |
-| effective run target identity             | yes               | Actual mutated target for that run.                      |
-| provider-config snapshot or immutable ref | yes               | No silent reinterpretation.                              |
-| `lane_policy` snapshot/fingerprint        | yes               | Source-run policy context.                               |
-| `admission_policy` snapshot/fingerprint   | yes               | Source-run policy context.                               |
-| rollout policy snapshot                   | yes when relevant | Source-run rollout semantics.                            |
-| `release_actions` plan snapshot           | yes when relevant | Includes replay behavior and data-compatibility posture. |
-| smoke policy snapshot                     | yes when relevant | Source-run validation contract.                          |
-| secret-contract version/reference         | yes               | Non-secret contract metadata only.                       |
+| Field                                     | Required          | Notes                                                         |
+| ----------------------------------------- | ----------------- | ------------------------------------------------------------- |
+| `schema_version`                          | yes               | Explicit replay schema id.                                    |
+| `deployment_id`                           | yes               | Source deployment id.                                         |
+| resolved component data                   | yes               | Canonical resolved component projection.                      |
+| artifact refs and identities              | yes               | Exact immutable artifact identity.                            |
+| declared normal target identity           | yes               | Normal live target.                                           |
+| effective run target identity             | yes               | Actual mutated target for that run.                           |
+| provider-config snapshot or immutable ref | yes               | No silent reinterpretation.                                   |
+| `lane_policy` snapshot/fingerprint        | yes               | Source-run policy context.                                    |
+| `admission_policy` snapshot/fingerprint   | yes               | Source-run policy context.                                    |
+| rollout policy snapshot                   | yes when relevant | Source-run rollout semantics.                                 |
+| `release_actions` plan snapshot           | yes when relevant | Includes replay behavior and data-compatibility posture.      |
+| smoke policy snapshot                     | yes when relevant | Source-run validation contract.                               |
+| secret-contract version/reference         | yes               | Non-secret contract metadata only.                            |
+| runtime-config reference/fingerprint      | yes when relevant | Non-secret admitted config selector for deterministic replay. |
 
 ## 7. Deployment Record
 
@@ -310,10 +315,25 @@ Conditionally required:
 - `artifact_lineage_id` when the same artifact is intentionally reused
 - `deploy_batch_id` or equivalent grouping id when the run was created from one higher-level mutating batch such as `--from-changes`
 - migration or alias exception reference when admission or replay relied on one
+- emergency evidence object or structured emergency-evidence reference when break-glass mutation was used
 - `failed_step` when `final_outcome` is not `succeeded` and the run reached a canonical lifecycle step after `resolve`
 - `cleanup_reason` for `preview_cleanup`
 - isolated preview target identity for `preview_cleanup`
 - source-run snapshot reference when a protected/shared exact-artifact selector resolved through an earlier admitted run
+
+### Emergency Evidence
+
+Required when break-glass mutation is used.
+
+Minimum fields:
+
+- incident reference
+- requesting identity
+- approving identity, when an approver exists for that emergency path
+- executing identity
+- emergency reason or justification
+- artifact or source-run selection path
+- why the normal control plane was unavailable or bypassed
 
 Canonical `final_outcome` values:
 
@@ -351,6 +371,7 @@ Repo validation should reject:
 - preview configuration without isolated-target semantics
 - missing canonical provider-target identity fields
 - invalid prerequisite graphs
+- cross-lane prerequisites
 - protected/shared approval-policy shapes that leave retry, promotion, or rollback approval semantics ambiguous
 - protected/shared immutable-artifact selectors that do not resolve unambiguously to one admitted source-run snapshot
 - `release_actions` declarations that omit phase, abort behavior, or replay policy

@@ -14,12 +14,12 @@ design has been explicitly updated first.
 - Every concrete deployment lives at `projects/deployments/<deployment-id>/` and exposes a canonical `:deploy` target.
 - Buck owns deployment structure, validation, dependency graph, and build artifacts.
 - Live deployment side effects do not run as ordinary Buck actions.
-- Protected/shared mutation runs only through the shared deployment control plane.
+- Protected/shared mutation runs only through the shared deployment control plane, except for an explicitly documented incident-bounded break-glass procedure for control-plane unavailability.
 - Trusted CI may build, attest, and submit, but it is not a peer mutating authority.
 - Preview is `publish_mode = preview`, not a peer `operation_kind`.
 - Preview must publish only to an explicitly isolated preview target or be rejected.
 - Every deployment must declare explicit provider-target identity in authoritative metadata.
-- `shared_nonprod` and `production_facing` deployments must declare explicit `promotion_lane`, `lane_policy`, `environment_stage`, and `admission_policy` metadata.
+- `shared_nonprod` and `production_facing` deployments must declare explicit `lane_policy`, `environment_stage`, and `admission_policy` metadata.
 - Provider config is provider-native input, not a second source of truth for core deployment facts.
 - One deployment id owns one normal mutable live target by default.
 - Reviewed migration or alias exceptions must be first-class control-plane objects with explicit scope, lock sharing, and expiry or completion semantics.
@@ -31,12 +31,15 @@ design has been explicitly updated first.
 - Default rollback candidates are prior successful `publish_mode = normal` runs against the same normal live target.
 - Default rollback candidates are usable only when any already-applied stateful `release_actions` remain rollback-compatible under their declared data-compatibility posture.
 - Protected/shared immutable-reuse flows must replay the recorded execution snapshot rather than reinterpret current repo state.
+- Protected/shared replay snapshots must record non-secret secret/config contract references or versions, not secret values.
+- Same-deployment protected/shared `retry` and `rollback` reuse the recorded admitted secret/config references by default; `promotion` uses the target deployment's newly admitted target-environment references.
 - Protected/shared exact-artifact selectors are in policy only when they deterministically resolve to exactly one admitted source run plus its recorded execution snapshot.
-- Promotion between deployment ids must follow the lane's declared `artifact_reuse_mode`.
+- Promotion between deployment ids that resolve to the same authoritative compatible `lane_policy` must follow that lane's declared `artifact_reuse_mode`.
 - `same_artifact` lanes reuse the same admitted artifact across environments.
 - `rebuild_per_stage` lanes promote the admitted source revision and build a new admitted stage artifact before publish.
 - For promotion, `--source-run-id` may select any earlier admitted run that remains eligible under the lane's current promotion policy; it is not limited to the latest candidate, and it is not an override around lane policy.
 - Protected/shared smoke is required and blocking by default unless there is an explicit `smoke.exception`.
+- Multi-component retry remains deployment-atomic by default after partial publish failure; already-proven-live components may be treated as no-op reuse only when the adapter can prove their live published identity still matches the intended resolved artifact identity and no declared rollout or release-action rule requires re-publish.
 - Protected/shared package-local executable hooks are out of policy for normal mutation paths.
 - Protected/shared approvals are target-environment run-admission facts, not reusable artifact facts.
 - Self-approval is out of policy by default when human approval is required.
@@ -57,6 +60,8 @@ design has been explicitly updated first.
 - `--rollback` is the explicit operator signal for same-deployment rollback semantics.
 - `--source-run-id` selects an earlier admitted run within policy; it does not override lane or admission policy.
 - Same-deployment preview publication defaults to `operation_kind = deploy` plus `publish_mode = preview`, not `retry`.
+- Unless `admission_policy` explicitly defines narrower preview rules, protected/shared preview uses the target deployment's normal branch/check/approval requirements.
+- Separate preview lock scope is allowed only when the preview meets the stronger independent-execution isolation bar; otherwise preview shares the normal deployment lock even when preview publication itself is in policy.
 - Mutating `--from-changes` fans out into ordinary per-deployment runs; it is not one multi-deployment mutating run record.
 
 ## Replay Rules
@@ -77,6 +82,8 @@ design has been explicitly updated first.
 - Rollback may use an earlier retained admitted run even when the branch head has moved forward, but the current branch/lane state must still authorize performing rollback.
 - Rollback must also honor the recorded data-compatibility posture of any already-applied stateful `release_actions`; unsafe rollback must fail closed rather than re-publish an older artifact by default.
 - Admission must preserve enough approval evidence to explain why the run was authorized.
+- Break-glass mutation is in policy only for an explicitly documented incident-bounded control-plane-unavailability path with mandatory fencing or equivalent concurrency protection and post-incident reconciliation back into the authoritative deployment record.
+- When break-glass mutation is used, the resulting authoritative record must preserve structured emergency evidence sufficient to explain who requested, approved, and executed the action, which incident justified it, which artifact or source-run selection path was used, and why the normal control plane was unavailable or bypassed.
 
 ## Required Review Questions
 

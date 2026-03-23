@@ -59,7 +59,7 @@ Expected behavior:
 
 Situation:
 
-- `pleomino-staging` and `pleomino-prod` are in the same compatible `promotion_lane`
+- `pleomino-staging` and `pleomino-prod` resolve to the same authoritative compatible `lane_policy`
 - the lane uses `artifact_reuse_mode = "same_artifact"`
 - the selected staging run is an earlier admitted candidate that is still eligible under the lane's current promotion policy
 
@@ -83,7 +83,9 @@ Expected behavior:
 - the operator or automation submits `deploy pleomino-prod --preview --source-run-id <admitted-run-id>`
 - preview is recorded as `publish_mode = preview`
 - for same-deployment preview publication, the default `operation_kind` remains `deploy`
+- unless the deployment's `admission_policy` explicitly defines narrower preview rules, the preview run uses the same target-environment branch/check/approval requirements as a normal protected/shared publish for `pleomino-prod`
 - the effective target identity is the isolated preview target
+- the preview run may still share the normal deployment lock unless the preview also satisfies the stronger independent-execution isolation requirements for a separate preview lock scope
 - preview cleanup is a first-class audited `preview_cleanup` operation
 - preview cleanup records `publish_mode = preview`, the isolated preview target identity, and a cleanup reason such as TTL expiry or PR close
 
@@ -245,6 +247,39 @@ Expected behavior:
 - the retry is not auto-superseded by default just because a newer normal deploy exists
 - the control plane still applies ordinary revalidation, approval, and queue-time policies before mutation
 - if the retry should no longer run, that decision must come from explicit cancellation, admission failure, or a stricter reviewed policy rather than implicit supersedence
+
+## 18. Multi-Component Partial Publish Retry
+
+Situation:
+
+- a multi-component deployment publishes component `frontend` successfully
+- component `api` then fails during the same deployment run
+- the provider and rollout policy do not support partial component retry as a separate operator workflow
+
+Expected behavior:
+
+- the original run records per-component publish state and artifact identity for both components
+- the follow-up operator action is still one deployment-level retry, not an implicitly narrowed component-only repair command
+- on retry, `frontend` may be treated as a no-op only if the adapter can prove its live published identity still matches the intended resolved artifact identity and no rollout or `release_action` rule requires it to be published again
+- if the adapter cannot prove that equivalence, the retry republishes `frontend` or fails clearly rather than guessing
+- `api` is retried using the recorded deployment state and normal retry admission rules
+- the deployment remains the operator-atomic recovery unit unless a reviewed provider capability entry and rollout contract explicitly allow a narrower replay unit
+
+## 19. Control-Plane-Outage Break-Glass Mutation
+
+Situation:
+
+- a `production_facing` deployment needs emergency stabilization
+- the normal shared control plane or one of its core online dependencies is unavailable
+- an incident-bounded break-glass procedure has been documented for that target class
+
+Expected behavior:
+
+- the emergency action may proceed only through the documented break-glass path, not through an ad hoc alternate workflow
+- the emergency path still prefers exact admitted-artifact reuse over rebuild when a retained admitted artifact is available
+- the emergency path uses explicit fencing, target freeze, or equivalent reviewed concurrency protection before mutation
+- the emergency path preserves structured emergency evidence including incident reference, requesting identity, approving identity when applicable, executing identity, artifact or source-run selection path, and why the normal control plane was unavailable or bypassed
+- once the incident is stabilized, that evidence is reconciled into the authoritative deployment record before the environment returns to steady-state normal operations
 
 ## Companion Docs
 

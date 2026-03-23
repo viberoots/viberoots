@@ -69,7 +69,7 @@ Future edits should not weaken or silently contradict the following invariants w
 - protected/shared first-run deploys use two admission stages:
   - source admission determines the admissible revision and trusted artifact inputs
   - target-environment run admission freezes the execution snapshot for the mutating publish run against the intended deployment target
-- promotion across distinct deployment ids in the same compatible `promotion_lane` must follow the lane's declared `artifact_reuse_mode`; it must not retarget one deployment dynamically across environments.
+- promotion across distinct deployment ids that resolve to the same authoritative compatible `lane_policy` must follow that lane's declared `artifact_reuse_mode`; it must not retarget one deployment dynamically across environments.
 - lanes with `artifact_reuse_mode = "same_artifact"` promote by reusing the same admitted artifact across environments.
 - lanes with `artifact_reuse_mode = "rebuild_per_stage"` promote by advancing the same admitted source revision across environments, producing a new admitted stage-specific artifact before each protected/shared publish.
 - for promotion, the lane policy and environment-branch state are authoritative for what is currently promotable; `--source-run-id` is a selector within that admitted policy boundary, not an override around it.
@@ -392,15 +392,17 @@ treated as planned policy, not open brainstorming:
   - the default lock scope should be derived from `provider` plus a normalized canonical provider-target identity
   - explicit overrides are special-case escape hatches and must validate as at least as strict as the derived scope
   - one active mutating run should run per lock scope
-  - different lock scopes may run in parallel
-  - rollback, retry, and redeploy actions should take the same lock as the normal deploy path
-  - preview should share the main deployment lock by default
-  - preview runs may use separate lock scope only when they publish to isolated preview targets
-  - the shared lock implementation must provide lease expiry plus stale-holder protection such as fencing or an equivalent safety mechanism
+- different lock scopes may run in parallel
+- rollback, retry, and redeploy actions should take the same lock as the normal deploy path
+- preview should share the main deployment lock by default
+- preview runs may use separate lock scope only when they meet a stronger independent-execution isolation bar
+  - preview-safe isolation is the minimum bar to allow preview at all: preview must not mutate the normal live target
+  - independent-execution isolation is the stronger bar required for a separate lock scope: the preview's mutable target identity, publish path, smoke target, and cleanup path are all independently isolated from the normal path
+- the shared lock implementation must provide lease expiry plus stale-holder protection such as fencing or an equivalent safety mechanism
 - deployments may declare explicit prerequisites on other deployment ids
   - prerequisite modes should be narrow by default: `ordering_only` or `health_gated`
-  - prerequisites should be same-lane by default
-  - cross-lane prerequisites require explicit reviewed shared-platform semantics
+  - prerequisites should remain same-lane in the base model
+  - cross-lane prerequisites are out of scope for v1 and should be rejected rather than carried as partially specified exceptions
   - prerequisite graphs must be DAGs
   - admission, orchestration, and changed-based selection should consume the same declared direct-edge prerequisite metadata
 - deploy records should include first-class lineage identifiers
@@ -450,6 +452,8 @@ treated as planned policy, not open brainstorming:
   - only named emergency roles may invoke them
   - they should still prefer exact admitted-artifact reuse over rebuild
   - any exceptional rebuild path should require a separately documented higher-bar approval
+  - the design must support an incident-bounded emergency path even when the normal shared control plane or one of its core dependencies is unavailable
+  - that emergency path may bypass the normal online control-plane workflow only through an explicitly documented offline-capable break-glass procedure with separate credentials, explicit fencing or equivalent concurrency protection, and mandatory post-incident reconciliation
   - they must record the requesting identity, the executing identity, reason, affected target, approval source, artifact-selection path, and reconciliation owner
   - they must be incident-bounded rather than a standing alternate workflow
   - they must require post-incident reconciliation back to the normal branch, admission, and deployment path
@@ -462,6 +466,7 @@ treated as planned policy, not open brainstorming:
   - deployment-specific preview URL only when explicitly configured
   - timeout and retry policy should be explicit, not implicit
   - a protected/shared deployment may omit or downgrade smoke only through an explicit documented exception
+- `lane_policy` should be the authoritative lane identity and policy object for protected/shared deployments
 - protected/shared control-plane permissions should follow one explicit minimum role model
   - separate normal submit, approve, operate, and break-glass powers rather than leaving privileged actions to adapter-local convention
   - when a deployment requires human approval, self-approval is out of policy by default; the same principal must not satisfy both submitter and approver roles unless an explicit break-glass procedure says otherwise
@@ -496,7 +501,6 @@ Common-case summary:
 - add `preview` only when preview is intentionally supported
 - add `rollout_policy` only when the deployment is multi-component or otherwise needs explicit staged behavior
 - for protected/shared deployments, the common single-component path should still stay compact:
-  - `promotion_lane`
   - `lane_policy`
   - `environment_stage`
   - `admission_policy`
@@ -519,6 +523,9 @@ Artifact portability rule:
 This design is intentionally opinionated about the model, but still leaves some implementation policy choices open:
 
 - the exact Postgres schema and lease mechanics for the shared deployment control plane, while still preserving lease expiry and stale-holder protection
+- the concrete implementation shape of the offline-capable break-glass path, while still preserving explicit emergency authorization, fencing or equivalent concurrency protection, and mandatory reconciliation back into the authoritative deployment record
+- the exact authorization-storage model for mixed-scope RBAC, while still preserving the minimum scope rules in this document
+- the exact adapter algorithm for proving a component is already live with the same artifact identity and can therefore be treated as a retry no-op after a partial multi-component failure
 
 Those are real decisions, but they are operational-policy details layered on top of this model rather than reasons to change the model itself.
 
@@ -573,6 +580,7 @@ Control-plane worker responsibilities for protected/shared mutation:
    - for immutable-reuse flows, source admission validates the selected prior admitted run and its replay eligibility
 2. resolve target-environment run admission and freeze one immutable execution snapshot for that mutating run before any waiting or mutation begins
    - the snapshot should preserve the deployment metadata, provider-config snapshot or fingerprint, resolved policy contents, selected artifact inputs when applicable, and any other non-secret execution inputs needed to replay the admitted decision faithfully
+   - for secret or runtime-config dependencies, the snapshot should preserve non-secret contract references, versions, selectors, or fingerprints rather than secret values
 3. revalidate admission, lane, prerequisite, and target-ownership policy before mutation
 4. acquire the shared lock
 5. revalidate under the acquired lock that the run is still admitted, not superseded, and still bound to the intended target
@@ -606,7 +614,7 @@ Promotion clarification:
 
 Minimum promotion-compatibility rule:
 
-- sharing a `promotion_lane` is necessary but not sufficient for cross-deployment promotion
+- sharing the same authoritative compatible `lane_policy` is necessary but not sufficient for cross-deployment promotion
 - the control plane should reject promotion unless source and target are compatible in the ways that matter for safe reuse:
   - resolved component shape and artifact contract
   - provider and publisher compatibility for the target publish path
@@ -631,7 +639,7 @@ Operation-kind classification rule for source-run reuse:
 - preview remains `publish_mode = preview`; it is never a peer `operation_kind`
 - same-deployment preview publication should not be classified as `retry` just because it reuses a selected source run
   - the default same-deployment preview shape is `operation_kind = deploy` plus `publish_mode = preview`
-- when a run reuses a source run from a different deployment id in the same compatible `promotion_lane`, the run is `operation_kind = promotion`
+- when a run reuses a source run from a different deployment id in the same authoritative compatible `lane_policy`, the run is `operation_kind = promotion`
 - when a run reuses a source run from the same deployment id and the operator explicitly requests `--rollback`, the run is `operation_kind = rollback`
 - when a run reuses a source run from the same deployment id without `--rollback` and `publish_mode = normal`, the run is `operation_kind = retry`
 - the control plane must reject ambiguous or policy-incompatible source-run reuse rather than infer a different operation kind from timing, recency, or guesswork
@@ -752,8 +760,8 @@ Flag interaction rules:
   - for `shared_nonprod` and `production_facing`, `--source-run-id` is only a selector for an earlier admitted run plus operation-appropriate recorded context; it does not authorize a rebuild outside the lane's declared policy
   - for `retry` and `rollback`, that source run should normally come from the same deployment id
   - same-deployment reuse should require explicit `--rollback` when the operator intends rollback semantics rather than retry semantics
-  - for `promotion`, that source run may come from another deployment in the same compatible `promotion_lane`
-  - the control plane must validate operation-kind compatibility, promotion-lane compatibility, and target compatibility before allowing that reuse
+  - for `promotion`, that source run may come from another deployment in the same authoritative compatible `lane_policy`
+  - the control plane must validate operation-kind compatibility, lane-policy compatibility, and target compatibility before allowing that reuse
   - for `local_only`, implementations may additionally offer another exact immutable selector such as `--artifact-ref <artifact-ref>` or an equivalent exact local record reference
     - that is an optional implementation convenience rather than part of the stable cross-environment operator contract
   - local-only `--publish-only` should remain exact-artifact reuse, not shorthand for "publish my latest local build output"
@@ -963,16 +971,15 @@ Concrete preview-enabled example:
 deployment(
     name = "deploy",
     provider = "cloudflare-pages",
+    lane_policy = "//build-tools/deploy/lanes:pleomino",
     provider_target = {
         "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
         "id": "pleomino-prod-pages",
     },
-    lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
-    promotion_lane = "pleomino",
     preview = {
         "target_derivation": "run-scoped-provider-default",
         "isolation_class": "provider-managed-isolated-preview",
@@ -1047,6 +1054,7 @@ Protected/shared preview admission policy:
 - preview on those deployments should therefore require `--source-run-id` or an equivalent explicit admitted source-run selector
 - preview for those deployments must still publish to an explicitly isolated preview target class
 - preview for those deployments must not be used to preview unadmitted PR code or to bypass the lane's normal branch, check, or approval policy
+- unless the target deployment's `admission_policy` explicitly defines narrower preview rules, protected/shared preview should inherit the target deployment's normal branch, check, and approval requirements
 - PR-driven shared previews of unadmitted code are out of policy
 - if a workflow needs previews for unadmitted revisions, that should use a separate `local_only` or other explicitly preview-safe review-app deployment shape rather than piggybacking on a protected/shared deployment id
 - preview remains a `publish_mode`; it does not introduce a separate replay or peer `operation_kind` category
@@ -1070,6 +1078,9 @@ Preview cleanup contract:
 - preview cleanup must use the same explicit authz boundary as other destructive protected/shared actions
 - preview cleanup must acquire the lock for the isolated preview target it destroys
 - if the preview is not isolated enough to have its own safe cleanup path, that preview shape is out of policy
+- a preview may be valid yet still share the normal deployment lock
+  - preview-safe isolation is enough to allow preview publication
+  - a separate preview lock scope requires the stronger independent-execution isolation bar described above
 
 Non-interference guarantees:
 
@@ -1155,11 +1166,11 @@ Monorepo clarification:
 Concrete examples:
 
 - `env/pleomino/dev -> env/pleomino/staging -> env/pleomino/prod`
-  - governs only deployments with `promotion_lane = "pleomino"`
+  - governs only deployments whose `lane_policy` resolves to the `pleomino` lane
 - `env/shared-observability/dev -> env/shared-observability/staging -> env/shared-observability/prod`
-  - governs only deployments with `promotion_lane = "shared-observability"`
+  - governs only deployments whose `lane_policy` resolves to the `shared-observability` lane
 - `env/customer-a-portal/dev -> env/customer-a-portal/staging -> env/customer-a-portal/prod`
-  - governs only deployments with `promotion_lane = "customer-a-portal"`
+  - governs only deployments whose `lane_policy` resolves to the `customer-a-portal` lane
 
 What that means in practice:
 
@@ -1290,7 +1301,6 @@ deployment(
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
-    promotion_lane = "pleomino",
     components = [
         {
             "id": "web",
@@ -1316,9 +1326,8 @@ In this example:
 - `admission_policy` is included because protected/shared admission policy binding should remain authoritative deployment metadata
 - `environment_stage` is included because lane ordering and default branch selection should be explicit deployment metadata too
 - `protection_class` is included because environment classification is part of the authoritative deployment contract
-- `promotion_lane` is included because this example represents a named environment that participates in protected/shared promotion policy
 - `lane_policy` is shown explicitly here because protected/shared deployments should bind directly to the authoritative lane object
-- deployments that are truly local-only or otherwise outside protected/shared promotion policy may omit `promotion_lane`, but that omission should be intentional and explained by the deployment's policy class
+- deployments that are truly local-only or otherwise outside protected/shared promotion policy may omit `lane_policy`, but that omission should be intentional and explained by the deployment's policy class
 - the smoke block uses a built-in smoke runner shape instead of a package-local executable hook because this example is compatible with protected/shared policy
 
 Suggested metadata shape conventions:
@@ -1336,6 +1345,7 @@ Typed policy-object minimums:
   - allowed promotion edges
   - artifact reuse mode for the lane, with `same_artifact` as the sensible default unless the lane explicitly declares `rebuild_per_stage`
   - any stricter lane-specific compatibility rules
+  - authoritative lane identity for protected/shared deployments
 - `admission_policy` should resolve to one authoritative typed policy object with at least:
   - allowed source refs or branches
   - required checks
@@ -1379,7 +1389,6 @@ How to read this:
 
 Policy evaluation order:
 
-- resolve the deployment's `promotion_lane`
 - resolve the authoritative `lane_policy`
 - validate that the deployment's `environment_stage` is allowed by that `lane_policy`
 - resolve the deployment's `admission_policy`
@@ -1387,6 +1396,7 @@ Policy evaluation order:
   - `lane_policy` governs stage ordering, branch mapping, allowed promotion edges, artifact reuse mode, and any lane-specific compatibility rules that affect promotion behavior
   - `admission_policy` governs allowed refs, required checks, approvals, and attestation requirements for the requested run kind
 - the shared control plane is the final mutating-policy gate and must not silently reinterpret these referenced policy objects differently from repo validation
+- unless `admission_policy` explicitly defines narrower preview rules, protected/shared preview runs should inherit the same target-environment branch/check/approval requirements as normal publishes for that deployment
 - recommended conventions for the low-level deployment shape are:
   - `provider_target`
     - required
@@ -1396,14 +1406,11 @@ Policy evaluation order:
     - the default lock scope, normal live-target ownership rule, preview isolation, and deployment-record target identity must all key off that same provider-specific canonical identity rule
     - a provider adapter must treat all fields required by that canonical identity rule as part of the mutable live-target identity, not as optional commentary
     - additional non-identity provider metadata may exist, but must not silently participate in canonical target identity unless the provider's documented identity rule says so
-  - `promotion_lane`
-    - required for deployments that participate in protected/shared promotion policy
-    - identifies the independently promoted deployment family this deployment belongs to
-    - should be explicit deployment metadata rather than inferred only from naming convention
   - `lane_policy`
     - required for `shared_nonprod` and `production_facing`
     - should be a Buck-visible, repo-owned reference to the authoritative lane-policy object for that deployment family
     - should define ordered stages, branch mapping, allowed promotion edges, artifact reuse mode, and any stricter lane-specific compatibility or admission rules
+    - is the authoritative lane identity for protected/shared deployments
     - the sensible common-case default is `artifact_reuse_mode = "same_artifact"`
     - lanes that require environment-specific build-time substitution must declare `artifact_reuse_mode = "rebuild_per_stage"` explicitly rather than inheriting same-artifact semantics by accident
   - `environment_stage`
@@ -1412,7 +1419,7 @@ Policy evaluation order:
     - is not a repo-global closed enum
     - must be a stage label defined by that deployment's authoritative `lane_policy`
     - common lanes will often use values such as `dev`, `staging`, and `prod`, but lanes may define other ordered stages such as `internal` or `beta`
-    - should drive default environment-branch selection and promotion ordering together with `promotion_lane`
+    - should drive default environment-branch selection and promotion ordering together with `lane_policy`
   - `admission_policy`
     - required for `shared_nonprod` and `production_facing`
     - should be an explicit reference to a centrally defined stable branch/check/approval policy object for that deployment
@@ -1736,8 +1743,9 @@ Policy:
 - prerequisites should be narrow and direct-edge-only by default
 - a deployment may declare zero or more prerequisites, but each prerequisite must name one concrete deployment id and one explicit mode
 - orchestration, admission, and `--from-changes` logic should all consume the same declared direct-edge prerequisite metadata rather than inventing separate notions of dependency
-- prerequisites should be same-lane by default
-- cross-lane prerequisites are forbidden unless they are explicitly marked and reviewed as shared-platform dependencies with documented admission, locking, and health semantics
+- prerequisites should be same-lane in the base model
+- cross-lane prerequisites are out of scope for the current design and should be rejected rather than carried as reviewed exceptions without fully specified semantics
+- if the repo later needs to express dependency on a shared platform that serves multiple lanes, that should use a separate shared-platform dependency model with its own admission, health, and ownership rules
 - prerequisite graphs must be DAGs
 - transitive prerequisite closure is not part of the default contract; a future explicit policy would need to add it deliberately
 - self-dependencies are invalid and must be rejected at validation time
@@ -1840,7 +1848,6 @@ deployment(
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
-    promotion_lane = "pleomino",
     components = [
         {
             "id": "web",
@@ -1915,7 +1922,6 @@ deployment(
     admission_policy = "//build-tools/deploy/policies:docs_site_prod_release",
     environment_stage = "prod",
     protection_class = "production_facing",
-    promotion_lane = "docs-site",
     components = [
         {
             "id": "web",
@@ -2023,7 +2029,6 @@ deployment(
     admission_policy = "//build-tools/deploy/policies:shared_observability_prod_release",
     environment_stage = "prod",
     protection_class = "production_facing",
-    promotion_lane = "shared-observability",
     components = [
         {
             "id": "otel-collector",
@@ -2140,7 +2145,8 @@ Plain-language rule:
 
 Shared-resource coordination rule:
 
-- when a mutable shared resource is substantial enough to deserve ongoing ownership, it should usually be modeled as its own deployment and referenced through explicit prerequisites rather than by widening unrelated deployment locks ad hoc
+- when a mutable shared resource is substantial enough to deserve ongoing ownership, it should usually be modeled as its own deployment rather than hidden inside an app deployment
+- consumers of that shared platform should normally depend on it through compatibility contracts, health checks, or a future shared-platform dependency model rather than through ordinary cross-lane deployment prerequisites
 - widened lock scope should be an exception path for narrowly scoped shared mutations that cannot practically be split into their own owned deployment
 - if lock scope is widened for such an exception, that widened scope must be explicit, reviewed, and treated as part of the deployment's ownership contract rather than an adapter-local convenience
 
@@ -2536,7 +2542,6 @@ deployment(
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
-    promotion_lane = "pleomino",
     components = [
         {
             "id": "web",
@@ -2667,6 +2672,11 @@ Multi-component lifecycle semantics:
 - retry and rollback must operate from recorded per-component artifact and publish state, not from guesses about what probably succeeded
 - when a deployment resolves more than one component, unchanged components should not be republished blindly if the adapter can prove their resolved artifact identity already matches the live published identity
 - the deployment still remains the default operator-atomic unit, but publishers may treat unchanged components as per-component no-ops when identity comparison is reliable and no declared rollout or `release_action` requires an actual re-publish
+- after a partial multi-component publish failure, the default retry contract should remain deployment-atomic while allowing safe per-component no-op reuse
+  - the retry re-runs the deployment as one operator action, not as an implicitly narrowed component-only repair workflow
+  - a component that was already published successfully in the failed run may be treated as a no-op only when the adapter can prove that the live published identity still matches the intended resolved artifact identity and no declared rollout gate or `release_action` requires that component to be published again
+  - if the adapter cannot prove that equivalence, the retry must republish that component or fail clearly rather than guessing
+  - partial component retry as a public operator workflow remains out of policy by default unless a provider capability entry and rollout contract explicitly add it later
 
 First-class rollout-shape policy:
 
@@ -3094,7 +3104,6 @@ deployment(
     admission_policy = "//build-tools/deploy/policies:pleomino_dev_release",
     environment_stage = "dev",
     protection_class = "shared_nonprod",
-    promotion_lane = "pleomino",
     components = [
         {
             "id": "web",
@@ -3247,6 +3256,24 @@ Minimum protected/shared RBAC model:
 - no built-in adapter should rely on ambient infrastructure credentials as a substitute for control-plane authorization
 - implementations may add finer-grained roles, but they must not collapse these minimum trust boundaries silently
 
+Minimum protected/shared RBAC scope model:
+
+- role names alone are insufficient; authorization must also be scoped to explicit repo-owned deployment boundaries
+- `submitter` permission should be granted per deployment id by default
+  - optional tighter constraints such as environment-stage restriction may narrow that scope further
+- `approver` permission should be granted per deployment id by default
+  - optional tighter constraints such as protection-class or environment-stage restriction may narrow that scope further
+- `operator` permission should be granted per canonical provider-target identity or reviewed lane scope by default
+  - it should not be repo-wide by default
+  - a reviewed lane-scoped grant is appropriate when one operational team intentionally owns routine control-plane actions for a coordinated deployment family
+- `break_glass` permission should be granted per canonical provider-target identity or reviewed lane scope by default
+  - it should be the smallest emergency scope that still lets the named role stabilize the affected target safely
+  - repo-wide break-glass power is out of policy unless separately documented as an exceptional platform-administrator posture
+- this mixed-scope model is intentional:
+  - release authority normally follows deployment ownership
+  - operational and emergency authority normally follow live-target or lane blast radius
+- if one implementation stores grants by deployment id and another stores them by target identity, both must still evaluate to these same effective minimum scopes
+
 Approval semantics for protected/shared runs:
 
 - required approvals are deployment-run admission facts, not reusable artifact facts
@@ -3279,7 +3306,7 @@ Release-admission contract for protected/shared environments:
   - for `rollback`, the current lane policy and environment-branch state must authorize performing a rollback for that deployment, but the selected rollback source run may be an earlier retained admitted run for the same deployment rather than the current branch head revision
 - required checks for that environment have passed for the admitted revision or admitted reusable artifact, as applicable to the run kind
   - any required human or policy approval has been granted
-  - the deployment's explicit `promotion_lane`, `protection_class`, and `admission_policy` metadata are present, valid, and match the intended target and admission path
+  - the deployment's explicit `lane_policy`, `protection_class`, and `admission_policy` metadata are present, valid, and match the intended target and admission path
   - the deployment's explicit `environment_stage` metadata is present, valid, and matches the intended lane role for this deployment
   - for runs that publish artifacts:
     - artifact provenance is present and valid for the intended target
@@ -3288,7 +3315,7 @@ Release-admission contract for protected/shared environments:
     - the shared control plane verifies that artifact attestation before publish
     - the selected artifact or revision still matches the environment's promotion and admission policy
     - for protected/shared `--publish-only`, retry, rollback, and other immutable-artifact reuse paths, the control plane should replay the recorded deployment snapshot for the selected source run rather than silently re-reading current repo metadata or provider config as if it were the original deployment state
-    - for source-run reuse across deployments, the source run must come from the same compatible `promotion_lane`, and the requested operation kind must be valid for that source/target pairing
+    - for source-run reuse across deployments, the source run must come from another deployment in the same authoritative compatible `lane_policy`, and the requested operation kind must be valid for that source/target pairing
     - for `promotion`, the target lane policy and environment-branch state are authoritative for what is currently promotable; `--source-run-id` is valid only when it names an earlier admitted run that remains eligible under the lane's current promotion policy
   - for `--provision-only` and other non-publishing mutating runs:
     - artifact attestation is not required
@@ -3385,7 +3412,6 @@ deployment(
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
-    promotion_lane = "pleomino",
     components = [
         {
             "id": "web",
@@ -3495,9 +3521,9 @@ Migration and alias exception policy:
 - if the exception expires or is superseded, later replay against the old binding must fail clearly rather than guessing which deployment now owns the target
 - the steady-state goal remains removal of the exception and restoration of one deployment id owning one normal mutable live target
 
-Promotion-lane compatibility contract:
+Lane-policy promotion compatibility contract:
 
-- deployments in the same `promotion_lane` are expected to be promotion-compatible according to that lane's declared `artifact_reuse_mode`
+- deployments that resolve to the same authoritative compatible `lane_policy` are expected to be promotion-compatible according to that lane's declared `artifact_reuse_mode`
 - that compatibility normally requires all of the following to match across the lane:
   - component ids
   - component kinds
@@ -3581,6 +3607,23 @@ Provider-native rollback policy:
 - provider-native rollback may be used as an emergency stabilization path
 - if it is used, the deployment control plane and Git history should be reconciled afterward so live state and declared state do not drift silently
 
+Control-plane-outage break-glass policy:
+
+- the emergency path must remain usable even when the normal shared control plane, its Postgres backend, or another core online dependency is the incident
+- that does not create a second normal deployment system; it creates one explicitly documented incident-only procedure for protected/shared stabilization
+- the offline-capable path should still prefer exact admitted-artifact reuse over rebuild whenever a retained admitted artifact is available
+- if the normal online lock service is unavailable, the emergency path must use explicit fencing, target freeze, or another reviewed concurrency-control mechanism strong enough to prevent concurrent normal-path mutation against the same canonical target
+- the emergency path must record enough local or deferred audit evidence to reconstruct:
+  - requesting identity
+  - approving identity
+  - executing identity
+  - incident reference
+  - affected deployment id and canonical target identity
+  - artifact or source-run selection path
+  - why the normal control plane was unavailable or unsuitable
+- once the incident is stabilized, the normal control plane must ingest or reconcile that evidence into the authoritative deployment record before the environment returns to steady-state normal operations
+- the emergency path must not become a standing convenience workaround for normal admission, approval, or locking friction
+
 Boundary between app rollback and infra rollback:
 
 - rollback of published artifacts is not the same thing as rollback of provisioned infrastructure
@@ -3601,7 +3644,7 @@ Concrete promotion story:
 2. The staging run publishes that exact artifact and records `artifact_lineage_id = pleomino-web/2026-03-19/abc1234`.
 3. Promotion to `pleomino-prod` reuses that same `artifact_ref` and `artifact_lineage_id` rather than rebuilding from `abc1234` on a different machine.
    - the normal operator input for that reuse would be `--source-run-id <staging-run-id>`
-   - that source run is valid because it is a compatible run from the same `promotion_lane`
+   - that source run is valid because it is a compatible run from another deployment in the same authoritative `lane_policy`
 4. The production deployment record differs from the staging record because deployment metadata, approvals, target identity, and publish result are environment-specific, even though artifact identity is unchanged.
 
 Concrete rollback story:
@@ -3762,6 +3805,14 @@ Input classes:
 - secrets
   - sensitive values injected only at deploy-runtime boundaries
 
+Replay rule for runtime inputs:
+
+- protected/shared execution snapshots should capture non-secret references to the admitted secret/config contract actually used for the run, such as contract ids, versions, selector identities, or resolved non-secret config fingerprints
+- snapshots must not contain secret values
+- same-deployment `retry` and `rollback` should, by default, reuse the recorded secret/config references from the admitted source-run snapshot so replay semantics stay deterministic
+- `promotion` should use the target deployment's own newly admitted target-environment secret/config references rather than replaying the source deployment's environment-specific refs
+- if a referenced secret/config version is no longer available at execution time, the run should fail closed rather than silently substituting a newer version
+
 Policy:
 
 - checked-in deployment files such as `TARGETS`, `wrangler.jsonc`, and `smoke.ts` must not contain credentials or secret values
@@ -3869,7 +3920,7 @@ Required current replay invariants:
   - component kinds
 - `promotion` should instead validate:
   - source-run artifact compatibility from the recorded source snapshot
-  - current target deployment compatibility for `provider`, publisher type, component ids and kinds, `promotion_lane`, and `lane_policy`
+  - current target deployment compatibility for `provider`, publisher type, component ids and kinds, and `lane_policy`
   - that the target deployment's current `admission_policy` is present, valid for the target environment, and satisfied for this promotion run
 - everything else needed to execute the reuse flow should come from the recorded snapshot rather than from opportunistic reinterpretation of current repo state
 
@@ -4045,7 +4096,7 @@ For Apple App Store and Google Play style releases:
 - `provider_target` should identify the concrete store app and default release track or channel
 - the built artifact should be a signed immutable mobile release artifact, typically an `.ipa` or `.aab`
 - the built-in publisher should own upload, processing, staged rollout, and release-track promotion semantics
-- `promotion_lane` and lane-defined `environment_stage` labels should model track progression such as internal, beta, staging, or production-like release channels through explicit deployment ids rather than one deployment dynamically retargeting itself
+- `lane_policy` and lane-defined `environment_stage` labels should model track progression such as internal, beta, staging, or production-like release channels through explicit deployment ids rather than one deployment dynamically retargeting itself
 - store credentials and signing-related secret requirements should be explicit through `secret_requirements`
 - smoke should usually mean store-processing validation, installability checks, staged-rollout health, or other release-health evidence rather than a simple URL check
 
@@ -4287,7 +4338,6 @@ cloudflare_static_pwa_deployment(
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
-    promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
     smoke = {
         "type": "http-smoke",
@@ -4445,14 +4495,11 @@ def cloudflare_static_pwa_deployment(
     lane_policy = None,
     environment_stage = None,
     admission_policy = None,
-    promotion_lane = None,
     provisioner = None,
     smoke = None,
     secret_requirements = {},
 ):
     if protection_class != "local_only":
-        if promotion_lane == None:
-            fail("protected/shared deployments must set promotion_lane")
         if environment_stage == None:
             fail("protected/shared deployments must set environment_stage")
         if admission_policy == None:
@@ -4467,7 +4514,6 @@ def cloudflare_static_pwa_deployment(
         environment_stage = environment_stage,
         admission_policy = admission_policy,
         protection_class = protection_class,
-        promotion_lane = promotion_lane,
         components = [
             {
                 "id": "web",
@@ -4506,7 +4552,6 @@ cloudflare_static_pwa_deployment(
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
-    promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
     smoke = {
         "type": "http-smoke",
@@ -4545,7 +4590,6 @@ def puzzle_cloudflare_deployment(
     lane_policy = None,
     environment_stage = None,
     admission_policy = None,
-    promotion_lane = None,
     provisioner = None,
     smoke = None,
     secret_requirements = {},
@@ -4559,7 +4603,6 @@ def puzzle_cloudflare_deployment(
         environment_stage = environment_stage,
         admission_policy = admission_policy,
         protection_class = protection_class,
-        promotion_lane = promotion_lane,
         provisioner = provisioner,
         smoke = smoke,
         secret_requirements = secret_requirements,
@@ -4586,7 +4629,6 @@ puzzle_cloudflare_deployment(
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
-    promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
     smoke = {
         "type": "http-smoke",
@@ -4656,7 +4698,6 @@ puzzle_cloudflare_deployment(
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
-    promotion_lane = "pleomino",
     wrangler_config = "wrangler.jsonc",
     smoke = {
         "type": "http-smoke",
@@ -4802,7 +4843,6 @@ deployment(
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     environment_stage = "prod",
     protection_class = "production_facing",
-    promotion_lane = "pleomino",
     components = [
         {
             "id": "web",
