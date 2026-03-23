@@ -413,6 +413,9 @@ treated as settled policy, not open brainstorming:
   - it should back deployment-record storage
   - it should back shared-environment deploy locking
   - Postgres is the intended initial implementation because this design needs durable shared locks, fencing-capable coordination, and authoritative audited deploy records
+  - because the shared control plane is the sole mutating authority for protected/shared environments, its own resilience is part of the deployment-system design
+  - the authoritative backend and API tier should have reviewed backup, restore-test, failover, and disaster-recovery expectations rather than relying on break-glass as the routine answer to ordinary platform failure
+  - the operator-facing design should define explicit control-plane recovery objectives, including target RPO and RTO, so teams know the intended availability posture of the deployment authority itself
 - shared-environment locking should use an explicit lock scope
   - the default lock scope should be derived from `provider` plus a normalized canonical provider-target identity
   - explicit overrides are special-case escape hatches and must validate as at least as strict as the derived scope
@@ -443,6 +446,9 @@ treated as settled policy, not open brainstorming:
 - service-like, SSR, and other non-trivial deployments may declare explicit built-in `release_actions` around publish
   - those actions should cover controlled release-time work such as schema migrations, cache warmups, or post-publish verification jobs when the deployment contract needs them
   - for `shared_nonprod` and `production_facing`, `release_actions` must come from a vetted built-in registry rather than package-local executable hooks
+  - any side-effecting built-in `release_action` must declare one reviewed duplicate-execution safety contract for every replay context it supports
+    - acceptable models are provider-native idempotency, control-plane deduplication, or explicit fail-closed refusal to rerun when duplicate safety cannot be proven
+    - retries, worker restarts, ambiguous outcomes, and replay must not be allowed to execute the same side effect twice by accident and still count as policy-compliant
 - each deployment should declare explicit provider-target identity in deployment metadata
   - adapters must not infer the live target from directory names, branch names, CLI defaults, or unchecked provider config drift
   - one deployment id should own one normal mutable live target by default
@@ -501,6 +507,10 @@ treated as settled policy, not open brainstorming:
   - when a deployment requires human approval, self-approval is out of policy by default; the same principal must not satisfy both submitter and approver roles unless an explicit break-glass procedure says otherwise
 - provisioners should be non-destructive by default during normal deploy flows
   - delete or replace behavior that can remove owned live resources should require an explicit separate operator path or equivalent break-glass intent
+  - for `shared_nonprod` and `production_facing`, infra-affecting provisioners should expose a reviewable plan or diff surface before mutation whenever they may change provider-managed state
+    - that plan surface may be provider-native or provider-neutral, but it should make intended creates, updates, replacements, and deletes understandable to operators and approvers
+    - approval evidence for infra-affecting runs should be able to point at that reviewed plan or diff artifact
+    - if a provisioner cannot produce a meaningful plan or diff, that limitation should be explicit in policy review and the mutating path should default to a higher-bar approval posture rather than silently proceeding as routine automation
 - `--provision-only` should not build or publish
   - the simple default is `metadata_only`
   - a reviewed provisioner may use `immutable_resolved_inputs`, but it must not trigger a rebuild or depend on mutable local build state
@@ -605,24 +615,28 @@ Control-plane worker responsibilities for protected/shared mutation:
 2. resolve target-environment run admission and freeze one immutable execution snapshot for that mutating run before any waiting or mutation begins
    - the snapshot should preserve the deployment metadata, immutable provider-config content or immutable provider-config references, resolved policy contents, selected artifact inputs when applicable, runner implementation identities for the built-in publisher, provisioner, smoke runner, and any built-in `release_actions` runner that materially influence execution, and any other non-secret execution inputs needed to replay the admitted decision faithfully
    - for secret or runtime-config dependencies, the snapshot should preserve non-secret contract references, versions, selectors, or fingerprints rather than secret values
-3. revalidate admission, lane, prerequisite, and target-ownership policy before mutation
-4. acquire the shared lock
-5. revalidate under the acquired lock that the run is still admitted, not superseded, and still bound to the intended target
+3. when the run includes an infra-affecting protected/shared provisioner, generate the reviewable provisioner plan or diff from that frozen execution snapshot before any mutating step begins
+   - the reviewed plan or diff must correspond to the same frozen execution snapshot that later drives mutation
+   - when human approval is required for that infra-affecting path, the approval evidence should bind to that specific reviewed plan or diff artifact rather than to an unfrozen future recomputation
+   - if the plan or diff must be regenerated later and no longer matches the reviewed artifact materially, the run must fail closed or require fresh approval rather than silently proceeding
+4. revalidate admission, lane, prerequisite, target-ownership policy, and reviewed-plan binding before mutation
+5. acquire the shared lock
+6. revalidate under the acquired lock that the run is still admitted, not superseded, and still bound to the intended target
    - this revalidation should check only narrow current invariants such as target ownership, lock scope, approval freshness, prerequisite health, and whether the admitted run has been superseded
    - it must not silently replace the frozen execution snapshot with newer repo metadata, newer provider config contents, or different resolved policy objects
-6. load the execution inputs required for this run kind
+7. load the execution inputs required for this run kind
    - for a first-run protected/shared publish, load the admitted frozen execution snapshot for that run
    - for `retry`, `rollback`, or any provisioner using `immutable_resolved_inputs`, load the admitted immutable artifact plus the recorded source-run snapshot metadata needed for replay
    - for `promotion`, load the admitted immutable artifact and any source-run compatibility evidence needed for promotion validation, but mutate using the target deployment's own admitted execution snapshot and current target-environment policy context
    - for `metadata_only` provision-only runs, load the frozen metadata, admitted source revision, and admitted secret/runtime-config contract references captured for that run, but no artifact
-7. record lifecycle progress in the authoritative deployment record
-8. run optional provisioning
-9. run optional `release_actions` declared for the `pre_publish` phase
-10. run publishing
-11. run optional `release_actions` declared for the `post_publish_pre_smoke` phase
-12. run optional smoke checks
-13. run optional `release_actions` declared for the `post_smoke` phase
-14. finalize the authoritative deployment record with the correct lifecycle state, termination reason, and final outcome
+8. record lifecycle progress in the authoritative deployment record
+9. run optional provisioning
+10. run optional `release_actions` declared for the `pre_publish` phase
+11. run publishing
+12. run optional `release_actions` declared for the `post_publish_pre_smoke` phase
+13. run optional smoke checks
+14. run optional `release_actions` declared for the `post_smoke` phase
+15. finalize the authoritative deployment record with the correct lifecycle state, termination reason, and final outcome
 
 For protected/shared mutation, loading immutable replay inputs means "load the previously admitted immutable
 artifact plus the exact recorded context needed for the requested reuse flow"; it does not authorize a new
@@ -1858,6 +1872,13 @@ Plain-language version:
 - a provisioner is not a one-time bootstrap script
 - a provisioner is an ongoing "make reality match this config" step
 
+Protected/shared provisioner review posture:
+
+- when a protected/shared provisioner may change provider-managed infrastructure state, the normal operator path should include a reviewable plan or diff before mutation
+- that plan or diff may come from the underlying infrastructure tool or from a provider-neutral built-in summary produced by the control plane
+- the minimum design goal is that an approver can see whether the provisioner intends create, update, replace, delete, or ownership-transfer operations before the mutating run proceeds
+- if a provisioner cannot surface a meaningful plan or diff, that limitation should be explicit in policy review and should raise the approval bar for that mutating path rather than being treated as an invisible implementation detail
+
 ### When To Use A Provisioner
 
 Use a provisioner when the deployment target needs setup work that should be owned by the deployment workflow.
@@ -2994,6 +3015,7 @@ Provisioner safety policy:
 - create and in-place update are normal provisioner behavior
 - normal deploy flows must not delete, replace, rename, or transfer ownership of live resources
 - delete, replacement, rename, or ownership-transfer operations require an explicit separate migration path or equivalent break-glass intent
+- for protected/shared infra-affecting runs, the provisioner should surface a reviewable plan or diff before mutation and that reviewed artifact should be part of the approval evidence for the run
 - a normal deploy invocation must fail closed if the provisioner detects a destructive plan
 - destructive provisioner actions require a separate reviewed workflow or explicit operator intent surface that is distinct from the normal deploy path
 - app artifact rollback should not imply destructive infra rollback
@@ -3036,6 +3058,11 @@ Policy:
   - `rerun`
   - `skip`
   - `fail`
+- each side-effecting built-in action type must also declare how duplicate execution is prevented or made safe for every replay context where `rerun` is allowed:
+  - provider-native idempotency keyed by a stable operation key
+  - control-plane deduplication keyed by a stable operation key plus target scope
+  - or explicit fail-closed rejection when duplicate safety cannot be proven
+- if duplicate safety cannot be proven for a context, that context must not claim `rerun`
 - each built-in action type must also declare one explicit data-compatibility posture for rollback and replay safety:
   - `backward_compatible`
   - `forward_only`
@@ -3054,6 +3081,9 @@ Policy:
 - the protected/shared default is fail-closed:
   - a `release_action` does not re-run during `deploy_publish_slice`, `retry`, `rollback`, or `promotion` unless that action type explicitly declares that replay is safe and intended for that replay context
   - if the requested replay flow would require an action whose replay behavior is not explicitly allowed, the run must fail clearly rather than guess
+- release-action duplicate safety is separate from replay intent:
+  - an action may intentionally support `rerun` for a replay context only when its built-in type also proves duplicate-execution safety for that context
+  - ambiguous prior execution state must fail closed when the action contract does not provide a safe deduplication or idempotency path
 - rollback admission must also evaluate the recorded data-compatibility posture of already-applied stateful actions:
   - `backward_compatible` means an earlier compatible artifact may be redeployed without extra rollback-specific state repair
   - `forward_only` means earlier artifacts must not be assumed safe after the action has advanced shared state; rollback should fail closed unless another explicitly compatible rollback path is declared
@@ -3583,6 +3613,17 @@ Artifact retention policy:
 - audit and authorization evidence must not expire sooner than the deployment records they justify
 - `local_only` retention may be implementation-defined unless a stricter team policy applies
 - storage mechanics may still be decided during implementation, but the operator-facing policy is that a supported artifact-reuse path must remain practically usable, with its full replay bundle intact, for at least those minimum windows
+
+Control-plane resilience policy:
+
+- because protected/shared mutation depends on one authoritative control plane, that control plane should have an explicit reviewed resilience posture rather than relying on break-glass as the normal recovery mechanism
+- the authoritative deployment backend should support durable backups and regularly tested restore procedures
+- the production control-plane topology should avoid one unrecoverable single storage or API instance as the sole practical path for routine protected/shared mutation
+- target control-plane recovery objectives should be:
+  - `production_facing`: `RPO <= 5 minutes`, `RTO <= 30 minutes`
+  - `shared_nonprod`: `RPO <= 15 minutes`, `RTO <= 4 hours`
+- those objectives are operator-facing policy commitments for the deployment authority itself; implementation topology may evolve as long as it continues to satisfy them
+- failover and restore posture may evolve by implementation, but the operator-facing resilience commitments should remain explicit and reviewable
 
 Migration and alias exception policy:
 

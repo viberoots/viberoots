@@ -74,6 +74,14 @@ Optional keys:
 
 - package-relative config or entry references
 - declared input class such as `metadata_only` or `immutable_resolved_inputs`
+- plan or diff contract for infra-affecting mutation paths
+
+Minimum plan/diff contract when provisioner-managed infra mutation is reviewable:
+
+- whether the plan surface is provider-native or provider-neutral
+- whether routine mutation requires a reviewed pre-mutation plan artifact
+- how destructive or replacement actions are surfaced distinctly from create or in-place update
+- if no meaningful plan or diff can be produced, the reviewed higher-bar approval posture required for that path
 
 ### `runtime_config_requirements`
 
@@ -129,6 +137,16 @@ Minimum replay-policy contract:
   - `rerun`
   - `skip`
   - `fail`
+
+Minimum duplicate-execution-safety contract for side-effecting actions:
+
+- required for every replay context where disposition is `rerun`
+- one closed duplicate-safety model from:
+  - `provider_idempotent`
+  - `control_plane_deduplicated`
+  - `not_duplicate_safe`
+- stable operation-key contract or equivalent deduplication keying rule for `provider_idempotent` and `control_plane_deduplicated`
+- if a replay context is `not_duplicate_safe`, that context must not declare `rerun`
 
 Minimum data-compatibility contract:
 
@@ -325,23 +343,24 @@ Used for protected/shared immutable-artifact reuse.
 
 Minimum fields:
 
-| Field                                               | Required          | Notes                                                                                             |
-| --------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------- |
-| `schema_version`                                    | yes               | Explicit replay schema id.                                                                        |
-| `deployment_id`                                     | yes               | Source deployment id.                                                                             |
-| resolved component data                             | yes               | Canonical resolved component projection.                                                          |
-| artifact refs and identities                        | yes               | Exact immutable artifact identity.                                                                |
-| runner implementation identities                    | yes               | Built-in publisher/provisioner/smoke/release-action runner version or digest set used by the run. |
-| declared normal target identity                     | yes               | Normal live target.                                                                               |
-| effective run target identity                       | yes               | Actual mutated target for that run.                                                               |
-| provider-config immutable snapshot or immutable ref | yes               | No silent reinterpretation; bare fingerprints are insufficient for replay.                        |
-| `lane_policy` snapshot/fingerprint                  | yes               | Source-run policy context.                                                                        |
-| `admission_policy` snapshot/fingerprint             | yes               | Source-run policy context.                                                                        |
-| rollout policy snapshot                             | yes when relevant | Source-run rollout semantics.                                                                     |
-| `release_actions` plan snapshot                     | yes when relevant | Includes replay behavior and data-compatibility posture.                                          |
-| smoke policy snapshot                               | yes when relevant | Source-run validation contract.                                                                   |
-| secret-contract version/reference                   | yes               | Non-secret contract metadata only.                                                                |
-| runtime-config reference/fingerprint                | yes when relevant | Non-secret admitted config selector for deterministic replay.                                     |
+| Field                                               | Required          | Notes                                                                                                                 |
+| --------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `schema_version`                                    | yes               | Explicit replay schema id.                                                                                            |
+| `deployment_id`                                     | yes               | Source deployment id.                                                                                                 |
+| resolved component data                             | yes               | Canonical resolved component projection.                                                                              |
+| artifact refs and identities                        | yes               | Exact immutable artifact identity.                                                                                    |
+| runner implementation identities                    | yes               | Built-in publisher/provisioner/smoke/release-action runner version or digest set used by the run.                     |
+| declared normal target identity                     | yes               | Normal live target.                                                                                                   |
+| effective run target identity                       | yes               | Actual mutated target for that run.                                                                                   |
+| provider-config immutable snapshot or immutable ref | yes               | No silent reinterpretation; bare fingerprints are insufficient for replay.                                            |
+| `lane_policy` snapshot/fingerprint                  | yes               | Source-run policy context.                                                                                            |
+| `admission_policy` snapshot/fingerprint             | yes               | Source-run policy context.                                                                                            |
+| rollout policy snapshot                             | yes when relevant | Source-run rollout semantics.                                                                                         |
+| `release_actions` plan snapshot                     | yes when relevant | Includes replay behavior, duplicate-execution-safety details for any `rerun` context, and data-compatibility posture. |
+| provisioner plan/diff snapshot or reference         | yes when relevant | Required when a reviewed pre-mutation provisioner plan/diff was part of admission.                                    |
+| smoke policy snapshot                               | yes when relevant | Source-run validation contract.                                                                                       |
+| secret-contract version/reference                   | yes               | Non-secret contract metadata only.                                                                                    |
+| runtime-config reference/fingerprint                | yes when relevant | Non-secret admitted config selector for deterministic replay.                                                         |
 
 ## 7. Deployment Record
 
@@ -376,6 +395,7 @@ Conditionally required:
 - `submitted_by` when distinct from `requested_by`
 - `executed_by` for protected/shared runs
 - smoke result when a smoke step was declared and reached
+- reviewed provisioner plan/diff artifact reference when infra-affecting mutation relied on one
 - `parent_run_id` for retry, rollback, and promotion derived from an earlier run
 - `release_lineage_id` when the run belongs to a promoted multi-run lineage
 - `artifact_lineage_id` when the same artifact is intentionally reused
@@ -458,7 +478,9 @@ Repo validation should reject:
 - protected/shared immutable-artifact selectors that do not resolve unambiguously to one admitted source-run snapshot
 - protected/shared lane policies whose promotion-compatibility contract is missing, open-ended, or not resolvable to one closed reviewed field set before promotion
 - `release_actions` declarations that omit phase, abort behavior, or replay policy
+- side-effecting `release_actions` declarations that allow `rerun` without a duplicate-execution-safety contract
 - `release_actions` declarations that omit data-compatibility posture for stateful action types
+- protected/shared infra-affecting provisioner declarations whose reviewed path requires plan/diff visibility but does not define that contract
 - `rollout_policy` declarations that omit mode-required phase, gate, or exposure semantics
 
 ## Companion Docs

@@ -38,6 +38,7 @@ design has been explicitly updated first.
 - Protected/shared replay snapshots must record non-secret secret/config contract references or versions, not secret values.
 - Protected/shared replay snapshots must preserve immutable provider-config content or an immutable provider-config reference, not only a bare fingerprint.
 - Protected/shared replay snapshots and deployment records must preserve the implementation identity of the built-in publisher, provisioner, smoke runner, and any built-in `release_actions` runner that materially influenced execution.
+- Side-effecting built-in `release_actions` may allow `rerun` in a replay context only when their reviewed type contract also defines duplicate-execution safety for that context; otherwise replay must fail closed or skip according to the recorded policy.
 - Protected/shared deployment metadata must declare both secret and non-secret runtime-config requirements explicitly, with `{}` as the reviewable empty value for each contract surface.
 - Same-deployment protected/shared `retry` and `rollback` reuse the recorded admitted secret/config references by default; `promotion` uses the target deployment's newly admitted target-environment references.
 - Protected/shared exact-artifact selectors are in policy only when they deterministically resolve to exactly one admitted source run plus its recorded execution snapshot.
@@ -59,6 +60,8 @@ design has been explicitly updated first.
 - `retry` is branch-independent replay of an earlier admitted run for the same deployment by default; later branch movement does not invalidate it unless the admission policy explicitly sets `retry_branch_policy = branch_coupled`.
 - Supported protected/shared artifact-reuse paths must retain retrievable immutable artifacts for at least the documented minimum retention window.
 - Protected/shared authoritative deployment records, approval evidence, migration or alias exception records, and break-glass emergency evidence must remain retained for at least the documented minimum audit-retention window.
+- Protected/shared infra-affecting provisioner runs must surface a reviewed plan or diff artifact before routine mutation, unless an explicitly reviewed higher-bar exception path says otherwise.
+- The authoritative protected/shared control plane must have explicit reviewed backup, restore-test, and recovery objectives; break-glass is an emergency exception path, not the normal resilience model for routine outages.
 
 ## Operator Semantics
 
@@ -81,11 +84,13 @@ design has been explicitly updated first.
 - Narrow current invariants include target ownership, lock scope, provider identity, publisher compatibility, and current admission validity.
 - Replay must not silently load newer deployment metadata, provider config, or release-action definitions as if they were part of the original run.
 - Recorded `release_actions` replay policy must use one closed disposition per replay context: `rerun`, `skip`, or `fail`.
+- Recorded side-effecting `release_actions` that declare `rerun` must also record or reference the duplicate-execution safety contract that made rerun admissible for that context.
 - Protected/shared replay by exact artifact ref is valid only when the artifact ref resolves unambiguously to one admitted source-run snapshot.
 
 ## Protected/Shared Admission Rules
 
 - Every protected/shared mutating run freezes one immutable execution snapshot at admission before queueing or locking.
+- When a protected/shared run includes an infra-affecting reviewed provisioner plan/diff, that plan/diff must be produced from the frozen execution snapshot before mutation and any required approval must bind to that reviewed artifact.
 - Protected/shared first-run deploys use two admission stages: source admission establishes the admissible revision and trusted artifact; target-environment run admission freezes the execution snapshot for the mutating publish run.
 - The mutating publish phase consumes an admitted immutable artifact.
 - Protected/shared non-publishing mutation, including `--provision-only`, still consumes an admitted source revision plus the frozen execution snapshot for that run; it is not an unbound mutable metadata action.
@@ -95,6 +100,7 @@ design has been explicitly updated first.
 - Rollback may use an earlier retained admitted run even when the branch head has moved forward, but the current branch/lane state must still authorize performing rollback.
 - Rollback must also honor the recorded data-compatibility posture of any already-applied stateful `release_actions`; unsafe rollback must fail closed rather than re-publish an older artifact by default.
 - Admission must preserve enough approval evidence to explain why the run was authorized.
+- If a reviewed provisioner plan/diff must be regenerated and no longer matches the reviewed artifact materially, the run must fail closed or obtain fresh approval before mutation.
 - Break-glass mutation is in policy only for an explicitly documented incident-bounded control-plane-unavailability path with mandatory fencing or equivalent concurrency protection and post-incident reconciliation back into the authoritative deployment record.
 - When break-glass mutation is used, the resulting authoritative record must preserve structured emergency evidence sufficient to explain who requested, approved, and executed the action, which incident justified it, which artifact or source-run selection path was used, and why the normal control plane was unavailable or bypassed.
 
@@ -108,6 +114,8 @@ Before approving a deployment-system change, confirm:
 - Does this keep preview isolated from the normal live target?
 - Does this preserve canonical provider-target identity and locking semantics?
 - Does this preserve the separation of `operation_kind`, `publish_mode`, lifecycle state, and final outcome?
+- Does this preserve duplicate-execution safety for side-effecting `release_actions`?
+- Does this preserve the reviewed plan/diff and resilience posture required for protected/shared mutation?
 
 ## Companion Docs
 
