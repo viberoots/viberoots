@@ -37,10 +37,12 @@ design has been explicitly updated first.
 - Protected/shared immutable-reuse flows must replay the recorded execution snapshot rather than reinterpret current repo state.
 - Protected/shared replay snapshots must record non-secret secret/config contract references or versions, not secret values.
 - Protected/shared replay snapshots must preserve immutable provider-config content or an immutable provider-config reference, not only a bare fingerprint.
+- Protected/shared replay snapshots and deployment records must preserve the implementation identity of the built-in publisher, provisioner, smoke runner, and any built-in `release_actions` runner that materially influenced execution.
 - Protected/shared deployment metadata must declare both secret and non-secret runtime-config requirements explicitly, with `{}` as the reviewable empty value for each contract surface.
 - Same-deployment protected/shared `retry` and `rollback` reuse the recorded admitted secret/config references by default; `promotion` uses the target deployment's newly admitted target-environment references.
 - Protected/shared exact-artifact selectors are in policy only when they deterministically resolve to exactly one admitted source run plus its recorded execution snapshot.
 - Promotion between deployment ids that resolve to the same authoritative compatible `lane_policy` must follow that lane's declared `artifact_reuse_mode`.
+- Promotion compatibility for protected/shared runs must evaluate one explicit closed compatibility contract; adapters must not decide promotability from ad hoc heuristics or unreviewed field comparisons.
 - `same_artifact` lanes reuse the same admitted artifact across environments.
 - `rebuild_per_stage` lanes promote the admitted source revision and build a new admitted stage artifact before publish.
 - For promotion, `--source-run-id` may select any earlier admitted run that remains eligible under the lane's current promotion policy; it is not limited to the latest candidate, and it is not an override around lane policy.
@@ -56,6 +58,7 @@ design has been explicitly updated first.
 - An admission policy may still require manual preview approval for especially sensitive targets.
 - `retry` is branch-independent replay of an earlier admitted run for the same deployment by default; later branch movement does not invalidate it unless the admission policy explicitly sets `retry_branch_policy = branch_coupled`.
 - Supported protected/shared artifact-reuse paths must retain retrievable immutable artifacts for at least the documented minimum retention window.
+- Protected/shared authoritative deployment records, approval evidence, migration or alias exception records, and break-glass emergency evidence must remain retained for at least the documented minimum audit-retention window.
 
 ## Operator Semantics
 

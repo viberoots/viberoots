@@ -430,6 +430,9 @@ treated as settled policy, not open brainstorming:
   - cross-lane prerequisites are rejected rather than carried as partially specified exceptions
   - prerequisite graphs must be DAGs
   - admission, orchestration, and changed-based selection should consume the same declared direct-edge prerequisite metadata
+- protected/shared promotion compatibility should use one explicit closed compatibility contract per lane
+  - the contract should state which fields must match exactly and which environment-specific differences are allowed
+  - adapters must not decide promotability from ad hoc heuristics, naming guesses, or undocumented field comparisons
 - deploy records should include first-class lineage identifiers
   - every run gets a globally unique `deploy_run_id`
   - retries, rollbacks, and promotions should set `parent_run_id`
@@ -600,7 +603,7 @@ Control-plane worker responsibilities for protected/shared mutation:
    - for first-run deploy, source admission determines the admissible revision and trusted artifact path
    - for immutable-reuse flows, source admission validates the selected prior admitted run and its replay eligibility
 2. resolve target-environment run admission and freeze one immutable execution snapshot for that mutating run before any waiting or mutation begins
-   - the snapshot should preserve the deployment metadata, immutable provider-config content or immutable provider-config references, resolved policy contents, selected artifact inputs when applicable, and any other non-secret execution inputs needed to replay the admitted decision faithfully
+   - the snapshot should preserve the deployment metadata, immutable provider-config content or immutable provider-config references, resolved policy contents, selected artifact inputs when applicable, runner implementation identities for the built-in publisher, provisioner, smoke runner, and any built-in `release_actions` runner that materially influence execution, and any other non-secret execution inputs needed to replay the admitted decision faithfully
    - for secret or runtime-config dependencies, the snapshot should preserve non-secret contract references, versions, selectors, or fingerprints rather than secret values
 3. revalidate admission, lane, prerequisite, and target-ownership policy before mutation
 4. acquire the shared lock
@@ -636,11 +639,15 @@ Promotion clarification:
 Minimum promotion-compatibility rule:
 
 - sharing the same authoritative compatible `lane_policy` is necessary but not sufficient for cross-deployment promotion
+- each lane should resolve to one explicit closed promotion-compatibility contract before promotion is allowed
+  - that contract should name the deployment-shape fields that must match exactly
+  - it should separately name the environment-specific differences that are allowed within the lane
 - the control plane should reject promotion unless source and target are compatible in the ways that matter for safe reuse:
   - resolved component shape and artifact contract
   - provider and publisher compatibility for the target publish path
   - rollout semantics required by the target deployment
   - any target-side `release_actions` or admission constraints that govern whether promotion is allowed
+- if a compatibility decision depends on a field not included in that closed contract, the lane design should be updated first rather than letting the adapter improvise
 - in other words, lane membership says two deployments participate in the same release flow; it does not by itself prove that any artifact from one deployment is valid for another without the target deployment's own compatibility checks
 
 That gives the user one command while keeping the execution boundary clear.
@@ -985,6 +992,7 @@ Preview metadata defaults:
 - when preview is supported, the preview metadata may rely on provider-wide built-in defaults for cleanup TTL, smoke behavior, or lock-scope separation to reduce repetition
 - those defaults should still be part of one authoritative built-in preview policy, not adapter-local guesswork
 - the authoritative source for those provider-wide preview defaults is the reviewed provider capability entry
+- provider capability entries should record concrete preview cleanup defaults, including the effective TTL or equivalent cleanup trigger, rather than referring only to undocumented provider behavior
 - validation should treat those values as required in the effective resolved preview policy even when a checked-in deployment omits them because the provider default supplies them
 
 Protected/shared preview product stance:
@@ -1454,7 +1462,7 @@ Policy evaluation order:
   - `lane_policy`
     - required for `shared_nonprod` and `production_facing`
     - should be a Buck-visible, repo-owned reference to the authoritative lane-policy object for that deployment family
-    - should define ordered stages, branch mapping, allowed promotion edges, artifact reuse mode, and any stricter lane-specific compatibility or admission rules
+    - should define ordered stages, branch mapping, allowed promotion edges, artifact reuse mode, one explicit closed promotion-compatibility contract, and any stricter lane-specific admission rules
     - is the authoritative lane identity for protected/shared deployments
     - the sensible common-case default is `artifact_reuse_mode = "same_artifact"`
     - lanes that require environment-specific build-time substitution must declare `artifact_reuse_mode = "rebuild_per_stage"` explicitly rather than inheriting same-artifact semantics by accident
@@ -3569,6 +3577,10 @@ Artifact retention policy:
 - minimum operator-facing retention defaults should be:
   - `production_facing`: 90 days
   - `shared_nonprod`: 30 days
+- minimum operator-facing audit-retention defaults should be:
+  - `production_facing`: 1 year for authoritative deployment records, approval evidence, migration or alias exception records, and break-glass emergency evidence
+  - `shared_nonprod`: 180 days for authoritative deployment records, approval evidence, migration or alias exception records, and break-glass emergency evidence
+- audit and authorization evidence must not expire sooner than the deployment records they justify
 - `local_only` retention may be implementation-defined unless a stricter team policy applies
 - storage mechanics may still be decided during implementation, but the operator-facing policy is that a supported artifact-reuse path must remain practically usable, with its full replay bundle intact, for at least those minimum windows
 
@@ -3605,7 +3617,7 @@ Lane-policy promotion compatibility contract:
   - secrets and secret references
   - smoke endpoints, preview URLs, or equivalent health targets
   - provider-native non-identity settings that are intentionally derived from environment-specific target identity
-- provisioner differences are allowed by default as long as they do not change the meaning of the reused artifact, the publisher/runtime contract, or the lane's rollout semantics
+- provisioner behavior must be accounted for explicitly in the lane's closed promotion-compatibility contract or in that lane's reviewed default compatibility set before promotion is allowed
 - a lane may explicitly opt into stricter infra-coupled promotion policy if matching provisioner behavior is part of its reviewed release contract
 - any other difference that changes how the same artifact would be interpreted, provisioned, or published across the lane should be treated as an explicit reviewed compatibility exception rather than as a silent default
 
@@ -3986,6 +3998,9 @@ Versioning contract:
   - migrate it to a supported schema before execution
   - or fail closed with a clear incompatibility error
 - a schema change must not silently reinterpret old replay snapshots or deployment records
+- protected/shared replay snapshots and deployment records should also preserve the implementation identity of the built-in publisher, provisioner, smoke runner, and any built-in `release_actions` runner that materially influenced execution
+  - that identity may be a version, digest, or another stable reviewed implementation identifier
+  - if execution compatibility cannot be proven for a stored runner identity, replay should fail closed rather than silently running materially different logic
 
 The design intentionally separates reusable artifact attestation from deployment-run provenance:
 
@@ -4005,6 +4020,7 @@ Minimum replay-snapshot contract for immutable-artifact reuse:
   - `schema_version`
   - resolved component data
   - artifact refs and artifact identities
+  - runner implementation identities for the built-in publisher, provisioner, smoke runner, and any built-in `release_actions` runner that materially influenced the run
   - declared normal target identity
   - effective run target identity
   - rendered provider-config snapshot or immutable provider-config reference
@@ -4076,6 +4092,7 @@ Minimum required fields for every run:
 - `lock_scope`
 - deployment metadata fingerprint or stable snapshot reference
 - frozen execution-snapshot reference for protected/shared mutating runs
+- runner implementation identities for protected/shared mutating runs
 - stable fingerprint or snapshot reference for the resolved `lane_policy` contents used by the run
 - stable fingerprint or snapshot reference for the resolved `admission_policy` contents used by the run
 - start time and end time

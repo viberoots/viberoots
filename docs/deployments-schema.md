@@ -203,9 +203,35 @@ Minimum fields:
 
 Optional fields:
 
-- stricter compatibility rules
+- `promotion_compatibility`
 - stricter rollback-candidate policy
 - additional lane-specific admission constraints
+
+### `promotion_compatibility`
+
+Used to define the closed compatibility contract for cross-deployment promotion within a lane.
+
+Minimum fields when present:
+
+- `match_fields`
+  - closed allowlist of deployment-shape fields that must match exactly for promotion in that lane
+- `allow_environment_differences`
+  - closed allowlist of fields that are expected to differ safely across stages in that lane
+
+Schema expectation:
+
+- any provisioner behavior that matters to promotability must be represented explicitly through this closed compatibility contract or the reviewed lane default it resolves to
+- provisioner differences must not be admitted through adapter-local "safe enough" heuristics outside that resolved contract
+
+Optional fields:
+
+- `additional_validations`
+  - reviewed lane-specific checks that must be evaluated before mutation
+
+Contract rule:
+
+- protected/shared promotion must evaluate this closed compatibility contract rather than adapter-local heuristics
+- if a lane omits `promotion_compatibility`, the reviewed lane default compatibility contract must still resolve to one explicit closed set before promotion is allowed
 
 ## 3. Rollout Policy Object
 
@@ -299,22 +325,23 @@ Used for protected/shared immutable-artifact reuse.
 
 Minimum fields:
 
-| Field                                               | Required          | Notes                                                                      |
-| --------------------------------------------------- | ----------------- | -------------------------------------------------------------------------- |
-| `schema_version`                                    | yes               | Explicit replay schema id.                                                 |
-| `deployment_id`                                     | yes               | Source deployment id.                                                      |
-| resolved component data                             | yes               | Canonical resolved component projection.                                   |
-| artifact refs and identities                        | yes               | Exact immutable artifact identity.                                         |
-| declared normal target identity                     | yes               | Normal live target.                                                        |
-| effective run target identity                       | yes               | Actual mutated target for that run.                                        |
-| provider-config immutable snapshot or immutable ref | yes               | No silent reinterpretation; bare fingerprints are insufficient for replay. |
-| `lane_policy` snapshot/fingerprint                  | yes               | Source-run policy context.                                                 |
-| `admission_policy` snapshot/fingerprint             | yes               | Source-run policy context.                                                 |
-| rollout policy snapshot                             | yes when relevant | Source-run rollout semantics.                                              |
-| `release_actions` plan snapshot                     | yes when relevant | Includes replay behavior and data-compatibility posture.                   |
-| smoke policy snapshot                               | yes when relevant | Source-run validation contract.                                            |
-| secret-contract version/reference                   | yes               | Non-secret contract metadata only.                                         |
-| runtime-config reference/fingerprint                | yes when relevant | Non-secret admitted config selector for deterministic replay.              |
+| Field                                               | Required          | Notes                                                                                             |
+| --------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------- |
+| `schema_version`                                    | yes               | Explicit replay schema id.                                                                        |
+| `deployment_id`                                     | yes               | Source deployment id.                                                                             |
+| resolved component data                             | yes               | Canonical resolved component projection.                                                          |
+| artifact refs and identities                        | yes               | Exact immutable artifact identity.                                                                |
+| runner implementation identities                    | yes               | Built-in publisher/provisioner/smoke/release-action runner version or digest set used by the run. |
+| declared normal target identity                     | yes               | Normal live target.                                                                               |
+| effective run target identity                       | yes               | Actual mutated target for that run.                                                               |
+| provider-config immutable snapshot or immutable ref | yes               | No silent reinterpretation; bare fingerprints are insufficient for replay.                        |
+| `lane_policy` snapshot/fingerprint                  | yes               | Source-run policy context.                                                                        |
+| `admission_policy` snapshot/fingerprint             | yes               | Source-run policy context.                                                                        |
+| rollout policy snapshot                             | yes when relevant | Source-run rollout semantics.                                                                     |
+| `release_actions` plan snapshot                     | yes when relevant | Includes replay behavior and data-compatibility posture.                                          |
+| smoke policy snapshot                               | yes when relevant | Source-run validation contract.                                                                   |
+| secret-contract version/reference                   | yes               | Non-secret contract metadata only.                                                                |
+| runtime-config reference/fingerprint                | yes when relevant | Non-secret admitted config selector for deterministic replay.                                     |
 
 ## 7. Deployment Record
 
@@ -337,6 +364,7 @@ Minimum required fields for every run:
 | `lock_scope`                                    | yes                                    | Canonical lock scope.                                                                                            |
 | deployment metadata fingerprint or snapshot ref | yes                                    | Resolved metadata used by the run.                                                                               |
 | execution-snapshot reference                    | yes for protected/shared mutating runs | Frozen snapshot actually used.                                                                                   |
+| runner implementation identities                | yes for protected/shared mutating runs | Built-in publisher/provisioner/smoke/release-action runner version or digest set actually used.                  |
 | `lane_policy` fingerprint or snapshot ref       | yes when applicable                    | Authoritative lane context.                                                                                      |
 | `admission_policy` fingerprint or snapshot ref  | yes when applicable                    | Authoritative admission context.                                                                                 |
 | approval evidence or approval record ref        | yes when human approval is required    | Must explain why the run was admitted.                                                                           |
@@ -373,6 +401,22 @@ Minimum fields:
 - artifact or source-run selection path
 - why the normal control plane was unavailable or bypassed
 
+## 8. Retention Expectations
+
+Minimum operator-facing retention windows:
+
+- protected/shared immutable artifacts plus full replay bundles:
+  - `production_facing`: 90 days
+  - `shared_nonprod`: 30 days
+- protected/shared authoritative deployment records, approval evidence, migration or alias exception records, and break-glass emergency evidence:
+  - `production_facing`: 1 year
+  - `shared_nonprod`: 180 days
+
+Retention rule:
+
+- audit and authorization evidence must not expire sooner than the corresponding deployment records they justify
+- implementations may retain records longer, but must not retain them for less than these minimums
+
 Canonical `final_outcome` values:
 
 - `validation_failed`
@@ -399,7 +443,7 @@ Notes:
 - The schema keeps a compact `final_outcome` enum; step-level failure location belongs in `failed_step` rather than expanding `final_outcome` for every phase.
 - `termination_reason` is intentionally separate from `final_outcome`; it explains non-canonical terminal exits rather than publish/provision/smoke success or failure.
 
-## 8. Validation Expectations
+## 9. Validation Expectations
 
 Repo validation should reject:
 
@@ -412,6 +456,7 @@ Repo validation should reject:
 - cross-lane prerequisites
 - protected/shared approval-policy shapes that leave retry, promotion, or rollback approval semantics ambiguous
 - protected/shared immutable-artifact selectors that do not resolve unambiguously to one admitted source-run snapshot
+- protected/shared lane policies whose promotion-compatibility contract is missing, open-ended, or not resolvable to one closed reviewed field set before promotion
 - `release_actions` declarations that omit phase, abort behavior, or replay policy
 - `release_actions` declarations that omit data-compatibility posture for stateful action types
 - `rollout_policy` declarations that omit mode-required phase, gate, or exposure semantics

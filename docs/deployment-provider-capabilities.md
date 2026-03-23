@@ -14,23 +14,23 @@ Normative-source note:
 
 ## Required Capability Fields
 
-| Field                            | Purpose                                                                                           |
-| -------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `provider`                       | Stable provider family identifier.                                                                |
-| canonical target identity fields | Defines which `provider_target` fields establish live-target identity.                            |
-| canonical lock-key rule          | Defines how lock scope is derived from canonical identity.                                        |
-| supported component kinds        | Defines which component shapes the provider can publish.                                          |
-| supported rollout modes          | Defines which `rollout_policy` modes are valid.                                                   |
-| default rollout mode             | Defines the provider's default rollout semantics when deployment metadata omits `rollout_policy`. |
-| preview support                  | States whether preview is unsupported, supported with restrictions, or fully supported.           |
-| preview isolation model          | Defines how preview target isolation is proven.                                                   |
-| preview cleanup default          | Defines the default cleanup/TTL behavior when deployment metadata relies on provider defaults.    |
-| preview lock-scope default       | Defines whether preview shares the normal lock by default or may use its own lock by default.     |
-| smoke or release-health model    | Defines how built-in smoke/health checks work for this provider.                                  |
-| retry/idempotency assumptions    | Defines when publish retry is safe.                                                               |
-| partial publish observability    | Defines whether partial publish state can be observed and recorded.                               |
-| multi-component support          | Defines whether multi-component deployments are supported.                                        |
-| protected/shared eligibility     | States whether the provider is in policy for protected/shared use.                                |
+| Field                            | Purpose                                                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `provider`                       | Stable provider family identifier.                                                                      |
+| canonical target identity fields | Defines which `provider_target` fields establish live-target identity.                                  |
+| canonical lock-key rule          | Defines how lock scope is derived from canonical identity.                                              |
+| supported component kinds        | Defines which component shapes the provider can publish.                                                |
+| supported rollout modes          | Defines which `rollout_policy` modes are valid.                                                         |
+| default rollout mode             | Defines the provider's default rollout semantics when deployment metadata omits `rollout_policy`.       |
+| preview support                  | States whether preview is unsupported, supported with restrictions, or fully supported.                 |
+| preview isolation model          | Defines how preview target isolation is proven.                                                         |
+| preview cleanup default          | Defines the concrete default cleanup/TTL behavior when deployment metadata relies on provider defaults. |
+| preview lock-scope default       | Defines whether preview shares the normal lock by default or may use its own lock by default.           |
+| smoke or release-health model    | Defines how built-in smoke/health checks work for this provider.                                        |
+| retry/idempotency assumptions    | Defines when publish retry is safe.                                                                     |
+| partial publish observability    | Defines whether partial publish state can be observed and recorded.                                     |
+| multi-component support          | Defines whether multi-component deployments are supported.                                              |
+| protected/shared eligibility     | States whether the provider is in policy for protected/shared use.                                      |
 
 ## Review Questions For Every Provider
 
@@ -86,7 +86,7 @@ Normative-source note:
 - preview isolation model:
   - provider-managed isolated preview target derived deterministically from deployment metadata plus run context
 - preview cleanup default:
-  - provider-managed cleanup with a documented default TTL; deployment metadata may override when needed
+  - provider-managed cleanup with a default TTL of `7d`; deployment metadata may override when needed
 - preview lock-scope default:
   - preview shares the normal deployment lock by default
   - a separate preview lock scope is allowed only when the preview satisfies the stronger independent-execution isolation bar
