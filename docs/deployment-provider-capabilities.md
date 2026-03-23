@@ -24,6 +24,8 @@ Normative-source note:
 | default rollout mode             | Defines the provider's default rollout semantics when deployment metadata omits `rollout_policy`. |
 | preview support                  | States whether preview is unsupported, supported with restrictions, or fully supported.           |
 | preview isolation model          | Defines how preview target isolation is proven.                                                   |
+| preview cleanup default          | Defines the default cleanup/TTL behavior when deployment metadata relies on provider defaults.    |
+| preview lock-scope default       | Defines whether preview shares the normal lock by default or may use its own lock by default.     |
 | smoke or release-health model    | Defines how built-in smoke/health checks work for this provider.                                  |
 | retry/idempotency assumptions    | Defines when publish retry is safe.                                                               |
 | partial publish observability    | Defines whether partial publish state can be observed and recorded.                               |
@@ -83,6 +85,11 @@ Normative-source note:
   - supported only when the deployment explicitly opts in with `preview` metadata
 - preview isolation model:
   - provider-managed isolated preview target derived deterministically from deployment metadata plus run context
+- preview cleanup default:
+  - provider-managed cleanup with a documented default TTL; deployment metadata may override when needed
+- preview lock-scope default:
+  - preview shares the normal deployment lock by default
+  - a separate preview lock scope is allowed only when the preview satisfies the stronger independent-execution isolation bar
 - required guarantees:
   - isolated effective mutable target identity
   - isolated smoke target

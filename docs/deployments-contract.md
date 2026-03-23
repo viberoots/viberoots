@@ -26,6 +26,7 @@ design has been explicitly updated first.
 - One deployment id owns one normal mutable live target by default.
 - Reviewed migration or alias exceptions must be first-class control-plane objects with explicit scope, lock sharing, and expiry or completion semantics.
 - `--publish-only` is exact-artifact reuse or delayed exact-artifact publish, never implicit rebuild.
+- `--publish-only` is in policy only for operation kinds that reuse an already-admitted immutable artifact or admitted same-deployment snapshot; `rebuild_per_stage` promotion is a distinct flow and must be rejected under `--publish-only`.
 - For protected/shared mutation, `--provision-only` must still bind to one admitted source revision and frozen execution snapshot, even when no artifact is required.
 - For `shared_nonprod` and `production_facing`, immutable-reuse publish paths must resolve to one authoritative admitted source run and its frozen execution snapshot.
 - Protected/shared rollback requires an explicit `--source-run-id` selecting the prior admitted run to reuse.
@@ -35,6 +36,7 @@ design has been explicitly updated first.
 - Default rollback candidates are usable only when any already-applied stateful `release_actions` remain rollback-compatible under their declared data-compatibility posture.
 - Protected/shared immutable-reuse flows must replay the recorded execution snapshot rather than reinterpret current repo state.
 - Protected/shared replay snapshots must record non-secret secret/config contract references or versions, not secret values.
+- Protected/shared replay snapshots must preserve immutable provider-config content or an immutable provider-config reference, not only a bare fingerprint.
 - Protected/shared deployment metadata must declare both secret and non-secret runtime-config requirements explicitly, with `{}` as the reviewable empty value for each contract surface.
 - Same-deployment protected/shared `retry` and `rollback` reuse the recorded admitted secret/config references by default; `promotion` uses the target deployment's newly admitted target-environment references.
 - Protected/shared exact-artifact selectors are in policy only when they deterministically resolve to exactly one admitted source run plus its recorded execution snapshot.
@@ -50,6 +52,8 @@ design has been explicitly updated first.
 - `promotion` always requires target-environment approval under the target deployment's admission policy.
 - `rollback` requires fresh target-environment approval by default for `production_facing`, unless an explicit emergency policy says otherwise.
 - `retry` may reuse approval only when the admission policy explicitly allows same-lineage retry reuse and the original approval remains valid.
+- Protected/shared preview reuses the target deployment's normal branch and required-check gates by default, but should not require a second manual approval by default when previewing an already-admitted artifact or run lineage.
+- An admission policy may still require manual preview approval for especially sensitive targets.
 - `retry` is branch-independent replay of an earlier admitted run for the same deployment by default; later branch movement does not invalidate it unless the admission policy explicitly sets `retry_branch_policy = branch_coupled`.
 - Supported protected/shared artifact-reuse paths must retain retrievable immutable artifacts for at least the documented minimum retention window.
 
@@ -64,7 +68,7 @@ design has been explicitly updated first.
 - `--rollback` is the explicit operator signal for same-deployment rollback semantics.
 - `--source-run-id` selects an earlier admitted run within policy; it does not override lane or admission policy.
 - Same-deployment preview publication defaults to `operation_kind = deploy` plus `publish_mode = preview`, not `retry`.
-- Unless `admission_policy` explicitly defines narrower preview rules, protected/shared preview uses the target deployment's normal branch/check/approval requirements.
+- Unless `admission_policy` explicitly defines a stricter preview posture, protected/shared preview uses the target deployment's normal branch and required-check requirements, while manual preview approval remains optional by default for already-admitted artifacts or run lineage.
 - Separate preview lock scope is allowed only when the preview meets the stronger independent-execution isolation bar; otherwise preview shares the normal deployment lock even when preview publication itself is in policy.
 - Mutating `--from-changes` fans out into ordinary per-deployment runs; it is not one multi-deployment mutating run record.
 

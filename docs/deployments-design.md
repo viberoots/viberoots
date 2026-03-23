@@ -326,6 +326,10 @@ Semantic contract for the canonical Buck `:deploy` target:
 
 ## Contract Summary
 
+This section is a reader-oriented summary of the fixed behavioral contract.
+For exact fail-closed wording, the authoritative source remains
+[Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md).
+
 Some implementation details remain open, but the following behavioral contracts are fixed:
 
 - every concrete deployment lives at `projects/deployments/<deployment-id>/`
@@ -362,7 +366,7 @@ If an implementation choice would break one of those contracts, the implementati
 
 ## Operator Quick Reference
 
-The table below is intentionally redundant with the normative sections later in this document.
+The table below is intentionally redundant with the contract and schema companion documents.
 Its job is to give operators and implementers one compact scan of the default policy shape before
 they dive into the detailed rationale.
 
@@ -377,6 +381,10 @@ they dive into the detailed rationale.
 | Smoke               | `shared_nonprod` and `production_facing` deploys must declare smoke explicitly and treat it as blocking by default unless an explicit `smoke.exception` says otherwise.                               | A publish can succeed and the overall deploy can still fail on smoke.                                         |
 
 ## Design Decisions Locked Now
+
+This section records the design decisions this document is intentionally optimizing around.
+It is not a second normative source; exact operator and implementation guarantees still live in the
+companion contract, schema, and provider-capabilities documents.
 
 The following operating-model decisions are part of this design and should be
 treated as settled policy, not open brainstorming:
@@ -401,9 +409,10 @@ treated as settled policy, not open brainstorming:
   - if that is not available or not appropriate, rollback should use a new revert commit promoted forward through the same branch flow
   - moving environment branches backward should not be the normal rollback mechanism
 - provider-native rollback should be treated as an emergency stabilization path, followed by control-plane and Git reconciliation
-- the shared deployment control plane should use a central Postgres-backed backend
+- the shared deployment control plane should use one central authoritative transactional backend
   - it should back deployment-record storage
   - it should back shared-environment deploy locking
+  - Postgres is the intended initial implementation because this design needs durable shared locks, fencing-capable coordination, and authoritative audited deploy records
 - shared-environment locking should use an explicit lock scope
   - the default lock scope should be derived from `provider` plus a normalized canonical provider-target identity
   - explicit overrides are special-case escape hatches and must validate as at least as strict as the derived scope
@@ -438,6 +447,7 @@ treated as settled policy, not open brainstorming:
 - protected or shared-environment `--publish-only` must identify the exact artifact being published
   - it must not mean "publish whatever was most recently built on this machine"
   - rebuilding during `--publish-only` is out of policy
+  - `rebuild_per_stage` promotion is therefore not a `--publish-only` flow; it is a distinct promotion path that must build and admit the target-stage artifact before publish
 - deploy records should distinguish operation kind from final outcome
   - operation kinds should use one canonical enum: `deploy`, `retry`, `promotion`, `rollback`, `preview_cleanup`
   - preview should be modeled through `publish_mode`, not as a peer `operation_kind`
@@ -474,7 +484,7 @@ treated as settled policy, not open brainstorming:
   - they must be incident-bounded rather than a standing alternate workflow
   - they must require post-incident reconciliation back to the normal branch, admission, and deployment path
 - local-only fallback should be explicitly limited
-  - shared environments must use the central Postgres control plane
+  - shared environments must use the central authoritative shared control plane
   - personal local/dev workflows may use a local filesystem lock plus a local structured deployment record
   - local-only fallback records are non-authoritative and must not be used for shared environments
 - protected/shared smoke checks should be required and blocking by default
@@ -590,7 +600,7 @@ Control-plane worker responsibilities for protected/shared mutation:
    - for first-run deploy, source admission determines the admissible revision and trusted artifact path
    - for immutable-reuse flows, source admission validates the selected prior admitted run and its replay eligibility
 2. resolve target-environment run admission and freeze one immutable execution snapshot for that mutating run before any waiting or mutation begins
-   - the snapshot should preserve the deployment metadata, provider-config snapshot or fingerprint, resolved policy contents, selected artifact inputs when applicable, and any other non-secret execution inputs needed to replay the admitted decision faithfully
+   - the snapshot should preserve the deployment metadata, immutable provider-config content or immutable provider-config references, resolved policy contents, selected artifact inputs when applicable, and any other non-secret execution inputs needed to replay the admitted decision faithfully
    - for secret or runtime-config dependencies, the snapshot should preserve non-secret contract references, versions, selectors, or fingerprints rather than secret values
 3. revalidate admission, lane, prerequisite, and target-ownership policy before mutation
 4. acquire the shared lock
@@ -762,6 +772,8 @@ Flag interaction rules:
     - if a required action is not declared replay-safe for `deploy_publish_slice`, the run must fail clearly rather than guess
   - it must publish one explicitly selected immutable artifact
   - it must not build or select an implicit local artifact on the caller's behalf
+- `--publish-only` is valid only for exact-artifact reuse flows such as retry, rollback, same-deployment delayed publish, or `same_artifact` promotion
+- if a lane declares `artifact_reuse_mode = "rebuild_per_stage"`, promotion must use the reviewed rebuild-per-stage flow and the system must reject `--publish-only` for that promotion request
 - promotion-grade, retry, and rollback-grade publish-only paths should use the exact previously resolved artifact rather than rebuilding
 - for protected or shared environments, `--publish-only` must require an explicit admitted source-run selector or another exact selector that resolves unambiguously to one admitted source-run snapshot
 - the normal protected/shared selector should be `--source-run-id <deploy-run-id>`
@@ -972,6 +984,7 @@ Preview metadata defaults:
 - the common default is that preview is unsupported unless the deployment opts in
 - when preview is supported, the preview metadata may rely on provider-wide built-in defaults for cleanup TTL, smoke behavior, or lock-scope separation to reduce repetition
 - those defaults should still be part of one authoritative built-in preview policy, not adapter-local guesswork
+- the authoritative source for those provider-wide preview defaults is the reviewed provider capability entry
 - validation should treat those values as required in the effective resolved preview policy even when a checked-in deployment omits them because the provider default supplies them
 
 Protected/shared preview product stance:
@@ -1024,6 +1037,7 @@ deployment(
         "path": "/",
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 
@@ -1073,7 +1087,10 @@ Protected/shared preview admission policy:
 - preview on those deployments should therefore require `--source-run-id` or an equivalent explicit admitted source-run selector
 - preview for those deployments must still publish to an explicitly isolated preview target class
 - preview for those deployments must not be used to preview unadmitted PR code or to bypass the lane's normal branch, check, or approval policy
-- unless the target deployment's `admission_policy` explicitly defines narrower preview rules, protected/shared preview should inherit the target deployment's normal branch, check, and approval requirements
+- unless the target deployment's `admission_policy` explicitly defines a stricter preview posture, protected/shared preview should inherit the target deployment's normal branch and required-check requirements
+- default approval posture for protected/shared preview should be lighter than normal publish:
+  - preview of an already-admitted artifact or run lineage should not require a second manual approval by default
+  - a deployment's `admission_policy` may still require manual preview approval for especially sensitive targets
 - PR-driven shared previews of unadmitted code are out of policy
 - if a workflow needs previews for unadmitted revisions, that should use a separate `local_only` or other explicitly preview-safe review-app deployment shape rather than piggybacking on a protected/shared deployment id
 - preview remains a `publish_mode`; it does not introduce a separate replay or peer `operation_kind` category
@@ -1096,7 +1113,9 @@ Preview cleanup contract:
   - the reason for cleanup such as TTL expiry, PR close, manual cleanup, or superseding preview
   - the final outcome
 - preview cleanup must use the same explicit authz boundary as other destructive protected/shared actions
-- preview cleanup must acquire the lock for the isolated preview target it destroys
+- preview cleanup must acquire the effective lock scope for the preview being destroyed
+  - when the preview uses its own isolated preview lock scope, cleanup must acquire that scope
+  - when the preview shares the normal deployment lock by policy, cleanup must acquire that shared lock instead of inventing a second cleanup-only lock
 - if the preview is not isolated enough to have its own safe cleanup path, that preview shape is out of policy
 - a preview may be valid yet still share the normal deployment lock
   - preview-safe isolation is enough to allow preview publication
@@ -1311,12 +1330,12 @@ Suggested low-level rule shape:
 deployment(
     name = "deploy",
     provider = "cloudflare-pages",
+    lane_policy = "//build-tools/deploy/lanes:pleomino",
     provider_target = {
         "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
         "id": "pleomino-prod-pages",
     },
-    lane_policy = "//build-tools/deploy/lanes:pleomino",
     environment_stage = "prod",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     protection_class = "production_facing",
@@ -1337,6 +1356,7 @@ deployment(
         "path": "/",
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 
@@ -1420,7 +1440,7 @@ Policy evaluation order:
   - `lane_policy` governs stage ordering, branch mapping, allowed promotion edges, artifact reuse mode, and any lane-specific compatibility rules that affect promotion behavior
   - `admission_policy` governs allowed refs, required checks, approvals, and attestation requirements for the requested run kind
 - the shared control plane is the final mutating-policy gate and must not silently reinterpret these referenced policy objects differently from repo validation
-- unless `admission_policy` explicitly defines narrower preview rules, protected/shared preview runs should inherit the same target-environment branch/check/approval requirements as normal publishes for that deployment
+- unless `admission_policy` explicitly defines a stricter preview posture, protected/shared preview runs should inherit the same target-environment branch and required-check requirements as normal publishes for that deployment
 - recommended conventions for the low-level deployment shape are:
   - illustrative snippets later in this document may omit `runtime_config_requirements = {}` when the example is focused on another concept, but the schema and contract still treat that explicit empty object as the normal no-runtime-config value
   - `provider_target`
@@ -1540,30 +1560,30 @@ Policy evaluation order:
     - `required`
     - optional source, mode, or preview qualifier when requirements differ by run mode
   - should remain Buck-visible metadata; secret values still belong in secret backends, not here
-  - `release_actions`
-    - optional
-    - when present, should describe controlled release-time actions that are neither infrastructure convergence nor ordinary publish nor smoke
-    - examples include schema migrations, cache warmups, search-index swaps, release-flag activation, or post-publish verification jobs
-    - should be explicit about phase placement such as `pre_publish`, `post_publish_pre_smoke`, or `post_smoke`
-    - should declare ordering, abort behavior, and whether later lifecycle steps may proceed on failure
-    - for `shared_nonprod` and `production_facing`, actions must come from a vetted built-in registry
-    - package-local executable release-action entries are invalid for `shared_nonprod` and `production_facing`
-  - `preview`
-    - optional
-    - when absent, preview should be treated as unsupported by default
-    - when present, should be the authoritative deployment metadata for preview behavior rather than leaving preview policy to prose or adapter convention
-    - should capture at least:
-      - target-derivation mode
-      - isolation class
-      - cleanup or TTL policy
-      - any smoke-policy override
-      - whether separate lock scope is allowed
-    - the common case may rely on provider-wide built-in defaults for some of those fields, but the deployment metadata must still opt into preview explicitly
-  - `prerequisites`
-    - optional
-    - when present, should be an explicit list of deployment-id prerequisites rather than free-form prose
-    - each prerequisite should declare whether it is `ordering_only` or `health_gated`
-    - prerequisites should stay narrow and direct-edge-only by default
+- `release_actions`
+  - optional
+  - when present, should describe controlled release-time actions that are neither infrastructure convergence nor ordinary publish nor smoke
+  - examples include schema migrations, cache warmups, search-index swaps, release-flag activation, or post-publish verification jobs
+  - should be explicit about phase placement such as `pre_publish`, `post_publish_pre_smoke`, or `post_smoke`
+  - should declare ordering, abort behavior, and whether later lifecycle steps may proceed on failure
+  - for `shared_nonprod` and `production_facing`, actions must come from a vetted built-in registry
+  - package-local executable release-action entries are invalid for `shared_nonprod` and `production_facing`
+- `preview`
+  - optional
+  - when absent, preview should be treated as unsupported by default
+  - when present, should be the authoritative deployment metadata for preview behavior rather than leaving preview policy to prose or adapter convention
+  - should capture at least:
+    - target-derivation mode
+    - isolation class
+    - cleanup or TTL policy
+    - any smoke-policy override
+    - whether separate lock scope is allowed
+  - the common case may rely on provider-wide built-in defaults from the reviewed provider capability entry for some of those fields, but the deployment metadata must still opt into preview explicitly
+- `prerequisites`
+  - optional
+  - when present, should be an explicit list of deployment-id prerequisites rather than free-form prose
+  - each prerequisite should declare whether it is `ordering_only` or `health_gated`
+  - prerequisites should stay narrow and direct-edge-only by default
     - cycles and self-dependencies are invalid
 
 Important design points:
@@ -1903,6 +1923,7 @@ deployment(
         "path": "/",
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 
@@ -1977,6 +1998,7 @@ deployment(
         "path": "/",
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 
@@ -2029,6 +2051,7 @@ deployment(
         "path": "/healthz",
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 
@@ -2084,6 +2107,7 @@ deployment(
         "path": "/ready",
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 
@@ -2592,6 +2616,7 @@ deployment(
         "path": "/",
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 
@@ -2794,6 +2819,7 @@ deployment(
         "path": "/",
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 
@@ -3156,6 +3182,7 @@ deployment(
         },
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 
@@ -3203,7 +3230,7 @@ Retry policy by step:
 
 Shared-environment locking policy:
 
-- shared environments should use a central Postgres-backed control plane for deploy coordination
+- shared environments should use a central authoritative control plane for deploy coordination
 - every deployment should resolve to one effective mutable live target for ownership and coordination purposes
 - by default that effective mutable target is exactly the deployment's canonical provider-target identity
 - every deployment should therefore resolve to one lock scope derived from that effective mutable target
@@ -3224,6 +3251,7 @@ Preview locking policy:
 
 - preview shares the main deployment lock by default
 - preview may use separate lock scope only when the preview target identity, publish path, smoke target, and cleanup path are all isolated from the non-preview path
+- preview cleanup must use that same effective preview lock scope rather than a separate cleanup-only coordination path
 
 Default lock-acquisition behavior:
 
@@ -3259,7 +3287,7 @@ Cancellation policy:
 
 Local-only fallback policy:
 
-- shared environments must use the central Postgres control plane
+- shared environments must use the central authoritative shared control plane
 - personal local or dev workflows may use a local filesystem lock plus a local structured deployment record
 - local-only fallback is non-authoritative and must not be used as the locking or record system for shared environments
 
@@ -3330,7 +3358,7 @@ Release-admission contract for protected/shared environments:
 
 - a run is eligible to mutate a protected or shared environment only when all of the following are true:
   - one immutable execution snapshot has been frozen for that admitted run before any waiting or mutating step begins
-    - the snapshot should preserve the admitted deployment metadata, provider-config snapshot or fingerprint, resolved policy contents, admitted secret/runtime-config contract references, and any selected artifact inputs needed for execution
+    - the snapshot should preserve the admitted deployment metadata, immutable provider-config content or immutable provider-config references, resolved policy contents, admitted secret/runtime-config contract references, and any selected artifact inputs needed for execution
   - for `deploy`, `promotion`, and protected/shared `metadata_only` `--provision-only`, the admitted source revision comes from the allowed environment branch for that deployment lane
   - for `retry`, the selected source run is an earlier admitted run for the same deployment and target environment, and replay remains branch-independent unless the admission policy explicitly sets `retry_branch_policy = branch_coupled`
   - for `rollback`, the current lane policy and environment-branch state must authorize performing a rollback for that deployment, but the selected rollback source run may be an earlier retained admitted run for the same deployment rather than the current branch head revision
@@ -3436,6 +3464,7 @@ Suppose `pleomino-prod` declares:
 deployment(
     name = "deploy",
     provider = "cloudflare-pages",
+    lane_policy = "//build-tools/deploy/lanes:pleomino",
     provider_target = {
         "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
@@ -3460,6 +3489,7 @@ deployment(
         "path": "/",
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 
@@ -3527,9 +3557,12 @@ Provenance split for promotion-safe artifact reuse:
 Artifact retention policy:
 
 - any workflow that depends on immutable artifact reuse must keep that artifact and its immutable reference retrievable for the full supported promotion, retry, and rollback window
+- the same supported window must also preserve the full replay bundle needed to execute that reuse path faithfully
+  - at minimum this includes the frozen execution snapshot, immutable provider-config content or immutable provider-config references, resolved policy snapshots or snapshot refs, and any approval or exception evidence required to justify the run
 - for protected or shared environments, artifact retention is a required part of the deployment contract, not an optional implementation convenience
-- an implementation must not garbage-collect or otherwise lose the only approved artifact for an in-policy promotion or rollback path while that path is still expected to be available
+- an implementation must not garbage-collect or otherwise lose the only approved artifact or the associated replay bundle for an in-policy promotion or rollback path while that path is still expected to be available
 - if the artifact has expired or been intentionally removed, the system should surface that condition explicitly rather than silently rebuilding and treating the rebuild as equivalent
+- if the replay bundle is missing or incomplete, the system should surface that condition explicitly rather than silently reinterpreting current repo state as a substitute
 - for protected/shared `--publish-only`, retry, and rollback reuse flows, the system should replay the recorded deployment snapshot associated with the reused artifact/run
 - for protected/shared `promotion` reuse flows, the system should replay only the source-run artifact and compatibility evidence from the reused run, while using the target deployment's own admitted execution snapshot for target-environment mutation
 - those flows should fail explicitly if the recorded snapshot is missing or if required current invariants no longer match that recorded snapshot
@@ -3537,7 +3570,7 @@ Artifact retention policy:
   - `production_facing`: 90 days
   - `shared_nonprod`: 30 days
 - `local_only` retention may be implementation-defined unless a stricter team policy applies
-- storage mechanics may still be decided during implementation, but the operator-facing policy is that a supported artifact-reuse path must remain practically usable for at least those minimum windows
+- storage mechanics may still be decided during implementation, but the operator-facing policy is that a supported artifact-reuse path must remain practically usable, with its full replay bundle intact, for at least those minimum windows
 
 Migration and alias exception policy:
 
@@ -3641,7 +3674,7 @@ Provider-native rollback policy:
 
 Control-plane-outage break-glass policy:
 
-- the emergency path must remain usable even when the normal shared control plane, its Postgres backend, or another core online dependency is the incident
+- the emergency path must remain usable even when the normal shared control plane, its transactional backend, or another core online dependency is the incident
 - that does not create a second normal deployment system; it creates one explicitly documented incident-only procedure for protected/shared stabilization
 - the offline-capable path should still prefer exact admitted-artifact reuse over rebuild whenever a retained admitted artifact is available
 - if the normal online lock service is unavailable, the emergency path must use explicit fencing, target freeze, or another reviewed concurrency-control mechanism strong enough to prevent concurrent normal-path mutation against the same canonical target
@@ -4130,6 +4163,7 @@ Artifact identity rules:
 - if an artifact is not produced through a fully content-addressed path, `resolve` should compute or surface a stable content fingerprint
 - publish should consume the resolved artifact from the build step, not rebuild implicitly
 - publish-only flows should accept a previously recorded artifact reference and must not rebuild
+- rebuild-per-stage promotion is a separate flow and must not be represented as publish-only
 - promotion, retry, and rollback flows should accept a previously recorded artifact reference and should prefer reusing that immutable artifact rather than rebuilding
 - a recorded artifact reference for a supported reuse flow must remain retrievable for the applicable retention window
 - reusable artifact attestation should bind artifact identity to source revision plus build inputs, not to environment-specific deployment metadata or provider config
@@ -4376,7 +4410,7 @@ Canonical lifecycle-state vocabulary:
 
 Storage guidance:
 
-- shared deployment records should be persisted in the central Postgres-backed control plane
+- shared deployment records should be persisted in the central authoritative control plane
 - structured CLI output is still useful, but it is an interface, not the sole source of truth
 - the record contract should remain stable even if the storage schema evolves
 
@@ -4426,6 +4460,7 @@ cloudflare_static_pwa_deployment(
         "path": "/",
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 
@@ -4580,6 +4615,7 @@ def cloudflare_static_pwa_deployment(
     provisioner = None,
     smoke = None,
     secret_requirements = {},
+    runtime_config_requirements = {},
 ):
     if protection_class != "local_only":
         if environment_stage == None:
@@ -4640,6 +4676,7 @@ cloudflare_static_pwa_deployment(
         "path": "/",
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 
@@ -4675,6 +4712,7 @@ def puzzle_cloudflare_deployment(
     provisioner = None,
     smoke = None,
     secret_requirements = {},
+    runtime_config_requirements = {},
 ):
     cloudflare_static_pwa_deployment(
         name = name,
@@ -4717,6 +4755,7 @@ puzzle_cloudflare_deployment(
         "path": "/",
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 
@@ -4786,6 +4825,7 @@ puzzle_cloudflare_deployment(
         "path": "/",
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 
@@ -4883,6 +4923,7 @@ deployment(
         "path": "/ready",
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 
@@ -4945,6 +4986,7 @@ deployment(
         "path": "/",
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 
@@ -5187,6 +5229,7 @@ deployment(
         "path": "/ready",
     },
     secret_requirements = {},
+    runtime_config_requirements = {},
 )
 ```
 

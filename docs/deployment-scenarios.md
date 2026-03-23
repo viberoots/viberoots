@@ -83,10 +83,12 @@ Expected behavior:
 - the operator or automation submits `deploy pleomino-prod --preview --source-run-id <admitted-run-id>`
 - preview is recorded as `publish_mode = preview`
 - for same-deployment preview publication, the default `operation_kind` remains `deploy`
-- unless the deployment's `admission_policy` explicitly defines narrower preview rules, the preview run uses the same target-environment branch/check/approval requirements as a normal protected/shared publish for `pleomino-prod`
+- unless the deployment's `admission_policy` explicitly defines a stricter preview posture, the preview run uses the same target-environment branch and required-check requirements as a normal protected/shared publish for `pleomino-prod`
+- by default, previewing that already-admitted artifact does not require a second manual approval
 - the effective target identity is the isolated preview target
 - the preview run may still share the normal deployment lock unless the preview also satisfies the stronger independent-execution isolation requirements for a separate preview lock scope
 - preview cleanup is a first-class audited `preview_cleanup` operation
+- preview cleanup acquires the effective lock scope for that preview, whether that is the shared normal lock or a separate isolated preview lock
 - preview cleanup records `publish_mode = preview`, the isolated preview target identity, and a cleanup reason such as TTL expiry or PR close
 
 ## 6. Rejected Preview On Non-Isolated Target
@@ -174,6 +176,7 @@ Situation:
 
 Expected behavior:
 
+- the operator must not use `--publish-only` for this promotion, because the target stage requires a newly built admitted artifact
 - source-run selection identifies the admitted source revision being promoted
 - trusted CI builds a new stage-specific immutable artifact for the target stage
 - the control plane admits that target-stage artifact before publish

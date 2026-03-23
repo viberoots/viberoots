@@ -169,7 +169,9 @@ Minimum fields when present:
 - either explicit cleanup or TTL policy or a provider-defaulted cleanup policy marker
 - any smoke override when deviating from the provider default
 - whether separate lock scope is allowed, when overriding the provider default
-- optional preview-specific admission constraints only when intentionally narrower than the deployment's normal admission policy
+- provider-default preview cleanup policy and preview-locking defaults must come from the authoritative provider capability entry when deployment metadata omits them
+- optional preview-specific admission constraints when intentionally different from the deployment's normal admission policy
+  - they may be stricter or lighter only where the deployment contract explicitly allows that variation
 
 ### `prerequisites[*]`
 
@@ -297,22 +299,22 @@ Used for protected/shared immutable-artifact reuse.
 
 Minimum fields:
 
-| Field                                     | Required          | Notes                                                         |
-| ----------------------------------------- | ----------------- | ------------------------------------------------------------- |
-| `schema_version`                          | yes               | Explicit replay schema id.                                    |
-| `deployment_id`                           | yes               | Source deployment id.                                         |
-| resolved component data                   | yes               | Canonical resolved component projection.                      |
-| artifact refs and identities              | yes               | Exact immutable artifact identity.                            |
-| declared normal target identity           | yes               | Normal live target.                                           |
-| effective run target identity             | yes               | Actual mutated target for that run.                           |
-| provider-config snapshot or immutable ref | yes               | No silent reinterpretation.                                   |
-| `lane_policy` snapshot/fingerprint        | yes               | Source-run policy context.                                    |
-| `admission_policy` snapshot/fingerprint   | yes               | Source-run policy context.                                    |
-| rollout policy snapshot                   | yes when relevant | Source-run rollout semantics.                                 |
-| `release_actions` plan snapshot           | yes when relevant | Includes replay behavior and data-compatibility posture.      |
-| smoke policy snapshot                     | yes when relevant | Source-run validation contract.                               |
-| secret-contract version/reference         | yes               | Non-secret contract metadata only.                            |
-| runtime-config reference/fingerprint      | yes when relevant | Non-secret admitted config selector for deterministic replay. |
+| Field                                               | Required          | Notes                                                                      |
+| --------------------------------------------------- | ----------------- | -------------------------------------------------------------------------- |
+| `schema_version`                                    | yes               | Explicit replay schema id.                                                 |
+| `deployment_id`                                     | yes               | Source deployment id.                                                      |
+| resolved component data                             | yes               | Canonical resolved component projection.                                   |
+| artifact refs and identities                        | yes               | Exact immutable artifact identity.                                         |
+| declared normal target identity                     | yes               | Normal live target.                                                        |
+| effective run target identity                       | yes               | Actual mutated target for that run.                                        |
+| provider-config immutable snapshot or immutable ref | yes               | No silent reinterpretation; bare fingerprints are insufficient for replay. |
+| `lane_policy` snapshot/fingerprint                  | yes               | Source-run policy context.                                                 |
+| `admission_policy` snapshot/fingerprint             | yes               | Source-run policy context.                                                 |
+| rollout policy snapshot                             | yes when relevant | Source-run rollout semantics.                                              |
+| `release_actions` plan snapshot                     | yes when relevant | Includes replay behavior and data-compatibility posture.                   |
+| smoke policy snapshot                               | yes when relevant | Source-run validation contract.                                            |
+| secret-contract version/reference                   | yes               | Non-secret contract metadata only.                                         |
+| runtime-config reference/fingerprint                | yes when relevant | Non-secret admitted config selector for deterministic replay.              |
 
 ## 7. Deployment Record
 
