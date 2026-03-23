@@ -41,7 +41,7 @@ design has been explicitly updated first.
 - `promotion` always requires target-environment approval under the target deployment's admission policy.
 - `rollback` requires fresh target-environment approval by default for `production_facing`, unless an explicit emergency policy says otherwise.
 - `retry` may reuse approval only when the admission policy explicitly allows same-lineage retry reuse and the original approval remains valid.
-- `retry` is branch-independent replay of an earlier admitted run for the same deployment by default; later branch movement does not invalidate it unless the admission policy explicitly says retry is branch-coupled.
+- `retry` is branch-independent replay of an earlier admitted run for the same deployment by default; later branch movement does not invalidate it unless the admission policy explicitly sets `retry_branch_policy = branch_coupled`.
 - Supported protected/shared artifact-reuse paths must retain retrievable immutable artifacts for at least the documented minimum retention window.
 
 ## Operator Semantics

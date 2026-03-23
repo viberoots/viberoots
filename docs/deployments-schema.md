@@ -223,6 +223,7 @@ Optional fields:
 - preview admission constraints
 - operation-kind-specific restrictions
 - whether same-lineage retry approval reuse is allowed
+- `retry_branch_policy`, using the closed enum `branch_independent` or `branch_coupled`
 - whether fresh approval is required for rollback by protection class
 
 ## 5. Replay Snapshot

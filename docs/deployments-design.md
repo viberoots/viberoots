@@ -3206,7 +3206,7 @@ Release-admission contract for protected/shared environments:
   - one immutable execution snapshot has been frozen for that admitted run before any waiting or mutating step begins
     - the snapshot should preserve the admitted deployment metadata, provider-config snapshot or fingerprint, resolved policy contents, and any selected artifact inputs needed for execution
   - for `deploy` and `promotion`, the source revision comes from the allowed environment branch for that deployment lane
-  - for `retry`, the selected source run is an earlier admitted run for the same deployment and target environment, and replay remains branch-independent unless the admission policy explicitly makes retry branch-coupled
+  - for `retry`, the selected source run is an earlier admitted run for the same deployment and target environment, and replay remains branch-independent unless the admission policy explicitly sets `retry_branch_policy = branch_coupled`
   - for `rollback`, the current lane policy and environment-branch state must authorize performing a rollback for that deployment, but the selected rollback source run may be an earlier retained admitted run for the same deployment rather than the current branch head revision
 - required checks for that environment have passed for the admitted revision or admitted reusable artifact, as applicable to the run kind
   - any required human or policy approval has been granted
