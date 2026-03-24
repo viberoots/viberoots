@@ -343,6 +343,7 @@ Optional fields:
 - `retry_branch_policy`, using the closed enum `branch_independent` or `branch_coupled`
 - whether fresh approval is required for rollback by protection class
 - approval payload-binding requirements when human or policy approval is required
+- authorization scope requirements or policy reference when the deployment uses scoped submit/approve/operate permissions
 
 Minimum `artifact_attestation_requirements` contract:
 
@@ -364,6 +365,16 @@ Minimum approval payload-binding contract when approval is required:
   - reviewed provisioner plan/diff artifact reference
 - validity or expiry rule for approval reuse where reuse is permitted
 - fail-closed behavior when any required bound field changes after approval
+
+Minimum authorization-scope contract when scoped protected/shared permissions are modeled here:
+
+- scope vocabulary drawn from:
+  - `repo_admin`
+  - `lane`
+  - `deployment`
+  - `break_glass_incident`
+- which actions each scope may authorize, such as `submit`, `approve`, `operate`, `administer_policy`, or `break_glass`
+- inheritance or narrowing rule, including whether lane scope applies to all deployments in that lane unless a stricter deployment-level policy narrows it
 
 ## 5. Migration / Alias Exception Object
 
@@ -396,26 +407,27 @@ Used for protected/shared immutable-artifact reuse.
 
 Minimum fields:
 
-| Field                                               | Required          | Notes                                                                                                                 |
-| --------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `schema_version`                                    | yes               | Explicit replay schema id.                                                                                            |
-| `deployment_id`                                     | yes               | Source deployment id.                                                                                                 |
-| resolved component data                             | yes               | Canonical resolved component projection.                                                                              |
-| artifact refs and identities                        | yes               | Exact immutable artifact identity.                                                                                    |
-| runner implementation identities                    | yes               | Built-in publisher/provisioner/smoke/release-action runner version or digest set used by the run.                     |
-| declared normal target identity                     | yes               | Normal live target.                                                                                                   |
-| effective run target identity                       | yes               | Actual mutated target for that run.                                                                                   |
-| provider-config immutable snapshot or immutable ref | yes               | No silent reinterpretation; bare fingerprints are insufficient for replay.                                            |
-| `lane_policy` snapshot/fingerprint                  | yes               | Source-run policy context.                                                                                            |
-| `admission_policy` snapshot/fingerprint             | yes               | Source-run policy context.                                                                                            |
-| rollout policy snapshot                             | yes when relevant | Source-run rollout semantics.                                                                                         |
-| `release_actions` plan snapshot                     | yes when relevant | Includes replay behavior, duplicate-execution-safety details for any `rerun` context, and data-compatibility posture. |
-| provisioner plan/diff snapshot or reference         | yes when relevant | Required when a reviewed pre-mutation provisioner plan/diff was part of admission.                                    |
-| smoke policy snapshot                               | yes when relevant | Source-run validation contract.                                                                                       |
-| secret-contract version/reference                   | yes               | Non-secret contract metadata only.                                                                                    |
-| runtime-config reference/fingerprint                | yes when relevant | Non-secret admitted config selector for deterministic replay.                                                         |
-| approval payload-binding snapshot or reference      | yes when relevant | Required when human or policy approval was part of admission.                                                         |
-| rollout runtime state snapshot                      | yes when relevant | Required for progressive rollout replay, resume, or auditability.                                                     |
+| Field                                               | Required          | Notes                                                                                                                       |
+| --------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `schema_version`                                    | yes               | Explicit replay schema id.                                                                                                  |
+| `deployment_id`                                     | yes               | Source deployment id.                                                                                                       |
+| resolved component data                             | yes               | Canonical resolved component projection.                                                                                    |
+| artifact refs and identities                        | yes               | Exact immutable artifact identity.                                                                                          |
+| runner implementation identities                    | yes               | Built-in publisher/provisioner/smoke/release-action runner version or digest set used by the run.                           |
+| declared normal target identity                     | yes               | Normal live target.                                                                                                         |
+| effective run target identity                       | yes               | Actual mutated target for that run.                                                                                         |
+| provider-config immutable snapshot or immutable ref | yes               | No silent reinterpretation; bare fingerprints are insufficient for replay.                                                  |
+| `lane_policy` snapshot/fingerprint                  | yes               | Source-run policy context.                                                                                                  |
+| `admission_policy` snapshot/fingerprint             | yes               | Source-run policy context.                                                                                                  |
+| rollout policy snapshot                             | yes when relevant | Source-run rollout semantics.                                                                                               |
+| `release_actions` plan snapshot                     | yes when relevant | Includes replay behavior, duplicate-execution-safety details for any `rerun` context, and data-compatibility posture.       |
+| provisioner plan/diff snapshot or reference         | yes when relevant | Required when a reviewed pre-mutation provisioner plan/diff was part of admission.                                          |
+| smoke policy snapshot                               | yes when relevant | Source-run validation contract.                                                                                             |
+| secret-contract version/reference                   | yes               | Non-secret contract metadata only.                                                                                          |
+| runtime-config reference/fingerprint                | yes when relevant | Non-secret admitted config selector for deterministic replay.                                                               |
+| replay reference-resolution policy                  | yes when relevant | Must preserve whether exact reference reuse is required and fail-closed behavior when an admitted reference is unavailable. |
+| approval payload-binding snapshot or reference      | yes when relevant | Required when human or policy approval was part of admission.                                                               |
+| rollout runtime state snapshot                      | yes when relevant | Required for progressive rollout replay, resume, or auditability.                                                           |
 
 Minimum `approval payload-binding snapshot` fields when present:
 
@@ -482,6 +494,7 @@ Conditionally required:
 - migration or alias exception reference when admission or replay relied on one
 - emergency evidence object or structured emergency-evidence reference when break-glass mutation was used
 - `failed_step` when `final_outcome` is not `succeeded` and the run reached a canonical lifecycle step after `resolve`
+- cancellation summary when a cancel request was accepted
 - recovery-state summary when protected/shared in-doubt recovery occurred
 - in-doubt-step identifier when protected/shared in-doubt recovery occurred
 - recovery decision summary when protected/shared in-doubt recovery occurred
@@ -503,6 +516,22 @@ Minimum fields:
 - whether provider-state reconciliation proved mutation completed, proved mutation did not occur, or remained inconclusive
 - whether execution resumed, converged directly to a final record, or terminated for operator follow-up
 - recovery-attempt timestamp or interval summary
+
+### Cancellation Summary
+
+Required when a cancel request was accepted for the run.
+
+Minimum fields:
+
+- cancellation requested time
+- requesting identity
+- lifecycle step active when cancellation was accepted
+- whether provider-side mutation or side-effecting `release_actions` may already have begun
+- whether the run entered reconciliation before terminalization
+- resulting terminalization path:
+  - `cancelled_without_mutation`
+  - `finished_after_reconciliation`
+  - `failed_after_reconciliation`
 
 ### Emergency Evidence
 
@@ -566,11 +595,17 @@ Minimum fields:
 Minimum operator-facing retention windows:
 
 - protected/shared immutable artifacts plus full replay bundles:
-  - `production_facing`: 90 days
+  - `production_facing`: 180 days
   - `shared_nonprod`: 30 days
 - protected/shared authoritative deployment records, approval evidence, migration or alias exception records, and break-glass emergency evidence:
   - `production_facing`: 1 year
   - `shared_nonprod`: 180 days
+- minimum restore-test cadence for the authoritative control plane:
+  - `production_facing`: monthly
+  - `shared_nonprod`: quarterly
+- target control-plane recovery objectives:
+  - `production_facing`: RPO `15m`, RTO `1h`
+  - `shared_nonprod`: RPO `4h`, RTO `8h`
 
 Retention rule:
 
@@ -624,6 +659,7 @@ Repo validation should reject:
 - `rollout_policy` declarations that omit mode-required phase, gate, or exposure semantics
 - approval-requiring protected/shared admission policies that do not define immutable payload-binding requirements
 - protected/shared record or snapshot shapes that preserve approval identity but not the immutable payload those approvals authorized
+- protected/shared replay shapes that preserve secret/config references without preserving fail-closed reference-resolution behavior
 - progressive rollout declarations that omit required phase-state, resume, abort, or partial-rollback semantics
 
 ## 10. Versioned Interface Payloads

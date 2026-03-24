@@ -416,6 +416,16 @@ treated as settled policy, not open brainstorming:
   - because the shared control plane is the sole mutating authority for protected/shared environments, its own resilience is part of the deployment-system design
   - the authoritative backend and API tier should have reviewed backup, restore-test, failover, and disaster-recovery expectations rather than relying on break-glass as the routine answer to ordinary platform failure
   - the operator-facing design should define explicit control-plane recovery objectives, including target RPO and RTO, so teams know the intended availability posture of the deployment authority itself
+  - the initial reviewed minimum objectives should be:
+
+    | protection class    | target RPO | target RTO | minimum admitted-artifact retention | minimum authoritative record retention | minimum restore-test cadence |
+    | ------------------- | ---------- | ---------- | ----------------------------------- | -------------------------------------- | ---------------------------- |
+    | `shared_nonprod`    | `4h`       | `8h`       | `30d`                               | `180d`                                 | quarterly                    |
+    | `production_facing` | `15m`      | `1h`       | `180d`                              | `365d`                                 | monthly                      |
+
+  - implementations may exceed those minimums, but must not silently operate below them without an explicit design update
+  - artifact garbage collection, backup policy, and disaster-recovery runbooks should all be validated against those same minimum objectives rather than being tuned independently
+
 - shared-environment locking should use an explicit lock scope
   - the default lock scope should be derived from `provider` plus a normalized canonical provider-target identity
   - explicit overrides are special-case escape hatches and must validate as at least as strict as the derived scope
@@ -472,6 +482,17 @@ treated as settled policy, not open brainstorming:
   - lifecycle states: `pending_approval`, `queued`, `waiting_for_lock`, `running`, `cancelling`, `finished`, `cancelled`
 - deploy records should also use one canonical vocabulary for non-canonical termination reasons
   - `termination_reason`: `cancelled`, `superseded`, `no_longer_admitted`, `lock_timeout`, or `null` when the run reaches a canonical terminal outcome
+- cancellation should be a first-class reviewed operator action with deterministic semantics
+  - a cancel request may be accepted only while the run is in `pending_approval`, `queued`, `waiting_for_lock`, `running`, or `cancelling`
+  - cancellation is always best-effort; it is not a guarantee that provider-side mutation can be interrupted safely once execution has entered a mutating step
+  - if cancellation is accepted before any provider-side mutation or side-effecting `release_action` begins, the run should terminate without mutating the target and record `termination_reason = cancelled`
+  - if cancellation is accepted after mutation may have begun, the run must transition to `cancelling`, stop scheduling any new optional later lifecycle steps, and reconcile provider state before choosing its terminal record
+  - a run in `cancelling` must not return to `queued` or silently resume ordinary forward progress as if no cancellation request occurred
+  - after reconciliation, the run should settle to exactly one of:
+    - `cancelled` with `termination_reason = cancelled` when reconciliation proves no protected/shared mutation occurred
+    - `finished` with a canonical terminal `final_outcome` when mutation completed or partially completed and the system can determine the correct resulting state
+    - `finished` with the appropriate failure outcome when reconciliation proves the run failed during or after mutation
+  - operator-facing clients should present cancellation after mutation start as "request stop and reconcile" rather than as an immediate destructive interrupt
 - deploy records should capture where a lifecycle failure happened without exploding the terminal outcome enum
   - failures after `resolve` should record the failed step explicitly, including `release_actions.pre_publish`, `publish`, `release_actions.post_publish_pre_smoke`, `smoke`, or `release_actions.post_smoke`
 - `preview_cleanup` records should preserve preview context explicitly
@@ -511,6 +532,16 @@ treated as settled policy, not open brainstorming:
 - protected/shared control-plane permissions should follow one explicit minimum role model
   - separate normal submit, approve, operate, and break-glass powers rather than leaving privileged actions to adapter-local convention
   - when a deployment requires human approval, self-approval is out of policy by default; the same principal must not satisfy both submitter and approver roles unless an explicit break-glass procedure says otherwise
+  - the minimum authorization scope model should be hierarchical and explicit:
+    - repo-wide administrative scope for platform ownership tasks
+    - lane scope for policy administration and operational access across one release lane
+    - deployment scope for day-to-day submit, approve, and operate permissions on one concrete deployment id
+    - incident-bounded break-glass scope for named emergency roles
+  - permission evaluation should be least-privilege and resource-scoped by default
+    - a deployment-scoped grant applies only to that deployment id
+    - a lane-scoped grant may cover deployments in that lane unless a stricter deployment-level policy narrows it
+    - repo-wide administrative scope is for platform stewardship and policy management, not the default way ordinary release operators gain mutation rights
+  - the CLI, control-plane API, and any UI must all authorize against the same scope model and action vocabulary so operators do not encounter channel-specific privilege differences
 - provisioners should be non-destructive by default during normal deploy flows
   - delete or replace behavior that can remove owned live resources should require an explicit separate operator path or equivalent break-glass intent
   - for `shared_nonprod` and `production_facing`, infra-affecting provisioners should expose a reviewable plan or diff surface before mutation whenever they may change provider-managed state
@@ -677,6 +708,7 @@ Control-plane worker responsibilities for protected/shared mutation:
 2. resolve target-environment run admission and freeze one immutable execution snapshot for that mutating run before any waiting or mutation begins
    - the snapshot should preserve the deployment metadata, immutable provider-config content or immutable provider-config references, resolved policy contents, selected artifact inputs when applicable, runner implementation identities for the built-in publisher, provisioner, smoke runner, and any built-in `release_actions` runner that materially influence execution, and any other non-secret execution inputs needed to replay the admitted decision faithfully
    - for secret or runtime-config dependencies, the snapshot should preserve non-secret contract references, versions, selectors, or fingerprints rather than secret values
+   - replay-sensitive secret or runtime-config references must resolve exactly to the admitted reference set for the run kind being executed; implementations must not silently substitute "latest", auto-rotated, or ambient defaults during retry or rollback
 3. when the run includes an infra-affecting protected/shared provisioner, generate the reviewable provisioner plan or diff from that frozen execution snapshot before any mutating step begins
    - the reviewed plan or diff must correspond to the same frozen execution snapshot that later drives mutation
    - when human approval is required for that infra-affecting path, the approval evidence should bind to that specific reviewed plan or diff artifact rather than to an unfrozen future recomputation
@@ -703,6 +735,14 @@ Control-plane worker responsibilities for protected/shared mutation:
 For protected/shared mutation, loading immutable replay inputs means "load the previously admitted immutable
 artifact plus the exact recorded context needed for the requested reuse flow"; it does not authorize a new
 build or rebuild by replay.
+
+Replay behavior for secret and runtime-config references:
+
+- `retry` and `rollback` should reuse the recorded admitted secret and runtime-config references for the source run by default
+- if one of those recorded references has expired, been deleted, been revoked, or can no longer be resolved exactly, the replay must fail closed rather than silently rebinding to a newer value
+- `promotion` should use the target deployment's newly admitted target-environment secret and runtime-config references, because target-environment admission is authoritative for the target run
+- when an admission policy intentionally allows a non-replayable input class, that policy should make the exception explicit and should disallow immutable-reuse replay paths that would otherwise depend on exact reference reuse
+- audit records for replay failures caused by unavailable admitted references should surface that cause directly so operators can distinguish policy-safe refusal from ordinary provider failure
 
 In-doubt run recovery contract:
 

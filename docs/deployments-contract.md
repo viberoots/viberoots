@@ -67,6 +67,10 @@ design has been explicitly updated first.
 - Protected/shared authoritative deployment records, approval evidence, migration or alias exception records, and break-glass emergency evidence must remain retained for at least the documented minimum audit-retention window.
 - Protected/shared infra-affecting provisioner runs must surface a reviewed plan or diff artifact before routine mutation, unless an explicitly reviewed higher-bar exception path says otherwise.
 - The authoritative protected/shared control plane must have explicit reviewed backup, restore-test, and recovery objectives; break-glass is an emergency exception path, not the normal resilience model for routine outages.
+- Minimum reviewed control-plane resilience objectives are:
+  - `shared_nonprod`: target RPO `4h`, target RTO `8h`, minimum admitted-artifact retention `30d`, minimum authoritative record retention `180d`, minimum restore-test cadence `quarterly`
+  - `production_facing`: target RPO `15m`, target RTO `1h`, minimum admitted-artifact retention `180d`, minimum authoritative record retention `365d`, minimum restore-test cadence `monthly`
+- Implementations may exceed those minimums, but must not operate below them without an explicit reviewed design update.
 - The authoritative protected/shared control plane must also provide required audit events, operational metrics, alerts, and dashboards sufficient to operate the published resilience, locking, rollout, and break-glass posture.
 - Protected/shared execution must define one reviewed in-doubt-run recovery path for failures after provider-side mutation may have begun but before the authoritative run record is finalized.
 - Protected/shared in-doubt-run recovery must prefer provider-state reconciliation over blind retry, and must fail closed when reconciliation cannot prove whether mutation happened and no reviewed duplicate-execution-safe continuation path exists.
@@ -95,6 +99,11 @@ design has been explicitly updated first.
 - Final outcome is a separate field from both operation kind and lifecycle state.
 - `pending_approval` is a first-class lifecycle state for accepted protected/shared runs awaiting required human approval.
 - `termination_reason` uses the canonical set `cancelled`, `superseded`, `no_longer_admitted`, `lock_timeout`, or `null` when a canonical terminal outcome exists.
+- Cancellation is a first-class reviewed operator action, not an implementation-specific interrupt.
+- A cancel request may be accepted only while the run is in `pending_approval`, `queued`, `waiting_for_lock`, `running`, or `cancelling`.
+- Cancellation is always best-effort; after provider-side mutation or side-effecting `release_actions` may have begun, the system must reconcile provider state before choosing a terminal record.
+- A run in `cancelling` must not return to `queued` or silently resume ordinary forward progress as if no cancellation request occurred.
+- After reconciliation, a cancelled run must settle to exactly one of: `cancelled` with `termination_reason = cancelled` when no mutation occurred, `finished` with a canonical terminal outcome when the resulting state is known, or `finished` with the appropriate failure outcome when reconciliation proves failure during or after mutation.
 - Supersedence is narrow by default: later admitted runs auto-supersede only older queued `deploy` runs for the same `deployment_id`, same `publish_mode`, and same effective `lock_scope`, unless a stricter reviewed policy says otherwise.
 - `--rollback` is the explicit operator signal for same-deployment rollback semantics.
 - `--source-run-id` selects an earlier admitted run within policy; it does not override lane or admission policy.
@@ -113,6 +122,9 @@ design has been explicitly updated first.
 - Replay must use the recorded source-run snapshot plus narrow current invariant checks.
 - Narrow current invariants include target ownership, lock scope, provider identity, publisher compatibility, and current admission validity.
 - Replay must not silently load newer deployment metadata, provider config, or release-action definitions as if they were part of the original run.
+- Replay-sensitive secret and runtime-config references must resolve exactly to the admitted reference set for the replayed run kind.
+- `retry` and `rollback` must fail closed if recorded admitted secret or runtime-config references have expired, been deleted, been revoked, or cannot be resolved exactly; implementations must not silently substitute newer, rotated, ambient, or `latest` values.
+- `promotion` uses the target deployment's newly admitted target-environment secret and runtime-config references rather than replaying the source deployment's references.
 - Recorded `release_actions` replay policy must use one closed disposition per replay context: `rerun`, `skip`, or `fail`.
 - Recorded side-effecting `release_actions` that declare `rerun` must also record or reference the duplicate-execution safety contract that made rerun admissible for that context.
 - Protected/shared replay by exact artifact ref is valid only when the artifact ref resolves unambiguously to one admitted source-run snapshot.
@@ -135,6 +147,8 @@ design has been explicitly updated first.
 - If a reviewed provisioner plan/diff must be regenerated and no longer matches the reviewed artifact materially, the run must fail closed or obtain fresh approval before mutation.
 - Break-glass mutation is in policy only for an explicitly documented incident-bounded control-plane-unavailability path with mandatory fencing or equivalent concurrency protection and post-incident reconciliation back into the authoritative deployment record.
 - When break-glass mutation is used, the resulting authoritative record must preserve structured emergency evidence sufficient to explain who requested, approved, and executed the action, which incident justified it, which artifact or source-run selection path was used, and why the normal control plane was unavailable or bypassed.
+- Protected/shared authorization must use one explicit hierarchical scope model with repo-wide administrative scope, lane scope, deployment scope, and incident-bounded break-glass scope.
+- Permission evaluation must be least-privilege and resource-scoped by default; CLI, API, and UI authorization decisions must use the same action vocabulary and scope semantics.
 
 ## Required Review Questions
 
