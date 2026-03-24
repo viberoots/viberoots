@@ -470,7 +470,7 @@ treated as settled policy, not open brainstorming:
   - success or failure outcome must remain separate from the kind of run being performed
 - deploy records should use separate canonical vocabularies for final outcomes and lifecycle states
   - terminal final outcomes: `validation_failed`, `build_failed`, `resolve_failed`, `provision_failed`, `release_action_failed`, `publish_failed`, `smoke_failed_after_publish`, `succeeded`
-  - lifecycle states: `queued`, `waiting_for_lock`, `running`, `cancelling`, `finished`, `cancelled`
+  - lifecycle states: `pending_approval`, `queued`, `waiting_for_lock`, `running`, `cancelling`, `finished`, `cancelled`
 - deploy records should also use one canonical vocabulary for non-canonical termination reasons
   - `termination_reason`: `cancelled`, `superseded`, `no_longer_admitted`, `lock_timeout`, or `null` when the run reaches a canonical terminal outcome
 - deploy records should capture where a lifecycle failure happened without exploding the terminal outcome enum
@@ -617,6 +617,58 @@ CLI/front-door responsibilities:
 3. validate provider and component rules
 4. for `local_only`, build referenced Buck targets and resolve concrete output paths directly
 5. for `shared_nonprod` and `production_facing`, act only as a thin authenticated submitter to the shared control-plane API for a mutating request that must resolve to an admitted immutable artifact or source run
+
+Protected/shared submission contract:
+
+- submission to the shared control-plane API must be idempotent at the request layer, not only at the provider publish layer
+- every mutating protected/shared submit request should carry one client-generated stable idempotency key or submission id that survives client retries, network timeouts, process restarts, and CI reruns for the same intended request
+- the idempotency key should bind to the exact normalized submit payload after operator-intent normalization, including:
+  - deployment id
+  - requested `operation_kind`
+  - requested `publish_mode`
+  - exact immutable selector set such as `source_run_id`
+  - normalized preview identity selector when preview is involved
+  - caller identity or authenticated submitter context when that context changes authorization semantics
+- if the control plane receives the same idempotency key with the same normalized payload again, it should return the original submission result rather than creating a second queued run
+- if the control plane receives the same idempotency key with materially different payload contents, it must reject the request clearly rather than guessing which intent the client meant
+- this submission-layer idempotency is required even for run kinds that are intentionally not auto-superseded in the queue, such as `retry`, `rollback`, `preview_cleanup`, and `--provision-only`
+- provider-side idempotency keys, request-correlation ids, and publish-step deduplication remain necessary but are not sufficient substitutes for submit-layer idempotency
+- local-only workflows may implement lighter local request correlation, but protected/shared mutation must treat submit idempotency as part of the control-plane contract
+- first-class operator actions that continue an existing run, such as progressive-rollout `resume`, must use the same reviewed idempotent submit contract rather than an ad hoc side channel
+  - for `resume`, the normalized payload should bind at least:
+    - target `deploy_run_id`
+    - caller identity or auth context
+    - any phase-specific approval evidence or selector required to continue from the paused state
+  - a repeated `resume` submission for the same paused run and same normalized payload should resolve idempotently to the same continuation result rather than creating duplicate continuation work
+
+Protected/shared submit-response contract:
+
+- the shared control-plane submit API should return one stable reviewed response shape rather than leaving clients to infer outcomes from transport-level behavior
+- a successful accepted response should include at least:
+  - `deploy_run_id`
+  - whether the request created a new run or resolved to an existing run through idempotent deduplication
+  - the initial lifecycle state such as `pending_approval`, `queued`, `waiting_for_lock`, or `running`
+  - a stable status/read-model reference the CLI or UI can poll
+- a rejected response should include one machine-readable closed reason code plus enough structured context for operator tooling to explain the failure without string parsing
+- the exact transport and HTTP status mapping can be implementation-specific, but the response payload contract should not be
+- when a request is valid and authorized to request deployment, but human approval is still outstanding, the canonical behavior should be to create a run in `pending_approval` rather than reject submission
+- approval-granting should then advance that same run into the next admissible lifecycle state rather than creating a second run
+- duplicate submit handling should therefore distinguish at least:
+  - accepted as a new run
+  - accepted as an idempotent replay of an existing run submission
+  - rejected because the idempotency key was reused for a different payload
+  - rejected because the request is unauthorized, invalid, or no longer admissible
+- the stable rejection taxonomy should cover common operator-actionable classes such as:
+  - invalid request shape or mutually incompatible flags
+  - invalid or incompatible source-run selector
+  - unauthorized or insufficient role
+  - no longer admitted under current lane or admission policy
+  - preview unsupported or preview isolation cannot be proven
+  - promotion incompatible with the target deployment's closed compatibility contract
+  - resume requested for a run that is not paused or not resumable
+  - resume blocked because required later-phase approval is still missing or no longer valid
+- operator-facing clients should surface those codes directly instead of reverse-engineering free-form error text
+- the same reviewed response and rejection contract should be used by the CLI, any control-plane UI, and CI-triggering clients so they do not drift into subtly different operator semantics
 
 Control-plane worker responsibilities for protected/shared mutation:
 
@@ -1478,6 +1530,10 @@ Typed policy-object minimums:
     - which provenance or predicate format is accepted
     - how artifact identity must bind back to source revision plus build inputs
     - what verifier behavior is required when attestation material is expired, revoked, or no longer trusted
+    - for `shared_nonprod` and `production_facing`, whether artifact signatures or equivalent signed attestations are required and which signer identities are trusted
+    - for `shared_nonprod` and `production_facing`, whether an SBOM or equivalent dependency inventory is required and what minimum format is accepted
+    - for `shared_nonprod` and `production_facing`, what vulnerability, license, or other supply-chain policy gates must pass before mutation is admitted
+    - whether those supply-chain gates are evaluated at build admission, publish admission, or both
 - repo validation should verify that referenced policy objects exist and are structurally valid
 - the shared control plane should be the final enforcer for mutating admission using those same referenced objects
 
@@ -2886,7 +2942,12 @@ Progressive-rollout execution contract:
   - `failed`
   - `aborted`
 - a progressive rollout may advance only from `pending -> running -> succeeded` for each phase unless it enters one of the exceptional states above
-- `paused` means the rollout is intentionally stopped between phases or increments with no further mutation until an explicit resume action under the same run or a documented replacement run policy
+- `paused` means the rollout is intentionally stopped between phases or increments with no further mutation until an explicit first-class `resume` action is submitted against that same `deploy_run_id`
+- `resume` is an operator action on an existing paused run, not a new `operation_kind`
+  - the run keeps the same `deploy_run_id`, `operation_kind`, lock scope, lineage ids, and recorded rollout history
+  - `resume` must reacquire the run's effective lock scope and revalidate the run against the same paused execution snapshot plus any later-phase approval gates declared by policy
+  - `resume` must not silently replace the paused run with a new run record, new snapshot, or newly inferred rollout state
+  - if the rollout cannot resume deterministically from the recorded state, the system must reject `resume` and require a new explicit replacement run
 - `failed` means the phase or increment did not satisfy its declared gate or publish requirement
 - `aborted` means an operator or policy intentionally stopped further rollout after a partial publish or during a stabilization window
 - each progressive rollout policy should declare whether human approval is:
@@ -2901,7 +2962,7 @@ Progressive-rollout execution contract:
 - resumability should be explicit per rollout mode:
   - `phased` and `store_staged` may support resume from the next unapplied phase when the provider capability entry and recorded rollout state make that deterministic
   - `canary` and `blue_green` may support resume only when the provider capability entry defines how traffic state, exposure percentage, or slot selection is read back safely
-  - otherwise a stopped rollout must be replaced by a new run rather than guessed back into motion
+  - otherwise `resume` must fail closed and operators must create a new explicit replacement run rather than guessing a stopped rollout back into motion
 - abort semantics must be explicit for each progressive mode:
   - `phased`: stop before later phases and preserve already completed phases in the run record
   - `canary`: stop or reduce exposure only through an explicitly declared exposure-step rule; otherwise fail closed and require a new rollback or recovery run
@@ -2913,6 +2974,8 @@ Progressive-rollout execution contract:
   - whether the rollout is resumable
   - whether the rollout is awaiting approval, paused for bake time, or terminally failed
   - the exact provider-side exposure or slot state last observed when that information exists
+  - whether a later-phase approval is still required before `resume` may continue
+  - the highest completed phase or increment that `resume` is allowed to continue from
 
 Operational consequence:
 
@@ -3449,7 +3512,7 @@ Admission policy:
 
 Minimum protected/shared RBAC model:
 
-- the control plane should define at least these distinct role capabilities:
+- the control plane must define at least these distinct role capabilities:
   - `submitter`
     - may create normal deploy requests, preview-mode deploy requests, retry requests, or rollback requests within the policies already attached to a deployment
   - `approver`
@@ -3458,23 +3521,23 @@ Minimum protected/shared RBAC model:
     - may execute or administer routine control-plane operations such as cancelling queued runs, inspecting run state, or invoking documented preview cleanup
   - `break_glass`
     - may invoke explicitly documented emergency-only paths with incident-bounded audit requirements
-- normal protected/shared policy should separate approval authority from ordinary run submission when an admission policy requires human approval
-- destructive or high-risk operations such as target migration, retirement, emergency mutation, or preview cleanup should require `operator` or stronger authority
+- normal protected/shared policy must separate approval authority from ordinary run submission when an admission policy requires human approval
+- destructive or high-risk operations such as target migration, retirement, emergency mutation, or preview cleanup must require `operator` or stronger authority
 - no built-in adapter should rely on ambient infrastructure credentials as a substitute for control-plane authorization
 - implementations may add finer-grained roles, but they must not collapse these minimum trust boundaries silently
 
 Minimum protected/shared RBAC scope model:
 
 - role names alone are insufficient; authorization must also be scoped to explicit repo-owned deployment boundaries
-- `submitter` permission should be granted per deployment id by default
+- `submitter` permission must be granted per deployment id by default
   - optional tighter constraints such as environment-stage restriction may narrow that scope further
-- `approver` permission should be granted per deployment id by default
+- `approver` permission must be granted per deployment id by default
   - optional tighter constraints such as protection-class or environment-stage restriction may narrow that scope further
-- `operator` permission should be granted per canonical provider-target identity or reviewed lane scope by default
-  - it should not be repo-wide by default
+- `operator` permission must be granted per canonical provider-target identity or reviewed lane scope by default
+  - it must not be repo-wide by default
   - a reviewed lane-scoped grant is appropriate when one operational team intentionally owns routine control-plane actions for a coordinated deployment family
-- `break_glass` permission should be granted per canonical provider-target identity or reviewed lane scope by default
-  - it should be the smallest emergency scope that still lets the named role stabilize the affected target safely
+- `break_glass` permission must be granted per canonical provider-target identity or reviewed lane scope by default
+  - it must be the smallest emergency scope that still lets the named role stabilize the affected target safely
   - repo-wide break-glass power is out of policy unless separately documented as an exceptional platform-administrator posture
 - this mixed-scope model is intentional:
   - release authority normally follows deployment ownership
@@ -3581,6 +3644,7 @@ Release-admission contract for protected/shared environments:
 Operator-facing lifecycle states:
 
 - in-progress states
+  - `pending_approval`
   - `queued`
   - `waiting_for_lock`
   - `running`
@@ -3736,19 +3800,19 @@ Artifact retention policy:
 
 Control-plane resilience policy:
 
-- because protected/shared mutation depends on one authoritative control plane, that control plane should have an explicit reviewed resilience posture rather than relying on break-glass as the normal recovery mechanism
-- the authoritative deployment backend should support durable backups and regularly tested restore procedures
-- the production control-plane topology should avoid one unrecoverable single storage or API instance as the sole practical path for routine protected/shared mutation
-- target control-plane recovery objectives should be:
+- because protected/shared mutation depends on one authoritative control plane, that control plane must have an explicit reviewed resilience posture rather than relying on break-glass as the normal recovery mechanism
+- the authoritative deployment backend must support durable backups and regularly tested restore procedures
+- the production control-plane topology must avoid one unrecoverable single storage or API instance as the sole practical path for routine protected/shared mutation
+- target control-plane recovery objectives must be:
   - `production_facing`: `RPO <= 5 minutes`, `RTO <= 30 minutes`
   - `shared_nonprod`: `RPO <= 15 minutes`, `RTO <= 4 hours`
 - those objectives are operator-facing policy commitments for the deployment authority itself; implementation topology may evolve as long as it continues to satisfy them
-- failover and restore posture may evolve by implementation, but the operator-facing resilience commitments should remain explicit and reviewable
+- failover and restore posture may evolve by implementation, but the operator-facing resilience commitments must remain explicit and reviewable
 
 Control-plane observability contract:
 
 - because the shared control plane is the sole mutating authority for protected/shared environments, its observability is part of the deployment-system contract rather than optional implementation polish
-- the control plane should emit structured audit or lifecycle events for at least:
+- the control plane must emit structured audit or lifecycle events for at least:
   - submission
   - admission granted or denied
   - approval granted, reused, expired, or revoked
@@ -3758,7 +3822,7 @@ Control-plane observability contract:
   - cancellation, supersedence, and no-longer-admitted exits
   - preview cleanup
   - break-glass invocation and reconciliation
-- the control plane should expose operational metrics for at least:
+- the control plane must expose operational metrics for at least:
   - queue depth
   - queue wait time
   - lock contention rate
@@ -3768,20 +3832,20 @@ Control-plane observability contract:
   - age of oldest queued and running runs
   - stale-lock or fencing-loss events
   - backup, restore-test, and failover success state for the authoritative backend
-- the control plane should define operator alerts for at least:
+- the control plane must define operator alerts for at least:
   - queue or lock saturation threatening target RTO
   - failed or overdue backups and restore tests
   - repeated publish or smoke failure for the same target or lane
   - stale lock holders or fencing anomalies
   - excessive break-glass use
   - control-plane availability degradation that risks published RPO or RTO commitments
-- operator-facing dashboards or equivalent views should make it possible to inspect:
+- operator-facing dashboards or equivalent views must make it possible to inspect:
   - per-lane and per-target run health
   - current queue and lock state
   - recent failures by lifecycle step
   - progressive-rollout state for in-flight runs
   - backup and restore-test posture of the authoritative backend
-- these observability surfaces may evolve by implementation, but the minimum signal categories above should be treated as required operational capability for protected/shared mutation
+- these observability surfaces may evolve by implementation, but the minimum signal categories above must be treated as required operational capability for protected/shared mutation
 
 Migration and alias exception policy:
 
@@ -4014,7 +4078,13 @@ Minimum versioned interface boundary:
   - extracted deployment metadata payload
     - authoritative deployment-model fields exactly as consumed from Buck-backed metadata
   - mutating submit request payload
-    - deployment id, requested operation kind, publish mode, source-run selectors, and caller identity or auth context
+    - deployment id, requested operation kind, publish mode, source-run selectors, normalized preview identity, caller identity or auth context, and submit-layer idempotency identity
+  - run-action request payload
+    - target `deploy_run_id`, requested action such as `resume`, caller identity or auth context, any action-specific approval evidence, and submit-layer idempotency identity
+  - mutating submit response payload
+    - `deploy_run_id`, dedupe result, initial lifecycle state, and any machine-readable rejection code or status reference needed by clients
+  - run-action response payload
+    - target `deploy_run_id`, whether the action was accepted or resolved idempotently to an existing continuation result, resulting lifecycle or rollout state, and any machine-readable rejection code or status reference needed by clients
   - admitted execution-snapshot payload
     - the frozen protected/shared execution context that mutation actually uses
   - run-status/read-model payload
@@ -4037,6 +4107,26 @@ Minimum payload-completeness rule:
   - the exact immutable selector set used by the operator, such as `source_run_id`
   - any explicit preview identity selector normalized into one structured field, such as branch, commit, or admitted source-run lineage
   - caller identity or auth-context reference
+  - one stable submit-layer idempotency key or submission id
+  - enough normalized intent detail that the control plane can determine whether a repeated submit is "the same request" without relying on transport retries alone
+- the mutating submit response payload should therefore preserve at least:
+  - `deploy_run_id`
+  - whether the request created a new run or resolved to an already-existing run via submit-layer idempotency
+  - initial lifecycle state when a run exists
+  - a stable read-model or status reference
+  - one machine-readable closed rejection reason when the request is not accepted
+- the run-action request payload should therefore preserve at least:
+  - target `deploy_run_id`
+  - requested action such as `resume`
+  - caller identity or auth-context reference
+  - one stable submit-layer idempotency key or submission id
+  - any action-specific approval evidence or continuation selector required by the paused run's policy
+- the run-action response payload should therefore preserve at least:
+  - target `deploy_run_id`
+  - whether the action was newly accepted or resolved to an already-existing idempotent continuation result
+  - resulting lifecycle state and rollout-state summary when a run exists
+  - a stable read-model or status reference
+  - one machine-readable closed rejection reason when the action is not accepted
 - the admitted execution-snapshot payload should therefore preserve at least:
   - the admitted run id
   - the frozen deployment-metadata snapshot ref
@@ -4053,7 +4143,27 @@ Minimum payload-completeness rule:
   - effective target identity and lock scope
   - lineage ids
   - current rollout state when applicable
+  - whether a paused progressive rollout is currently resumable
+  - whether later-phase approval is still required before a paused rollout may resume
   - preview identity summary when the run uses `publish_mode = preview` or `operation_kind = preview_cleanup`
+- one reviewed closed rejection taxonomy should back submit-time failures and non-admitted exits so operators and clients can automate against stable codes rather than parsing prose
+- examples of machine-readable submit-time rejection classes include:
+  - `invalid_request`
+  - `invalid_selector`
+  - `unauthorized`
+  - `no_longer_admitted`
+  - `preview_not_supported`
+  - `preview_not_isolated`
+  - `promotion_incompatible`
+  - `idempotency_conflict`
+- examples of machine-readable run-action rejection classes include:
+  - `invalid_action`
+  - `run_not_found`
+  - `run_not_paused`
+  - `run_not_resumable`
+  - `approval_required`
+  - `approval_no_longer_valid`
+  - `idempotency_conflict`
 
 ### Example: Metadata Precedence Versus Provider Config Mismatch
 
@@ -4163,6 +4273,11 @@ Policy:
 - runtime-secret injection must avoid leaking secret material into Buck metadata, checked-in files, or durable deployment records
 - deployments should expose non-secret `secret_requirements` metadata, with `{}` as the normal explicit value when no secrets are required, so validation, admission, and operator tooling can determine whether the secret contract is complete before mutation begins
 - validation for `shared_nonprod` and `production_facing` should fail if a step consumes secrets but `secret_requirements` does not declare that requirement
+- protected/shared runtime credentials must be least-privilege for the specific provider operations, target scope, and lifecycle step they authorize
+- protected/shared implementations must prefer short-lived or renewable credentials over broad static credentials whenever the provider supports that posture
+- when a mutating protected/shared run may outlive one credential lease, the control plane must define how credentials are renewed or reacquired without widening scope or reclassifying the run as a fresh admission
+- if a required credential expires, is revoked, or can no longer be renewed during execution, the run must fail closed and record the affected step rather than silently switching to a broader fallback credential
+- break-glass credentials, when they exist, must remain segregated from routine mutation credentials and must be usable only through the explicitly audited emergency path
 
 Canonical `secret_requirements` shape:
 
@@ -4274,7 +4389,7 @@ Minimum replay-snapshot contract for immutable-artifact reuse:
   - runner implementation identities for the built-in publisher, provisioner, smoke runner, and any built-in `release_actions` runner that materially influenced the run
   - declared normal target identity
   - effective run target identity
-  - rendered provider-config snapshot or immutable provider-config reference
+  - secret-free rendered provider-config snapshot or immutable provider-config reference
   - stable fingerprint or snapshot reference for the resolved `lane_policy` contents used by the source run
   - stable fingerprint or snapshot reference for the resolved `admission_policy` contents used by the source run
   - rollout policy snapshot
@@ -4284,6 +4399,11 @@ Minimum replay-snapshot contract for immutable-artifact reuse:
   - non-secret runtime-config reference or fingerprint set when runtime-config admission was relevant to that run
   - the `lane_policy` reference used for the source run
   - the `admission_policy` reference used for the source run
+- replay snapshots and durable deployment records must never persist injected secret values, post-injection provider config, or any other secret-bearing render artifact
+- when a publisher or provisioner requires rendered config that includes secret material, replay must preserve only:
+  - a redacted or pre-secret render sufficient to explain non-secret behavior
+  - non-secret fingerprints of the rendered input set
+  - stable references to the admitted secret contracts used at execution time
 - for `retry`, `rollback`, and same-deployment `--publish-only`, replay should use that recorded snapshot as the authoritative source for immutable-reuse semantics, with only narrow current-invariant checks layered on top
 - for `promotion`, the recorded source snapshot is preserved as source artifact and compatibility evidence, not as the target environment's execution snapshot
   - promotion must still use the target deployment's own admitted execution snapshot, target identity, current target-environment approvals, and target-environment provider-config context before mutation
@@ -4368,6 +4488,11 @@ Conditionally required fields:
   - required for `preview_cleanup`
 - isolated preview target identity
   - required for `preview_cleanup`
+- rollout resumability state
+  - required when a run uses progressive rollout and reaches `paused`
+- latest accepted run action summary
+  - required when a paused or running progressive rollout has received a first-class action such as `resume`
+  - should preserve the action type, requesting identity, time, and resulting rollout-state transition
 
 Fields required once `resolve` succeeds:
 
@@ -5232,6 +5357,7 @@ deployment(
         "account": "web-platform-prod",
         "id": "pleomino-prod-pages",
     },
+    lane_policy = "//build-tools/deploy/lanes:pleomino",
     admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
     environment_stage = "prod",
     protection_class = "production_facing",

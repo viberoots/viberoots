@@ -70,6 +70,14 @@ design has been explicitly updated first.
 - The authoritative protected/shared control plane must also provide required audit events, operational metrics, alerts, and dashboards sufficient to operate the published resilience, locking, rollout, and break-glass posture.
 - Progressive rollout modes must use one explicit reviewed phase-state model and must define approval, supersedence, resume, abort, and partial-rollout rollback semantics before protected/shared mutation is allowed.
 - The implementation boundary between Buck metadata extraction, the repo-level `deploy` CLI, and the shared control-plane API must use explicit versioned payload contracts; independently implemented components must not rely on undocumented in-process conventions.
+- Protected/shared mutating submit requests must be idempotent at the control-plane request layer through one explicit stable submission id or idempotency key that survives client retries.
+- Reusing the same protected/shared submission id with the same normalized request payload must resolve to the same accepted run or same rejection result; reusing it with different payload contents must fail closed with an explicit idempotency-conflict result.
+- The shared control-plane submit API must return one stable reviewed submit-response contract that includes `deploy_run_id` when a run exists, dedupe outcome, initial lifecycle state, and one machine-readable closed rejection code when the request is not accepted.
+- First-class protected/shared run actions on existing runs, such as progressive-rollout `resume`, must use their own reviewed versioned request/response contract rather than an ad hoc side channel.
+- Protected/shared run-action requests must be idempotent at the control-plane request layer through one explicit stable submission id or idempotency key that survives client retries.
+- Reusing the same protected/shared run-action submission id with the same normalized action payload must resolve to the same accepted continuation result or same rejection result; reusing it with different payload contents must fail closed with an explicit idempotency-conflict result.
+- The shared control-plane run-action API must return one stable reviewed response contract that includes the target `deploy_run_id`, dedupe outcome, resulting lifecycle or rollout state when a run exists, and one machine-readable closed rejection code when the action is not accepted.
+- When a protected/shared request is valid and authorized to request deployment but still needs human approval, the canonical behavior is to create one run in `pending_approval` rather than reject submission and force clients to resubmit after approval.
 
 ## Operator Semantics
 
@@ -77,6 +85,7 @@ design has been explicitly updated first.
 - `publish_mode` is a separate field from `operation_kind`.
 - `preview_cleanup` is a destructive housekeeping run against preview resources; it should preserve preview context in records rather than being treated as a normal publish.
 - Final outcome is a separate field from both operation kind and lifecycle state.
+- `pending_approval` is a first-class lifecycle state for accepted protected/shared runs awaiting required human approval.
 - `termination_reason` uses the canonical set `cancelled`, `superseded`, `no_longer_admitted`, `lock_timeout`, or `null` when a canonical terminal outcome exists.
 - Supersedence is narrow by default: later admitted runs auto-supersede only older queued `deploy` runs for the same `deployment_id`, same `publish_mode`, and same effective `lock_scope`, unless a stricter reviewed policy says otherwise.
 - `--rollback` is the explicit operator signal for same-deployment rollback semantics.
@@ -87,6 +96,9 @@ design has been explicitly updated first.
 - Unless `admission_policy` explicitly defines a stricter preview posture, protected/shared preview uses the target deployment's normal branch and required-check requirements, while manual preview approval remains optional by default for already-admitted artifacts or run lineage.
 - Separate preview lock scope is allowed only when the preview meets the stronger independent-execution isolation bar; otherwise preview shares the normal deployment lock even when preview publication itself is in policy.
 - Mutating `--from-changes` fans out into ordinary per-deployment runs; it is not one multi-deployment mutating run record.
+- `resume` is a first-class operator action on an existing paused progressive-rollout run, not a new `operation_kind`.
+- `resume` keeps the existing `deploy_run_id`, lineage, and frozen execution snapshot; it must reacquire lock and revalidate the paused run under the recorded rollout-resume policy before continuing.
+- If a paused rollout is not resumable under recorded rollout state, current approval state, or provider capability contract, `resume` must fail closed rather than creating an implicit replacement run.
 
 ## Replay Rules
 
@@ -129,6 +141,8 @@ Before approving a deployment-system change, confirm:
 - Does this preserve duplicate-execution safety for side-effecting `release_actions`?
 - Does this preserve approval binding to the exact immutable admitted payload?
 - Does this preserve the required versioned contract boundary between Buck extraction, CLI submission, and control-plane admission?
+- Does this preserve submit-layer idempotency and the stable submit-response contract for protected/shared mutation?
+- Does this preserve the first-class run-action contract and idempotency model for paused-run continuation such as `resume`?
 - Does this preserve the required observability posture for protected/shared mutation?
 - Does this preserve the reviewed plan/diff and resilience posture required for protected/shared mutation?
 

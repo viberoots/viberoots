@@ -445,7 +445,7 @@ Minimum required fields for every run:
 | `deployment_id`                                  | yes                                    | Concrete deployment id.                                                                                          |
 | `deployment_label`                               | yes                                    | Buck deployment label.                                                                                           |
 | `operation_kind`                                 | yes                                    | `deploy`, `retry`, `promotion`, `rollback`, `preview_cleanup`.                                                   |
-| `lifecycle_state`                                | yes                                    | `queued`, `waiting_for_lock`, `running`, `cancelling`, `finished`, `cancelled`.                                  |
+| `lifecycle_state`                                | yes                                    | `pending_approval`, `queued`, `waiting_for_lock`, `running`, `cancelling`, `finished`, `cancelled`.              |
 | `termination_reason`                             | yes                                    | Nullable when canonical terminal outcome exists; otherwise uses the closed vocabulary below.                     |
 | source revision identifier                       | yes except `preview_cleanup`           | Revision associated with the run; `preview_cleanup` may instead point to preview lineage or source-run ancestry. |
 | `requested_by`                                   | yes                                    | Requesting actor identity.                                                                                       |
@@ -486,6 +486,8 @@ Conditionally required:
 - isolated preview target identity for `preview_cleanup`
 - source-run snapshot reference when a protected/shared exact-artifact selector resolved through an earlier admitted run
 - explicit preview identity selector summary when `publish_mode = preview` or `operation_kind = preview_cleanup`
+- rollout resumability state when a progressive rollout run reaches `paused`
+- latest accepted run-action summary when a paused or running progressive rollout has received a first-class action such as `resume`
 
 ### Emergency Evidence
 
@@ -528,6 +530,21 @@ Minimum fields:
 - resumability posture
 - last observed provider-side exposure, slot, or rollout-track state when the provider exposes it
 - whether the rollout is paused awaiting operator action, bake-time expiry, or fresh approval
+- whether the paused rollout is currently resumable under recorded state and current approval status
+- highest completed phase or increment from which `resume` is allowed to continue
+
+### Latest Accepted Run-Action Summary
+
+Required when a paused or running progressive rollout has received a first-class action such as `resume`.
+
+Minimum fields:
+
+- action type
+- requesting identity
+- accepted time
+- action idempotency key or equivalent deduplication identity
+- resulting lifecycle-state or rollout-state transition
+- machine-readable action rejection code when the latest action attempt was rejected and the implementation chooses to surface that in the record or read model
 
 ## 8. Retention Expectations
 
@@ -620,6 +637,32 @@ Minimum fields:
 - any explicit source-run selectors
 - normalized preview identity selector summary when preview publish or preview cleanup is requested
 - caller identity or auth context reference
+- client-generated stable submit idempotency key or submission id
+- normalized-intent fingerprint or equivalent server-verifiable representation of the request meaning used to detect same-key different-payload conflicts
+
+Contract rules:
+
+- protected/shared submit requests must be idempotent at the control-plane submission layer, not only at the provider publish layer
+- re-submitting the same idempotency key with the same normalized request must resolve to the same accepted run or same rejection result
+- re-submitting the same idempotency key with materially different normalized request contents must fail with an explicit idempotency-conflict rejection rather than creating a second run
+
+### Run-Action Request Payload
+
+Minimum fields:
+
+- `schema_version`
+- target `deploy_run_id`
+- requested action such as `resume`
+- caller identity or auth context reference
+- any action-specific approval evidence or continuation selector required by the paused run's policy
+- client-generated stable submit idempotency key or submission id
+- normalized-intent fingerprint or equivalent server-verifiable representation of the action meaning used to detect same-key different-payload conflicts
+
+Contract rules:
+
+- protected/shared run-action requests must be idempotent at the control-plane submission layer, not only at the worker or provider layer
+- re-submitting the same run-action idempotency key with the same normalized action request must resolve to the same continuation result or same rejection result
+- re-submitting the same run-action idempotency key with materially different normalized action request contents must fail with an explicit idempotency-conflict rejection rather than creating duplicate continuation work
 
 ### Admitted Execution-Snapshot Payload
 
@@ -652,7 +695,69 @@ Minimum fields:
 - lock scope
 - lineage ids when present
 - current rollout state when applicable
+- whether a paused progressive rollout is currently resumable
+- whether later-phase approval is still required before a paused rollout may resume
 - preview identity selector summary when `publish_mode = preview` or `operation_kind = preview_cleanup`
+
+### Mutating Submit Response Payload
+
+Minimum fields:
+
+- `schema_version`
+- whether the request was accepted
+- `deploy_run_id` when a run exists
+- whether the submission created a new run or resolved to an existing run through submit-layer idempotency
+- initial lifecycle state when a run exists
+- stable run-status/read-model reference when a run exists
+- machine-readable rejection code when the request is not accepted
+- structured rejection details or references sufficient for operator tooling to explain the outcome without parsing free-form text
+
+Minimum closed rejection-code vocabulary:
+
+- `invalid_request`
+- `invalid_selector`
+- `unauthorized`
+- `no_longer_admitted`
+- `preview_not_supported`
+- `preview_not_isolated`
+- `promotion_incompatible`
+- `idempotency_conflict`
+
+Contract rules:
+
+- the exact transport or HTTP status mapping is implementation-specific, but this payload shape and rejection-code meaning should remain stable across CLI, UI, and CI-triggering clients
+- a repeated request resolved through idempotent deduplication should return the same `deploy_run_id` and indicate that no new run was created
+- when a request is valid and authorized to request deployment but still needs human approval, the canonical response is an accepted run with `lifecycle_state = pending_approval`, not a submit-time rejection
+- rejection codes should be machine-readable, closed by policy review, and documented enough that clients can automate behavior without depending on prose strings
+
+### Run-Action Response Payload
+
+Minimum fields:
+
+- `schema_version`
+- whether the action was accepted
+- target `deploy_run_id`
+- whether the action created new continuation work or resolved to an existing result through submit-layer idempotency
+- resulting lifecycle state and rollout-state summary when a run exists
+- stable run-status/read-model reference when a run exists
+- machine-readable rejection code when the action is not accepted
+- structured rejection details or references sufficient for operator tooling to explain the outcome without parsing free-form text
+
+Minimum closed run-action rejection-code vocabulary:
+
+- `invalid_action`
+- `run_not_found`
+- `run_not_paused`
+- `run_not_resumable`
+- `approval_required`
+- `approval_no_longer_valid`
+- `idempotency_conflict`
+
+Contract rules:
+
+- the exact transport or HTTP status mapping is implementation-specific, but this payload shape and rejection-code meaning should remain stable across CLI, UI, and CI-triggering clients
+- a repeated action request resolved through idempotent deduplication should return the same target `deploy_run_id` and indicate that no duplicate continuation work was created
+- run-action rejection codes should be machine-readable, closed by policy review, and documented enough that clients can automate behavior without depending on prose strings
 
 ### Replay-Selector Payload
 
