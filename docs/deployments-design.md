@@ -67,6 +67,7 @@ This document defines the final deployment model for this repository.
 - systems that span multiple provider families must be modeled as multiple coordinated deployments rather than one cross-provider deployment object
 - `lane_policy` is the authoritative lane object for protected/shared deployments
 - every protected/shared lane is branch-backed, with explicit stage-to-branch mappings that govern promotion for all deployment families, including mobile/store releases
+  - this is a repository policy choice for consistency and auditability, not a claim that branch-backed promotion is the only viable industry model
 - implementation-planning documents may describe rollout order or work breakdown, but they do not define or narrow this design
 
 ## Design Invariants
@@ -173,15 +174,13 @@ projects/
     pleomino-staging/
       TARGETS
       wrangler.jsonc
-    acme-platform-prod/
+    acme-platform-preview/
       TARGETS
-      deploy.ts
-      cdktf/
-        main.ts
+      smoke.ts
 ```
 
 The deployment id is the directory name under `projects/deployments/`.
-The `acme-platform-prod` example is illustrative of a local-only or isolated-preview-capable shape;
+The `acme-platform-preview` example is illustrative of a local-only or isolated-preview-capable shape;
 protected/shared packages should normally stay closer to declarative metadata plus provider-native config.
 
 Recommended deployment-id style:
@@ -228,7 +227,6 @@ Typical contents:
   - for example `wrangler.jsonc`
 - optional deployment-local executable files for local-only or isolated-preview-only flows
   - for example `smoke.ts`
-  - for example `cdktf/main.ts`
   - these executable-hook examples are intentionally non-default and should not be read as the normal protected/shared deployment package shape
 
 Things that should usually not live here:
@@ -402,6 +400,7 @@ treated as settled policy, not open brainstorming:
   - it should bind artifact identity to source revision plus build inputs
   - deployment-specific metadata, provider config, approvals, and publish results belong to the deployment-run record rather than the reusable artifact attestation
 - promotion should use one-way fast-forward environment branches
+  - this document treats branch-backed promotion as a repo-level governance standard rather than a universal requirement for all deployment systems
   - later environments advance only after required checks pass for earlier environments within the same independently promoted lane
 - rollback for bad app releases should prefer redeploying a prior known-good artifact
   - default meaning of "known good" is a prior run for the same deployment, against the same normal live target and `publish_mode = normal`, with `final_outcome = succeeded` and all required blocking smoke or release-health checks passed for that run
@@ -2065,10 +2064,7 @@ deployment(
         "account": "web-platform-prod",
         "id": "pleomino-prod-pages",
     },
-    lane_policy = "//build-tools/deploy/lanes:pleomino",
-    environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
-    protection_class = "production_facing",
+    protection_class = "local_only",
     components = [
         {
             "id": "web",
@@ -2093,8 +2089,11 @@ deployment(
 )
 ```
 
-This example includes `lane_policy` explicitly because protected/shared deployments should bind
-directly to the authoritative lane-policy object rather than rely on implicit repo defaults.
+This example is intentionally `local_only`.
+
+- it shows how the abstract deployment model represents repo-owned Pages setup
+- it is not a statement that protected/shared `cloudflare-pages` provisioners are currently in policy
+- protected/shared support is still controlled by the authoritative provider capability entry
 
 What this means in plain language:
 
@@ -3941,7 +3940,8 @@ Mobile-store and SSR compatibility note:
 
 Promotion model:
 
-- use one-way fast-forward environment branches
+- repo policy choice: use one-way fast-forward environment branches
+- other organizations can build comparable promotion safety around immutable tags or signed release manifests, but this repository intentionally standardizes on branch-backed lanes so promotion authority, required checks, and operator ergonomics all resolve through one consistent Git-backed control surface
 - each independently promoted deployment family should have its own lane such as `env/<family>/dev -> env/<family>/staging -> env/<family>/prod`
 - additional environment branches for that family may extend the lane when needed, but should follow the same fast-forward-only policy
 - a later environment should advance only after required checks pass for the earlier environment
@@ -3963,6 +3963,7 @@ Monorepo release-scope clarification:
 
 Minimum branch-policy assumptions:
 
+- these are repository policy assumptions, not a claim that every mature deployment system must use branches specifically
 - each family lane should have protected environment branches such as `env/<family>/dev`, `env/<family>/staging`, and `env/<family>/prod`
 - promotion should happen by fast-forwarding the next environment branch, not by rebuilding from an unrelated revision
 - direct pushes to later environment branches should be disallowed except for controlled emergency procedures
@@ -4651,7 +4652,7 @@ For Apple App Store and Google Play style releases:
 - the built artifact should be a signed immutable mobile release artifact, typically an `.ipa` or `.aab`
 - the built-in publisher should own upload, processing, staged rollout, and release-track promotion semantics
 - `lane_policy` and lane-defined `environment_stage` labels should model track progression such as internal, beta, staging, or production-like release channels through explicit deployment ids rather than one deployment dynamically retargeting itself
-- those mobile/store lanes are still branch-backed like every other protected/shared lane; the stage branch authorizes which signed artifact may advance, while the publisher executes the store-specific release mechanics for that stage
+- those mobile/store lanes are still branch-backed like every other protected/shared lane because this repository standardizes on that policy choice; the stage branch authorizes which signed artifact may advance, while the publisher executes the store-specific release mechanics for that stage
 - store credentials and signing-related secret requirements should be explicit through `secret_requirements`
 - smoke should usually mean store-processing validation, installability checks, staged-rollout health, or other release-health evidence rather than a simple URL check
 
@@ -5402,10 +5403,7 @@ deployment(
         "account": "web-platform-prod",
         "id": "pleomino-prod-pages",
     },
-    lane_policy = "//build-tools/deploy/lanes:pleomino",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
-    environment_stage = "prod",
-    protection_class = "production_facing",
+    protection_class = "local_only",
     components = [
         {
             "id": "web",
@@ -5430,8 +5428,9 @@ deployment(
 )
 ```
 
-This example includes `lane_policy` explicitly because protected/shared deployments should bind
-directly to the authoritative lane-policy object rather than rely on implicit repo defaults.
+This example is intentionally `local_only` for the same reason as the earlier Pages provisioner example:
+it illustrates the abstract provisioner boundary without implying reviewed protected/shared support for
+deployment-owned `cloudflare-pages` provisioners.
 
 What this means:
 
