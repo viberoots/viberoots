@@ -50,10 +50,13 @@ Must reject:
 Must reject:
 
 - ambiguous same-deployment source-run reuse without explicit `--rollback` for rollback intent
+- ambiguous same-deployment `--publish-only` requests where the system cannot tell whether the operator intends delayed first publish or retry semantics
 - protected/shared `--publish-only` without exact artifact or source-run selection
 - protected/shared exact-artifact selectors that do not resolve to one admitted source-run snapshot
 - protected/shared `--rollback` without explicit `--source-run-id`
 - preview requests without explicit preview support
+- preview publish or cleanup requests without an explicit supported preview identity selector
+- protected/shared preview publish or cleanup requests that use branch or commit selectors instead of `--source-run-id`
 - source-run reuse across incompatible lanes
 - protected/shared mutating `--from-changes` requests that do not resolve to explicit per-deployment runs
 
@@ -88,8 +91,11 @@ Must enforce:
 ## Policy-Focused Tests To Add Early
 
 - reject preview that reuses the normal live target
+- reject preview publish or cleanup that omits the canonical preview identity selector
+- reject protected/shared preview publish or cleanup that does not use `--source-run-id`
 - reject protected/shared package-local mutation hooks
 - reject ambiguous same-deployment source-run reuse without `--rollback`
+- reject ambiguous same-deployment delayed publish vs retry classification
 - reject promotion across incompatible lanes
 - reject promotion from an admitted source run that is retained but no longer eligible under current lane policy
 - reject rollback sourced from preview-only success

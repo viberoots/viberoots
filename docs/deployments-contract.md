@@ -18,6 +18,7 @@ design has been explicitly updated first.
 - Trusted CI may build, attest, and submit, but it is not a peer mutating authority.
 - Preview is `publish_mode = preview`, not a peer `operation_kind`.
 - Preview must publish only to an explicitly isolated preview target or be rejected.
+- Preview publication and cleanup must use explicit preview identity selectors; implementations must not infer preview identity from ambient git state, current branch, or provider defaults.
 - Deployments are single-provider by design; systems that span multiple provider families must be represented as multiple coordinated deployments.
 - Every deployment must declare explicit provider-target identity in authoritative metadata.
 - `shared_nonprod` and `production_facing` deployments must declare explicit `lane_policy`, `environment_stage`, and `admission_policy` metadata.
@@ -30,7 +31,9 @@ design has been explicitly updated first.
 - For protected/shared mutation, `--provision-only` must still bind to one admitted source revision and frozen execution snapshot, even when no artifact is required.
 - For `shared_nonprod` and `production_facing`, immutable-reuse publish paths must resolve to one authoritative admitted source run and its frozen execution snapshot.
 - Protected/shared rollback requires an explicit `--source-run-id` selecting the prior admitted run to reuse.
-- Same-deployment source-run reuse with `publish_mode = normal` is `retry` unless the operator explicitly requests `--rollback`.
+- Protected/shared preview publish and preview cleanup require an explicit `--source-run-id` selecting the admitted run lineage the preview is derived from.
+- Same-deployment source-run reuse with `publish_mode = normal` is classified by operator intent: delayed first publish remains `deploy`, re-publication is `retry`, and explicit restoration uses `--rollback`.
+- Same-deployment delayed first publish of an already admitted artifact or admitted run lineage remains `operation_kind = deploy`; same-deployment re-publication of an earlier attempted normal run is `retry`.
 - Rollback source selection must use a prior admitted run for the same deployment.
 - Default rollback candidates are prior successful `publish_mode = normal` runs against the same normal live target.
 - Default rollback candidates are usable only when any already-applied stateful `release_actions` remain rollback-compatible under their declared data-compatibility posture.
@@ -78,6 +81,8 @@ design has been explicitly updated first.
 - Supersedence is narrow by default: later admitted runs auto-supersede only older queued `deploy` runs for the same `deployment_id`, same `publish_mode`, and same effective `lock_scope`, unless a stricter reviewed policy says otherwise.
 - `--rollback` is the explicit operator signal for same-deployment rollback semantics.
 - `--source-run-id` selects an earlier admitted run within policy; it does not override lane or admission policy.
+- Preview-safe local or isolated-preview flows must expose one explicit preview identity selector such as branch name or commit SHA; those selectors identify both preview publication and preview cleanup.
+- Supported explicit local preview identity selectors are branch name and commit SHA.
 - Same-deployment preview publication defaults to `operation_kind = deploy` plus `publish_mode = preview`, not `retry`.
 - Unless `admission_policy` explicitly defines a stricter preview posture, protected/shared preview uses the target deployment's normal branch and required-check requirements, while manual preview approval remains optional by default for already-admitted artifacts or run lineage.
 - Separate preview lock scope is allowed only when the preview meets the stronger independent-execution isolation bar; otherwise preview shares the normal deployment lock even when preview publication itself is in policy.

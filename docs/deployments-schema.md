@@ -184,12 +184,18 @@ Minimum fields when present:
 
 - `target_derivation`
 - `isolation_class`
+- supported preview identity selector kind or kinds
+  - `branch`
+  - `commit`
+  - `source_run`
 - either explicit cleanup or TTL policy or a provider-defaulted cleanup policy marker
 - any smoke override when deviating from the provider default
 - whether separate lock scope is allowed, when overriding the provider default
 - provider-default preview cleanup policy and preview-locking defaults must come from the authoritative provider capability entry when deployment metadata omits them
 - optional preview-specific admission constraints when intentionally different from the deployment's normal admission policy
   - they may be stricter or lighter only where the deployment contract explicitly allows that variation
+- local preview-safe deployments should use branch-scoped or commit-scoped preview identity
+- protected/shared preview should use `source_run` identity only
 
 ### `prerequisites[*]`
 
@@ -353,6 +359,7 @@ Minimum approval payload-binding contract when approval is required:
   - canonical target identity
   - selected artifact identity
   - selected source-run snapshot reference
+  - selected preview identity when preview publication or preview cleanup is being approved
   - reviewed provisioner plan/diff artifact reference
 - validity or expiry rule for approval reuse where reuse is permitted
 - fail-closed behavior when any required bound field changes after approval
@@ -472,6 +479,7 @@ Conditionally required:
 - `cleanup_reason` for `preview_cleanup`
 - isolated preview target identity for `preview_cleanup`
 - source-run snapshot reference when a protected/shared exact-artifact selector resolved through an earlier admitted run
+- explicit preview identity selector summary when `publish_mode = preview` or `operation_kind = preview_cleanup`
 
 ### Emergency Evidence
 
@@ -497,6 +505,7 @@ Minimum fields:
 - bound execution-snapshot fingerprint or ref
 - bound canonical target identity
 - bound artifact identity or source-run snapshot ref when publishing
+- bound preview identity selector when preview publication or preview cleanup is being approved
 - bound provisioner plan/diff ref when infra-affecting provisioning was approved
 - approval record reference or approver identity
 

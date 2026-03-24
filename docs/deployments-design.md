@@ -573,10 +573,14 @@ Examples:
 ```bash
 deploy pleomino-prod
 deploy pleomino-prod --preview --source-run-id <deploy-run-id>
+deploy pleomino-dev --preview --preview-branch <branch-name>
+deploy pleomino-dev --preview --preview-commit <commit-sha>
 deploy pleomino-prod --validate-only
 deploy pleomino-prod --provision-only
 deploy pleomino-prod --publish-only --source-run-id <deploy-run-id>
 deploy pleomino-prod --publish-only --source-run-id <deploy-run-id> --rollback
+deploy pleomino-dev --preview-cleanup --preview-branch <branch-name>
+deploy pleomino-dev --preview-cleanup --preview-commit <commit-sha>
 deploy --from-changes
 deploy --list
 ```
@@ -684,7 +688,9 @@ Operation-kind classification rule for source-run reuse:
   - the default same-deployment preview shape is `operation_kind = deploy` plus `publish_mode = preview`
 - when a run reuses a source run from a different deployment id in the same authoritative compatible `lane_policy`, the run is `operation_kind = promotion`
 - when a run reuses a source run from the same deployment id and the operator explicitly requests `--rollback`, the run is `operation_kind = rollback`
-- when a run reuses a source run from the same deployment id without `--rollback` and `publish_mode = normal`, the run is `operation_kind = retry`
+- when a run reuses a source run from the same deployment id without `--rollback` and `publish_mode = normal`, the run is classified by intent:
+  - same-deployment delayed first publish of an already admitted artifact or admitted run lineage remains `operation_kind = deploy`
+  - same-deployment re-publication of an earlier attempted normal run is `operation_kind = retry`
 - the control plane must reject ambiguous or policy-incompatible source-run reuse rather than infer a different operation kind from timing, recency, or guesswork
 
 ### Deployment Id Versus Preview Run
@@ -700,7 +706,8 @@ So:
 - `deploy pleomino-prod --preview --source-run-id <deploy-run-id>` is still operating on `pleomino-prod`
 - preview should not silently invent a second deployment id or bypass the deployment package's validation rules
 - for `shared_nonprod` and `production_facing`, preview should not be used from unadmitted revisions or artifacts
-- bare `--preview` should therefore be treated as valid only for `local_only` or other explicitly preview-safe non-protected flows
+- for `shared_nonprod` and `production_facing`, `--preview` should require an explicit admitted source selector such as `--source-run-id <deploy-run-id>`
+- bare `--preview` should therefore be treated as valid only for `local_only` or other explicitly preview-safe non-protected flows that also provide an explicit preview identity selector
 
 Plain-language version:
 
@@ -722,7 +729,6 @@ Examples of lower environments:
 
 Examples of previews:
 
-- "publish a preview for PR-184"
 - "publish a branch preview for `feature/new-nav`"
 - "publish a one-off review build for commit `abc1234`"
 
@@ -790,8 +796,8 @@ Flag interaction rules:
   - for those protected/shared immutable-reuse flows, `resolve` means loading the recorded source-run snapshot and immutable artifact references required for that operation kind
   - it must not silently reinterpret current repo metadata, current provider config, or current release-action declarations as if they were the original source-run inputs
   - it should still run smoke by default, because the publish lifecycle is not considered complete until post-publish validation has either passed or failed under the deployment's documented smoke policy
-  - it should evaluate declared `release_actions` for the publish lifecycle being run, but must execute them only according to the replay context that matches the run's operation kind
-    - same-deployment delayed publish without retry, rollback, or promotion semantics uses `deploy_publish_slice`
+  - it should evaluate declared `release_actions` for the publish lifecycle being run, but must execute them only according to the replay context that matches the run's operator-visible run kind and publish intent
+    - same-deployment delayed first publish without retry, rollback, or promotion semantics uses the `deploy_publish_slice` replay context while still recording `operation_kind = deploy`
     - `retry` uses the `retry` replay context
     - `rollback` uses the `rollback` replay context
     - `promotion` uses the `promotion` replay context
@@ -820,10 +826,25 @@ Flag interaction rules:
   - for protected/shared mutation, `--source-run-id` remains the normal selector because it carries the earlier admitted run identity plus the recorded context needed for policy-safe replay or promotion
   - it must not fall back to "latest local build output" or an implicit rebuild on the operator's machine
   - for protected or shared environments, immutable-artifact reuse operations should use the recorded snapshot semantics for that operation kind rather than silently reinterpreting current repo metadata or provider config
+- exact same-deployment operator classification rule:
+  - if the operator is completing a delayed first publish of one already admitted artifact or admitted run lineage that has not previously completed a normal publish to that target, the run remains `operation_kind = deploy`
+  - if the operator is re-publishing an earlier attempted same-deployment normal run after publish began or after a previous publication attempt failed ambiguously, the run is `operation_kind = retry`
+  - if the operator is intentionally restoring an earlier known-good same-deployment normal run, the run is `operation_kind = rollback` and must use `--rollback`
 - for `shared_nonprod` and `production_facing`, any mutating publish path should operate on an admitted immutable artifact or admitted source run
   - fresh workstation builds are out of policy
   - ad hoc control-plane rebuilds are out of policy
 - `--preview` changes the publish mode, not the deployment identity
+- preview identity must also be explicit in the request
+  - preview-safe local or isolated-preview flows should use exactly one of:
+    - `--preview-branch <branch-name>`
+    - `--preview-commit <commit-sha>`
+  - protected/shared preview should use `--source-run-id <deploy-run-id>` as the authoritative preview identity because the preview is derived from admitted run lineage rather than from ambient branch state
+- `--preview-cleanup` is the explicit destructive cleanup entry point for isolated preview targets
+  - preview cleanup should select the preview to destroy by the same canonical identity used to create it
+  - preview-safe local or isolated-preview flows should therefore use exactly one of:
+    - `--preview-cleanup --preview-branch <branch-name>`
+    - `--preview-cleanup --preview-commit <commit-sha>`
+  - protected/shared preview cleanup should normally use `--preview-cleanup --source-run-id <deploy-run-id>`
 - `--list` does not mutate anything
 - `--from-changes` selects deployment ids first, then runs the same lifecycle each selected deployment would normally run
   - for mutating workflows, it should fan out into one admitted per-deployment run per selected deployment rather than one multi-target mutating run record
@@ -832,6 +853,7 @@ Flag interaction rules:
 Mutual-exclusion rule:
 
 - `--validate-only`, `--provision-only`, and `--publish-only` should be mutually exclusive
+- `--preview-cleanup` should be mutually exclusive with `--preview`, `--validate-only`, `--provision-only`, and `--publish-only`
 
 #### `--validate-only`
 
@@ -987,23 +1009,33 @@ Safety rule:
 - preview must publish to an explicitly isolated preview target
 - if a provider cannot guarantee that isolation, the adapter should reject `--preview` for that deployment rather than silently publishing to the normal live target with preview-like labeling
 - preview should be considered supported only when the deployment metadata includes an explicit `preview` policy block or a documented provider-wide default that the deployment has opted into
+- preview submission must include one explicit preview identity selector; the CLI must not infer preview identity from ambient git state, the current branch, or provider defaults
 
 How preview target selection works:
 
 - preview target selection must be rule-based, not operator-invented per run
 - the deployment metadata may explicitly declare preview targeting behavior
 - or the provider adapter may define a deterministic derivation rule from deployment metadata plus run context
-  - for review-app style previews on preview-safe deployment shapes, that run context may include PR number, branch name, or commit SHA
+  - for review-app style previews on preview-safe deployment shapes, that run context should come from exactly one explicit selector such as branch name or commit SHA
   - for protected/shared release-path previews, that run context should derive from admitted-run identity or equivalent admitted lineage context rather than unadmitted branch state
 - the rule must be validated before any mutating step
 
 Preview identity rule:
 
-- a preview policy should define one deterministic preview derivation key, such as admitted run id, PR number, or branch name, rather than leaving preview identity ambiguous per invocation
+- a preview policy should define one deterministic preview derivation key, such as admitted run id, branch name, or commit SHA, rather than leaving preview identity ambiguous per invocation
 - by default, one derivation key maps to one active preview slot
 - a new publish to the same preview slot should supersede the prior preview for that slot rather than silently creating multiple indistinguishable previews
 - if a provider or workflow intentionally supports multiple concurrent previews for one deployment, the distinguishing key must still be explicit in policy so records, cleanup, URLs, and lock scope remain understandable
 - preview URLs, isolated target identity, cleanup ownership, and lock scope should all derive from that same policy-defined preview identity rather than from ad hoc implementation choices
+
+Canonical preview selector rule:
+
+- preview-safe local or isolated-preview flows should expose exactly one explicit preview identity in the operator contract:
+  - `--preview-branch <branch-name>` for branch-scoped preview slots
+  - `--preview-commit <commit-sha>` for commit-scoped preview slots
+- the CLI may offer convenience defaults in the future, but the stable contract should still normalize to one explicit preview identity field before submission
+- protected/shared preview should not accept `--preview-branch` or `--preview-commit` as mutating selectors because those previews are release-path previews derived from admitted run lineage
+- protected/shared preview should instead use `--source-run-id <deploy-run-id>` as the canonical selector for both preview publish and preview cleanup
 
 Preview metadata defaults:
 
@@ -1018,6 +1050,7 @@ Protected/shared preview product stance:
 
 - previews attached to `shared_nonprod` or `production_facing` deployment ids are release-path previews, not general PR review apps
 - those previews may publish only from already-admitted artifacts, admitted revisions, or admitted run lineage
+- those previews must therefore require an explicit admitted source selector such as `--source-run-id <deploy-run-id>`
 - unadmitted PR or branch code must not publish through a protected/shared deployment id, even in preview mode
 - if the repo wants unadmitted review environments, it should model them as a separate preview-safe deployment shape, typically `local_only`, rather than weakening protected/shared admission rules
 - this separation is intentional:
@@ -1078,8 +1111,8 @@ into a separate preview lock scope.
 
 What "explicit" means here:
 
-- acceptable: "for this local-only review-app deployment, preview publishes to a provider-managed branch-preview target derived from the git ref"
-- acceptable: "for this deployment, preview publishes to ephemeral namespace `preview-<pr-number>`"
+- acceptable: "for this local-only review-app deployment, preview publishes to a provider-managed preview target derived from the explicit branch name or commit SHA selector in the request"
+- acceptable: "for this deployment, preview publishes to an ephemeral namespace derived from the explicit branch name or commit SHA selector"
 - acceptable: "for this protected/shared deployment, preview publishes to an isolated target derived from admitted run identity"
 - not acceptable: "the engineer picks a bucket/project/namespace at runtime without a checked policy"
 
@@ -1092,11 +1125,17 @@ Preview lifecycle examples:
   - smoke runs against the preview URL
   - when the preview expires, the control plane destroys that isolated target or asks the provider to expire it
 - Branch preview with provider-managed ephemeral target
-  - CI publishes a branch preview for a local-only or explicitly preview-safe deployment using the provider's native preview facility
+  - CI publishes a branch preview for a local-only or explicitly preview-safe deployment by running `deploy pleomino-dev --preview --preview-branch feature/new-nav`
   - the provider owns most of the lifecycle
+  - the provider adapter derives the isolated preview target, URL, cleanup identity, and lock scope from that explicit branch selector
+  - repo policy still requires that the preview target be isolated from the normal live target
+- Commit preview with provider-managed ephemeral target
+  - CI or a developer publishes a commit preview for a local-only or explicitly preview-safe deployment by running `deploy pleomino-dev --preview --preview-commit abc1234`
+  - the provider adapter derives the isolated preview target, URL, cleanup identity, and lock scope from that explicit commit selector
   - repo policy still requires that the preview target be isolated from the normal live target
 - Manual local preview to a personal isolated target
   - a developer may run preview locally only when the provider adapter supports a clearly isolated local or personal preview target
+  - the request should still use one canonical selector such as `deploy pleomino-dev --preview --preview-branch feature/new-nav`
   - that preview must not mutate any shared deployment target
   - if isolation cannot be proven, local preview is out of policy
 
@@ -1132,6 +1171,10 @@ Preview cleanup contract:
 - destruction of isolated preview targets is a first-class control-plane workflow, not an unrecorded housekeeping side effect
 - preview cleanup should be modeled as its own audited operation kind:
   - `preview_cleanup`
+- the public operator surface should expose preview cleanup explicitly rather than hiding it behind provider-specific tooling or implicit TTL-only behavior
+  - example protected/shared cleanup: `deploy pleomino-prod --preview-cleanup --source-run-id <deploy-run-id>`
+  - example preview-safe local cleanup: `deploy pleomino-dev --preview-cleanup --preview-branch <branch-name>`
+  - example preview-safe local cleanup: `deploy pleomino-dev --preview-cleanup --preview-commit <commit-sha>`
 - preview cleanup must record at least:
   - the deployment id
   - `publish_mode = preview`
@@ -1147,6 +1190,9 @@ Preview cleanup contract:
   - when the preview uses its own isolated preview lock scope, cleanup must acquire that scope
   - when the preview shares the normal deployment lock by policy, cleanup must acquire that shared lock instead of inventing a second cleanup-only lock
 - if the preview is not isolated enough to have its own safe cleanup path, that preview shape is out of policy
+- cleanup selectors must be canonical and idempotent
+  - the request must identify the preview by the same derivation key or admitted source-run identity that created it
+  - the cleanup path should be safe to repeat when the preview is already gone
 - a preview may be valid yet still share the normal deployment lock
   - preview-safe isolation is enough to allow preview publication
   - a separate preview lock scope requires the stronger independent-execution isolation bar described above
