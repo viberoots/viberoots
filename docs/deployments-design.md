@@ -705,6 +705,26 @@ For protected/shared mutation, loading immutable replay inputs means "load the p
 artifact plus the exact recorded context needed for the requested reuse flow"; it does not authorize a new
 build or rebuild by replay.
 
+In-doubt run recovery contract:
+
+- protected/shared execution must assume the worker, process, host, or network may fail after provider-side mutation has begun but before the authoritative run record is finalized
+- the control plane must therefore define one reviewed recovery path for runs left in an in-doubt state such as:
+  - lock lease lost after mutation started
+  - worker restart during publish, smoke, or a side-effecting `release_action`
+  - provider request timeout where remote acceptance is uncertain
+  - process death after provider mutation but before final record persistence
+- recovery must prefer reconciliation over blind retry
+  - on restart or takeover, the control plane should reload the frozen execution snapshot, reacquire or re-establish authoritative ownership for the run, and inspect provider state before scheduling more side effects
+  - if provider readback proves the intended mutation completed, the run should converge to the correct terminal record rather than re-executing the step
+  - if provider readback proves the mutation did not happen, the control plane may continue or retry only when the step's duplicate-execution-safety contract allows it
+  - if provider readback cannot determine whether mutation happened and no reviewed idempotent or deduplicated continuation path exists, the run must fail closed and require explicit operator follow-up
+- recovery must use the same effective lock scope and stale-holder protections as the original run
+  - a restarted or replacement worker must not continue mutating until it holds current authority for that target, such as a valid lease plus fencing token
+  - a worker that has lost authority must stop mutating even if its local process is still running
+- the authoritative run record must preserve recovery facts that materially explain the final state
+  - at minimum: whether recovery occurred, which step was in doubt, whether provider-state reconciliation succeeded, and whether execution resumed or terminated after reconciliation
+- implementations may choose the exact persistence and heartbeat mechanism, but they must not leave crash recovery as adapter-local guesswork or operator memory
+
 Promotion clarification:
 
 - `retry`, `rollback`, and same-deployment replay reuse the recorded source-run execution snapshot for that deployment
@@ -3822,6 +3842,7 @@ Control-plane observability contract:
   - cancellation, supersedence, and no-longer-admitted exits
   - preview cleanup
   - break-glass invocation and reconciliation
+  - in-doubt run detection, recovery start, recovery decision, and recovery completion
 - the control plane must expose operational metrics for at least:
   - queue depth
   - queue wait time
@@ -3845,7 +3866,27 @@ Control-plane observability contract:
   - recent failures by lifecycle step
   - progressive-rollout state for in-flight runs
   - backup and restore-test posture of the authoritative backend
+  - in-doubt and recovered runs, including whether reconciliation proved remote mutation, allowed safe continuation, or required operator intervention
 - these observability surfaces may evolve by implementation, but the minimum signal categories above must be treated as required operational capability for protected/shared mutation
+
+Structured logging and redaction contract:
+
+- structured observability must be fail-closed for sensitive data, not "best effort"
+- control-plane logs, audit events, dashboards, and exported event payloads must never contain:
+  - secret values
+  - raw credentials or tokens
+  - rendered config content that includes secret material
+  - unreviewed provider CLI output copied verbatim when it may include secret-bearing request or response fields
+- implementations should classify operator-visible fields into at least:
+  - safe to display directly
+  - redact before persistence or display
+  - reference-only, where the system stores a stable pointer or fingerprint instead of the raw value
+- provider stdout, stderr, plan output, smoke failure context, and exception payloads should pass through a reviewed redaction boundary before they enter durable logs, audit streams, or UI summaries
+- when a provider or built-in action cannot guarantee secret-safe raw output, the control plane should persist only redacted summaries, structured error codes, fingerprints, or bounded excerpts that are known to be safe
+- approval evidence, plan/diff artifacts, and replay snapshots should follow the same redaction posture
+  - preserve enough non-secret detail for audit and troubleshooting
+  - fail closed rather than storing a richer artifact whose secret safety cannot be established
+- operator-facing tooling should make redaction explicit so that omitted values are understood as intentional safety behavior rather than missing data
 
 Migration and alias exception policy:
 
@@ -4278,6 +4319,10 @@ Policy:
 - when a mutating protected/shared run may outlive one credential lease, the control plane must define how credentials are renewed or reacquired without widening scope or reclassifying the run as a fresh admission
 - if a required credential expires, is revoked, or can no longer be renewed during execution, the run must fail closed and record the affected step rather than silently switching to a broader fallback credential
 - break-glass credentials, when they exist, must remain segregated from routine mutation credentials and must be usable only through the explicitly audited emergency path
+- secret-safe observability is part of the same contract:
+  - logs, audit events, dashboards, plan or diff artifacts, and captured provider output must be redacted before durable persistence or operator display
+  - if the system cannot prove a captured payload is secret-safe, it should store only a redacted summary, structured code, stable reference, or fingerprint instead of the raw payload
+- secret-bearing provider CLI output, rendered config, and failure payloads must not be copied verbatim into deployment records, replay snapshots, or operator-visible event streams
 
 Canonical `secret_requirements` shape:
 

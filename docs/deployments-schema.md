@@ -482,12 +482,27 @@ Conditionally required:
 - migration or alias exception reference when admission or replay relied on one
 - emergency evidence object or structured emergency-evidence reference when break-glass mutation was used
 - `failed_step` when `final_outcome` is not `succeeded` and the run reached a canonical lifecycle step after `resolve`
+- recovery-state summary when protected/shared in-doubt recovery occurred
+- in-doubt-step identifier when protected/shared in-doubt recovery occurred
+- recovery decision summary when protected/shared in-doubt recovery occurred
 - `cleanup_reason` for `preview_cleanup`
 - isolated preview target identity for `preview_cleanup`
 - source-run snapshot reference when a protected/shared exact-artifact selector resolved through an earlier admitted run
 - explicit preview identity selector summary when `publish_mode = preview` or `operation_kind = preview_cleanup`
 - rollout resumability state when a progressive rollout run reaches `paused`
 - latest accepted run-action summary when a paused or running progressive rollout has received a first-class action such as `resume`
+
+### In-Doubt Recovery Summary
+
+Required when protected/shared recovery occurred after provider-side mutation may have begun but before authoritative finalization completed.
+
+Minimum fields:
+
+- whether recovery occurred
+- in-doubt step identifier
+- whether provider-state reconciliation proved mutation completed, proved mutation did not occur, or remained inconclusive
+- whether execution resumed, converged directly to a final record, or terminated for operator follow-up
+- recovery-attempt timestamp or interval summary
 
 ### Emergency Evidence
 
@@ -784,6 +799,7 @@ Minimum required structured event categories for protected/shared mutation:
 - cancellation, supersedence, and no-longer-admitted termination
 - preview cleanup
 - break-glass invocation and reconciliation
+- in-doubt-run detection, recovery start, recovery decision, and recovery completion
 
 Minimum required metric categories:
 
@@ -794,11 +810,17 @@ Minimum required metric categories:
 - failure counts by `final_outcome` and `failed_step`
 - age of oldest queued and running runs
 - backup, restore-test, and failover success state for the authoritative backend
+- in-doubt-run count and recovery-outcome count
 
 Minimum required operator-visibility surfaces:
 
 - alerting for resilience, lock, and repeated-run-failure conditions
-- dashboards or equivalent views for per-lane run health, queue state, lock state, progressive rollout state, and backend recovery posture
+- dashboards or equivalent views for per-lane run health, queue state, lock state, progressive rollout state, backend recovery posture, and in-doubt or recovered run state
+
+Protected/shared observability and durable-record redaction rules:
+
+- logs, audit events, dashboards, deployment records, and replay snapshots must not contain secret values, raw credentials, rendered secret-bearing config, or unreviewed provider output that may include secret-bearing request or response fields
+- when a captured payload is not provably secret-safe, the implementation should persist only a redacted summary, structured code, stable reference, or fingerprint instead of the raw payload
 
 ## Companion Docs
 
