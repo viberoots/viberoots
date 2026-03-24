@@ -75,6 +75,7 @@ Optional keys:
 - package-relative config or entry references
 - declared input class such as `metadata_only` or `immutable_resolved_inputs`
 - plan or diff contract for infra-affecting mutation paths
+- reviewed higher-bar approval posture when no meaningful plan or diff can be produced
 
 Minimum plan/diff contract when provisioner-managed infra mutation is reviewable:
 
@@ -468,7 +469,12 @@ Conditionally required:
 - `executed_by` for protected/shared runs
 - smoke result when a smoke step was declared and reached
 - reviewed provisioner plan/diff artifact reference when infra-affecting mutation relied on one
+- per-component publish outcome state for multi-component runs
+- per-component resolved artifact identity for multi-component runs
+- per-component remote publish identifier when a multi-component provider exposes one
+- per-component no-op reuse decision and supporting evidence when a multi-component retry or reconciliation path safely skips re-publish
 - progressive rollout state when the run uses phased or traffic-shifting rollout semantics
+- rollout phase or step result history when the run uses phased or traffic-shifting rollout semantics
 - `parent_run_id` for retry, rollback, and promotion derived from an earlier run
 - `release_lineage_id` when the run belongs to a promoted multi-run lineage
 - `artifact_lineage_id` when the same artifact is intentionally reused
@@ -612,6 +618,7 @@ Minimum fields:
 - requested `operation_kind`
 - requested `publish_mode`
 - any explicit source-run selectors
+- normalized preview identity selector summary when preview publish or preview cleanup is requested
 - caller identity or auth context reference
 
 ### Admitted Execution-Snapshot Payload
@@ -623,8 +630,13 @@ Minimum fields:
 - frozen deployment metadata snapshot ref
 - frozen provider-config snapshot ref
 - frozen policy snapshot refs
+- declared normal target identity
+- effective run target identity
 - admitted artifact refs or admitted source revision
 - admitted secret/runtime-config refs
+- runner implementation identities
+- approval payload-binding ref or embedded summary when approval is part of admission
+- reviewed provisioner plan/diff artifact ref when infra-affecting mutation is in scope
 
 ### Run-Status / Read-Model Payload
 
@@ -638,7 +650,9 @@ Minimum fields:
 - termination reason
 - effective target identity
 - lock scope
+- lineage ids when present
 - current rollout state when applicable
+- preview identity selector summary when `publish_mode = preview` or `operation_kind = preview_cleanup`
 
 ### Replay-Selector Payload
 

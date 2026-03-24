@@ -444,12 +444,18 @@ treated as settled policy, not open brainstorming:
   - promotions of the same built artifact across environments should also carry an `artifact_lineage_id`
 - each component kind should resolve to a canonical provider-neutral data shape with required fields and artifact identity
   - publishers consume that resolved data shape and must not rediscover artifact semantics ad hoc from build outputs
+- for any provider that is in policy for protected/shared provisioner-managed mutation, the authoritative provider capability entry should also declare:
+  - whether deployment-owned provisioners are supported for that provider family
+  - which built-in provisioner types are allowed
+  - the minimum reviewed plan/diff contract for infra-affecting mutation on that provider
+  - whether routine mutation may proceed when no meaningful plan/diff artifact can be produced, and if so under what higher-bar approval posture
 - service-like, SSR, and other non-trivial deployments may declare explicit built-in `release_actions` around publish
   - those actions should cover controlled release-time work such as schema migrations, cache warmups, or post-publish verification jobs when the deployment contract needs them
   - for `shared_nonprod` and `production_facing`, `release_actions` must come from a vetted built-in registry rather than package-local executable hooks
   - any side-effecting built-in `release_action` must declare one reviewed duplicate-execution safety contract for every replay context it supports
     - acceptable models are provider-native idempotency, control-plane deduplication, or explicit fail-closed refusal to rerun when duplicate safety cannot be proven
     - retries, worker restarts, ambiguous outcomes, and replay must not be allowed to execute the same side effect twice by accident and still count as policy-compliant
+  - the authoritative provider capability entry should also declare whether protected/shared built-in `release_actions` are supported for that provider family and, when they are, which reviewed built-in action types are allowed or required to be rejected
 - each deployment should declare explicit provider-target identity in deployment metadata
   - adapters must not infer the live target from directory names, branch names, CLI defaults, or unchecked provider config drift
   - one deployment id should own one normal mutable live target by default
@@ -2810,6 +2816,7 @@ Multi-component lifecycle semantics:
   - true cross-component atomicity is not implied
 - adapters may explicitly support `parallel_best_effort` or `all_or_nothing`, but they must say so
 - partial publish success must be recorded per component in the deployment record
+- that per-component publish state is a required replay input for any supported multi-component retry, rollback, or reconciliation path, not merely optional audit detail
 - rollout may interleave publish and smoke when the declared rollout policy requires per-phase validation
 - deployment-level final smoke should run after the publish phase completes according to the selected policy whenever the rollout contract requires final smoke
 - retry and rollback must operate from recorded per-component artifact and publish state, not from guesses about what probably succeeded
@@ -2820,6 +2827,17 @@ Multi-component lifecycle semantics:
   - a component that was already published successfully in the failed run may be treated as a no-op only when the adapter can prove that the live published identity still matches the intended resolved artifact identity and no declared rollout gate or `release_action` requires that component to be published again
   - if the adapter cannot prove that equivalence, the retry must republish that component or fail clearly rather than guessing
   - partial component retry as a public operator workflow remains out of policy by default unless a provider capability entry and rollout contract explicitly add it later
+
+Minimum record completeness for supported multi-component or progressive runs:
+
+- when a deployment has more than one component, or when a single-component deployment uses progressive rollout, the deployment record should retain enough structured publish state to make later replay, rollback, and audit decisions deterministic
+- at minimum that means:
+  - per-component publish outcome state
+  - per-component resolved artifact identity
+  - per-component remote publish identifier once the provider exposes it
+  - per-component proof of no-op reuse when a retry or reconciliation path skips re-publish because the adapter proved the live published identity already matches the intended resolved artifact identity
+  - per-phase or per-step rollout result history when progressive rollout is in use
+- this is part of the minimum contract for those run shapes, not optional observability frosting
 
 First-class rollout-shape policy:
 
@@ -4009,6 +4027,34 @@ Minimum versioned interface boundary:
 - the design does not require one transport, serialization format, or Buck query API, but it does require one stable reviewed contract shape for these boundaries before multiple components are implemented independently
 - companion schema documents should define those payloads concretely enough that Buck extraction, CLI submission, and control-plane admission can be implemented in parallel without rediscovering field meaning by convention
 
+Minimum payload-completeness rule:
+
+- the versioned boundary must be rich enough that a separately implemented CLI, control plane, and UI do not need undocumented adapter-local conventions to recover operator intent or replay state
+- the mutating submit request payload should therefore preserve:
+  - the requested deployment id
+  - requested `operation_kind`
+  - requested `publish_mode`
+  - the exact immutable selector set used by the operator, such as `source_run_id`
+  - any explicit preview identity selector normalized into one structured field, such as branch, commit, or admitted source-run lineage
+  - caller identity or auth-context reference
+- the admitted execution-snapshot payload should therefore preserve at least:
+  - the admitted run id
+  - the frozen deployment-metadata snapshot ref
+  - the frozen provider-config snapshot ref
+  - the frozen lane-policy, admission-policy, and rollout-policy snapshot refs when applicable
+  - the declared normal target identity and effective run target identity
+  - admitted artifact refs or the admitted source revision, depending on run kind
+  - admitted secret/runtime-config references
+  - runner implementation identities for the built-in publisher, provisioner, smoke runner, and any built-in `release_actions` runner that materially influence execution
+  - approval payload-binding evidence or a stable reference to it when approval is part of admission
+  - reviewed provisioner plan/diff artifact reference when infra-affecting mutation is in scope
+- the run-status/read-model payload should preserve enough operator-facing detail to render run status without hidden joins, including:
+  - lifecycle state, final outcome, and termination reason
+  - effective target identity and lock scope
+  - lineage ids
+  - current rollout state when applicable
+  - preview identity summary when the run uses `publish_mode = preview` or `operation_kind = preview_cleanup`
+
 ### Example: Metadata Precedence Versus Provider Config Mismatch
 
 Suppose deployment metadata says:
@@ -4339,6 +4385,7 @@ Fields required once publish starts for multi-component or progressive rollout r
 - per-component publish outcome state
 - per-component remote publish identifier once exposed by the provider
 - per-component or per-phase artifact identity actually published
+- per-component no-op reuse decision and evidence when the adapter safely skips a re-publish for an already-proven-live component
 - rollout-phase result history, including phase name, advance gate result, and abort or completion decision
 - enough phase or component detail to reconstruct which parts of the intended release were published, which were not, and which gate stopped or advanced the rollout
 
