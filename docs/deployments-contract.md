@@ -51,6 +51,8 @@ design has been explicitly updated first.
 - Multi-component retry remains deployment-atomic by default after partial publish failure; already-proven-live components may be treated as no-op reuse only when the adapter can prove their live published identity still matches the intended resolved artifact identity and no declared rollout or release-action rule requires re-publish.
 - Protected/shared package-local executable hooks are out of policy for normal mutation paths.
 - Protected/shared approvals are target-environment run-admission facts, not reusable artifact facts.
+- Protected/shared approval evidence must bind to one immutable admission payload, including the admitted `deploy_run_id`, frozen execution snapshot, canonical target identity, selected artifact identity or admitted source-run selector when publishing, and reviewed provisioner plan/diff artifact when infra-affecting mutation is in scope.
+- If any bound approval input changes materially after approval, mutation must fail closed or require fresh approval.
 - Self-approval is out of policy by default when human approval is required.
 - `promotion` always requires target-environment approval under the target deployment's admission policy.
 - `rollback` requires fresh target-environment approval by default for `production_facing`, unless an explicit emergency policy says otherwise.
@@ -62,6 +64,9 @@ design has been explicitly updated first.
 - Protected/shared authoritative deployment records, approval evidence, migration or alias exception records, and break-glass emergency evidence must remain retained for at least the documented minimum audit-retention window.
 - Protected/shared infra-affecting provisioner runs must surface a reviewed plan or diff artifact before routine mutation, unless an explicitly reviewed higher-bar exception path says otherwise.
 - The authoritative protected/shared control plane must have explicit reviewed backup, restore-test, and recovery objectives; break-glass is an emergency exception path, not the normal resilience model for routine outages.
+- The authoritative protected/shared control plane must also provide required audit events, operational metrics, alerts, and dashboards sufficient to operate the published resilience, locking, rollout, and break-glass posture.
+- Progressive rollout modes must use one explicit reviewed phase-state model and must define approval, supersedence, resume, abort, and partial-rollout rollback semantics before protected/shared mutation is allowed.
+- The implementation boundary between Buck metadata extraction, the repo-level `deploy` CLI, and the shared control-plane API must use explicit versioned payload contracts; independently implemented components must not rely on undocumented in-process conventions.
 
 ## Operator Semantics
 
@@ -86,6 +91,7 @@ design has been explicitly updated first.
 - Recorded `release_actions` replay policy must use one closed disposition per replay context: `rerun`, `skip`, or `fail`.
 - Recorded side-effecting `release_actions` that declare `rerun` must also record or reference the duplicate-execution safety contract that made rerun admissible for that context.
 - Protected/shared replay by exact artifact ref is valid only when the artifact ref resolves unambiguously to one admitted source-run snapshot.
+- Progressive-rollout replay or resume is out of policy by default unless the recorded rollout state and provider capability contract define an explicit deterministic resume path.
 
 ## Protected/Shared Admission Rules
 
@@ -100,6 +106,7 @@ design has been explicitly updated first.
 - Rollback may use an earlier retained admitted run even when the branch head has moved forward, but the current branch/lane state must still authorize performing rollback.
 - Rollback must also honor the recorded data-compatibility posture of any already-applied stateful `release_actions`; unsafe rollback must fail closed rather than re-publish an older artifact by default.
 - Admission must preserve enough approval evidence to explain why the run was authorized.
+- Protected/shared admission and execution must preserve enough payload-binding evidence to prove that the approved payload, admitted payload, and executed payload were the same reviewed unit.
 - If a reviewed provisioner plan/diff must be regenerated and no longer matches the reviewed artifact materially, the run must fail closed or obtain fresh approval before mutation.
 - Break-glass mutation is in policy only for an explicitly documented incident-bounded control-plane-unavailability path with mandatory fencing or equivalent concurrency protection and post-incident reconciliation back into the authoritative deployment record.
 - When break-glass mutation is used, the resulting authoritative record must preserve structured emergency evidence sufficient to explain who requested, approved, and executed the action, which incident justified it, which artifact or source-run selection path was used, and why the normal control plane was unavailable or bypassed.
@@ -115,6 +122,9 @@ Before approving a deployment-system change, confirm:
 - Does this preserve canonical provider-target identity and locking semantics?
 - Does this preserve the separation of `operation_kind`, `publish_mode`, lifecycle state, and final outcome?
 - Does this preserve duplicate-execution safety for side-effecting `release_actions`?
+- Does this preserve approval binding to the exact immutable admitted payload?
+- Does this preserve the required versioned contract boundary between Buck extraction, CLI submission, and control-plane admission?
+- Does this preserve the required observability posture for protected/shared mutation?
 - Does this preserve the reviewed plan/diff and resilience posture required for protected/shared mutation?
 
 ## Companion Docs

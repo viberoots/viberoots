@@ -2812,6 +2812,44 @@ First-class rollout-shape policy:
   - bake duration or stabilization window between increments
   - the explicit completion condition
 
+Progressive-rollout execution contract:
+
+- progressive rollout runs should use one explicit phase-state vocabulary:
+  - `pending`
+  - `running`
+  - `paused`
+  - `succeeded`
+  - `failed`
+  - `aborted`
+- a progressive rollout may advance only from `pending -> running -> succeeded` for each phase unless it enters one of the exceptional states above
+- `paused` means the rollout is intentionally stopped between phases or increments with no further mutation until an explicit resume action under the same run or a documented replacement run policy
+- `failed` means the phase or increment did not satisfy its declared gate or publish requirement
+- `aborted` means an operator or policy intentionally stopped further rollout after a partial publish or during a stabilization window
+- each progressive rollout policy should declare whether human approval is:
+  - required once for the whole rollout before the first mutating phase
+  - required again before specific later phases
+  - or not required beyond the deployment's normal admission policy
+- if a later phase needs additional approval, that requirement must be explicit in the rollout policy or provider capability contract rather than inferred from operator habit
+- supersedence for progressive rollout should be fail-closed by default:
+  - a newer run must not silently supersede an already-running progressive rollout mid-phase
+  - a newer run may supersede only a rollout that is still `pending` or `paused`, unless a reviewed provider capability entry explicitly defines a safer stronger rule
+- cancellation during a progressive rollout should stop later phases but must not silently undo already-published exposure unless the declared rollout mode explicitly supports that abort path
+- resumability should be explicit per rollout mode:
+  - `phased` and `store_staged` may support resume from the next unapplied phase when the provider capability entry and recorded rollout state make that deterministic
+  - `canary` and `blue_green` may support resume only when the provider capability entry defines how traffic state, exposure percentage, or slot selection is read back safely
+  - otherwise a stopped rollout must be replaced by a new run rather than guessed back into motion
+- abort semantics must be explicit for each progressive mode:
+  - `phased`: stop before later phases and preserve already completed phases in the run record
+  - `canary`: stop or reduce exposure only through an explicitly declared exposure-step rule; otherwise fail closed and require a new rollback or recovery run
+  - `blue_green`: either keep traffic on the old slot or cut back according to the declared cutover policy; the adapter must not improvise
+  - `store_staged`: stop further stage advancement according to store/provider semantics and record the resulting track state explicitly
+- rollback from a partially completed progressive rollout is out of policy by default unless the provider capability entry and rollout policy explicitly define how partial state is detected and safely reversed
+- deployment records for progressive rollout must preserve enough state to support those semantics, including:
+  - current phase state
+  - whether the rollout is resumable
+  - whether the rollout is awaiting approval, paused for bake time, or terminally failed
+  - the exact provider-side exposure or slot state last observed when that information exists
+
 Operational consequence:
 
 - if one component publishes and a later component fails under a best-effort policy, the deployment run is a publish failure
@@ -3399,6 +3437,15 @@ Approval semantics for protected/shared runs:
 - self-approval is out of policy by default when human approval is required
   - the same principal must not satisfy both submitter and approver roles in the normal path
   - any emergency self-approval path must be break-glass only and separately audited
+- approval evidence for any protected/shared mutating run must bind to one immutable admission payload rather than only to a deployment id or environment name
+  - at minimum that payload binding should cover:
+    - `deploy_run_id`
+    - the frozen execution-snapshot fingerprint or stable snapshot reference
+    - the canonical target identity being authorized
+    - the selected artifact identity or explicit `--source-run-id` / source-run snapshot being authorized when the run publishes artifacts
+    - the reviewed provisioner plan or diff fingerprint when the run includes infra-affecting provisioning
+- if any bound approval input changes materially after approval, the run must fail closed or require fresh approval rather than silently proceeding under stale approval evidence
+- an approval for one admitted artifact, one source-run selector, or one execution snapshot must not be reused for a different admitted payload even when the deployment id and target environment are the same
 - the deployment record should preserve the approval policy reference and enough approval identity/evidence to explain why the run was admitted
 
 Release-admission contract for protected/shared environments:
@@ -3634,6 +3681,44 @@ Control-plane resilience policy:
 - those objectives are operator-facing policy commitments for the deployment authority itself; implementation topology may evolve as long as it continues to satisfy them
 - failover and restore posture may evolve by implementation, but the operator-facing resilience commitments should remain explicit and reviewable
 
+Control-plane observability contract:
+
+- because the shared control plane is the sole mutating authority for protected/shared environments, its observability is part of the deployment-system contract rather than optional implementation polish
+- the control plane should emit structured audit or lifecycle events for at least:
+  - submission
+  - admission granted or denied
+  - approval granted, reused, expired, or revoked
+  - lock acquisition attempt, success, timeout, and release
+  - mutation step start and finish
+  - progressive-rollout phase transitions
+  - cancellation, supersedence, and no-longer-admitted exits
+  - preview cleanup
+  - break-glass invocation and reconciliation
+- the control plane should expose operational metrics for at least:
+  - queue depth
+  - queue wait time
+  - lock contention rate
+  - run duration by lifecycle step
+  - retry counts by step
+  - failure counts by `final_outcome` and `failed_step`
+  - age of oldest queued and running runs
+  - stale-lock or fencing-loss events
+  - backup, restore-test, and failover success state for the authoritative backend
+- the control plane should define operator alerts for at least:
+  - queue or lock saturation threatening target RTO
+  - failed or overdue backups and restore tests
+  - repeated publish or smoke failure for the same target or lane
+  - stale lock holders or fencing anomalies
+  - excessive break-glass use
+  - control-plane availability degradation that risks published RPO or RTO commitments
+- operator-facing dashboards or equivalent views should make it possible to inspect:
+  - per-lane and per-target run health
+  - current queue and lock state
+  - recent failures by lifecycle step
+  - progressive-rollout state for in-flight runs
+  - backup and restore-test posture of the authoritative backend
+- these observability surfaces may evolve by implementation, but the minimum signal categories above should be treated as required operational capability for protected/shared mutation
+
 Migration and alias exception policy:
 
 - a reviewed migration or alias exception must be a first-class control-plane object, not an undocumented note or one-off operator memory
@@ -3853,6 +3938,30 @@ The exact extraction mechanism can be decided during implementation. The design 
 - consume from Buck
 
 The external contract should stay stable even if the extraction mechanism changes. Callers should depend on deployment metadata fields, not on one particular Buck query implementation detail.
+
+Minimum versioned interface boundary:
+
+- even if the concrete Buck query mechanism evolves, implementation should freeze one minimal versioned interface between:
+  - Buck metadata extraction
+  - the repo-level `deploy` CLI
+  - the shared control-plane API
+- that interface should be treated as implementation-facing contract, not left as an informal in-process convention
+- the minimum versioned payload set should include:
+  - extracted deployment metadata payload
+    - authoritative deployment-model fields exactly as consumed from Buck-backed metadata
+  - mutating submit request payload
+    - deployment id, requested operation kind, publish mode, source-run selectors, and caller identity or auth context
+  - admitted execution-snapshot payload
+    - the frozen protected/shared execution context that mutation actually uses
+  - run-status/read-model payload
+    - lifecycle state, final outcome, target identity, lineage ids, and operator-facing progress fields
+  - replay-selector payload
+    - the exact selector contract for `--source-run-id` and any other reviewed immutable selector surfaces
+- each of those payloads should carry an explicit schema version
+- readers must handle a known version explicitly or fail closed
+- an implementation must not silently reinterpret an older extracted payload or execution snapshot according to newer code assumptions
+- the design does not require one transport, serialization format, or Buck query API, but it does require one stable reviewed contract shape for these boundaries before multiple components are implemented independently
+- companion schema documents should define those payloads concretely enough that Buck extraction, CLI submission, and control-plane admission can be implemented in parallel without rediscovering field meaning by convention
 
 ### Example: Metadata Precedence Versus Provider Config Mismatch
 
@@ -5398,6 +5507,9 @@ The remaining work is implementation work, not another design pass:
 - implement provider adapters, admission flows, and lock handling to match this contract
 - implement artifact retention and artifact-selection flows for promotion, retry, and rollback
 - implement secret injection, smoke execution, and provider-config validation without creating a second source of truth
+- implement approval-evidence binding to immutable admission payloads rather than environment-only approval labels
+- implement progressive-rollout state handling, resume/abort policy, and record persistence according to the declared rollout contract
+- implement required control-plane observability, including audit events, metrics, dashboards, and alerting that support the published resilience posture
 
 Any later implementation choice that would weaken or contradict the contract in this document should be
 surfaced explicitly rather than introduced implicitly.

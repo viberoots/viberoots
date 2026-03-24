@@ -224,6 +224,7 @@ Optional fields:
 - `promotion_compatibility`
 - stricter rollback-candidate policy
 - additional lane-specific admission constraints
+- versioned interface bindings or schema refs used by Buck extraction, CLI submission, and control-plane admission
 
 ### `promotion_compatibility`
 
@@ -283,6 +284,37 @@ Optional fields:
 - explicit component groups
 - dependency barriers
 - provider-specific validated extensions that do not change the provider-neutral meaning of the mode
+- rollout-level approval policy when later phases require fresh approval beyond ordinary admission
+- rollout resume policy when paused or interrupted progressive rollout may continue deterministically
+- rollout supersedence policy when a newer run interacts with a pending or paused rollout
+
+Progressive-rollout required semantics for `phased`, `canary`, `blue_green`, and `store_staged`:
+
+- explicit phase-state vocabulary support from:
+  - `pending`
+  - `running`
+  - `paused`
+  - `succeeded`
+  - `failed`
+  - `aborted`
+- explicit abort semantics for the selected rollout mode
+- explicit resumability declaration:
+  - `not_resumable`
+  - `resume_from_next_phase`
+  - `provider_state_resumable`
+- explicit rollback posture for partially completed rollout:
+  - `not_supported`
+  - `requires_new_rollback_run`
+  - `provider_defined_partial_rollback`
+
+Minimum per-phase or per-step fields for progressive rollout:
+
+- stable phase or step id
+- advance gate
+- phase-local approval requirement when different from rollout default
+- terminal behavior on failure or abort
+- optional bake or stabilization window
+- optional target exposure or slot state for traffic-shifting modes
 
 ## 4. Admission Policy Object
 
@@ -303,6 +335,7 @@ Optional fields:
 - whether same-lineage retry approval reuse is allowed
 - `retry_branch_policy`, using the closed enum `branch_independent` or `branch_coupled`
 - whether fresh approval is required for rollback by protection class
+- approval payload-binding requirements when human or policy approval is required
 
 Minimum `artifact_attestation_requirements` contract:
 
@@ -311,6 +344,18 @@ Minimum `artifact_attestation_requirements` contract:
 - required binding from artifact identity to source revision plus build inputs
 - verification rule for the signing or attesting authority
 - failure behavior for revoked, expired, or no-longer-trusted attestation material
+
+Minimum approval payload-binding contract when approval is required:
+
+- required immutable payload fields from:
+  - `deploy_run_id`
+  - execution-snapshot fingerprint or stable snapshot reference
+  - canonical target identity
+  - selected artifact identity
+  - selected source-run snapshot reference
+  - reviewed provisioner plan/diff artifact reference
+- validity or expiry rule for approval reuse where reuse is permitted
+- fail-closed behavior when any required bound field changes after approval
 
 ## 5. Migration / Alias Exception Object
 
@@ -361,34 +406,54 @@ Minimum fields:
 | smoke policy snapshot                               | yes when relevant | Source-run validation contract.                                                                                       |
 | secret-contract version/reference                   | yes               | Non-secret contract metadata only.                                                                                    |
 | runtime-config reference/fingerprint                | yes when relevant | Non-secret admitted config selector for deterministic replay.                                                         |
+| approval payload-binding snapshot or reference      | yes when relevant | Required when human or policy approval was part of admission.                                                         |
+| rollout runtime state snapshot                      | yes when relevant | Required for progressive rollout replay, resume, or auditability.                                                     |
+
+Minimum `approval payload-binding snapshot` fields when present:
+
+- approved `deploy_run_id`
+- approved execution-snapshot fingerprint or ref
+- approved canonical target identity
+- approved artifact identity or approved source-run snapshot ref, when publishing
+- approved provisioner plan/diff ref, when infra-affecting provisioning was in scope
+
+Minimum `rollout runtime state snapshot` fields when present:
+
+- rollout mode
+- current phase or step id
+- phase-state map
+- resumability status
+- latest observed exposure, slot, or track state when applicable
+- whether later phases still require fresh approval
 
 ## 7. Deployment Record
 
 Minimum required fields for every run:
 
-| Field                                           | Required                               | Notes                                                                                                            |
-| ----------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `schema_version`                                | yes                                    | Explicit record schema id.                                                                                       |
-| `deploy_run_id`                                 | yes                                    | Globally unique.                                                                                                 |
-| `deployment_id`                                 | yes                                    | Concrete deployment id.                                                                                          |
-| `deployment_label`                              | yes                                    | Buck deployment label.                                                                                           |
-| `operation_kind`                                | yes                                    | `deploy`, `retry`, `promotion`, `rollback`, `preview_cleanup`.                                                   |
-| `lifecycle_state`                               | yes                                    | `queued`, `waiting_for_lock`, `running`, `cancelling`, `finished`, `cancelled`.                                  |
-| `termination_reason`                            | yes                                    | Nullable when canonical terminal outcome exists; otherwise uses the closed vocabulary below.                     |
-| source revision identifier                      | yes except `preview_cleanup`           | Revision associated with the run; `preview_cleanup` may instead point to preview lineage or source-run ancestry. |
-| `requested_by`                                  | yes                                    | Requesting actor identity.                                                                                       |
-| publish mode                                    | yes                                    | `normal` or `preview`; `preview_cleanup` records should use `preview`.                                           |
-| declared normal provider-target identity        | yes                                    | Normal live target identity.                                                                                     |
-| effective run target identity                   | yes                                    | Actual mutated target identity.                                                                                  |
-| `lock_scope`                                    | yes                                    | Canonical lock scope.                                                                                            |
-| deployment metadata fingerprint or snapshot ref | yes                                    | Resolved metadata used by the run.                                                                               |
-| execution-snapshot reference                    | yes for protected/shared mutating runs | Frozen snapshot actually used.                                                                                   |
-| runner implementation identities                | yes for protected/shared mutating runs | Built-in publisher/provisioner/smoke/release-action runner version or digest set actually used.                  |
-| `lane_policy` fingerprint or snapshot ref       | yes when applicable                    | Authoritative lane context.                                                                                      |
-| `admission_policy` fingerprint or snapshot ref  | yes when applicable                    | Authoritative admission context.                                                                                 |
-| approval evidence or approval record ref        | yes when human approval is required    | Must explain why the run was admitted.                                                                           |
-| start time and end time                         | yes                                    | Audit timeline.                                                                                                  |
-| `final_outcome`                                 | nullable                               | Canonical terminal outcome when reached.                                                                         |
+| Field                                            | Required                               | Notes                                                                                                            |
+| ------------------------------------------------ | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `schema_version`                                 | yes                                    | Explicit record schema id.                                                                                       |
+| `deploy_run_id`                                  | yes                                    | Globally unique.                                                                                                 |
+| `deployment_id`                                  | yes                                    | Concrete deployment id.                                                                                          |
+| `deployment_label`                               | yes                                    | Buck deployment label.                                                                                           |
+| `operation_kind`                                 | yes                                    | `deploy`, `retry`, `promotion`, `rollback`, `preview_cleanup`.                                                   |
+| `lifecycle_state`                                | yes                                    | `queued`, `waiting_for_lock`, `running`, `cancelling`, `finished`, `cancelled`.                                  |
+| `termination_reason`                             | yes                                    | Nullable when canonical terminal outcome exists; otherwise uses the closed vocabulary below.                     |
+| source revision identifier                       | yes except `preview_cleanup`           | Revision associated with the run; `preview_cleanup` may instead point to preview lineage or source-run ancestry. |
+| `requested_by`                                   | yes                                    | Requesting actor identity.                                                                                       |
+| publish mode                                     | yes                                    | `normal` or `preview`; `preview_cleanup` records should use `preview`.                                           |
+| declared normal provider-target identity         | yes                                    | Normal live target identity.                                                                                     |
+| effective run target identity                    | yes                                    | Actual mutated target identity.                                                                                  |
+| `lock_scope`                                     | yes                                    | Canonical lock scope.                                                                                            |
+| deployment metadata fingerprint or snapshot ref  | yes                                    | Resolved metadata used by the run.                                                                               |
+| execution-snapshot reference                     | yes for protected/shared mutating runs | Frozen snapshot actually used.                                                                                   |
+| runner implementation identities                 | yes for protected/shared mutating runs | Built-in publisher/provisioner/smoke/release-action runner version or digest set actually used.                  |
+| `lane_policy` fingerprint or snapshot ref        | yes when applicable                    | Authoritative lane context.                                                                                      |
+| `admission_policy` fingerprint or snapshot ref   | yes when applicable                    | Authoritative admission context.                                                                                 |
+| approval evidence or approval record ref         | yes when human approval is required    | Must explain why the run was admitted.                                                                           |
+| approval payload-binding ref or embedded summary | yes when human approval is required    | Must prove what immutable payload the approval authorized.                                                       |
+| start time and end time                          | yes                                    | Audit timeline.                                                                                                  |
+| `final_outcome`                                  | nullable                               | Canonical terminal outcome when reached.                                                                         |
 
 Conditionally required:
 
@@ -396,6 +461,7 @@ Conditionally required:
 - `executed_by` for protected/shared runs
 - smoke result when a smoke step was declared and reached
 - reviewed provisioner plan/diff artifact reference when infra-affecting mutation relied on one
+- progressive rollout state when the run uses phased or traffic-shifting rollout semantics
 - `parent_run_id` for retry, rollback, and promotion derived from an earlier run
 - `release_lineage_id` when the run belongs to a promoted multi-run lineage
 - `artifact_lineage_id` when the same artifact is intentionally reused
@@ -420,6 +486,33 @@ Minimum fields:
 - emergency reason or justification
 - artifact or source-run selection path
 - why the normal control plane was unavailable or bypassed
+
+### Approval Payload-Binding Evidence
+
+Required when human or policy approval is used for admission.
+
+Minimum fields:
+
+- bound `deploy_run_id`
+- bound execution-snapshot fingerprint or ref
+- bound canonical target identity
+- bound artifact identity or source-run snapshot ref when publishing
+- bound provisioner plan/diff ref when infra-affecting provisioning was approved
+- approval record reference or approver identity
+
+### Progressive Rollout State
+
+Required when the run uses `phased`, `canary`, `blue_green`, or `store_staged`.
+
+Minimum fields:
+
+- rollout mode
+- current phase or step id
+- current phase state from the closed rollout-state vocabulary
+- per-phase state history
+- resumability posture
+- last observed provider-side exposure, slot, or rollout-track state when the provider exposes it
+- whether the rollout is paused awaiting operator action, bake-time expiry, or fresh approval
 
 ## 8. Retention Expectations
 
@@ -482,6 +575,102 @@ Repo validation should reject:
 - `release_actions` declarations that omit data-compatibility posture for stateful action types
 - protected/shared infra-affecting provisioner declarations whose reviewed path requires plan/diff visibility but does not define that contract
 - `rollout_policy` declarations that omit mode-required phase, gate, or exposure semantics
+- approval-requiring protected/shared admission policies that do not define immutable payload-binding requirements
+- protected/shared record or snapshot shapes that preserve approval identity but not the immutable payload those approvals authorized
+- progressive rollout declarations that omit required phase-state, resume, abort, or partial-rollback semantics
+
+## 10. Versioned Interface Payloads
+
+These payloads define the minimum versioned contract boundary between Buck extraction, the repo-level
+CLI, and the shared control plane.
+
+### Extracted Deployment Metadata Payload
+
+Minimum fields:
+
+- `schema_version`
+- deployment id
+- deployment label
+- extracted authoritative deployment metadata fields
+- extraction timestamp or build metadata version
+
+### Mutating Submit Request Payload
+
+Minimum fields:
+
+- `schema_version`
+- deployment id
+- requested `operation_kind`
+- requested `publish_mode`
+- any explicit source-run selectors
+- caller identity or auth context reference
+
+### Admitted Execution-Snapshot Payload
+
+Minimum fields:
+
+- `schema_version`
+- admitted run id
+- frozen deployment metadata snapshot ref
+- frozen provider-config snapshot ref
+- frozen policy snapshot refs
+- admitted artifact refs or admitted source revision
+- admitted secret/runtime-config refs
+
+### Run-Status / Read-Model Payload
+
+Minimum fields:
+
+- `schema_version`
+- `deploy_run_id`
+- deployment id
+- lifecycle state
+- final outcome
+- termination reason
+- effective target identity
+- lock scope
+- current rollout state when applicable
+
+### Replay-Selector Payload
+
+Minimum fields:
+
+- `schema_version`
+- selector kind such as `source_run_id`
+- selected source-run id or equivalent immutable selector
+- resolution result or resolution reference once bound
+
+Contract rule:
+
+- these payloads may be transported or serialized differently by implementation, but their schema version and field meaning must remain explicit and fail closed across independently implemented components
+
+## 11. Control-Plane Observability Signals
+
+Minimum required structured event categories for protected/shared mutation:
+
+- submission and admission outcome
+- approval granted, reused, expired, or revoked
+- lock acquisition attempt, success, timeout, and release
+- mutation-step start and finish
+- progressive-rollout phase transition
+- cancellation, supersedence, and no-longer-admitted termination
+- preview cleanup
+- break-glass invocation and reconciliation
+
+Minimum required metric categories:
+
+- queue depth and queue wait time
+- lock contention and stale-lock or fencing-loss events
+- run duration by lifecycle step
+- retry counts by step
+- failure counts by `final_outcome` and `failed_step`
+- age of oldest queued and running runs
+- backup, restore-test, and failover success state for the authoritative backend
+
+Minimum required operator-visibility surfaces:
+
+- alerting for resilience, lock, and repeated-run-failure conditions
+- dashboards or equivalent views for per-lane run health, queue state, lock state, progressive rollout state, and backend recovery posture
 
 ## Companion Docs
 
