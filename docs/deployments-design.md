@@ -603,6 +603,118 @@ Key point:
 - Jenkins performs the trusted build and submits the release
 - the control plane still owns admission, locking, mutation, smoke, and final deployment records
 
+## Self-Hosting Bootstrap Possibility
+
+This design can support the deployment system deploying or bootstrapping itself, but only through a
+deliberately narrower bootstrap path rather than by pretending the not-yet-running control plane can
+already act as its own normal mutating authority.
+
+Recommended model:
+
+- treat bootstrap as a first-class limited mode, not as the ordinary protected/shared deploy path
+- use bootstrap only to create or recover the minimum dependencies the normal deployment system needs in
+  order to exist and resume authoritative operation
+- once those dependencies exist, hand back to the normal control-plane-managed deployment path for
+  ongoing updates
+
+What bootstrap should be allowed to create or recover:
+
+- control-plane host or service runtime
+- authoritative deploy database and lock backend
+- artifact or provenance storage
+- secrets or runtime-config backend integration wiring
+- DNS, certificates, ingress, or service endpoint wiring needed for the control plane itself
+- initial operator or service credentials required for the normal control plane to take ownership
+
+What bootstrap should normally not do:
+
+- act as a second long-lived deployment authority beside the normal control plane
+- run arbitrary package-local hooks with protected/shared credentials
+- weaken normal approval, replay, or audit guarantees for ordinary application deployments
+- silently fall back from the normal path into bootstrap mode just because the control plane is unhealthy
+
+Bootstrap policy stance:
+
+- bootstrap is a reviewed special case closer to break-glass or disaster-recovery posture than to routine
+  day-to-day deployment
+- bootstrap should still prefer exact immutable artifacts, explicit target identity, bounded credentials,
+  auditable operator intent, and post-bootstrap reconciliation into the authoritative deployment record
+- bootstrap should remain intentionally small so the system does not gain two competing ways to mutate the
+  same protected/shared environment
+
+Bootstrap execution options that stay within this design:
+
+- local operator bootstrap for a homelab or first install
+  - a trusted operator machine may run a reviewed limited bootstrap command against a declared bootstrap
+    deployment target
+- trusted CI bootstrap submitter
+  - CI may build and attest the control-plane artifact, while a reviewed bootstrap executor performs the
+    minimal bring-up steps
+- offline recovery bootstrap
+  - when the normal control plane or its database is unavailable, a reviewed offline-capable bootstrap or
+    recovery procedure may restore the control plane's minimum dependencies before normal operation resumes
+
+Conceptual split:
+
+- bootstrap mode answers "how do we create or recover the deployment authority itself?"
+- normal deploy mode answers "how does the authoritative deployment authority mutate reviewed targets once
+  it exists?"
+
+Illustrative flow:
+
+```mermaid
+sequenceDiagram
+    autonumber
+
+    participant OP as "Trusted operator or CI"
+    participant BT as "Bootstrap tool"
+    participant PV as "Provider APIs / infra"
+    participant DB as "Deploy DB / lock backend"
+    participant ART as "Artifact / provenance store"
+    participant SEC as "Secrets / runtime-config backend"
+    participant CP as "Normal control plane"
+
+    OP->>BT: bootstrap deploy-system
+    BT->>ART: load exact reviewed control-plane artifact
+    BT->>PV: create or recover minimal infra
+    BT->>DB: initialize or restore authoritative state backend
+    BT->>SEC: wire required secret/config integration
+    BT->>PV: publish control-plane service
+    BT->>CP: start normal control-plane service
+    CP->>DB: take authoritative ownership
+    OP->>CP: use normal deploy path for subsequent updates
+```
+
+Recommended repository shape for self-hosting:
+
+- model the deployment system itself as one or more ordinary deployment ids for steady-state updates
+  - for example, API, worker, and observability surfaces may each become normal deployments when that is
+    operationally useful
+- model bootstrap separately as one reviewed limited deployment family or executor path
+  - it may reuse the same artifacts and provider adapters
+  - it should not claim to be the same mutating authority as the normal control plane while the control
+    plane is still being created
+
+Minimum bootstrap constraints:
+
+- bootstrap must target only deployment-system-owned infrastructure, not arbitrary application deployments
+- bootstrap must use one explicit reviewed identity and authorization path distinct from ordinary submit,
+  approve, and operate roles
+- bootstrap should produce or reconcile authoritative records as soon as the normal control plane is
+  available again
+- bootstrap should fail closed if it cannot prove target identity, artifact identity, or ownership of the
+  deployment-system resources it is mutating
+- after bootstrap succeeds, routine updates to the deployment system should go back through the normal
+  control plane rather than continuing to use bootstrap mode
+
+Plain-language version:
+
+- yes, the deployment system can bring up or recover itself
+- no, it should not do that by pretending the half-booted control plane is already the normal deployment
+  authority
+- the right answer is a small, reviewed bootstrap path followed by ordinary control-plane-managed
+  self-updates
+
 ## Contract Summary
 
 This section is a reader-oriented summary of the fixed behavioral contract.
@@ -915,10 +1027,93 @@ Suggested layout:
 
 ```text
 build-tools/tools/deploy/deploy.ts
+build-tools/tools/deploy/control-plane/
+build-tools/tools/deploy/shared/
 build-tools/tools/deploy/providers/cloudflare-pages.ts
 build-tools/tools/deploy/provisioners/cdktf.ts
+build-tools/tools/deploy/release-actions/
 build-tools/tools/bin/deploy
+build-tools/deploy/lanes/
+build-tools/deploy/policies/
 ```
+
+Code-location map:
+
+```mermaid
+flowchart TB
+    ROOT["bucknix-fresh repo"]
+
+    subgraph CLI["CLI and repo-facing front door"]
+        BIN["build-tools/tools/bin/deploy<br/>thin executable wrapper"]
+        FRONT["build-tools/tools/deploy/deploy.ts<br/>operator CLI entrypoint"]
+        SHARED["build-tools/tools/deploy/shared/<br/>versioned payloads, shared types, common helpers"]
+    end
+
+    subgraph REPOL["Repo-facing logic"]
+        EXTRACT["build-tools/tools/deploy/extract.*<br/>Buck extraction adapter"]
+        VALIDATE["build-tools/tools/deploy/validate.*<br/>deployment validation"]
+        SELECT["build-tools/tools/deploy/select.*<br/>impact selection / --from-changes"]
+    end
+
+    subgraph CPLANE["Shared control-plane service"]
+        API["build-tools/tools/deploy/control-plane/api/*<br/>submission + status API"]
+        ADMIT["build-tools/tools/deploy/control-plane/admission/*<br/>lane + admission evaluation"]
+        APPROVAL["build-tools/tools/deploy/control-plane/approvals/*<br/>approval binding + reuse logic"]
+        ORCH["build-tools/tools/deploy/control-plane/orchestrator/*<br/>run orchestration"]
+        LOCK["build-tools/tools/deploy/control-plane/locking/*<br/>lock and fencing logic"]
+        PREVIEW["build-tools/tools/deploy/control-plane/previews/*<br/>preview lifecycle + cleanup"]
+        RECOVER["build-tools/tools/deploy/control-plane/recovery/*<br/>in-doubt reconciliation"]
+        AUTHZ["build-tools/tools/deploy/control-plane/authz/*<br/>scoped authz / RBAC"]
+        OBS["build-tools/tools/deploy/control-plane/observability/*<br/>audit events, metrics, dashboards"]
+    end
+
+    subgraph RUNNERS["Built-in execution adapters"]
+        PROVIDERS["build-tools/tools/deploy/providers/*<br/>publisher, smoke, provider API adapters"]
+        PROVISIONERS["build-tools/tools/deploy/provisioners/*<br/>built-in provisioner runners"]
+        ACTIONS["build-tools/tools/deploy/release-actions/*<br/>built-in release-action runners"]
+    end
+
+    subgraph POLICY["Repo-owned policy objects"]
+        LANES["build-tools/deploy/lanes/*<br/>lane_policy definitions"]
+        POLICIES["build-tools/deploy/policies/*<br/>admission_policy definitions"]
+    end
+
+    ROOT --> BIN --> FRONT
+    ROOT --> SHARED
+    FRONT --> EXTRACT
+    FRONT --> VALIDATE
+    FRONT --> SELECT
+    FRONT --> API
+    API --> ADMIT
+    API --> APPROVAL
+    API --> ORCH
+    API --> AUTHZ
+    API --> PREVIEW
+    API --> OBS
+    ORCH --> LOCK
+    ORCH --> RECOVER
+    ORCH --> PROVIDERS
+    ORCH --> PROVISIONERS
+    ORCH --> ACTIONS
+    ADMIT --> LANES
+    ADMIT --> POLICIES
+    EXTRACT --> LANES
+    EXTRACT --> POLICIES
+    SHARED --> API
+    SHARED --> FRONT
+    SHARED --> PROVIDERS
+    SHARED --> PROVISIONERS
+    SHARED --> ACTIONS
+```
+
+How to read this map:
+
+- `build-tools/tools/bin/deploy` stays as the thin user-facing executable
+- `build-tools/tools/deploy/` is the main implementation root for CLI, extraction, validation, shared contracts, and control-plane code
+- `build-tools/tools/deploy/control-plane/` is where the authoritative protected/shared mutating service logic should live
+- `build-tools/tools/deploy/providers/`, `provisioners/`, and `release-actions/` hold only vetted built-in execution adapters
+- `build-tools/deploy/lanes/` and `build-tools/deploy/policies/` remain repo-owned policy-definition locations rather than control-plane implementation code
+- exact filenames may evolve, but these directory boundaries should remain stable so the implementation matches the design's trust and ownership model
 
 CLI/front-door responsibilities:
 
