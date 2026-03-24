@@ -323,6 +323,286 @@ Semantic contract for the canonical Buck `:deploy` target:
 - the repo-level `deploy` CLI remains the canonical repo-facing command-line client for live mutation submission
 - if an implementation uses `buck2` internally while servicing the deploy CLI, that is an implementation detail rather than a second supported workflow
 
+## Proposed System Architecture
+
+This is the intended steady-state architecture for protected/shared deployments. Local-only workflows may
+collapse several of these boundaries onto one machine, but protected/shared mutation should preserve these
+authority and trust boundaries.
+
+```mermaid
+flowchart LR
+    subgraph Repo["Repository"]
+        D["Deployment metadata in TARGETS"]
+        P["Provider-native config"]
+        L["Lane / admission / rollout policy objects"]
+        A["App and component build targets"]
+    end
+
+    O["Operator / CI / UI client"]
+    CLI["Repo deploy CLI"]
+    BX["Buck metadata extraction and validation"]
+    CP["Shared deploy control plane API"]
+    Q["Queue / workers / orchestration"]
+    DB["Authoritative deploy DB and lock backend"]
+    AR["Artifact store + attestation records"]
+    SEC["Secrets / runtime config backend"]
+    PR["Built-in provisioner / publisher / smoke runners"]
+    PV["Provider APIs"]
+    OBS["Audit events / metrics / dashboards"]
+
+    O --> CLI
+    CLI --> BX
+    BX --> D
+    BX --> P
+    BX --> L
+    BX --> A
+    CLI --> CP
+    CP --> DB
+    CP --> Q
+    Q --> DB
+    Q --> AR
+    Q --> SEC
+    Q --> PR
+    PR --> PV
+    CP --> OBS
+    Q --> OBS
+    A -. trusted CI build + attest .-> AR
+```
+
+Plain-language flow:
+
+- the repo remains the source of truth for deployment metadata, policy objects, and build targets
+- the deploy CLI is the front door for operators, CI, and any UI-backed workflows
+- Buck extraction and validation turn repo definitions into a stable implementation-facing contract
+- the shared control plane is the sole mutating authority for `shared_nonprod` and `production_facing`
+- workers execute only vetted built-in provisioner, publisher, smoke, and release-action logic
+- artifacts, approvals, locks, audit records, and secrets stay outside arbitrary workstation execution
+
+## Proposed Software Components
+
+This diagram names the main software components implied by the design so implementation planning can map
+workstreams to concrete codebases or modules.
+
+```mermaid
+flowchart TB
+    subgraph ClientSide["Client-side components"]
+        CLI2["deploy CLI"]
+        UI["Operator UI"]
+        CI["Trusted CI integration"]
+    end
+
+    subgraph RepoFacing["Repo-facing components"]
+        EX["Buck extraction adapter"]
+        VAL["Deployment validator"]
+        SEL["Impact selector / from-changes planner"]
+    end
+
+    subgraph ControlPlane["Shared control-plane components"]
+        API["Submission and status API"]
+        ADM["Admission engine"]
+        APP["Approval service"]
+        ORCH["Run orchestrator"]
+        LOCK["Lock manager"]
+        REC["Recovery / reconciliation manager"]
+        PRE["Preview lifecycle manager"]
+        RBAC["Authorization / RBAC layer"]
+    end
+
+    subgraph Execution["Execution components"]
+        BUILD["Artifact resolver / source-run loader"]
+        PROV["Built-in provisioner runners"]
+        ACT["Built-in release-action runners"]
+        PUB["Built-in publisher runners"]
+        SMK["Built-in smoke runners"]
+    end
+
+    subgraph DataPlane["State and integration components"]
+        DB2["Authoritative deploy records DB"]
+        ART2["Artifact / provenance store"]
+        SEC2["Secrets and runtime-config integration"]
+        OBS2["Audit / metrics / dashboards"]
+        CAP["Provider capability registry"]
+        PV2["Provider API clients"]
+    end
+
+    CLI2 --> EX
+    CLI2 --> API
+    UI --> API
+    CI --> API
+
+    EX --> VAL
+    EX --> SEL
+    EX --> API
+
+    API --> RBAC
+    API --> ADM
+    API --> APP
+    API --> ORCH
+    API --> PRE
+
+    ADM --> CAP
+    ADM --> ART2
+    ADM --> DB2
+    APP --> DB2
+    ORCH --> LOCK
+    ORCH --> BUILD
+    ORCH --> REC
+    ORCH --> DB2
+    PRE --> LOCK
+    PRE --> DB2
+    REC --> DB2
+
+    BUILD --> ART2
+    BUILD --> SEC2
+    ORCH --> PROV
+    ORCH --> ACT
+    ORCH --> PUB
+    ORCH --> SMK
+
+    PROV --> PV2
+    ACT --> PV2
+    PUB --> PV2
+    SMK --> PV2
+
+    API --> OBS2
+    ORCH --> OBS2
+    REC --> OBS2
+```
+
+Suggested implementation grouping:
+
+- client surfaces: CLI, UI, CI integration
+- repo-facing logic: Buck extraction, validation, change selection
+- control plane core: API, admission, approvals, orchestration, locking, recovery, preview lifecycle, RBAC
+- execution runtime: artifact loading plus built-in provisioner, publisher, smoke, and release-action runners
+- shared state and integrations: authoritative DB, artifact/provenance store, secrets integration, provider capability registry, observability
+
+## Minimal Homelab Interaction Example
+
+For a one-developer setup with one laptop and one low-power home server, the worker loop should normally be
+part of the control-plane service or a sibling worker process on the home server, not Jenkins itself.
+
+Jenkins can still be useful as a trusted build producer or submitter, but in this design it should remain a
+client of the control-plane API on that same home server rather than the authoritative mutating worker for
+protected/shared targets.
+
+```mermaid
+sequenceDiagram
+    autonumber
+
+    box "Laptop"
+        participant Dev as "Developer"
+        participant CLI3 as "deploy CLI"
+        participant BX3 as "Buck extraction adapter"
+        participant VAL3 as "Deployment validator"
+    end
+
+    box "Home Server"
+        participant API3 as "Control-plane API"
+        participant ADM3 as "Admission engine"
+        participant DB3 as "Deploy DB / lock backend"
+        participant W3 as "Worker loop / orchestrator"
+        participant ART3 as "Artifact / provenance store"
+        participant SEC3 as "Secrets / runtime-config integration"
+        participant RUN3 as "Built-in runners"
+        participant OBS3 as "Audit / metrics"
+        participant JEN3 as "Jenkins"
+    end
+
+    participant PV3 as "Provider APIs"
+
+    Dev->>CLI3: deploy <deployment-id>
+    CLI3->>BX3: extract deployment metadata
+    BX3->>VAL3: validate shape and policy references
+    VAL3-->>CLI3: validated payload
+    CLI3->>API3: submit mutating request
+    API3->>ADM3: evaluate admission policy
+    ADM3->>DB3: create run record / queue state
+    ADM3-->>API3: admitted run id
+    API3-->>CLI3: accepted response + status ref
+
+    opt "Trusted CI build path"
+        JEN3->>ART3: publish artifact + attestation
+        JEN3->>API3: optional submit or status update as client
+    end
+
+    W3->>DB3: claim queued run and acquire lock
+    W3->>ART3: load admitted artifact or source-run snapshot
+    W3->>SEC3: resolve admitted secret/runtime-config refs
+    W3->>RUN3: execute provision / release-actions / publish / smoke
+    RUN3->>PV3: call provider APIs
+    PV3-->>RUN3: provider result
+    RUN3-->>W3: step result
+    W3->>DB3: persist lifecycle state and final outcome
+    W3->>OBS3: emit audit events and metrics
+    CLI3->>API3: poll run status
+    API3->>DB3: read current run state
+    API3-->>CLI3: lifecycle state / outcome
+```
+
+Homelab interpretation:
+
+- the laptop is the control surface: authoring, validation, Buck extraction, and submission
+- the home server is the deployment authority: API, DB, locks, worker loop, Jenkins, and provider-facing execution
+- Jenkins runs on the home server in this setup, but should still sit beside the control plane as a build producer or submitter, not as the source of truth for locking, admission, or deployment records
+- the worker loop can be one background process in the same application as the API at first; it does not need to be a separate distributed system
+
+## Example: GitHub Hook Triggering Staging Release Through Jenkins
+
+This example shows an automation-driven staging release path where GitHub triggers Jenkins on the home
+server, Jenkins builds and attests the artifact, and the shared control plane remains the mutating authority.
+
+```mermaid
+sequenceDiagram
+    autonumber
+
+    participant GH as "GitHub"
+
+    box "Home Server"
+        participant JEN4 as "Jenkins"
+        participant API4 as "Control-plane API"
+        participant ADM4 as "Admission engine"
+        participant DB4 as "Deploy DB / lock backend"
+        participant ART4 as "Artifact / provenance store"
+        participant W4 as "Worker loop / orchestrator"
+        participant SEC4 as "Secrets / runtime-config integration"
+        participant RUN4 as "Built-in runners"
+        participant OBS4 as "Audit / metrics"
+    end
+
+    participant PV4 as "Provider APIs"
+
+    GH->>JEN4: webhook for staging branch / merge event
+    JEN4->>JEN4: checkout repo + run trusted build
+    JEN4->>ART4: publish artifact + attestation
+    JEN4->>API4: submit staging deploy request
+    API4->>ADM4: evaluate lane + admission policy
+    ADM4->>DB4: create admitted run record
+    ADM4-->>API4: admitted run id
+    API4-->>JEN4: accepted response + status ref
+
+    W4->>DB4: claim staging run and acquire lock
+    W4->>ART4: load admitted artifact
+    W4->>SEC4: resolve admitted config / secrets
+    W4->>RUN4: execute publish and smoke lifecycle
+    RUN4->>PV4: publish to staging target
+    PV4-->>RUN4: publish result
+    RUN4->>PV4: run smoke / health check interactions as needed
+    PV4-->>RUN4: smoke result
+    RUN4-->>W4: lifecycle result
+    W4->>DB4: persist outcome and release record
+    W4->>OBS4: emit audit events and metrics
+    JEN4->>API4: poll status / final outcome
+    API4->>DB4: read run state
+    API4-->>JEN4: succeeded or failed
+```
+
+Key point:
+
+- GitHub triggers Jenkins
+- Jenkins performs the trusted build and submits the release
+- the control plane still owns admission, locking, mutation, smoke, and final deployment records
+
 ## Contract Summary
 
 This section is a reader-oriented summary of the fixed behavioral contract.
@@ -890,11 +1170,12 @@ These flags are not just convenience syntax. They exist because real deployment 
 Flag interaction rules:
 
 - default `deploy <id>` means `validate -> build -> resolve -> provision? -> release_actions(pre_publish)? -> publish -> release_actions(post_publish_pre_smoke)? -> smoke? -> release_actions(post_smoke)?` for `local_only`
-- for `shared_nonprod` and `production_facing`, default `deploy <id>` means `validate -> submit trusted build-admit-or-reuse request -> provision? -> release_actions(pre_publish)? -> publish -> release_actions(post_publish_pre_smoke)? -> smoke? -> release_actions(post_smoke)?`
+- for `shared_nonprod` and `production_facing`, default `deploy <id>` means `validate -> submit trusted build-admit-or-reuse request -> provision? -> release_actions(pre_publish)? -> publish -> release_actions(post_publish_pre_smoke)? -> smoke -> release_actions(post_smoke)?`
   - CI may perform the trusted build-and-attest step before mutation begins
   - the shared control plane remains the sole authority that admits the run, selects the admitted artifact, acquires the lock, orchestrates mutation, runs smoke, and records deployment history
   - the mutating publish phase must consume only the resulting admitted immutable artifact
   - it must not mutate directly from a workstation build or an ad hoc control-plane rebuild
+  - smoke is mandatory by default for these protection classes and may be omitted or downgraded only through an explicit reviewed `smoke.exception`
 - `--validate-only` runs validation only
 - `--provision-only` still performs `validate`, but it must not build, resolve artifacts, or publish
   - it must not run `release_actions`, because no publish-phase lifecycle is being executed
@@ -2986,6 +3267,28 @@ First-class rollout-shape policy:
   - an advance gate for each phase
   - an abort rule
   - smoke mode: `per_phase`, `final_only`, or `both`
+- advance gates must use one explicit typed contract rather than free-form prose so adapters, the control plane, and operator UIs evaluate the same continuation rule
+  - each gate should declare one closed `type`
+  - each gate should declare the evidence source, selector, query, or runner result it evaluates
+  - each gate should declare pass criteria
+  - each gate should declare timeout behavior when evaluation is not instantaneous
+  - each gate should declare the terminal effect of a non-passing result: `pause`, `fail`, or `abort`
+- the minimum reviewed gate-type vocabulary should be:
+  - `manual_approval`
+    - pass requires an accepted approval record bound to the paused run and phase
+  - `smoke_pass`
+    - pass requires the declared smoke runner or smoke checkpoint for that phase to succeed
+  - `metric_threshold`
+    - pass requires a reviewed metric query, observation window, and threshold comparison to succeed
+  - `time_bake`
+    - pass requires the declared stabilization window to elapse without a contradicting failure signal defined by policy
+  - `provider_health`
+    - pass requires a reviewed provider-native health or rollout-status signal to report the declared healthy state
+  - `store_health`
+    - pass requires reviewed store-processing, installability, staged-rollout, or equivalent release-health evidence for mobile/store lanes
+- if a rollout needs a different gate type, the gate vocabulary must be extended explicitly in reviewed schema and provider capability policy before an implementation relies on it
+- gate evaluation records should preserve enough structured evidence to explain why a phase advanced, paused, failed, or aborted without relying on log scraping
+  - at minimum: gate type, evidence reference or fingerprint, observed result, evaluation time, and terminal decision
 - rollout modes that shift traffic, audience, or store exposure must additionally define:
   - exposure increments
   - bake duration or stabilization window between increments
@@ -4539,7 +4842,7 @@ Minimum required fields for every run:
   - required for all run kinds except `preview_cleanup`
   - `preview_cleanup` should instead preserve either the preview's originating source revision or a stable lineage/reference to the preview-producing run when no single revision is the most meaningful audit key
 - `requested_by`
-  - the human, CI job, or automation that requested or triggered the run
+  - the stable principal identity of the human, CI job, or automation that requested or triggered the run
 - publish mode, such as normal or preview
   - `preview_cleanup` should preserve `publish_mode = preview`
 - declared normal provider-target identity
@@ -4560,7 +4863,7 @@ Minimum required fields for every run:
 Conditionally required fields:
 
 - `submitted_by`
-  - required when a distinct client identity creates a control-plane run request
+  - required when a distinct client principal creates a control-plane run request
   - may be omitted when it would be identical to `requested_by`
 - `executed_by`
   - required for `shared_nonprod` and `production_facing`
@@ -4620,6 +4923,10 @@ Identity-field defaulting policy:
 - `executed_by` may be omitted for `local_only` runs when the same local actor both initiated and executed the mutation
 - implementations should prefer omission over redundant duplication when a field would add no new information in the common local-only case
 - operator-facing views may still render omitted identity fields as inherited defaults for readability
+- identity-bearing audit fields must use one canonical principal shape in protected/shared records
+  - at minimum that shape should preserve a stable immutable principal id such as an OIDC subject, workload identity, or reviewed service-account id
+  - optional display fields such as username, email, or friendly label may be recorded for operator readability, but authorization and self-approval checks must evaluate the stable principal id rather than display strings
+  - if a principal is acting through delegated automation, the record should preserve both the durable automation principal and the requesting human principal when both are materially relevant
 
 Lineage requirement:
 
@@ -4634,7 +4941,8 @@ Approval-audit requirement:
 - at minimum that should include:
   - the resolved admission-policy reference or fingerprint
   - whether approval was fresh or reused under explicit retry policy
-  - approver identity or approval record reference when human approval was required
+  - approver principal id or approval record reference when human approval was required
+  - optional approver display fields may be stored, but self-approval and separation-of-duties checks must be explainable from stable principal ids alone
 - these lineage fields are optional only for runs that truly have no parent, no promoted-release-lineage relationship, or no artifact-lineage relationship
 
 Artifact identity rules:
@@ -5779,7 +6087,7 @@ Under the hood that may still mean:
 2. trusted CI builds `//projects/apps/pleomino:app` and records attested immutable artifact metadata
 3. the shared control plane selects the admitted artifact and replays the recorded deployment snapshot needed for this run
 4. the control-plane publisher uploads that exact artifact to Cloudflare Pages
-5. optional control-plane smoke checks run
+5. control-plane smoke checks run unless an explicit reviewed `smoke.exception` changes the protected/shared smoke policy
 
 The user should not need to think about that wiring.
 

@@ -323,6 +323,34 @@ Minimum per-phase or per-step fields for progressive rollout:
 - optional bake or stabilization window
 - optional target exposure or slot state for traffic-shifting modes
 
+Minimum `advance_gate` contract:
+
+- `type`, using a reviewed closed vocabulary
+- evidence source, selector, query, or runner reference appropriate to that gate type
+- pass criteria
+- timeout rule when evaluation is not instantaneous
+- terminal effect when the gate does not pass:
+  - `pause`
+  - `fail`
+  - `abort`
+
+Minimum reviewed `advance_gate.type` vocabulary:
+
+- `manual_approval`
+- `smoke_pass`
+- `metric_threshold`
+- `time_bake`
+- `provider_health`
+- `store_health`
+
+Minimum gate-evidence record for each evaluated phase gate:
+
+- gate type
+- evidence reference, query fingerprint, or runner result reference
+- observed result summary
+- evaluation time
+- terminal decision
+
 ## 4. Admission Policy Object
 
 Minimum fields:
@@ -460,7 +488,7 @@ Minimum required fields for every run:
 | `lifecycle_state`                                | yes                                    | `pending_approval`, `queued`, `waiting_for_lock`, `running`, `cancelling`, `finished`, `cancelled`.              |
 | `termination_reason`                             | yes                                    | Nullable when canonical terminal outcome exists; otherwise uses the closed vocabulary below.                     |
 | source revision identifier                       | yes except `preview_cleanup`           | Revision associated with the run; `preview_cleanup` may instead point to preview lineage or source-run ancestry. |
-| `requested_by`                                   | yes                                    | Requesting actor identity.                                                                                       |
+| `requested_by`                                   | yes                                    | Stable principal id for the requesting actor.                                                                    |
 | publish mode                                     | yes                                    | `normal` or `preview`; `preview_cleanup` records should use `preview`.                                           |
 | declared normal provider-target identity         | yes                                    | Normal live target identity.                                                                                     |
 | effective run target identity                    | yes                                    | Actual mutated target identity.                                                                                  |
@@ -505,6 +533,13 @@ Conditionally required:
 - rollout resumability state when a progressive rollout run reaches `paused`
 - latest accepted run-action summary when a paused or running progressive rollout has received a first-class action such as `resume`
 
+Identity rule:
+
+- protected/shared identity-bearing audit fields should preserve a stable immutable principal id first
+- display-oriented identity strings may be stored in addition to the stable principal id
+- omitted identity fields may inherit semantically from earlier ones when the actor is the same
+- authorization and self-approval checks should evaluate the stable principal identity, not display strings
+
 ### In-Doubt Recovery Summary
 
 Required when protected/shared recovery occurred after provider-side mutation may have begun but before authoritative finalization completed.
@@ -540,9 +575,9 @@ Required when break-glass mutation is used.
 Minimum fields:
 
 - incident reference
-- requesting identity
-- approving identity, when an approver exists for that emergency path
-- executing identity
+- requesting principal id
+- approving principal id, when an approver exists for that emergency path
+- executing principal id
 - emergency reason or justification
 - artifact or source-run selection path
 - why the normal control plane was unavailable or bypassed
@@ -559,7 +594,7 @@ Minimum fields:
 - bound artifact identity or source-run snapshot ref when publishing
 - bound preview identity selector when preview publication or preview cleanup is being approved
 - bound provisioner plan/diff ref when infra-affecting provisioning was approved
-- approval record reference or approver identity
+- approval record reference or approver principal id
 
 ### Progressive Rollout State
 
@@ -584,7 +619,7 @@ Required when a paused or running progressive rollout has received a first-class
 Minimum fields:
 
 - action type
-- requesting identity
+- requesting principal id
 - accepted time
 - action idempotency key or equivalent deduplication identity
 - resulting lifecycle-state or rollout-state transition
