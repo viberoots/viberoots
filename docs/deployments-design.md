@@ -815,8 +815,11 @@ treated as settled policy, not open brainstorming:
     | `shared_nonprod`    | `4h`       | `8h`       | `30d`                               | `180d`                                 | quarterly                    |
     | `production_facing` | `15m`      | `1h`       | `180d`                              | `365d`                                 | monthly                      |
 
-  - implementations may exceed those minimums, but must not silently operate below them without an explicit design update
-  - artifact garbage collection, backup policy, and disaster-recovery runbooks should all be validated against those same minimum objectives rather than being tuned independently
+- implementations may exceed those minimums, but must not silently operate below them without an explicit design update
+- artifact garbage collection, backup policy, and disaster-recovery runbooks should all be validated against those same minimum objectives rather than being tuned independently
+- for release-class admitted runs, the shared control plane is responsible for preserving the exact reusable artifact and any required immutable dependency closure in the authoritative artifact/provenance store for at least the applicable retention window
+  - upstream caches may be used as acquisition sources when first materializing that artifact or closure, but they are not the retention authority for promotion, retry, rollback, or historical rebuild guarantees
+  - implementations must surface preservation or retrieval failure explicitly rather than silently rebuilding a lookalike artifact and treating it as the originally admitted release
 
 - shared-environment locking should use an explicit lock scope
   - the default lock scope should be derived from `provider` plus a normalized canonical provider-target identity
@@ -5149,6 +5152,7 @@ Artifact identity rules:
 - rebuild-per-stage promotion is a separate flow and must not be represented as publish-only
 - promotion, retry, and rollback flows should accept a previously recorded artifact reference and should prefer reusing that immutable artifact rather than rebuilding
 - a recorded artifact reference for a supported reuse flow must remain retrievable for the applicable retention window
+- when reusable artifact identity depends on a separately materialized immutable dependency closure, that closure must also remain retrievable for the same retention window rather than being delegated implicitly to best-effort upstream cache availability
 - reusable artifact attestation should bind artifact identity to source revision plus build inputs, not to environment-specific deployment metadata or provider config
 - for protected/shared immutable-reuse flows, the operator contract is "reuse the recorded artifact plus the correct recorded source-run snapshot inputs, then apply only the current target-execution context required by that operation kind", not "reinterpret today's repo state as if it were the original run"
 - provider-instance identifiers used during publish should come from authoritative deployment metadata or generated config, not from silently drift-prone duplicated checked-in fields
