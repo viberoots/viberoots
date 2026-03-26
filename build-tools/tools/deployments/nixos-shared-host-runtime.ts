@@ -37,7 +37,13 @@ export async function materializeNixosSharedHostRuntime(
   hostRoot: string,
   config: NixosSharedHostConfig,
 ): Promise<void> {
-  await fsp.mkdir(path.join(hostRoot, "containers"), { recursive: true });
+  const containersRoot = path.join(hostRoot, "containers");
+  await fsp.mkdir(containersRoot, { recursive: true });
+  const desiredContainers = new Set(Object.keys(config.containers));
+  for (const entry of await fsp.readdir(containersRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || desiredContainers.has(entry.name)) continue;
+    await fsp.rm(path.join(containersRoot, entry.name), { recursive: true, force: true });
+  }
   for (const container of Object.values(config.containers)) {
     await materializeContainerRoot(
       hostRoot,

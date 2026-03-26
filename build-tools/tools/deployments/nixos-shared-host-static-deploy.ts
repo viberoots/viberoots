@@ -19,6 +19,16 @@ import {
 import { publishNixosSharedHostStaticWebapp } from "./nixos-shared-host-static-publisher.ts";
 import { smokeNixosSharedHostStaticWebapp } from "./nixos-shared-host-static-smoke.ts";
 
+type DeployFailureStep = "provision" | "publish" | "smoke";
+
+function withFailedStep(
+  step: DeployFailureStep,
+  error: unknown,
+): Error & { failedStep: DeployFailureStep } {
+  const base = error instanceof Error ? error : new Error(String(error));
+  return Object.assign(base, { failedStep: step });
+}
+
 export async function runNixosSharedHostStaticDeploy(opts: {
   deployment: NixosSharedHostDeployment;
   artifactDir: string;
@@ -34,13 +44,13 @@ export async function runNixosSharedHostStaticDeploy(opts: {
   };
 }): Promise<{ record: NixosSharedHostDeployRecord; recordPath: string }> {
   const runId = createNixosSharedHostDeployRunId();
-  const current = await readNixosSharedHostPlatformStateOrEmpty(opts.statePath);
-  const state = applyNixosSharedHostScopedDeployments(current, [opts.deployment]);
-  await writeJsonDocument(opts.statePath, state);
-  const rendered = renderNixosSharedHostConfig(state);
-  if (opts.hostConfigPath) await writeJsonDocument(opts.hostConfigPath, rendered);
-  await materializeNixosSharedHostRuntime(opts.hostRoot, rendered);
   try {
+    const current = await readNixosSharedHostPlatformStateOrEmpty(opts.statePath);
+    const state = applyNixosSharedHostScopedDeployments(current, [opts.deployment]);
+    await writeJsonDocument(opts.statePath, state);
+    const rendered = renderNixosSharedHostConfig(state);
+    if (opts.hostConfigPath) await writeJsonDocument(opts.hostConfigPath, rendered);
+    await materializeNixosSharedHostRuntime(opts.hostRoot, rendered);
     const container = rendered.containers[opts.deployment.providerTarget.containerName];
     const published = await publishNixosSharedHostStaticWebapp({
       artifactDir: opts.artifactDir,
@@ -50,29 +60,53 @@ export async function runNixosSharedHostStaticDeploy(opts: {
         publishRoot: container.publishRoot,
         activeReleaseLink: container.activeReleaseLink,
       },
+    }).catch((error) => {
+      throw withFailedStep("publish", error);
     });
     const smoke = await smokeNixosSharedHostStaticWebapp({
       hostname: opts.deployment.providerTarget.hostname,
       indexPath: published.indexPath,
       healthPath: opts.deployment.runtime.healthPath,
       connectOverride: opts.smokeConnectOverride,
+    }).catch((error) => {
+      throw withFailedStep("smoke", error);
     });
     const record = createNixosSharedHostDeployRecord(opts.deployment, {
-      runId,
+      deployRunId: runId,
+      runClassification: "deploy",
       finalOutcome: "succeeded",
       artifactIdentity: published.artifactIdentity,
+      artifactLineageId: published.artifactIdentity,
       publicUrl: smoke.publicUrl,
       healthUrl: smoke.healthUrl,
     });
     return { record, recordPath: await writeNixosSharedHostDeployRecord(opts.recordsRoot, record) };
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const failedStep =
+      error &&
+      typeof error === "object" &&
+      "failedStep" in error &&
+      (error.failedStep === "provision" ||
+        error.failedStep === "publish" ||
+        error.failedStep === "smoke")
+        ? error.failedStep
+        : "provision";
+    const finalOutcome =
+      failedStep === "smoke"
+        ? "smoke_failed_after_publish"
+        : failedStep === "publish"
+          ? "publish_failed"
+          : "provision_failed";
     const record = createNixosSharedHostDeployRecord(opts.deployment, {
-      runId,
-      finalOutcome: "failed",
-      error: error instanceof Error ? error.message : String(error),
+      deployRunId: runId,
+      runClassification: "deploy",
+      finalOutcome,
+      failedStep,
+      error: message,
     });
     const recordPath = await writeNixosSharedHostDeployRecord(opts.recordsRoot, record);
-    throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
+    throw Object.assign(error instanceof Error ? error : new Error(message), {
       record,
       recordPath,
     });

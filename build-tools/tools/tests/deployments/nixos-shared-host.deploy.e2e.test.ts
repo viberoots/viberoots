@@ -29,10 +29,17 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
         cwd: tmp,
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${path.join(tmp, "records")} --host-config-out ${path.join(tmp, "rendered-host.json")} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
+      assert.equal(summary.runClassification, "deploy");
       assert.equal(summary.finalOutcome, "succeeded");
       assert.equal(summary.publicUrl, "https://pleomino.apps.kilty.io/");
       const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
-      assert.equal(record.artifactIdentity, summary.artifactIdentity);
+      assert.equal(record.schemaVersion, "deploy-record@2026-03-25");
+      assert.equal(record.deployRunId, summary.deployRunId);
+      assert.equal(record.runClassification, "deploy");
+      assert.equal(record.lifecycleState, "finished");
+      assert.equal(record.provider, "nixos-shared-host");
+      assert.equal(record.providerTargetIdentity, "nixos-shared-host:default:pleomino");
+      assert.equal(record.artifact.identity, summary.artifactIdentity);
       assert.equal(record.finalOutcome, "succeeded");
       const rendered = JSON.parse(await fsp.readFile(path.join(tmp, "rendered-host.json"), "utf8"));
       assert.ok(rendered.containers.pleomino);

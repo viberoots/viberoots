@@ -42,7 +42,8 @@ test("nixos-shared-host deploy records smoke failure when the public health path
           },
         }),
         (error: any) => {
-          assert.equal(error.record.finalOutcome, "failed");
+          assert.equal(error.record.finalOutcome, "smoke_failed_after_publish");
+          assert.equal(error.record.failedStep, "smoke");
           assert.match(error.record.error, /expected 200/);
           return true;
         },
@@ -50,7 +51,8 @@ test("nixos-shared-host deploy records smoke failure when the public health path
       const runsDir = path.join(recordsRoot, "runs");
       const [recordName] = await fsp.readdir(runsDir);
       const record = JSON.parse(await fsp.readFile(path.join(runsDir, recordName), "utf8"));
-      assert.equal(record.finalOutcome, "failed");
+      assert.equal(record.runClassification, "deploy");
+      assert.equal(record.finalOutcome, "smoke_failed_after_publish");
     } finally {
       await server.close();
     }
@@ -80,7 +82,12 @@ test("nixos-shared-host deploy rejects a reachable hostname serving the wrong ar
             rejectUnauthorized: false,
           },
         }),
-        /smoke content mismatch/,
+        (error: any) => {
+          assert.equal(error.record.finalOutcome, "smoke_failed_after_publish");
+          assert.equal(error.record.failedStep, "smoke");
+          assert.match(error.message, /smoke content mismatch/);
+          return true;
+        },
       );
     } finally {
       await server.close();

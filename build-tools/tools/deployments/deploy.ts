@@ -4,10 +4,11 @@ import path from "node:path";
 import { ensureGraph } from "../buck/glue-run.ts";
 import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
 import { resolveSelectedTargetLabel } from "../dev/target-label-resolver.ts";
-import { getFlagStr } from "../lib/cli.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli.ts";
 import { readCompositeGraph } from "../lib/graph-view.ts";
 import { findRepoRoot } from "../lib/repo.ts";
 import { extractNixosSharedHostDeployments, type NixosSharedHostDeployment } from "./contract.ts";
+import { runNixosSharedHostExplicitRemoval } from "./nixos-shared-host-explicit-removal.ts";
 import { runNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy.ts";
 
 function requireFlag(name: string): string {
@@ -59,41 +60,54 @@ async function resolveArtifactDir(
 
 async function main() {
   const workspaceRoot = await findRepoRoot(process.cwd());
+  const remove = getFlagBool("remove");
   const hostRoot = path.resolve(
     getFlagStr("host-root", path.join(workspaceRoot, ".local", "deployments", "nixos-shared-host")),
   );
   const deployment = await resolveDeployment(workspaceRoot);
-  const artifactDir = await resolveArtifactDir(workspaceRoot, deployment);
   const statePath = path.resolve(getFlagStr("state", path.join(hostRoot, "platform-state.json")));
   const recordsRoot = path.resolve(getFlagStr("records-root", path.join(hostRoot, "records")));
   const hostConfigPath = getFlagStr("host-config-out", "").trim();
-  const smokeConnectHost = getFlagStr("smoke-connect-host", "").trim();
-  const smokeConnectPort = Number(getFlagStr("smoke-connect-port", "").trim() || 0);
-  const smokeConnectProtocol = getFlagStr("smoke-connect-protocol", "https:").trim();
-  const result = await runNixosSharedHostStaticDeploy({
-    deployment,
-    artifactDir,
-    statePath,
-    hostRoot,
-    recordsRoot,
-    ...(hostConfigPath ? { hostConfigPath: path.resolve(hostConfigPath) } : {}),
-    ...(smokeConnectHost && smokeConnectPort > 0
-      ? {
-          smokeConnectOverride: {
-            protocol: smokeConnectProtocol === "http:" ? "http:" : "https:",
-            hostname: smokeConnectHost,
-            port: smokeConnectPort,
-            rejectUnauthorized: false,
-          },
-        }
-      : {}),
-  });
+  const result = remove
+    ? await runNixosSharedHostExplicitRemoval({
+        deployment,
+        statePath,
+        hostRoot,
+        recordsRoot,
+        ...(hostConfigPath ? { hostConfigPath: path.resolve(hostConfigPath) } : {}),
+      })
+    : await (async () => {
+        const artifactDir = await resolveArtifactDir(workspaceRoot, deployment);
+        const smokeConnectHost = getFlagStr("smoke-connect-host", "").trim();
+        const smokeConnectPort = Number(getFlagStr("smoke-connect-port", "").trim() || 0);
+        const smokeConnectProtocol = getFlagStr("smoke-connect-protocol", "https:").trim();
+        return await runNixosSharedHostStaticDeploy({
+          deployment,
+          artifactDir,
+          statePath,
+          hostRoot,
+          recordsRoot,
+          ...(hostConfigPath ? { hostConfigPath: path.resolve(hostConfigPath) } : {}),
+          ...(smokeConnectHost && smokeConnectPort > 0
+            ? {
+                smokeConnectOverride: {
+                  protocol: smokeConnectProtocol === "http:" ? "http:" : "https:",
+                  hostname: smokeConnectHost,
+                  port: smokeConnectPort,
+                  rejectUnauthorized: false,
+                },
+              }
+            : {}),
+        });
+      })();
   console.log(
     JSON.stringify(
       {
-        runId: result.record.runId,
+        runId: result.record.deployRunId,
+        deployRunId: result.record.deployRunId,
+        runClassification: result.record.runClassification,
         finalOutcome: result.record.finalOutcome,
-        artifactIdentity: result.record.artifactIdentity,
+        artifactIdentity: result.record.artifact?.identity,
         publicUrl: result.record.publicUrl,
         recordPath: result.recordPath,
       },

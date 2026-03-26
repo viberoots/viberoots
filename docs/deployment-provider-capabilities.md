@@ -101,10 +101,15 @@ Normative-source note:
 ### Partial Publish Observability
 
 - the initial local record surface preserves:
+  - canonical `operation_kind = deploy`
+  - `run_classification = deploy | explicit_removal`
+  - `publish_mode = normal`
+  - `lifecycle_state = finished`
+  - canonical `final_outcome`
   - deployment id and deployment label
-  - canonical provider-target identity
-  - artifact identity
-  - publish outcome and smoke outcome
+  - canonical provider-target identity as both structured provider-target fields and normalized identity
+  - artifact identity for publish runs
+  - failed step when a run terminates unsuccessfully after admission into the local workflow
 
 ### Provisioner Support
 
