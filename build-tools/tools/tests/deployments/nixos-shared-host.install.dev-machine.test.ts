@@ -17,7 +17,7 @@ test("nixos-shared-host dev-machine install accepts required parameters by flags
   });
 });
 
-test("nixos-shared-host dev-machine install accepts required parameters by stdin and fails closed when incomplete", async () => {
+test("nixos-shared-host dev-machine install accepts required parameters by stdin and applies declarative defaults when stdin is partial", async () => {
   await runInTemp("nixos-shared-host-dev-machine-stdin", async (tmp, $) => {
     const outputRoot = path.join(tmp, "profiles");
     const payload = JSON.stringify({
@@ -33,10 +33,25 @@ test("nixos-shared-host dev-machine install accepts required parameters by stdin
       input: payload,
     })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts dev-machine install --output-root ${outputRoot}`;
     assert.equal(JSON.parse(String(ok.stdout)).manifest.destination, "mini");
-    const bad = await $({
+    const partial = await $({
       input: '{"profileName":"mini"}',
     })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts dev-machine install --output-root ${outputRoot}`.nothrow();
-    assert.notEqual(bad.exitCode, 0);
-    assert.match(String(bad.stderr || ""), /missing required dev-machine parameter "destination"/);
+    assert.equal(partial.exitCode, 0);
+    const partialSummary = JSON.parse(String(partial.stdout));
+    assert.equal(partialSummary.manifest.profileName, "mini");
+    assert.equal(partialSummary.manifest.destination, "mini");
+    assert.equal(partialSummary.manifest.sshMode, "ssh");
+  });
+});
+
+test("nixos-shared-host dev-machine install ignores empty stdin", async () => {
+  await runInTemp("nixos-shared-host-dev-machine-empty-stdin", async (tmp, $) => {
+    const outputRoot = path.join(tmp, "profiles");
+    const result = await $({
+      input: "",
+    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts dev-machine install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/bucknix --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime --remote-records-root /var/lib/bucknix/nixos-shared-host/records --ssh-mode ssh`;
+    const summary = JSON.parse(String(result.stdout));
+    assert.equal(summary.manifest.profileName, "mini");
+    await fsp.access(path.join(outputRoot, "mini.json"));
   });
 });

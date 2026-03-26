@@ -73,3 +73,45 @@ test("nixos-shared-host host install supports emit-only on flake roots without m
     );
   });
 });
+
+test("nixos-shared-host host install accepts stdin JSON and flags override stdin values", async () => {
+  await runInTemp("nixos-shared-host-host-install-stdin", async (tmp, $) => {
+    const fixture = await createNixosSharedHostInstallFixture({
+      root: tmp,
+      topology: "plain",
+      withExtraImports: true,
+    });
+    const payload = JSON.stringify({
+      hostRoot: fixture.hostRoot,
+      configRoot: "/etc/nixos",
+      configEntryPath: "/etc/nixos/configuration.nix",
+      installMode: "emit-only",
+      statePath: "/var/lib/bucknix/custom/platform-state.json",
+    });
+    const result = await $({
+      input: payload,
+    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts host install --install-mode managed-dropin`;
+    const summary = JSON.parse(String(result.stdout));
+    assert.equal(summary.manifest.installMode, "managed-dropin");
+    assert.equal(summary.manifest.statePath, "/var/lib/bucknix/custom/platform-state.json");
+    await fsp.access(path.join(fixture.hostRoot, "var/lib/bucknix/custom/platform-state.json"));
+  });
+});
+
+test("nixos-shared-host host install ignores empty stdin", async () => {
+  await runInTemp("nixos-shared-host-host-install-empty-stdin", async (tmp, $) => {
+    const fixture = await createNixosSharedHostInstallFixture({
+      root: tmp,
+      topology: "plain",
+      withExtraImports: true,
+    });
+    const result = await $({
+      input: "",
+    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts host install --host-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin`;
+    const summary = JSON.parse(String(result.stdout));
+    assert.equal(summary.manifest.installMode, "managed-dropin");
+    await fsp.access(
+      path.join(fixture.hostRoot, "var/lib/bucknix/nixos-shared-host/platform-state.json"),
+    );
+  });
+});

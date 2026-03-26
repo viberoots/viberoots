@@ -69,6 +69,37 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --install-mode managed-dropin
 ```
 
+When you run `host install` in an interactive terminal, the installer asks for
+missing setup values. Required fields get defaults only when the default is
+part of the reviewed contract:
+
+- `configRoot`
+  - defaults to `/etc/nixos`
+- `installMode`
+  - defaults to `managed-dropin`
+- `configEntryPath`
+  - becomes required when `installMode=managed-dropin`
+  - defaults to `<configRoot>/configuration.nix`
+
+Optional host fields do not get defaults, so you can leave them blank to keep
+them out of the final install input.
+
+Structured stdin JSON is also supported for `host install`:
+
+```bash
+printf '%s\n' '{
+  "configRoot": "/etc/nixos",
+  "configEntryPath": "/etc/nixos/configuration.nix",
+  "installMode": "managed-dropin",
+  "statePath": "/var/lib/bucknix/nixos-shared-host/platform-state.json",
+  "runtimeRoot": "/var/lib/bucknix/nixos-shared-host/runtime",
+  "recordsRoot": "/var/lib/bucknix/nixos-shared-host/records"
+}' | direnv exec . build-tools/tools/bin/nixos-shared-host-install \
+  host install
+```
+
+For `host install`, explicit flags still take precedence over stdin JSON.
+
 Useful optional flags:
 
 - `--host-root /fixture/root`
@@ -82,6 +113,9 @@ Useful optional flags:
 - `--dry-run`
 
 For `managed-dropin`, `--config-entry-path` is required.
+
+`host status` and `host uninstall` remain flag-driven; structured stdin JSON is
+currently supported for `host install` and `dev-machine install`.
 
 Host preflight checks fail closed on:
 
@@ -134,6 +168,25 @@ Uninstall guarantees:
 
 The dev-machine installer records a local profile for targeting a real
 `nixos-shared-host`.
+
+When you run `dev-machine install` in an interactive terminal, the installer
+asks for missing setup values. All dev-machine manifest fields are required,
+and only those required fields get defaults:
+
+- `profileName`
+  - defaults to `default`
+- `destination`
+  - defaults to the current `profileName`
+- `remoteRepoPath`
+  - defaults to `/srv/<repo-name>`
+- `remoteStatePath`
+  - defaults to `/var/lib/bucknix/nixos-shared-host/platform-state.json`
+- `remoteRuntimeRoot`
+  - defaults to `/var/lib/bucknix/nixos-shared-host/runtime`
+- `remoteRecordsRoot`
+  - defaults to `/var/lib/bucknix/nixos-shared-host/records`
+- `sshMode`
+  - defaults to `ssh`
 
 Flag-based input:
 

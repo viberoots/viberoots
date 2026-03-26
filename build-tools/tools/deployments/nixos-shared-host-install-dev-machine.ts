@@ -8,7 +8,7 @@ import {
   type NixosSharedHostDevMachineManifest,
 } from "./nixos-shared-host-install-contract.ts";
 
-type DevMachineInput = {
+export type DevMachineInput = {
   profileName: string;
   destination: string;
   remoteRepoPath: string;
@@ -17,43 +17,6 @@ type DevMachineInput = {
   remoteRecordsRoot: string;
   sshMode: string;
 };
-
-export async function readDevMachineInstallInputFromStdin(): Promise<Partial<DevMachineInput>> {
-  if (process.stdin.isTTY) return {};
-  const raw = await new Promise<string>((resolve) => {
-    let done = false;
-    let data = "";
-    let timer: NodeJS.Timeout | undefined;
-    const onData = (chunk: string | Buffer) => {
-      data += String(chunk);
-    };
-    const onFinish = () => finish();
-    const finish = () => {
-      if (done) return;
-      done = true;
-      if (timer) clearTimeout(timer);
-      process.stdin.off("data", onData);
-      process.stdin.off("end", onFinish);
-      process.stdin.off("error", onFinish);
-      process.stdin.pause();
-      resolve(data);
-    };
-    process.stdin.setEncoding("utf8");
-    process.stdin.on("data", onData);
-    process.stdin.once("end", onFinish);
-    process.stdin.once("error", onFinish);
-    process.stdin.resume();
-    timer = setTimeout(finish, 25);
-    timer.unref?.();
-  });
-  const trimmed = raw.trim();
-  if (!trimmed) return {};
-  try {
-    return JSON.parse(trimmed) as Partial<DevMachineInput>;
-  } catch (error) {
-    throw new Error(`failed to parse dev-machine stdin JSON (${String(error)})`);
-  }
-}
 
 function requireValue(name: keyof DevMachineInput, value: string): string {
   if (!value.trim()) throw new Error(`missing required dev-machine parameter "${name}"`);
