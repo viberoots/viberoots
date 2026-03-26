@@ -364,6 +364,186 @@ Implement immediately after the first end-to-end `mini` flow works.
 
 ---
 
+## PR-4.5: Versioned `nixos-shared-host` host install / uninstall tooling for real NixOS hosts
+
+### Description
+
+I will add reviewed installation tooling for turning a real NixOS host such as `mini` into a
+managed `nixos-shared-host` without relying on one-off manual shell sessions or unsafe edits to
+arbitrary host config. This PR introduces versioned install and uninstall scripts that are safe
+across repo revisions, resilient to different existing host states, and fail closed when the host's
+Nix configuration cannot be updated through a reviewed managed path.
+
+### Scope & Changes
+
+- Add built-in install tooling for a NixOS host to become a managed `nixos-shared-host`.
+- Add built-in install tooling for a developer machine so local operator workflows can target a real
+  `nixos-shared-host` safely and repeatably.
+- Add built-in uninstall tooling that removes only repo-managed `nixos-shared-host` assets and does
+  not assume the host is still on the same repo version that installed them.
+- Genericize and rename the current operator setup manual so it documents any
+  `nixos-shared-host`, not just `mini`, and make the guide invoke the reviewed install/uninstall
+  scripts from this PR instead of manual setup steps.
+- Introduce a versioned host-install manifest that records:
+  - install-tool schema version
+  - repo/tool version or fingerprint
+  - managed file paths
+  - managed system users, directories, and state paths
+  - chosen install mode
+  - any managed NixOS drop-in/import entrypoints created by the installer
+- Keep install/uninstall logic in reviewed TypeScript zx tools; no substantive host mutation logic in
+  ad hoc shell scripts.
+- Add a reviewed dev-machine install command that accepts required host parameters either:
+  - by explicit CLI flags, or
+  - by structured stdin input for scripted/automation usage
+- Minimum parameterized dev-machine inputs should include:
+  - the hostname or SSH destination of the `nixos-shared-host`
+  - the remote repo checkout path or managed root path when not defaultable
+  - the remote authoritative `statePath`
+  - the remote managed runtime root and records root when not defaultable
+  - any reviewed SSH or transport mode selectors required by the implementation
+- Support at least two reviewed install modes:
+  - `emit-only`
+    - generate the exact NixOS module snippet, managed state paths, and operator instructions without
+      mutating the host's config
+  - `managed-dropin`
+    - write a dedicated repo-managed drop-in file and a dedicated import/include anchor only when the
+      target NixOS config path is explicit and reviewable
+- Do not silently edit arbitrary existing host files by regex guesswork.
+- Require explicit operator-supplied paths or explicit reviewed detection for:
+  - the host's authoritative NixOS config root
+  - the managed drop-in destination
+  - the authoritative `statePath`
+  - the managed runtime root
+  - the managed records root
+- Make installer behavior robust across varying host states:
+  - host already has nginx enabled
+  - host already imports extra NixOS modules
+  - host already has existing non-managed files under the chosen config root
+  - host may be flake-based or non-flake-based
+  - host may already have an older managed install manifest from a previous repo version
+- Implement uninstall behavior that:
+  - reads the versioned managed-install manifest
+  - removes only files and directories owned by that manifest
+  - preserves non-managed sibling files
+  - tolerates already-missing paths
+  - supports uninstalling older manifest versions through explicit compatibility shims or fail-closed
+    upgrade guidance
+- Add a reviewed upgrade path when an installer encounters an older managed version:
+  - safe in-place migration when compatibility is reviewed
+  - otherwise emit an explicit manual migration refusal rather than making guessed destructive edits
+- Add explicit host-preflight checks for:
+  - NixOS presence
+  - required Nix features
+  - write permissions
+  - conflicting existing managed install anchors
+  - incompatible previously managed versions
+  - unsupported host config topology for in-place managed-dropin mode
+- Add an operator-facing dry-run mode for install and uninstall.
+- Add an operator-facing inspect/status command that reports:
+  - whether the host is managed
+  - which version installed it
+  - which managed paths exist
+  - whether the expected NixOS module import is still wired
+- Add a reviewed dev-machine configuration/install manifest that records:
+  - the selected `nixos-shared-host` destination hostname
+  - the chosen remote paths and transport parameters
+  - the local tool version or fingerprint that produced the config
+  - any repo-managed local config files, shell snippets, or connection profiles created by the installer
+- Replace `mini`-specific setup guidance with a generic `nixos-shared-host` installation guide that:
+  - explains how to install a host
+  - explains how to install a dev machine
+  - explains how to inspect status
+  - explains how to uninstall safely
+  - uses `mini` only as an example host, not as a special-case contract
+
+### Tests (in this PR)
+
+- Add install-manifest schema tests for current and backward-compatible manifest versions.
+- Add fixture-based install tests for:
+  - fresh host config root
+  - host with preexisting nginx config
+  - host with preexisting extra imports
+  - flake-based host config
+  - non-flake `/etc/nixos` style host config
+- Add uninstall tests proving:
+  - only manifest-owned paths are removed
+  - unrelated sibling files are preserved
+  - missing managed paths do not fail uninstall
+  - older manifest versions either migrate safely or fail closed with an explicit message
+- Add dry-run snapshot tests for install and uninstall.
+- Add dev-machine installer tests proving:
+  - required host parameters can be supplied by flags
+  - the same parameters can be supplied by stdin
+  - missing required host parameters fail closed with explicit guidance
+  - install output is deterministic for the same parameter set
+- Add status/inspect tests for:
+  - uninstalled host
+  - correctly installed host
+  - partially drifted host
+- Add integration tests that install, then uninstall, then reinstall into the same fixture host root.
+
+### Docs (in this PR)
+
+- Document the reviewed host install modes for `nixos-shared-host`.
+- Document the versioned managed-install manifest contract.
+- Document uninstall guarantees and non-goals.
+- Rename `mini-setup.md` to a generic `nixos-shared-host` setup/install guide and update any links or
+  references accordingly.
+- Document the operator decision tree for:
+  - `emit-only`
+  - `managed-dropin`
+  - dev-machine install with flag-based input
+  - dev-machine install with stdin-based input
+  - uninstall
+  - upgrade from an older managed install version
+
+### Verification Commands
+
+- `buck2 test //...`
+- install dry-run command for a fixture host root introduced in this PR
+- uninstall dry-run command for a fixture host root introduced in this PR
+
+### Acceptance Criteria
+
+- A real NixOS host such as `mini` can be put into a reviewed `nixos-shared-host` shape without
+  unsafe ad hoc edits.
+- A developer machine can be configured through a reviewed installer to target that
+  `nixos-shared-host` using explicit parameterized host input.
+- Uninstall removes only managed assets and remains safe across reviewed installer versions.
+- The tooling fails closed when the host's Nix configuration cannot be modified through a reviewed
+  managed path.
+- The genericized `nixos-shared-host` setup guide matches the new installer/uninstaller workflow and
+  no longer presents `mini`-specific manual steps as the primary path.
+- Tests cover install, uninstall, status, versioning, and host-state variation in the same PR.
+
+### Risks
+
+Host-install tooling can become dangerously destructive if it guesses ownership or edits arbitrary
+Nix config files heuristically.
+
+### Mitigation
+
+Use explicit managed install manifests, dedicated managed drop-in paths, dry-run support, and
+fail-closed behavior for unsupported host layouts or unknown older versions.
+
+### Consequence of Not Implementing
+
+The `mini` slice would keep depending on tribal manual setup, making real host adoption fragile and
+hard to reproduce safely across machines or over time.
+
+### Downsides for Implementing
+
+Adds host-operations complexity and version-compatibility surface area before the shared control
+plane is fully in place.
+
+### Recommendation
+
+Implement before the shared-control-plane PR so real hosts can be brought under the reviewed
+`nixos-shared-host` shape safely and repeatably.
+
+---
+
 ## PR-5: Shared control-plane skeleton + admission, locking, and authority rules for `shared_nonprod`
 
 ### Description
