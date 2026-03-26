@@ -12,6 +12,7 @@ result
 
 # Local temp artifacts
 .tmp/
+.local/deployments/
 
 # macOS
 .DS_Store

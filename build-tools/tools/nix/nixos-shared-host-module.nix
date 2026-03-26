@@ -170,8 +170,9 @@ let
               };
               systemd.tmpfiles.rules = [
                 "d /srv/static-app 0755 root root -"
-                "d /srv/static-app/current 0755 root root -"
                 "d /srv/static-app/releases 0755 root root -"
+                "d /srv/static-app/releases/.empty 0755 root root -"
+                "L+ /srv/static-app/current - - - - /srv/static-app/releases/.empty"
                 "L+ /srv/static-app/live - - - - /srv/static-app/current"
               ];
             };

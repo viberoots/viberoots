@@ -201,6 +201,10 @@ Suggested deployment metadata contract:
   - optional reviewed runtime class such as static site, node app, SSR app, or generic HTTP service
 - `publishContract`
   - how the publisher updates the running app inside the container
+  - initial reviewed static-webapp contract:
+    - stage immutable contents under `/srv/static-app/releases/<artifact-identity>`
+    - atomically repoint `/srv/static-app/current` to the staged release
+    - keep `/srv/static-app/live` as the stable nginx-facing link
 
 What should not be required:
 
@@ -433,6 +437,9 @@ The lifecycle for the first deployment of a new shared-dev app should be:
    - hostname becomes routable through wildcard DNS/TLS
 5. publisher publishes the app artifact into the container
 6. smoke/health validation runs against `https://${appName}.apps.kilty.io`
+   - smoke always checks `/`
+   - when `healthPath` is declared, smoke also checks that path
+   - a reachable hostname that serves the wrong `index.html` still fails the deploy
 
 Important properties:
 
@@ -680,6 +687,8 @@ What happens when a new shared-dev app is added:
 3. the system generates host config for `mini`
 4. `mini` creates the container and ingress automatically
 5. the app becomes reachable at `https://${appName}.apps.kilty.io`
+   - the first built-in deploy workflow is `build-tools/tools/bin/deploy`
+   - it reconciles the single deployment into platform state, materializes the local/shared-dev host runtime contract, publishes the static artifact, runs blocking smoke, and writes a local durable run record
 
 What happens for later updates:
 

@@ -88,15 +88,23 @@ Normative-source note:
 
 - default smoke model:
   - when `healthPath` is declared, smoke resolves against `https://${appName}.apps.kilty.io${healthPath}`
-  - otherwise smoke defaults to provider-family hostname reachability only in later PRs
+  - every static-webapp publish also validates `https://${appName}.apps.kilty.io/` and rejects success when the public root does not serve the just-published `index.html`
 
 ### Retry / Idempotency
 
-- not yet reviewed beyond deterministic target-identity derivation in this metadata-foundation slice
+- reviewed initial publish contract for `nixos-shared-host-static-webapp`:
+  - stage immutable artifact contents under `/srv/static-app/releases/<artifact-identity>`
+  - activate by atomically repointing `/srv/static-app/current`
+  - keep nginx rooted at `/srv/static-app/live`, which remains a stable link to `current`
+  - re-publishing an already-staged artifact identity may reuse the existing release directory
 
 ### Partial Publish Observability
 
-- not yet reviewed beyond canonical target-identity derivation in this metadata-foundation slice
+- the initial local record surface preserves:
+  - deployment id and deployment label
+  - canonical provider-target identity
+  - artifact identity
+  - publish outcome and smoke outcome
 
 ### Provisioner Support
 
@@ -110,6 +118,7 @@ Normative-source note:
   - host realization consumes only that authoritative platform state and owns container and ingress creation on the target NixOS host
   - host generation derives one generic `static-app-host` container plus one nginx route per declared app and fails closed on duplicate hostnames or backend identities
   - the current host-consumer boundary is the NixOS module `build-tools/tools/nix/nixos-shared-host-module.nix`
+  - the initial operator workflow also has a reviewed local materialization path that mirrors the same container filesystem contract for end-to-end publish and smoke testing
 
 ### Built-In `release_actions` Support
 
