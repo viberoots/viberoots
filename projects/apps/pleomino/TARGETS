@@ -17,6 +17,7 @@ node_asset_stage(
     ],
     labels = ["lang:node", "kind:app", "webapp:static", "webapp:pwa"],
     out = "dist",
+    visibility = ["//projects/deployments/..."],
 )
 
 nix_node_test(

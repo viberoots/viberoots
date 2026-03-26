@@ -46,6 +46,74 @@ Normative-source note:
 - Does the provider support protected/shared built-in `release_actions`, and which action types are allowed?
 - Does the provider require package-local executable hooks, or can it stay inside the built-in registry model?
 
+## Capability Entry: `mini-dev-container`
+
+### Identity
+
+- `provider`: `mini-dev-container`
+- canonical target identity fields:
+  - `host`
+  - `target_group`
+  - `app_name`
+- canonical lock-key shape:
+  - `mini-dev-container:<target_group>:<app_name>`
+- required normalized derived fields:
+  - `hostname = "${appName}.apps.kilty.io"`
+  - `container_name = "${appName}"`
+
+### Component Support
+
+- supported component kinds:
+  - `static-webapp`
+- multi-component support:
+  - not supported in the initial reviewed slice
+  - deployments must contain exactly one `static-webapp` component
+- additional unsupported shapes:
+  - explicit subdomain-style overrides
+  - provider-family use with non-webapp component targets
+
+### Rollout Support
+
+- default rollout mode:
+  - provider-family host realization only; publish rollout remains single-target and all-at-once in the initial slice
+- supported rollout modes:
+  - `all_at_once` only for the initial reviewed slice
+
+### Preview Support
+
+- preview support:
+  - not reviewed in the initial `mini-dev-container` slice
+
+### Smoke / Release Health
+
+- default smoke model:
+  - when `healthPath` is declared, smoke resolves against `https://${appName}.apps.kilty.io${healthPath}`
+  - otherwise smoke defaults to provider-family hostname reachability only in later PRs
+
+### Retry / Idempotency
+
+- not yet reviewed beyond deterministic target-identity derivation in this metadata-foundation slice
+
+### Partial Publish Observability
+
+- not yet reviewed beyond canonical target-identity derivation in this metadata-foundation slice
+
+### Provisioner Support
+
+- reviewed built-in provisioner reference for the initial slice:
+  - `mini-dev-container-host-manifest`
+- meaning:
+  - host realization owns container and ingress creation on `mini`
+
+### Built-In `release_actions` Support
+
+- not supported in the initial reviewed `mini-dev-container` slice
+
+### Protected/Shared Eligibility
+
+- `protection_class` defaults to `shared_nonprod`
+- the initial reviewed slice is limited to shared-dev metadata extraction and validation for static webapps on `mini`
+
 ## Capability Entry: `cloudflare-pages`
 
 ### Identity

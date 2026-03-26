@@ -46,6 +46,19 @@ Required shape:
 - includes every field required by the provider's canonical identity rule
 - optional shorthand fields such as `id` are allowed only as non-authoritative display metadata unless the provider capability entry explicitly makes them part of canonical identity
 
+Initial reviewed `mini-dev-container` shape:
+
+- canonical identity fields:
+  - `host = "mini"`
+  - `target_group`
+  - `app_name`
+- required normalized derived fields:
+  - `hostname = "${appName}.apps.kilty.io"`
+  - `container_name = "${appName}"`
+  - `shared_dev_target_identity = "mini-dev-container:${targetGroupOrDefault}:${appName}"`
+- `target_group` defaults to the provider's implicit shared-dev group when omitted
+- `app_name` must be a lowercase hostname token and must not carry dots or explicit subdomain overrides
+
 ### `components[*]`
 
 Required keys:
@@ -53,6 +66,11 @@ Required keys:
 - `id`
 - `kind`
 - `target`
+
+Initial reviewed `mini-dev-container` component rule:
+
+- exactly one component
+- `kind = "static-webapp"`
 
 ### `publisher`
 

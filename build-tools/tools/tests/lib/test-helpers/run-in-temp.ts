@@ -13,6 +13,7 @@ import { shSingleQuote } from "./shell-quote";
 import { timeAsync } from "./timing";
 import { ensureToolchainPathsForTempRepo } from "./toolchain-paths";
 import { mktemp } from "./tmp";
+import { ensureSharedNixTarballCacheRepo } from "./xdg-cache";
 import "./worker-init";
 import { ensureZxInitProbedOnce, zxInitPathFromWorkspace } from "./zx-init-probe";
 
@@ -187,13 +188,15 @@ export async function runInTemp<T>(
   }
   const { home, removeOnExit: removeHome } = await resolveTestHome();
   const xdgCacheHome = await stableXdgCacheRoot();
+  const activeXdgCacheHome = process.env.XDG_CACHE_HOME || xdgCacheHome;
+  await ensureSharedNixTarballCacheRepo(activeXdgCacheHome);
   const tempSetupEnv = {
     ...process.env,
     WORKSPACE_ROOT: tmp,
     BUCK_TEST_SRC: tmp,
     REPO_ROOT: process.cwd(),
     HOME: home,
-    XDG_CACHE_HOME: process.env.XDG_CACHE_HOME || xdgCacheHome,
+    XDG_CACHE_HOME: activeXdgCacheHome,
   };
   const goModCacheRoot = await stableGoModCacheRoot();
   const initMode = await initTempRepoFromSeedStore({

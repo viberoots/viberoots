@@ -11,6 +11,7 @@ import {
 import { attrList } from "./cquery/attrs.ts";
 import { cqueryNodes } from "./cquery/index.ts";
 import { deriveTupleForNode } from "./env.ts";
+import { attachSimulatedGoModuleLabels } from "./go-simulated-labels.ts";
 import { cacheHits, cacheMisses, runGoList } from "./golist.ts";
 import { parseArgs, readSimulatedNodes, writeIfChangedJSON } from "./io.ts";
 import { loadPresentAdapters } from "./lang/contract.ts";
@@ -118,7 +119,7 @@ export async function run() {
 
     // If batches carry Go tuples, execute go list to warm cache for labeler
     let goListByBatch: GoListByBatch | undefined = undefined;
-    if (batchesA.length > 0 && (batchesA[0] as any).tuple) {
+    if (!simulate && batchesA.length > 0 && (batchesA[0] as any).tuple) {
       const goListResults: Array<{ batch: Batch; pkgs: any[] }> = [];
       let i = 0;
       const workers = new Array(Math.max(1, Math.min(maxParallel, batchesA.length)))
@@ -144,7 +145,11 @@ export async function run() {
 
     // Authoritative fallback: if requested and no batches formed (e.g., simulate nodes),
     // still run a go list once to populate cache and enable cache reuse tests.
-    if (batchesA.length === 0 && String(process.env.FORCE_AUTHORITATIVE || "") === "1") {
+    if (
+      !simulate &&
+      batchesA.length === 0 &&
+      String(process.env.FORCE_AUTHORITATIVE || "") === "1"
+    ) {
       const first = nodesA.find((n) => isGoNode(n));
       if (first) {
         const tuple = await deriveTupleForNode(first as any);
@@ -155,12 +160,19 @@ export async function run() {
       }
     }
 
-    const enriched = await adapter.attachLabels(
-      Array.from(byName.values()),
-      batchesA as any,
-      cacheDir,
-      goListByBatch,
-    );
+    const enriched =
+      simulate && adapter.name === "go"
+        ? await attachSimulatedGoModuleLabels(
+            Array.from(byName.values()),
+            batchesA as any,
+            cacheDir,
+          )
+        : await adapter.attachLabels(
+            Array.from(byName.values()),
+            batchesA as any,
+            cacheDir,
+            goListByBatch,
+          );
     for (const n of enriched) {
       const cur = byName.get(n.name) || n;
       const labs = new Set([...(cur.labels || []), ...((n.labels as any) || [])]);

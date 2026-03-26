@@ -8,6 +8,14 @@ import type { GoPkg, Tuple } from "./types.ts";
 export let cacheHits = 0;
 export let cacheMisses = 0;
 
+export function recordCacheHit(): void {
+  cacheHits += 1;
+}
+
+export function recordCacheMiss(): void {
+  cacheMisses += 1;
+}
+
 function toHashInput(tuple: Tuple, roots: string[], modRootAbs: string): any {
   const modNorm = modRootAbs.startsWith("/private/var/")
     ? modRootAbs.slice("/private".length)
@@ -62,11 +70,11 @@ export async function runGoList(
   await ensureDir(cacheDir);
   try {
     await fsp.access(cachePath);
-    cacheHits++;
+    recordCacheHit();
     const txt = await fsp.readFile(cachePath, "utf8");
     return parseGoListStream(txt);
   } catch {}
-  cacheMisses++;
+  recordCacheMiss();
   // Ensure module dependencies (including test-only) are available and go.sum is populated
   try {
     await $({ env, stdio: "pipe", cwd: modRootAbs })`${goBin} mod download all`;

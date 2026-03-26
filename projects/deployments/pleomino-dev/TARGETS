@@ -1,0 +1,9 @@
+load("//projects/deployments:defs.bzl", "mini_dev_container_static_webapp_deployment")
+
+mini_dev_container_static_webapp_deployment(
+    name = "deploy",
+    component = "//projects/apps/pleomino:app",
+    app_name = "pleomino",
+    container_port = 3000,
+    health_path = "/healthz",
+)
