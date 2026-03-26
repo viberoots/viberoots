@@ -36,21 +36,21 @@ deployment_target = rule(
     },
 )
 
-def mini_dev_container_static_webapp_deployment(
+def nixos_shared_host_static_webapp_deployment(
         name,
         component,
         app_name,
         container_port,
         health_path = "",
         target_group = "",
-        publisher = "mini-dev-container-static-webapp",
-        provisioner = "mini-dev-container-host-manifest",
+        publisher = "nixos-shared-host-static-webapp",
+        provisioner = "nixos-shared-host-manifest",
         protection_class = "shared_nonprod",
         labels = [],
         visibility = ["PUBLIC"]):
     deployment_target(
         name = name,
-        provider = "mini-dev-container",
+        provider = "nixos-shared-host",
         component = component,
         component_kind = "static-webapp",
         publisher = publisher,
@@ -62,7 +62,7 @@ def mini_dev_container_static_webapp_deployment(
         target_group = target_group,
         labels = labels + [
             "kind:deployment",
-            "deployment:mini-dev-container",
+            "deployment:nixos-shared-host",
             "deployment-component:static-webapp",
         ],
         visibility = visibility,

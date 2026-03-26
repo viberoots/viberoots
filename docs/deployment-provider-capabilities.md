@@ -46,17 +46,17 @@ Normative-source note:
 - Does the provider support protected/shared built-in `release_actions`, and which action types are allowed?
 - Does the provider require package-local executable hooks, or can it stay inside the built-in registry model?
 
-## Capability Entry: `mini-dev-container`
+## Capability Entry: `nixos-shared-host`
 
 ### Identity
 
-- `provider`: `mini-dev-container`
+- `provider`: `nixos-shared-host`
 - canonical target identity fields:
   - `host`
   - `target_group`
   - `app_name`
 - canonical lock-key shape:
-  - `mini-dev-container:<target_group>:<app_name>`
+  - `nixos-shared-host:<target_group>:<app_name>`
 - required normalized derived fields:
   - `hostname = "${appName}.apps.kilty.io"`
   - `container_name = "${appName}"`
@@ -82,7 +82,7 @@ Normative-source note:
 ### Preview Support
 
 - preview support:
-  - not reviewed in the initial `mini-dev-container` slice
+  - not reviewed in the initial `nixos-shared-host` slice
 
 ### Smoke / Release Health
 
@@ -101,18 +101,24 @@ Normative-source note:
 ### Provisioner Support
 
 - reviewed built-in provisioner reference for the initial slice:
-  - `mini-dev-container-host-manifest`
+  - `nixos-shared-host-manifest`
 - meaning:
-  - host realization owns container and ingress creation on `mini`
+  - reviewed deploy/control-plane workflows maintain one authoritative cumulative platform-state artifact for the selected `nixos-shared-host` target
+  - scoped apply may create or update only the named deployment entries in that platform state
+  - authoritative full reconcile may replace the full platform state
+  - explicit removal deletes one named deployment entry without inferring deletion from slice-local omission
+  - host realization consumes only that authoritative platform state and owns container and ingress creation on the target NixOS host
+  - host generation derives one generic `static-app-host` container plus one nginx route per declared app and fails closed on duplicate hostnames or backend identities
+  - the current host-consumer boundary is the NixOS module `build-tools/tools/nix/nixos-shared-host-module.nix`
 
 ### Built-In `release_actions` Support
 
-- not supported in the initial reviewed `mini-dev-container` slice
+- not supported in the initial reviewed `nixos-shared-host` slice
 
 ### Protected/Shared Eligibility
 
 - `protection_class` defaults to `shared_nonprod`
-- the initial reviewed slice is limited to shared-dev metadata extraction and validation for static webapps on `mini`
+- the initial reviewed slice supports shared-dev metadata extraction, authoritative platform-state reconciliation, and deterministic host realization for static webapps on a NixOS host
 
 ## Capability Entry: `cloudflare-pages`
 

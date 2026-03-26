@@ -35,18 +35,18 @@ Completion criteria:
 
 ---
 
-## PR-1: Deployment metadata foundation + `mini-dev-container` static-webapp contract
+## PR-1: Deployment metadata foundation + `nixos-shared-host` static-webapp contract
 
 ### Description
 
 I will establish the smallest reviewed metadata and validation foundation needed to support a real
-provider family without baking policy into ad hoc scripts. This PR lands the `mini-dev-container`
+provider family without baking policy into ad hoc scripts. This PR lands the `nixos-shared-host`
 deployment shape for static webapps, the extraction path from `TARGETS`, and validation rules that
 keep the later control-plane and host realization work deterministic.
 
 ### Scope & Changes
 
-- Add deployment-schema support for the first `mini-dev-container` provider family shape.
+- Add deployment-schema support for the first `nixos-shared-host` provider family shape.
 - Add `static-webapp` as the first in-scope component kind for this provider family.
 - Add reviewed deployment metadata fields required for the first slice:
   - `appName`
@@ -56,7 +56,7 @@ keep the later control-plane and host realization work deterministic.
   - provider family / publisher / provisioner references
   - `protection_class = "shared_nonprod"` defaulting rules for this provider family
 - Add Buck-side extraction for canonical deployment metadata from `TARGETS`.
-- Add provider-target identity normalization for `mini-dev-container`:
+- Add provider-target identity normalization for `nixos-shared-host`:
   - hostname `${appName}.apps.kilty.io`
   - container identity `${appName}`
   - shared-dev target identity normalization suitable for locking and records later
@@ -69,7 +69,7 @@ keep the later control-plane and host realization work deterministic.
 
 ### Tests (in this PR)
 
-- Add schema tests for `mini-dev-container` deployment metadata.
+- Add schema tests for `nixos-shared-host` deployment metadata.
 - Add Buck extraction tests proving canonical metadata is emitted from `TARGETS`.
 - Add validation tests that reject:
   - duplicate `appName`
@@ -83,7 +83,7 @@ keep the later control-plane and host realization work deterministic.
 
 ### Docs (in this PR)
 
-- Update deployment schema and provider-capability docs for `mini-dev-container`.
+- Update deployment schema and provider-capability docs for `nixos-shared-host`.
 - Document the static-webapp-only initial scope and the required metadata contract.
 - Document the normalization rules for hostname and container identity.
 
@@ -94,7 +94,7 @@ keep the later control-plane and host realization work deterministic.
 
 ### Acceptance Criteria
 
-- `TARGETS` can express a valid `mini-dev-container` static-webapp deployment.
+- `TARGETS` can express a valid `nixos-shared-host` static-webapp deployment.
 - Extraction produces deterministic normalized metadata for that deployment.
 - Validation fails closed on hostname collisions and missing required fields.
 - Documentation and tests in this PR describe the same first-slice contract.
@@ -123,24 +123,24 @@ Implement first so the rest of the `mini` work lands on a stable metadata founda
 
 ---
 
-## PR-2: Authoritative platform state + `mini` host realization for shared-dev static targets
+## PR-2: Authoritative platform state + `nixos-shared-host` realization for shared-dev static targets
 
 ### Description
 
-I will implement the authoritative cumulative platform-state model for `mini` and teach the host to
-realize shared-dev static targets declaratively from that state. This PR covers safe partial-slice
-behavior, host-side NixOS container generation, and nginx routing generation, but stops short of the
-artifact publisher.
+I will implement the authoritative cumulative platform-state model for the reviewed
+`nixos-shared-host` provider and teach the host to realize shared-dev static targets declaratively
+from that state. This PR covers safe partial-slice behavior, host-side NixOS container generation,
+and nginx routing generation, but stops short of the artifact publisher.
 
 ### Scope & Changes
 
-- Implement the first authoritative platform-state artifact for `mini` shared-dev deployments.
+- Implement the first authoritative platform-state artifact for `nixos-shared-host` shared-dev deployments.
 - Add control-plane or deploy-side logic to update that platform state from:
   - scoped apply inputs
   - authoritative full reconcile inputs
   - explicit removal requests
 - Add safe merge semantics so slice-local inputs cannot delete out-of-scope apps.
-- Teach `mini` host configuration to consume authoritative platform state and derive:
+- Teach the `nixos-shared-host` configuration to consume authoritative platform state and derive:
   - one declarative NixOS container per app
   - one nginx route per app
   - deterministic backend addressing
@@ -149,7 +149,7 @@ artifact publisher.
   - duplicate backend identity rejection
   - undeclared hostname routing rejection
 - Add a generic static-app-host container shape for the first shared-dev implementation.
-- Add a reviewed host-apply path for updating `mini` declaratively from generated state.
+- Add a reviewed host-apply path for updating a NixOS shared host declaratively from generated state.
 
 ### Tests (in this PR)
 
@@ -168,18 +168,18 @@ artifact publisher.
 
 ### Docs (in this PR)
 
-- Document the authoritative platform-state model for `mini`.
+- Document the authoritative platform-state model for `nixos-shared-host`.
 - Document scoped apply, authoritative full reconcile, and explicit removal semantics.
 - Document the host realization contract for containers, routing, and deterministic backend identity.
 
 ### Verification Commands
 
 - `buck2 test //...`
-- host-generation evaluation command for the `mini` module as introduced in this PR
+- host-generation evaluation command for the `nixos-shared-host` module as introduced in this PR
 
 ### Acceptance Criteria
 
-- `mini` realizes declarative shared-dev host state from one authoritative cumulative input.
+- `nixos-shared-host` realizes declarative shared-dev host state from one authoritative cumulative input.
 - Scoped apply updates are safe with partial repo slices.
 - Host generation is deterministic and fails closed on routing conflicts.
 - Documentation and tests describe the same reconciliation semantics.
@@ -219,7 +219,7 @@ hostname under `*.apps.kilty.io`.
 
 ### Scope & Changes
 
-- Implement the first built-in publisher for `mini-dev-container` static webapps.
+- Implement the first built-in publisher for `nixos-shared-host` static webapps.
 - Define the first `publishContract` for the generic static app-host container:
   - artifact staging path
   - activation path
@@ -252,7 +252,7 @@ hostname under `*.apps.kilty.io`.
 ### Docs (in this PR)
 
 - Document the first complete shared-dev operator flow for static webapps.
-- Document the static-webapp publish contract for `mini-dev-container`.
+- Document the static-webapp publish contract for `nixos-shared-host`.
 - Document smoke expectations and the first failure signatures.
 
 ### Verification Commands
@@ -322,13 +322,13 @@ identity, artifact identity, lifecycle state, and outcome using the repository's
 - Add persistence tests for required deployment-record fields.
 - Add classification tests for `deploy` and `explicit removal`.
 - Add record contract tests proving canonical provider-target identity is preserved for
-  `mini-dev-container`.
+  `nixos-shared-host`.
 - Extend the existing end-to-end `mini` static deploy test to assert durable record contents.
 
 ### Docs (in this PR)
 
 - Document the first implemented deployment-record schema slice and operator-visible meanings.
-- Document how provider-target identity is recorded for `mini-dev-container`.
+- Document how provider-target identity is recorded for `nixos-shared-host`.
 - Document the distinction between lifecycle state and final outcome for the implemented flows.
 
 ### Verification Commands
@@ -375,8 +375,8 @@ reviewed execution boundaries rather than advanced artifact replay.
 ### Scope & Changes
 
 - Introduce the first shared control-plane API and worker skeleton for mutating shared deployments.
-- Require `mini-dev-container` `shared_nonprod` mutation to execute through the shared control plane.
-- Implement lock acquisition on canonical provider-target identity for `mini-dev-container`.
+- Require `nixos-shared-host` `shared_nonprod` mutation to execute through the shared control plane.
+- Implement lock acquisition on canonical provider-target identity for `nixos-shared-host`.
 - Implement the first admission flow for shared-dev `deploy` and `explicit removal`.
 - Freeze an execution snapshot with the deployment metadata and provider-target identity needed for
   the implemented flows.
@@ -397,7 +397,7 @@ reviewed execution boundaries rather than advanced artifact replay.
 
 - Document the first shared-control-plane path for `mini` shared-dev deployments.
 - Document locking behavior and conflict expectations.
-- Document the shared-environment authority rule for `mini-dev-container`.
+- Document the shared-environment authority rule for `nixos-shared-host`.
 
 ### Verification Commands
 
@@ -656,7 +656,7 @@ Pages in the same deployment system rather than only on `mini`.
 - Implement canonical provider-target identity normalization for Cloudflare Pages.
 - Implement the first built-in Cloudflare Pages publisher and smoke runner.
 - Add concrete deployment packages for Pleomino:
-  - `pleomino-dev` on `mini-dev-container` remains the shared-dev path
+  - `pleomino-dev` on `nixos-shared-host` remains the shared-dev path
   - `pleomino-staging` on `cloudflare-pages`
   - `pleomino-prod` on `cloudflare-pages`
 - Add provider-native config generation or validation rules so Cloudflare target identity stays

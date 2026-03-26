@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GraphNode } from "../../lib/graph.ts";
-import { extractMiniDeployments } from "../../deployments/contract.ts";
+import { extractNixosSharedHostDeployments } from "../../deployments/contract.ts";
 
 function staticWebappComponent(label: string): GraphNode {
   return {
@@ -14,11 +14,11 @@ function staticWebappComponent(label: string): GraphNode {
 function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
   return {
     name: "//projects/deployments/pleomino-dev:deploy",
-    provider: "mini-dev-container",
+    provider: "nixos-shared-host",
     component: "//projects/apps/pleomino:app",
     component_kind: "static-webapp",
-    publisher: "mini-dev-container-static-webapp",
-    provisioner: "mini-dev-container-host-manifest",
+    publisher: "nixos-shared-host-static-webapp",
+    provisioner: "nixos-shared-host-manifest",
     protection_class: "shared_nonprod",
     app_name: "pleomino",
     container_port: 3000,
@@ -38,12 +38,12 @@ test("validation rejects duplicate app_name collisions", () => {
       component: "//projects/apps/other:app",
     }),
   ];
-  const { errors } = extractMiniDeployments(nodes);
+  const { errors } = extractNixosSharedHostDeployments(nodes);
   assert.ok(errors.some((entry) => entry.includes('duplicate app_name "pleomino"')));
 });
 
 test("validation rejects missing container_port", () => {
-  const { errors } = extractMiniDeployments([
+  const { errors } = extractNixosSharedHostDeployments([
     staticWebappComponent("//projects/apps/pleomino:app"),
     deploymentNode({ container_port: 0 }),
   ]);
@@ -51,19 +51,17 @@ test("validation rejects missing container_port", () => {
 });
 
 test("validation rejects invalid target_group", () => {
-  const { errors } = extractMiniDeployments([
+  const { errors } = extractNixosSharedHostDeployments([
     staticWebappComponent("//projects/apps/pleomino:app"),
     deploymentNode({ target_group: "group.a" }),
   ]);
   assert.ok(errors.some((entry) => entry.includes("target_group must be lowercase")));
 });
 
-test("validation rejects unsupported component kinds for mini-dev-container", () => {
-  const { errors } = extractMiniDeployments([
+test("validation rejects unsupported component kinds for nixos-shared-host", () => {
+  const { errors } = extractNixosSharedHostDeployments([
     staticWebappComponent("//projects/apps/pleomino:app"),
     deploymentNode({ component_kind: "http-service" }),
   ]);
-  assert.ok(
-    errors.some((entry) => entry.includes("unsupported mini-dev-container component_kind")),
-  );
+  assert.ok(errors.some((entry) => entry.includes("unsupported nixos-shared-host component_kind")));
 });

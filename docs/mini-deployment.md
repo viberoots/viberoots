@@ -3,6 +3,10 @@
 This document defines a concrete design for using `mini` as the shared development deployment
 destination for application environments served under `*.apps.kilty.io`.
 
+The reviewed provider family is `nixos-shared-host`. In this document, `mini` is the current
+concrete NixOS host instance for that provider shape, not a machine-specific requirement baked into
+the provider contract itself.
+
 This document is intentionally narrower than the general deployment model. It specializes the
 shared deployment design for one provider family:
 
@@ -169,7 +173,7 @@ Public-hostname rule:
 
 This provider family should be treated as a distinct deployment type, for example:
 
-- `mini-dev-container`
+- `nixos-shared-host`
 
 The exact enum or provider-family naming can follow the repo's deployment schema, but the semantics
 should be:
@@ -331,6 +335,19 @@ Operational meaning:
 
 This preserves declarative host realization while keeping partial-repo operation fail-closed.
 
+Current repo implementation for this model:
+
+- deployment extraction still produces `{ version: 1, deployments: [...] }`
+- `build-tools/tools/deployments/nixos-shared-host-platform-state.ts` is the reviewed reconciler for:
+  - `--mode scoped-apply`
+  - `--mode full-reconcile`
+  - `--mode remove`
+- `build-tools/tools/deployments/nixos-shared-host-apply.ts` consumes only the authoritative cumulative
+  platform-state artifact and renders the host-facing container plus nginx config document
+- `build-tools/tools/nix/nixos-shared-host-module.nix` is the host-side NixOS consumer that reads the same
+  authoritative platform-state artifact and derives `containers` plus `services.nginx.virtualHosts`
+- both documents are deterministic JSON so they stay easy to diff, test, and audit
+
 ## Host Realization On `mini`
 
 `mini` should consume the authoritative platform state and derive:
@@ -408,7 +425,7 @@ This separation matters because:
 The lifecycle for the first deployment of a new shared-dev app should be:
 
 1. developer adds deployment metadata in the repo
-2. Buck/deploy extraction identifies the deployment as a `mini-dev-container` target
+2. Buck/deploy extraction identifies the deployment as a `nixos-shared-host` target
 3. deploy control plane generates or updates the host manifest for `mini`
 4. provisioner applies the new host state on `mini`
    - container is created
@@ -547,6 +564,11 @@ Requirements:
 - nginx generation must have a stable backend target
 - the deploy record should preserve enough routing identity to diagnose failures
 
+Current repo implementation uses a deterministic backend identity of `${containerName}:${containerPort}`
+and a deterministic backend address of `http://${containerName}.mini.internal:${containerPort}` inside
+the generated host document. That keeps host realization stable and lets conflict checks reject
+duplicate backend identities before anything is applied.
+
 ## Health And Smoke
 
 Shared-dev deployments should support a lightweight default health contract.
@@ -619,7 +641,7 @@ For another provider family later, the same `appName` may instead map to:
 
 The cleanest implementation path is:
 
-1. add a deployment/provider capability for `mini-dev-container`
+1. add a deployment/provider capability for `nixos-shared-host`
 2. require `appName` and `containerPort`
 3. extend deployment extraction to emit a generated shared-dev manifest
 4. teach `mini`'s host config to consume that manifest and generate:
@@ -627,6 +649,20 @@ The cleanest implementation path is:
    - nginx virtual hosts
 5. implement a provisioner that updates/applies host state on `mini`
 6. implement a publisher that deploys the resolved app artifact into the target container
+
+The repo now has the first four of those steps in place for `mini`:
+
+1. deployment/provider capability and metadata extraction
+2. authoritative cumulative platform-state reconciliation
+3. deterministic host-document generation for containers plus nginx routes
+4. reviewed explicit removal semantics that do not infer deletion from slice-local omission
+
+For PR-2 specifically, the host realization boundary is now split cleanly:
+
+- TypeScript owns authoritative deployment extraction, reconciliation, and host-manifest rendering
+- NixOS owns host-side consumption of the authoritative platform state through
+  `build-tools/tools/nix/nixos-shared-host-module.nix`
+- both layers reject duplicate hostname and backend conflicts before host realization proceeds
 
 This preserves the repo's core design principles:
 

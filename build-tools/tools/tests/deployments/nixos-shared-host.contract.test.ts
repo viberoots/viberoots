@@ -2,7 +2,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GraphNode } from "../../lib/graph.ts";
-import { deriveMiniProviderTarget, extractMiniDeployments } from "../../deployments/contract.ts";
+import {
+  deriveNixosSharedHostProviderTarget,
+  extractNixosSharedHostDeployments,
+} from "../../deployments/contract.ts";
 
 function staticWebappComponent(label: string): GraphNode {
   return {
@@ -11,28 +14,28 @@ function staticWebappComponent(label: string): GraphNode {
   };
 }
 
-test("deriveMiniProviderTarget normalizes hostname, container name, and shared identity", () => {
-  const target = deriveMiniProviderTarget({ appName: "pleomino" });
+test("deriveNixosSharedHostProviderTarget normalizes hostname, container name, and shared identity", () => {
+  const target = deriveNixosSharedHostProviderTarget({ appName: "pleomino" });
   assert.deepEqual(target, {
-    host: "mini",
+    host: "nixos-shared-host",
     appName: "pleomino",
     targetGroup: "default",
     hostname: "pleomino.apps.kilty.io",
     containerName: "pleomino",
-    sharedDevTargetIdentity: "mini-dev-container:default:pleomino",
+    sharedDevTargetIdentity: "nixos-shared-host:default:pleomino",
   });
 });
 
-test("extractMiniDeployments defaults protection_class to shared_nonprod", () => {
+test("extractNixosSharedHostDeployments defaults protection_class to shared_nonprod", () => {
   const nodes: GraphNode[] = [
     staticWebappComponent("//projects/apps/pleomino:app"),
     {
       name: "//projects/deployments/pleomino-dev:deploy",
-      provider: "mini-dev-container",
+      provider: "nixos-shared-host",
       component: "//projects/apps/pleomino:app",
       component_kind: "static-webapp",
-      publisher: "mini-dev-container-static-webapp",
-      provisioner: "mini-dev-container-host-manifest",
+      publisher: "nixos-shared-host-static-webapp",
+      provisioner: "nixos-shared-host-manifest",
       protection_class: "",
       app_name: "pleomino",
       container_port: 3000,
@@ -41,7 +44,7 @@ test("extractMiniDeployments defaults protection_class to shared_nonprod", () =>
     },
   ];
 
-  const { deployments, errors } = extractMiniDeployments(nodes);
+  const { deployments, errors } = extractNixosSharedHostDeployments(nodes);
   assert.deepEqual(errors, []);
   assert.equal(deployments.length, 1);
   assert.equal(deployments[0]?.protectionClass, "shared_nonprod");

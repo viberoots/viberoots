@@ -1,6 +1,6 @@
-load("//projects/deployments:defs.bzl", "mini_dev_container_static_webapp_deployment")
+load("//projects/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")
 
-mini_dev_container_static_webapp_deployment(
+nixos_shared_host_static_webapp_deployment(
     name = "deploy",
     component = "//projects/apps/pleomino:app",
     app_name = "pleomino",

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { nodesFromCqueryJson } from "../../buck/exporter/cquery/nodes.ts";
-import { extractMiniDeployments } from "../../deployments/contract.ts";
+import { extractNixosSharedHostDeployments } from "../../deployments/contract.ts";
 
 const ATTRS = [
   "name",
@@ -20,7 +20,7 @@ const ATTRS = [
   "labels",
 ];
 
-test("mini deployment extraction reads canonical metadata from TARGETS via cquery", async () => {
+test("nixos-shared-host deployment extraction reads canonical metadata from TARGETS via cquery", async () => {
   const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
   const query = "set(//projects/deployments/pleomino-dev:deploy //projects/apps/pleomino:app)";
   const cquery = await $({
@@ -33,7 +33,7 @@ test("mini deployment extraction reads canonical metadata from TARGETS via cquer
     },
   })`buck2 --isolation-dir deployment-cquery cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
   const merged = JSON.parse(String(cquery.stdout || "")) as Record<string, any>;
-  const { deployments, errors } = extractMiniDeployments(nodesFromCqueryJson(merged));
+  const { deployments, errors } = extractNixosSharedHostDeployments(nodesFromCqueryJson(merged));
   assert.deepEqual(errors, []);
   assert.equal(deployments.length, 1);
   assert.equal(deployments[0]?.label, "//projects/deployments/pleomino-dev:deploy");
@@ -43,6 +43,6 @@ test("mini deployment extraction reads canonical metadata from TARGETS via cquer
   assert.equal(deployments[0]?.providerTarget.hostname, "pleomino.apps.kilty.io");
   assert.equal(
     deployments[0]?.providerTarget.sharedDevTargetIdentity,
-    "mini-dev-container:default:pleomino",
+    "nixos-shared-host:default:pleomino",
   );
 });

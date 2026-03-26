@@ -3,14 +3,14 @@ import path from "node:path";
 import type { GraphNode } from "../lib/graph.ts";
 import { normalizeTargetLabel, packagePathFromLabel } from "../lib/labels.ts";
 
-export const MINI_PROVIDER = "mini-dev-container";
+export const NIXOS_SHARED_HOST_PROVIDER = "nixos-shared-host";
 export const STATIC_WEBAPP_COMPONENT = "static-webapp";
 const APP_NAME_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const TARGET_GROUP_RE = APP_NAME_RE;
 const SHARED_NONPROD = "shared_nonprod";
 
-export type MiniProviderTarget = {
-  host: "mini";
+export type NixosSharedHostProviderTarget = {
+  host: "nixos-shared-host";
   appName: string;
   targetGroup: string;
   hostname: string;
@@ -18,11 +18,11 @@ export type MiniProviderTarget = {
   sharedDevTargetIdentity: string;
 };
 
-export type MiniDeployment = {
+export type NixosSharedHostDeployment = {
   deploymentId: string;
   label: string;
   name: string;
-  provider: typeof MINI_PROVIDER;
+  provider: typeof NIXOS_SHARED_HOST_PROVIDER;
   protectionClass: string;
   component: {
     kind: typeof STATIC_WEBAPP_COMPONENT;
@@ -36,7 +36,7 @@ export type MiniDeployment = {
     healthPath?: string;
     targetGroup?: string;
   };
-  providerTarget: MiniProviderTarget;
+  providerTarget: NixosSharedHostProviderTarget;
 };
 
 function readString(node: GraphNode, key: string): string {
@@ -71,24 +71,24 @@ function deploymentError(label: string, message: string): string {
   return `${normalizeTargetLabel(label)}: ${message}`;
 }
 
-export function deriveMiniProviderTarget(input: {
+export function deriveNixosSharedHostProviderTarget(input: {
   appName: string;
   targetGroup?: string;
-}): MiniProviderTarget {
+}): NixosSharedHostProviderTarget {
   const appName = input.appName.trim();
   const targetGroup = normalizeTargetGroup(input.targetGroup || "");
   return {
-    host: "mini",
+    host: "nixos-shared-host",
     appName,
     targetGroup,
     hostname: `${appName}.apps.kilty.io`,
     containerName: appName,
-    sharedDevTargetIdentity: `${MINI_PROVIDER}:${targetGroup}:${appName}`,
+    sharedDevTargetIdentity: `${NIXOS_SHARED_HOST_PROVIDER}:${targetGroup}:${appName}`,
   };
 }
 
-export function extractMiniDeployments(nodes: GraphNode[]): {
-  deployments: MiniDeployment[];
+export function extractNixosSharedHostDeployments(nodes: GraphNode[]): {
+  deployments: NixosSharedHostDeployment[];
   errors: string[];
 } {
   const errors: string[] = [];
@@ -98,9 +98,9 @@ export function extractMiniDeployments(nodes: GraphNode[]): {
     if (label) components.set(label, node);
   }
 
-  const deployments: MiniDeployment[] = [];
+  const deployments: NixosSharedHostDeployment[] = [];
   for (const node of nodes) {
-    if (readString(node, "provider") !== MINI_PROVIDER) continue;
+    if (readString(node, "provider") !== NIXOS_SHARED_HOST_PROVIDER) continue;
     const label = normalizeTargetLabel(String(node.name || ""));
     const componentTarget = normalizeTargetLabel(readString(node, "component"));
     const componentKind = readString(node, "component_kind");
@@ -120,7 +120,7 @@ export function extractMiniDeployments(nodes: GraphNode[]): {
       errors.push(
         deploymentError(
           label,
-          `unsupported mini-dev-container component_kind "${componentKind || "<empty>"}"`,
+          `unsupported nixos-shared-host component_kind "${componentKind || "<empty>"}"`,
         ),
       );
       continue;
@@ -150,7 +150,7 @@ export function extractMiniDeployments(nodes: GraphNode[]): {
       errors.push(
         deploymentError(
           label,
-          `mini-dev-container deployments must use protection_class "${SHARED_NONPROD}"`,
+          `nixos-shared-host deployments must use protection_class "${SHARED_NONPROD}"`,
         ),
       );
     }
@@ -168,12 +168,12 @@ export function extractMiniDeployments(nodes: GraphNode[]): {
     }
     if (errors.some((entry) => entry.startsWith(`${label}:`))) continue;
 
-    const providerTarget = deriveMiniProviderTarget({ appName, targetGroup });
+    const providerTarget = deriveNixosSharedHostProviderTarget({ appName, targetGroup });
     deployments.push({
       deploymentId: packageBaseName(label),
       label,
       name: targetName(label),
-      provider: MINI_PROVIDER,
+      provider: NIXOS_SHARED_HOST_PROVIDER,
       protectionClass,
       component: {
         kind: STATIC_WEBAPP_COMPONENT,
