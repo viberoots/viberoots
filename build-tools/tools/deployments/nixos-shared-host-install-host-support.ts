@@ -1,0 +1,76 @@
+#!/usr/bin/env zx-wrapper
+import fs from "node:fs";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
+import { configEntryContainsManagedAnchor } from "./nixos-shared-host-install-config-entry.ts";
+import {
+  hostPath,
+  readInstallManifest,
+  type NixosSharedHostConfigTopology,
+  type NixosSharedHostInstallManifestV1,
+  type NixosSharedHostWiringState,
+} from "./nixos-shared-host-install-contract.ts";
+
+export async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fsp.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function readText(filePath: string): Promise<string> {
+  return await fsp.readFile(filePath, "utf8");
+}
+
+export async function ensureWritable(targetPath: string): Promise<void> {
+  let current = path.dirname(targetPath);
+  for (;;) {
+    if (await pathExists(current)) {
+      await fsp.access(current, fs.constants.W_OK);
+      return;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  throw new Error(`host preflight failed: no writable parent exists for ${targetPath}`);
+}
+
+export async function detectConfigTopology(
+  hostRoot: string,
+  configRoot: string,
+): Promise<NixosSharedHostConfigTopology> {
+  if (await pathExists(hostPath(hostRoot, path.posix.join(configRoot, "flake.nix"))))
+    return "flake";
+  if (await pathExists(hostPath(hostRoot, path.posix.join(configRoot, "configuration.nix"))))
+    return "plain";
+  throw new Error(
+    `${configRoot}: unable to detect host config topology (expected flake.nix or configuration.nix)`,
+  );
+}
+
+export async function detectWiringState(
+  hostRoot: string,
+  manifest: NixosSharedHostInstallManifestV1,
+): Promise<NixosSharedHostWiringState> {
+  if (!manifest.configInjection?.path) return "unknown";
+  const entryPath = hostPath(hostRoot, manifest.configInjection.path);
+  if (!(await pathExists(entryPath))) return "missing";
+  return configEntryContainsManagedAnchor(
+    await readText(entryPath),
+    manifest.managedEntryPoints.anchorPath,
+  )
+    ? "wired"
+    : "missing";
+}
+
+export async function readManifestIfPresent(
+  hostRoot: string,
+  manifestPath: string,
+): Promise<NixosSharedHostInstallManifestV1 | null> {
+  const physicalPath = hostPath(hostRoot, manifestPath);
+  if (!(await pathExists(physicalPath))) return null;
+  return await readInstallManifest(physicalPath);
+}
