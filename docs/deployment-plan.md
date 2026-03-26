@@ -460,6 +460,12 @@ Nix configuration cannot be updated through a reviewed managed path.
 ### Tests (in this PR)
 
 - Add install-manifest schema tests for current and backward-compatible manifest versions.
+- Keep all install/uninstall tests non-destructive to the real testhost system:
+  - host-mutation tests must run against isolated fixture roots or temp-repo host trees
+  - live-system paths such as `/etc/nixos`, `/var/lib`, system users, nginx state, and running host
+    services must not be mutated by ordinary test execution
+  - any test that needs real-host validation must default to dry-run or explicit opt-in execution
+    and must fail closed when the required isolation boundary is not present
 - Add fixture-based install tests for:
   - fresh host config root
   - host with preexisting nginx config
