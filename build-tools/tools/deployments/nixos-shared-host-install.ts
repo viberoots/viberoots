@@ -13,12 +13,14 @@ import {
   type NixosSharedHostInstallMode,
 } from "./nixos-shared-host-install-contract.ts";
 import {
-  type DevMachineInput,
-  installNixosSharedHostDevMachine,
+  type ClientInput,
+  installNixosSharedHostClient,
+  listNixosSharedHostClients,
+  uninstallNixosSharedHostClient,
 } from "./nixos-shared-host-install-dev-machine.ts";
 import {
-  maybePromptDevMachineInstallInput,
-  maybePromptHostInstallInput,
+  maybePromptClientInstallInput,
+  maybePromptServerInstallInput,
 } from "./nixos-shared-host-install-prompt.ts";
 import { readStructuredInstallInputFromStdin } from "./nixos-shared-host-install-stdin.ts";
 import {
@@ -28,7 +30,7 @@ import {
 } from "./nixos-shared-host-install-host.ts";
 
 type HostInstallInput = {
-  hostRoot: string;
+  serverRoot: string;
   configRoot: string;
   configEntryPath: string;
   managedRoot: string;
@@ -43,9 +45,7 @@ type HostInstallInput = {
 function requireSubcommands(): [string, string] {
   const [scope = "", action = ""] = getPositionals();
   if (!scope || !action) {
-    throw new Error(
-      "usage: nixos-shared-host-install <host|dev-machine> <install|uninstall|status>",
-    );
+    throw new Error("usage: nixos-shared-host-install <server|client> <install|uninstall|status>");
   }
   return [scope, action];
 }
@@ -56,19 +56,19 @@ async function repoFingerprint(repoRoot: string): Promise<string> {
   return head || `workspace:${repoRoot}`;
 }
 
-async function runHostCommand(action: string, repoRoot: string) {
+async function runServerCommand(action: string, repoRoot: string) {
   const fromOptionalFlag = (name: string) => {
     const value = getFlagStr(name, "").trim();
     return value ? value : undefined;
   };
   const stdinInput: Partial<HostInstallInput> =
     action === "install"
-      ? await readStructuredInstallInputFromStdin<HostInstallInput>("host install")
+      ? await readStructuredInstallInputFromStdin<HostInstallInput>("server install")
       : {};
   const fromBool = (name: string, fallback = false) =>
     hasFlag(name) ? getFlagBool(name) : fallback;
-  const mergedHostInput = mergeFlatPromptObjects(action === "install" ? stdinInput : undefined, {
-    hostRoot: fromOptionalFlag("host-root"),
+  const mergedServerInput = mergeFlatPromptObjects(action === "install" ? stdinInput : undefined, {
+    serverRoot: fromOptionalFlag("server-root"),
     configRoot: fromOptionalFlag("config-root"),
     configEntryPath: fromOptionalFlag("config-entry-path"),
     managedRoot: fromOptionalFlag("managed-root"),
@@ -81,8 +81,10 @@ async function runHostCommand(action: string, repoRoot: string) {
     installMode: fromOptionalFlag("install-mode") as NixosSharedHostInstallMode | undefined,
   });
   const promptInput =
-    action === "install" ? await maybePromptHostInstallInput(mergedHostInput) : mergedHostInput;
-  const hostRoot = path.resolve(String(promptInput.hostRoot || "/"));
+    action === "install"
+      ? await maybePromptServerInstallInput(mergedServerInput)
+      : mergedServerInput;
+  const hostRoot = path.resolve(String(promptInput.serverRoot || "/"));
   const configRoot = String(promptInput.configRoot || "");
   if (action === "install" && !configRoot) throw new Error("missing required --config-root");
   const managedRoot =
@@ -93,7 +95,11 @@ async function runHostCommand(action: string, repoRoot: string) {
   ).trim();
   if (action === "install") {
     const installMode = String(promptInput.installMode || "") as NixosSharedHostInstallMode;
-    if (installMode !== "emit-only" && installMode !== "managed-dropin") {
+    if (
+      installMode !== "emit-only" &&
+      installMode !== "managed-manual-wire" &&
+      installMode !== "managed-dropin"
+    ) {
       throw new Error(`unsupported --install-mode "${installMode}"`);
     }
     const topologyValue = String(promptInput.configTopology || "").trim();
@@ -138,11 +144,11 @@ async function runHostCommand(action: string, repoRoot: string) {
     console.log(JSON.stringify(await statusNixosSharedHost({ hostRoot, manifestPath }), null, 2));
     return;
   }
-  throw new Error(`unsupported host action "${action}"`);
+  throw new Error(`unsupported server action "${action}"`);
 }
 
-async function runDevMachineInstall(repoRoot: string) {
-  const stdinInput = await readStructuredInstallInputFromStdin<DevMachineInput>("dev-machine");
+async function runClientInstall(repoRoot: string) {
+  const stdinInput = await readStructuredInstallInputFromStdin<ClientInput>("client");
   const fromOptionalFlag = (name: string) => {
     const value = getFlagStr(name, "").trim();
     return value ? value : undefined;
@@ -156,12 +162,12 @@ async function runDevMachineInstall(repoRoot: string) {
     remoteRecordsRoot: fromOptionalFlag("remote-records-root"),
     sshMode: fromOptionalFlag("ssh-mode"),
   });
-  const promptInput = await maybePromptDevMachineInstallInput(repoRoot, mergedInstallInput);
-  const result = await installNixosSharedHostDevMachine({
+  const promptInput = await maybePromptClientInstallInput(repoRoot, mergedInstallInput);
+  const result = await installNixosSharedHostClient({
     outputRoot: path.resolve(
       getFlagStr(
         "output-root",
-        path.join(repoRoot, ".local", "deployments", "nixos-shared-host", "dev-machines"),
+        path.join(repoRoot, ".local", "deployments", "nixos-shared-host", "clients"),
       ),
     ),
     toolFingerprint: await repoFingerprint(repoRoot),
@@ -179,11 +185,46 @@ async function runDevMachineInstall(repoRoot: string) {
   console.log(JSON.stringify(result, null, 2));
 }
 
+function clientOutputRoot(repoRoot: string): string {
+  return path.resolve(
+    getFlagStr(
+      "output-root",
+      path.join(repoRoot, ".local", "deployments", "nixos-shared-host", "clients"),
+    ),
+  );
+}
+
+async function runClientCommand(action: string, repoRoot: string) {
+  if (action === "install") return await runClientInstall(repoRoot);
+  const outputRoot = clientOutputRoot(repoRoot);
+  if (action === "list") {
+    console.log(JSON.stringify(await listNixosSharedHostClients({ outputRoot }), null, 2));
+    return;
+  }
+  if (action === "uninstall") {
+    const profileName = getFlagStr("profile", "").trim() || undefined;
+    console.log(
+      JSON.stringify(
+        await uninstallNixosSharedHostClient({
+          outputRoot,
+          profileName,
+          all: hasFlag("all"),
+          dryRun: getFlagBool("dry-run"),
+        }),
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+  throw new Error(`unsupported client action "${action}"`);
+}
+
 async function main() {
   const repoRoot = await findRepoRoot(process.cwd());
   const [scope, action] = requireSubcommands();
-  if (scope === "host") return await runHostCommand(action, repoRoot);
-  if (scope === "dev-machine" && action === "install") return await runDevMachineInstall(repoRoot);
+  if (scope === "server") return await runServerCommand(action, repoRoot);
+  if (scope === "client") return await runClientCommand(action, repoRoot);
   throw new Error(`unsupported command "${scope} ${action}"`);
 }
 

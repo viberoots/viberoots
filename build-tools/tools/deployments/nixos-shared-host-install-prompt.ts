@@ -1,5 +1,4 @@
 #!/usr/bin/env zx-wrapper
-import path from "node:path";
 import {
   completeJsonPromptObject,
   mergeFlatPromptObjects,
@@ -20,8 +19,8 @@ type PromptRunner = (
   rules: JsonPromptRuleSet,
 ) => Promise<JsonPromptObject>;
 
-export type HostInstallPromptInput = {
-  hostRoot?: string;
+export type ServerInstallPromptInput = {
+  serverRoot?: string;
   configRoot?: string;
   configEntryPath?: string;
   managedRoot?: string;
@@ -32,7 +31,7 @@ export type HostInstallPromptInput = {
   installMode?: NixosSharedHostInstallMode | "";
 };
 
-export type DevMachinePromptInput = {
+export type ClientPromptInput = {
   profileName?: string;
   destination?: string;
   remoteRepoPath?: string;
@@ -42,8 +41,8 @@ export type DevMachinePromptInput = {
   sshMode?: string;
 };
 
-function defaultRemoteRepoPath(repoRoot: string): string {
-  return `/srv/${path.basename(repoRoot)}`;
+function defaultRemoteRepoPath(_repoRoot: string): string {
+  return "/srv/common";
 }
 
 async function maybePromptInput<T extends Record<string, unknown>>(
@@ -62,14 +61,14 @@ async function maybePromptInput<T extends Record<string, unknown>>(
   )) as T;
 }
 
-function hostPromptRules(): JsonPromptRuleSet {
+function serverPromptRules(): JsonPromptRuleSet {
   return {
     order: [
       "configRoot",
       "installMode",
       "configEntryPath",
       "configTopology",
-      "hostRoot",
+      "serverRoot",
       "managedRoot",
       "statePath",
       "runtimeRoot",
@@ -77,10 +76,10 @@ function hostPromptRules(): JsonPromptRuleSet {
     ],
     labels: {
       configRoot: "Config root",
-      installMode: "Install mode (managed-dropin or emit-only)",
+      installMode: "Install mode (managed-manual-wire, managed-dropin, or emit-only)",
       configEntryPath: "Config entry path",
       configTopology: "Config topology (plain or flake)",
-      hostRoot: "Host root",
+      serverRoot: "Server root",
       managedRoot: "Managed root",
       statePath: "State path",
       runtimeRoot: "Runtime root",
@@ -89,9 +88,13 @@ function hostPromptRules(): JsonPromptRuleSet {
     required: ["configRoot", "installMode"],
     defaults: {
       configRoot: "/etc/nixos",
-      installMode: "managed-dropin",
+      installMode: "managed-manual-wire",
     },
     requiredWhen: [
+      {
+        if: { installMode: "managed-manual-wire" },
+        require: ["configEntryPath"],
+      },
       {
         if: { installMode: "managed-dropin" },
         require: ["configEntryPath"],
@@ -103,7 +106,7 @@ function hostPromptRules(): JsonPromptRuleSet {
   };
 }
 
-function devMachinePromptRules(repoRoot: string): JsonPromptRuleSet {
+function clientPromptRules(repoRoot: string): JsonPromptRuleSet {
   return {
     order: [
       "profileName",
@@ -146,17 +149,17 @@ function devMachinePromptRules(repoRoot: string): JsonPromptRuleSet {
   };
 }
 
-export async function maybePromptHostInstallInput(
-  input: HostInstallPromptInput,
+export async function maybePromptServerInstallInput(
+  input: ServerInstallPromptInput,
   opts?: { interactive?: boolean; runner?: PromptRunner },
-): Promise<HostInstallPromptInput> {
-  return await maybePromptInput(input, hostPromptRules(), opts);
+): Promise<ServerInstallPromptInput> {
+  return await maybePromptInput(input, serverPromptRules(), opts);
 }
 
-export async function maybePromptDevMachineInstallInput(
+export async function maybePromptClientInstallInput(
   repoRoot: string,
-  input: DevMachinePromptInput,
+  input: ClientPromptInput,
   opts?: { interactive?: boolean; runner?: PromptRunner },
-): Promise<DevMachinePromptInput> {
-  return await maybePromptInput(input, devMachinePromptRules(repoRoot), opts);
+): Promise<ClientPromptInput> {
+  return await maybePromptInput(input, clientPromptRules(repoRoot), opts);
 }

@@ -9,15 +9,20 @@ import {
 test("nixos-shared-host install manifest parses current schema", () => {
   const manifest = createInstallManifestV1({
     toolFingerprint: "abc123",
-    installMode: "managed-dropin",
+    installMode: "managed-manual-wire",
     configTopology: "plain",
     configRoot: "/etc/nixos",
+    configEntryPath: "/etc/nixos/configuration.nix",
     managedRoot: "/etc/nixos/bucknix/nixos-shared-host",
     statePath: "/var/lib/bucknix/nixos-shared-host/platform-state.json",
     runtimeRoot: "/var/lib/bucknix/nixos-shared-host/runtime",
     recordsRoot: "/var/lib/bucknix/nixos-shared-host/records",
   });
-  assert.equal(parseInstallManifest(manifest).schemaVersion, "nixos-shared-host-install@1");
+  const parsed = parseInstallManifest(manifest);
+  assert.equal(parsed.schemaVersion, "nixos-shared-host-install@1");
+  assert.equal(parsed.installMode, "managed-manual-wire");
+  assert.equal(parsed.configEntryPath, "/etc/nixos/configuration.nix");
+  assert.equal(parsed.configInjection, undefined);
 });
 
 test("nixos-shared-host install manifest migrates reviewed legacy v0 schema", () => {

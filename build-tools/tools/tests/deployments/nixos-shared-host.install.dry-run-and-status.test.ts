@@ -6,20 +6,20 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { createNixosSharedHostInstallFixture } from "./nixos-shared-host.install.fixture.ts";
 
-test("nixos-shared-host host install dry-run is deterministic and non-mutating", async () => {
+test("nixos-shared-host server install dry-run is deterministic and non-mutating", async () => {
   await runInTemp("nixos-shared-host-host-install-dry-run", async (tmp, $) => {
     const fixture = await createNixosSharedHostInstallFixture({ root: tmp, topology: "plain" });
     const first = JSON.parse(
       String(
         (
-          await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts host install --host-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin --dry-run`
+          await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin --dry-run`
         ).stdout,
       ),
     );
     const second = JSON.parse(
       String(
         (
-          await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts host install --host-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin --dry-run`
+          await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin --dry-run`
         ).stdout,
       ),
     );
@@ -32,17 +32,17 @@ test("nixos-shared-host host install dry-run is deterministic and non-mutating",
   });
 });
 
-test("nixos-shared-host host status reports partially drifted installs", async () => {
+test("nixos-shared-host server status reports partially drifted installs", async () => {
   await runInTemp("nixos-shared-host-host-status", async (tmp, $) => {
     const fixture = await createNixosSharedHostInstallFixture({ root: tmp, topology: "plain" });
-    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts host install --host-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin`;
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin`;
     await fsp.writeFile(
       path.join(fixture.hostRoot, "etc/nixos/configuration.nix"),
       "{ ... }:\n{\n  imports = [\n    ./hardware-configuration.nix\n  ];\n}\n",
       "utf8",
     );
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts host status --host-root ${fixture.hostRoot} --config-root /etc/nixos`;
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server status --server-root ${fixture.hostRoot} --config-root /etc/nixos`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.managed, true);
     assert.equal(summary.wiringState, "missing");
@@ -52,14 +52,32 @@ test("nixos-shared-host host status reports partially drifted installs", async (
   });
 });
 
-test("nixos-shared-host host status reports uninstalled hosts and uninstall dry-run is non-destructive", async () => {
+test("nixos-shared-host server status can inspect manual-wire installs after operator wiring", async () => {
+  await runInTemp("nixos-shared-host-host-status-manual-wire", async (tmp, $) => {
+    const fixture = await createNixosSharedHostInstallFixture({ root: tmp, topology: "plain" });
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-manual-wire`;
+    await fsp.writeFile(
+      path.join(fixture.hostRoot, "etc/nixos/configuration.nix"),
+      "{ ... }:\n{\n  imports = [\n    ./hardware-configuration.nix\n    /etc/nixos/bucknix/nixos-shared-host/default.nix\n  ];\n}\n",
+      "utf8",
+    );
+    const result =
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server status --server-root ${fixture.hostRoot} --config-root /etc/nixos`;
+    const summary = JSON.parse(String(result.stdout));
+    assert.equal(summary.managed, true);
+    assert.equal(summary.manifest.installMode, "managed-manual-wire");
+    assert.equal(summary.wiringState, "wired");
+  });
+});
+
+test("nixos-shared-host server status reports uninstalled servers and uninstall dry-run is non-destructive", async () => {
   await runInTemp("nixos-shared-host-host-uninstalled", async (tmp, $) => {
     const fixture = await createNixosSharedHostInstallFixture({ root: tmp, topology: "plain" });
     const status =
-      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts host status --host-root ${fixture.hostRoot} --config-root /etc/nixos`;
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server status --server-root ${fixture.hostRoot} --config-root /etc/nixos`;
     assert.equal(JSON.parse(String(status.stdout)).managed, false);
-    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts host install --host-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin`;
-    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts host uninstall --host-root ${fixture.hostRoot} --config-root /etc/nixos --dry-run`;
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin`;
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server uninstall --server-root ${fixture.hostRoot} --config-root /etc/nixos --dry-run`;
     await fsp.access(
       path.join(fixture.hostRoot, "etc/nixos/bucknix/nixos-shared-host/install-manifest.json"),
     );

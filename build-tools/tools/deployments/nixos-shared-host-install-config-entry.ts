@@ -58,7 +58,8 @@ export function renderConfigEntryInstruction(opts: {
 
 export function configEntryContainsManagedAnchor(source: string, anchorPath: string): boolean {
   const managed = source.includes(START_MARKER) && source.includes(END_MARKER);
-  return managed && source.includes(anchorPath);
+  if (managed && source.includes(anchorPath)) return true;
+  return source.includes(anchorLiteralPath(anchorPath));
 }
 
 export function installManagedConfigEntry(opts: {

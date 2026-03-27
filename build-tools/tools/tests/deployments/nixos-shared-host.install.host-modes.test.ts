@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { createNixosSharedHostInstallFixture } from "./nixos-shared-host.install.fixture.ts";
 
-test("nixos-shared-host host install supports managed-dropin on plain /etc/nixos roots", async () => {
+test("nixos-shared-host server install supports managed-dropin on plain /etc/nixos roots", async () => {
   await runInTemp("nixos-shared-host-host-install-plain", async (tmp, $) => {
     const fixture = await createNixosSharedHostInstallFixture({
       root: tmp,
@@ -15,7 +15,7 @@ test("nixos-shared-host host install supports managed-dropin on plain /etc/nixos
       withNginxConfig: true,
     });
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts host install --host-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin`;
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.managed, true);
     assert.equal(summary.manifest.installMode, "managed-dropin");
@@ -37,7 +37,7 @@ test("nixos-shared-host host install supports managed-dropin on plain /etc/nixos
   });
 });
 
-test("nixos-shared-host host install supports emit-only on flake roots without mutating runtime state", async () => {
+test("nixos-shared-host server install supports emit-only on flake roots without mutating runtime state", async () => {
   await runInTemp("nixos-shared-host-host-install-flake", async (tmp, $) => {
     const fixture = await createNixosSharedHostInstallFixture({
       root: tmp,
@@ -45,7 +45,7 @@ test("nixos-shared-host host install supports emit-only on flake roots without m
       withExtraImports: true,
     });
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts host install --host-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/flake.nix --install-mode emit-only`;
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/flake.nix --install-mode emit-only`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.manifest.configTopology, "flake");
     assert.equal(summary.manifest.installMode, "emit-only");
@@ -74,7 +74,39 @@ test("nixos-shared-host host install supports emit-only on flake roots without m
   });
 });
 
-test("nixos-shared-host host install accepts stdin JSON and flags override stdin values", async () => {
+test("nixos-shared-host server install supports managed-manual-wire without editing config entry", async () => {
+  await runInTemp("nixos-shared-host-host-install-manual-wire", async (tmp, $) => {
+    const fixture = await createNixosSharedHostInstallFixture({
+      root: tmp,
+      topology: "plain",
+      withExtraImports: true,
+    });
+    const configBefore = await fsp.readFile(
+      path.join(fixture.hostRoot, "etc/nixos/configuration.nix"),
+      "utf8",
+    );
+    const result =
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-manual-wire`;
+    const summary = JSON.parse(String(result.stdout));
+    assert.equal(summary.manifest.installMode, "managed-manual-wire");
+    assert.equal(summary.wiringState, "missing");
+    assert.equal(summary.manifest.configEntryPath, "/etc/nixos/configuration.nix");
+    assert.equal(summary.manifest.configInjection, undefined);
+    assert.match(String(summary.configInstruction || ""), /imports = \[ .*default\.nix .*]/);
+    await fsp.access(
+      path.join(fixture.hostRoot, "etc/nixos/bucknix/nixos-shared-host/install-manifest.json"),
+    );
+    await fsp.access(
+      path.join(fixture.hostRoot, "var/lib/bucknix/nixos-shared-host/platform-state.json"),
+    );
+    assert.equal(
+      await fsp.readFile(path.join(fixture.hostRoot, "etc/nixos/configuration.nix"), "utf8"),
+      configBefore,
+    );
+  });
+});
+
+test("nixos-shared-host server install accepts stdin JSON and flags override stdin values", async () => {
   await runInTemp("nixos-shared-host-host-install-stdin", async (tmp, $) => {
     const fixture = await createNixosSharedHostInstallFixture({
       root: tmp,
@@ -82,7 +114,7 @@ test("nixos-shared-host host install accepts stdin JSON and flags override stdin
       withExtraImports: true,
     });
     const payload = JSON.stringify({
-      hostRoot: fixture.hostRoot,
+      serverRoot: fixture.hostRoot,
       configRoot: "/etc/nixos",
       configEntryPath: "/etc/nixos/configuration.nix",
       installMode: "emit-only",
@@ -90,7 +122,7 @@ test("nixos-shared-host host install accepts stdin JSON and flags override stdin
     });
     const result = await $({
       input: payload,
-    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts host install --install-mode managed-dropin`;
+    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --install-mode managed-dropin`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.manifest.installMode, "managed-dropin");
     assert.equal(summary.manifest.statePath, "/var/lib/bucknix/custom/platform-state.json");
@@ -98,7 +130,7 @@ test("nixos-shared-host host install accepts stdin JSON and flags override stdin
   });
 });
 
-test("nixos-shared-host host install ignores empty stdin", async () => {
+test("nixos-shared-host server install ignores empty stdin", async () => {
   await runInTemp("nixos-shared-host-host-install-empty-stdin", async (tmp, $) => {
     const fixture = await createNixosSharedHostInstallFixture({
       root: tmp,
@@ -107,9 +139,9 @@ test("nixos-shared-host host install ignores empty stdin", async () => {
     });
     const result = await $({
       input: "",
-    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts host install --host-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin`;
+    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix`;
     const summary = JSON.parse(String(result.stdout));
-    assert.equal(summary.manifest.installMode, "managed-dropin");
+    assert.equal(summary.manifest.installMode, "managed-manual-wire");
     await fsp.access(
       path.join(fixture.hostRoot, "var/lib/bucknix/nixos-shared-host/platform-state.json"),
     );

@@ -68,6 +68,7 @@ export async function installNixosSharedHost(opts: {
     configTopology: opts.configTopology || (await detectConfigTopology(opts.hostRoot, configRoot)),
     configRoot,
     configEntryPath: opts.configEntryPath,
+    configInjected: opts.installMode === "managed-dropin",
     managedRoot,
     statePath: opts.statePath || defaultStatePath(),
     runtimeRoot: opts.runtimeRoot || defaultRuntimeRoot(),
@@ -118,7 +119,7 @@ export async function installNixosSharedHost(opts: {
     [manifest.managedEntryPoints.modulePath, managedModuleSource],
     [manifest.managedEntryPoints.anchorPath, managedAnchorSource],
     [manifestPath, JSON.stringify(manifest, null, 2) + "\n"],
-    ...(opts.installMode === "managed-dropin"
+    ...(opts.installMode === "managed-dropin" || opts.installMode === "managed-manual-wire"
       ? [[manifest.statePath, createEmptyPlatformStateJson()]]
       : []),
   ] as Array<[string, string]>;
@@ -144,6 +145,22 @@ export async function installNixosSharedHost(opts: {
         anchorPath: manifest.managedEntryPoints.anchorPath,
       });
       await fsp.writeFile(configEntryPath, updated, "utf8");
+    } else if (opts.installMode === "managed-manual-wire") {
+      if (existing) {
+        throw new Error(
+          "managed-manual-wire refuses to reuse an existing managed install; use status or uninstall",
+        );
+      }
+      for (const logicalDir of manifest.managedDirectories) {
+        await fsp.mkdir(hostPath(opts.hostRoot, logicalDir), { recursive: true });
+      }
+      for (const [logicalPath, content] of writes) {
+        const physical = hostPath(opts.hostRoot, logicalPath);
+        await fsp.mkdir(path.dirname(physical), { recursive: true });
+        if (logicalPath === manifestPath) await writeJsonDocument(physical, manifest);
+        else if (logicalPath === manifest.statePath && (await pathExists(physical))) continue;
+        else await fsp.writeFile(physical, content, "utf8");
+      }
     } else if (existing) {
       throw new Error(
         "emit-only refuses to reuse an existing managed install; use status or uninstall",

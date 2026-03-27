@@ -5,11 +5,11 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("nixos-shared-host dev-machine install accepts required parameters by flags", async () => {
-  await runInTemp("nixos-shared-host-dev-machine-flags", async (tmp, $) => {
+test("nixos-shared-host client install accepts required parameters by flags", async () => {
+  await runInTemp("nixos-shared-host-client-flags", async (tmp, $) => {
     const outputRoot = path.join(tmp, "profiles");
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts dev-machine install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/bucknix --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime --remote-records-root /var/lib/bucknix/nixos-shared-host/records --ssh-mode ssh`;
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/bucknix --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime --remote-records-root /var/lib/bucknix/nixos-shared-host/records --ssh-mode ssh`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.manifest.profileName, "mini");
     assert.equal(summary.manifest.destination, "mini");
@@ -17,8 +17,8 @@ test("nixos-shared-host dev-machine install accepts required parameters by flags
   });
 });
 
-test("nixos-shared-host dev-machine install accepts required parameters by stdin and applies declarative defaults when stdin is partial", async () => {
-  await runInTemp("nixos-shared-host-dev-machine-stdin", async (tmp, $) => {
+test("nixos-shared-host client install accepts required parameters by stdin and applies declarative defaults when stdin is partial", async () => {
+  await runInTemp("nixos-shared-host-client-stdin", async (tmp, $) => {
     const outputRoot = path.join(tmp, "profiles");
     const payload = JSON.stringify({
       profileName: "mini",
@@ -31,11 +31,11 @@ test("nixos-shared-host dev-machine install accepts required parameters by stdin
     });
     const ok = await $({
       input: payload,
-    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts dev-machine install --output-root ${outputRoot}`;
+    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot}`;
     assert.equal(JSON.parse(String(ok.stdout)).manifest.destination, "mini");
     const partial = await $({
       input: '{"profileName":"mini"}',
-    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts dev-machine install --output-root ${outputRoot}`.nothrow();
+    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot}`.nothrow();
     assert.equal(partial.exitCode, 0);
     const partialSummary = JSON.parse(String(partial.stdout));
     assert.equal(partialSummary.manifest.profileName, "mini");
@@ -44,14 +44,80 @@ test("nixos-shared-host dev-machine install accepts required parameters by stdin
   });
 });
 
-test("nixos-shared-host dev-machine install ignores empty stdin", async () => {
-  await runInTemp("nixos-shared-host-dev-machine-empty-stdin", async (tmp, $) => {
+test("nixos-shared-host client install ignores empty stdin", async () => {
+  await runInTemp("nixos-shared-host-client-empty-stdin", async (tmp, $) => {
     const outputRoot = path.join(tmp, "profiles");
     const result = await $({
       input: "",
-    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts dev-machine install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/bucknix --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime --remote-records-root /var/lib/bucknix/nixos-shared-host/records --ssh-mode ssh`;
+    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/bucknix --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime --remote-records-root /var/lib/bucknix/nixos-shared-host/records --ssh-mode ssh`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.manifest.profileName, "mini");
     await fsp.access(path.join(outputRoot, "mini.json"));
+  });
+});
+
+test("nixos-shared-host client list reports installed profiles", async () => {
+  await runInTemp("nixos-shared-host-client-list", async (tmp, $) => {
+    const outputRoot = path.join(tmp, "profiles");
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/bucknix --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime --remote-records-root /var/lib/bucknix/nixos-shared-host/records --ssh-mode ssh`;
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile staging --destination staging --remote-repo-path /srv/bucknix --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime --remote-records-root /var/lib/bucknix/nixos-shared-host/records --ssh-mode ssh`;
+    const result =
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client list --output-root ${outputRoot}`;
+    const summary = JSON.parse(String(result.stdout));
+    assert.deepEqual(
+      summary.profiles.map(
+        (entry: { manifest: { profileName: string } }) => entry.manifest.profileName,
+      ),
+      ["mini", "staging"],
+    );
+  });
+});
+
+test("nixos-shared-host client uninstall removes exactly one profile when --profile is provided", async () => {
+  await runInTemp("nixos-shared-host-client-uninstall-profile", async (tmp, $) => {
+    const outputRoot = path.join(tmp, "profiles");
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/bucknix --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime --remote-records-root /var/lib/bucknix/nixos-shared-host/records --ssh-mode ssh`;
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile staging --destination staging --remote-repo-path /srv/bucknix --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime --remote-records-root /var/lib/bucknix/nixos-shared-host/records --ssh-mode ssh`;
+    const uninstall =
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client uninstall --output-root ${outputRoot} --profile mini`;
+    const summary = JSON.parse(String(uninstall.stdout));
+    assert.deepEqual(summary.removedProfiles, ["mini"]);
+    await assert.rejects(() => fsp.access(path.join(outputRoot, "mini.json")));
+    await fsp.access(path.join(outputRoot, "staging.json"));
+  });
+});
+
+test("nixos-shared-host client uninstall removes all profiles when --all is provided", async () => {
+  await runInTemp("nixos-shared-host-client-uninstall-all", async (tmp, $) => {
+    const outputRoot = path.join(tmp, "profiles");
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/bucknix --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime --remote-records-root /var/lib/bucknix/nixos-shared-host/records --ssh-mode ssh`;
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile staging --destination staging --remote-repo-path /srv/bucknix --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime --remote-records-root /var/lib/bucknix/nixos-shared-host/records --ssh-mode ssh`;
+    const uninstall =
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client uninstall --output-root ${outputRoot} --all`;
+    const summary = JSON.parse(String(uninstall.stdout));
+    assert.deepEqual(summary.removedProfiles, ["mini", "staging"]);
+    const list =
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client list --output-root ${outputRoot}`;
+    assert.deepEqual(JSON.parse(String(list.stdout)).profiles, []);
+  });
+});
+
+test("nixos-shared-host client uninstall fails closed without --profile or --all", async () => {
+  await runInTemp("nixos-shared-host-client-uninstall-missing-selector", async (tmp, $) => {
+    const outputRoot = path.join(tmp, "profiles");
+    const result =
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client uninstall --output-root ${outputRoot}`.nothrow();
+    assert.notEqual(result.exitCode, 0);
+    assert.match(String(result.stderr), /requires --profile <name> or --all/);
+  });
+});
+
+test("nixos-shared-host client uninstall fails closed when --profile and --all are combined", async () => {
+  await runInTemp("nixos-shared-host-client-uninstall-conflicting-selectors", async (tmp, $) => {
+    const outputRoot = path.join(tmp, "profiles");
+    const result =
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client uninstall --output-root ${outputRoot} --profile mini --all`.nothrow();
+    assert.notEqual(result.exitCode, 0);
+    assert.match(String(result.stderr), /either --profile or --all, not both/);
   });
 });

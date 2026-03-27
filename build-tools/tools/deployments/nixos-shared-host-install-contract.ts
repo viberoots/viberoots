@@ -5,10 +5,10 @@ import { emptyNixosSharedHostPlatformState } from "./nixos-shared-host-platform.
 
 export const NIXOS_SHARED_HOST_INSTALL_SCHEMA_V1 = "nixos-shared-host-install@1";
 export const NIXOS_SHARED_HOST_INSTALL_SCHEMA_V0 = "nixos-shared-host-install@0";
-export const NIXOS_SHARED_HOST_DEV_MACHINE_SCHEMA_V1 = "nixos-shared-host-dev-machine@1";
+export const NIXOS_SHARED_HOST_CLIENT_SCHEMA_V1 = "nixos-shared-host-client@1";
 export const NIXOS_SHARED_HOST_INSTALL_TOOL = "nixos-shared-host-install";
 
-export type NixosSharedHostInstallMode = "emit-only" | "managed-dropin";
+export type NixosSharedHostInstallMode = "emit-only" | "managed-manual-wire" | "managed-dropin";
 export type NixosSharedHostConfigTopology = "flake" | "plain";
 export type NixosSharedHostWiringState = "wired" | "missing" | "unknown";
 
@@ -49,8 +49,8 @@ type NixosSharedHostInstallManifestV0 = {
   managedPaths?: string[];
 };
 
-export type NixosSharedHostDevMachineManifest = {
-  schemaVersion: typeof NIXOS_SHARED_HOST_DEV_MACHINE_SCHEMA_V1;
+export type NixosSharedHostClientManifest = {
+  schemaVersion: typeof NIXOS_SHARED_HOST_CLIENT_SCHEMA_V1;
   tool: typeof NIXOS_SHARED_HOST_INSTALL_TOOL;
   toolFingerprint: string;
   profileName: string;
@@ -137,6 +137,7 @@ export function createInstallManifestV1(input: {
   configTopology: NixosSharedHostConfigTopology;
   configRoot: string;
   configEntryPath?: string;
+  configInjected?: boolean;
   managedRoot: string;
   statePath: string;
   runtimeRoot: string;
@@ -181,7 +182,7 @@ export function createInstallManifestV1(input: {
       modulePath: modulePathFor(managedRoot),
       anchorPath: anchorPathFor(managedRoot),
     },
-    ...(input.configEntryPath
+    ...(input.configEntryPath && input.configInjected
       ? { configInjection: { path: normalizeHostLogicalPath(input.configEntryPath) } }
       : {}),
   };

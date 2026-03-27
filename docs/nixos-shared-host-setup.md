@@ -24,14 +24,89 @@ contract.
 
 The installer writes only repo-managed assets:
 
-- a host install manifest
+- a server install manifest
 - a managed module file
 - a managed anchor file
 - optionally the shared-host platform state and runtime/records directories
 
 The installer does not try to regex-edit arbitrary host config files.
 
+## What "Managed" Means
+
+In this guide, "managed" does not mean "the whole host belongs to the repo."
+It means only this:
+
+- the installer created a specific file or directory for the shared-host setup
+- that file or directory is recorded in the install manifest
+- status and uninstall are allowed to act on that recorded path later
+
+That includes:
+
+- the install manifest
+- the managed module file
+- the managed anchor file
+- the dedicated managed block inserted into the chosen config entry file when
+  `managed-dropin` is used
+- the shared-host state, runtime, and records paths that the manifest claims
+
+Plain-language ownership:
+
+- "installer-managed" means "this setup tool created it and may update or
+  remove it later"
+- "operator-managed" means "a human or some other system owns it, so this
+  installer must not guess about it"
+
+The most important operator-managed path is usually the authoritative NixOS
+config entry file such as `/etc/nixos/configuration.nix`. That file often
+contains hand-edited host configuration unrelated to this deployment system.
+
+`managed` matters because status and uninstall only trust manifest-owned
+assets. If something is outside that set, the installer treats it as
+operator-managed and leaves it alone.
+
+## Terminology
+
+- `managed` is the umbrella concept: a path is tracked and owned by the
+  installer
+- `managed-manual-wire` is the default install mode
+- `managed-dropin` is the auto-wiring install mode
+- `emit-only` is the non-mutating install mode
+
+So "managed" and "`managed-dropin`" are not synonyms. A host can have
+installer-managed assets because it was installed in `managed-manual-wire` or
+`managed-dropin` mode, but "`managed`" itself is the broader lifecycle
+concept.
+
 ## Install Modes
+
+### `managed-manual-wire`
+
+Use this when you want the installer to create and track the dedicated
+shared-host assets, but you do not want it to edit the authoritative NixOS
+config entry file.
+
+This mode writes:
+
+- the managed manifest
+- the managed module file
+- the managed anchor file
+- `platform-state.json`
+- runtime and records directories
+
+This mode does not edit `--config-entry-path`.
+
+Instead, it emits the exact config instruction you should add manually.
+
+Tradeoffs:
+
+- this is the safest fully managed default when the authoritative NixOS config
+  file is still treated as operator-managed
+- status and uninstall work for the dedicated shared-host assets because those
+  assets are still installer-managed
+- status can inspect whether the operator later wired the anchor when
+  `--config-entry-path` is known
+- uninstall removes installer-managed assets but does not try to remove a
+  manual config import from the authoritative config file
 
 ### `emit-only`
 
@@ -41,6 +116,17 @@ and config-entry instruction without mutating the host tree.
 
 This mode does not write the managed manifest, managed module files, runtime
 directories, or `platform-state.json`.
+
+Tradeoffs:
+
+- safest choice when you want full manual review before changing host config
+- works well when another team or another process owns the authoritative host
+  config file
+- the installer does not create any managed assets at all in this mode
+- `server status` and `server uninstall` have no managed install to inspect or
+  remove, because nothing was written
+- best thought of as "generate the exact config snippet and instructions, then
+  stop"
 
 ### `managed-dropin`
 
@@ -57,52 +143,83 @@ This mode writes:
 - `platform-state.json`
 - runtime and records directories
 
-## Host Install
+Tradeoffs:
 
-Run on the NixOS host itself:
+- fastest path to a fully managed shared host because install, status, and
+  uninstall all operate on the same manifest-owned assets
+- gives the installer a reviewed, explicit place to own the shared-host wiring
+- easiest mode to inspect and cleanly uninstall later
+- requires an authoritative config entry file that the installer can safely
+  update with its dedicated managed block
+- not appropriate when you do not want the repo to own that wiring step
+
+So the practical split is now:
+
+- `emit-only`
+  - write nothing
+- `managed-manual-wire`
+  - manage dedicated shared-host assets, but leave the authoritative config
+    file for manual review
+- `managed-dropin`
+  - manage dedicated shared-host assets and also write the reviewed managed
+    block into the authoritative config file
+
+The authoritative Nix config entry file is still the main place where
+user-edited content is expected and conflicts are most likely.
+
+The other managed paths are intended to belong entirely to this build and
+deployment system. The installer still fails closed if those paths already
+contain conflicting unmanaged content, but they are designed to be dedicated
+installer-managed setup paths rather than mixed-use operator files.
+
+## Server Install
+
+Run on the NixOS server itself:
 
 ```bash
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
-  host install \
+  server install \
+  --server-root / \
   --config-root /etc/nixos \
   --config-entry-path /etc/nixos/configuration.nix \
-  --install-mode managed-dropin
+  --install-mode managed-manual-wire
 ```
 
-When you run `host install` in an interactive terminal, the installer asks for
+When you run `server install` in an interactive terminal, the installer asks for
 missing setup values. Required fields get defaults only when the default is
 part of the reviewed contract:
 
 - `configRoot`
   - defaults to `/etc/nixos`
 - `installMode`
-  - defaults to `managed-dropin`
+  - defaults to `managed-manual-wire`
 - `configEntryPath`
-  - becomes required when `installMode=managed-dropin`
+  - becomes required when `installMode=managed-manual-wire` or
+    `installMode=managed-dropin`
   - defaults to `<configRoot>/configuration.nix`
 
-Optional host fields do not get defaults, so you can leave them blank to keep
+Optional server fields do not get defaults, so you can leave them blank to keep
 them out of the final install input.
 
-Structured stdin JSON is also supported for `host install`:
+Structured stdin JSON is also supported for `server install`:
 
 ```bash
 printf '%s\n' '{
   "configRoot": "/etc/nixos",
   "configEntryPath": "/etc/nixos/configuration.nix",
-  "installMode": "managed-dropin",
+  "installMode": "managed-manual-wire",
   "statePath": "/var/lib/bucknix/nixos-shared-host/platform-state.json",
   "runtimeRoot": "/var/lib/bucknix/nixos-shared-host/runtime",
   "recordsRoot": "/var/lib/bucknix/nixos-shared-host/records"
 }' | direnv exec . build-tools/tools/bin/nixos-shared-host-install \
-  host install
+  server install
 ```
 
-For `host install`, explicit flags still take precedence over stdin JSON.
+For `server install`, explicit flags still take precedence over stdin JSON.
 
 Useful optional flags:
 
-- `--host-root /fixture/root`
+- `--server-root /fixture/root`
   - for tests and isolated dry-run fixture trees
 - `--config-topology plain|flake`
   - only needed when reviewed detection is not enough
@@ -112,12 +229,13 @@ Useful optional flags:
 - `--records-root /var/lib/bucknix/nixos-shared-host/records`
 - `--dry-run`
 
-For `managed-dropin`, `--config-entry-path` is required.
+For `managed-manual-wire` and `managed-dropin`, `--config-entry-path` is
+required.
 
-`host status` and `host uninstall` remain flag-driven; structured stdin JSON is
-currently supported for `host install` and `dev-machine install`.
+`server status` and `server uninstall` remain flag-driven; structured stdin JSON
+is currently supported for `server install` and `client install`.
 
-Host preflight checks fail closed on:
+Server preflight checks fail closed on:
 
 - non-NixOS hosts
 - missing required Nix experimental features
@@ -127,17 +245,18 @@ Host preflight checks fail closed on:
 
 ## Status / Inspect
 
-Inspect whether a host is managed:
+Inspect whether a server is managed:
 
 ```bash
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
-  host status \
+  server status \
+  --server-root / \
   --config-root /etc/nixos
 ```
 
 The status output reports:
 
-- whether the host is managed
+- whether the server is managed
 - the manifest schema version and tool fingerprint
 - the managed paths that still exist
 - wiring state:
@@ -153,7 +272,8 @@ Uninstall reads the versioned manifest and removes only manifest-owned assets:
 
 ```bash
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
-  host uninstall \
+  server uninstall \
+  --server-root / \
   --config-root /etc/nixos
 ```
 
@@ -164,13 +284,13 @@ Uninstall guarantees:
 - already-missing managed paths are tolerated
 - reviewed legacy manifest versions are migrated or rejected explicitly
 
-## Dev-Machine Install
+## Client Install
 
-The dev-machine installer records a local profile for targeting a real
+The client installer records a local profile for targeting a real
 `nixos-shared-host`.
 
-When you run `dev-machine install` in an interactive terminal, the installer
-asks for missing setup values. All dev-machine manifest fields are required,
+When you run `client install` in an interactive terminal, the installer asks
+for missing setup values. All client manifest fields are required,
 and only those required fields get defaults:
 
 - `profileName`
@@ -178,7 +298,7 @@ and only those required fields get defaults:
 - `destination`
   - defaults to the current `profileName`
 - `remoteRepoPath`
-  - defaults to `/srv/<repo-name>`
+  - defaults to `/srv/common`
 - `remoteStatePath`
   - defaults to `/var/lib/bucknix/nixos-shared-host/platform-state.json`
 - `remoteRuntimeRoot`
@@ -192,10 +312,10 @@ Flag-based input:
 
 ```bash
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
-  dev-machine install \
+  client install \
   --profile mini \
   --destination mini \
-  --remote-repo-path /srv/bucknix-fresh \
+  --remote-repo-path /srv/common \
   --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json \
   --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime \
   --remote-records-root /var/lib/bucknix/nixos-shared-host/records \
@@ -208,24 +328,53 @@ Stdin-based input:
 printf '%s\n' '{
   "profileName": "mini",
   "destination": "mini",
-  "remoteRepoPath": "/srv/bucknix-fresh",
+  "remoteRepoPath": "/srv/common",
   "remoteStatePath": "/var/lib/bucknix/nixos-shared-host/platform-state.json",
   "remoteRuntimeRoot": "/var/lib/bucknix/nixos-shared-host/runtime",
   "remoteRecordsRoot": "/var/lib/bucknix/nixos-shared-host/records",
   "sshMode": "ssh"
 }' | direnv exec . build-tools/tools/bin/nixos-shared-host-install \
-  dev-machine install
+  client install
 ```
 
 The generated profile lives under:
 
-- `.local/deployments/nixos-shared-host/dev-machines/`
+- `.local/deployments/nixos-shared-host/clients/`
 
 Override with `--output-root` when needed.
 
+Client lifecycle commands:
+
+- list installed client profiles:
+
+```bash
+direnv exec . build-tools/tools/bin/nixos-shared-host-install client list
+```
+
+- remove one client profile explicitly:
+
+```bash
+direnv exec . build-tools/tools/bin/nixos-shared-host-install \
+  client uninstall \
+  --profile mini
+```
+
+- remove all client profiles explicitly:
+
+```bash
+direnv exec . build-tools/tools/bin/nixos-shared-host-install \
+  client uninstall \
+  --all
+```
+
+`client uninstall` fails closed unless you provide exactly one selector:
+
+- `--profile <name>` to remove one profile
+- `--all` to remove every installed client profile under `--output-root`
+
 ## Managed Manifest Contract
 
-Current host manifest schema:
+Current server manifest schema:
 
 - `nixos-shared-host-install@1`
 
@@ -249,7 +398,7 @@ Reviewed legacy compatibility:
 - `nixos-shared-host-install@0` migrates to the current schema
 - unknown versions fail closed with explicit guidance
 
-## Wiring The Host Config
+## Wiring The Server Config
 
 The installer creates a dedicated managed anchor file under the managed root.
 
@@ -257,17 +406,20 @@ Example managed root:
 
 - `/etc/nixos/bucknix/nixos-shared-host`
 
+For `managed-manual-wire`, the installer leaves `--config-entry-path` alone and
+returns the exact instruction you should add manually.
+
 For `managed-dropin`, the installer wires that anchor into the explicit
 `--config-entry-path` by inserting a dedicated managed block. If the file does
 not match a reviewed `imports = [ ... ]` or `modules = [ ... ]` topology, the
 installer fails closed instead of guessing.
 
-For `emit-only`, the command returns the exact instruction you should add to the
-authoritative config entry, but it does not modify the file.
+For `emit-only`, the command returns the same exact instruction, but it does
+not create any managed assets on disk.
 
 ## Deploying After Install
 
-Once the host is installed and its authoritative config imports the managed
+Once the server is installed and its authoritative config imports the managed
 anchor, the normal deploy flow remains:
 
 ```bash
@@ -278,7 +430,7 @@ direnv exec . build-tools/tools/bin/deploy \
   --records-root /var/lib/bucknix/nixos-shared-host/records
 ```
 
-Then apply host config as usual:
+Then apply server config as usual:
 
 ```bash
 sudo nixos-rebuild switch

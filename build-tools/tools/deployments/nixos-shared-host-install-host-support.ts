@@ -55,8 +55,9 @@ export async function detectWiringState(
   hostRoot: string,
   manifest: NixosSharedHostInstallManifestV1,
 ): Promise<NixosSharedHostWiringState> {
-  if (!manifest.configInjection?.path) return "unknown";
-  const entryPath = hostPath(hostRoot, manifest.configInjection.path);
+  const logicalEntryPath = manifest.configInjection?.path || manifest.configEntryPath;
+  if (!logicalEntryPath) return "unknown";
+  const entryPath = hostPath(hostRoot, logicalEntryPath);
   if (!(await pathExists(entryPath))) return "missing";
   return configEntryContainsManagedAnchor(
     await readText(entryPath),
