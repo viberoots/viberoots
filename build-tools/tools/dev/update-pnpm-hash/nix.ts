@@ -54,7 +54,7 @@ export async function buildStore(
   attrPath: string,
   flakeRef: string,
   activity?: ManagedCommandActivity,
-): Promise<{ ok: boolean; output: string }> {
+): Promise<{ ok: boolean; output: string; outPath?: string }> {
   const gcCfg = gcWaitConfig();
   const gcPids = await waitForNoActiveNixGc({
     timeoutMs: gcCfg.timeoutMs,
@@ -71,7 +71,7 @@ export async function buildStore(
   const timeoutSec = resolvedFetchTimeoutSec();
   const res = await runManagedCommand({
     command: "nix",
-    args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: false, maxJobs, cores }),
+    args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores }),
     cwd: process.cwd(),
     env: envWithFetchTimeout(timeoutSec),
     timeoutMs: timeoutSec * 1000,
@@ -86,7 +86,13 @@ export async function buildStore(
         `\nupdate-pnpm-hash: timed out building ${attrPath} after ${timeoutSec}s (descendants terminated)`,
     };
   }
-  return { ok: res.ok, output };
+  const outPath =
+    String(res.stdout || "")
+      .trim()
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .pop() || undefined;
+  return { ok: res.ok, output, outPath };
 }
 
 export async function buildUnfixedAndHash(

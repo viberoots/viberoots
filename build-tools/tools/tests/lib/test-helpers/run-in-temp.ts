@@ -23,6 +23,7 @@ import {
 
 let cachedDevEnvExport: Promise<string> | null = null;
 let cachedPinnedNixpkgsPath: Promise<string> | null = null;
+let cachedUnifiedPnpmStorePath: Promise<string> | null = null;
 let envMutationQueue: Promise<void> = Promise.resolve();
 type EnvKeys = "WORKSPACE_ROOT" | "BUCK_TEST_SRC";
 
@@ -156,6 +157,38 @@ async function unifiedPnpmStoreFromRepoRoot(repoRoot: string): Promise<string> {
   } catch {
     return "";
   }
+}
+
+async function ensureUnifiedPnpmStoreOncePerWorker($: any): Promise<string> {
+  if (cachedUnifiedPnpmStorePath) return await cachedUnifiedPnpmStorePath;
+  cachedUnifiedPnpmStorePath = (async () => {
+    const repoRoot = process.cwd();
+    const existing = await unifiedPnpmStoreFromRepoRoot(repoRoot);
+    if (existing) return existing;
+    const out = await $({
+      cwd: repoRoot,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+      env: {
+        ...process.env,
+        IN_NIX_SHELL: "1",
+      },
+    })`zx-wrapper build-tools/tools/dev/require-unified-pnpm-store.ts`;
+    if ((out as any).exitCode !== 0) {
+      throw new Error("runInTemp: failed to build unified pnpm store for temp-repo tests");
+    }
+    const built = String((out as any).stdout || "")
+      .trim()
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .pop();
+    if (built) return built;
+    const resolved = await unifiedPnpmStoreFromRepoRoot(repoRoot);
+    if (resolved) return resolved;
+    throw new Error("runInTemp: unified pnpm store did not produce a usable store path");
+  })();
+  return await cachedUnifiedPnpmStorePath;
 }
 
 let stableTestHomeOnce: Promise<string> | null = null;
@@ -355,14 +388,14 @@ export async function runInTemp<T>(
   }
   exportEnv.DIRENV_LOG_FORMAT = "";
   exportEnv.ZX_INIT = zxInitPathFromWorkspace();
-  try {
-    const unified = await unifiedPnpmStoreFromRepoRoot(process.cwd());
-    // Only opt into prefetched stores when explicitly requested; some temp importers
-    // introduce new deps that are not present in the unified store and must be fetched.
-    if (unified && exportEnv.NIX_USE_PREFETCHED_PNPM_STORE === "1") {
-      exportEnv.LOCAL_PNPM_STORE = exportEnv.LOCAL_PNPM_STORE || unified;
-    }
-  } catch {}
+  const wantsUnifiedPnpmStore =
+    String(process.env.NIX_PNPM_ALLOW_GENERATE || "").trim() === "1" ||
+    String(process.env.NIX_USE_PREFETCHED_PNPM_STORE || "").trim() === "1";
+  if (wantsUnifiedPnpmStore) {
+    const unified = await ensureUnifiedPnpmStoreOncePerWorker($);
+    exportEnv.LOCAL_PNPM_STORE = exportEnv.LOCAL_PNPM_STORE || unified;
+    exportEnv.NIX_USE_PREFETCHED_PNPM_STORE = "1";
+  }
 
   const nodeOpts = ["--experimental-strip-types", `--import ${exportEnv.ZX_INIT}`];
   exportEnv.NODE_OPTIONS = [nodeOpts.join(" "), exportEnv.NODE_OPTIONS || ""]

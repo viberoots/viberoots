@@ -4,6 +4,7 @@ import { updateNodeModulesHashesJson } from "./hashes-json.ts";
 import { withHeartbeat } from "./heartbeat.ts";
 import { generateImporterLockfile, makeFilteredFlakeRef } from "./lockfile.ts";
 import { buildStore, buildUnfixedAndHash, extractHash } from "./nix.ts";
+import { syncBuiltPnpmStoreIntoLocalPrefetch } from "./prefetched-store.ts";
 import { type PnpmStoreVerifiedMarker, writeVerifiedMarker } from "./verified-marker.ts";
 
 const newActivity = (): ManagedCommandActivity => ({
@@ -55,6 +56,9 @@ export async function handleNonDefaultImporter(opts: {
       { activity: verifyExistingActivity },
     );
     if (verifyExisting.ok) {
+      if (verifyExisting.outPath) {
+        await syncBuiltPnpmStoreIntoLocalPrefetch(verifyExisting.outPath);
+      }
       if (opts.existingLockHash) {
         await writeVerifiedMarker(opts.markerPath, {
           importer: opts.importer,
@@ -191,6 +195,9 @@ export async function handleNonDefaultImporter(opts: {
           process.exit(1);
           return true;
         }
+        if (retryAfterHash.outPath) {
+          await syncBuiltPnpmStoreIntoLocalPrefetch(retryAfterHash.outPath);
+        }
       } else {
         console.error(
           "pnpm-store still failing after hash update\n\n" + String(verifyAfterHash.output || ""),
@@ -198,6 +205,9 @@ export async function handleNonDefaultImporter(opts: {
         process.exit(1);
         return true;
       }
+    }
+    if (verifyAfterHash.outPath) {
+      await syncBuiltPnpmStoreIntoLocalPrefetch(verifyAfterHash.outPath);
     }
     if (opts.existingLockHash) {
       await writeVerifiedMarker(opts.markerPath, {

@@ -23,6 +23,7 @@ import {
   pnpmStoreUnfixedAttrFromImporter,
   repoRelativeLockfilePath,
 } from "./update-pnpm-hash/paths.ts";
+import { syncBuiltPnpmStoreIntoLocalPrefetch } from "./update-pnpm-hash/prefetched-store.ts";
 import {
   currentVerifiedMarkerFingerprint,
   readVerifiedMarker,
@@ -107,6 +108,9 @@ async function inner() {
     { activity: fixedActivity },
   );
   if (verify.ok) {
+    if (verify.outPath) {
+      await syncBuiltPnpmStoreIntoLocalPrefetch(verify.outPath);
+    }
     if (!nonDefaultImporter && hasValidExistingHash) {
       const lockHash = existingLockHash;
       if (lockHash) {
@@ -194,6 +198,9 @@ async function inner() {
   if (!verify.ok) {
     console.error("pnpm-store still failing after hash update\n\n" + verify.output);
     process.exit(1);
+  }
+  if (verify.outPath) {
+    await syncBuiltPnpmStoreIntoLocalPrefetch(verify.outPath);
   }
   if (!nonDefaultImporter) {
     const lockHash = existingLockHash;
