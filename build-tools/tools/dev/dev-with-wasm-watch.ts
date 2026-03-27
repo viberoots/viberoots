@@ -16,9 +16,11 @@ function spawnShell(
   cwd: string,
   envOverrides: Record<string, string>,
 ): ChildProcess {
-  const child = spawn("/bin/bash", ["--noprofile", "--norc", "-lc", command], {
+  const env = { ...process.env, ...envOverrides };
+  const shell = String(env.BASH || env.SHELL || "bash").trim() || "bash";
+  const child = spawn(shell, ["--noprofile", "--norc", "-lc", command], {
     cwd,
-    env: { ...process.env, ...envOverrides },
+    env,
     stdio: "pipe",
     detached: true,
   });

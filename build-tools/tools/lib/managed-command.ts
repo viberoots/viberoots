@@ -87,6 +87,8 @@ export async function runManagedCommand(opts: {
     if (process.platform === "win32" || !pid) return;
     const graceSec = Math.max(1, Math.ceil(killGraceMs / 1000));
     const parentPid = process.pid;
+    const env = opts.env || process.env;
+    const shell = String(env.BASH || env.SHELL || "bash").trim() || "bash";
     const script = [
       "set -u",
       'P="$1"',
@@ -107,10 +109,9 @@ export async function runManagedCommand(opts: {
       "done",
     ].join("\n");
     try {
-      const debugWatchdog =
-        String((opts.env || process.env).MANAGED_COMMAND_DEBUG_WATCHDOG || "") === "1";
+      const debugWatchdog = String(env.MANAGED_COMMAND_DEBUG_WATCHDOG || "") === "1";
       const wd = spawn(
-        "/bin/bash",
+        shell,
         [
           "--noprofile",
           "--norc",
@@ -130,6 +131,12 @@ export async function runManagedCommand(opts: {
         },
       );
       watchdogPid = wd.pid || 0;
+      wd.once("error", (err) => {
+        if (!debugWatchdog) return;
+        try {
+          console.error(`[managed-command] watchdog error: ${String(err)}`);
+        } catch {}
+      });
       if (debugWatchdog) {
         wd.stdout?.setEncoding("utf8");
         wd.stderr?.setEncoding("utf8");

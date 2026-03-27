@@ -7,8 +7,11 @@ test("managed-command starts parent-lifecycle watchdog for spawned process group
   if (!txt.includes("startParentWatchdog")) {
     throw new Error("managed-command.ts must define parent-lifecycle watchdog helper");
   }
-  if (!txt.includes('"/bin/bash"') || !txt.includes("detached: true")) {
-    throw new Error("managed-command.ts watchdog must run as detached bash helper");
+  if (!txt.includes('env.BASH || env.SHELL || "bash"') || !txt.includes("detached: true")) {
+    throw new Error("managed-command.ts watchdog must run as a detached env-resolved shell helper");
+  }
+  if (!txt.includes('wd.once("error"')) {
+    throw new Error("managed-command.ts watchdog must handle shell spawn failures");
   }
   if (!txt.includes("kill -TERM -") || !txt.includes("kill -KILL -")) {
     throw new Error(

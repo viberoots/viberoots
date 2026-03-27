@@ -118,8 +118,9 @@ export async function refreshWatcherSpecs(args: {
 }
 
 export async function runBuildStep(buildCommand: string, cwd: string): Promise<void> {
+  const shell = String(process.env.BASH || process.env.SHELL || "bash").trim() || "bash";
   const result = await runManagedCommand({
-    command: "/bin/bash",
+    command: shell,
     args: ["--noprofile", "--norc", "-lc", buildCommand],
     cwd,
     env: process.env,
