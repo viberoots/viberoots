@@ -9,17 +9,20 @@ let
   dirnameOf = common.dirnameOf;
   importerOnlySrc = common.importerOnlySrc;
   mkPnpmStore = store.mkPnpmStore;
-  hostSystem = pkgs.stdenv.hostPlatform.system;
-  pnpmOs =
-    if lib.hasSuffix "linux" hostSystem then "linux"
-    else if lib.hasSuffix "darwin" hostSystem then "darwin"
-    else "";
-  pnpmCpu =
-    if lib.hasPrefix "x86_64-" hostSystem then "x64"
-    else if lib.hasPrefix "aarch64-" hostSystem then "arm64"
-    else if lib.hasPrefix "armv7l-" hostSystem || lib.hasPrefix "armv6l-" hostSystem then "arm"
-    else "";
-  pnpmLibc = if pnpmOs == "linux" then (if lib.hasInfix "musl" hostSystem then "musl" else "glibc") else "";
+  pnpmSupportedArchitectures = ''
+    supportedArchitectures:
+      os:
+        - darwin
+        - linux
+        - win32
+      cpu:
+        - x64
+        - arm64
+        - arm
+      libc:
+        - glibc
+        - musl
+  '';
   inherit repoRoot repoFsRoot prefetchedStorePathGlobal;
 in {
   mkNodeModules = { lockfilePath, importerDir, npmrcPath ? null, packageJsonPath ? null, prefetchedStorePath ? prefetchedStorePathGlobal, ignoreImporterLock ? false }:
@@ -131,17 +134,7 @@ in {
         pnpm config set package-import-method copy
         printf '%s\n' "packages:" > pnpm-workspace.yaml
         printf '%s\n' "  - ./" >> pnpm-workspace.yaml
-        if [ -n "${pnpmOs}" ]; then
-          printf '%s\n' "supportedArchitectures:" >> pnpm-workspace.yaml
-          printf '%s\n' "  os:" >> pnpm-workspace.yaml
-          printf '%s\n' "    - ${pnpmOs}" >> pnpm-workspace.yaml
-          printf '%s\n' "  cpu:" >> pnpm-workspace.yaml
-          printf '%s\n' "    - ${pnpmCpu}" >> pnpm-workspace.yaml
-          if [ -n "${pnpmLibc}" ]; then
-            printf '%s\n' "  libc:" >> pnpm-workspace.yaml
-            printf '%s\n' "    - ${pnpmLibc}" >> pnpm-workspace.yaml
-          fi
-        fi
+        printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
         FT="${ftVal}"
         echo "[BNX-MKNM-DEBUG] NIX_PNPM_FETCH_TIMEOUT=$FT" >&2
         echo "[BNX-MKNM-DEBUG] lockfile_present=$(test -f pnpm-lock.yaml && echo yes || echo no)" >&2

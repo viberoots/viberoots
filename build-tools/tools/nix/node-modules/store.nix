@@ -9,17 +9,20 @@ let
   importerOnlySrc = common.importerOnlySrc;
   hashMap = common.hashMap;
   placeholderDigest = common.placeholderDigest;
-  hostSystem = pkgs.stdenv.hostPlatform.system;
-  pnpmOs =
-    if lib.hasSuffix "linux" hostSystem then "linux"
-    else if lib.hasSuffix "darwin" hostSystem then "darwin"
-    else "";
-  pnpmCpu =
-    if lib.hasPrefix "x86_64-" hostSystem then "x64"
-    else if lib.hasPrefix "aarch64-" hostSystem then "arm64"
-    else if lib.hasPrefix "armv7l-" hostSystem || lib.hasPrefix "armv6l-" hostSystem then "arm"
-    else "";
-  pnpmLibc = if pnpmOs == "linux" then (if lib.hasInfix "musl" hostSystem then "musl" else "glibc") else "";
+  pnpmSupportedArchitectures = ''
+    supportedArchitectures:
+      os:
+        - darwin
+        - linux
+        - win32
+      cpu:
+        - x64
+        - arm64
+        - arm
+      libc:
+        - glibc
+        - musl
+  '';
   inherit repoRoot repoFsRoot prefetchedStorePathGlobal;
 in {
   mkPnpmStore = { lockfilePath, importerDir, npmrcPath ? null, packageJsonPath ? null, prefetchedStorePath ? prefetchedStorePathGlobal }:
@@ -117,20 +120,10 @@ in {
         fi
         pnpm config set store-dir "$out/store"
         # Force workspace root to current directory and pin platform selection so
-        # pnpm materializes the correct optional binary packages in hermetic builds.
+        # pnpm materializes a platform-invariant set of optional binary packages in hermetic builds.
         printf '%s\n' "packages:" > pnpm-workspace.yaml
         printf '%s\n' "  - ./" >> pnpm-workspace.yaml
-        if [ -n "${pnpmOs}" ]; then
-          printf '%s\n' "supportedArchitectures:" >> pnpm-workspace.yaml
-          printf '%s\n' "  os:" >> pnpm-workspace.yaml
-          printf '%s\n' "    - ${pnpmOs}" >> pnpm-workspace.yaml
-          printf '%s\n' "  cpu:" >> pnpm-workspace.yaml
-          printf '%s\n' "    - ${pnpmCpu}" >> pnpm-workspace.yaml
-          if [ -n "${pnpmLibc}" ]; then
-            printf '%s\n' "  libc:" >> pnpm-workspace.yaml
-            printf '%s\n' "    - ${pnpmLibc}" >> pnpm-workspace.yaml
-          fi
-        fi
+        printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
         echo "[nix] pnpm install (timeout) --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir . (FT=${ftVal}s)"
         FT="${ftVal}"
         timeout "$FT"s env PNPM_HOME="$PNPM_HOME" pnpm install --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
@@ -254,20 +247,10 @@ in {
         fi
         pnpm config set store-dir "$out/store"
         # Force workspace root to current directory and pin platform selection so
-        # pnpm materializes the correct optional binary packages in hermetic builds.
+        # pnpm materializes a platform-invariant set of optional binary packages in hermetic builds.
         printf '%s\n' "packages:" > pnpm-workspace.yaml
         printf '%s\n' "  - ./" >> pnpm-workspace.yaml
-        if [ -n "${pnpmOs}" ]; then
-          printf '%s\n' "supportedArchitectures:" >> pnpm-workspace.yaml
-          printf '%s\n' "  os:" >> pnpm-workspace.yaml
-          printf '%s\n' "    - ${pnpmOs}" >> pnpm-workspace.yaml
-          printf '%s\n' "  cpu:" >> pnpm-workspace.yaml
-          printf '%s\n' "    - ${pnpmCpu}" >> pnpm-workspace.yaml
-          if [ -n "${pnpmLibc}" ]; then
-            printf '%s\n' "  libc:" >> pnpm-workspace.yaml
-            printf '%s\n' "    - ${pnpmLibc}" >> pnpm-workspace.yaml
-          fi
-        fi
+        printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
         echo "[nix] mkPnpmStoreUnfixed: pnpm install --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir ."
         FT="''${NIX_PNPM_FETCH_TIMEOUT:-600}"
         timeout "$FT"s env PNPM_HOME="$PNPM_HOME" pnpm install --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
