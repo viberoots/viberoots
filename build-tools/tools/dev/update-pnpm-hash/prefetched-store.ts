@@ -26,10 +26,9 @@ async function ensureMergedDir(dst: string): Promise<void> {
   }
 }
 
-export async function syncBuiltPnpmStoreIntoLocalPrefetch(storeOutPath: string): Promise<void> {
+export async function syncSourcePnpmStoreIntoLocalPrefetch(sourceStore: string): Promise<void> {
   const localStore = String(process.env.LOCAL_PNPM_STORE || "").trim();
   if (!localStore) return;
-  const sourceStore = path.join(storeOutPath, "store");
   if (!(await dirExists(sourceStore))) return;
   await fsp.mkdir(localStore, { recursive: true });
   const entries = await fsp.readdir(sourceStore, { withFileTypes: true }).catch(() => []);
@@ -61,4 +60,8 @@ export async function syncBuiltPnpmStoreIntoLocalPrefetch(storeOutPath: string):
       await fsp.cp(srcIndex, dstIndex, { recursive: true }).catch(() => {});
     }
   }
+}
+
+export async function syncBuiltPnpmStoreIntoLocalPrefetch(storeOutPath: string): Promise<void> {
+  await syncSourcePnpmStoreIntoLocalPrefetch(path.join(storeOutPath, "store"));
 }

@@ -7,6 +7,7 @@ import {
   externalPnpmStateDirs,
   removeLegacyImporterPnpmState,
 } from "../../lib/pnpm-state-paths.ts";
+import { syncSourcePnpmStoreIntoLocalPrefetch } from "./prefetched-store.ts";
 
 async function runLockfileInstallWithGcRetry(opts: {
   importerAbs: string;
@@ -138,6 +139,7 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
     homeDir,
     storeDir,
   });
+  await syncSourcePnpmStoreIntoLocalPrefetch(storeDir);
 
   await seedImporterLockfileFromRootIfNeeded({ repoRoot: opts.repoRoot, importerAbs });
   await cleanupLocalWorkspaceMarker({ workspaceFileAbs, hadLocalWorkspaceFile });
