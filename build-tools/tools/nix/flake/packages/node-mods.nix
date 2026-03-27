@@ -22,7 +22,11 @@ let
 
   perImporterStoreUnfixed = builtins.listToAttrs (map (imp: {
     name = (nodeMods.sanitizeName imp);
-    value = nodeMods.mkPnpmStoreUnfixed { lockfilePath = imp + "/pnpm-lock.yaml"; importerDir = imp; };
+    value = nodeMods.mkPnpmStoreUnfixed {
+      lockfilePath = imp + "/pnpm-lock.yaml";
+      importerDir = imp;
+      prefetchedStorePath = localPnpmStore;
+    };
   }) importerDirs);
 in
 {
@@ -37,11 +41,14 @@ in
 
   pnpm-store-unfixed =
     ({} // (if haveRootLock then {
-      default = nodeMods.mkPnpmStoreUnfixed { lockfilePath = "pnpm-lock.yaml"; importerDir = "."; };
+      default = nodeMods.mkPnpmStoreUnfixed {
+        lockfilePath = "pnpm-lock.yaml";
+        importerDir = ".";
+        prefetchedStorePath = localPnpmStore;
+      };
     } else {}) // perImporterStoreUnfixed);
 
   node-modules =
     ({} // (if haveRootLock then { default = nodeMods.node-modules; } else {}) // perImporterNM);
 }
-
 

@@ -182,7 +182,7 @@ in {
       };
     } // fixHashAttrs);
 
-  mkPnpmStoreUnfixed = { lockfilePath, importerDir, npmrcPath ? null, packageJsonPath ? null }:
+  mkPnpmStoreUnfixed = { lockfilePath, importerDir, npmrcPath ? null, packageJsonPath ? null, prefetchedStorePath ? prefetchedStorePathGlobal }:
     let
       relLock = lockfilePath;
       relLockDir = dirnameOf relLock;
@@ -192,6 +192,8 @@ in {
       hasLockFs = builtins.pathExists lockAbsStrFs;
       hasLockStore = builtins.pathExists lockAbsStrStore;
       lockInput = if hasLockFs then (builtins.path { path = lockAbsStrFs; name = "pnpm-lock.yaml"; }) else (if hasLockStore then (builtins.path { path = lockAbsStrStore; name = "pnpm-lock.yaml"; }) else null);
+      chosenPrefetchedPath = if prefetchedStorePath == null || prefetchedStorePath == "" then prefetchedStorePathGlobal else prefetchedStorePath;
+      prefetchedInput = if chosenPrefetchedPath == null || chosenPrefetchedPath == "" then null else chosenPrefetchedPath;
     in pkgs.stdenvNoCC.mkDerivation {
       pname = "pnpm-store-unfixed";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
@@ -246,6 +248,10 @@ in {
           exit 4
         fi
         pnpm config set store-dir "$out/store"
+        if [ -n "${if prefetchedInput == null then "" else "${prefetchedInput}"}" ] && [ -d "${if prefetchedInput == null then "/nonexistent" else "${prefetchedInput}"}" ]; then
+          echo "[nix] mkPnpmStoreUnfixed: seeding store from prefetched input ${if prefetchedInput == null then "" else "${prefetchedInput}"}" >&2
+          cp -R "${if prefetchedInput == null then "/nonexistent" else "${prefetchedInput}"}/." "$out/store/" || true
+        fi
         # Force workspace root to current directory and pin platform selection so
         # pnpm materializes a platform-invariant set of optional binary packages in hermetic builds.
         printf '%s\n' "packages:" > pnpm-workspace.yaml

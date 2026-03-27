@@ -3,18 +3,22 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
-test("verify contract: repo-local TMPDIR + coverage gating + disk gate strings present", async () => {
+test("verify contract: TMPDIR policy + coverage gating + disk gate strings present", async () => {
   const tmpRoot = await fsp.readFile("build-tools/tools/dev/verify/tmp-root.ts", "utf8");
   const coverage = await fsp.readFile("build-tools/tools/dev/verify/coverage.ts", "utf8");
   const housekeeping = await fsp.readFile("build-tools/tools/dev/verify/housekeeping.ts", "utf8");
 
   assert.ok(
-    tmpRoot.includes("TEST_TMP_IN_REPO"),
-    "expected verify to set TEST_TMP_IN_REPO=1 so temp repos live under the workspace filesystem",
+    tmpRoot.includes('process.platform === "linux"'),
+    "expected verify TMPDIR policy to branch for Linux hosts",
   );
   assert.ok(
-    tmpRoot.includes('buck-out", "tmp", "tmpdir'),
-    "expected verify to set TMPDIR to buck-out/tmp/tmpdir (workspace-local temp root)",
+    tmpRoot.includes('"/tmp"') && tmpRoot.includes("bucknix-verify"),
+    "expected verify to place Linux temp repos outside the workspace under /tmp",
+  );
+  assert.ok(
+    tmpRoot.includes('TEST_TMP_IN_REPO = "1"'),
+    "expected non-Linux verify runs to keep using workspace-local temp repos",
   );
 
   assert.ok(

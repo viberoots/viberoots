@@ -193,6 +193,10 @@ async function main() {
       // Build quietly, print logs only on failure
       const built = await $({
         stdio: "pipe",
+        env: {
+          ...process.env,
+          LOCAL_PNPM_STORE: unifyStore,
+        },
       })`nix build --impure --accept-flake-config --no-link --print-out-paths path:${repo}#${attr}`.nothrow();
       if (built.exitCode !== 0) {
         // Ignore importers that fail to build unfixed store (e.g., missing lock); proceed
