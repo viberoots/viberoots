@@ -26,20 +26,24 @@ let cachedDevEnvExport: Promise<string> | null = null;
 let cachedPinnedNixpkgsPath: Promise<string> | null = null;
 let cachedUnifiedPnpmStorePath: Promise<string> | null = null;
 let envMutationQueue: Promise<void> = Promise.resolve();
-type EnvKeys = "WORKSPACE_ROOT" | "BUCK_TEST_SRC";
-
-async function withTempProcessEnv<T>(tmp: string, fn: () => Promise<T>): Promise<T> {
+async function withTempProcessEnv<T>(
+  overrides: Record<string, string | undefined>,
+  fn: () => Promise<T>,
+): Promise<T> {
   const prevGate = envMutationQueue;
   let releaseGate: (() => void) | null = null;
   envMutationQueue = new Promise<void>((resolve) => {
     releaseGate = resolve;
   });
   await prevGate;
-  const keys: EnvKeys[] = ["WORKSPACE_ROOT", "BUCK_TEST_SRC"];
-  const prev: Partial<Record<EnvKeys, string | undefined>> = {};
+  const keys = Array.from(new Set(Object.keys(overrides)));
+  const prev: Record<string, string | undefined> = {};
   for (const key of keys) prev[key] = process.env[key];
-  process.env.WORKSPACE_ROOT = tmp;
-  process.env.BUCK_TEST_SRC = tmp;
+  for (const key of keys) {
+    const next = overrides[key];
+    if (typeof next === "string") process.env[key] = next;
+    else delete process.env[key];
+  }
   try {
     return await fn();
   } finally {
@@ -450,7 +454,7 @@ export async function runInTemp<T>(
   await timeAsync("buck-daemon-reaper setup", async () => await ensureBuckReaperStarted(tmp, _$));
 
   try {
-    return await withTempProcessEnv(tmp, async () => await fn(tmp, _$));
+    return await withTempProcessEnv(exportEnv, async () => await fn(tmp, _$));
   } finally {
     await timeAsync("temp process cleanup", async () => {
       await cleanupTempRepoProcesses({ roots: [tmp] }).catch(() => {});

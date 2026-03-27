@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { findImporterLockfiles, computeImporterLabel } from "../lib/importers.ts";
+import { unifiedPnpmStoreEpochDigest } from "./unified-pnpm-store-epoch.ts";
 
 function sha256Hex(s: string) {
   return crypto.createHash("sha256").update(s).digest("hex");
@@ -133,10 +134,8 @@ async function main() {
   const stateDir = path.join(buckOut, ".unified-pnpm-store");
   await ensureDir(stateDir);
 
-  // Hash the node-modules hashes file as a coarse epoch for the unified store
-  const hashesPath = path.join(repo, "build-tools", "tools", "nix", "node-modules.hashes.json");
-  const hashesTxt = await readTextSafe(hashesPath);
-  const epochHash = sha256Hex(hashesTxt || "no-hashes");
+  // Invalidate the unified store whenever either package hashes or the assembly logic changes.
+  const epochHash = await unifiedPnpmStoreEpochDigest(repo);
   const unifyDir = path.join(stateDir, `store-${epochHash}`);
   const unifyStore = path.join(unifyDir, "store");
   const pathFile = path.join(stateDir, "path");

@@ -81,7 +81,8 @@ test("node-modules derivation snapshots untracked importer files", async () => {
         { env?: Record<string, string>; inputs?: { drvs?: Record<string, unknown> } }
       >;
     };
-    const firstDrv = Object.values(parsed.derivations || {})[0];
+    const firstDrv =
+      (parsed.derivations || {})[drvPath] || Object.values(parsed.derivations || {})[0];
     const importerSrcOut = String(firstDrv?.env?.src || "").trim();
     assert.ok(importerSrcOut.startsWith("/nix/store/"), `unexpected src path: ${importerSrcOut}`);
     const importerSrcDrv = Object.keys(firstDrv?.inputs?.drvs || {}).find((d) =>
