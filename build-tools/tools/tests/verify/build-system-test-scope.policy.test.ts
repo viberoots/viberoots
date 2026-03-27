@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import {
   hasRelevantBuildSystemChanges,
@@ -65,4 +66,11 @@ test("relevant build-system changes exclude ignored paths", () => {
     ]),
     true,
   );
+});
+
+test("git helper probes use non-throwing zx calls", async () => {
+  const txt = await fsp.readFile("build-tools/tools/lib/build-system-test-scope.ts", "utf8");
+  assert.equal(txt.includes("git rev-parse --verify --quiet ${ref}`.nothrow()"), true);
+  assert.equal(txt.includes("git merge-base ${ref} HEAD`.nothrow()"), true);
+  assert.equal(txt.includes("git status --porcelain=v1`.nothrow()"), true);
 });

@@ -130,7 +130,7 @@ function parseStatusPaths(statusText: string): string[] {
 }
 
 async function gitLines(root: string, args: string[]): Promise<string[]> {
-  const out = await $({ cwd: root, stdio: "pipe", reject: false })`git ${args}`;
+  const out = await $({ cwd: root, stdio: "pipe" })`git ${args}`.nothrow();
   if ((out as any).exitCode !== 0) {
     return [];
   }
@@ -144,8 +144,7 @@ async function gitRefExists(root: string, ref: string): Promise<boolean> {
   const out = await $({
     cwd: root,
     stdio: "pipe",
-    reject: false,
-  })`git rev-parse --verify --quiet ${ref}`;
+  })`git rev-parse --verify --quiet ${ref}`.nothrow();
   return (out as any).exitCode === 0;
 }
 
@@ -162,7 +161,7 @@ async function mergeBaseChangedPaths(root: string, env: NodeJS.ProcessEnv): Prom
     if (!(await gitRefExists(root, ref))) {
       continue;
     }
-    const mb = await $({ cwd: root, stdio: "pipe", reject: false })`git merge-base ${ref} HEAD`;
+    const mb = await $({ cwd: root, stdio: "pipe" })`git merge-base ${ref} HEAD`.nothrow();
     if ((mb as any).exitCode === 0) {
       mergeBase = String((mb as any).stdout || "").trim();
       if (mergeBase) {
@@ -188,8 +187,7 @@ export async function collectChangedPaths(
   const statusRaw = await $({
     cwd: root,
     stdio: "pipe",
-    reject: false,
-  })`git status --porcelain=v1`;
+  })`git status --porcelain=v1`.nothrow();
   const statusPaths =
     (statusRaw as any).exitCode === 0
       ? parseStatusPaths(String((statusRaw as any).stdout || ""))
