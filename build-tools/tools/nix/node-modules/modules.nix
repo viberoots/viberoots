@@ -198,6 +198,12 @@ in {
         if [ -d .pnpm ]; then
           cp -R .pnpm $out/
         fi
+        mapfile -d '''' -t brokenLinks < <(find "$out" -type l ! -exec test -e {} \; -print0)
+        if [ "''${#brokenLinks[@]}" -gt 0 ]; then
+          echo "[nix] mkNodeModules: pruning dangling symlinks before fixup"
+          printf '%s\n' "''${brokenLinks[@]}"
+          rm -f "''${brokenLinks[@]}"
+        fi
         runHook postInstall
       '';
       passthru.lockHash = if (hasLockFs || hasLockStore) then builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore) else "";
