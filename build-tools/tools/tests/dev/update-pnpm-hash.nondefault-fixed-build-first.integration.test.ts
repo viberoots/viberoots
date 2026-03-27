@@ -14,4 +14,12 @@ test("update-pnpm-hash nondefault importer verifies fixed build before unfixed r
   ) {
     throw new Error("nondefault importer fixed-build verification must use the current repo flake");
   }
+  if (!txt.includes("const suggestedFromExisting = extractHash")) {
+    throw new Error(
+      "nondefault importer path must extract suggested hash from fixed-build failures",
+    );
+  }
+  if (!txt.includes("step=fixed-build-after-hash attr=${opts.storeAttr}")) {
+    throw new Error("nondefault importer path must retry fixed build after updating the hash");
+  }
 });

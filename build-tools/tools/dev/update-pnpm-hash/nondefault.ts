@@ -69,6 +69,37 @@ export async function handleNonDefaultImporter(opts: {
       console.warn(`[update-pnpm-hash] skip: flake attr missing (${opts.storeAttr}); continuing`);
       return true;
     }
+    const suggestedFromExisting = extractHash(String(verifyExisting.output || ""));
+    if (suggestedFromExisting) {
+      await updateNodeModulesHashesJson(opts.key, suggestedFromExisting);
+      console.log(
+        `[update-pnpm-hash] importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr} timeout=${opts.timeoutSec}s`,
+      );
+      const verifyAfterActivity = newActivity();
+      const verifyAfterHash = await withHeartbeat(
+        `importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr}`,
+        buildStore(opts.storeAttr, `path:${opts.repoRoot}#pnpm`, verifyAfterActivity),
+        { activity: verifyAfterActivity },
+      );
+      if (!verifyAfterHash.ok) {
+        console.error(
+          "pnpm-store still failing after hash update\n\n" + String(verifyAfterHash.output || ""),
+        );
+        process.exit(1);
+        return true;
+      }
+      if (opts.existingLockHash) {
+        await writeVerifiedMarker(opts.markerPath, {
+          importer: opts.importer,
+          lockfile: opts.key,
+          lockHash: opts.existingLockHash,
+          hashValue: suggestedFromExisting,
+          builderFingerprint: opts.builderFingerprint,
+        });
+      }
+      console.log("pnpm-store:", opts.storeAttr, "hash updated and build succeeded");
+      return true;
+    }
   }
   let tempFlake: { flakeRef: string; cleanup: () => Promise<void> } | null = null;
   try {
