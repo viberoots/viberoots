@@ -28,7 +28,6 @@ export async function handleNonDefaultImporter(opts: {
   existingMarker: PnpmStoreVerifiedMarker | null;
 }): Promise<boolean> {
   if (opts.importer === ".") return false;
-  let tempFlake: { flakeRef: string; cleanup: () => Promise<void> } | null = null;
   if (opts.hasValidExistingHash) {
     if (
       opts.existingLockHash &&
@@ -47,7 +46,31 @@ export async function handleNonDefaultImporter(opts: {
     console.log(
       `[update-pnpm-hash] importer=${opts.importer} step=stale-existing-hash attr=${opts.storeAttr} lockfile=${opts.key}`,
     );
+    const verifyExistingActivity = newActivity();
+    const verifyExisting = await withHeartbeat(
+      `importer=${opts.importer} step=fixed-build attr=${opts.storeAttr}`,
+      buildStore(opts.storeAttr, `path:${opts.repoRoot}#pnpm`, verifyExistingActivity),
+      { activity: verifyExistingActivity },
+    );
+    if (verifyExisting.ok) {
+      if (opts.existingLockHash) {
+        await writeVerifiedMarker(opts.markerPath, {
+          importer: opts.importer,
+          lockfile: opts.key,
+          lockHash: opts.existingLockHash,
+          hashValue: opts.existingHash,
+          builderFingerprint: opts.builderFingerprint,
+        });
+      }
+      console.log("pnpm-store:", opts.storeAttr, "hash updated and build succeeded");
+      return true;
+    }
+    if (/does not provide attribute/.test(String(verifyExisting.output || ""))) {
+      console.warn(`[update-pnpm-hash] skip: flake attr missing (${opts.storeAttr}); continuing`);
+      return true;
+    }
   }
+  let tempFlake: { flakeRef: string; cleanup: () => Promise<void> } | null = null;
   try {
     console.log(
       `[update-pnpm-hash] importer=${opts.importer} step=prepare-filtered-flake attr=${opts.unfixedAttr}`,
