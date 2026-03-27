@@ -2,6 +2,7 @@ import "zx/globals";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { resolveToolPath } from "../../lib/tool-paths.ts";
 import { activeNixGcProcesses } from "./preflight.ts";
 
 function parseNum(s: string | undefined): number | null {
@@ -165,11 +166,12 @@ export async function startVerifySafetyRails(opts: {
   await appendLine(telemetry, `[verify] safety-rails baseline /nix/store free ~${base}GiB`);
 
   if ((process.env.VERIFY_ANALYSIS_STORE_TOTALS || "").trim() === "1") {
+    const timeoutPath = await resolveToolPath("timeout");
     const res = await $({
       stdio: "pipe",
       cwd: opts.root,
       reject: false,
-    })`timeout -k 5s 20s nix store info`;
+    })`${timeoutPath} -k 5s 20s nix store info`;
     const txt = String(res.stdout || "").trim();
     if (txt) await appendLine(telemetry, `[verify] nix store info:\n${txt}`);
   }

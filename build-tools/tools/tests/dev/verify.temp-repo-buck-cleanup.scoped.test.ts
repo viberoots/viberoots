@@ -6,9 +6,11 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { cleanupRegisteredTempRepos } from "../../dev/verify/buck-orphan-cleanup.ts";
+import { resolveToolPath } from "../../lib/tool-paths.ts";
 function psForkserversForToken(token: string): Promise<string[]> {
-  return new Promise((resolve) => {
-    const child = spawn("ps", ["-A", "-o", "pid=,ppid=,command="], {
+  return new Promise(async (resolve) => {
+    const psPath = await resolveToolPath("ps").catch(() => "ps");
+    const child = spawn(psPath, ["-A", "-o", "pid=,ppid=,command="], {
       stdio: ["ignore", "pipe", "ignore"],
     });
     let buf = "";
@@ -56,8 +58,9 @@ async function waitForNoForkserver(token: string, timeoutMs: number): Promise<vo
 }
 
 function psLinesMatching(substr: string): Promise<string[]> {
-  return new Promise((resolve) => {
-    const child = spawn("ps", ["-A", "-o", "pid=,ppid=,command="], {
+  return new Promise(async (resolve) => {
+    const psPath = await resolveToolPath("ps").catch(() => "ps");
+    const child = spawn(psPath, ["-A", "-o", "pid=,ppid=,command="], {
       stdio: ["ignore", "pipe", "ignore"],
     });
     let buf = "";

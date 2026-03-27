@@ -5,6 +5,7 @@
 //   node build-tools/tools/dev/buck-kill-stale.ts --kill --include exporter- --dry-run
 //   node build-tools/tools/dev/buck-kill-stale.ts --kill --include '^zxtest-' --yes
 import { getFlagBool, getFlagStr } from "../lib/cli.ts";
+import { resolveToolPathSync } from "../lib/tool-paths.ts";
 
 type Args = {
   list?: boolean;
@@ -31,10 +32,11 @@ function unique<T>(arr: T[]): T[] {
 
 async function psLines(): Promise<string[]> {
   // Cross-platform-ish: use a broad format including command and args
+  const psPath = resolveToolPathSync("ps");
   const args =
     process.platform === "darwin"
-      ? ["ps", "-A", "-o", "pid=,command="]
-      : ["ps", "-e", "-o", "pid=,command="];
+      ? [psPath, "-A", "-o", "pid=,command="]
+      : [psPath, "-e", "-o", "pid=,command="];
   const { stdout } = await $({ stdio: "pipe" })`${args}`;
   return String(stdout || "")
     .split(/\r?\n/)

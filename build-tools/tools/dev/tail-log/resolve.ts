@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { spawn } from "node:child_process";
+import { resolveToolPath } from "../../lib/tool-paths.ts";
 import { latestSymlink, lockDir, logsDir } from "./paths.ts";
 
 export type Resolution =
@@ -23,8 +24,9 @@ export async function pidAlive(pid: number): Promise<boolean> {
   // `kill(pid, 0)` returns success for zombies (the PID exists but has exited).
   // For tail-log's "watch until pid ends" semantics we treat zombies as not alive.
   try {
+    const psPath = await resolveToolPath("ps");
     const stat = await new Promise<string>((resolve, reject) => {
-      const p = spawn("ps", ["-p", String(pid), "-o", "stat="], {
+      const p = spawn(psPath, ["-p", String(pid), "-o", "stat="], {
         stdio: ["ignore", "pipe", "pipe"],
       });
       let out = "";
@@ -53,8 +55,9 @@ export async function pidAlive(pid: number): Promise<boolean> {
 export async function pidStartSignature(pid: number): Promise<string> {
   if (!Number.isInteger(pid) || pid <= 0) return "";
   try {
+    const psPath = await resolveToolPath("ps");
     const sig = await new Promise<string>((resolve, reject) => {
-      const p = spawn("ps", ["-p", String(pid), "-o", "lstart="], {
+      const p = spawn(psPath, ["-p", String(pid), "-o", "lstart="], {
         stdio: ["ignore", "pipe", "pipe"],
       });
       let out = "";

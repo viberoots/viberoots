@@ -23,3 +23,6 @@ config = ./prelude
 prelude = prelude
 user_platform = prelude//platforms:default
 target_platforms = prelude//platforms:default
+
+[project]
+ignore = buck-out/tmp/tmpdir

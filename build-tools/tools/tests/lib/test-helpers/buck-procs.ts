@@ -2,6 +2,7 @@ import "./worker-init";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { resolveToolPath } from "../../../lib/tool-paths.ts";
 
 export async function buckIsolationDirsForRepo(repoRoot: string): Promise<string[]> {
   const dirs: string[] = [];
@@ -35,12 +36,13 @@ export async function forkserversUnderRepo(
   $: any,
 ): Promise<Array<{ pid: number; ppid: number; cmd: string }>> {
   const absCandidates = repoRootCandidatePaths(repoRoot);
+  const psPath = await resolveToolPath("ps");
   const res = await $({
     stdio: "pipe",
     reject: false,
     nothrow: true,
     timeout: 2000,
-  })`ps -A -o pid=,ppid=,command=`;
+  })`${psPath} -A -o pid=,ppid=,command=`;
   const lines = String(res.stdout || "")
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -63,12 +65,13 @@ export async function forkserversUnderRepo(
 
 export async function pidCmdline(pid: number, $: any): Promise<string> {
   if (!Number.isFinite(pid) || pid <= 1) return "";
+  const psPath = await resolveToolPath("ps");
   const res = await $({
     stdio: "pipe",
     reject: false,
     nothrow: true,
     timeout: 1500,
-  })`ps -p ${pid} -o command=`;
+  })`${psPath} -p ${pid} -o command=`;
   return String(res.stdout || "").trim();
 }
 
@@ -82,12 +85,13 @@ export function isolationDirFromCmd(cmd: string): string {
 export async function buck2dProcsForRepo(repoRoot: string, $: any): Promise<Buck2dProc[]> {
   const base = path.basename(path.resolve(repoRoot));
   if (!base) return [];
+  const psPath = await resolveToolPath("ps");
   const res = await $({
     stdio: "pipe",
     reject: false,
     nothrow: true,
     timeout: 2000,
-  })`ps -A -o pid=,command=`;
+  })`${psPath} -A -o pid=,command=`;
   const lines = String(res.stdout || "")
     .split(/\r?\n/)
     .map((l) => l.trim())

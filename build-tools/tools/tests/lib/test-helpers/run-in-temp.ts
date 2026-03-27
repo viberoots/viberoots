@@ -16,6 +16,10 @@ import { mktemp } from "./tmp";
 import { ensureSharedNixTarballCacheRepo } from "./xdg-cache";
 import "./worker-init";
 import { ensureZxInitProbedOnce, zxInitPathFromWorkspace } from "./zx-init-probe";
+import {
+  nixEvalTempDirOutsideWorkspace,
+  pinnedNixpkgsOutPathExpr,
+} from "../../../lib/pinned-nixpkgs.ts";
 
 let cachedDevEnvExport: Promise<string> | null = null;
 let cachedPinnedNixpkgsPath: Promise<string> | null = null;
@@ -66,18 +70,20 @@ async function exportDevEnvOncePerWorker($: any): Promise<string> {
 async function pinnedNixpkgsPathOncePerWorker($: any): Promise<string> {
   if (cachedPinnedNixpkgsPath) return await cachedPinnedNixpkgsPath;
   cachedPinnedNixpkgsPath = (async () => {
+    const repoRoot = process.cwd();
+    const nixEvalTmp = nixEvalTempDirOutsideWorkspace(repoRoot);
+    await fsp.mkdir(nixEvalTmp, { recursive: true }).catch(() => {});
     const out = await $({
-      cwd: process.cwd(),
+      cwd: repoRoot,
       stdio: "pipe",
       reject: false,
       nothrow: true,
       env: {
         ...process.env,
         IN_NIX_SHELL: "1",
+        TMPDIR: nixEvalTmp,
       },
-    })`nix eval --impure --accept-flake-config --raw --expr ${String.raw`let
-      flake = builtins.getFlake (toString ./.);
-    in flake.inputs.nixpkgs.outPath`}`;
+    })`nix eval --impure --accept-flake-config --raw --expr ${pinnedNixpkgsOutPathExpr(path.join(repoRoot, "flake.lock"))}`;
     return String((out as any).stdout || "").trim();
   })();
   return await cachedPinnedNixpkgsPath;

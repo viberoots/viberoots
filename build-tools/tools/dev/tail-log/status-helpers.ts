@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { resolveToolPathSync } from "../../lib/tool-paths.ts";
 
 export function getExtraStatusLines(isTty: boolean): string {
   const commands = getProcessCommands();
@@ -66,7 +67,7 @@ function truncateAnsi(input: string, maxVisible: number): string {
 
 function getProcessCommands(): string[] {
   try {
-    const out = execFileSync("ps", ["-A", "-o", "command="], {
+    const out = execFileSync(resolveToolPathSync("ps"), ["-A", "-o", "command="], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     });

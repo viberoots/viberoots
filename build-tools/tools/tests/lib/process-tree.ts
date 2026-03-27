@@ -1,6 +1,7 @@
 import { spawnSync, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { setTimeout as sleep } from "node:timers/promises";
+import { resolveToolPathSync } from "../../lib/tool-paths.ts";
 
 function parsePid(value: string): number {
   const n = Number(String(value || "").trim());
@@ -8,7 +9,7 @@ function parsePid(value: string): number {
 }
 
 function descendantPids(rootPid: number): number[] {
-  const ps = spawnSync("ps", ["-Ao", "pid=,ppid="], {
+  const ps = spawnSync(resolveToolPathSync("ps"), ["-Ao", "pid=,ppid="], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
   });

@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { runNodeWithZx } from "../../lib/node-run.ts";
+import { resolveToolPath } from "../../lib/tool-paths.ts";
 
 function parsePositiveInt(s: string | undefined): number | null {
   const n = Number(String(s || "").trim());
@@ -36,16 +37,13 @@ async function purgeRepoLocalTemps(root: string): Promise<void> {
 }
 
 async function runBoundedNixOptimise(root: string, secs: number): Promise<void> {
+  const timeoutPath = await resolveToolPath("timeout");
   await $({
     stdio: "ignore",
     cwd: root,
   })`bash --noprofile --norc -c ${`set -euo pipefail
-if ! command -v timeout >/dev/null 2>&1; then
-  echo "error: timeout not found on PATH (expected via direnv/devshell)" 1>&2
-  exit 127
-fi
 set +e
-timeout -k 5s ${secs}s nix store optimise >/dev/null 2>&1
+${timeoutPath} -k 5s ${secs}s nix store optimise >/dev/null 2>&1
 exit 0
 `}`.nothrow();
 }
@@ -55,16 +53,13 @@ export function shouldRunNixStoreOptimizeForRequestedTargets(requestedTargets: s
 }
 
 async function runBoundedGc(root: string, maxFreed: string, secs: number): Promise<void> {
+  const timeoutPath = await resolveToolPath("timeout");
   await $({
     stdio: "ignore",
     cwd: root,
   })`bash --noprofile --norc -c ${`set -euo pipefail
-if ! command -v timeout >/dev/null 2>&1; then
-  echo "error: timeout not found on PATH (expected via direnv/devshell)" 1>&2
-  exit 127
-fi
 set +e
-timeout -k 5s ${secs}s nix-store --gc --max-freed ${maxFreed} >/dev/null 2>&1
+${timeoutPath} -k 5s ${secs}s nix-store --gc --max-freed ${maxFreed} >/dev/null 2>&1
 exit 0
 `}`.nothrow();
 }

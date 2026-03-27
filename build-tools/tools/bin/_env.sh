@@ -24,6 +24,22 @@ env_init_paths() {
 	fi
 }
 
+tool_path() {
+	local tool="$1"
+	local dir
+	local old_ifs="$IFS"
+	IFS=':'
+	for dir in $PATH; do
+		if [[ -n "${dir}" && "${dir}" == /nix/store/* && -x "${dir}/${tool}" ]]; then
+			printf '%s\n' "${dir}/${tool}"
+			IFS="$old_ifs"
+			return 0
+		fi
+	done
+	IFS="$old_ifs"
+	command -v "$tool"
+}
+
 exec_in_dev_shell() {
 	local live_root="$1"; shift
 	local fastpath_enabled="${BUCK_DEV_SHELL_FASTPATH:-1}"

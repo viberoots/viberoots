@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import "zx/globals";
 import { collectChangedPaths } from "../../lib/build-system-test-scope.ts";
 import { runNodeWithZx } from "../../lib/node-run.ts";
+import { resolveToolPath } from "../../lib/tool-paths.ts";
 
 async function runVerifyFileSizePreflight(root: string, zxInitPath: string): Promise<void> {
   const script = path.resolve(root, "build-tools/tools/dev/file-size-lint.ts");
@@ -153,6 +154,7 @@ export async function runVerifyLintPreflight(
     ? `${eslintTargets.length > 0 ? `pnpm exec eslint --no-warn-ignored ${eslintTargets.join(" ")} --ext .ts,.tsx --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern '**/.vite-cache/**' && ` : ""}pnpm exec prettier -c ${prettierTargets.join(" ")}`
     : "skip (no changed lint/prettier files)";
   process.stderr.write(`[verify] lint preflight: timeout -k 10s ${secs}s ${lintCmd}\n`);
+  const timeoutPath = await resolveToolPath("timeout");
 
   const eslintRes =
     scoped && eslintTargets.length > 0
@@ -160,7 +162,7 @@ export async function runVerifyLintPreflight(
           stdio: "inherit",
           cwd: root,
           reject: false,
-        })`timeout -k 10s ${secs}s pnpm exec eslint --no-warn-ignored ${eslintTargets} --ext .ts,.tsx --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern "**/.vite-cache/**"`
+        })`${timeoutPath} -k 10s ${secs}s pnpm exec eslint --no-warn-ignored ${eslintTargets} --ext .ts,.tsx --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern "**/.vite-cache/**"`
       : { exitCode: 0 };
   if (eslintRes.exitCode !== 0) {
     process.stderr.write(
@@ -174,7 +176,7 @@ export async function runVerifyLintPreflight(
       stdio: "inherit",
       cwd: root,
       reject: false,
-    })`timeout -k 10s ${secs}s pnpm exec prettier -c ${prettierTargets}`;
+    })`${timeoutPath} -k 10s ${secs}s pnpm exec prettier -c ${prettierTargets}`;
     if (prettierRes.exitCode !== 0) {
       process.stderr.write(
         "error: lint preflight failed; refusing to run verify while formatting/lint is dirty\n" +

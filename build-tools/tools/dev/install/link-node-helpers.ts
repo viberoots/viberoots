@@ -5,6 +5,7 @@ import path from "node:path";
 import { activeNixGcPids } from "../../lib/nix-gc-lock.ts";
 import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command.ts";
 import { pathExists } from "../../lib/repo.ts";
+import { resolveToolPathSync } from "../../lib/tool-paths.ts";
 
 export async function withHeartbeat<T>(
   label: string,
@@ -29,9 +30,11 @@ export async function withHeartbeat<T>(
   const describeChild = (pid: number): string => {
     if (!pid || pid <= 0) return "pid=unknown alive=false";
     try {
-      const out = spawnSync("ps", ["-p", String(pid), "-o", "state=,etime=,command="], {
-        encoding: "utf8",
-      });
+      const out = spawnSync(
+        resolveToolPathSync("ps"),
+        ["-p", String(pid), "-o", "state=,etime=,command="],
+        { encoding: "utf8" },
+      );
       if (out.status !== 0) return `pid=${pid} alive=false`;
       const line = String(out.stdout || "").trim();
       if (!line) return `pid=${pid} alive=false`;
@@ -202,7 +205,9 @@ function commandMatchesScope(cmd: string, flakeRefBase: string): boolean {
 }
 
 function findCompetingNodeModulesBuilds(attr: string, flakeRefBase: string): CompetingBuild[] {
-  const out = spawnSync("ps", ["-axo", "pid=,etime=,command="], { encoding: "utf8" });
+  const out = spawnSync(resolveToolPathSync("ps"), ["-axo", "pid=,etime=,command="], {
+    encoding: "utf8",
+  });
   if (out.status !== 0) return [];
   const self = Number(process.pid || 0);
   const needle = `#node-modules.${attr}`;

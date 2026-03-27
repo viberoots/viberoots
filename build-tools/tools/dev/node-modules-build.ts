@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { resolveToolPathSync } from "../lib/tool-paths.ts";
 import { findNearestImporterLock, nodeModulesAttr } from "./install/common.ts";
 
 async function findFlakeRoot(start: string): Promise<string> {
@@ -196,18 +197,21 @@ try {
   }
 } catch {}
 async function tryBuild(): Promise<string> {
+  const timeoutPath = resolveToolPathSync("timeout");
   const cmd = [
     "set -euo pipefail;",
+    'TIMEOUT_PATH="$1";',
+    'FLAKE_REF="$2";',
+    'FULL_ATTR="$3";',
     'MJ="${NIX_MAX_JOBS:-0}";',
     'CR="${NIX_CORES:-0}";',
     'TS="${NIX_PNPM_FETCH_TIMEOUT:-900}";',
-    'if ! command -v timeout >/dev/null 2>&1; then echo "node-modules-build: error: timeout not found on PATH" 1>&2; exit 127; fi;',
-    'TO="timeout -k 10s ${TS}s ";',
     'JOBS_FLAG=""; if [ -n "$MJ" ] && [ "$MJ" != "0" ]; then JOBS_FLAG="--max-jobs $MJ"; fi;',
     'CORES_FLAG=""; if [ -n "$CR" ] && [ "$CR" != "0" ]; then CORES_FLAG="--option cores $CR"; fi;',
-    `$TO nix build "${flakeRef}#${fullAttr}" --no-link --accept-flake-config --builders "" --print-out-paths $JOBS_FLAG $CORES_FLAG`,
+    '"$TIMEOUT_PATH" -k 10s "${TS}s" nix build "${FLAKE_REF}#${FULL_ATTR}" --no-link --accept-flake-config --builders "" --print-out-paths $JOBS_FLAG $CORES_FLAG',
   ].join(" ");
-  const built = await $`bash --noprofile --norc -c ${cmd}`.nothrow();
+  const built =
+    await $`bash --noprofile --norc -c ${cmd} -- ${timeoutPath} ${flakeRef} ${fullAttr}`.nothrow();
   const txt = String(built.stdout || "").trim();
   if (built.exitCode === 0 && txt) {
     return txt.split("\n").filter(Boolean).pop() || "";

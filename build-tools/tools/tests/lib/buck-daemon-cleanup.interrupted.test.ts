@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { test } from "node:test";
+import { resolveToolPathSync } from "../../lib/tool-paths.ts";
 
 function psForkserversForToken(token: string): Promise<string[]> {
+  const psPath = resolveToolPathSync("ps");
   return new Promise((resolve) => {
-    const child = spawn("ps", ["-A", "-o", "pid=,ppid=,command="], {
+    const child = spawn(psPath, ["-A", "-o", "pid=,ppid=,command="], {
       stdio: ["ignore", "pipe", "ignore"],
     });
     let buf = "";

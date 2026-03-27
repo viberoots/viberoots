@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { resolveToolPathSync } from "../lib/tool-paths.ts";
 
 function runnableBuildTimeoutSec(): number {
   const raw = String(process.env.BNX_RUNNABLE_BUILD_TIMEOUT_SEC || "").trim();
@@ -33,9 +34,13 @@ async function emitTimeoutDiagnostics(opts: {
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
   const outDir = path.join(opts.workspaceRoot, "buck-out", "tmp");
   const outPath = path.join(outDir, `run-runnable-timeout-${ts}.log`);
-  const ps = spawnSync("ps", ["-Ao", "pid,ppid,pgid,stat,etime,time,command"], {
-    encoding: "utf8",
-  });
+  const ps = spawnSync(
+    resolveToolPathSync("ps"),
+    ["-Ao", "pid,ppid,pgid,stat,etime,time,command"],
+    {
+      encoding: "utf8",
+    },
+  );
   const safePid = opts.childPid > 0 ? opts.childPid : -1;
   const psLines = String(ps.stdout || "")
     .split("\n")

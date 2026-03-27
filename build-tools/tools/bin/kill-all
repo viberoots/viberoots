@@ -26,7 +26,9 @@ EOF
 is_verify_process() {
   local pid="$1"
   local cmd=""
-  cmd="$(ps -p "${pid}" -o command= 2>/dev/null || true)"
+  local ps_path
+  ps_path="$(tool_path ps)"
+  cmd="$("${ps_path}" -p "${pid}" -o command= 2>/dev/null || true)"
   [[ -z "${cmd}" ]] && return 1
 
   # Canonicalize repo root to avoid non-normalized paths (../..) breaking pgrep matching.
@@ -44,7 +46,9 @@ is_verify_process() {
 
 pid_start_signature() {
   local pid="$1"
-  ps -p "${pid}" -o lstart= 2>/dev/null | tr -d '\n' | sed -e 's/[[:space:]]*$//'
+  local ps_path
+  ps_path="$(tool_path ps)"
+  "${ps_path}" -p "${pid}" -o lstart= 2>/dev/null | tr -d '\n' | sed -e 's/[[:space:]]*$//'
 }
 
 pid_alive_with_signature() {
@@ -62,6 +66,9 @@ verify_pids_in_repo() {
   repo_root="$(cd "${REPO_ROOT}" >/dev/null 2>&1 && pwd || echo "${REPO_ROOT}")"
   local verify_path="${repo_root}/build-tools/tools/bin/verify"
   local pids=""
+  local pgrep_path=""
+  local ps_path
+  ps_path="$(tool_path ps)"
 
   # Prefer the lock PID if present; it's authoritative for this repo.
   # Since verify now runs as a Node process (TypeScript entrypoint), matching argv strings is not
@@ -79,8 +86,8 @@ verify_pids_in_repo() {
     fi
   fi
 
-  if command -v pgrep >/dev/null 2>&1; then
-    pids="$(pgrep -f "${verify_path}" 2>/dev/null || true)"
+  if pgrep_path="$(tool_path pgrep 2>/dev/null)"; then
+    pids="$("${pgrep_path}" -f "${verify_path}" 2>/dev/null || true)"
     if [[ -n "${pids}" ]]; then
       while IFS= read -r pid; do
         [[ -z "${pid}" ]] && continue
@@ -92,7 +99,7 @@ verify_pids_in_repo() {
     fi
 
     # Fallback: match generic "build-tools/tools/bin/verify" and filter to this repo root.
-    pids="$(pgrep -f "build-tools/tools/bin/verify" 2>/dev/null || true)"
+    pids="$("${pgrep_path}" -f "build-tools/tools/bin/verify" 2>/dev/null || true)"
     if [[ -z "${pids}" ]]; then
       return 0
     fi
@@ -106,7 +113,7 @@ verify_pids_in_repo() {
   fi
 
   # Fallback if pgrep is unavailable: scan ps output.
-  ps -ax -o pid=,command= | while read -r pid cmd; do
+  "${ps_path}" -ax -o pid=,command= | while read -r pid cmd; do
     [[ -z "${pid}" ]] && continue
     if [[ "${cmd}" == *"${verify_path}"* ]] && is_verify_process "${pid}"; then
       printf "%s\n" "${pid}"
@@ -118,8 +125,9 @@ collect_descendants() {
   local root="$1"
   local -a queue=("${root}")
   local -a out=()
+  local pgrep_path=""
 
-  if ! command -v pgrep >/dev/null 2>&1; then
+  if ! pgrep_path="$(tool_path pgrep 2>/dev/null)"; then
     # Best-effort without pgrep: no descendants.
     printf "%s\n" ""
     return 0
@@ -129,7 +137,7 @@ collect_descendants() {
     local pid="${queue[0]}"
     queue=("${queue[@]:1}")
     local children=""
-    children="$(pgrep -P "${pid}" 2>/dev/null || true)"
+    children="$("${pgrep_path}" -P "${pid}" 2>/dev/null || true)"
     if [[ -z "${children}" ]]; then
       continue
     fi
@@ -164,9 +172,11 @@ kill_tree() {
   done < <(printf "%s\n" "${all[@]}" | awk 'NF {print}' | sort -n | uniq)
 
   if [[ "${dry_run}" == "1" ]]; then
+    local ps_path
+    ps_path="$(tool_path ps)"
     echo "would kill verify tree rooted at pid ${root}:"
     for p in "${uniq[@]}"; do
-      echo "  - ${p}  $(ps -p "${p}" -o command= 2>/dev/null || true)"
+      echo "  - ${p}  $("${ps_path}" -p "${p}" -o command= 2>/dev/null || true)"
     done
     return 0
   fi
@@ -243,4 +253,3 @@ main() {
 }
 
 main "$@"
-

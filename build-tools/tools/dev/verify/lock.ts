@@ -3,10 +3,12 @@ import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { resolveToolPath } from "../../lib/tool-paths.ts";
 
 async function pidStartSignature(pid: number): Promise<string> {
   try {
-    const { stdout } = await $({ stdio: "pipe" })`ps -p ${pid} -o lstart=`;
+    const psPath = await resolveToolPath("ps");
+    const { stdout } = await $({ stdio: "pipe" })`${psPath} -p ${pid} -o lstart=`;
     return String(stdout || "").trim();
   } catch {
     return "";

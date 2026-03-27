@@ -1,6 +1,7 @@
 import path from "node:path";
 import crypto from "node:crypto";
 import { nodeFlagsWithZx } from "../../lib/node-run.ts";
+import { resolveToolPath } from "../../lib/tool-paths.ts";
 
 export type Isolation = {
   buckIsolation: string;
@@ -15,7 +16,8 @@ export type Isolation = {
 
 async function reapChildBuckDaemonsByPrefix(prefixes: string[]): Promise<void> {
   try {
-    const { stdout } = await $({ stdio: "pipe" })`ps -A -o pid=,comm=`;
+    const psPath = await resolveToolPath("ps");
+    const { stdout } = await $({ stdio: "pipe" })`${psPath} -A -o pid=,comm=`;
     const lines = String(stdout || "").split("\n");
     for (const ln of lines) {
       const m = ln.match(/buck2d\[([^\]]+)\]/);
@@ -32,7 +34,8 @@ async function reapChildBuckDaemonsByPrefix(prefixes: string[]): Promise<void> {
 
 async function reapExporterDaemonsFromPs(): Promise<void> {
   try {
-    const { stdout } = await $({ stdio: "pipe" })`ps -A -o pid=,command=`;
+    const psPath = await resolveToolPath("ps");
+    const { stdout } = await $({ stdio: "pipe" })`${psPath} -A -o pid=,command=`;
     const lines = String(stdout || "").split("\n");
     for (const ln of lines) {
       const m = ln.match(/--isolation-dir\s+(exporter-[^\s]+)/);

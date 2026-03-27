@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import "zx/globals";
 import { getFlagStr } from "../lib/cli.ts";
+import { resolveToolPath } from "../lib/tool-paths.ts";
 import { ownerPidForIsolation } from "./buck-watchdog-lib.ts";
 
 function isPidAlive(pid: number): boolean {
@@ -32,7 +33,8 @@ async function tryBuckKillIsolation(iso: string): Promise<void> {
 
 async function sweepOrphans(patterns: RegExp) {
   try {
-    const { stdout } = await $({ stdio: "pipe" })`ps -A -o pid=,command=`;
+    const psPath = await resolveToolPath("ps");
+    const { stdout } = await $({ stdio: "pipe" })`${psPath} -A -o pid=,command=`;
     const lines = String(stdout || "").split("\n");
     for (const ln of lines) {
       const pidFromLine = Number((ln.match(/^\s*(\d+)\s+/) || [])[1] || "0");

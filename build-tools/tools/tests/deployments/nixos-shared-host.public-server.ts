@@ -5,6 +5,10 @@ import https from "node:https";
 import path from "node:path";
 import { promisify } from "node:util";
 import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime.ts";
+import {
+  nixEvalTempDirOutsideWorkspace,
+  pinnedNixpkgsPackageExpr,
+} from "../../lib/pinned-nixpkgs.ts";
 import { pickFreePort } from "../scaffolding/lib/webapp-static-hmr.ts";
 import type { NixosSharedHostDeployment } from "../../deployments/contract.ts";
 
@@ -14,10 +18,8 @@ let cachedOpenSslPath: Promise<string> | null = null;
 async function pinnedOpenSslPath(): Promise<string> {
   if (cachedOpenSslPath) return await cachedOpenSslPath;
   cachedOpenSslPath = (async () => {
-    const expr = String.raw`let
-      flake = builtins.getFlake (toString ./.);
-      pkgs = import flake.inputs.nixpkgs { system = builtins.currentSystem; };
-    in pkgs.openssl`;
+    const repoRoot = process.cwd();
+    const expr = pinnedNixpkgsPackageExpr(path.join(repoRoot, "flake.lock"), "pkgs.openssl");
     const { stdout } = await execFileAsync(
       "nix",
       [
@@ -30,7 +32,11 @@ async function pinnedOpenSslPath(): Promise<string> {
         "--print-out-paths",
       ],
       {
-        cwd: process.cwd(),
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          TMPDIR: nixEvalTempDirOutsideWorkspace(repoRoot),
+        },
       },
     );
     const outPath = String(stdout || "")

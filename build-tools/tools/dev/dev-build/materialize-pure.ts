@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
+import { resolveToolPath } from "../../lib/tool-paths.ts";
 import {
   formatRunnableLine,
   inferRunnableFromOutPath,
@@ -22,12 +23,13 @@ async function nixBuildPrintOutPaths(opts: {
   timeoutSec?: number;
 }): Promise<string> {
   const tout = materializeTimeoutSec(opts.timeoutSec ?? 120);
+  const timeoutPath = await resolveToolPath("timeout", opts.env);
   const res = await $({
     stdio: "pipe",
     cwd: opts.root,
     env: opts.env,
     nothrow: true,
-  })`bash --noprofile --norc -c ${`set -euo pipefail; if ! command -v timeout >/dev/null 2>&1; then echo "dev-build materialize: timeout not found on PATH" 1>&2; exit 127; fi; timeout -k 5s ${tout}s nix build ${opts.args}`}`;
+  })`bash --noprofile --norc -c ${`set -euo pipefail; ${timeoutPath} -k 5s ${tout}s nix build ${opts.args}`}`;
   if (res.exitCode === 0) {
     return String(res.stdout || "");
   }

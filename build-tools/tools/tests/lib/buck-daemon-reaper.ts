@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { spawn } from "node:child_process";
 import path from "node:path";
+import { resolveToolPathSync } from "../../lib/tool-paths.ts";
 import { cwdIsInsideTempRepo } from "./buck-daemon-reaper-utils.ts";
 
 type Args = {
@@ -29,8 +30,9 @@ function isPidAlive(pid: number): boolean {
 
 async function processStartSignature(pid: number, timeoutMs: number): Promise<string> {
   if (!Number.isFinite(pid) || pid <= 1) return "";
+  const psPath = resolveToolPathSync("ps");
   return await new Promise<string>((resolve) => {
-    const child = spawn("ps", ["-p", String(pid), "-o", "lstart="], {
+    const child = spawn(psPath, ["-p", String(pid), "-o", "lstart="], {
       stdio: ["ignore", "pipe", "ignore"],
     });
     let buf = "";
@@ -65,8 +67,9 @@ async function sleep(ms: number): Promise<void> {
 }
 
 async function psLines(timeoutMs: number): Promise<string[]> {
+  const psPath = resolveToolPathSync("ps");
   const stdout = await new Promise<string>((resolve) => {
-    const child = spawn("ps", ["-A", "-o", "pid=,ppid=,command="], {
+    const child = spawn(psPath, ["-A", "-o", "pid=,ppid=,command="], {
       stdio: ["ignore", "pipe", "ignore"],
     });
     let buf = "";
@@ -126,8 +129,9 @@ async function readForkserverProcesses(): Promise<
 async function cwdForPid(pid: number): Promise<string> {
   // Use lsof to read cwd, which is reliable on macOS for same-user processes, but can hang.
   // If it hangs, return "" and skip this PID (better to miss one sweep than leak reaper processes).
+  const lsofPath = resolveToolPathSync("lsof");
   const out = await new Promise<string>((resolve) => {
-    const child = spawn("lsof", ["-a", "-p", String(pid), "-d", "cwd", "-Fn"], {
+    const child = spawn(lsofPath, ["-a", "-p", String(pid), "-d", "cwd", "-Fn"], {
       stdio: ["ignore", "pipe", "ignore"],
     });
     let buf = "";
@@ -160,8 +164,9 @@ async function killBuckIsoInRepo(
   buck2dPid: number,
 ): Promise<void> {
   if (!tmpRepoRoot || !iso) return;
+  const buck2Path = resolveToolPathSync("buck2");
   await new Promise<void>((resolve) => {
-    const child = spawn("buck2", ["--isolation-dir", iso, "kill"], {
+    const child = spawn(buck2Path, ["--isolation-dir", iso, "kill"], {
       cwd: tmpRepoRoot,
       stdio: ["ignore", "ignore", "ignore"],
     });
@@ -179,8 +184,9 @@ async function killBuckIsoInRepo(
   // If buck2 kill didn't terminate the daemon, SIGKILL the matching buck2d.
   // Guard against PID reuse by verifying the command line includes the expected isolation dir.
   if (Number.isFinite(buck2dPid) && buck2dPid > 1 && isPidAlive(buck2dPid)) {
+    const psPath = resolveToolPathSync("ps");
     const cmd = await new Promise<string>((resolve) => {
-      const child = spawn("ps", ["-p", String(buck2dPid), "-o", "command="], {
+      const child = spawn(psPath, ["-p", String(buck2dPid), "-o", "command="], {
         stdio: ["ignore", "pipe", "ignore"],
       });
       let buf = "";
@@ -246,8 +252,9 @@ async function reapBuckDaemonsForTempRepo(tmpRepoRoot: string): Promise<void> {
     // matching buck2d for this forkserver+iso, SIGKILL it. Guard against PID reuse by verifying
     // command line contains both buck2d and the expected isolation dir.
     if (iso && Number.isFinite(f.ppid) && f.ppid > 1 && isPidAlive(f.ppid)) {
+      const psPath = resolveToolPathSync("ps");
       const parentCmd = await new Promise<string>((resolve) => {
-        const child = spawn("ps", ["-p", String(f.ppid), "-o", "command="], {
+        const child = spawn(psPath, ["-p", String(f.ppid), "-o", "command="], {
           stdio: ["ignore", "pipe", "ignore"],
         });
         let buf = "";
@@ -276,8 +283,9 @@ async function reapBuckDaemonsForTempRepo(tmpRepoRoot: string): Promise<void> {
   try {
     const base = path.basename(path.resolve(tmpRepoRoot));
     if (base) {
+      const psPath = resolveToolPathSync("ps");
       const res = await new Promise<string>((resolve) => {
-        const child = spawn("ps", ["-A", "-o", "pid=,command="], {
+        const child = spawn(psPath, ["-A", "-o", "pid=,command="], {
           stdio: ["ignore", "pipe", "ignore"],
         });
         let buf = "";

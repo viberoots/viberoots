@@ -4,18 +4,20 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { resolveToolPath } from "../../../lib/tool-paths.ts";
 
 let buckReaperStateFile: string | null = null;
 let buckReaperStarted = false;
 
 async function startSignatureForPid(pid: number, $: any): Promise<string> {
   try {
+    const psPath = await resolveToolPath("ps");
     const res = await $({
       stdio: "pipe",
       reject: false,
       nothrow: true,
       timeout: 1000,
-    })`ps -p ${pid} -o lstart=`;
+    })`${psPath} -p ${pid} -o lstart=`;
     return String(res.stdout || "").trim();
   } catch {
     return "";

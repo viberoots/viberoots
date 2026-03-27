@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { resolveToolPath } from "../../lib/tool-paths.ts";
 
 export async function killBuckIsolation(root: string, iso: string): Promise<void> {
   await $({ stdio: "ignore", cwd: root })`buck2 --isolation-dir ${iso} kill`.nothrow();
@@ -35,7 +36,8 @@ export async function startBuckDaemonReaper(opts: {
   iso: string;
   stateFile: string;
 }): Promise<void> {
-  const parentSig = await $({ stdio: "pipe" })`ps -p ${process.pid} -o lstart=`
+  const psPath = await resolveToolPath("ps");
+  const parentSig = await $({ stdio: "pipe" })`${psPath} -p ${process.pid} -o lstart=`
     .then((r) => String(r.stdout || "").trim())
     .catch(() => "");
   if (!parentSig) return;

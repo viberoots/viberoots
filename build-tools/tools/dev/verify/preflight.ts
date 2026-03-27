@@ -1,11 +1,13 @@
 import { appendVerifyLogLine } from "./process-control.ts";
 import { isNixGcCommand } from "../../lib/nix-gc-lock.ts";
+import { resolveToolPath } from "../../lib/tool-paths.ts";
 
 export async function activeNixGcProcesses(): Promise<Array<{ pid: number; command: string }>> {
+  const psPath = await resolveToolPath("ps");
   const out = await $({
     stdio: "pipe",
     reject: false,
-  })`ps -axo pid=,command=`;
+  })`${psPath} -axo pid=,command=`;
   if ((out as any).exitCode !== 0) return [];
   const rows: Array<{ pid: number; command: string }> = [];
   const lines = String((out as any).stdout || "").split("\n");

@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { resolveToolPathSync } from "../../lib/tool-paths.ts";
 import { nodeBin, zxNodeBase } from "./paths.ts";
 
 async function getDiskStats(root: string): Promise<{ freePct: number; freeBytes: number }> {
@@ -49,6 +50,7 @@ export async function runHousekeeping(opts: { isCI: boolean; root: string }): Pr
 
     const nodeBase = zxNodeBase(opts.root);
     const node = nodeBin();
+    const timeoutPath = resolveToolPathSync("timeout");
     console.log("[housekeeping] starting post-build housekeeping...");
 
     const cleanMinutes = 30;
@@ -80,7 +82,7 @@ export async function runHousekeeping(opts: { isCI: boolean; root: string }): Pr
       await $({
         stdio: "ignore",
         cwd: opts.root,
-      })`bash --noprofile --norc -c 'set -euo pipefail; TOUT=60; if ! command -v timeout >/dev/null 2>&1; then echo \"housekeeping: error: timeout not found on PATH\" 1>&2; exit 127; fi; set +e; timeout -k 5s ${TOUT}s nix store optimise >/dev/null 2>&1; exit 0'`.nothrow();
+      })`bash --noprofile --norc -c 'set -euo pipefail; TOUT=60; TIMEOUT_PATH="$1"; set +e; "$TIMEOUT_PATH" -k 5s "${TOUT}s" nix store optimise >/dev/null 2>&1; exit 0' -- ${timeoutPath}`.nothrow();
       await touch(optStamp);
     } else {
       console.log("[housekeeping] optimise: skipped (cooldown)");
@@ -98,7 +100,7 @@ export async function runHousekeeping(opts: { isCI: boolean; root: string }): Pr
       await $({
         stdio: "ignore",
         cwd: opts.root,
-      })`bash --noprofile --norc -c 'set -euo pipefail; TOUT=45; if ! command -v timeout >/dev/null 2>&1; then echo \"housekeeping: error: timeout not found on PATH\" 1>&2; exit 127; fi; set +e; timeout -k 5s ${TOUT}s nix-store --gc --max-freed ${cap} >/dev/null 2>&1; exit 0'`.nothrow();
+      })`bash --noprofile --norc -c 'set -euo pipefail; TOUT=45; TIMEOUT_PATH="$1"; CAP="$2"; set +e; "$TIMEOUT_PATH" -k 5s "${TOUT}s" nix-store --gc --max-freed "$CAP" >/dev/null 2>&1; exit 0' -- ${timeoutPath} ${cap}`.nothrow();
       await touch(gcStamp);
 
       const { freePct: afterPct, freeBytes: afterBytes } = await getDiskStats(opts.root);

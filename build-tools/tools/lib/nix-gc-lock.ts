@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { resolveToolPathSync } from "./tool-paths.ts";
 
 function isExactTokenOrNixBin(token: string, binName: "nix" | "nix-store"): boolean {
   if (token === binName) return true;
@@ -25,7 +26,7 @@ export function isNixGcCommand(cmd: string): boolean {
 }
 
 export function activeNixGcPids(): number[] {
-  const out = spawnSync("ps", ["-axo", "pid=,command="], {
+  const out = spawnSync(resolveToolPathSync("ps"), ["-axo", "pid=,command="], {
     encoding: "utf8",
   });
   if (out.status !== 0) return [];

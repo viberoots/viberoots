@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { resolveToolPathSync } from "../../lib/tool-paths.ts";
 
 export type ForkserverProc = {
   pid: number;
@@ -22,8 +23,9 @@ export function parsePsLine(
 }
 
 export async function psLines(timeoutMs: number): Promise<string[]> {
+  const psPath = resolveToolPathSync("ps");
   return await new Promise<string[]>((resolve) => {
-    const child = spawn("ps", ["-A", "-o", "pid=,ppid=,etime=,command="], {
+    const child = spawn(psPath, ["-A", "-o", "pid=,ppid=,etime=,command="], {
       stdio: ["ignore", "pipe", "ignore"],
     });
     let buf = "";
@@ -87,8 +89,9 @@ export function isPidAlive(pid: number): boolean {
 }
 
 export async function buck2Kill(repoRoot: string, iso: string, timeoutMs: number): Promise<void> {
+  const buck2Path = resolveToolPathSync("buck2");
   await new Promise<void>((resolve) => {
-    const child = spawn("buck2", ["--isolation-dir", iso, "kill"], {
+    const child = spawn(buck2Path, ["--isolation-dir", iso, "kill"], {
       cwd: repoRoot,
       stdio: ["ignore", "ignore", "ignore"],
     });

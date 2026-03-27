@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { resolveToolPathSync } from "../../lib/tool-paths.ts";
 
 async function exists(p: string): Promise<boolean> {
   try {
@@ -124,19 +125,20 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
     } catch {}
     // Optional quick preflight: detect obvious connectivity issues without failing the run
     try {
+      const timeoutPath = resolveToolPathSync("timeout");
       await $({
         cwd: tmp,
         stdio: "pipe",
-      })`bash --noprofile --norc -lc ${`if command -v curl >/dev/null 2>&1; then timeout 3 curl -sSfI https://proxy.golang.org/ >/dev/null && echo "[gomod2nix] preflight: proxy.golang.org OK" || echo "[gomod2nix] preflight: proxy.golang.org unreachable"; else echo "[gomod2nix] preflight: curl not found"; fi`}`;
+      })`bash --noprofile --norc -lc ${`TIMEOUT_PATH="$1"; if command -v curl >/dev/null 2>&1; then "$TIMEOUT_PATH" 3 curl -sSfI https://proxy.golang.org/ >/dev/null && echo "[gomod2nix] preflight: proxy.golang.org OK" || echo "[gomod2nix] preflight: proxy.golang.org unreachable"; else echo "[gomod2nix] preflight: curl not found"; fi`} -- ${timeoutPath}`;
     } catch {}
-    // Use timeout if present; otherwise run directly to support minimal shells
     let ran = false;
     let tmpOut = path.join(tmp, "gomod2nix.toml");
     try {
+      const timeoutPath = resolveToolPathSync("timeout");
       await $({
         cwd: tmp,
         stdio: "inherit",
-      })`bash --noprofile --norc -lc ${`if command -v timeout >/dev/null 2>&1; then timeout ${timeoutSec} ${cmd}; else ${cmd}; fi`}`;
+      })`bash --noprofile --norc -lc ${`TIMEOUT_PATH="$1"; "$TIMEOUT_PATH" ${timeoutSec} ${cmd}`} -- ${timeoutPath}`;
       ran = true;
     } catch {
       ran = false;

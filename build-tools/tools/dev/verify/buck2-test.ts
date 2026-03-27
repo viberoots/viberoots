@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import process from "node:process";
 import { type Buck2Completion, parseBuck2ProgressFromLines } from "./buck2-output";
+import { resolveToolPathSync } from "../../lib/tool-paths.ts";
 
 export type SpawnedVerifyTests = {
   pgid: number;
@@ -90,6 +91,8 @@ export function spawnVerifyBuck2Tests(opts: {
     `TEST_EXCLUDE_CPP_REQS=${process.env.TEST_EXCLUDE_CPP_REQS || ""}`,
     "--env",
     `ZX_TEST_NODE_MODULES_OUT=${opts.zxNodeModulesOut}`,
+    "--env",
+    `NIX_PATH=${process.env.NIX_PATH || ""}`,
     ...extraEnvArgs,
   ];
   if ((process.env.COVERAGE || "0") === "1" && process.env.NODE_V8_COVERAGE) {
@@ -113,8 +116,10 @@ export function spawnVerifyBuck2Tests(opts: {
   ];
 
   const startS = Math.floor(Date.now() / 1000);
+  const timeoutPath = resolveToolPathSync("timeout");
+  const buck2Path = resolveToolPathSync("buck2");
 
-  const proc = spawn("timeout", ["-k", "10s", `${tsec}s`, "buck2", ...buckArgs], {
+  const proc = spawn(timeoutPath, ["-k", "10s", `${tsec}s`, buck2Path, ...buckArgs], {
     cwd: opts.root,
     env: {
       ...process.env,

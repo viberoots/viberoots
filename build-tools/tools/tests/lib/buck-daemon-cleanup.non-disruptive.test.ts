@@ -4,11 +4,13 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { resolveToolPathSync } from "../../lib/tool-paths.ts";
 import { runInTemp } from "./test-helpers";
 
 function psForkserversForToken(token: string): Promise<string[]> {
+  const psPath = resolveToolPathSync("ps");
   return new Promise((resolve) => {
-    const child = spawn("ps", ["-A", "-o", "pid=,ppid=,command="], {
+    const child = spawn(psPath, ["-A", "-o", "pid=,ppid=,command="], {
       stdio: ["ignore", "pipe", "ignore"],
     });
     let buf = "";
