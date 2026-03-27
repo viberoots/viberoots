@@ -24,6 +24,7 @@ import {
   repoRelativeLockfilePath,
 } from "./update-pnpm-hash/paths.ts";
 import {
+  currentVerifiedMarkerFingerprint,
   readVerifiedMarker,
   sha256File,
   verifiedMarkerPath,
@@ -42,6 +43,7 @@ async function inner() {
   const timeoutSec = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600").trim();
   const lockAbs = path.join(repoRoot, relLock);
   const markerPath = verifiedMarkerPath(repoRoot, importer);
+  const builderFingerprint = await currentVerifiedMarkerFingerprint(repoRoot);
 
   const key = relLock;
   if (force) {
@@ -62,6 +64,7 @@ async function inner() {
       importer,
       key,
       repoRoot,
+      builderFingerprint,
       storeAttr,
       unfixedAttr,
       timeoutSec,
@@ -83,7 +86,8 @@ async function inner() {
       marker.importer === importer &&
       marker.lockfile === key &&
       marker.lockHash === existingLockHash &&
-      marker.hashValue === existingHash
+      marker.hashValue === existingHash &&
+      marker.builderFingerprint === builderFingerprint
     ) {
       console.log(
         `[update-pnpm-hash] importer=${importer} step=skip-root-marker attr=${storeAttr} lockfile=${key}`,
@@ -117,6 +121,7 @@ async function inner() {
           lockfile: key,
           lockHash,
           hashValue: existingHash,
+          builderFingerprint,
         });
       }
     }
@@ -222,6 +227,7 @@ async function inner() {
         lockfile: key,
         lockHash,
         hashValue: nextHash,
+        builderFingerprint,
       });
     }
   }

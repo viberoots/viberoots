@@ -17,6 +17,7 @@ export async function handleNonDefaultImporter(opts: {
   importer: string;
   key: string;
   repoRoot: string;
+  builderFingerprint: string;
   storeAttr: string;
   unfixedAttr: string;
   timeoutSec: string;
@@ -35,7 +36,8 @@ export async function handleNonDefaultImporter(opts: {
       opts.existingMarker.importer === opts.importer &&
       opts.existingMarker.lockfile === opts.key &&
       opts.existingMarker.lockHash === opts.existingLockHash &&
-      opts.existingMarker.hashValue === opts.existingHash
+      opts.existingMarker.hashValue === opts.existingHash &&
+      opts.existingMarker.builderFingerprint === opts.builderFingerprint
     ) {
       console.log(
         `[update-pnpm-hash] importer=${opts.importer} step=skip-existing-hash attr=${opts.storeAttr} lockfile=${opts.key}`,
@@ -147,6 +149,7 @@ export async function handleNonDefaultImporter(opts: {
         lockfile: opts.key,
         lockHash: opts.existingLockHash,
         hashValue: sri,
+        builderFingerprint: opts.builderFingerprint,
       });
     }
     console.log("pnpm-store:", opts.storeAttr, "hash updated and build succeeded");

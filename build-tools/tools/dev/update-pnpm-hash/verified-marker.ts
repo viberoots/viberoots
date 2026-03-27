@@ -7,6 +7,7 @@ export type PnpmStoreVerifiedMarker = {
   lockfile: string;
   lockHash: string;
   hashValue: string;
+  builderFingerprint: string;
 };
 
 export function verifiedMarkerPath(repoRoot: string, importer: string): string {
@@ -34,11 +35,32 @@ export async function readVerifiedMarker(
     const lockfile = String(m.lockfile || "").trim();
     const lockHash = String(m.lockHash || "").trim();
     const hashValue = String(m.hashValue || "").trim();
-    if (!importer || !lockfile || !lockHash || !hashValue) return null;
-    return { importer, lockfile, lockHash, hashValue };
+    const builderFingerprint = String(m.builderFingerprint || "").trim();
+    if (!importer || !lockfile || !lockHash || !hashValue || !builderFingerprint) return null;
+    return { importer, lockfile, lockHash, hashValue, builderFingerprint };
   } catch {
     return null;
   }
+}
+
+export async function currentVerifiedMarkerFingerprint(repoRoot: string): Promise<string> {
+  const files = [
+    "build-tools/tools/nix/node-modules/store.nix",
+    "build-tools/tools/nix/node-modules/modules.nix",
+  ];
+  const hash = crypto.createHash("sha256");
+  hash.update(`platform=${process.platform}\n`);
+  hash.update(`arch=${process.arch}\n`);
+  for (const rel of files) {
+    hash.update(`file=${rel}\n`);
+    try {
+      hash.update(await fsp.readFile(path.join(repoRoot, rel), "utf8"));
+    } catch {
+      hash.update("<missing>");
+    }
+    hash.update("\n");
+  }
+  return hash.digest("hex");
 }
 
 export async function writeVerifiedMarker(

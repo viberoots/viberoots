@@ -22,4 +22,12 @@ test("update-pnpm-hash root importer uses strict marker fast-path", async () => 
       "update-pnpm-hash.ts root fast-path must verify marker hash matches lockfile hash entry",
     );
   }
+  if (!mainTxt.includes("marker.builderFingerprint === builderFingerprint")) {
+    throw new Error(
+      "update-pnpm-hash.ts root fast-path must invalidate when builder fingerprint changes",
+    );
+  }
+  if (!markerTxt.includes("currentVerifiedMarkerFingerprint")) {
+    throw new Error("verified-marker.ts must expose a builder fingerprint helper");
+  }
 });
