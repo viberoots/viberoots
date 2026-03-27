@@ -40,18 +40,8 @@ export async function syncSourcePnpmStoreIntoLocalPrefetch(sourceStore: string):
     const srcFiles = path.join(srcVer, "files");
     const dstFiles = path.join(dstVer, "files");
     if (await dirExists(srcFiles)) {
-      if (!(await dirExists(dstFiles))) {
-        const current = await fsp.lstat(dstFiles).catch(() => null);
-        if (!current) {
-          await fsp.symlink(srcFiles, dstFiles).catch(() => {});
-        } else {
-          await ensureMergedDir(dstFiles);
-          await fsp.cp(srcFiles, dstFiles, { recursive: true }).catch(() => {});
-        }
-      } else {
-        await ensureMergedDir(dstFiles);
-        await fsp.cp(srcFiles, dstFiles, { recursive: true }).catch(() => {});
-      }
+      await ensureMergedDir(dstFiles);
+      await fsp.cp(srcFiles, dstFiles, { recursive: true }).catch(() => {});
     }
     const srcIndex = path.join(srcVer, "index");
     const dstIndex = path.join(dstVer, "index");
