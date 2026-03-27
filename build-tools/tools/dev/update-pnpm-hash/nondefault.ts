@@ -1,4 +1,5 @@
 import { type ManagedCommandActivity } from "../../lib/managed-command.ts";
+import { flakeRefForImporter } from "../install/common.ts";
 import { updateNodeModulesHashesJson } from "./hashes-json.ts";
 import { withHeartbeat } from "./heartbeat.ts";
 import { generateImporterLockfile, makeFilteredFlakeRef } from "./lockfile.ts";
@@ -28,6 +29,7 @@ export async function handleNonDefaultImporter(opts: {
   existingMarker: PnpmStoreVerifiedMarker | null;
 }): Promise<boolean> {
   if (opts.importer === ".") return false;
+  const fixedFlakeRef = flakeRefForImporter(opts.repoRoot, opts.importer);
   if (opts.hasValidExistingHash) {
     if (
       opts.existingLockHash &&
@@ -49,7 +51,7 @@ export async function handleNonDefaultImporter(opts: {
     const verifyExistingActivity = newActivity();
     const verifyExisting = await withHeartbeat(
       `importer=${opts.importer} step=fixed-build attr=${opts.storeAttr}`,
-      buildStore(opts.storeAttr, `path:${opts.repoRoot}#pnpm`, verifyExistingActivity),
+      buildStore(opts.storeAttr, fixedFlakeRef, verifyExistingActivity),
       { activity: verifyExistingActivity },
     );
     if (verifyExisting.ok) {
@@ -78,7 +80,7 @@ export async function handleNonDefaultImporter(opts: {
       const verifyAfterActivity = newActivity();
       const verifyAfterHash = await withHeartbeat(
         `importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr}`,
-        buildStore(opts.storeAttr, `path:${opts.repoRoot}#pnpm`, verifyAfterActivity),
+        buildStore(opts.storeAttr, fixedFlakeRef, verifyAfterActivity),
         { activity: verifyAfterActivity },
       );
       if (!verifyAfterHash.ok) {

@@ -7,12 +7,13 @@ test("update-pnpm-hash nondefault importer verifies fixed build before unfixed r
   if (!txt.includes("step=fixed-build attr=${opts.storeAttr}")) {
     throw new Error("nondefault importer path must verify fixed build before unfixed rebuild");
   }
-  if (
-    !txt.includes(
-      "buildStore(opts.storeAttr, `path:${opts.repoRoot}#pnpm`, verifyExistingActivity)",
-    )
-  ) {
-    throw new Error("nondefault importer fixed-build verification must use the current repo flake");
+  if (!txt.includes("const fixedFlakeRef = flakeRefForImporter(opts.repoRoot, opts.importer);")) {
+    throw new Error("nondefault importer fixed-build verification must compute importer flake ref");
+  }
+  if (!txt.includes("buildStore(opts.storeAttr, fixedFlakeRef, verifyExistingActivity)")) {
+    throw new Error(
+      "nondefault importer fixed-build verification must use normalized importer flake ref",
+    );
   }
   if (!txt.includes("const suggestedFromExisting = extractHash")) {
     throw new Error(
