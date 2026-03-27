@@ -18,6 +18,7 @@ import {
 } from "./housekeeping.ts";
 import { runVerifyLintPreflight } from "./lint-preflight.ts";
 import { acquireVerifyLock } from "./lock.ts";
+import { ensureVerifyPinnedNixpkgs } from "./nix-env.ts";
 import { activeNixGcProcesses, logVerifyRevision } from "./preflight.ts";
 import { prewarmVerifyOnce } from "./prewarm.ts";
 import { printVerifySelection, resolveRequestedVerifyScope } from "./requested-scope.ts";
@@ -35,10 +36,6 @@ import { isProjectsOnlyVerifyTargets } from "./target-scope.ts";
 import { summarizeTemplateScopeDecision } from "./template-test-scope.ts";
 import { ensureRepoLocalTmpRoot } from "./tmp-root.ts";
 import { computeZxTestNodeModulesOut } from "./zx-node-modules.ts";
-import {
-  nixEvalTempDirOutsideWorkspace,
-  pinnedNixpkgsOutPathExpr,
-} from "../../lib/pinned-nixpkgs.ts";
 
 export async function runVerify(): Promise<void> {
   const invocationCwd = process.cwd();
@@ -49,28 +46,7 @@ export async function runVerify(): Promise<void> {
     args: parseVerifyArgs(),
   });
   const zxInitPath = path.join(root, "build-tools", "tools", "dev", "zx-init.mjs");
-  {
-    const nixEvalTmp = nixEvalTempDirOutsideWorkspace(root);
-    await fsp.mkdir(nixEvalTmp, { recursive: true }).catch(() => {});
-    const nixpkgsPath = await $({
-      cwd: root,
-      stdio: "pipe",
-      env: {
-        ...process.env,
-        TMPDIR: nixEvalTmp,
-      },
-    })`nix eval --impure --accept-flake-config --raw --expr ${pinnedNixpkgsOutPathExpr(path.join(root, "flake.lock"))}`
-      .then((res) => String(res.stdout || "").trim())
-      .catch(() => "");
-    if (nixpkgsPath) {
-      const entries = String(process.env.NIX_PATH || "")
-        .split(":")
-        .map((entry) => entry.trim())
-        .filter(Boolean)
-        .filter((entry) => !entry.startsWith("nixpkgs="));
-      process.env.NIX_PATH = [`nixpkgs=${nixpkgsPath}`, ...entries].join(":");
-    }
-  }
+  await ensureVerifyPinnedNixpkgs(root);
   if (args.explainSelection) {
     printVerifySelection(templateScope);
     return;
