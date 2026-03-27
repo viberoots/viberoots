@@ -198,11 +198,11 @@ in {
         if [ -d .pnpm ]; then
           cp -R .pnpm $out/
         fi
-        mapfile -d '''' -t brokenLinks < <(find "$out" -type l ! -exec test -e {} \; -print0)
-        if [ "''${#brokenLinks[@]}" -gt 0 ]; then
+        brokenLinks="$(find "$out" -type l ! -exec test -e {} \; -print || true)"
+        if [ -n "$brokenLinks" ]; then
           echo "[nix] mkNodeModules: pruning dangling symlinks before fixup"
-          printf '%s\n' "''${brokenLinks[@]}"
-          rm -f "''${brokenLinks[@]}"
+          printf '%s\n' "$brokenLinks"
+          find "$out" -type l ! -exec test -e {} \; -delete
         fi
         runHook postInstall
       '';
