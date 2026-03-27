@@ -20,6 +20,7 @@ import {
   nixEvalTempDirOutsideWorkspace,
   pinnedNixpkgsOutPathExpr,
 } from "../../../lib/pinned-nixpkgs.ts";
+import { externalPnpmStateDirs } from "../../../lib/pnpm-state-paths.ts";
 
 let cachedDevEnvExport: Promise<string> | null = null;
 let cachedPinnedNixpkgsPath: Promise<string> | null = null;
@@ -389,12 +390,15 @@ export async function runInTemp<T>(
   exportEnv.DIRENV_LOG_FORMAT = "";
   exportEnv.ZX_INIT = zxInitPathFromWorkspace();
   const wantsUnifiedPnpmStore =
-    String(process.env.NIX_PNPM_ALLOW_GENERATE || "").trim() === "1" ||
-    String(process.env.NIX_USE_PREFETCHED_PNPM_STORE || "").trim() === "1";
+    String(process.env.TEST_DISABLE_UNIFIED_PNPM_STORE || "").trim() !== "1";
   if (wantsUnifiedPnpmStore) {
     const unified = await ensureUnifiedPnpmStoreOncePerWorker($);
+    const pnpmState = await externalPnpmStateDirs(tmp);
     exportEnv.LOCAL_PNPM_STORE = exportEnv.LOCAL_PNPM_STORE || unified;
     exportEnv.NIX_USE_PREFETCHED_PNPM_STORE = "1";
+    exportEnv.PNPM_HOME = exportEnv.PNPM_HOME || pnpmState.homeDir;
+    exportEnv.npm_config_store_dir = exportEnv.npm_config_store_dir || unified;
+    exportEnv.NPM_CONFIG_STORE_DIR = exportEnv.NPM_CONFIG_STORE_DIR || unified;
   }
 
   const nodeOpts = ["--experimental-strip-types", `--import ${exportEnv.ZX_INIT}`];

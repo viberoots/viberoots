@@ -3,6 +3,10 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { activeNixGcPids, gcWaitConfig, waitForNoActiveNixGc } from "../../lib/nix-gc-lock.ts";
 import { importerLockfileNeedsRegen } from "../../lib/pnpm-importer-lockfile.ts";
+import {
+  externalPnpmStateDirs,
+  removeLegacyImporterPnpmState,
+} from "../../lib/pnpm-state-paths.ts";
 
 async function runLockfileInstallWithGcRetry(opts: {
   importerAbs: string;
@@ -51,13 +55,6 @@ async function runLockfileInstallWithGcRetry(opts: {
 function pnpmFlakeRef(repoRoot: string): string {
   // Keep path: so newly scaffolded/untracked files are visible to flake evaluation.
   return `path:${path.resolve(repoRoot)}#pnpm`;
-}
-
-function localPnpmDirs(importerAbs: string): { homeDir: string; storeDir: string } {
-  return {
-    homeDir: path.join(importerAbs, ".pnpm-home"),
-    storeDir: path.join(importerAbs, ".pnpm-store"),
-  };
 }
 
 export async function makeFilteredFlakeRef(repoRoot: string): Promise<{
@@ -129,9 +126,8 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
   const { workspaceFileAbs, hadLocalWorkspaceFile } = await ensureLocalWorkspaceMarker(importerAbs);
   const fetchTimeout = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "").trim() || "600";
   const timeoutMs = (Number.parseInt(fetchTimeout, 10) || 600) * 1000 + 120_000;
-  const { homeDir, storeDir } = localPnpmDirs(importerAbs);
-  await fsp.mkdir(homeDir, { recursive: true }).catch(() => {});
-  await fsp.mkdir(storeDir, { recursive: true }).catch(() => {});
+  await removeLegacyImporterPnpmState(importerAbs);
+  const { homeDir, storeDir } = await externalPnpmStateDirs(importerAbs);
   const flakeRef = pnpmFlakeRef(opts.repoRoot);
   console.log(`[lockfile] generating importer lockfile: ${opts.importer}`);
   await runLockfileInstallWithGcRetry({

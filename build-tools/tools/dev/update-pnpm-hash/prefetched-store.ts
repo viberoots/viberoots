@@ -57,7 +57,7 @@ export async function syncBuiltPnpmStoreIntoLocalPrefetch(storeOutPath: string):
     const srcIndex = path.join(srcVer, "index");
     const dstIndex = path.join(dstVer, "index");
     if (await dirExists(srcIndex)) {
-      await fsp.rm(dstIndex, { recursive: true, force: true }).catch(() => {});
+      await ensureMergedDir(dstIndex);
       await fsp.cp(srcIndex, dstIndex, { recursive: true }).catch(() => {});
     }
   }

@@ -2,6 +2,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 
 import { parsePnpmLock } from "./pnpm-lock.ts";
+import { externalPnpmStateDirs, removeLegacyImporterPnpmState } from "./pnpm-state-paths.ts";
 
 type PkgJson = {
   dependencies?: Record<string, string>;
@@ -81,11 +82,14 @@ export async function ensureImporterLockfileFresh(opts: {
     importerRel: opts.importerRel,
   }).catch(() => true);
   if (!needsRegen) return;
+  const importerAbs = path.join(opts.tmp, opts.importerRel);
+  await removeLegacyImporterPnpmState(importerAbs);
+  const { homeDir, storeDir } = await externalPnpmStateDirs(importerAbs);
 
   await opts.$({
     stdio: "inherit",
     env: opts.env,
-  })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p "${opts.tmp}/${opts.importerRel}/.pnpm-home" "${opts.tmp}/${opts.importerRel}/.pnpm-store"; export PNPM_HOME="${opts.tmp}/${opts.importerRel}/.pnpm-home"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config "path:${opts.tmp}#pnpm" -- config set store-dir "${opts.tmp}/${opts.importerRel}/.pnpm-store"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config "path:${opts.tmp}#pnpm" -- install --filter "./${opts.importerRel}" --lockfile-only --prod=false --ignore-scripts --lockfile-dir "./${opts.importerRel}" --dir "./${opts.importerRel}" --color never'`;
+  })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p "${homeDir}" "${storeDir}"; export PNPM_HOME="${homeDir}"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config "path:${opts.tmp}#pnpm" -- config set store-dir "${storeDir}"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config "path:${opts.tmp}#pnpm" -- install --filter "./${opts.importerRel}" --lockfile-only --prod=false --ignore-scripts --lockfile-dir "./${opts.importerRel}" --dir "./${opts.importerRel}" --color never'`;
 
   await fsp.access(lockAbs);
 }

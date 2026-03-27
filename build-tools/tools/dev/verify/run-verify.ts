@@ -21,6 +21,7 @@ import { acquireVerifyLock } from "./lock.ts";
 import { ensureVerifyPinnedNixpkgs } from "./nix-env.ts";
 import { activeNixGcProcesses, logVerifyRevision } from "./preflight.ts";
 import { prewarmVerifyOnce } from "./prewarm.ts";
+import { cleanupVerifyLegacyPnpmState } from "./pnpm-state.ts";
 import { printVerifySelection, resolveRequestedVerifyScope } from "./requested-scope.ts";
 import {
   appendVerifyLogLine,
@@ -74,6 +75,7 @@ export async function runVerify(): Promise<void> {
   const allowConcurrent = process.env.VERIFY_ALLOW_CONCURRENT === "1";
   const lock = await acquireVerifyLock({ root, allowConcurrent });
   await ensureRepoLocalTmpRoot(root);
+  await cleanupVerifyLegacyPnpmState(root);
   const analysisDir = path.join(
     root,
     "buck-out",
