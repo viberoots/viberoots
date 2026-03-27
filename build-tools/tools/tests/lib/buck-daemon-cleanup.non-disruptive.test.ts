@@ -8,7 +8,7 @@ import { runInTemp } from "./test-helpers";
 
 function psForkserversForToken(token: string): Promise<string[]> {
   return new Promise((resolve) => {
-    const child = spawn("/bin/ps", ["-A", "-o", "pid=,ppid=,command="], {
+    const child = spawn("ps", ["-A", "-o", "pid=,ppid=,command="], {
       stdio: ["ignore", "pipe", "ignore"],
     });
     let buf = "";

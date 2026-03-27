@@ -30,7 +30,7 @@ function isPidAlive(pid: number): boolean {
 async function processStartSignature(pid: number, timeoutMs: number): Promise<string> {
   if (!Number.isFinite(pid) || pid <= 1) return "";
   return await new Promise<string>((resolve) => {
-    const child = spawn("/bin/ps", ["-p", String(pid), "-o", "lstart="], {
+    const child = spawn("ps", ["-p", String(pid), "-o", "lstart="], {
       stdio: ["ignore", "pipe", "ignore"],
     });
     let buf = "";
@@ -66,7 +66,7 @@ async function sleep(ms: number): Promise<void> {
 
 async function psLines(timeoutMs: number): Promise<string[]> {
   const stdout = await new Promise<string>((resolve) => {
-    const child = spawn("/bin/ps", ["-A", "-o", "pid=,ppid=,command="], {
+    const child = spawn("ps", ["-A", "-o", "pid=,ppid=,command="], {
       stdio: ["ignore", "pipe", "ignore"],
     });
     let buf = "";
@@ -180,7 +180,7 @@ async function killBuckIsoInRepo(
   // Guard against PID reuse by verifying the command line includes the expected isolation dir.
   if (Number.isFinite(buck2dPid) && buck2dPid > 1 && isPidAlive(buck2dPid)) {
     const cmd = await new Promise<string>((resolve) => {
-      const child = spawn("/bin/ps", ["-p", String(buck2dPid), "-o", "command="], {
+      const child = spawn("ps", ["-p", String(buck2dPid), "-o", "command="], {
         stdio: ["ignore", "pipe", "ignore"],
       });
       let buf = "";
@@ -247,7 +247,7 @@ async function reapBuckDaemonsForTempRepo(tmpRepoRoot: string): Promise<void> {
     // command line contains both buck2d and the expected isolation dir.
     if (iso && Number.isFinite(f.ppid) && f.ppid > 1 && isPidAlive(f.ppid)) {
       const parentCmd = await new Promise<string>((resolve) => {
-        const child = spawn("/bin/ps", ["-p", String(f.ppid), "-o", "command="], {
+        const child = spawn("ps", ["-p", String(f.ppid), "-o", "command="], {
           stdio: ["ignore", "pipe", "ignore"],
         });
         let buf = "";
@@ -277,7 +277,7 @@ async function reapBuckDaemonsForTempRepo(tmpRepoRoot: string): Promise<void> {
     const base = path.basename(path.resolve(tmpRepoRoot));
     if (base) {
       const res = await new Promise<string>((resolve) => {
-        const child = spawn("/bin/ps", ["-A", "-o", "pid=,command="], {
+        const child = spawn("ps", ["-A", "-o", "pid=,command="], {
           stdio: ["ignore", "pipe", "ignore"],
         });
         let buf = "";
@@ -367,7 +367,7 @@ async function main() {
       // Primary path: do not wait and do not reap if the observed pid is not the expected parent.
       return;
     }
-    // Parent PID reuse guard: re-check infrequently to avoid spawning /bin/ps in a tight loop.
+    // Parent PID reuse guard: re-check infrequently to avoid spawning ps in a tight loop.
     let lastSigCheckMs = Date.now();
     while (isPidAlive(parentPid)) {
       if (Date.now() - t0 > maxWaitMs) return;

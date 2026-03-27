@@ -33,7 +33,7 @@ async function psLines(): Promise<string[]> {
   // Cross-platform-ish: use a broad format including command and args
   const args =
     process.platform === "darwin"
-      ? ["/bin/ps", "-A", "-o", "pid=,command="]
+      ? ["ps", "-A", "-o", "pid=,command="]
       : ["ps", "-e", "-o", "pid=,command="];
   const { stdout } = await $({ stdio: "pipe" })`${args}`;
   return String(stdout || "")

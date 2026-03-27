@@ -32,7 +32,7 @@ async function tryBuckKillIsolation(iso: string): Promise<void> {
 
 async function sweepOrphans(patterns: RegExp) {
   try {
-    const { stdout } = await $({ stdio: "pipe" })`/bin/ps -A -o pid=,command=`;
+    const { stdout } = await $({ stdio: "pipe" })`ps -A -o pid=,command=`;
     const lines = String(stdout || "").split("\n");
     for (const ln of lines) {
       const pidFromLine = Number((ln.match(/^\s*(\d+)\s+/) || [])[1] || "0");

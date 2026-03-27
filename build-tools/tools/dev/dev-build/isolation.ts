@@ -15,7 +15,7 @@ export type Isolation = {
 
 async function reapChildBuckDaemonsByPrefix(prefixes: string[]): Promise<void> {
   try {
-    const { stdout } = await $({ stdio: "pipe" })`/bin/ps -A -o pid=,comm=`;
+    const { stdout } = await $({ stdio: "pipe" })`ps -A -o pid=,comm=`;
     const lines = String(stdout || "").split("\n");
     for (const ln of lines) {
       const m = ln.match(/buck2d\[([^\]]+)\]/);
@@ -32,7 +32,7 @@ async function reapChildBuckDaemonsByPrefix(prefixes: string[]): Promise<void> {
 
 async function reapExporterDaemonsFromPs(): Promise<void> {
   try {
-    const { stdout } = await $({ stdio: "pipe" })`/bin/ps -A -o pid=,command=`;
+    const { stdout } = await $({ stdio: "pipe" })`ps -A -o pid=,command=`;
     const lines = String(stdout || "").split("\n");
     for (const ln of lines) {
       const m = ln.match(/--isolation-dir\s+(exporter-[^\s]+)/);

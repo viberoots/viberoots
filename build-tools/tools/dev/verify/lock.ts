@@ -6,7 +6,7 @@ import process from "node:process";
 
 async function pidStartSignature(pid: number): Promise<string> {
   try {
-    const { stdout } = await $({ stdio: "pipe" })`/bin/ps -p ${pid} -o lstart=`;
+    const { stdout } = await $({ stdio: "pipe" })`ps -p ${pid} -o lstart=`;
     return String(stdout || "").trim();
   } catch {
     return "";

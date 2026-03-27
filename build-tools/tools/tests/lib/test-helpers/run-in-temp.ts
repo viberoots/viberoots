@@ -18,6 +18,7 @@ import "./worker-init";
 import { ensureZxInitProbedOnce, zxInitPathFromWorkspace } from "./zx-init-probe";
 
 let cachedDevEnvExport: Promise<string> | null = null;
+let cachedPinnedNixpkgsPath: Promise<string> | null = null;
 let envMutationQueue: Promise<void> = Promise.resolve();
 type EnvKeys = "WORKSPACE_ROOT" | "BUCK_TEST_SRC";
 
@@ -60,6 +61,26 @@ async function exportDevEnvOncePerWorker($: any): Promise<string> {
     return String((out as any).stdout || "");
   })();
   return await cachedDevEnvExport;
+}
+
+async function pinnedNixpkgsPathOncePerWorker($: any): Promise<string> {
+  if (cachedPinnedNixpkgsPath) return await cachedPinnedNixpkgsPath;
+  cachedPinnedNixpkgsPath = (async () => {
+    const out = await $({
+      cwd: process.cwd(),
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+      env: {
+        ...process.env,
+        IN_NIX_SHELL: "1",
+      },
+    })`nix eval --impure --accept-flake-config --raw --expr ${String.raw`let
+      flake = builtins.getFlake (toString ./.);
+    in flake.inputs.nixpkgs.outPath`}`;
+    return String((out as any).stdout || "").trim();
+  })();
+  return await cachedPinnedNixpkgsPath;
 }
 
 async function stableTestHomeRoot(): Promise<string> {
@@ -302,6 +323,17 @@ export async function runInTemp<T>(
   exportEnv.GOPROXY = exportEnv.GOPROXY || "https://proxy.golang.org,direct";
   exportEnv.GOSUMDB = exportEnv.GOSUMDB || "sum.golang.org";
   exportEnv.GOMODCACHE = exportEnv.GOMODCACHE || goModCacheRoot;
+  try {
+    const pinnedNixpkgs = await pinnedNixpkgsPathOncePerWorker($);
+    if (pinnedNixpkgs) {
+      const nixPathEntries = String(exportEnv.NIX_PATH || "")
+        .split(":")
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .filter((entry) => !entry.startsWith("nixpkgs="));
+      exportEnv.NIX_PATH = [`nixpkgs=${pinnedNixpkgs}`, ...nixPathEntries].join(":");
+    }
+  } catch {}
   if (!exportEnv.SSL_CERT_FILE && exportEnv.NIX_SSL_CERT_FILE) {
     exportEnv.SSL_CERT_FILE = exportEnv.NIX_SSL_CERT_FILE;
   }

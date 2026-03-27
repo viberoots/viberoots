@@ -40,7 +40,7 @@ export async function forkserversUnderRepo(
     reject: false,
     nothrow: true,
     timeout: 2000,
-  })`/bin/ps -A -o pid=,ppid=,command=`;
+  })`ps -A -o pid=,ppid=,command=`;
   const lines = String(res.stdout || "")
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -68,7 +68,7 @@ export async function pidCmdline(pid: number, $: any): Promise<string> {
     reject: false,
     nothrow: true,
     timeout: 1500,
-  })`/bin/ps -p ${pid} -o command=`;
+  })`ps -p ${pid} -o command=`;
   return String(res.stdout || "").trim();
 }
 
@@ -87,7 +87,7 @@ export async function buck2dProcsForRepo(repoRoot: string, $: any): Promise<Buck
     reject: false,
     nothrow: true,
     timeout: 2000,
-  })`/bin/ps -A -o pid=,command=`;
+  })`ps -A -o pid=,command=`;
   const lines = String(res.stdout || "")
     .split(/\r?\n/)
     .map((l) => l.trim())

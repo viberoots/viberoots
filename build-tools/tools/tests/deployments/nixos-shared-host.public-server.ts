@@ -9,6 +9,41 @@ import { pickFreePort } from "../scaffolding/lib/webapp-static-hmr.ts";
 import type { NixosSharedHostDeployment } from "../../deployments/contract.ts";
 
 const execFileAsync = promisify(execFile);
+let cachedOpenSslPath: Promise<string> | null = null;
+
+async function pinnedOpenSslPath(): Promise<string> {
+  if (cachedOpenSslPath) return await cachedOpenSslPath;
+  cachedOpenSslPath = (async () => {
+    const expr = String.raw`let
+      flake = builtins.getFlake (toString ./.);
+      pkgs = import flake.inputs.nixpkgs { system = builtins.currentSystem; };
+    in pkgs.openssl`;
+    const { stdout } = await execFileAsync(
+      "nix",
+      [
+        "build",
+        "--impure",
+        "--accept-flake-config",
+        "--expr",
+        expr,
+        "--no-link",
+        "--print-out-paths",
+      ],
+      {
+        cwd: process.cwd(),
+      },
+    );
+    const outPath = String(stdout || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find(Boolean);
+    if (!outPath) {
+      throw new Error("failed to resolve pinned openssl from workspace flake");
+    }
+    return path.join(outPath, "bin", "openssl");
+  })();
+  return await cachedOpenSslPath;
+}
 
 async function serveFile(
   root: string,
@@ -35,7 +70,8 @@ async function writeTlsMaterial(
   const keyPath = path.join(certDir, "server.key");
   const certPath = path.join(certDir, "server.crt");
   await fsp.mkdir(certDir, { recursive: true });
-  await execFileAsync("openssl", [
+  const openssl = await pinnedOpenSslPath();
+  await execFileAsync(openssl, [
     "req",
     "-x509",
     "-newkey",

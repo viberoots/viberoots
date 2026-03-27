@@ -23,7 +23,7 @@ export function parsePsLine(
 
 export async function psLines(timeoutMs: number): Promise<string[]> {
   return await new Promise<string[]>((resolve) => {
-    const child = spawn("/bin/ps", ["-A", "-o", "pid=,ppid=,etime=,command="], {
+    const child = spawn("ps", ["-A", "-o", "pid=,ppid=,etime=,command="], {
       stdio: ["ignore", "pipe", "ignore"],
     });
     let buf = "";

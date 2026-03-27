@@ -8,7 +8,7 @@ import { test } from "node:test";
 import { cleanupRegisteredTempRepos } from "../../dev/verify/buck-orphan-cleanup.ts";
 function psForkserversForToken(token: string): Promise<string[]> {
   return new Promise((resolve) => {
-    const child = spawn("/bin/ps", ["-A", "-o", "pid=,ppid=,command="], {
+    const child = spawn("ps", ["-A", "-o", "pid=,ppid=,command="], {
       stdio: ["ignore", "pipe", "ignore"],
     });
     let buf = "";
@@ -57,7 +57,7 @@ async function waitForNoForkserver(token: string, timeoutMs: number): Promise<vo
 
 function psLinesMatching(substr: string): Promise<string[]> {
   return new Promise((resolve) => {
-    const child = spawn("/bin/ps", ["-A", "-o", "pid=,ppid=,command="], {
+    const child = spawn("ps", ["-A", "-o", "pid=,ppid=,command="], {
       stdio: ["ignore", "pipe", "ignore"],
     });
     let buf = "";

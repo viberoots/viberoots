@@ -35,7 +35,7 @@ export async function startBuckDaemonReaper(opts: {
   iso: string;
   stateFile: string;
 }): Promise<void> {
-  const parentSig = await $({ stdio: "pipe" })`/bin/ps -p ${process.pid} -o lstart=`
+  const parentSig = await $({ stdio: "pipe" })`ps -p ${process.pid} -o lstart=`
     .then((r) => String(r.stdout || "").trim())
     .catch(() => "");
   if (!parentSig) return;

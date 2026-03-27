@@ -15,7 +15,7 @@ async function startSignatureForPid(pid: number, $: any): Promise<string> {
       reject: false,
       nothrow: true,
       timeout: 1000,
-    })`/bin/ps -p ${pid} -o lstart=`;
+    })`ps -p ${pid} -o lstart=`;
     return String(res.stdout || "").trim();
   } catch {
     return "";
@@ -50,7 +50,7 @@ export async function ensureBuckReaperStarted(tmp: string, $: any): Promise<void
     const parentPid = String(process.pid);
     const parentSig = await startSignatureForPid(process.pid, $);
     if (!parentSig) {
-      throw new Error("buck-daemon-reaper: unable to read parent lstart signature via /bin/ps");
+      throw new Error("buck-daemon-reaper: unable to read parent lstart signature via ps");
     }
     // Avoid shelling out to `zx-wrapper` here: some environments/tests may not have it on PATH,
     // and non-interactive shells may not support job control (`disown`). Use a detached Node

@@ -26,7 +26,7 @@ EOF
 is_verify_process() {
   local pid="$1"
   local cmd=""
-  cmd="$(/bin/ps -p "${pid}" -o command= 2>/dev/null || true)"
+  cmd="$(ps -p "${pid}" -o command= 2>/dev/null || true)"
   [[ -z "${cmd}" ]] && return 1
 
   # Canonicalize repo root to avoid non-normalized paths (../..) breaking pgrep matching.
@@ -44,7 +44,7 @@ is_verify_process() {
 
 pid_start_signature() {
   local pid="$1"
-  /bin/ps -p "${pid}" -o lstart= 2>/dev/null | tr -d '\n' | sed -e 's/[[:space:]]*$//'
+  ps -p "${pid}" -o lstart= 2>/dev/null | tr -d '\n' | sed -e 's/[[:space:]]*$//'
 }
 
 pid_alive_with_signature() {
@@ -106,7 +106,7 @@ verify_pids_in_repo() {
   fi
 
   # Fallback if pgrep is unavailable: scan ps output.
-  /bin/ps -ax -o pid=,command= | while read -r pid cmd; do
+  ps -ax -o pid=,command= | while read -r pid cmd; do
     [[ -z "${pid}" ]] && continue
     if [[ "${cmd}" == *"${verify_path}"* ]] && is_verify_process "${pid}"; then
       printf "%s\n" "${pid}"
@@ -166,7 +166,7 @@ kill_tree() {
   if [[ "${dry_run}" == "1" ]]; then
     echo "would kill verify tree rooted at pid ${root}:"
     for p in "${uniq[@]}"; do
-      echo "  - ${p}  $(/bin/ps -p "${p}" -o command= 2>/dev/null || true)"
+      echo "  - ${p}  $(ps -p "${p}" -o command= 2>/dev/null || true)"
     done
     return 0
   fi
@@ -243,5 +243,4 @@ main() {
 }
 
 main "$@"
-
 

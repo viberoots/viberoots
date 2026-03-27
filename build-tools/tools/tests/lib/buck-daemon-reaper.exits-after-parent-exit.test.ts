@@ -8,7 +8,7 @@ import { test } from "node:test";
 
 function startSignatureForPid(pid: number, timeoutMs: number) {
   return new Promise<string>((resolve) => {
-    const child = spawn("/bin/ps", ["-p", String(pid), "-o", "lstart="], {
+    const child = spawn("ps", ["-p", String(pid), "-o", "lstart="], {
       stdio: ["ignore", "pipe", "ignore"],
     });
     let buf = "";
