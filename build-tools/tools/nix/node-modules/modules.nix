@@ -9,6 +9,17 @@ let
   dirnameOf = common.dirnameOf;
   importerOnlySrc = common.importerOnlySrc;
   mkPnpmStore = store.mkPnpmStore;
+  hostSystem = pkgs.stdenv.hostPlatform.system;
+  pnpmOs =
+    if lib.hasSuffix "linux" hostSystem then "linux"
+    else if lib.hasSuffix "darwin" hostSystem then "darwin"
+    else "";
+  pnpmCpu =
+    if lib.hasPrefix "x86_64-" hostSystem then "x64"
+    else if lib.hasPrefix "aarch64-" hostSystem then "arm64"
+    else if lib.hasPrefix "armv7l-" hostSystem || lib.hasPrefix "armv6l-" hostSystem then "arm"
+    else "";
+  pnpmLibc = if pnpmOs == "linux" then (if lib.hasInfix "musl" hostSystem then "musl" else "glibc") else "";
   inherit repoRoot repoFsRoot prefetchedStorePathGlobal;
 in {
   mkNodeModules = { lockfilePath, importerDir, npmrcPath ? null, packageJsonPath ? null, prefetchedStorePath ? prefetchedStorePathGlobal, ignoreImporterLock ? false }:
@@ -72,6 +83,11 @@ in {
         export COREPACK_ENABLE_AUTO_PIN=0
         export PNPM_HOME="$HOME/.pnpm-home"
         mkdir -p "$PNPM_HOME"
+        export npm_config_supported_architectures_os_0="${pnpmOs}"
+        export npm_config_supported_architectures_cpu="${pnpmCpu}"
+        if [ -n "${pnpmLibc}" ]; then
+          export npm_config_supported_architectures_libc="${pnpmLibc}"
+        fi
         # Strip packageManager to prevent corepack/pnpm self-bootstrap loops inside hermetic builds
         node -e 'const fs=require("fs"); const p="package.json"; if(fs.existsSync(p)){const j=JSON.parse(fs.readFileSync(p,"utf8")); delete j.packageManager; fs.writeFileSync(p, JSON.stringify(j, null, 2));}'
         # Ensure pnpm cache is confined to the build directory (avoid ~/Library/Caches on darwin).
