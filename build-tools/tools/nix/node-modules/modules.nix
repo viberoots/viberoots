@@ -83,11 +83,6 @@ in {
         export COREPACK_ENABLE_AUTO_PIN=0
         export PNPM_HOME="$HOME/.pnpm-home"
         mkdir -p "$PNPM_HOME"
-        export npm_config_supported_architectures_os_0="${pnpmOs}"
-        export npm_config_supported_architectures_cpu="${pnpmCpu}"
-        if [ -n "${pnpmLibc}" ]; then
-          export npm_config_supported_architectures_libc="${pnpmLibc}"
-        fi
         # Strip packageManager to prevent corepack/pnpm self-bootstrap loops inside hermetic builds
         node -e 'const fs=require("fs"); const p="package.json"; if(fs.existsSync(p)){const j=JSON.parse(fs.readFileSync(p,"utf8")); delete j.packageManager; fs.writeFileSync(p, JSON.stringify(j, null, 2));}'
         # Ensure pnpm cache is confined to the build directory (avoid ~/Library/Caches on darwin).
@@ -134,6 +129,19 @@ in {
         # Keep imported package files writable in sandbox builds.
         # Hardlinked files from read-only store paths can fail during bin chmod.
         pnpm config set package-import-method copy
+        printf '%s\n' "packages:" > pnpm-workspace.yaml
+        printf '%s\n' "  - ./" >> pnpm-workspace.yaml
+        if [ -n "${pnpmOs}" ]; then
+          printf '%s\n' "supportedArchitectures:" >> pnpm-workspace.yaml
+          printf '%s\n' "  os:" >> pnpm-workspace.yaml
+          printf '%s\n' "    - ${pnpmOs}" >> pnpm-workspace.yaml
+          printf '%s\n' "  cpu:" >> pnpm-workspace.yaml
+          printf '%s\n' "    - ${pnpmCpu}" >> pnpm-workspace.yaml
+          if [ -n "${pnpmLibc}" ]; then
+            printf '%s\n' "  libc:" >> pnpm-workspace.yaml
+            printf '%s\n' "    - ${pnpmLibc}" >> pnpm-workspace.yaml
+          fi
+        fi
         FT="${ftVal}"
         echo "[BNX-MKNM-DEBUG] NIX_PNPM_FETCH_TIMEOUT=$FT" >&2
         echo "[BNX-MKNM-DEBUG] lockfile_present=$(test -f pnpm-lock.yaml && echo yes || echo no)" >&2

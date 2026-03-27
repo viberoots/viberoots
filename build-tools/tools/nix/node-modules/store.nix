@@ -89,11 +89,6 @@ in {
         export COREPACK_ENABLE_AUTO_PIN=0
         export PNPM_HOME="$HOME/.pnpm-home"
         mkdir -p "$PNPM_HOME"
-        export npm_config_supported_architectures_os_0="${pnpmOs}"
-        export npm_config_supported_architectures_cpu="${pnpmCpu}"
-        if [ -n "${pnpmLibc}" ]; then
-          export npm_config_supported_architectures_libc="${pnpmLibc}"
-        fi
         # Strip packageManager to prevent corepack/pnpm self-bootstrap (relative to importer root)
         node -e 'const fs=require("fs"); const p="package.json"; if(fs.existsSync(p)){const j=JSON.parse(fs.readFileSync(p,"utf8")); delete j.packageManager; fs.writeFileSync(p, JSON.stringify(j, null, 2));}'
         # Do NOT generate a lockfile inside this fixed-output derivation. This must be seeded
@@ -121,9 +116,21 @@ in {
           exit 4
         fi
         pnpm config set store-dir "$out/store"
-        # Force workspace root to current directory to avoid inheriting repo-root workspace
+        # Force workspace root to current directory and pin platform selection so
+        # pnpm materializes the correct optional binary packages in hermetic builds.
         printf '%s\n' "packages:" > pnpm-workspace.yaml
         printf '%s\n' "  - ./" >> pnpm-workspace.yaml
+        if [ -n "${pnpmOs}" ]; then
+          printf '%s\n' "supportedArchitectures:" >> pnpm-workspace.yaml
+          printf '%s\n' "  os:" >> pnpm-workspace.yaml
+          printf '%s\n' "    - ${pnpmOs}" >> pnpm-workspace.yaml
+          printf '%s\n' "  cpu:" >> pnpm-workspace.yaml
+          printf '%s\n' "    - ${pnpmCpu}" >> pnpm-workspace.yaml
+          if [ -n "${pnpmLibc}" ]; then
+            printf '%s\n' "  libc:" >> pnpm-workspace.yaml
+            printf '%s\n' "    - ${pnpmLibc}" >> pnpm-workspace.yaml
+          fi
+        fi
         echo "[nix] pnpm install (timeout) --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir . (FT=${ftVal}s)"
         FT="${ftVal}"
         timeout "$FT"s env PNPM_HOME="$PNPM_HOME" pnpm install --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
@@ -225,11 +232,6 @@ in {
         export COREPACK_ENABLE_AUTO_PIN=0
         export PNPM_HOME="$HOME/.pnpm-home"
         mkdir -p "$PNPM_HOME"
-        export npm_config_supported_architectures_os_0="${pnpmOs}"
-        export npm_config_supported_architectures_cpu="${pnpmCpu}"
-        if [ -n "${pnpmLibc}" ]; then
-          export npm_config_supported_architectures_libc="${pnpmLibc}"
-        fi
         # Strip packageManager to prevent corepack/pnpm self-bootstrap (relative to importer root)
         node -e 'const fs=require("fs"); const p="package.json"; if(fs.existsSync(p)){const j=JSON.parse(fs.readFileSync(p,"utf8")); delete j.packageManager; fs.writeFileSync(p, JSON.stringify(j, null, 2));}'
         # Inject lockfile if available
@@ -251,9 +253,21 @@ in {
           exit 4
         fi
         pnpm config set store-dir "$out/store"
-        # Force workspace root to current directory to avoid inheriting repo-root workspace
+        # Force workspace root to current directory and pin platform selection so
+        # pnpm materializes the correct optional binary packages in hermetic builds.
         printf '%s\n' "packages:" > pnpm-workspace.yaml
         printf '%s\n' "  - ./" >> pnpm-workspace.yaml
+        if [ -n "${pnpmOs}" ]; then
+          printf '%s\n' "supportedArchitectures:" >> pnpm-workspace.yaml
+          printf '%s\n' "  os:" >> pnpm-workspace.yaml
+          printf '%s\n' "    - ${pnpmOs}" >> pnpm-workspace.yaml
+          printf '%s\n' "  cpu:" >> pnpm-workspace.yaml
+          printf '%s\n' "    - ${pnpmCpu}" >> pnpm-workspace.yaml
+          if [ -n "${pnpmLibc}" ]; then
+            printf '%s\n' "  libc:" >> pnpm-workspace.yaml
+            printf '%s\n' "    - ${pnpmLibc}" >> pnpm-workspace.yaml
+          fi
+        fi
         echo "[nix] mkPnpmStoreUnfixed: pnpm install --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir ."
         FT="''${NIX_PNPM_FETCH_TIMEOUT:-600}"
         timeout "$FT"s env PNPM_HOME="$PNPM_HOME" pnpm install --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
