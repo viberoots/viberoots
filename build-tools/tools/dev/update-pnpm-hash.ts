@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { type ManagedCommandActivity } from "../lib/managed-command.ts";
 import { flakeRefForImporter } from "./install/common.ts";
 import { withExclusiveInstallLock } from "./install/lock.ts";
+import { newManagedCommandActivity } from "./update-pnpm-hash/activity.ts";
 import { withHeartbeat } from "./update-pnpm-hash/heartbeat.ts";
 import { parseUpdatePnpmHashArgs } from "./update-pnpm-hash/args.ts";
 import {
@@ -100,13 +100,7 @@ async function inner() {
   console.log(
     `[update-pnpm-hash] importer=${importer} step=fixed-build attr=${storeAttr} timeout=${timeoutSec}s`,
   );
-  const fixedActivity: ManagedCommandActivity = {
-    startedAtMs: Date.now(),
-    lastOutputAtMs: 0,
-    lastEventSnippet: "",
-    stdoutBytes: 0,
-    stderrBytes: 0,
-  };
+  const fixedActivity = newManagedCommandActivity();
   let verify = await withHeartbeat(
     `importer=${importer} step=fixed-build attr=${storeAttr}`,
     buildStore(storeAttr, flakeRef, fixedActivity),
@@ -152,13 +146,7 @@ async function inner() {
       console.log(
         `[update-pnpm-hash] importer=${importer} step=unfixed-build attr=${unfixedAttr} timeout=${timeoutSec}s`,
       );
-      const unfixedActivity: ManagedCommandActivity = {
-        startedAtMs: Date.now(),
-        lastOutputAtMs: 0,
-        lastEventSnippet: "",
-        stdoutBytes: 0,
-        stderrBytes: 0,
-      };
+      const unfixedActivity = newManagedCommandActivity();
       let pre = await withHeartbeat(
         `importer=${importer} step=unfixed-build attr=${unfixedAttr}`,
         buildUnfixedAndHash(unfixedAttr, prewarmFlakeRef, unfixedActivity),
@@ -169,13 +157,7 @@ async function inner() {
         console.log(
           `[update-pnpm-hash] importer=${importer} step=unfixed-build-retry attr=${unfixedAttr} timeout=${timeoutSec}s`,
         );
-        const retryActivity: ManagedCommandActivity = {
-          startedAtMs: Date.now(),
-          lastOutputAtMs: 0,
-          lastEventSnippet: "",
-          stdoutBytes: 0,
-          stderrBytes: 0,
-        };
+        const retryActivity = newManagedCommandActivity();
         pre = await withHeartbeat(
           `importer=${importer} step=unfixed-build-retry attr=${unfixedAttr}`,
           buildUnfixedAndHash(unfixedAttr, prewarmFlakeRef, retryActivity),
@@ -203,13 +185,7 @@ async function inner() {
   console.log(
     `[update-pnpm-hash] importer=${importer} step=fixed-build-after-hash attr=${storeAttr} timeout=${timeoutSec}s`,
   );
-  const fixedAfterActivity: ManagedCommandActivity = {
-    startedAtMs: Date.now(),
-    lastOutputAtMs: 0,
-    lastEventSnippet: "",
-    stdoutBytes: 0,
-    stderrBytes: 0,
-  };
+  const fixedAfterActivity = newManagedCommandActivity();
   verify = await withHeartbeat(
     `importer=${importer} step=fixed-build-after-hash attr=${storeAttr}`,
     buildStore(storeAttr, flakeRef, fixedAfterActivity),
