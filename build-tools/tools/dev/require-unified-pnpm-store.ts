@@ -6,6 +6,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { findImporterLockfiles, computeImporterLabel } from "../lib/importers.ts";
 import { unifiedPnpmStoreEpochDigest } from "./unified-pnpm-store-epoch.ts";
+import { mergePnpmStore } from "./update-pnpm-hash/prefetched-store.ts";
 
 function sha256Hex(s: string) {
   return crypto.createHash("sha256").update(s).digest("hex");
@@ -208,16 +209,7 @@ async function main() {
           .pop() || "";
       if (!outPath) continue;
       const src = path.join(outPath, "store");
-      try {
-        await $`bash --noprofile --norc -c ${`set -euo pipefail
-          if [ -d "${src}" ]; then
-            # Copy without preserving owner/perms to ensure user-writable cleanup under buck-out
-            rsync -rlt --no-perms --no-owner --no-group "${src}/" "${unifyStore}/" >/dev/null 2>&1 || true
-          fi
-        `}`;
-      } catch {
-        // best-effort copy
-      }
+      await mergePnpmStore(src, unifyStore);
     }
 
     // Ensure everything under the unified store is user-writable so buck-out is removable without sudo

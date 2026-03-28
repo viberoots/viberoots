@@ -94,10 +94,10 @@ in {
         mkdir -p "$XDG_CACHE_HOME" "$npm_config_cache"
 
         # Use a writable local store directory.
-        # To avoid copying the huge content-addressed `files/` tree into the build dir,
-        # symlink it from the fixed-output store, and copy only the smaller `index/`
-        # tree into the local store so pnpm can read/write metadata offline.
-        echo "[BNX-MKNM-DEBUG] preparing local pnpm store (symlink files/, copy index/)" >&2
+        # Copy both files/ and index/ so the importer-specific fixed store can
+        # repair any gaps in the shared prefetched store instead of inheriting
+        # a stale/incomplete files/ tree through a symlink.
+        echo "[BNX-MKNM-DEBUG] preparing local pnpm store (copy files/, copy index/)" >&2
         LOCAL_STORE="$HOME/.pnpm-store"
         mkdir -p "$LOCAL_STORE"
 
@@ -109,11 +109,11 @@ in {
             ver="$(basename "$verDir")"
             mkdir -p "$LOCAL_STORE/$ver"
             chmod -R u+rwX "$LOCAL_STORE/$ver"
-            if [ -d "$verDir/files" ] && [ ! -e "$LOCAL_STORE/$ver/files" ]; then
-              ln -s "$verDir/files" "$LOCAL_STORE/$ver/files"
+            if [ -d "$verDir/files" ]; then
+              mkdir -p "$LOCAL_STORE/$ver/files"
+              cp -R --no-preserve=ownership "$verDir/files/." "$LOCAL_STORE/$ver/files/"
             fi
             if [ -d "$verDir/index" ]; then
-              rm -rf "$LOCAL_STORE/$ver/index"
               mkdir -p "$LOCAL_STORE/$ver/index"
               cp -R --no-preserve=mode,ownership "$verDir/index/." "$LOCAL_STORE/$ver/index/"
               chmod -R u+rwX "$LOCAL_STORE/$ver/index"
