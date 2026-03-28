@@ -17,6 +17,7 @@ import { ensureSharedNixTarballCacheRepo } from "./xdg-cache";
 import "./worker-init";
 import { ensureZxInitProbedOnce, zxInitPathFromWorkspace } from "./zx-init-probe";
 import {
+  pinnedCacertBundleExpr,
   nixEvalTempDirOutsideWorkspace,
   pinnedNixpkgsOutPathExpr,
 } from "../../../lib/pinned-nixpkgs.ts";
@@ -24,6 +25,7 @@ import { externalPnpmStateDirs } from "../../../lib/pnpm-state-paths.ts";
 
 let cachedDevEnvExport: Promise<string> | null = null;
 let cachedPinnedNixpkgsPath: Promise<string> | null = null;
+let cachedPinnedCacertPath: Promise<string> | null = null;
 let cachedUnifiedPnpmStorePath: Promise<string> | null = null;
 let envMutationQueue: Promise<void> = Promise.resolve();
 async function withTempProcessEnv<T>(
@@ -93,6 +95,28 @@ async function pinnedNixpkgsPathOncePerWorker($: any): Promise<string> {
     return String((out as any).stdout || "").trim();
   })();
   return await cachedPinnedNixpkgsPath;
+}
+
+async function pinnedCacertPathOncePerWorker($: any): Promise<string> {
+  if (cachedPinnedCacertPath) return await cachedPinnedCacertPath;
+  cachedPinnedCacertPath = (async () => {
+    const repoRoot = process.cwd();
+    const nixEvalTmp = nixEvalTempDirOutsideWorkspace(repoRoot);
+    await fsp.mkdir(nixEvalTmp, { recursive: true }).catch(() => {});
+    const out = await $({
+      cwd: repoRoot,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+      env: {
+        ...process.env,
+        IN_NIX_SHELL: "1",
+        TMPDIR: nixEvalTmp,
+      },
+    })`nix eval --impure --accept-flake-config --raw --expr ${pinnedCacertBundleExpr(path.join(repoRoot, "flake.lock"))}`;
+    return String((out as any).stdout || "").trim();
+  })();
+  return await cachedPinnedCacertPath;
 }
 
 async function stableTestHomeRoot(): Promise<string> {
@@ -380,6 +404,16 @@ export async function runInTemp<T>(
   } catch {}
   if (!exportEnv.SSL_CERT_FILE && exportEnv.NIX_SSL_CERT_FILE) {
     exportEnv.SSL_CERT_FILE = exportEnv.NIX_SSL_CERT_FILE;
+  }
+  if (!exportEnv.SSL_CERT_FILE) {
+    try {
+      const pinnedCacert = await pinnedCacertPathOncePerWorker($);
+      if (pinnedCacert) {
+        exportEnv.SSL_CERT_FILE = pinnedCacert;
+        exportEnv.NIX_SSL_CERT_FILE = pinnedCacert;
+        exportEnv.NODE_EXTRA_CA_CERTS = exportEnv.NODE_EXTRA_CA_CERTS || pinnedCacert;
+      }
+    } catch {}
   }
   if (!exportEnv.SSL_CERT_FILE) {
     const defaultCert = "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt";

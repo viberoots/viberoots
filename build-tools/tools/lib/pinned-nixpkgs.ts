@@ -16,6 +16,10 @@ export function pinnedNixpkgsPackageExpr(lockPath: string, packageExpr: string):
   in ${packageExpr}`;
 }
 
+export function pinnedCacertBundleExpr(lockPath: string): string {
+  return pinnedNixpkgsPackageExpr(lockPath, 'pkgs.cacert + "/etc/ssl/certs/ca-bundle.crt"');
+}
+
 export function nixEvalTempDirOutsideWorkspace(workspaceRoot: string): string {
   const base = process.platform === "win32" ? os.tmpdir() : "/tmp";
   const workspaceBase = path.basename(path.resolve(workspaceRoot)) || "workspace";

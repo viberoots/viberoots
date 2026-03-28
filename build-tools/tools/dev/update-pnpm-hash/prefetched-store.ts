@@ -29,13 +29,23 @@ async function ensureMergedDir(dst: string): Promise<void> {
 export async function syncSourcePnpmStoreIntoLocalPrefetch(sourceStore: string): Promise<void> {
   const localStore = String(process.env.LOCAL_PNPM_STORE || "").trim();
   if (!localStore) return;
+  await syncPnpmStore(sourceStore, localStore);
+}
+
+export async function syncLocalPrefetchIntoPnpmStore(targetStore: string): Promise<void> {
+  const localStore = String(process.env.LOCAL_PNPM_STORE || "").trim();
+  if (!localStore) return;
+  await syncPnpmStore(localStore, targetStore);
+}
+
+async function syncPnpmStore(sourceStore: string, targetStore: string): Promise<void> {
   if (!(await dirExists(sourceStore))) return;
-  await fsp.mkdir(localStore, { recursive: true });
+  await fsp.mkdir(targetStore, { recursive: true });
   const entries = await fsp.readdir(sourceStore, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
     if (!entry.isDirectory() || !entry.name.startsWith("v")) continue;
     const srcVer = path.join(sourceStore, entry.name);
-    const dstVer = path.join(localStore, entry.name);
+    const dstVer = path.join(targetStore, entry.name);
     await fsp.mkdir(dstVer, { recursive: true });
     const srcFiles = path.join(srcVer, "files");
     const dstFiles = path.join(dstVer, "files");

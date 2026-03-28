@@ -7,7 +7,10 @@ import {
   externalPnpmStateDirs,
   removeLegacyImporterPnpmState,
 } from "../../lib/pnpm-state-paths.ts";
-import { syncSourcePnpmStoreIntoLocalPrefetch } from "./prefetched-store.ts";
+import {
+  syncLocalPrefetchIntoPnpmStore,
+  syncSourcePnpmStoreIntoLocalPrefetch,
+} from "./prefetched-store.ts";
 
 async function runLockfileInstallWithGcRetry(opts: {
   importerAbs: string;
@@ -129,6 +132,7 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
   const timeoutMs = (Number.parseInt(fetchTimeout, 10) || 600) * 1000 + 120_000;
   await removeLegacyImporterPnpmState(importerAbs);
   const { homeDir, storeDir } = await externalPnpmStateDirs(importerAbs);
+  await syncLocalPrefetchIntoPnpmStore(storeDir);
   const flakeRef = pnpmFlakeRef(opts.repoRoot);
   console.log(`[lockfile] generating importer lockfile: ${opts.importer}`);
   await runLockfileInstallWithGcRetry({

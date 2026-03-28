@@ -1,7 +1,10 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 
-import { syncSourcePnpmStoreIntoLocalPrefetch } from "../dev/update-pnpm-hash/prefetched-store.ts";
+import {
+  syncLocalPrefetchIntoPnpmStore,
+  syncSourcePnpmStoreIntoLocalPrefetch,
+} from "../dev/update-pnpm-hash/prefetched-store.ts";
 import { parsePnpmLock } from "./pnpm-lock.ts";
 import { externalPnpmStateDirs, removeLegacyImporterPnpmState } from "./pnpm-state-paths.ts";
 
@@ -86,6 +89,7 @@ export async function ensureImporterLockfileFresh(opts: {
   const importerAbs = path.join(opts.tmp, opts.importerRel);
   await removeLegacyImporterPnpmState(importerAbs);
   const { homeDir, storeDir } = await externalPnpmStateDirs(importerAbs);
+  await syncLocalPrefetchIntoPnpmStore(storeDir);
 
   await opts.$({
     stdio: "inherit",

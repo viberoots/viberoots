@@ -13,4 +13,4 @@ display_name:
 
 _tasks:
   - mkdir -p build-tools/tools/tests/{{ lang_id }}/contract
-  - cp -n build-tools/tools/scaffolding/templates/language/kit/build-tools/tools/tests/_contract.basic.test.ts.jinja build-tools/tools/tests/{{ lang_id }}/contract/basic.test.ts || true
+  - cp -n build-tools/tools/scaffolding/templates/language/kit/tools/tests/_contract.basic.test.ts.jinja build-tools/tools/tests/{{ lang_id }}/contract/basic.test.ts || true
