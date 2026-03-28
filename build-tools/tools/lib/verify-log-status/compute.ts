@@ -4,9 +4,9 @@ import type { VerifyStatus } from "./types.ts";
 import {
   findLastFullSuiteWindowStart,
   formatElapsed,
-  parseBuck2BeginEpochSec,
   parseBuck2ExitMarker,
   parseGcDetected,
+  parseVerifyBeginEpochSec,
 } from "./parsing.ts";
 import { deriveInProgressCounts } from "./derived.ts";
 import { parseFinalSummary } from "./summary.ts";
@@ -23,7 +23,7 @@ export function computeVerifyStatusFromLogText(opts: {
   const window = startIdx > 0 ? lines.slice(startIdx) : lines;
 
   const exitMarker = parseBuck2ExitMarker(window);
-  const beginSec = parseBuck2BeginEpochSec(window);
+  const beginSec = parseVerifyBeginEpochSec(window);
   const gcDetected = parseGcDetected(window);
 
   // Prefer summary *for the current run window* when present.

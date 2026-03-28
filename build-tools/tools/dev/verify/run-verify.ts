@@ -98,8 +98,9 @@ export async function runVerify(): Promise<void> {
   enforceVerifyDiskGate({ freeGiB, targetFreeGiB });
   const cov = await setupCoverage({ root, enabled: args.coverage });
   const iso = `v-${process.pid}-${Date.now()}`;
+  const verifyStartS = Math.floor(Date.now() / 1000);
   await writeVerifyIsoMarker(lock.lockDir, iso);
-  await appendVerifyLogLine(lock.logFile, `[verify] begin iso=${iso}`);
+  await appendVerifyLogLine(lock.logFile, `[verify] begin iso=${iso} start_s=${verifyStartS}`);
   const nixGc = await activeNixGcProcesses();
   if (nixGc.length > 0) {
     const sample = nixGc

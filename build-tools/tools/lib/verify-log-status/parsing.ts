@@ -145,15 +145,21 @@ export function parseBuck2ExitMarker(lines: string[]): {
   return { done: false };
 }
 
-export function parseBuck2BeginEpochSec(lines: string[]): number | undefined {
-  // [verify] buck2 test begin iso=v-123 start_s=1735250987
-  const re = /^\[verify\]\s+buck2 test begin iso=.*\s+start_s=(\d+)/;
+export function parseVerifyBeginEpochSec(lines: string[]): number | undefined {
+  // Prefer the earliest verify-run start marker when available so elapsed includes
+  // preflight/setup time before buck2 test execution begins.
+  const res = [
+    /^\[verify\]\s+begin iso=.*\s+start_s=(\d+)/,
+    /^\[verify\]\s+buck2 test begin iso=.*\s+start_s=(\d+)/,
+  ];
   for (let i = lines.length - 1; i >= 0; i--) {
     const { normalized } = parseLineForMatching(lines[i]);
-    const m = re.exec(normalized);
-    if (m) {
-      const s = Number(m[1]);
-      if (Number.isFinite(s) && s > 0) return s;
+    for (const re of res) {
+      const m = re.exec(normalized);
+      if (m) {
+        const s = Number(m[1]);
+        if (Number.isFinite(s) && s > 0) return s;
+      }
     }
   }
   return undefined;

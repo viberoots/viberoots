@@ -112,19 +112,40 @@ function isNodeProcess(command: string): boolean {
 
 function getDiskUsage(): string {
   try {
-    const out = execFileSync("df", ["-h", "/System/Volumes/Data"], {
+    const out = execFileSync(resolveToolPathSync("df"), ["-kP", process.cwd()], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
-    })
-      .trim()
-      .split("\n");
-    if (out.length < 2) return "Unknown";
-    const fields = out[1].trim().split(/\s+/);
-    const size = fields[1] || "?";
-    const avail = fields[3] || "?";
-    const capacity = fields[4] || "?";
-    return `${avail} free, ${size} total, ${capacity} full`;
+    });
+    return formatDiskUsageFromDfOutput(out) ?? "Unknown";
   } catch {
     return "Unknown";
   }
+}
+
+export function formatDiskUsageFromDfOutput(output: string): string | null {
+  const lines = String(output || "")
+    .trim()
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length < 2) return null;
+  const fields = lines[1].split(/\s+/);
+  const totalKiB = Number(fields[1]);
+  const availKiB = Number(fields[3]);
+  const capacity = fields[4] || "?";
+  if (!Number.isFinite(totalKiB) || !Number.isFinite(availKiB)) return null;
+  return `${formatKiB(availKiB)} free, ${formatKiB(totalKiB)} total, ${capacity} full`;
+}
+
+function formatKiB(kib: number): string {
+  if (kib <= 0) return "0KiB";
+  const units = ["KiB", "MiB", "GiB", "TiB"];
+  let value = kib;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  const rounded = value >= 10 || unit === 0 ? Math.round(value) : Math.round(value * 10) / 10;
+  return `${rounded}${units[unit]}`;
 }
