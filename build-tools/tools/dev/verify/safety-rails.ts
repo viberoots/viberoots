@@ -153,7 +153,7 @@ export async function startVerifySafetyRails(opts: {
   onTrigger?: (reason: string) => Promise<void>;
 }): Promise<{ stop: () => void }> {
   const lowSpace = defaultOrNonNegative(parseNum(process.env.VERIFY_LOW_SPACE_GB), 5);
-  const dropBudget = defaultOrNonNegative(parseNum(process.env.VERIFY_NIX_DROP_BUDGET_GB), 20);
+  const dropBudget = defaultOrNonNegative(parseNum(process.env.VERIFY_NIX_DROP_BUDGET_GB), 40);
   const intervalSec = defaultOrAtLeast(parseNum(process.env.VERIFY_SAFETY_RAILS_POLL_SECS), 5, 1);
 
   const base = await freeGiBForPath("/nix/store");
