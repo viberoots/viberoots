@@ -1,14 +1,25 @@
+import { runPatchCommand } from "./lib/command-runner";
 import { createDbg } from "./lib/util";
 const dbg = createDbg("patch-diff");
 
 export async function makeUnifiedDiff(srcDir: string, dstDir: string): Promise<string> {
   // Require git --no-index so we get canonical a/ and b/ prefixes; do not fallback.
-  const res = await $({
-    stdio: "pipe",
-  })`git -c core.filemode=false --no-pager diff --no-index -U3 --src-prefix=a/ --dst-prefix=b/ -- ${srcDir} ${dstDir}`.nothrow();
+  const res = await runPatchCommand("git", [
+    "-c",
+    "core.filemode=false",
+    "--no-pager",
+    "diff",
+    "--no-index",
+    "-U3",
+    "--src-prefix=a/",
+    "--dst-prefix=b/",
+    "--",
+    srcDir,
+    dstDir,
+  ]);
   let s = String(res.stdout || "");
   try {
-    dbg("git-diff", { exitCode: res.exitCode, stderrLen: String(res.stderr || "").length });
+    dbg("git-diff", { exitCode: res.code, stderrLen: String(res.stderr || "").length });
   } catch {}
   // If there are no changes, stdout will be empty. Treat that as a clean no-op diff
   // and return an empty string so callers can handle it without failing.

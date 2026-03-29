@@ -6,6 +6,7 @@ import crypto from "node:crypto";
 import { debugEnabled } from "./util";
 import { repoRoot as _repoRoot } from "../../lib/repo.ts";
 import { copyFileCloneAware, copyTree } from "../../lib/copy-tree.ts";
+import { runPatchCommand } from "./command-runner";
 import {
   readForceFlag,
   readFlagBoolFromTokens,
@@ -132,17 +133,23 @@ export async function verifyPatchDryRun(
   await cpRecursive(originPath, tmpCopy);
   if (mode === "cpp") {
     // C++ path: run quiet, capture output; mirror existing behavior
-    const res = await $({
-      cwd: tmpCopy,
-      stdio: "pipe",
-      env: { ...process.env, LC_ALL: "C" },
-    })`patch -s -p1 --dry-run -i ${path.resolve(patchPath)}`.nothrow();
-    if ((res.exitCode || 0) !== 0) {
+    const res = await runPatchCommand(
+      "patch",
+      ["-s", "-p1", "--dry-run", "-i", path.resolve(patchPath)],
+      { cwd: tmpCopy, env: { ...process.env, LC_ALL: "C" } },
+    );
+    if ((res.code || 0) !== 0) {
       const stderr = String(res.stderr || "").trim();
       throw new Error(stderr || "patch dry-run failed");
     }
     return;
   }
   // Go/Python path: inherit stdio; throw on failure
-  await $({ cwd: tmpCopy, stdio: "inherit" })`patch -p1 --dry-run -i ${path.resolve(patchPath)}`;
+  const res = await runPatchCommand("patch", ["-p1", "--dry-run", "-i", path.resolve(patchPath)], {
+    cwd: tmpCopy,
+  });
+  if ((res.code || 0) !== 0) {
+    const stderr = String(res.stderr || "").trim();
+    throw new Error(stderr || "patch dry-run failed");
+  }
 }
