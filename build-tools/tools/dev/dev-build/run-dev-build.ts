@@ -10,6 +10,7 @@ import { materializePureGraphIfEnabled } from "./materialize-pure.ts";
 import { maybePrintImpureMaterializedBins, exportGraphImpure } from "./materialize-impure.ts";
 import { shouldMaterializeByDefault } from "./materialize-policy.ts";
 import { ensureBuckPreludeConfig } from "./prelude.ts";
+import { ensureDevBuildStoreSpace } from "./safety-rails.ts";
 import { runStartupCheck } from "./startup.ts";
 import { normalizeDevBuildTargetArgs } from "./target-args.ts";
 import { maybeAutoImpureFromUntrackedFiles } from "./untracked.ts";
@@ -112,6 +113,10 @@ export async function runDevBuild(): Promise<void> {
   let materializeReason = materializeDecision.reason;
 
   await runStartupCheck(root);
+  await ensureDevBuildStoreSpace({
+    subcmd: parsed.subcmd,
+    restArgs: parsed.restArgs,
+  });
 
   if (parsed.materialize && !materialize) {
     console.log(`[dev-build] fast-path: skipping glue/materialize (${materializeDecision.reason})`);
