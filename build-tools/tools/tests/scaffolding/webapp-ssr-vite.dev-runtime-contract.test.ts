@@ -116,7 +116,7 @@ test(
         cwd: appAbs,
         stdio: "inherit",
         env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-      })`pnpm install --prefer-offline --ignore-workspace --reporter=append-only`;
+      })`pnpm install --no-frozen-lockfile --prefer-offline --ignore-workspace --reporter=append-only`;
 
       const entryServerPath = path.join(appAbs, "src", "entry-server.ts");
       const originalEntryServer = await fsp.readFile(entryServerPath, "utf8");

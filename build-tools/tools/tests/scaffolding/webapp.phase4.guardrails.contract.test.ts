@@ -10,33 +10,60 @@ type InstallGuardrailExpectation = {
   forbidden: string[];
 };
 
-const SOURCE_ONLY_EXPECTATIONS: InstallGuardrailExpectation[] = [
+const LIGHTWEIGHT_SOURCE_ONLY_EXPECTATIONS: InstallGuardrailExpectation[] = [
   {
-    file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-reload.wasm-producer.test.ts",
+    file: "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.ssr-vite.contract.test.ts",
     required: [
       "pnpm install",
-      "--filter ./projects/apps/demo-vite-ssr...",
+      "--filter ./projects/apps/demo-vite...",
       "--frozen-lockfile",
       "--prefer-offline",
       "--ignore-scripts",
     ],
     forbidden: ["--skip-lockfile-gen", "--no-frozen-lockfile"],
+  },
+  {
+    file: "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.static.contract.test.ts",
+    required: [
+      "pnpm install",
+      "--filter ./projects/apps/demo-web...",
+      "--frozen-lockfile",
+      "--prefer-offline",
+      "--ignore-scripts",
+    ],
+    forbidden: ["--skip-lockfile-gen", "--no-frozen-lockfile"],
+  },
+];
+
+const HEAVY_RUNTIME_EXPECTATIONS: InstallGuardrailExpectation[] = [
+  {
+    file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-reload.wasm-producer.test.ts",
+    required: [
+      "--skip-lockfile-gen",
+      "pnpm install",
+      "--filter ./projects/apps/demo-vite-ssr...",
+      "--no-frozen-lockfile",
+      "--prefer-offline",
+      "--ignore-scripts",
+    ],
+    forbidden: ["--frozen-lockfile"],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-consistency.phase3.test.ts",
     required: [
+      "--skip-lockfile-gen",
       "pnpm install",
       "--filter ./projects/apps/demo-vite-ssr...",
-      "--frozen-lockfile",
+      "--no-frozen-lockfile",
       "--prefer-offline",
       "--ignore-scripts",
     ],
-    forbidden: ["--skip-lockfile-gen", "--no-frozen-lockfile"],
+    forbidden: ["--frozen-lockfile"],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-contract.test.ts",
-    required: ["pnpm install", "--frozen-lockfile", "--prefer-offline", "--ignore-workspace"],
-    forbidden: ["--skip-lockfile-gen", "--no-frozen-lockfile"],
+    required: ["--skip-lockfile-gen", "pnpm install", "--prefer-offline", "--ignore-workspace"],
+    forbidden: ["--frozen-lockfile"],
   },
 ];
 
@@ -142,8 +169,14 @@ async function assertContract(expectation: InstallGuardrailExpectation): Promise
   }
 }
 
-test("phase4 guardrails: source-only HMR tests keep frozen lockfile installs", async () => {
-  for (const expectation of SOURCE_ONLY_EXPECTATIONS) {
+test("phase4 guardrails: lightweight source-only contract tests keep frozen installs", async () => {
+  for (const expectation of LIGHTWEIGHT_SOURCE_ONLY_EXPECTATIONS) {
+    await assertContract(expectation);
+  }
+});
+
+test("phase4 guardrails: heavy runtime tests own install via skip-lockfile-gen", async () => {
+  for (const expectation of HEAVY_RUNTIME_EXPECTATIONS) {
     await assertContract(expectation);
   }
 });

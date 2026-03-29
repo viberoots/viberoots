@@ -24,10 +24,11 @@ import {
 } from "./update-pnpm-hash/paths.ts";
 import {
   currentVerifiedMarkerFingerprint,
+  persistVerifiedHash,
   readVerifiedMarker,
+  restoreHashFromSharedCache,
   sha256File,
   verifiedMarkerPath,
-  writeVerifiedMarker,
 } from "./update-pnpm-hash/verified-marker.ts";
 
 async function inner() {
@@ -88,11 +89,39 @@ async function inner() {
       marker.hashValue === existingHash &&
       marker.builderFingerprint === builderFingerprint
     ) {
+      await persistVerifiedHash({
+        repoRoot,
+        markerPath,
+        marker: {
+          importer,
+          lockfile: key,
+          lockHash: existingLockHash,
+          hashValue: existingHash,
+          builderFingerprint,
+        },
+      });
       console.log(
         `[update-pnpm-hash] importer=${importer} step=skip-root-marker attr=${storeAttr} lockfile=${key}`,
       );
       return;
     }
+  }
+  if (
+    !nonDefaultImporter &&
+    existingLockHash &&
+    (await restoreHashFromSharedCache({
+      repoRoot,
+      key,
+      markerPath,
+      importer,
+      storeAttr,
+      builderFingerprint,
+      existingLockHash,
+      existingHash,
+      hasValidExistingHash,
+    }))
+  ) {
+    return;
   }
 
   // Fast strict path: verify fixed-output store first. Only compute unfixed hash when needed.
@@ -109,12 +138,16 @@ async function inner() {
     if (!nonDefaultImporter && hasValidExistingHash) {
       const lockHash = existingLockHash;
       if (lockHash) {
-        await writeVerifiedMarker(markerPath, {
-          importer,
-          lockfile: key,
-          lockHash,
-          hashValue: existingHash,
-          builderFingerprint,
+        await persistVerifiedHash({
+          repoRoot,
+          markerPath,
+          marker: {
+            importer,
+            lockfile: key,
+            lockHash,
+            hashValue: existingHash,
+            builderFingerprint,
+          },
         });
       }
     }
@@ -178,12 +211,16 @@ async function inner() {
   if (!nonDefaultImporter) {
     const lockHash = existingLockHash;
     if (lockHash) {
-      await writeVerifiedMarker(markerPath, {
-        importer,
-        lockfile: key,
-        lockHash,
-        hashValue: nextHash,
-        builderFingerprint,
+      await persistVerifiedHash({
+        repoRoot,
+        markerPath,
+        marker: {
+          importer,
+          lockfile: key,
+          lockHash,
+          hashValue: nextHash,
+          builderFingerprint,
+        },
       });
     }
   }

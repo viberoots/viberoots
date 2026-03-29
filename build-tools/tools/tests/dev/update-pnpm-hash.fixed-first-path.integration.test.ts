@@ -11,8 +11,24 @@ test("update-pnpm-hash uses importer-aware fast path and fixed-first root path",
   if (!mainTxt.includes("handleNonDefaultImporter")) {
     throw new Error("update-pnpm-hash.ts must route non-default importers through dedicated flow");
   }
-  if (!nondefaultTxt.includes("buildUnfixedAndHash(opts.unfixedAttr, prewarmFlakeRef")) {
-    throw new Error("nondefault.ts must compute hash from unfixed build for non-default importers");
+  if (
+    !nondefaultTxt.includes(
+      "const fixedFlakeRef = flakeRefForImporter(opts.repoRoot, opts.importer);",
+    )
+  ) {
+    throw new Error("nondefault.ts must compute importer flake refs for fixed-first verification");
+  }
+  if (!nondefaultTxt.includes("buildStore(opts.storeAttr, fixedFlakeRef")) {
+    throw new Error("nondefault.ts must verify the fixed store before falling back to unfixed");
+  }
+  if (!nondefaultTxt.includes('suggestedHash = extractHash(String(verify.output || ""))')) {
+    throw new Error("nondefault.ts must parse a suggested hash from the first fixed-store failure");
+  }
+  if (!nondefaultTxt.includes("if (!suggestedHash) {")) {
+    throw new Error("nondefault.ts must only compute an unfixed hash when no suggestion exists");
+  }
+  if (!nondefaultTxt.includes("restoreHashFromSharedCache")) {
+    throw new Error("nondefault.ts must consult the shared lock-hash cache before rebuilding");
   }
 
   if (!mainTxt.includes("buildStore(storeAttr, flakeRef")) {
@@ -30,5 +46,10 @@ test("update-pnpm-hash uses importer-aware fast path and fixed-first root path",
   }
   if (!mainTxt.includes("if (!suggested) {")) {
     throw new Error("update-pnpm-hash.ts must only compute unfixed hash when suggestion is absent");
+  }
+  if (!mainTxt.includes("restoreHashFromSharedCache")) {
+    throw new Error(
+      "update-pnpm-hash.ts must consult the shared lock-hash cache for root importer",
+    );
   }
 });
