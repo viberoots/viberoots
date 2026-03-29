@@ -19,6 +19,7 @@ import { ensureZxInitProbedOnce, zxInitPathFromWorkspace } from "./zx-init-probe
 import {
   pinnedCacertBundleExpr,
   nixEvalTempDirOutsideWorkspace,
+  pinnedNixpkgsPackageExpr,
   pinnedNixpkgsOutPathExpr,
 } from "../../../lib/pinned-nixpkgs.ts";
 import { externalPnpmStateDirs } from "../../../lib/pnpm-state-paths.ts";
@@ -26,6 +27,7 @@ import { externalPnpmStateDirs } from "../../../lib/pnpm-state-paths.ts";
 let cachedDevEnvExport: Promise<string> | null = null;
 let cachedPinnedNixpkgsPath: Promise<string> | null = null;
 let cachedPinnedCacertPath: Promise<string> | null = null;
+let cachedPinnedZipPath: Promise<string> | null = null;
 let cachedUnifiedPnpmStorePath: Promise<string> | null = null;
 let envMutationQueue: Promise<void> = Promise.resolve();
 async function withTempProcessEnv<T>(
@@ -117,6 +119,33 @@ async function pinnedCacertPathOncePerWorker($: any): Promise<string> {
     return String((out as any).stdout || "").trim();
   })();
   return await cachedPinnedCacertPath;
+}
+
+async function pinnedZipPathOncePerWorker($: any): Promise<string> {
+  if (cachedPinnedZipPath) return await cachedPinnedZipPath;
+  cachedPinnedZipPath = (async () => {
+    const repoRoot = process.cwd();
+    const nixEvalTmp = nixEvalTempDirOutsideWorkspace(repoRoot);
+    await fsp.mkdir(nixEvalTmp, { recursive: true }).catch(() => {});
+    const out = await $({
+      cwd: repoRoot,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+      env: {
+        ...process.env,
+        IN_NIX_SHELL: "1",
+        TMPDIR: nixEvalTmp,
+      },
+    })`nix build --impure --accept-flake-config --expr ${pinnedNixpkgsPackageExpr(path.join(repoRoot, "flake.lock"), "pkgs.zip")} --no-link --print-out-paths`;
+    const outPath = String((out as any).stdout || "")
+      .trim()
+      .split(/\r?\n/)
+      .map((line: string) => line.trim())
+      .find(Boolean);
+    return outPath ? path.join(outPath, "bin", "zip") : "";
+  })();
+  return await cachedPinnedZipPath;
 }
 
 async function stableTestHomeRoot(): Promise<string> {
@@ -375,6 +404,14 @@ export async function runInTemp<T>(
     exportEnv.NODE_PATH = [wsNodeModules, exportEnv.NODE_PATH || ""]
       .filter(Boolean)
       .join(path.delimiter);
+  } catch {}
+  try {
+    const pinnedZip = await pinnedZipPathOncePerWorker($);
+    if (pinnedZip) {
+      exportEnv.PATH = [path.dirname(pinnedZip), exportEnv.PATH || ""]
+        .filter(Boolean)
+        .join(path.delimiter);
+    }
   } catch {}
 
   exportEnv.WORKSPACE_ROOT = tmp;

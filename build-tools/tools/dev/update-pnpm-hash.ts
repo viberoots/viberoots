@@ -12,7 +12,6 @@ import {
 import {
   ensureImporterLockfileFreshIfAllowed,
   generateImporterLockfile,
-  makeFilteredFlakeRef,
 } from "./update-pnpm-hash/lockfile.ts";
 import { handleNonDefaultImporter } from "./update-pnpm-hash/nondefault.ts";
 import { buildStore, buildUnfixedAndHash, extractHash } from "./update-pnpm-hash/nix.ts";
@@ -23,7 +22,6 @@ import {
   pnpmStoreUnfixedAttrFromImporter,
   repoRelativeLockfilePath,
 } from "./update-pnpm-hash/paths.ts";
-import { syncBuiltPnpmStoreIntoLocalPrefetch } from "./update-pnpm-hash/prefetched-store.ts";
 import {
   currentVerifiedMarkerFingerprint,
   readVerifiedMarker,
@@ -108,9 +106,6 @@ async function inner() {
     { activity: fixedActivity },
   );
   if (verify.ok) {
-    if (verify.outPath) {
-      await syncBuiltPnpmStoreIntoLocalPrefetch(verify.outPath);
-    }
     if (!nonDefaultImporter && hasValidExistingHash) {
       const lockHash = existingLockHash;
       if (lockHash) {
@@ -133,48 +128,29 @@ async function inner() {
   let suggested = extractHash(verify.output || "");
 
   if (!suggested) {
-    let tempFlake: { flakeRef: string; cleanup: () => Promise<void> } | null = null;
-    try {
-      if (nonDefaultImporter) {
-        console.log(
-          `[update-pnpm-hash] importer=${importer} step=prepare-filtered-flake attr=${unfixedAttr}`,
-        );
-      }
-      tempFlake = nonDefaultImporter
-        ? await withHeartbeat(
-            `importer=${importer} step=prepare-filtered-flake attr=${unfixedAttr}`,
-            makeFilteredFlakeRef(repoRoot),
-          )
-        : null;
-      const prewarmFlakeRef = tempFlake ? tempFlake.flakeRef.replace(/#pnpm$/, "") : flakeRef;
+    console.log(
+      `[update-pnpm-hash] importer=${importer} step=unfixed-build attr=${unfixedAttr} timeout=${timeoutSec}s`,
+    );
+    const unfixedActivity = newManagedCommandActivity();
+    let pre = await withHeartbeat(
+      `importer=${importer} step=unfixed-build attr=${unfixedAttr}`,
+      buildUnfixedAndHash(unfixedAttr, flakeRef, unfixedActivity),
+      { activity: unfixedActivity },
+    );
+    if (!pre.ok) {
+      await generateImporterLockfile({ repoRoot, importer });
       console.log(
-        `[update-pnpm-hash] importer=${importer} step=unfixed-build attr=${unfixedAttr} timeout=${timeoutSec}s`,
+        `[update-pnpm-hash] importer=${importer} step=unfixed-build-retry attr=${unfixedAttr} timeout=${timeoutSec}s`,
       );
-      const unfixedActivity = newManagedCommandActivity();
-      let pre = await withHeartbeat(
-        `importer=${importer} step=unfixed-build attr=${unfixedAttr}`,
-        buildUnfixedAndHash(unfixedAttr, prewarmFlakeRef, unfixedActivity),
-        { activity: unfixedActivity },
+      const retryActivity = newManagedCommandActivity();
+      pre = await withHeartbeat(
+        `importer=${importer} step=unfixed-build-retry attr=${unfixedAttr}`,
+        buildUnfixedAndHash(unfixedAttr, flakeRef, retryActivity),
+        { activity: retryActivity },
       );
-      if (!pre.ok) {
-        await generateImporterLockfile({ repoRoot, importer });
-        console.log(
-          `[update-pnpm-hash] importer=${importer} step=unfixed-build-retry attr=${unfixedAttr} timeout=${timeoutSec}s`,
-        );
-        const retryActivity = newManagedCommandActivity();
-        pre = await withHeartbeat(
-          `importer=${importer} step=unfixed-build-retry attr=${unfixedAttr}`,
-          buildUnfixedAndHash(unfixedAttr, prewarmFlakeRef, retryActivity),
-          { activity: retryActivity },
-        );
-      }
-      if (pre.ok && pre.sri) {
-        suggested = pre.sri;
-      }
-    } finally {
-      if (tempFlake) {
-        await tempFlake.cleanup();
-      }
+    }
+    if (pre.ok && pre.sri) {
+      suggested = pre.sri;
     }
   }
 
@@ -198,9 +174,6 @@ async function inner() {
   if (!verify.ok) {
     console.error("pnpm-store still failing after hash update\n\n" + verify.output);
     process.exit(1);
-  }
-  if (verify.outPath) {
-    await syncBuiltPnpmStoreIntoLocalPrefetch(verify.outPath);
   }
   if (!nonDefaultImporter) {
     const lockHash = existingLockHash;

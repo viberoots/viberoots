@@ -12,7 +12,18 @@ import {
   syncSourcePnpmStoreIntoLocalPrefetch,
 } from "./prefetched-store.ts";
 
-async function runLockfileInstallWithGcRetry(opts: {
+function preferredPnpmStoreDir(defaultStoreDir: string): {
+  storeDir: string;
+  usesSharedPrefetch: boolean;
+} {
+  const localPrefetch = String(process.env.LOCAL_PNPM_STORE || "").trim();
+  if (localPrefetch) {
+    return { storeDir: localPrefetch, usesSharedPrefetch: true };
+  }
+  return { storeDir: defaultStoreDir, usesSharedPrefetch: false };
+}
+
+async function runLockfileCommandsWithGcRetry(opts: {
   importerAbs: string;
   flakeRef: string;
   timeoutMs: number;
@@ -20,7 +31,7 @@ async function runLockfileInstallWithGcRetry(opts: {
   homeDir: string;
   storeDir: string;
 }): Promise<void> {
-  const runInstall = async () =>
+  const runPnpm = async (...args: string[]) =>
     await $({
       cwd: opts.importerAbs,
       stdio: "inherit",
@@ -31,10 +42,41 @@ async function runLockfileInstallWithGcRetry(opts: {
         NIX_PNPM_FETCH_TIMEOUT: opts.fetchTimeout,
         PNPM_HOME: opts.homeDir,
       },
-    })`nix run --accept-flake-config ${opts.flakeRef} -- install --lockfile-only --prod=false --ignore-scripts --lockfile-dir . --dir . --store-dir ${opts.storeDir} --color never`;
+    })`nix run --accept-flake-config ${opts.flakeRef} -- ${args}`;
+
+  const runCommands = async () => {
+    await runPnpm(
+      "install",
+      "--lockfile-only",
+      "--prefer-offline",
+      "--prod=false",
+      "--ignore-scripts",
+      "--lockfile-dir",
+      ".",
+      "--dir",
+      ".",
+      "--store-dir",
+      opts.storeDir,
+      "--color",
+      "never",
+    );
+    await runPnpm(
+      "fetch",
+      "--prefer-offline",
+      "--prod=false",
+      "--lockfile-dir",
+      ".",
+      "--dir",
+      ".",
+      "--store-dir",
+      opts.storeDir,
+      "--color",
+      "never",
+    );
+  };
 
   try {
-    await runInstall();
+    await runCommands();
     return;
   } catch (error) {
     const gcPids = activeNixGcPids();
@@ -52,7 +94,7 @@ async function runLockfileInstallWithGcRetry(opts: {
         `lockfile generation blocked after install failure: active 'nix store gc' process(es) still running (${stillActive.join(", ")}). Stop GC and rerun 'scaf new ...'.`,
       );
     }
-    await runInstall();
+    await runCommands();
   }
 }
 
@@ -131,11 +173,14 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
   const fetchTimeout = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "").trim() || "600";
   const timeoutMs = (Number.parseInt(fetchTimeout, 10) || 600) * 1000 + 120_000;
   await removeLegacyImporterPnpmState(importerAbs);
-  const { homeDir, storeDir } = await externalPnpmStateDirs(importerAbs);
-  await syncLocalPrefetchIntoPnpmStore(storeDir);
+  const { homeDir, storeDir: externalStoreDir } = await externalPnpmStateDirs(importerAbs);
+  const { storeDir, usesSharedPrefetch } = preferredPnpmStoreDir(externalStoreDir);
+  if (!usesSharedPrefetch) {
+    await syncLocalPrefetchIntoPnpmStore(storeDir);
+  }
   const flakeRef = pnpmFlakeRef(opts.repoRoot);
   console.log(`[lockfile] generating importer lockfile: ${opts.importer}`);
-  await runLockfileInstallWithGcRetry({
+  await runLockfileCommandsWithGcRetry({
     importerAbs,
     flakeRef,
     timeoutMs,
@@ -143,7 +188,9 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
     homeDir,
     storeDir,
   });
-  await syncSourcePnpmStoreIntoLocalPrefetch(storeDir);
+  if (!usesSharedPrefetch) {
+    await syncSourcePnpmStoreIntoLocalPrefetch(storeDir);
+  }
 
   await seedImporterLockfileFromRootIfNeeded({ repoRoot: opts.repoRoot, importerAbs });
   await cleanupLocalWorkspaceMarker({ workspaceFileAbs, hadLocalWorkspaceFile });

@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -203,6 +204,23 @@ async function syncPnpmStore(sourceStore: string, targetStore: string): Promise<
   }
 }
 
+function immutableSyncMarkerPath(targetStore: string, sourceStore: string): string {
+  const key = crypto.createHash("sha256").update(path.resolve(sourceStore)).digest("hex");
+  return path.join(path.dirname(targetStore), ".sync-markers", `${key}.done`);
+}
+
+async function syncImmutablePnpmStore(sourceStore: string, targetStore: string): Promise<void> {
+  await withStoreLock(targetStore, async () => {
+    const markerPath = immutableSyncMarkerPath(targetStore, sourceStore);
+    if (await fsp.stat(markerPath).catch(() => null)) return;
+    await syncPnpmStore(sourceStore, targetStore);
+    await fsp.mkdir(path.dirname(markerPath), { recursive: true });
+    await fsp.writeFile(markerPath, `${path.resolve(sourceStore)}\n`, "utf8");
+  });
+}
+
 export async function syncBuiltPnpmStoreIntoLocalPrefetch(storeOutPath: string): Promise<void> {
-  await syncSourcePnpmStoreIntoLocalPrefetch(path.join(storeOutPath, "store"));
+  const localStore = String(process.env.LOCAL_PNPM_STORE || "").trim();
+  if (!localStore) return;
+  await syncImmutablePnpmStore(path.join(storeOutPath, "store"), localStore);
 }

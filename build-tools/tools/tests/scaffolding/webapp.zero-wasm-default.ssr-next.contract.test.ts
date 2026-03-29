@@ -20,7 +20,7 @@ test(
   async () => {
     await runInTemp("webapp-zero-wasm-default-ssr-next", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-ssr-next demo-next --yes --no-tests`;
+      await $`scaf new ts webapp-ssr-next demo-next --yes --no-tests --skip-lockfile-gen`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-next");
       const targetsPath = path.join(appAbs, "TARGETS");
       const targetsRaw = await fsp.readFile(targetsPath, "utf8");
@@ -51,7 +51,7 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, CI: "1", NEXT_TELEMETRY_DISABLED: "1" },
-      })`pnpm install --filter ./projects/apps/demo-next... --frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+      })`pnpm install --filter ./projects/apps/demo-next... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
       await _$({ cwd: appAbs, stdio: "inherit" })`pnpm run build:ssr`;
 
       const port = await pickFreePort();

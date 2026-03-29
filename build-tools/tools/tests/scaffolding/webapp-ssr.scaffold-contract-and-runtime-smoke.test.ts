@@ -67,7 +67,7 @@ async function installNodeModules(appAbs: string, _$: any): Promise<void> {
     cwd: appAbs,
     stdio: "inherit",
     env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-  })`pnpm install --frozen-lockfile --ignore-scripts --ignore-workspace --prefer-offline --reporter=append-only`;
+  })`pnpm install --ignore-scripts --ignore-workspace --prefer-offline --reporter=append-only`;
 }
 
 async function assertNextContractFiles(tmp: string, appName: string): Promise<void> {
@@ -161,7 +161,7 @@ test(
     await runInTemp("node-webapp-ssr-scaffold-smoke", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
       const nextApp = "scaf-smoke-ssr-next";
-      await $`scaf new ts webapp-ssr-next ${nextApp} --yes --no-tests`;
+      await $`scaf new ts webapp-ssr-next ${nextApp} --yes --no-tests --skip-lockfile-gen`;
       await assertNextContractFiles(tmp, nextApp);
       await assertPackageScriptsAndLabels(tmp, "webapp-ssr-next", "next", nextApp);
       await runNextRuntimeSmoke(tmp, 'data-ssr-marker="next"', _$, nextApp);

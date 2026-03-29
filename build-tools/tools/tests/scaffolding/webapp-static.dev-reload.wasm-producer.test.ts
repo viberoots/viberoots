@@ -10,7 +10,6 @@ import { httpGet, pickFreePort, stopServer } from "./lib/webapp-static-hmr";
 import {
   assertSingleQueueInvariant,
   captureHmrMutationEventsDuring,
-  esbuildPackageName,
   waitForHmrConnected,
 } from "./lib/wasm-watch";
 
@@ -32,27 +31,12 @@ test(
       await fsp.writeFile(producerPayloadPath, "phase2-a", "utf8");
 
       await _$({ cwd: tmp, stdio: "pipe" })`git add -A projects/apps/demo-web`;
-      const outPathRaw = await _$({
-        cwd: appAbs,
-        stdio: "pipe",
-      })`zx-wrapper ../../../build-tools/tools/dev/node-modules-build.ts`;
-      const outPath = String(outPathRaw.stdout || "").trim();
-      if (!outPath) throw new Error("failed to resolve node_modules derivation path");
       await _$({
-        cwd: appAbs,
+        cwd: tmp,
         stdio: "inherit",
-      })`rm -rf node_modules && ln -s ${outPath}/node_modules node_modules`;
+        env: { ...process.env, CI: "1" },
+      })`pnpm install --filter ./projects/apps/demo-web... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
 
-      const esbuildPkg = esbuildPackageName();
-      const esbuildBin = esbuildPkg
-        ? path.join(
-            appAbs,
-            "node_modules",
-            esbuildPkg,
-            "bin",
-            process.platform === "win32" ? "esbuild.exe" : "esbuild",
-          )
-        : "";
       const port = await pickFreePort();
       const serverStdout: string[] = [];
       const serverStderr: string[] = [];
@@ -64,7 +48,6 @@ test(
           ...process.env,
           NODE_ENV: "development",
           NODE_OPTIONS: "",
-          ESBUILD_BINARY_PATH: esbuildBin,
           PORT: String(port),
         },
       });

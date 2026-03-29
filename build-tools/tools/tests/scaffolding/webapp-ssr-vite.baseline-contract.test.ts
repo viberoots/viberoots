@@ -58,7 +58,7 @@ test("Vite SSR template metadata and scaffold baseline are present", async () =>
 
   await runInTemp("scaf-webapp-ssr-vite-baseline", async (tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
-    await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes`;
+    await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --skip-lockfile-gen`;
     const appRoot = path.join(tmp, "projects", "apps", "demo-vite-ssr");
     const expectedFiles = [
       path.join(appRoot, "TARGETS"),

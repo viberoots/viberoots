@@ -32,16 +32,19 @@ test("update-pnpm-hash skips non-default recompute when existing hash is present
   if (!nondefaultTxt.includes("step=skip-existing-hash")) {
     throw new Error("nondefault.ts must log skip-existing-hash for non-default importers");
   }
-  if (
-    !nondefaultTxt.includes('const refreshedFlakeRef = tempFlake.flakeRef.replace(/#pnpm$/, "");')
-  ) {
+  if (!nondefaultTxt.includes('const unfixedFlakeRef = fixedFlakeRef.replace(/#pnpm$/, "");')) {
     throw new Error(
-      "nondefault.ts must refresh filtered flake inputs after hash writes before fixed-build-after-hash",
+      "nondefault.ts must derive the unfixed flake ref directly from the importer path flake",
     );
   }
-  if (!nondefaultTxt.includes("buildStore(opts.storeAttr, refreshedFlakeRef")) {
+  if (nondefaultTxt.includes("makeFilteredFlakeRef")) {
     throw new Error(
-      "nondefault.ts must verify fixed store after hash updates using refreshed flake inputs",
+      "nondefault.ts must not create filtered-flake snapshots for non-default importer hash refresh",
+    );
+  }
+  if (!nondefaultTxt.includes("buildStore(opts.storeAttr, fixedFlakeRef")) {
+    throw new Error(
+      "nondefault.ts must verify fixed store after hash updates using the importer path flake",
     );
   }
   if (nondefaultTxt.includes("deriving hash from unfixed build")) {

@@ -20,6 +20,22 @@ test("update-pnpm-hash nondefault importer verifies fixed build before unfixed r
       "nondefault importer path must extract suggested hash from fixed-build failures",
     );
   }
+  if (!txt.includes('suggestedHash = extractHash(String(verify.output || ""))')) {
+    throw new Error(
+      "nondefault importer path must extract a suggested hash from the first fixed-build failure",
+    );
+  }
+  const fixedIdx = txt.indexOf(
+    "step=fixed-build attr=${opts.storeAttr} timeout=${opts.timeoutSec}s",
+  );
+  const unfixedIdx = txt.indexOf(
+    "step=unfixed-build attr=${opts.unfixedAttr} timeout=${opts.timeoutSec}s",
+  );
+  if (fixedIdx === -1 || unfixedIdx === -1 || fixedIdx > unfixedIdx) {
+    throw new Error(
+      "nondefault importer path must try the fixed build before falling back to the unfixed build",
+    );
+  }
   if (!txt.includes("step=fixed-build-after-hash attr=${opts.storeAttr}")) {
     throw new Error("nondefault importer path must retry fixed build after updating the hash");
   }

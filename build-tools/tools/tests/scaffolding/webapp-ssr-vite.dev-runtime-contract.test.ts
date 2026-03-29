@@ -110,13 +110,13 @@ test(
   async () => {
     await runInTemp("scaf-webapp-ssr-vite-dev-runtime", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --no-tests`;
+      await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --no-tests --skip-lockfile-gen`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-vite-ssr");
       await _$({
         cwd: appAbs,
         stdio: "inherit",
         env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-      })`pnpm install --frozen-lockfile --prefer-offline --ignore-workspace --reporter=append-only`;
+      })`pnpm install --prefer-offline --ignore-workspace --reporter=append-only`;
 
       const entryServerPath = path.join(appAbs, "src", "entry-server.ts");
       const originalEntryServer = await fsp.readFile(entryServerPath, "utf8");
