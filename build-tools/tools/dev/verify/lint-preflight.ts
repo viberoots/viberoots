@@ -101,6 +101,19 @@ async function pathIsFile(root: string, relPath: string): Promise<boolean> {
   }
 }
 
+async function resolveRepoNodeBin(root: string, name: string): Promise<string> {
+  const candidate = path.join(root, "node_modules", ".bin", name);
+  try {
+    await fsp.access(candidate);
+    return candidate;
+  } catch {
+    process.stderr.write(
+      `error: verify lint preflight requires ${name} at ${candidate}; run 'i' to provision repo dev tools before re-running 'v'\n`,
+    );
+    process.exit(2);
+  }
+}
+
 async function resolveChangedLintPaths(root: string): Promise<string[]> {
   const changedPaths = await collectChangedPaths(root, process.env);
   const normalized = Array.from(
@@ -151,10 +164,14 @@ export async function runVerifyLintPreflight(
     process.stderr.write("[verify] lint preflight: skipped (no changed lint/prettier files)\n");
   }
   const lintCmd = scoped
-    ? `${eslintTargets.length > 0 ? `pnpm exec eslint --no-warn-ignored ${eslintTargets.join(" ")} --ext .ts,.tsx --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern '**/.vite-cache/**' && ` : ""}pnpm exec prettier -c ${prettierTargets.join(" ")}`
+    ? `${eslintTargets.length > 0 ? `node_modules/.bin/eslint --no-warn-ignored ${eslintTargets.join(" ")} --ext .ts,.tsx --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern '**/.vite-cache/**' && ` : ""}node_modules/.bin/prettier -c ${prettierTargets.join(" ")}`
     : "skip (no changed lint/prettier files)";
   process.stderr.write(`[verify] lint preflight: timeout -k 10s ${secs}s ${lintCmd}\n`);
   const timeoutPath = await resolveToolPath("timeout");
+  const eslintPath =
+    scoped && eslintTargets.length > 0 ? await resolveRepoNodeBin(root, "eslint") : "";
+  const prettierPath =
+    scoped && prettierTargets.length > 0 ? await resolveRepoNodeBin(root, "prettier") : "";
 
   const eslintRes =
     scoped && eslintTargets.length > 0
@@ -162,7 +179,7 @@ export async function runVerifyLintPreflight(
           stdio: "inherit",
           cwd: root,
           reject: false,
-        })`${timeoutPath} -k 10s ${secs}s pnpm exec eslint --no-warn-ignored ${eslintTargets} --ext .ts,.tsx --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern "**/.vite-cache/**"`
+        })`${timeoutPath} -k 10s ${secs}s ${eslintPath} --no-warn-ignored ${eslintTargets} --ext .ts,.tsx --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern "**/.vite-cache/**"`
       : { exitCode: 0 };
   if (eslintRes.exitCode !== 0) {
     process.stderr.write(
@@ -176,7 +193,7 @@ export async function runVerifyLintPreflight(
       stdio: "inherit",
       cwd: root,
       reject: false,
-    })`${timeoutPath} -k 10s ${secs}s pnpm exec prettier -c ${prettierTargets}`;
+    })`${timeoutPath} -k 10s ${secs}s ${prettierPath} -c ${prettierTargets}`;
     if (prettierRes.exitCode !== 0) {
       process.stderr.write(
         "error: lint preflight failed; refusing to run verify while formatting/lint is dirty\n" +
