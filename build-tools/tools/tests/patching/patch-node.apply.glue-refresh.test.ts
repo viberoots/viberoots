@@ -62,14 +62,22 @@ test("patch-node apply runs glue and writes provider targets deterministically",
       process.exit(2);
     }
 
-    // Re-run apply (idempotent) and confirm files unchanged
+    // Apply clears the active session. Starting a fresh session and applying again should
+    // leave the generated glue unchanged.
+    const clearedStore = JSON.parse(await fs.readFile(storePath, "utf8"));
+    if (clearedStore?.sessions?.node?.[key]) {
+      console.error("expected node session to be cleared after apply");
+      process.exit(2);
+    }
+
     const beforeTargets = await fs.readFile(autoTargets, "utf8");
     const beforeMap = await fs.readFile(autoMap, "utf8");
+    await $({ cwd: importer, env })`${cli} start node lodash --importer ${importer}`;
     await $({ cwd: importer, env })`${cli} apply node lodash --importer ${importer}`;
     const afterTargets = await fs.readFile(autoTargets, "utf8");
     const afterMap = await fs.readFile(autoMap, "utf8");
     if (beforeTargets !== afterTargets || beforeMap !== afterMap) {
-      console.error("provider outputs changed on idempotent re-apply");
+      console.error("provider outputs changed across repeated start/apply cycles");
       process.exit(2);
     }
   });

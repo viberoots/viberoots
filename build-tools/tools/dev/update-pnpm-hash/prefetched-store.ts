@@ -157,7 +157,9 @@ async function withStoreLock<T>(storePath: string, fn: () => Promise<T>): Promis
 }
 
 export async function mergePnpmStore(sourceStore: string, targetStore: string): Promise<void> {
-  await syncPnpmStore(sourceStore, targetStore);
+  await withStoreLock(targetStore, async () => {
+    await syncPnpmStore(sourceStore, targetStore);
+  });
 }
 
 export async function syncSourcePnpmStoreIntoLocalPrefetch(sourceStore: string): Promise<void> {

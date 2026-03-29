@@ -60,7 +60,7 @@
             export uv2nix_groups='${builtins.toJSON groups}'
             export INFO="$INFO"
             ${ (nixpkgs.legacyPackages.${builtins.currentSystem}).python3 or (nixpkgs.legacyPackages.${builtins.currentSystem}).python311 }/bin/python - <<'PY'
-import io, json, os, re, shutil, subprocess, sys, hashlib
+import io, json, os, re, shutil, subprocess, sys, hashlib, tempfile
 from pathlib import Path
 
 lockfile = Path(os.environ.get("lockfile") or "uv.lock")
@@ -203,7 +203,9 @@ def normalize_and_validate_patch(patch_file: Path) -> Path:
         if "/.." in path:
             sys.stderr.write("[uv2nix-lib][strict] unsafe patch path traversal detected in " + patch_file.name + "\n")
             raise SystemExit(3)
-    tmp = Path(os.environ.get("TMPDIR","/tmp")) / patch_file.name
+    patch_hash = hashlib.sha256((str(patch_file) + "\0" + content).encode("utf-8")).hexdigest()[:16]
+    patch_tmpdir = Path(tempfile.mkdtemp(prefix="uv2nix-patch-", dir=str(tmpdir)))
+    tmp = patch_tmpdir / f"{patch_hash}-{patch_file.name}"
     tmp.write_text(content, encoding="utf-8")
     return tmp
 
@@ -220,9 +222,13 @@ for key in keys:
         continue
     is_dev_override = bool(dev_overrides.get(key))
     sys.stderr.write("[uv2nix-lib] is_dev_override=%s\n" % ("yes" if is_dev_override else "no"))
-    work_pkg = Path(os.environ.get("TMPDIR","/tmp")) / ("work-" + key.replace("@","_").replace("/","_"))
-    if work_pkg.exists():
-        shutil.rmtree(work_pkg)
+    work_pkg_root = Path(
+        tempfile.mkdtemp(
+            prefix=("work-" + key.replace("@","_").replace("/","_") + "-"),
+            dir=str(tmpdir),
+        )
+    )
+    work_pkg = work_pkg_root / "src"
     shutil.copytree(src_path, work_pkg)
     # ensure work tree is writable
     for dirpath, dirnames, filenames in os.walk(work_pkg):
@@ -318,5 +324,3 @@ PY
     };
   };
 }
-
-

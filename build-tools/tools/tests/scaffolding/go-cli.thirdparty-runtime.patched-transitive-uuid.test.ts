@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { test } from "node:test";
+import { resolveToolPathSync } from "../../lib/tool-paths.ts";
 import { runInTemp } from "../lib/test-helpers";
 
 // Ensure Node is on PATH inside zx_test sandboxes that may not have dev shell
@@ -94,9 +95,12 @@ async function seedUuidModuleCache(
   await fsp.mkdir(zipModuleDir, { recursive: true });
   await fsp.copyFile(path.join(fixtureDir, "uuid.go"), path.join(zipModuleDir, "uuid.go"));
   await fsp.writeFile(path.join(zipModuleDir, "go.mod"), goMod, "utf8");
-  await sh({ stdio: "pipe" })`command -v zip`;
+  const zipBin = resolveToolPathSync("zip");
   const zipPath = path.join(proxyDir, "v1.6.0.zip");
-  await sh({ cwd: zipRoot, stdio: "pipe" })`zip -qr -X ${zipPath} github.com/google/uuid@v1.6.0`;
+  await sh({
+    cwd: zipRoot,
+    stdio: "pipe",
+  })`${zipBin} -qr -X ${zipPath} github.com/google/uuid@v1.6.0`;
   return { proxyRoot, gomodcache };
 }
 
