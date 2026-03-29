@@ -1,5 +1,5 @@
 import process from "node:process";
-import "zx/globals";
+import "../dev/zx-init.mjs";
 import { buckCommandEnv, isBuckDaemonInitTransient } from "./buck-command-env.ts";
 
 const CONFIG_SUFFIX = /\s+\([^)]*\)$/;

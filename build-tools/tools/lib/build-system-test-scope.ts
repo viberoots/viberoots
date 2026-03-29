@@ -1,5 +1,5 @@
 import process from "node:process";
-import "zx/globals";
+import "../dev/zx-init.mjs";
 
 export type BuildSystemTestMode = "auto" | "always" | "never";
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
+import fs from "node:fs";
 import path from "node:path";
 import { readImporterArg } from "../lib/cli.ts";
 import { resolveImporterDir } from "../lib/lockfiles.ts";
@@ -21,13 +22,21 @@ import {
 import type { LanguageHandler, SessionRecord } from "./types";
 
 function pnpmBin(): string {
-  const b = (process.env.PNPM_BIN || "").trim();
-  return b || "pnpm";
+  return (process.env.PNPM_BIN || "").trim() || "pnpm";
 }
 
 function sessionKey(importerDir: string, pkgName: string): string {
-  const root = repoRoot();
-  const rel = path.relative(root, importerDir).replace(/\\/g, "/");
+  const canonical = (p: string): string => {
+    const abs = path.resolve(p);
+    try {
+      return fs.realpathSync.native(abs);
+    } catch {
+      return abs;
+    }
+  };
+  const root = canonical(repoRoot());
+  const importer = canonical(importerDir);
+  const rel = path.relative(root, importer).replace(/\\/g, "/");
   return `${rel || "."}#${pkgName}`.toLowerCase();
 }
 

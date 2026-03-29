@@ -11,10 +11,10 @@ test("move, update, delete and ls reflects state", async () => {
     await $`scaf new go lib demo-lib --path=projects/libs/demo-lib`;
     await $`git init`;
     await $`git add -A`;
-    await $`git commit -m "init scaffold"`;
+    await $`git -c user.name=test -c user.email=test@example.com commit -m "init scaffold"`;
     await $`scaf move projects/libs/demo-lib projects/libs/demo-moved --yes`;
     await $`git add -A`;
-    await $`git commit -m "move scaffold"`;
+    await $`git -c user.name=test -c user.email=test@example.com commit -m "move scaffold"`;
     const ans = path.join(_tmp, "projects", "libs", "demo-moved", ".copier-answers.yml");
     const txt = await fsp.readFile(ans, "utf8");
     if (!/^name:\s*demo-moved/m.test(txt)) {

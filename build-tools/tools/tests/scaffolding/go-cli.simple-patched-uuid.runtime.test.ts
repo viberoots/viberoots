@@ -105,12 +105,12 @@ async function startPatchPkgSession(
 
 async function seedUuidModuleCache(
   tmp: string,
-  $: any,
+  sh: any,
   gomodcacheOverride?: string,
 ): Promise<{ proxyRoot: string; gomodcache: string }> {
   const gomodcache =
     gomodcacheOverride ||
-    String((await $({ cwd: tmp, stdio: "pipe" })`go env GOMODCACHE`).stdout || "").trim();
+    String((await sh({ cwd: tmp, stdio: "pipe" })`go env GOMODCACHE`).stdout || "").trim();
   if (!gomodcache) throw new Error("GOMODCACHE not found");
   const moduleDir = path.join(gomodcache, "github.com", "google", "uuid@v1.6.0");
   const fixtureDir = new URL("../fixtures/go/github.com/google/uuid@v1.6.0", import.meta.url)
@@ -139,9 +139,9 @@ async function seedUuidModuleCache(
   await fsp.copyFile(path.join(fixtureDir, "uuid.go"), path.join(zipModuleDir, "uuid.go"));
   await fsp.writeFile(path.join(zipModuleDir, "go.mod"), goMod, "utf8");
 
-  await $({ stdio: "pipe" })`command -v zip`;
+  await sh({ stdio: "pipe" })`command -v zip`;
   const zipPath = path.join(proxyDir, "v1.6.0.zip");
-  await $({ cwd: zipRoot, stdio: "pipe" })`zip -qr -X ${zipPath} github.com/google/uuid@v1.6.0`;
+  await sh({ cwd: zipRoot, stdio: "pipe" })`zip -qr -X ${zipPath} github.com/google/uuid@v1.6.0`;
   return { proxyRoot, gomodcache };
 }
 

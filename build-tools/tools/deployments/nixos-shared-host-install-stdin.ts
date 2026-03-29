@@ -7,15 +7,21 @@ export async function readStructuredInstallInputFromStdin<T>(
   const raw = await new Promise<string>((resolve) => {
     let done = false;
     let data = "";
-    let timer: NodeJS.Timeout | undefined;
+    let sawData = false;
+    let idleTimer: NodeJS.Timeout | undefined;
     const onData = (chunk: string | Buffer) => {
+      sawData = true;
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+        idleTimer = undefined;
+      }
       data += String(chunk);
     };
     const onFinish = () => finish();
     const finish = () => {
       if (done) return;
       done = true;
-      if (timer) clearTimeout(timer);
+      if (idleTimer) clearTimeout(idleTimer);
       process.stdin.off("data", onData);
       process.stdin.off("end", onFinish);
       process.stdin.off("error", onFinish);
@@ -27,8 +33,10 @@ export async function readStructuredInstallInputFromStdin<T>(
     process.stdin.once("end", onFinish);
     process.stdin.once("error", onFinish);
     process.stdin.resume();
-    timer = setTimeout(finish, 25);
-    timer.unref?.();
+    idleTimer = setTimeout(() => {
+      if (!sawData) finish();
+    }, 250);
+    idleTimer.unref?.();
   });
   const trimmed = raw.trim();
   if (!trimmed) return {};

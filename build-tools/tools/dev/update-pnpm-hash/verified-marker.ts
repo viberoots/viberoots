@@ -45,8 +45,15 @@ export async function readVerifiedMarker(
 
 export async function currentVerifiedMarkerFingerprint(repoRoot: string): Promise<string> {
   const files = [
+    "build-tools/tools/dev/update-pnpm-hash.ts",
+    "build-tools/tools/dev/update-pnpm-hash/lockfile.ts",
+    "build-tools/tools/dev/update-pnpm-hash/nondefault.ts",
+    "build-tools/tools/dev/update-pnpm-hash/nix.ts",
+    "build-tools/tools/dev/update-pnpm-hash/prefetched-store.ts",
     "build-tools/tools/nix/node-modules/store.nix",
     "build-tools/tools/nix/node-modules/modules.nix",
+    "build-tools/tools/lib/pnpm-importer-lockfile.ts",
+    "build-tools/tools/lib/pnpm-state-paths.ts",
   ];
   const hash = crypto.createHash("sha256");
   hash.update(`platform=${process.platform}\n`);

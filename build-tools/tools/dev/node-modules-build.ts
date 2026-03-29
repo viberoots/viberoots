@@ -4,6 +4,12 @@ import path from "node:path";
 import process from "node:process";
 import { resolveToolPathSync } from "../lib/tool-paths.ts";
 import { findNearestImporterLock, nodeModulesAttr } from "./install/common.ts";
+import {
+  currentVerifiedMarkerFingerprint,
+  readVerifiedMarker,
+  sha256File,
+  verifiedMarkerPath,
+} from "./update-pnpm-hash/verified-marker.ts";
 
 async function findFlakeRoot(start: string): Promise<string> {
   let dir = path.resolve(start);
@@ -136,11 +142,29 @@ async function isLockfileDirty(lockfileRel: string): Promise<boolean> {
   return Boolean(String(status.stdout || "").trim());
 }
 
+async function hasFreshVerifiedMarker(lockfileRel: string): Promise<boolean> {
+  const importer = lockfileRel.includes("/")
+    ? lockfileRel.slice(0, lockfileRel.lastIndexOf("/"))
+    : ".";
+  const marker = await readVerifiedMarker(verifiedMarkerPath(repoRoot, importer));
+  if (!marker) return false;
+  const lockHash = await sha256File(path.join(repoRoot, lockfileRel));
+  if (!lockHash) return false;
+  const builderFingerprint = await currentVerifiedMarkerFingerprint(repoRoot);
+  return (
+    marker.importer === importer &&
+    marker.lockfile === lockfileRel &&
+    marker.lockHash === lockHash &&
+    marker.hashValue === (await readHashForLock(lockfileRel)) &&
+    marker.builderFingerprint === builderFingerprint
+  );
+}
+
 async function ensurePnpmStoreHash(lockfileRel: string): Promise<void> {
   const current = await readHashForLock(lockfileRel);
   if (current && current !== placeholderDigest) {
     const dirty = await isLockfileDirty(lockfileRel);
-    if (!dirty) return;
+    if (!dirty && (await hasFreshVerifiedMarker(lockfileRel))) return;
   }
   const updater = path.join(flakeRoot, "build-tools/tools/dev/update-pnpm-hash.ts");
   const update = await $({

@@ -84,9 +84,21 @@ test("node-modules derivation snapshots untracked importer files", async () => {
     const allDrvs = Object.entries(parsed.derivations || {});
     const firstDrv =
       (parsed.derivations || {})[drvPath] ||
+      allDrvs.find(([, value]) => {
+        const src = String(value?.env?.src || "").trim();
+        return (
+          src.startsWith("/nix/store/") &&
+          Object.keys(value?.inputs?.drvs || {}).some((d) => d.includes("-importer-src-"))
+        );
+      })?.[1] ||
       allDrvs.find(([key]) => key === drvPath || key.endsWith(path.basename(drvPath)))?.[1] ||
       allDrvs.find(([, value]) =>
         Object.keys(value?.inputs?.drvs || {}).some((d) => d.includes("-importer-src-")),
+      )?.[1] ||
+      allDrvs.find(([, value]) =>
+        String(value?.env?.src || "")
+          .trim()
+          .startsWith("/nix/store/"),
       )?.[1] ||
       allDrvs[0]?.[1];
     const importerSrcOut = String(firstDrv?.env?.src || "").trim();

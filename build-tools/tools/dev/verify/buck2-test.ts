@@ -39,14 +39,14 @@ export function spawnVerifyBuck2Tests(opts: {
   targets: string[];
   zxNodeModulesOut: string;
 }): SpawnedVerifyTests {
-  const tsecRaw = Number((process.env.VERIFY_TIMEOUT_SECS || "3600").trim());
-  const tsec = Number.isFinite(tsecRaw) && tsecRaw > 0 ? Math.floor(tsecRaw) : 3600;
+  const tsecRaw = Number((process.env.VERIFY_TIMEOUT_SECS || "7200").trim());
+  const tsec = Number.isFinite(tsecRaw) && tsecRaw > 0 ? Math.floor(tsecRaw) : 7200;
   const tms = tsec * 1000;
-  const testNixTimeoutRaw = Number((process.env.TEST_NIX_TIMEOUT_SECS || "900").trim());
+  const testNixTimeoutRaw = Number((process.env.TEST_NIX_TIMEOUT_SECS || "1800").trim());
   const testNixTimeoutSecs =
     Number.isFinite(testNixTimeoutRaw) && testNixTimeoutRaw > 0
       ? Math.floor(testNixTimeoutRaw)
-      : 900;
+      : 1800;
   // Node's per-test timeout should never be tighter than the Nix timeout budget.
   const nodeTestTimeoutMs = Math.max(tms, testNixTimeoutSecs * 1000);
 

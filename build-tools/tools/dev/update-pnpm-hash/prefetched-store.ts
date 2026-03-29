@@ -24,6 +24,58 @@ async function ensureMergedDir(dst: string): Promise<void> {
       await fsp.cp(target, dst, { recursive: true }).catch(() => {});
     }
   }
+  await fsp.chmod(dst, 0o755).catch(() => {});
+}
+
+async function removeExistingTarget(target: string): Promise<void> {
+  const cur = await fsp.lstat(target).catch(() => null);
+  if (!cur) return;
+  if (cur.isDirectory() && !cur.isSymbolicLink()) {
+    await fsp.rm(target, { recursive: true, force: true });
+    return;
+  }
+  await fsp.chmod(target, 0o644).catch(() => {});
+  await fsp.rm(target, { force: true }).catch(() => {});
+}
+
+async function copyResolvedFile(source: string, target: string): Promise<void> {
+  await fsp.mkdir(path.dirname(target), { recursive: true });
+  await fsp.chmod(path.dirname(target), 0o755).catch(() => {});
+  await removeExistingTarget(target);
+  await fsp.copyFile(source, target);
+  const st = await fsp.stat(source);
+  await fsp.chmod(target, st.mode);
+}
+
+async function mergeResolvedTree(source: string, target: string): Promise<void> {
+  const st = await fsp.stat(source);
+  if (st.isDirectory()) {
+    await fsp.mkdir(target, { recursive: true });
+    const entries = await fsp.readdir(source, { withFileTypes: true });
+    for (const entry of entries) {
+      await mergeSymlinkSafe(path.join(source, entry.name), path.join(target, entry.name));
+    }
+    return;
+  }
+  await copyResolvedFile(source, target);
+}
+
+async function mergeSymlinkSafe(source: string, target: string): Promise<void> {
+  const lst = await fsp.lstat(source);
+  if (lst.isSymbolicLink()) {
+    const real = await fsp.realpath(source);
+    await mergeResolvedTree(real, target);
+    return;
+  }
+  if (lst.isDirectory()) {
+    await ensureMergedDir(target);
+    const entries = await fsp.readdir(source, { withFileTypes: true });
+    for (const entry of entries) {
+      await mergeSymlinkSafe(path.join(source, entry.name), path.join(target, entry.name));
+    }
+    return;
+  }
+  await copyResolvedFile(source, target);
 }
 
 function lockPathForStore(storePath: string): string {
@@ -138,13 +190,13 @@ async function syncPnpmStore(sourceStore: string, targetStore: string): Promise<
     const dstFiles = path.join(dstVer, "files");
     if (await dirExists(srcFiles)) {
       await ensureMergedDir(dstFiles);
-      await fsp.cp(srcFiles, dstFiles, { recursive: true });
+      await mergeSymlinkSafe(srcFiles, dstFiles);
     }
     const srcIndex = path.join(srcVer, "index");
     const dstIndex = path.join(dstVer, "index");
     if (await dirExists(srcIndex)) {
       await ensureMergedDir(dstIndex);
-      await fsp.cp(srcIndex, dstIndex, { recursive: true });
+      await mergeSymlinkSafe(srcIndex, dstIndex);
     }
   }
 }

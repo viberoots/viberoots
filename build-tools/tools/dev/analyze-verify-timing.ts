@@ -6,7 +6,7 @@ import { getFlagBool, getFlagStr, getPositionals } from "../lib/cli.ts";
 import { stripAnsiAndCrs } from "../lib/verify-log-status/types.ts";
 import {
   findLastFullSuiteWindowStart,
-  parseBuck2BeginEpochSec,
+  parseVerifyBeginEpochSec,
   parseBuck2ExitMarker,
   parseLineFromBuckLogForMatching,
 } from "../lib/verify-log-status/parsing.ts";
@@ -82,7 +82,7 @@ export function analyzeVerifyTimingFromLogText(opts: {
   const startIdx = findLastFullSuiteWindowStart(lines);
   const window = startIdx > 0 ? lines.slice(startIdx) : lines;
 
-  const begin = parseBuck2BeginEpochSec(window);
+  const begin = parseVerifyBeginEpochSec(window);
   const exit = parseBuck2ExitMarker(window);
   const end = exit.endSec;
   const wallSec = begin !== undefined && end !== undefined && end > begin ? end - begin : undefined;

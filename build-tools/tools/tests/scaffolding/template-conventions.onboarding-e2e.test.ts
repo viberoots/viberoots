@@ -53,6 +53,6 @@ test("e2e: canonical path onboarding wires conventions without template_keys", a
     );
     assert.equal(manifestBefore, manifestAfter);
 
-    await $`node build-tools/tools/tests/scaffolding/template-taxonomy.parity-contract.test.ts`;
+    await $`zx-wrapper build-tools/tools/tests/scaffolding/template-taxonomy.parity-contract.test.ts`;
   });
 });
