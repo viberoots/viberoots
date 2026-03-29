@@ -7,6 +7,7 @@ import * as fsp from "node:fs/promises";
 import { ensureImporterLockfileFresh } from "../../../dev/update-pnpm-hash/lockfile.ts";
 import { printSkip } from "../../../lib/errors.ts";
 import { confirmOrExit } from "../confirm.ts";
+import { runScafNodeTool } from "../command-runner.ts";
 import {
   formatImporterLockfiles,
   formatScaffoldOutput,
@@ -136,7 +137,7 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
         await fsp.writeFile(cfgPath, cfg, "utf8");
       }
       try {
-        await $`node build-tools/tools/dev/planner-gen.ts --lang ${langId}`;
+        await runScafNodeTool("build-tools/tools/dev/planner-gen.ts", ["--lang", langId]);
         console.log(`planner generated: build-tools/tools/nix/planner/${langId}.nix`);
       } catch (e) {
         console.warn("warning: planner-gen failed:", e);

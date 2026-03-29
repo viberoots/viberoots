@@ -1,4 +1,3 @@
-import "../../../lib/ensure-zx-globals.ts";
 import type { ScafFlags } from "../types.ts";
 
 import path from "node:path";
@@ -6,6 +5,7 @@ import path from "node:path";
 import * as fsp from "node:fs/promises";
 
 import { confirmOrExit } from "../confirm.ts";
+import { runScafNodeTool } from "../command-runner.ts";
 import { exists } from "../fs.ts";
 import { cmdNew } from "./new.ts";
 
@@ -119,7 +119,7 @@ export async function cmdLanguage(args: string[], flags: ScafFlags) {
         await fsp.writeFile(p, JSON.stringify(doc, null, 2) + "\n", "utf8");
       }
       try {
-        await $`node build-tools/tools/dev/validate-langs.ts`;
+        await runScafNodeTool("build-tools/tools/dev/validate-langs.ts");
       } catch {}
     }
 
@@ -131,7 +131,7 @@ export async function cmdLanguage(args: string[], flags: ScafFlags) {
     const doCodegen = flags["no-codegen"] === "true" ? false : true;
     if (doCodegen) {
       try {
-        await $`node build-tools/tools/dev/codegen.ts`;
+        await runScafNodeTool("build-tools/tools/dev/codegen.ts");
       } catch (e) {
         console.warn("warning: codegen failed:", e);
       }

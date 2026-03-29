@@ -2,6 +2,7 @@ import os from "node:os";
 import path from "node:path";
 
 import * as fsp from "node:fs/promises";
+import { runScafCommand } from "../command-runner.ts";
 
 export async function runCopierCopy(templateDir: string, dest: string, data: Record<string, any>) {
   const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), "scaf-"));
@@ -11,7 +12,16 @@ export async function runCopierCopy(templateDir: string, dest: string, data: Rec
     const absTemplate = path.resolve(templateDir);
     const absDest = path.resolve(dest);
     await fsp.mkdir(absDest, { recursive: true });
-    await $`copier copy --trust --defaults --force --data-file ${answersPath} ${absTemplate} ${absDest}`;
+    await runScafCommand("copier", [
+      "copy",
+      "--trust",
+      "--defaults",
+      "--force",
+      "--data-file",
+      answersPath,
+      absTemplate,
+      absDest,
+    ]);
   } finally {
     await fsp.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }

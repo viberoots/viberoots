@@ -2,6 +2,7 @@ import type { Dirent } from "node:fs";
 
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { runScafCommand } from "../command-runner.ts";
 
 const FORMAT_EXTENSIONS = new Set([
   ".ts",
@@ -45,10 +46,7 @@ async function collectFormattableFiles(root: string): Promise<string[]> {
 export async function formatScaffoldOutput(dest: string): Promise<void> {
   const files = await collectFormattableFiles(dest);
   if (files.length === 0) return;
-  await $({
-    cwd: process.cwd(),
-    stdio: "pipe",
-  })`prettier --write ${files}`;
+  await runScafCommand("prettier", ["--write", ...files], process.cwd());
 }
 
 export async function removeScaffoldTemplateConfig(dest: string): Promise<void> {
@@ -66,10 +64,11 @@ export async function refreshImporterStoreHash(repoRoot: string, importer: strin
     .then((s) => s.isFile())
     .catch(() => false);
   if (!hasLockfile) return;
-  await $({
-    cwd: repoRoot,
-    stdio: "inherit",
-  })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
+  await runScafCommand(
+    "zx-wrapper",
+    ["build-tools/tools/dev/update-pnpm-hash.ts", "--lockfile", lockfile],
+    repoRoot,
+  );
 }
 
 export async function formatImporterLockfiles(
@@ -86,10 +85,7 @@ export async function formatImporterLockfiles(
     if (hasLockfile) lockfiles.push(absLockfile);
   }
   if (lockfiles.length === 0) return;
-  await $({
-    cwd: repoRoot,
-    stdio: "pipe",
-  })`prettier --write ${lockfiles}`;
+  await runScafCommand("prettier", ["--write", ...lockfiles], repoRoot);
 }
 
 export function templateImportersToRefresh(opts: {

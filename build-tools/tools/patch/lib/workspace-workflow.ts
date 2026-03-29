@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import "../../lib/ensure-zx-globals.ts";
 import * as fsp from "node:fs/promises";
+import { spawn } from "node:child_process";
 import { echoSnippetRequested } from "../../lib/cli.ts";
 import { makeWorkspace } from "../cross-platform";
 import { setOverride, clearOverride, printOverrideSnippet } from "../dev-overrides";
@@ -64,6 +64,26 @@ async function reuseWorkspaceOrNull(
   return existing.workspacePath;
 }
 
+async function runPatchEditor(editor: string, cwd: string): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(editor, {
+      cwd,
+      stdio: "inherit",
+      shell: true,
+    });
+    child.once("error", reject);
+    child.once("exit", (code, signal) => {
+      if (code === 0 || code === null) {
+        resolve();
+        return;
+      }
+      reject(
+        new Error(`PATCH_EDITOR exited with code ${String(code)}${signal ? ` (${signal})` : ""}`),
+      );
+    });
+  });
+}
+
 export async function startWorkspaceWorkflow(opts: StartOpts): Promise<string> {
   const exists = opts.deps?.pathExists ?? pathExists;
   const mkWs = opts.deps?.makeWorkspace ?? makeWorkspace;
@@ -101,7 +121,9 @@ export async function startWorkspaceWorkflow(opts: StartOpts): Promise<string> {
   console.log(ws);
   if (process.env.PATCH_EDITOR && process.env.PATCH_EDITOR.trim() !== "") {
     const ed = process.env.PATCH_EDITOR;
-    await $({ cwd: ws })`${ed}`.nothrow();
+    try {
+      await runPatchEditor(ed, ws);
+    } catch {}
   }
   return ws;
 }
