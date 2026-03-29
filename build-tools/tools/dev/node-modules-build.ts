@@ -75,15 +75,12 @@ async function resolveImporterInRepo(
   );
 }
 
-// Allow an explicit importer override for tests to reduce redundant per-importer builds.
-// When set, it should be a repo-root-relative directory containing pnpm-lock.yaml, e.g., "projects/libs/test-deps".
 const overrideImporterRaw = (process.env.ZX_TEST_NODE_MODULES_IMPORTER || "").trim();
 let importer = "";
 if (overrideImporterRaw) {
   try {
     importer = await resolveImporterInRepo(repoRoot, cwd, overrideImporterRaw);
   } catch {
-    // Fall back to nearest importer when override is invalid
     importer = "";
   }
 }
@@ -104,10 +101,6 @@ if (!importer) {
 const fullAttr = nodeModulesAttr(importer);
 const relLock = importer === "." ? "pnpm-lock.yaml" : `${importer}/pnpm-lock.yaml`;
 const placeholderDigest = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-// Performance + determinism: require a git worktree and use git-snapshot semantics.
-// This avoids expensive full-directory hashing that can make even `nix eval` take minutes.
-//
-// Tests that create/modify files that must be visible to Nix must `git add` them in their temp repo.
 try {
   const chk = await $({
     cwd: flakeRoot,
@@ -133,7 +126,6 @@ async function readHashForLock(lockfileRel: string): Promise<string> {
     return "";
   }
 }
-
 async function isLockfileDirty(lockfileRel: string): Promise<boolean> {
   const status = await $({
     cwd: flakeRoot,
@@ -141,7 +133,6 @@ async function isLockfileDirty(lockfileRel: string): Promise<boolean> {
   })`git status --porcelain -- ${lockfileRel}`.nothrow();
   return Boolean(String(status.stdout || "").trim());
 }
-
 async function hasFreshVerifiedMarker(lockfileRel: string): Promise<boolean> {
   const importer = lockfileRel.includes("/")
     ? lockfileRel.slice(0, lockfileRel.lastIndexOf("/"))
@@ -166,10 +157,7 @@ async function ensurePnpmStoreHash(lockfileRel: string): Promise<void> {
     const dirty = await isLockfileDirty(lockfileRel);
     if (!dirty && (await hasFreshVerifiedMarker(lockfileRel))) return;
   }
-  const updater = path.join(flakeRoot, "build-tools/tools/dev/update-pnpm-hash.ts");
-  const update = await $({
-    cwd: flakeRoot,
-  })`zx-wrapper ${updater} --lockfile ${lockfileRel}`.nothrow();
+  const update = await runPnpmHashUpdater(lockfileRel);
   if (update.exitCode !== 0) {
     console.error("node-modules-build: pnpm-store hash update failed");
     if (update.stdout) console.error(String(update.stdout).trim());
@@ -190,11 +178,15 @@ async function ensurePnpmStoreHash(lockfileRel: string): Promise<void> {
   } catch {}
 }
 
-async function forceRefreshPnpmStoreHash(lockfileRel: string): Promise<void> {
+async function runPnpmHashUpdater(lockfileRel: string, force = false) {
   const updater = path.join(flakeRoot, "build-tools/tools/dev/update-pnpm-hash.ts");
-  const update = await $({
+  return await $({
     cwd: flakeRoot,
-  })`zx-wrapper ${updater} --lockfile ${lockfileRel} --force`.nothrow();
+  })`zx-wrapper ${updater} --lockfile ${lockfileRel} ${force ? "--force" : ""}`.nothrow();
+}
+
+async function forceRefreshPnpmStoreHash(lockfileRel: string): Promise<void> {
+  const update = await runPnpmHashUpdater(lockfileRel, true);
   if (update.exitCode !== 0) {
     console.error("node-modules-build: forced pnpm-store hash update failed");
     if (update.stdout) console.error(String(update.stdout).trim());
