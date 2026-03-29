@@ -23,8 +23,12 @@ builtins.filterSource
       isRootFile ".envrc" ||
       isAnyDir "node_modules" ||
       isAnyDir ".pnpm" ||
-      isAnyDir ".pnpm-store"
+      isAnyDir ".pnpm-store" ||
+      isAnyDir "dist" ||
+      isAnyDir "build" ||
+      isAnyDir ".vite" ||
+      isAnyDir ".next" ||
+      isAnyDir ".wasm-producer"
     ))
   path
-
 
