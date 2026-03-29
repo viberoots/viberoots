@@ -245,8 +245,10 @@ for key in keys:
     # apply patches if any (preserve declared order for determinism)
     # When a dev override is provided for this key, skip applying patches to avoid reversed hunks.
     if not is_dev_override:
-        # Sort patches by basename to enforce lexicographic within key
-        patch_list = sorted((patches_map.get(key) or []), key=lambda p: os.path.basename(p))
+        # Preserve Nix-declared order. The incoming list is already built from
+        # a deterministic filename scan, and re-sorting materialized /nix/store
+        # paths by basename reintroduces hash-prefix nondeterminism.
+        patch_list = (patches_map.get(key) or [])
         for patch in patch_list:
             pf = Path(patch)
             if not pf.exists():

@@ -1,3 +1,4 @@
+import "zx/globals";
 import type { ScafFlags } from "../types.ts";
 
 import path from "node:path";
