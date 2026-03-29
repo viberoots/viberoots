@@ -1,4 +1,4 @@
-import "zx/globals";
+import "../../../lib/ensure-zx-globals.ts";
 import type { ScafFlags } from "../types.ts";
 
 import path from "node:path";

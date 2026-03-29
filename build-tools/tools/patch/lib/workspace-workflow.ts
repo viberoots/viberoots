@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import "zx/globals";
+import "../../lib/ensure-zx-globals.ts";
 import * as fsp from "node:fs/promises";
 import { echoSnippetRequested } from "../../lib/cli.ts";
 import { makeWorkspace } from "../cross-platform";
