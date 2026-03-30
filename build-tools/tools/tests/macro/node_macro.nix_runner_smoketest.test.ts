@@ -49,6 +49,6 @@ test("node nix runner: minimal importer with no tests passes", async () => {
     // Update pnpm-store FOD hash mapping for this importer lockfile
     await $`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile projects/apps/mini/pnpm-lock.yaml`;
     // Execute the test target; with no test files present, the derivation should succeed
-    await $`buck2 test //projects/apps/mini:node_tests`;
+    await $`buck2 test --target-platforms prelude//platforms:default //projects/apps/mini:node_tests`;
   });
 });

@@ -95,7 +95,7 @@ def nix_bootstrap_env():
 
 
 def nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = 600):
-    tout = default_sec if isinstance(default_sec, int) and default_sec > 0 else 600
+    tout = default_sec if type(default_sec) == "int" and default_sec > 0 else 600
     return (
         ("TOUT=%d; " % tout)
         + "RAW_TOUT=\"${TEST_NIX_TIMEOUT_SECS:-${VERIFY_TIMEOUT_SECS:-}}\"; "
@@ -211,7 +211,7 @@ def nix_calling_env_export_buck_graph_json(graph_json_path = "$WORKSPACE_ROOT/bu
 
 
 def nix_calling_env_export_nix_pnpm_fetch_timeout(default_sec = 600):
-    v = default_sec if isinstance(default_sec, int) and default_sec > 0 else 600
+    v = default_sec if type(default_sec) == "int" and default_sec > 0 else 600
     return ("export NIX_PNPM_FETCH_TIMEOUT=\"${NIX_PNPM_FETCH_TIMEOUT:-%d}\"; " % v)
 
 def nix_calling_node_patch_requirements_preflight(importer):
@@ -226,5 +226,4 @@ def nix_calling_node_patch_requirements_preflight(importer):
         + "fi; "
         + "node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$BNX_NODE_ZX_INIT\" \"$WORKSPACE_ROOT/build-tools/tools/buck/enforce-node-patch-requirements.ts\" --check --importer \"$BNX_NODE_PATCH_IMPORTER\"; "
     )
-
 

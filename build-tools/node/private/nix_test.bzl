@@ -1,5 +1,6 @@
 load("//build-tools/lang:sanitize.bzl", "sanitize_name")
 load("//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_timeout_wrapper_var")
+load("@prelude//test:inject_test_run_info.bzl", "inject_test_run_info")
 
 def _node_nix_test_impl(ctx):
     imp = ctx.attrs.importer
@@ -31,7 +32,7 @@ def _node_nix_test_impl(ctx):
         "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
         + nix_bootstrap_env_core()
         + ("".join(env_pairs))
-        + nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = (tout if isinstance(tout, int) and tout > 0 else 600))
+        + nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = (tout if tout > 0 else 600))
         + ("echo '[node_nix_test] importer=%s (attr=%s)' >&2; " % (imp, imp_attr))
         + ("if ! (cd \"$WORKSPACE_ROOT/%s\" && (find . -type f -name \"*.test.ts\" -print -quit | grep -q . || find . -type f -name \"*.test.js\" -print -quit | grep -q .)); then echo '[node_nix_test] no tests matched; passing' >&2; exit 0; fi; " % imp)
         # If the main repo root already has a unified pnpm store, reuse it in temp workspaces
@@ -55,18 +56,17 @@ def _node_nix_test_impl(ctx):
     )
     ctx.actions.run(cmd, category = "node_nix_test_stamp")
 
-    return [
+    return inject_test_run_info(ctx, ExternalRunnerTestInfo(
+            type = "custom",
+            command = ["bash", "-c", run_cmd],
+            labels = ctx.attrs.labels,
+            contacts = [],
+        )) + [
         DefaultInfo(
             default_output = stamp,
             # Ensure srcs are inputs so changes to patch files/others invalidate correctly
             # Note: deps edges are carried by attrs.deps
             other_outputs = [],
-        ),
-        ExternalRunnerTestInfo(
-            type = "custom",
-            command = ["bash", "-c", run_cmd],
-            labels = [],
-            contacts = [],
         ),
     ]
 
@@ -91,6 +91,6 @@ node_nix_test = rule(
         "labels": attrs.list(attrs.string(), default = []),
         # Deterministic tiny output file name
         "out": attrs.string(default = "node_nix_test.stamp"),
+        "_inject_test_env": attrs.default_only(attrs.dep(default = "prelude//test/tools:inject_test_env")),
     },
 )
-

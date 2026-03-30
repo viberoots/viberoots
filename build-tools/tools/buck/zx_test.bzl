@@ -1,3 +1,5 @@
+load("@prelude//test:inject_test_run_info.bzl", "inject_test_run_info")
+
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
     # Export NODE_V8_COVERAGE so child Node processes also write coverage data, but only when COVERAGE=1.
@@ -137,15 +139,14 @@ def _zx_test_impl(ctx):
         hidden = [ctx.attrs.script] + (ctx.attrs.template_inputs or []),
     )
     ctx.actions.run(stamp_cmd, category = "zx_test_stamp")
-    return [
-        DefaultInfo(
-            default_output = stamp,
-        ),
-        ExternalRunnerTestInfo(
+    return inject_test_run_info(ctx, ExternalRunnerTestInfo(
             type = "custom",
             command = cmd,
             labels = labels,
             contacts = [],
+        )) + [
+        DefaultInfo(
+            default_output = stamp,
         ),
     ]
 
@@ -158,5 +159,6 @@ zx_test = rule(
         "test_rule_timeout_ms": attrs.option(attrs.int(), default = None),
         "labels": attrs.list(attrs.string(), default = []),
         "template_inputs": attrs.list(attrs.source(), default = []),
+        "_inject_test_env": attrs.default_only(attrs.dep(default = "prelude//test/tools:inject_test_env")),
     },
 )

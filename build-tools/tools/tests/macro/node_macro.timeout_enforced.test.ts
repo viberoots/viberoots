@@ -65,7 +65,7 @@ test("nix_node_test: external timeout is enforced", { timeout: 420_000 }, async 
       cwd: tmp,
       stdio: "pipe",
       env,
-    })`buck2 test //projects/libs/demo:timeout_short`.nothrow();
+    })`buck2 test --target-platforms prelude//platforms:default //projects/libs/demo:timeout_short`.nothrow();
     if (res.exitCode === 0) {
       throw new Error("expected buck2 test to fail due to external timeout");
     }

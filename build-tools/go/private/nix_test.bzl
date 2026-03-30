@@ -1,6 +1,7 @@
 load("//build-tools/lang:sanitize.bzl", "sanitize_name")
 load("//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_timeout_wrapper_var")
 load("//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
+load("@prelude//test:inject_test_run_info.bzl", "inject_test_run_info")
 
 def _go_nix_test_impl(ctx):
     raw = ctx.attrs.self_label
@@ -44,14 +45,13 @@ def _go_nix_test_impl(ctx):
         hidden = ctx.attrs.nix_inputs,
     )
     ctx.actions.run(stamp_cmd, category = "go_nix_test_stamp")
-    return [
-        DefaultInfo(default_output = stamp),
-        ExternalRunnerTestInfo(
+    return inject_test_run_info(ctx, ExternalRunnerTestInfo(
             type = "custom",
             command = ["bash", "-c", run_and_exec],
             labels = [],
             contacts = [],
-        ),
+        )) + [
+        DefaultInfo(default_output = stamp),
     ]
 
 go_nix_test = rule(
@@ -65,6 +65,7 @@ go_nix_test = rule(
         "nix_inputs": attrs.list(attrs.source(), default = []),
         "labels": attrs.list(attrs.string(), default = []),
         "test_rule_timeout_ms": attrs.option(attrs.int(), default = None),
+        "_inject_test_env": attrs.default_only(attrs.dep(default = "prelude//test/tools:inject_test_env")),
         "override_cgo_enabled": attrs.bool(default = False),
         "asan": attrs.bool(default = False),
         "race": attrs.bool(default = False),

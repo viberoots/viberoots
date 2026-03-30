@@ -89,7 +89,7 @@ test(
       const res = await $({
         cwd: tmp,
         stdio: "pipe",
-      })`buck2 test //projects/libs/demo:unit`.nothrow();
+      })`buck2 test --target-platforms prelude//platforms:default //projects/libs/demo:unit`.nothrow();
       if (res.exitCode === 0) {
         console.error("[debug] buck2 exitCode=", res.exitCode);
         if (res.stdout) console.error("[debug] buck2 stdout:\n" + res.stdout);

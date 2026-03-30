@@ -47,11 +47,15 @@ test(
       assert.equal(wasmManifest.defaultModuleKey, "");
 
       await _$({ cwd: tmp, stdio: "pipe" })`git add -A projects/apps/demo-vite`;
+      await fsp.rm(path.join(appAbs, "node_modules"), {
+        recursive: true,
+        force: true,
+      });
       await _$({
-        cwd: tmp,
+        cwd: appAbs,
         stdio: "inherit",
         env: { ...process.env, CI: "1", NEXT_TELEMETRY_DISABLED: "1" },
-      })`pnpm --dir ${tmp} install --filter ./projects/apps/demo-vite... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+      })`pnpm --dir ${appAbs} install --ignore-workspace --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
       await _$({ cwd: appAbs, stdio: "inherit" })`pnpm --dir ${appAbs} run build:ssr`;
 
       const port = await pickFreePort();

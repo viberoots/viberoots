@@ -70,7 +70,7 @@ test("python macros: nix_python_test runs via Nix-backed runner", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 test //projects/apps/pytester:pytester_test`;
+    })`buck2 test --target-platforms prelude//platforms:default //projects/apps/pytester:pytester_test`;
     assert.equal(res.exitCode, 0, `buck2 test failed:\n${String(res.stderr || res.stdout)}`);
   });
 });

@@ -2,6 +2,7 @@ load("//build-tools/lang:sanitize.bzl", "sanitize_name")
 load("//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_timeout_wrapper_var")
 load("//build-tools/lang:nix_attr.bzl", "sanitize_nix_attr_from_target_label")
 load("//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
+load("@prelude//test:inject_test_run_info.bzl", "inject_test_run_info")
 
 
 def _cpp_nix_test_impl(ctx):
@@ -45,14 +46,13 @@ def _cpp_nix_test_impl(ctx):
         hidden = ctx.attrs.nix_inputs,
     )
     ctx.actions.run(stamp_cmd, category = "cpp_nix_test_stamp")
-    return [
-        DefaultInfo(default_output = stamp),
-        ExternalRunnerTestInfo(
+    return inject_test_run_info(ctx, ExternalRunnerTestInfo(
             type = "custom",
             command = ["bash", "-c", run_and_exec],
             labels = [],
             contacts = [],
-        ),
+        )) + [
+        DefaultInfo(default_output = stamp),
     ]
 
 
@@ -62,9 +62,10 @@ cpp_nix_test = rule(
         "planner_label": attrs.string(),
         "out": attrs.string(),
         "nix_inputs": attrs.list(attrs.source(), default = []),
+        "test_rule_timeout_ms": attrs.option(attrs.int(), default = None),
+        "_inject_test_env": attrs.default_only(attrs.dep(default = "prelude//test/tools:inject_test_env")),
         # Create a graph edge so exporter cquery includes the planner cxx_test node
         "planner": attrs.dep(),
     },
 )
-
 

@@ -63,13 +63,13 @@ const HEAVY_RUNTIME_EXPECTATIONS: InstallGuardrailExpectation[] = [
     file: "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.ssr-vite.contract.test.ts",
     required: [
       "--skip-lockfile-gen",
-      "pnpm --dir ${tmp} install",
-      "--filter ./projects/apps/demo-vite...",
+      "pnpm --dir ${appAbs} install",
       "--no-frozen-lockfile",
       "--prefer-offline",
       "--ignore-scripts",
+      "--ignore-workspace",
     ],
-    forbidden: ["--frozen-lockfile"],
+    forbidden: ["--frozen-lockfile", "--filter ./projects/apps/demo-vite..."],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-static-pwa.runtime-offline.contract.test.ts",
