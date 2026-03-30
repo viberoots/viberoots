@@ -186,10 +186,11 @@ async function main() {
     // Always include repo-root importer '.' if lockfile present there
     const uniq = Array.from(new Set(importers));
 
-    // Build and merge each importer's unfixed pnpm store
+    // Build and merge each importer's verified fixed pnpm store. install-deps
+    // has already refreshed hashes and realized these stores, so prewarm must
+    // stay on that offline path instead of retrying networked unfixed builds.
     for (const imp of uniq) {
-      const attr =
-        imp === "." ? "pnpm-store-unfixed.default" : `pnpm-store-unfixed.${sanitizeImporter(imp)}`;
+      const attr = imp === "." ? "pnpm-store.default" : `pnpm-store.${sanitizeImporter(imp)}`;
       // Build quietly, print logs only on failure
       const built = await $({
         stdio: "pipe",
