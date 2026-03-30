@@ -82,7 +82,13 @@ def _zx_test_impl(ctx):
             + "if [ \"$ZX_TEST_DIRENV\" = \"1\" ]; then if command -v direnv >/dev/null 2>&1; then eval \"$(direnv export bash)\"; fi; fi; "
             # Skip direnv in temp repos by default; specific tests can override
             # Provide a single global default timeout unless a caller overrides it
-            + "if [ -z \"$TEST_NODE_OPTIONS\" ]; then TSECS=\"${VERIFY_TIMEOUT_SECS:-1200}\"; if [ -n \"$TEST_NIX_TIMEOUT_SECS\" ]; then TSECS=\"$TEST_NIX_TIMEOUT_SECS\"; fi; export TEST_NODE_OPTIONS=\"--test-timeout=$(( TSECS * 1000 ))\"; fi; "
+            + "TSECS=0; "
+            + "for RAW_TSECS in \"${VERIFY_TIMEOUT_SECS:-}\" \"${TEST_NIX_TIMEOUT_SECS:-}\"; do "
+            + "  if [ -n \"$RAW_TSECS\" ] && [ \"$RAW_TSECS\" -gt \"$TSECS\" ] 2>/dev/null; then TSECS=\"$RAW_TSECS\"; fi; "
+            + "done; "
+            + "if [ \"$TSECS\" -le 0 ] 2>/dev/null; then TSECS=1200; fi; "
+            + "export TEST_NIX_TIMEOUT_SECS=\"$TSECS\"; "
+            + "if [ -z \"$TEST_NODE_OPTIONS\" ]; then export TEST_NODE_OPTIONS=\"--test-timeout=$(( TSECS * 1000 ))\"; fi; "
             + "if [ -n \"$NODE_V8_COVERAGE\" ]; then mkdir -p \"$NODE_V8_COVERAGE\"; fi; "
             # Ensure zx-init is loaded in all node:test workers via NODE_OPTIONS
             + "if [ -n \"$NODE_PATH\" ]; then export NODE_PATH=\"$WORKSPACE_ROOT/node_modules:$NODE_PATH\"; else export NODE_PATH=\"$WORKSPACE_ROOT/node_modules\"; fi; "
