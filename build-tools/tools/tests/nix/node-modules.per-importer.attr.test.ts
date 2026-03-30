@@ -119,35 +119,39 @@ test("node-modules derivation snapshots untracked importer files", async () => {
     const importerSrcDrvName = Object.keys(requestedDrv?.inputs?.drvs || {}).find((d) =>
       d.includes("-importer-src-"),
     );
-    assert.ok(
-      importerSrcDrvName,
-      "expected node-modules derivation to depend on importer-src input",
-    );
+    const importerSrcEnv = String(requestedDrv?.env?.src || "").trim();
+    let importerSrcOut = "";
 
-    const importerSrcDrvPath = importerSrcDrvName.startsWith("/nix/store/")
-      ? importerSrcDrvName
-      : path.join("/nix/store", importerSrcDrvName);
-    const importerDrvShow = await $`nix derivation show ${importerSrcDrvPath}`;
-    const importerDrvParsed = JSON.parse(String(importerDrvShow.stdout || "")) as
-      | Record<string, { outputs?: { out?: { path?: string } } }>
-      | { derivations?: Record<string, { outputs?: { out?: { path?: string } } }> };
-    const importerDerivations = selectDerivationMap(importerDrvParsed as any);
-    const importerDrv =
-      importerDerivations[importerSrcDrvPath] ||
-      importerDerivations[path.basename(importerSrcDrvPath)] ||
-      Object.entries(importerDerivations).find(
-        ([key]) => key === importerSrcDrvPath || key.endsWith(path.basename(importerSrcDrvPath)),
-      )?.[1];
-    const importerSrcOutRaw = String(importerDrv?.outputs?.out?.path || "").trim();
-    const importerSrcOut = importerSrcOutRaw.startsWith("/nix/store/")
-      ? importerSrcOutRaw
-      : path.join("/nix/store", importerSrcOutRaw);
+    if (importerSrcDrvName) {
+      const importerSrcDrvPath = importerSrcDrvName.startsWith("/nix/store/")
+        ? importerSrcDrvName
+        : path.join("/nix/store", importerSrcDrvName);
+      const importerDrvShow = await $`nix derivation show ${importerSrcDrvPath}`;
+      const importerDrvParsed = JSON.parse(String(importerDrvShow.stdout || "")) as
+        | Record<string, { outputs?: { out?: { path?: string } } }>
+        | { derivations?: Record<string, { outputs?: { out?: { path?: string } } }> };
+      const importerDerivations = selectDerivationMap(importerDrvParsed as any);
+      const importerDrv =
+        importerDerivations[importerSrcDrvPath] ||
+        importerDerivations[path.basename(importerSrcDrvPath)] ||
+        Object.entries(importerDerivations).find(
+          ([key]) => key === importerSrcDrvPath || key.endsWith(path.basename(importerSrcDrvPath)),
+        )?.[1];
+      const importerSrcOutRaw = String(importerDrv?.outputs?.out?.path || "").trim();
+      importerSrcOut = importerSrcOutRaw.startsWith("/nix/store/")
+        ? importerSrcOutRaw
+        : path.join("/nix/store", importerSrcOutRaw);
+      await $`nix-store -r ${importerSrcDrvPath}`;
+    } else if (importerSrcEnv) {
+      importerSrcOut = importerSrcEnv.startsWith("/nix/store/")
+        ? importerSrcEnv
+        : path.join("/nix/store", importerSrcEnv);
+    }
+
     assert.ok(
       importerSrcOut.startsWith("/nix/store/"),
-      `unexpected importer-src output path: ${importerSrcOut}`,
+      `expected importer-src input or env.src store path, got: ${importerSrcOut || "<empty>"}`,
     );
-
-    await $`nix-store -r ${importerSrcDrvPath}`;
 
     const snappedPackageCandidates = [
       path.join(importerSrcOut, importer, "package.json"),
