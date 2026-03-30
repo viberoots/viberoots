@@ -5,6 +5,24 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
+function selectDerivationMap(
+  parsed:
+    | Record<string, { env?: Record<string, string>; inputs?: { drvs?: Record<string, unknown> } }>
+    | {
+        derivations?: Record<
+          string,
+          { env?: Record<string, string>; inputs?: { drvs?: Record<string, unknown> } }
+        >;
+      },
+): Record<string, { env?: Record<string, string>; inputs?: { drvs?: Record<string, unknown> } }> {
+  return "derivations" in parsed && parsed.derivations && typeof parsed.derivations === "object"
+    ? parsed.derivations
+    : (parsed as Record<
+        string,
+        { env?: Record<string, string>; inputs?: { drvs?: Record<string, unknown> } }
+      >);
+}
+
 test("nix packages expose per-importer node-modules attr for untracked importer under WORKSPACE_ROOT", async () => {
   await runInTemp("node-modules-per-importer-attr", async (tmp, _$) => {
     const importer = "projects/apps/demo-untracked";
@@ -76,51 +94,104 @@ test("node-modules derivation snapshots untracked importer files", async () => {
 
     const show = await $`nix derivation show ${drvPath}`;
     const parsed = JSON.parse(String(show.stdout || "")) as
-      | Record<string, { env?: Record<string, string>; inputDrvs?: Record<string, unknown> }>
+      | Record<
+          string,
+          { env?: Record<string, string>; inputs?: { drvs?: Record<string, unknown> } }
+        >
       | {
           derivations?: Record<
             string,
-            { env?: Record<string, string>; inputDrvs?: Record<string, unknown> }
+            { env?: Record<string, string>; inputs?: { drvs?: Record<string, unknown> } }
           >;
         };
-    const derivations =
-      "derivations" in parsed && parsed.derivations && typeof parsed.derivations === "object"
-        ? parsed.derivations
-        : (parsed as Record<
-            string,
-            { env?: Record<string, string>; inputDrvs?: Record<string, unknown> }
-          >);
-    const allDrvs = Object.entries(derivations || {});
+    const derivations = selectDerivationMap(parsed);
     const requestedDrv =
       derivations[drvPath] ||
-      allDrvs.find(([key]) => key === drvPath || key.endsWith(path.basename(drvPath)))?.[1];
-    const firstDrv =
-      requestedDrv ||
-      allDrvs.find(([, value]) => {
-        const src = String(value?.env?.src || "").trim();
-        return (
-          src.startsWith("/nix/store/") &&
-          Object.keys(value?.inputDrvs || {}).some((d) => d.includes("-importer-src-"))
-        );
-      })?.[1] ||
-      allDrvs.find(([, value]) =>
-        Object.keys(value?.inputDrvs || {}).some((d) => d.includes("-importer-src-")),
-      )?.[1] ||
-      allDrvs.find(([, value]) =>
-        String(value?.env?.src || "")
-          .trim()
-          .startsWith("/nix/store/"),
-      )?.[1] ||
-      allDrvs[0]?.[1];
-    const importerSrcOut = String(firstDrv?.env?.src || "").trim();
-    assert.ok(importerSrcOut.startsWith("/nix/store/"), `unexpected src path: ${importerSrcOut}`);
+      derivations[path.basename(drvPath)] ||
+      Object.entries(derivations).find(
+        ([key]) => key === drvPath || key.endsWith(path.basename(drvPath)),
+      )?.[1];
+    assert.ok(
+      requestedDrv,
+      `unable to find requested derivation in nix derivation show: ${drvPath}`,
+    );
 
-    const snappedPackage = path.join(importerSrcOut, importer, "package.json");
-    const snappedLock = path.join(importerSrcOut, importer, "pnpm-lock.yaml");
-    await fsp.access(snappedPackage);
-    await fsp.access(snappedLock);
+    const importerSrcDrvName = Object.keys(requestedDrv?.inputs?.drvs || {}).find((d) =>
+      d.includes("-importer-src-"),
+    );
+    assert.ok(
+      importerSrcDrvName,
+      "expected node-modules derivation to depend on importer-src input",
+    );
 
-    const pkgTxt = await fsp.readFile(snappedPackage, "utf8");
+    const importerSrcDrvPath = importerSrcDrvName.startsWith("/nix/store/")
+      ? importerSrcDrvName
+      : path.join("/nix/store", importerSrcDrvName);
+    const importerDrvShow = await $`nix derivation show ${importerSrcDrvPath}`;
+    const importerDrvParsed = JSON.parse(String(importerDrvShow.stdout || "")) as
+      | Record<string, { outputs?: { out?: { path?: string } } }>
+      | { derivations?: Record<string, { outputs?: { out?: { path?: string } } }> };
+    const importerDerivations = selectDerivationMap(importerDrvParsed as any);
+    const importerDrv =
+      importerDerivations[importerSrcDrvPath] ||
+      importerDerivations[path.basename(importerSrcDrvPath)] ||
+      Object.entries(importerDerivations).find(
+        ([key]) => key === importerSrcDrvPath || key.endsWith(path.basename(importerSrcDrvPath)),
+      )?.[1];
+    const importerSrcOutRaw = String(importerDrv?.outputs?.out?.path || "").trim();
+    const importerSrcOut = importerSrcOutRaw.startsWith("/nix/store/")
+      ? importerSrcOutRaw
+      : path.join("/nix/store", importerSrcOutRaw);
+    assert.ok(
+      importerSrcOut.startsWith("/nix/store/"),
+      `unexpected importer-src output path: ${importerSrcOut}`,
+    );
+
+    await $`nix-store -r ${importerSrcDrvPath}`;
+
+    const snappedPackageCandidates = [
+      path.join(importerSrcOut, importer, "package.json"),
+      path.join(importerSrcOut, "package.json"),
+    ];
+    const snappedLockCandidates = [
+      path.join(importerSrcOut, importer, "pnpm-lock.yaml"),
+      path.join(importerSrcOut, "pnpm-lock.yaml"),
+    ];
+    const resolvedPackage =
+      (
+        await Promise.all(
+          snappedPackageCandidates.map(async (candidate) =>
+            (await fsp
+              .access(candidate)
+              .then(() => true)
+              .catch(() => false))
+              ? candidate
+              : "",
+          ),
+        )
+      ).find(Boolean) || "";
+    const resolvedLock =
+      (
+        await Promise.all(
+          snappedLockCandidates.map(async (candidate) =>
+            (await fsp
+              .access(candidate)
+              .then(() => true)
+              .catch(() => false))
+              ? candidate
+              : "",
+          ),
+        )
+      ).find(Boolean) || "";
+    assert.ok(
+      resolvedPackage,
+      `expected package.json in importer-src output under one of: ${snappedPackageCandidates.join(", ")}`,
+    );
+    assert.ok(
+      resolvedLock,
+      `expected pnpm-lock.yaml in importer-src output under one of: ${snappedLockCandidates.join(", ")}`,
+    );
+    const pkgTxt = await fsp.readFile(resolvedPackage, "utf8");
     assert.match(pkgTxt, /demo-untracked-snapshot/);
   });
 });

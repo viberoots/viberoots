@@ -49,8 +49,16 @@ test(
           path.join(appRoot, "scripts", "build-ssr.mjs"),
           "utf8",
         );
-        assert.match(buildSsrScript, /next build/);
-        assert.match(buildSsrScript, /tsc -p tsconfig\.server\.json/);
+        assert.match(
+          buildSsrScript,
+          /const nextBin = path\.join\(process\.cwd\(\), "node_modules", "\.bin", "next"\);/,
+        );
+        assert.match(buildSsrScript, /execFileSync\(nextBin, \["build"\]/);
+        assert.match(
+          buildSsrScript,
+          /const tscBin = path\.join\(process\.cwd\(\), "node_modules", "\.bin", "tsc"\);/,
+        );
+        assert.match(buildSsrScript, /execFileSync\(tscBin, \["-p", "tsconfig\.server\.json"\]/);
         await fsp.access(path.join(appRoot, "app", "wasm-producer", "payload.txt"));
         const { outPath, importer } = await buildSelectedSsr(tmp, _$, label, "next");
         await assertSsrAdapterConformance({ label, outPath, importer, framework: "next" });

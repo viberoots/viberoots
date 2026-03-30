@@ -1,6 +1,9 @@
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { cpSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+
+const viteBin = path.join(process.cwd(), "node_modules", ".bin", "vite");
+const tscBin = path.join(process.cwd(), "node_modules", ".bin", "tsc");
 
 const contractsPaths = JSON.parse(
   execSync("zx-wrapper ../../../build-tools/tools/dev/sync-module-contracts.ts --cwd . --print-json 1", {
@@ -20,9 +23,11 @@ execSync(
   { stdio: "inherit" },
 );
 
-execSync("vite build --outDir dist/client", { stdio: "inherit" });
-execSync("vite build --ssr src/entry-server.ts --outDir dist/server", { stdio: "inherit" });
-execSync("tsc -p tsconfig.server.json", { stdio: "inherit" });
+execFileSync(viteBin, ["build", "--outDir", "dist/client"], { stdio: "inherit" });
+execFileSync(viteBin, ["build", "--ssr", "src/entry-server.ts", "--outDir", "dist/server"], {
+  stdio: "inherit",
+});
+execFileSync(tscBin, ["-p", "tsconfig.server.json"], { stdio: "inherit" });
 
 const wasmManifest = JSON.parse(readFileSync(wasmManifestPath, "utf8"));
 for (const entry of wasmManifest.modules || []) {
