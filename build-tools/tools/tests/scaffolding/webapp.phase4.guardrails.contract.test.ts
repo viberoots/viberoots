@@ -75,17 +75,18 @@ const HEAVY_RUNTIME_EXPECTATIONS: InstallGuardrailExpectation[] = [
     file: "build-tools/tools/tests/scaffolding/webapp-static-pwa.runtime-offline.contract.test.ts",
     required: [
       "--skip-lockfile-gen",
-      "pnpm --dir ${tmp} install",
-      "--filter ./projects/apps/demo-pwa...",
+      "pnpm --dir ${appAbs} install",
       "--no-frozen-lockfile",
       "--prefer-offline",
       "--ignore-scripts",
+      "--ignore-workspace",
       "pnpm --dir ${appAbs} run build",
     ],
     forbidden: [
       "deps-main.ts --verbose --glue-only",
       "update-pnpm-hash.ts --lockfile",
       "nix build",
+      "--filter ./projects/apps/demo-pwa...",
     ],
   },
 ];
