@@ -196,6 +196,10 @@ test("node-modules derivation snapshots untracked importer files", async () => {
         : path.join("/nix/store", importerSrcEnv);
     }
 
+    if (importerSrcOut) {
+      await $`nix-store -r ${importerSrcOut}`;
+    }
+
     assert.ok(
       importerSrcOut.startsWith("/nix/store/"),
       `expected importer-src input or env.src store path, got: ${importerSrcOut || "<empty>"}`,
