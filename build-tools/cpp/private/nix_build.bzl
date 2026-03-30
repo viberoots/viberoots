@@ -1,5 +1,5 @@
 load("//build-tools/lang:sanitize.bzl", "sanitize_name")
-load("//build-tools/lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_cmd_prefix")
+load("//build-tools/lang:nix_shell.bzl", "nix_cmd_prefix")
 load("//build-tools/lang:nix_action_runner.bzl", "nix_action_export_graph_cmd", "nix_action_workspace_setup_from_args")
 
 
@@ -69,13 +69,22 @@ def _cpp_nix_build_impl(ctx):
         + "  exit 2; "
         + "fi; "
         + "export BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/build-tools/tools/buck/graph.json\"; "
-        # Build the selected target via the primary flake attr using BUCK_TARGET
-        + nix_build_out_path_cmd(
-            "\"path:$FLK_ROOT#graph-generator-selected\"",
-            timeout_var = "TIMEOUT",
-            impure = True,
-            build_prefix = build_prefix,
+        # Build via a filtered flake snapshot instead of the live repo root so broad
+        # dev builds are not poisoned by dirty/untracked workspace artifacts.
+        + "export PLANNER_ONLY_CPP=1; "
+        + ("export BUCK_TARGET=\"%s\"; " % raw)
+        + "export BUCK_TEST_SRC=\"$WORKSPACE_ROOT\"; "
+        + "OUT_PATHS_FILE=\"$TMP/bnx-nix-outpaths.txt\"; "
+        + (
+            "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning "
+            + "--experimental-strip-types --import \"$BNX_NODE_ZX_INIT\" "
+            + "\"$WORKSPACE_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
+            + "\"graph-generator-selected\" > \"$OUT_PATHS_FILE\"; "
         )
+        + "OUT_LAST_FILE=\"$OUT_PATHS_FILE.last\"; "
+        + "tail -n1 \"$OUT_PATHS_FILE\" > \"$OUT_LAST_FILE\"; "
+        + "outPath=\"\"; read -r outPath < \"$OUT_LAST_FILE\" 2>/dev/null || true; "
+        + "test -n \"$outPath\"; "
         + (
             "if [ ! -e \"$outPath/%s\" ]; then echo 'cpp_nix_build (%s): expected artifact not found for kind \"%s\": %s' >&2; (ls -la \"$outPath\"; ls -la \"$outPath/bin\" 2>/dev/null || true; ls -la \"$outPath/lib\" 2>/dev/null || true; ls -la \"$outPath/include\" 2>/dev/null || true) >&2; exit 2; fi; "
             % (expected, raw, kind, expected)
@@ -151,5 +160,3 @@ cpp_nix_build = rule(
         "flake_file": attrs.option(attrs.source(), default = None),
     },
 )
-
-
