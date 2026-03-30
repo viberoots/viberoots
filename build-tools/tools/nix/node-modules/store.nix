@@ -44,6 +44,7 @@ in {
       prefetchedInput = null;
       # Keep default fetch timeout aligned with update-pnpm-hash/install-deps primary path.
       ftVal = let v = builtins.getEnv "NIX_PNPM_FETCH_TIMEOUT"; in if v != "" then v else "600";
+      installTimeoutVal = let v = builtins.getEnv "NIX_PNPM_INSTALL_TIMEOUT"; in if v != "" then v else "1800";
       # Choose FOD hashing strategy:
       # - When a lockfile is present (in live FS or flake snapshot), fix the output hash to the lockfile hash.
       # - When lockfile is missing and generation is allowed, do NOT fix the output hash (non-FOD) to avoid hash mismatch.
@@ -63,7 +64,10 @@ in {
       pname = "pnpm-store";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
       inherit src;
-      nativeBuildInputs = [ node pnpm pkgs.coreutils ];
+      nativeBuildInputs = [ node pnpm pkgs.coreutils pkgs.patchelf ];
+      # Non-Linux builders may still materialize foreign ELF payloads in the store for
+      # deterministic lockfile coverage, but only Linux can meaningfully run patchelf on them.
+      dontPatchELF = !pkgs.stdenvNoCC.hostPlatform.isLinux;
       preferLocalBuild = true;
       allowSubstitutes = false;
       dontPatchShebangs = true;
@@ -124,9 +128,9 @@ in {
         printf '%s\n' "packages:" > pnpm-workspace.yaml
         printf '%s\n' "  - ./" >> pnpm-workspace.yaml
         printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
-        echo "[nix] pnpm install (timeout) --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir . (FT=${ftVal}s)"
-        FT="${ftVal}"
-        timeout "$FT"s env PNPM_HOME="$PNPM_HOME" pnpm install --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+        echo "[nix] pnpm install (timeout) --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir . (IT=${installTimeoutVal}s, FT=${ftVal}s)"
+        IT="${installTimeoutVal}"
+        timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
         echo "[nix] mkPnpmStore: install complete"
         # Normalize store timestamps and scrub volatile JSON fields to stabilize FOD output
         if [ -d "$out/store" ]; then
@@ -198,7 +202,10 @@ in {
       pname = "pnpm-store-unfixed";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
       inherit src;
-      nativeBuildInputs = [ node pnpm pkgs.coreutils ];
+      nativeBuildInputs = [ node pnpm pkgs.coreutils pkgs.patchelf ];
+      # Same rationale as the fixed-output store above: suppress Linux-only ELF patching
+      # on builders that cannot execute it, while preserving the real Linux path.
+      dontPatchELF = !pkgs.stdenvNoCC.hostPlatform.isLinux;
       preferLocalBuild = true;
       allowSubstitutes = false;
       dontPatchShebangs = true;
@@ -257,9 +264,9 @@ in {
         printf '%s\n' "packages:" > pnpm-workspace.yaml
         printf '%s\n' "  - ./" >> pnpm-workspace.yaml
         printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
-        echo "[nix] mkPnpmStoreUnfixed: pnpm install --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir ."
-        FT="''${NIX_PNPM_FETCH_TIMEOUT:-600}"
-        timeout "$FT"s env PNPM_HOME="$PNPM_HOME" pnpm install --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+        echo "[nix] mkPnpmStoreUnfixed: pnpm install --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir ."
+        IT="''${NIX_PNPM_INSTALL_TIMEOUT:-1800}"
+        timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
         echo "[nix] mkPnpmStoreUnfixed: install complete"
         # Normalize store timestamps and scrub volatile JSON fields to stabilize output hashing
         if [ -d "$out/store" ]; then

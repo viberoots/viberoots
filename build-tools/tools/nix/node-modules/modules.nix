@@ -50,12 +50,16 @@ in {
       hasLockStore = builtins.pathExists lockAbsStrStore;
       lockInput = if hasLockFs then (builtins.path { path = lockAbsStrFs; name = "pnpm-lock.yaml"; }) else (if hasLockStore then (builtins.path { path = lockAbsStrStore; name = "pnpm-lock.yaml"; }) else null);
       ftVal = let v = builtins.getEnv "NIX_PNPM_FETCH_TIMEOUT"; in if v != "" then v else "600";
+      installTimeoutVal = let v = builtins.getEnv "NIX_PNPM_INSTALL_TIMEOUT"; in if v != "" then v else "1800";
       genAllowed = (builtins.getEnv "NIX_PNPM_ALLOW_GENERATE") == "1";
     in pkgs.stdenvNoCC.mkDerivation {
       pname = "node-modules";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
       inherit src;
-      nativeBuildInputs = [ node pnpm pkgs.coreutils pkgs.findutils ];
+      nativeBuildInputs = [ node pnpm pkgs.coreutils pkgs.findutils pkgs.patchelf ];
+      # Darwin builders can carry foreign ELF payloads for reproducibility, but they
+      # cannot patch them because patchelf is Linux-only. Keep ELF fixups enabled on Linux.
+      dontPatchELF = !pkgs.stdenvNoCC.hostPlatform.isLinux;
       preferLocalBuild = true;
       allowSubstitutes = false;
       unpackPhase = ''
@@ -153,7 +157,9 @@ in {
         printf '%s\n' "  - ./" >> pnpm-workspace.yaml
         printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
         FT="${ftVal}"
+        IT="${installTimeoutVal}"
         debug_mknm "[BNX-MKNM-DEBUG] NIX_PNPM_FETCH_TIMEOUT=$FT"
+        debug_mknm "[BNX-MKNM-DEBUG] NIX_PNPM_INSTALL_TIMEOUT=$IT"
         debug_mknm "[BNX-MKNM-DEBUG] lockfile_present=$(test -f pnpm-lock.yaml && echo yes || echo no)"
         if [ "''${BNX_MKNM_DEBUG:-0}" = "1" ] && [ -f pnpm-lock.yaml ]; then
           echo "[BNX-MKNM-DEBUG] head -n5 pnpm-lock.yaml:" >&2
@@ -181,8 +187,8 @@ in {
             cp ${if lockInput != null then "${lockInput}" else "/nonexistent"} pnpm-lock.yaml
           elif [ "${if genAllowed then "1" else "0"}" = "1" ]; then
             echo "[nix] mkNodeModules: offline install to create lockfile (allow-generate)"
-          debug_mknm "[BNX-MKNM-DEBUG] pnpm install (generate) --offline --no-frozen-lockfile --ignore-scripts --prod=false (FT=${ftVal}s)"
-          timeout "$FT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --no-frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          debug_mknm "[BNX-MKNM-DEBUG] pnpm install (generate) --offline --force --no-frozen-lockfile --ignore-scripts --prod=false (IT=${installTimeoutVal}s)"
+          timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --no-frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
           else
             echo "[nix] mkNodeModules: no lockfile present and generation not allowed; failing"
             exit 3
@@ -190,8 +196,8 @@ in {
         else
           # Install strictly from the fixed-output store for the specific importer (relative to importer root)
           # Force inclusion of devDependencies so tool binaries (e.g., vite) are available
-          debug_mknm "[BNX-MKNM-DEBUG] pnpm install (offline) --frozen-lockfile --ignore-scripts --prod=false (FT=${ftVal}s)"
-          timeout "$FT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          debug_mknm "[BNX-MKNM-DEBUG] pnpm install (offline) --force --frozen-lockfile --ignore-scripts --prod=false (IT=${installTimeoutVal}s)"
+          timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
         fi
         echo "[nix] mkNodeModules: install complete"
         if [ "''${BNX_MKNM_DEBUG:-0}" = "1" ]; then

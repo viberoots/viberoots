@@ -11,6 +11,7 @@ import {
   syncLocalPrefetchIntoPnpmStore,
   syncSourcePnpmStoreIntoLocalPrefetch,
 } from "./prefetched-store.ts";
+import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard.ts";
 
 function preferredPnpmStoreDir(defaultStoreDir: string): {
   storeDir: string;
@@ -47,6 +48,7 @@ async function runLockfileCommandsWithGcRetry(opts: {
   const runCommands = async () => {
     await runPnpm(
       "install",
+      "--force",
       "--lockfile-only",
       "--prefer-offline",
       "--prod=false",
@@ -62,6 +64,7 @@ async function runLockfileCommandsWithGcRetry(opts: {
     );
     await runPnpm(
       "fetch",
+      "--force",
       "--prefer-offline",
       "--prod=false",
       "--lockfile-dir",
@@ -180,13 +183,15 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
   }
   const flakeRef = pnpmFlakeRef(opts.repoRoot);
   console.log(`[lockfile] generating importer lockfile: ${opts.importer}`);
-  await runLockfileCommandsWithGcRetry({
-    importerAbs,
-    flakeRef,
-    timeoutMs,
-    fetchTimeout,
-    homeDir,
-    storeDir,
+  await withHiddenNodeModules(importerAbs, async () => {
+    await runLockfileCommandsWithGcRetry({
+      importerAbs,
+      flakeRef,
+      timeoutMs,
+      fetchTimeout,
+      homeDir,
+      storeDir,
+    });
   });
   if (!usesSharedPrefetch) {
     await syncSourcePnpmStoreIntoLocalPrefetch(storeDir);

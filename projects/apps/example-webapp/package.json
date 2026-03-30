@@ -21,7 +21,6 @@
     "react-native-web": "^0.19.13"
   },
   "devDependencies": {
-    "@esbuild/darwin-arm64": "^0.21.5",
     "@types/express": "^4.17.21",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.11",

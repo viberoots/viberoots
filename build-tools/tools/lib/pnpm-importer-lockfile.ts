@@ -5,6 +5,7 @@ import {
   syncLocalPrefetchIntoPnpmStore,
   syncSourcePnpmStoreIntoLocalPrefetch,
 } from "../dev/update-pnpm-hash/prefetched-store.ts";
+import { withHiddenNodeModules } from "./pnpm-node-modules-guard.ts";
 import { parsePnpmLock } from "./pnpm-lock.ts";
 import { externalPnpmStateDirs, removeLegacyImporterPnpmState } from "./pnpm-state-paths.ts";
 
@@ -105,10 +106,12 @@ export async function ensureImporterLockfileFresh(opts: {
     await syncLocalPrefetchIntoPnpmStore(storeDir);
   }
 
-  await opts.$({
-    stdio: "inherit",
-    env: opts.env,
-  })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p "${homeDir}" "${storeDir}"; export PNPM_HOME="${homeDir}"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config "path:${opts.tmp}#pnpm" -- config set store-dir "${storeDir}"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config "path:${opts.tmp}#pnpm" -- install --filter "./${opts.importerRel}" --lockfile-only --prefer-offline --prod=false --ignore-scripts --lockfile-dir "./${opts.importerRel}" --dir "./${opts.importerRel}" --color never; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config "path:${opts.tmp}#pnpm" -- fetch --filter "./${opts.importerRel}" --prefer-offline --prod=false --lockfile-dir "./${opts.importerRel}" --dir "./${opts.importerRel}" --color never'`;
+  await withHiddenNodeModules(importerAbs, async () => {
+    await opts.$({
+      stdio: "inherit",
+      env: opts.env,
+    })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p "${homeDir}" "${storeDir}"; export PNPM_HOME="${homeDir}"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config "path:${opts.tmp}#pnpm" -- config set store-dir "${storeDir}"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config "path:${opts.tmp}#pnpm" -- install --force --filter "./${opts.importerRel}" --lockfile-only --prefer-offline --prod=false --ignore-scripts --lockfile-dir "./${opts.importerRel}" --dir "./${opts.importerRel}" --color never; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config "path:${opts.tmp}#pnpm" -- fetch --force --filter "./${opts.importerRel}" --prefer-offline --prod=false --lockfile-dir "./${opts.importerRel}" --dir "./${opts.importerRel}" --color never'`;
+  });
   if (!usesSharedPrefetch) {
     await syncSourcePnpmStoreIntoLocalPrefetch(storeDir);
   }

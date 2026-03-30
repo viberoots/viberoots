@@ -20,9 +20,6 @@ importers:
         specifier: ^0.19.13
         version: 0.19.13(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
-      "@esbuild/darwin-arm64":
-        specifier: ^0.21.5
-        version: 0.21.5
       "@types/node":
         specifier: ^22.0.0
         version: 22.19.15
@@ -1790,7 +1787,8 @@ snapshots:
   "@esbuild/android-x64@0.21.5":
     optional: true
 
-  "@esbuild/darwin-arm64@0.21.5": {}
+  "@esbuild/darwin-arm64@0.21.5":
+    optional: true
 
   "@esbuild/darwin-x64@0.21.5":
     optional: true
