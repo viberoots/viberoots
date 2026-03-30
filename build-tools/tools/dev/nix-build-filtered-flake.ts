@@ -40,7 +40,7 @@ async function main(): Promise<void> {
       "nix-build",
       $({
         stdio: "pipe",
-      })`nix build ${flakeRef} --accept-flake-config --option min-free 0 --option max-free 0 --no-link --print-out-paths`,
+      })`nix build --impure ${flakeRef} --accept-flake-config --option min-free 0 --option max-free 0 --no-link --print-out-paths`,
     );
     process.stdout.write(String(res.stdout || ""));
   } finally {

@@ -20,4 +20,10 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
       throw new Error(`nix-build-filtered-flake snapshot must include ${token}`);
     }
   }
+
+  if (!helper.includes("nix build --impure")) {
+    throw new Error(
+      "nix-build-filtered-flake must use --impure so selected planner env reaches filtered flake builds",
+    );
+  }
 });
