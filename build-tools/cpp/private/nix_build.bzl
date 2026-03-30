@@ -69,6 +69,7 @@ def _cpp_nix_build_impl(ctx):
         + "  exit 2; "
         + "fi; "
         + "export BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/build-tools/tools/buck/graph.json\"; "
+        + "export BNX_NODE_ZX_INIT=\"$WORKSPACE_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
         # Build via a filtered flake snapshot instead of the live repo root so broad
         # dev builds are not poisoned by dirty/untracked workspace artifacts.
         + "export PLANNER_ONLY_CPP=1; "
