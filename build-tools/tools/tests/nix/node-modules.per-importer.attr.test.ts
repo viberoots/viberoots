@@ -62,6 +62,24 @@ function derivationOutputPaths(
     );
 }
 
+async function realizedDerivationOutputPaths(drvPath: string, $: any): Promise<string[]> {
+  const out = await $({
+    stdio: "pipe",
+    reject: false,
+    nothrow: true,
+  })`nix-store -q --outputs ${drvPath}`;
+  if (out.exitCode !== 0) return [];
+  return String(out.stdout || "")
+    .split(/\s+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function nixStoreNameStem(storePath: string): string {
+  const base = path.basename(storePath.trim());
+  return base.replace(/^[^-]+-/, "");
+}
+
 function findDerivationByKey<T extends object>(
   derivations: Record<string, T>,
   drvPath: string,
@@ -205,7 +223,11 @@ test("node-modules derivation snapshots untracked importer files", async () => {
       d.includes("-importer-src-"),
     );
     const importerSrcEnv = String(requestedDrv?.env?.src || "").trim();
+    const inputDrvPaths = Object.keys(requestedDrv?.inputs?.drvs || {}).map((drv) =>
+      drv.startsWith("/nix/store/") ? drv : path.join("/nix/store", drv),
+    );
     let importerSrcOut = "";
+    const snapshotRoots = new Set<string>();
 
     if (importerSrcDrvName) {
       const importerSrcDrvPath = importerSrcDrvName.startsWith("/nix/store/")
@@ -217,15 +239,14 @@ test("node-modules derivation snapshots untracked importer files", async () => {
         | { derivations?: Record<string, { outputs?: { out?: { path?: string } } }> };
       const importerDerivations = selectDerivationMap(importerDrvParsed as any);
       const importerDrv = findDerivationByKey(importerDerivations, importerSrcDrvPath);
-      importerSrcOut = derivationOutputPaths(importerDrv)[0] || "";
       await $`nix-store -r ${importerSrcDrvPath}`;
+      const realizedOutputs = await realizedDerivationOutputPaths(importerSrcDrvPath, $);
+      realizedOutputs.forEach((output) => snapshotRoots.add(output));
+      importerSrcOut = realizedOutputs[0] || derivationOutputPaths(importerDrv)[0] || "";
     } else if (importerSrcEnv) {
       importerSrcOut = importerSrcEnv.startsWith("/nix/store/")
         ? importerSrcEnv
         : path.join("/nix/store", importerSrcEnv);
-      const inputDrvPaths = Object.keys(requestedDrv?.inputs?.drvs || {}).map((drv) =>
-        drv.startsWith("/nix/store/") ? drv : path.join("/nix/store", drv),
-      );
       for (const inputDrvPath of inputDrvPaths) {
         const inputDrvShow = await $({
           stdio: "pipe",
@@ -239,29 +260,51 @@ test("node-modules derivation snapshots untracked importer files", async () => {
         const inputDerivations = selectDerivationMap(inputDrvParsed as any);
         const inputDrv = findDerivationByKey(inputDerivations, inputDrvPath);
         const inputOuts = derivationOutputPaths(inputDrv);
-        if (!inputOuts.includes(importerSrcOut)) continue;
+        const envStem = nixStoreNameStem(importerSrcOut);
+        const matchedIndex = inputOuts.findIndex(
+          (outputPath) => outputPath === importerSrcOut || nixStoreNameStem(outputPath) === envStem,
+        );
+        const isImporterSrcInput =
+          inputDrvPath.includes("-importer-src-") ||
+          inputOuts.some((outputPath) => nixStoreNameStem(outputPath).includes("importer-src-"));
+        if (matchedIndex === -1 && !isImporterSrcInput) continue;
         await $`nix-store -r ${inputDrvPath}`;
-        break;
+        const realizedOutputs = await realizedDerivationOutputPaths(inputDrvPath, $);
+        realizedOutputs.forEach((output) => snapshotRoots.add(output));
+        if (matchedIndex !== -1) {
+          importerSrcOut = realizedOutputs[matchedIndex] || realizedOutputs[0] || importerSrcOut;
+        } else if (!importerSrcOut || !importerSrcOut.startsWith("/nix/store/")) {
+          importerSrcOut = realizedOutputs[0] || importerSrcOut;
+        }
       }
     }
 
     await ensureRealizedStorePath(importerSrcOut, $);
+    if (importerSrcOut.startsWith("/nix/store/")) snapshotRoots.add(importerSrcOut);
 
     assert.ok(
       importerSrcOut.startsWith("/nix/store/"),
       `expected importer-src input or env.src store path, got: ${importerSrcOut || "<empty>"}`,
     );
 
-    const snappedPackageCandidates = [
-      path.join(importerSrcOut, importer, "package.json"),
-      path.join(importerSrcOut, "package.json"),
-      ...(await recursiveImporterFileCandidates(importerSrcOut, importer, "package.json")),
-    ];
-    const snappedLockCandidates = [
-      path.join(importerSrcOut, importer, "pnpm-lock.yaml"),
-      path.join(importerSrcOut, "pnpm-lock.yaml"),
-      ...(await recursiveImporterFileCandidates(importerSrcOut, importer, "pnpm-lock.yaml")),
-    ];
+    const snappedPackageCandidates = (
+      await Promise.all(
+        Array.from(snapshotRoots).map(async (root) => [
+          path.join(root, importer, "package.json"),
+          path.join(root, "package.json"),
+          ...(await recursiveImporterFileCandidates(root, importer, "package.json")),
+        ]),
+      )
+    ).flat();
+    const snappedLockCandidates = (
+      await Promise.all(
+        Array.from(snapshotRoots).map(async (root) => [
+          path.join(root, importer, "pnpm-lock.yaml"),
+          path.join(root, "pnpm-lock.yaml"),
+          ...(await recursiveImporterFileCandidates(root, importer, "pnpm-lock.yaml")),
+        ]),
+      )
+    ).flat();
     const resolvedPackage = await existingPath(snappedPackageCandidates);
     const resolvedLock = await existingPath(snappedLockCandidates);
     assert.ok(
