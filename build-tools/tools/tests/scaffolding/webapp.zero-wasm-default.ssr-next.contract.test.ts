@@ -51,8 +51,8 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, CI: "1", NEXT_TELEMETRY_DISABLED: "1" },
-      })`pnpm install --filter ./projects/apps/demo-next... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
-      await _$({ cwd: appAbs, stdio: "inherit" })`pnpm run build:ssr`;
+      })`pnpm --dir ${tmp} install --filter ./projects/apps/demo-next... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+      await _$({ cwd: appAbs, stdio: "inherit" })`pnpm --dir ${appAbs} run build:ssr`;
 
       const port = await pickFreePort();
       const devServer: ChildProcess = spawn("pnpm", ["run", "dev:ssr"], {

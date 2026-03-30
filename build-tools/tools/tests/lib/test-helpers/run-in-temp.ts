@@ -27,7 +27,6 @@ import { externalPnpmStateDirs } from "../../../lib/pnpm-state-paths.ts";
 let cachedDevEnvExport: Promise<string> | null = null;
 let cachedPinnedNixpkgsPath: Promise<string> | null = null;
 let cachedPinnedCacertPath: Promise<string> | null = null;
-let cachedPinnedZipPath: Promise<string> | null = null;
 let cachedUnifiedPnpmStorePath: Promise<string> | null = null;
 let envMutationQueue: Promise<void> = Promise.resolve();
 async function withTempProcessEnv<T>(
@@ -121,33 +120,6 @@ async function pinnedCacertPathOncePerWorker($: any): Promise<string> {
   return await cachedPinnedCacertPath;
 }
 
-async function pinnedZipPathOncePerWorker($: any): Promise<string> {
-  if (cachedPinnedZipPath) return await cachedPinnedZipPath;
-  cachedPinnedZipPath = (async () => {
-    const repoRoot = process.cwd();
-    const nixEvalTmp = nixEvalTempDirOutsideWorkspace(repoRoot);
-    await fsp.mkdir(nixEvalTmp, { recursive: true }).catch(() => {});
-    const out = await $({
-      cwd: repoRoot,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-      env: {
-        ...process.env,
-        IN_NIX_SHELL: "1",
-        TMPDIR: nixEvalTmp,
-      },
-    })`nix build --impure --accept-flake-config --expr ${pinnedNixpkgsPackageExpr(path.join(repoRoot, "flake.lock"), "pkgs.zip")} --no-link --print-out-paths`;
-    const outPath = String((out as any).stdout || "")
-      .trim()
-      .split(/\r?\n/)
-      .map((line: string) => line.trim())
-      .find(Boolean);
-    return outPath ? path.join(outPath, "bin", "zip") : "";
-  })();
-  return await cachedPinnedZipPath;
-}
-
 async function stableTestHomeRoot(): Promise<string> {
   // Keep per-test HOME outside repo-local TMPDIR to avoid flake input churn and rsync/nix races
   // caused by transient tool caches (e.g. pnpm metadata temp files).
@@ -222,29 +194,7 @@ async function ensureUnifiedPnpmStoreOncePerWorker($: any): Promise<string> {
   cachedUnifiedPnpmStorePath = (async () => {
     const repoRoot = process.cwd();
     const existing = await unifiedPnpmStoreFromRepoRoot(repoRoot);
-    if (existing) return existing;
-    const out = await $({
-      cwd: repoRoot,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-      env: {
-        ...process.env,
-        IN_NIX_SHELL: "1",
-      },
-    })`zx-wrapper build-tools/tools/dev/require-unified-pnpm-store.ts`;
-    if ((out as any).exitCode !== 0) {
-      throw new Error("runInTemp: failed to build unified pnpm store for temp-repo tests");
-    }
-    const built = String((out as any).stdout || "")
-      .trim()
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .pop();
-    if (built) return built;
-    const resolved = await unifiedPnpmStoreFromRepoRoot(repoRoot);
-    if (resolved) return resolved;
-    throw new Error("runInTemp: unified pnpm store did not produce a usable store path");
+    return existing;
   })();
   return await cachedUnifiedPnpmStorePath;
 }
@@ -405,15 +355,6 @@ export async function runInTemp<T>(
       .filter(Boolean)
       .join(path.delimiter);
   } catch {}
-  try {
-    const pinnedZip = await pinnedZipPathOncePerWorker($);
-    if (pinnedZip) {
-      exportEnv.PATH = [path.dirname(pinnedZip), exportEnv.PATH || ""]
-        .filter(Boolean)
-        .join(path.delimiter);
-    }
-  } catch {}
-
   exportEnv.WORKSPACE_ROOT = tmp;
   exportEnv.BUCK_TEST_SRC = tmp;
   exportEnv.HOME = home;
@@ -469,11 +410,13 @@ export async function runInTemp<T>(
   if (wantsUnifiedPnpmStore) {
     const unified = await ensureUnifiedPnpmStoreOncePerWorker($);
     const pnpmState = await externalPnpmStateDirs(tmp);
-    exportEnv.LOCAL_PNPM_STORE = exportEnv.LOCAL_PNPM_STORE || unified;
-    exportEnv.NIX_USE_PREFETCHED_PNPM_STORE = "1";
     exportEnv.PNPM_HOME = exportEnv.PNPM_HOME || pnpmState.homeDir;
-    exportEnv.npm_config_store_dir = exportEnv.npm_config_store_dir || unified;
-    exportEnv.NPM_CONFIG_STORE_DIR = exportEnv.NPM_CONFIG_STORE_DIR || unified;
+    if (unified) {
+      exportEnv.LOCAL_PNPM_STORE = exportEnv.LOCAL_PNPM_STORE || unified;
+      exportEnv.NIX_USE_PREFETCHED_PNPM_STORE = "1";
+      exportEnv.npm_config_store_dir = exportEnv.npm_config_store_dir || unified;
+      exportEnv.NPM_CONFIG_STORE_DIR = exportEnv.NPM_CONFIG_STORE_DIR || unified;
+    }
   }
 
   const nodeOpts = ["--experimental-strip-types", `--import ${exportEnv.ZX_INIT}`];

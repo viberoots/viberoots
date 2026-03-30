@@ -101,7 +101,7 @@ export async function runWebappLocalTsDependencyTest(options: {
       cwd: tmp,
       stdio: "inherit",
       env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-    })`pnpm install --filter ./projects/apps/${options.appName}... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+    })`pnpm --dir ${tmp} install --filter ./projects/apps/${options.appName}... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
 
     const esbuildPkg = esbuildPackageName();
     const esbuildBin = esbuildPkg

@@ -67,7 +67,7 @@ async function installNodeModules(appAbs: string, _$: any): Promise<void> {
     cwd: appAbs,
     stdio: "inherit",
     env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-  })`pnpm install --ignore-scripts --ignore-workspace --prefer-offline --reporter=append-only`;
+  })`pnpm --dir ${appAbs} install --ignore-scripts --ignore-workspace --prefer-offline --reporter=append-only`;
 }
 
 async function assertNextContractFiles(tmp: string, appName: string): Promise<void> {
@@ -125,7 +125,7 @@ async function runNextRuntimeSmoke(
     cwd: appAbs,
     stdio: "inherit",
     env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" },
-  })`pnpm run build:ssr`;
+  })`pnpm --dir ${appAbs} run build:ssr`;
   const port = await pickFreePort();
   const child = spawn("node", ["dist/server/index.js"], {
     cwd: appAbs,

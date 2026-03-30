@@ -46,8 +46,8 @@ test(
           cwd: tmp,
           stdio: "inherit",
           env: { ...process.env, CI: "1" },
-        })`pnpm install --filter ./projects/apps/demo-pwa... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
-        await _$({ cwd: appAbs, stdio: "inherit" })`pnpm run build`;
+        })`pnpm --dir ${tmp} install --filter ./projects/apps/demo-pwa... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+        await _$({ cwd: appAbs, stdio: "inherit" })`pnpm --dir ${appAbs} run build`;
         const distDir = path.join(appAbs, "dist");
         assertStaticPwaServiceWorkerReady(`${distDir}/service-worker.js`);
         const serviceWorkerSource = await fsp.readFile(

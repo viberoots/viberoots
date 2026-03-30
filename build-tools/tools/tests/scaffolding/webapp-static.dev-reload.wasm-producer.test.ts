@@ -35,7 +35,7 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, CI: "1" },
-      })`pnpm install --filter ./projects/apps/demo-web... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+      })`pnpm --dir ${tmp} install --filter ./projects/apps/demo-web... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
 
       const port = await pickFreePort();
       const serverStdout: string[] = [];
