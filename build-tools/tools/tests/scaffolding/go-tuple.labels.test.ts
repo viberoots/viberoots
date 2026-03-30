@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
+import { buckCommandEnv, isBuckDaemonInitTransient } from "../../lib/buck-command-env.ts";
 import { runInTemp } from "../lib/test-helpers";
 
 test("nix_go_library stamps gotags and goenv tuple labels deterministically", async () => {
@@ -19,12 +20,22 @@ nix_go_library(
 )
 EOF'`;
 
-    const probe = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-    })`buck2 --isolation-dir go_tuple_labels cquery --target-platforms //:no_cgo --json --output-attribute labels //tmp:lib`;
+    const runProbe = async () =>
+      await $({
+        cwd: tmp,
+        stdio: "pipe",
+        reject: false,
+        nothrow: true,
+        env: buckCommandEnv(),
+      })`buck2 --isolation-dir go_tuple_labels cquery --target-platforms //:no_cgo --json --output-attribute labels //tmp:lib`;
+    let probe = await runProbe();
+    if (probe.exitCode !== 0) {
+      const msg = String(probe.stderr || probe.stdout || "");
+      if (isBuckDaemonInitTransient(msg)) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 150));
+        probe = await runProbe();
+      }
+    }
     if (probe.exitCode !== 0) {
       console.error(String(probe.stderr || probe.stdout || ""));
       process.exit(2);

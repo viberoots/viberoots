@@ -23,6 +23,54 @@ function selectDerivationMap(
       >);
 }
 
+async function existingPath(candidates: string[]): Promise<string> {
+  for (const candidate of candidates) {
+    try {
+      await fsp.access(candidate);
+      return candidate;
+    } catch {}
+  }
+  return "";
+}
+
+async function recursiveImporterFileCandidates(
+  root: string,
+  importer: string,
+  fileName: string,
+): Promise<string[]> {
+  const importerBase = path.basename(importer);
+  const matches: string[] = [];
+  const queue = [{ dir: root, depth: 0 }];
+  const seen = new Set<string>();
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) break;
+    if (seen.has(current.dir)) continue;
+    seen.add(current.dir);
+    let entries: Array<{ name: string; isDirectory: () => boolean }> = [];
+    try {
+      entries = await fsp.readdir(current.dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const full = path.join(current.dir, entry.name);
+      if (entry.isDirectory()) {
+        if (current.depth < 5) queue.push({ dir: full, depth: current.depth + 1 });
+        continue;
+      }
+      if (entry.name !== fileName) continue;
+      if (
+        full.endsWith(path.join(importer, fileName)) ||
+        full.endsWith(path.join(importerBase, fileName))
+      ) {
+        matches.push(full);
+      }
+    }
+  }
+  return matches;
+}
+
 test("nix packages expose per-importer node-modules attr for untracked importer under WORKSPACE_ROOT", async () => {
   await runInTemp("node-modules-per-importer-attr", async (tmp, _$) => {
     const importer = "projects/apps/demo-untracked";
@@ -156,37 +204,15 @@ test("node-modules derivation snapshots untracked importer files", async () => {
     const snappedPackageCandidates = [
       path.join(importerSrcOut, importer, "package.json"),
       path.join(importerSrcOut, "package.json"),
+      ...(await recursiveImporterFileCandidates(importerSrcOut, importer, "package.json")),
     ];
     const snappedLockCandidates = [
       path.join(importerSrcOut, importer, "pnpm-lock.yaml"),
       path.join(importerSrcOut, "pnpm-lock.yaml"),
+      ...(await recursiveImporterFileCandidates(importerSrcOut, importer, "pnpm-lock.yaml")),
     ];
-    const resolvedPackage =
-      (
-        await Promise.all(
-          snappedPackageCandidates.map(async (candidate) =>
-            (await fsp
-              .access(candidate)
-              .then(() => true)
-              .catch(() => false))
-              ? candidate
-              : "",
-          ),
-        )
-      ).find(Boolean) || "";
-    const resolvedLock =
-      (
-        await Promise.all(
-          snappedLockCandidates.map(async (candidate) =>
-            (await fsp
-              .access(candidate)
-              .then(() => true)
-              .catch(() => false))
-              ? candidate
-              : "",
-          ),
-        )
-      ).find(Boolean) || "";
+    const resolvedPackage = await existingPath(snappedPackageCandidates);
+    const resolvedLock = await existingPath(snappedLockCandidates);
     assert.ok(
       resolvedPackage,
       `expected package.json in importer-src output under one of: ${snappedPackageCandidates.join(", ")}`,

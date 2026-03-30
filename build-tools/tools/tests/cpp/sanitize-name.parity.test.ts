@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 // Verifies Starlark sanitize_name matches Nix H.sanitizeName
 import { sanitizeName } from "../../lib/sanitize.ts";
+import { buckCommandEnv, isBuckDaemonInitTransient } from "../../lib/buck-command-env.ts";
 
 const cases: Array<{ name: string; label: string }> = [
   { name: "case1", label: "//projects/apps/foo:bin" },
@@ -18,8 +19,26 @@ const parityIso = inheritedIso || `parity_${process.pid}`;
 const ownsIso = !inheritedIso;
 
 async function starlarkProbeOutput(target: string): Promise<string> {
-  await $`buck2 --isolation-dir ${parityIso} build ${target}`;
-  const { stdout } = await $`buck2 --isolation-dir ${parityIso} targets --show-output ${target}`;
+  const runBuck = async (mode: "build" | "show-output") =>
+    mode === "build"
+      ? await $({ env: buckCommandEnv() })`buck2 --isolation-dir ${parityIso} build ${target}`
+      : await $({
+          env: buckCommandEnv(),
+        })`buck2 --isolation-dir ${parityIso} targets --show-output ${target}`;
+
+  const withTransientRetry = async <T>(run: () => Promise<T>): Promise<T> => {
+    try {
+      return await run();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!isBuckDaemonInitTransient(msg)) throw err;
+      await new Promise<void>((resolve) => setTimeout(resolve, 150));
+      return await run();
+    }
+  };
+
+  await withTransientRetry(async () => await runBuck("build"));
+  const { stdout } = await withTransientRetry(async () => await runBuck("show-output"));
   const out = stdout.trim().split(/\s+/).pop() || "";
   const outName = out.split("/").pop() || "";
   if (!outName) throw new Error("no output path for " + target);
@@ -39,6 +58,7 @@ try {
 } finally {
   if (ownsIso) {
     await $({
+      env: buckCommandEnv(),
       reject: false,
       stdio: "ignore",
     })`buck2 --isolation-dir ${parityIso} kill`;

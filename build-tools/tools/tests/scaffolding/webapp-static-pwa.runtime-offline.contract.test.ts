@@ -42,11 +42,15 @@ test(
           root: tmp,
         });
         await _$({ cwd: tmp, stdio: "pipe" })`git add -A projects/apps/demo-pwa`;
+        await fsp.rm(path.join(appAbs, "node_modules"), {
+          recursive: true,
+          force: true,
+        });
         await _$({
-          cwd: tmp,
+          cwd: appAbs,
           stdio: "inherit",
           env: { ...process.env, CI: "1" },
-        })`pnpm --dir ${tmp} install --filter ./projects/apps/demo-pwa... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+        })`pnpm --dir ${appAbs} install --ignore-workspace --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
         await _$({ cwd: appAbs, stdio: "inherit" })`pnpm --dir ${appAbs} run build`;
         const distDir = path.join(appAbs, "dist");
         assertStaticPwaServiceWorkerReady(`${distDir}/service-worker.js`);

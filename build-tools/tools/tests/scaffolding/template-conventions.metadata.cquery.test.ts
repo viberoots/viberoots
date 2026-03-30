@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { after, test } from "node:test";
+import { buckCommandEnv, isBuckDaemonInitTransient } from "../../lib/buck-command-env.ts";
 
 type TemplateExpectation = {
   script: string;
@@ -328,7 +329,18 @@ function isolationId(prefix: string): string {
 }
 
 const templateConventionsIsolation = isolationId("template_conventions_metadata_cquery");
-const buckEnv = { ...process.env, IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1" };
+const buckEnv = { ...buckCommandEnv(), IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1" };
+
+async function withBuckTransientRetry<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!isBuckDaemonInitTransient(msg)) throw err;
+    await new Promise<void>((resolve) => setTimeout(resolve, 150));
+    return await run();
+  }
+}
 
 after(async () => {
   await $({
@@ -341,10 +353,13 @@ after(async () => {
 test("template-owned tests expose labels and template inputs", async () => {
   const targets = EXPECTATIONS.map((entry) => `//:${targetNameFromScript(entry.script)}`);
   const query = `set(${targets.join(" ")})`;
-  const out = await $({
-    stdio: "pipe",
-    env: buckEnv,
-  })`buck2 --isolation-dir ${templateConventionsIsolation} cquery ${query} --json --output-attribute labels --output-attribute template_inputs`;
+  const out = await withBuckTransientRetry(
+    async () =>
+      await $({
+        stdio: "pipe",
+        env: buckEnv,
+      })`buck2 --isolation-dir ${templateConventionsIsolation} cquery ${query} --json --output-attribute labels --output-attribute template_inputs`,
+  );
   const raw = JSON.parse(out.stdout) as Record<
     string,
     { labels?: string[]; template_inputs?: string[] }
@@ -389,10 +404,13 @@ test("template-owned tests expose labels and template inputs", async () => {
 });
 
 test("non-template tests do not carry template labels", async () => {
-  const out = await $({
-    stdio: "pipe",
-    env: buckEnv,
-  })`buck2 --isolation-dir ${templateConventionsIsolation} cquery //:scaffolding_macros_exports_present --json --output-attribute labels`;
+  const out = await withBuckTransientRetry(
+    async () =>
+      await $({
+        stdio: "pipe",
+        env: buckEnv,
+      })`buck2 --isolation-dir ${templateConventionsIsolation} cquery //:scaffolding_macros_exports_present --json --output-attribute labels`,
+  );
   const raw = JSON.parse(out.stdout) as Record<string, { labels?: string[] }>;
   const first = Object.values(raw)[0] || {};
   const labels = Array.isArray(first.labels) ? first.labels.map(String) : [];

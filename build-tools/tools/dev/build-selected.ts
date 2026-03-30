@@ -10,20 +10,9 @@ import { findRepoRoot, pathExists } from "../lib/repo.ts";
 import { getArgvTokens } from "../lib/cli.ts";
 import { withScopedEnv } from "../lib/scoped-env.ts";
 import { untrackedRequiresImpureForTargets } from "./dev-build/untracked.ts";
+import { stripAnsi, targetPackageFromLabel } from "./build-selected-helpers.ts";
 import { makeFilteredFlakeRef } from "./filtered-flake.ts";
 import { resolveSelectedTargetLabel } from "./target-label-resolver.ts";
-function stripAnsi(s: string): string {
-  return s.replace(/\x1B\[[0-9;]*[A-Za-z]/g, "").replace(/\r/g, "");
-}
-function targetPackageFromLabel(target: string): string {
-  const t = String(target || "").trim();
-  const noCell = t.startsWith("root//") ? t.slice("root//".length - 2) : t;
-  if (!noCell.startsWith("//")) return "";
-  const body = noCell.slice(2);
-  const idx = body.indexOf(":");
-  return idx >= 0 ? body.slice(0, idx) : body;
-}
-
 function parseSourceMode(argv: string[]): {
   sourceMode: "auto" | "git" | "path";
   sourceError?: string;
@@ -61,7 +50,12 @@ async function chooseFlakeRef(opts: {
     workspaceAbs.startsWith("/private/var/folders/") ||
     workspaceAbs.includes(`${path.sep}buck-out${path.sep}tmp${path.sep}tmpdir${path.sep}`);
   if (opts.sourceMode === "auto" && isLikelyTempWorkspace) {
-    return { flakeRef: `path:${workspaceAbs}#graph-generator-selected` };
+    const filtered = await makeFilteredFlakeRef({
+      workspaceRoot: opts.workspaceRoot,
+      attr: "graph-generator-selected",
+      logPrefix: "[build-selected]",
+    });
+    return filtered;
   }
   if (opts.sourceMode === "auto" && repoRootEnv) {
     const repoRootAbs = path.resolve(repoRootEnv);
@@ -106,7 +100,6 @@ async function chooseFlakeRef(opts: {
     return { flakeRef: `${opts.workspaceRoot}#graph-generator-selected` };
   }
 }
-
 async function main() {
   const parsedSource = parseSourceMode(getArgvTokens());
   if (parsedSource.sourceError) {
@@ -186,7 +179,6 @@ async function main() {
   const providedTargetAttr = (process.env.BUCK_TARGET_ATTR || "").trim();
   const cppTargetAttrSuffix = providedTargetAttr || sanitizeAttrNameFromLabel(target);
   console.error(`[build-selected] cppTargetAttrSuffix=${cppTargetAttrSuffix}`);
-
   const sanitizedEnv: Record<string, string> = {
     ...process.env,
     BUCK_TARGET: target,

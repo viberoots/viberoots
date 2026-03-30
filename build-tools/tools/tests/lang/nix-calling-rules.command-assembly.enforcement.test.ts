@@ -44,15 +44,21 @@ test("Nix-calling rule implementations use shared nix out-path capture helpers a
     );
     assertContains(
       src,
-      "nix_build_out_path_cmd(",
-      `${label}: expected nix build out path capture to route through nix_build_out_path_cmd(...)`,
-    );
-    assertContains(
-      src,
       'load("//build-tools/lang:nix_shell.bzl"',
       `${label}: expected nix shell helpers to be loaded from //build-tools/lang:nix_shell.bzl`,
     );
   }
+
+  assertContains(
+    wasm,
+    "nix_build_out_path_cmd(",
+    "build-tools/go/private/nix_build_wasm.bzl: expected nix build out path capture to route through nix_build_out_path_cmd(...)",
+  );
+  assertContains(
+    cpp,
+    "nix-build-filtered-flake.ts",
+    "build-tools/cpp/private/nix_build.bzl: expected C++ builds to route through the filtered flake helper",
+  );
 
   assertDoesNotContain(
     wasm,
