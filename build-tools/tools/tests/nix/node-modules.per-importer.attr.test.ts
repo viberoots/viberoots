@@ -52,6 +52,19 @@ async function ensureRealizedStorePath(storePath: string, $: any): Promise<void>
   await $`nix-store -r ${storePath}`;
 }
 
+function findDerivationByKey<T extends object>(
+  derivations: Record<string, T>,
+  drvPath: string,
+): T | undefined {
+  return (
+    derivations[drvPath] ||
+    derivations[path.basename(drvPath)] ||
+    Object.entries(derivations).find(
+      ([key]) => key === drvPath || key.endsWith(path.basename(drvPath)),
+    )?.[1]
+  );
+}
+
 async function recursiveImporterFileCandidates(
   root: string,
   importer: string,
@@ -172,12 +185,7 @@ test("node-modules derivation snapshots untracked importer files", async () => {
           >;
         };
     const derivations = selectDerivationMap(parsed);
-    const requestedDrv =
-      derivations[drvPath] ||
-      derivations[path.basename(drvPath)] ||
-      Object.entries(derivations).find(
-        ([key]) => key === drvPath || key.endsWith(path.basename(drvPath)),
-      )?.[1];
+    const requestedDrv = findDerivationByKey(derivations, drvPath);
     assert.ok(
       requestedDrv,
       `unable to find requested derivation in nix derivation show: ${drvPath}`,
@@ -198,12 +206,7 @@ test("node-modules derivation snapshots untracked importer files", async () => {
         | Record<string, { outputs?: { out?: { path?: string } } }>
         | { derivations?: Record<string, { outputs?: { out?: { path?: string } } }> };
       const importerDerivations = selectDerivationMap(importerDrvParsed as any);
-      const importerDrv =
-        importerDerivations[importerSrcDrvPath] ||
-        importerDerivations[path.basename(importerSrcDrvPath)] ||
-        Object.entries(importerDerivations).find(
-          ([key]) => key === importerSrcDrvPath || key.endsWith(path.basename(importerSrcDrvPath)),
-        )?.[1];
+      const importerDrv = findDerivationByKey(importerDerivations, importerSrcDrvPath);
       const importerSrcOutRaw = String(importerDrv?.outputs?.out?.path || "").trim();
       importerSrcOut = importerSrcOutRaw.startsWith("/nix/store/")
         ? importerSrcOutRaw
@@ -213,6 +216,29 @@ test("node-modules derivation snapshots untracked importer files", async () => {
       importerSrcOut = importerSrcEnv.startsWith("/nix/store/")
         ? importerSrcEnv
         : path.join("/nix/store", importerSrcEnv);
+      const inputDrvPaths = Object.keys(requestedDrv?.inputs?.drvs || {}).map((drv) =>
+        drv.startsWith("/nix/store/") ? drv : path.join("/nix/store", drv),
+      );
+      for (const inputDrvPath of inputDrvPaths) {
+        const inputDrvShow = await $({
+          stdio: "pipe",
+          reject: false,
+          nothrow: true,
+        })`nix derivation show ${inputDrvPath}`;
+        if (inputDrvShow.exitCode !== 0) continue;
+        const inputDrvParsed = JSON.parse(String(inputDrvShow.stdout || "")) as
+          | Record<string, { outputs?: { out?: { path?: string } } }>
+          | { derivations?: Record<string, { outputs?: { out?: { path?: string } } }> };
+        const inputDerivations = selectDerivationMap(inputDrvParsed as any);
+        const inputDrv = findDerivationByKey(inputDerivations, inputDrvPath);
+        const inputOutRaw = String(inputDrv?.outputs?.out?.path || "").trim();
+        const inputOut = inputOutRaw.startsWith("/nix/store/")
+          ? inputOutRaw
+          : path.join("/nix/store", inputOutRaw);
+        if (inputOut !== importerSrcOut) continue;
+        await $`nix-store -r ${inputDrvPath}`;
+        break;
+      }
     }
 
     await ensureRealizedStorePath(importerSrcOut, $);
