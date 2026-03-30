@@ -75,6 +75,19 @@ async function realizedDerivationOutputPaths(drvPath: string, $: any): Promise<s
     .filter(Boolean);
 }
 
+async function derivationReferences(drvPath: string, $: any): Promise<string[]> {
+  const out = await $({
+    stdio: "pipe",
+    reject: false,
+    nothrow: true,
+  })`nix-store -q --references ${drvPath}`;
+  if (out.exitCode !== 0) return [];
+  return String(out.stdout || "")
+    .split(/\s+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 function nixStoreNameStem(storePath: string): string {
   const base = path.basename(storePath.trim());
   return base.replace(/^[^-]+-/, "");
@@ -226,13 +239,25 @@ test("node-modules derivation snapshots untracked importer files", async () => {
     const inputDrvPaths = Object.keys(requestedDrv?.inputs?.drvs || {}).map((drv) =>
       drv.startsWith("/nix/store/") ? drv : path.join("/nix/store", drv),
     );
+    const referencedDrvPaths = (await derivationReferences(drvPath, $)).filter((ref) =>
+      ref.endsWith(".drv"),
+    );
+    const candidateImporterSrcDrvPaths = Array.from(
+      new Set(
+        [...inputDrvPaths, ...referencedDrvPaths].filter((candidate) =>
+          candidate.includes("-importer-src-"),
+        ),
+      ),
+    );
     let importerSrcOut = "";
     const snapshotRoots = new Set<string>();
 
-    if (importerSrcDrvName) {
-      const importerSrcDrvPath = importerSrcDrvName.startsWith("/nix/store/")
-        ? importerSrcDrvName
-        : path.join("/nix/store", importerSrcDrvName);
+    if (importerSrcDrvName || candidateImporterSrcDrvPaths.length > 0) {
+      const importerSrcDrvPath =
+        candidateImporterSrcDrvPaths[0] ||
+        (importerSrcDrvName!.startsWith("/nix/store/")
+          ? importerSrcDrvName!
+          : path.join("/nix/store", importerSrcDrvName!));
       const importerDrvShow = await $`nix derivation show ${importerSrcDrvPath}`;
       const importerDrvParsed = JSON.parse(String(importerDrvShow.stdout || "")) as
         | Record<string, { outputs?: { out?: { path?: string } } }>
@@ -280,7 +305,12 @@ test("node-modules derivation snapshots untracked importer files", async () => {
     }
 
     await ensureRealizedStorePath(importerSrcOut, $);
-    if (importerSrcOut.startsWith("/nix/store/")) snapshotRoots.add(importerSrcOut);
+    if (importerSrcOut.startsWith("/nix/store/")) {
+      try {
+        await fsp.access(importerSrcOut);
+        snapshotRoots.add(importerSrcOut);
+      } catch {}
+    }
 
     assert.ok(
       importerSrcOut.startsWith("/nix/store/"),
