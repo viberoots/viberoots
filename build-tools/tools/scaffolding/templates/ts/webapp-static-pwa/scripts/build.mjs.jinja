@@ -1,0 +1,23 @@
+import { execSync } from "node:child_process";
+import * as fsp from "node:fs";
+import path from "node:path";
+
+const wasmManifestPath = path.join("src", "wasm-modules.manifest.json");
+execSync(
+  `zx-wrapper ../../../build-tools/tools/dev/ensure-wasm-contract-assets.ts --cwd . --wasm-manifest ${JSON.stringify(wasmManifestPath)}`,
+  {
+    stdio: "inherit",
+  },
+);
+execSync("vite build", { stdio: "inherit" });
+
+const manifest = JSON.parse(fsp.readFileSync(wasmManifestPath, "utf8"));
+for (const entry of Array.isArray(manifest.modules) ? manifest.modules : []) {
+  const rel = String(entry?.runtimeDestinations?.client || "").trim();
+  if (!rel) continue;
+  const source = path.resolve(rel);
+  if (!fsp.existsSync(source)) continue;
+  const target = path.resolve("dist", rel);
+  fsp.mkdirSync(path.dirname(target), { recursive: true });
+  fsp.copyFileSync(source, target);
+}

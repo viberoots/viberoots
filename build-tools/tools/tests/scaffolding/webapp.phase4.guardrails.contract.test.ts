@@ -12,17 +12,6 @@ type InstallGuardrailExpectation = {
 
 const LIGHTWEIGHT_SOURCE_ONLY_EXPECTATIONS: InstallGuardrailExpectation[] = [
   {
-    file: "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.ssr-vite.contract.test.ts",
-    required: [
-      "pnpm install",
-      "--filter ./projects/apps/demo-vite...",
-      "--frozen-lockfile",
-      "--prefer-offline",
-      "--ignore-scripts",
-    ],
-    forbidden: ["--skip-lockfile-gen", "--no-frozen-lockfile"],
-  },
-  {
     file: "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.static.contract.test.ts",
     required: [
       "pnpm install",
@@ -64,6 +53,35 @@ const HEAVY_RUNTIME_EXPECTATIONS: InstallGuardrailExpectation[] = [
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-contract.test.ts",
     required: ["--skip-lockfile-gen", "pnpm install", "--prefer-offline", "--ignore-workspace"],
     forbidden: ["--frozen-lockfile"],
+  },
+  {
+    file: "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.ssr-vite.contract.test.ts",
+    required: [
+      "--skip-lockfile-gen",
+      "pnpm install",
+      "--filter ./projects/apps/demo-vite...",
+      "--no-frozen-lockfile",
+      "--prefer-offline",
+      "--ignore-scripts",
+    ],
+    forbidden: ["--frozen-lockfile"],
+  },
+  {
+    file: "build-tools/tools/tests/scaffolding/webapp-static-pwa.runtime-offline.contract.test.ts",
+    required: [
+      "--skip-lockfile-gen",
+      "pnpm install",
+      "--filter ./projects/apps/demo-pwa...",
+      "--no-frozen-lockfile",
+      "--prefer-offline",
+      "--ignore-scripts",
+      "pnpm run build",
+    ],
+    forbidden: [
+      "deps-main.ts --verbose --glue-only",
+      "update-pnpm-hash.ts --lockfile",
+      "nix build",
+    ],
   },
 ];
 

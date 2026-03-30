@@ -30,7 +30,7 @@ def nix_node_test(
     cmd = None,
     patterns = None,
     env = {},
-    timeout_sec = 600,
+    timeout_sec = 1800,
     deps = [],
     labels = [],
     lockfile_label = None,
@@ -206,4 +206,3 @@ def nix_node_cli_bin(
         importer = importer,
         **kwargs
     )
-

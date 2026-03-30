@@ -1,4 +1,7 @@
-import "zx/globals";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 function parseNum(s: string | undefined): number | null {
   const raw = String(s ?? "").trim();
@@ -16,8 +19,13 @@ function defaultOrNonNegative(envVal: number | null, def: number): number {
 
 async function freeGiBForPath(p: string): Promise<number | null> {
   try {
-    const { stdout } = await $({ stdio: "pipe" })`df -Pk ${p} | tail -n1`;
-    const line = String(stdout || "").trim();
+    const { stdout } = await execFileAsync("df", ["-Pk", p], { encoding: "utf8" });
+    const line = String(stdout || "")
+      .trim()
+      .split(/\r?\n/)
+      .at(-1)
+      ?.trim();
+    if (!line) return null;
     const toks = line.split(/\s+/);
     const availKB = Number(toks[3] || "0");
     return Math.max(0, Math.floor(availKB / 1024 / 1024));

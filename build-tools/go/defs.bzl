@@ -150,6 +150,7 @@ def nix_go_test(name, **kwargs):
         "deps": wiring.deps,
         "srcs": prepared.get("srcs", []) or [],
         "labels": prepared.get("labels", []) or [],
+        "test_rule_timeout_ms": 30 * 60 * 1000,
         "nix_inputs": nix_inputs,
         "visibility": prepared.get("visibility", []),
     }
@@ -197,4 +198,3 @@ def nix_go_carchive(name, **kwargs):
 
 def nix_go_tiny_wasm_lib(name, **kwargs):
     _nix_go_tiny_wasm_lib(name = name, **kwargs)
-

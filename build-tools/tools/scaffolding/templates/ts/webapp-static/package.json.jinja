@@ -8,7 +8,7 @@
     "dev:wasm": "pnpm run dev",
     "dev:vite": "vite",
     "dev:wasm:watch": "node scripts/dev-wasm-watch.mjs",
-    "build": "vite build",
+    "build": "node scripts/build.mjs",
     "preview": "vite preview",
     {% if includeNodeTests %}
     "test": "vitest run"
@@ -27,4 +27,3 @@
     {% endif %}
   }
 }
-

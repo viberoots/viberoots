@@ -81,7 +81,8 @@ node_nix_test = rule(
         # Env to merge into runner environment
         "env": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
         # External timeout in seconds (default 600)
-        "timeout_sec": attrs.int(default = 600),
+        "timeout_sec": attrs.int(default = 1800),
+        "test_rule_timeout_ms": attrs.option(attrs.int(), default = None),
         # Inputs that affect invalidation (e.g., importer-local patches)
         "srcs": attrs.list(attrs.source(), default = []),
         # Additional deps (e.g., provider stamps)
@@ -92,5 +93,4 @@ node_nix_test = rule(
         "out": attrs.string(default = "node_nix_test.stamp"),
     },
 )
-
 

@@ -3,15 +3,24 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { after, test } from "node:test";
-import {
-  assertStaticPwaServiceWorkerReady,
-  readStaticPwaPrecacheState,
-} from "../../lib/static-pwa-precache.ts";
+import { resolveModuleContractsPaths } from "../../dev/module-contract-paths.ts";
+import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core.ts";
+import { assertStaticPwaServiceWorkerReady } from "../../lib/static-pwa-precache.ts";
 import { runInTemp } from "../lib/test-helpers/run-in-temp.ts";
 import { createStaticPwaServiceWorkerHarness } from "./lib/static-pwa-service-worker.ts";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
+
+function parseInjectedPrecacheUrls(serviceWorkerSource: string): string[] {
+  const match = serviceWorkerSource.match(
+    /const PRECACHE_URLS = \[APP_SHELL_URL, \.\.\.(\[[\s\S]*?\])\];/,
+  );
+  if (!match?.[1]) {
+    throw new Error("failed to parse injected service worker precache urls");
+  }
+  return JSON.parse(match[1]) as string[];
+}
 
 test(
   "webapp-static-pwa build cold-loads offline after service-worker install and keeps the app shell contract",
@@ -26,51 +35,30 @@ test(
         const $ = _$({ cwd: tmp, stdio: "inherit" });
         await $`scaf new ts webapp-static-pwa demo-pwa --yes --no-tests --skip-lockfile-gen`;
         const appAbs = path.join(tmp, "projects", "apps", "demo-pwa");
-        await $({
-          cwd: appAbs,
-          env: { ...process.env },
-        })`zx-wrapper ../../../build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
+        const contracts = resolveModuleContractsPaths({ appCwd: appAbs, root: tmp });
+        await syncModuleContractsForApp({
+          appCwd: appAbs,
+          appTargetLabel: contracts.appTargetLabel,
+          root: tmp,
+        });
+        await _$({ cwd: tmp, stdio: "pipe" })`git add -A projects/apps/demo-pwa`;
         await _$({
           cwd: tmp,
-          stdio: "pipe",
-        })`git add -A projects/apps/demo-pwa build-tools/tools/nix/node-modules.hashes.json build-tools/tools/nix/langs.nix build-tools/lang/importer_roots.bzl build-tools/tools/buck third_party/providers`;
-        const importer = "projects/apps/demo-pwa";
-        const lockfile = path.join(importer, "pnpm-lock.yaml");
-        const sanitized = importer
-          .replace(/\/\//g, "")
-          .replace(/:/g, "-")
-          .replace(/[\/\s]+/g, "-");
-        const envWithPrefetch = { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" } as Record<
-          string,
-          string
-        >;
-        await $({
-          cwd: tmp,
           stdio: "inherit",
-          env: envWithPrefetch,
-        })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
-        const nixOut = await $({
-          stdio: "pipe",
-          cwd: tmp,
-          env: envWithPrefetch,
-        })`bash --noprofile --norc -c ${`set -euo pipefail; nix build "${tmp}#node-webapp.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-build-logs --print-out-paths`}`;
-        const outPath =
-          String(nixOut.stdout || "")
-            .trim()
-            .split("\n")
-            .pop() || "";
-        const distDir = path.join(outPath, "dist");
-        const precacheState = readStaticPwaPrecacheState(distDir);
+          env: { ...process.env, CI: "1" },
+        })`pnpm install --filter ./projects/apps/demo-pwa... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+        await _$({ cwd: appAbs, stdio: "inherit" })`pnpm run build`;
+        const distDir = path.join(appAbs, "dist");
         assertStaticPwaServiceWorkerReady(`${distDir}/service-worker.js`);
-
-        const scriptUrl = precacheState.urls.find((url) => url.endsWith(".js"));
-        const wasmUrl = precacheState.urls.find((url) => url.endsWith(".wasm"));
-        assert.ok(scriptUrl, "expected built JS entry in precache");
-        assert.ok(wasmUrl, "expected built wasm asset in precache");
         const serviceWorkerSource = await fsp.readFile(
           path.join(distDir, "service-worker.js"),
           "utf8",
         );
+        const precacheUrls = parseInjectedPrecacheUrls(serviceWorkerSource);
+        const scriptUrl = precacheUrls.find((url) => url.endsWith(".js"));
+        const wasmUrl = precacheUrls.find((url) => url.endsWith(".wasm"));
+        assert.ok(scriptUrl, "expected built JS entry in precache");
+        assert.ok(wasmUrl, "expected built wasm asset in precache");
         assert.match(serviceWorkerSource, new RegExp(scriptUrl.replace(".", "\\.")));
         assert.match(serviceWorkerSource, new RegExp(wasmUrl.replace(".", "\\.")));
 

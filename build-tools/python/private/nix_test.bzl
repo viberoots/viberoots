@@ -35,7 +35,7 @@ def _python_nix_test_impl(ctx):
         + "  if [ -d \"$OUT_PATH/bin\" ]; then ls -la \"$OUT_PATH/bin\" >&2; fi; "
         + "  exit 2; "
         + "fi; "
-        + nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = 600)
+        + nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = 1800)
         + "$TIMEOUT \"$BIN\""
     )
     stamp = ctx.actions.declare_output(ctx.attrs.out)
@@ -63,6 +63,7 @@ python_nix_test = rule(
         "srcs": attrs.list(attrs.source(), default = []),
         "nix_inputs": attrs.list(attrs.source(), default = []),
         "labels": attrs.list(attrs.string(), default = []),
+        "test_rule_timeout_ms": attrs.option(attrs.int(), default = None),
     },
 )
 

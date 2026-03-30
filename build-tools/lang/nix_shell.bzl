@@ -98,6 +98,8 @@ def nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = 600):
     tout = default_sec if isinstance(default_sec, int) and default_sec > 0 else 600
     return (
         ("TOUT=%d; " % tout)
+        + "RAW_TOUT=\"${TEST_NIX_TIMEOUT_SECS:-${VERIFY_TIMEOUT_SECS:-}}\"; "
+        + "if [ -n \"$RAW_TOUT\" ] && [ \"$RAW_TOUT\" -gt \"$TOUT\" ] 2>/dev/null; then TOUT=\"$RAW_TOUT\"; fi; "
         + "if command -v timeout >/dev/null 2>&1; then "
         + ("%s=\"timeout -k 2s ${TOUT}s\"; " % var_name)
         + "else "
@@ -224,6 +226,5 @@ def nix_calling_node_patch_requirements_preflight(importer):
         + "fi; "
         + "node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$BNX_NODE_ZX_INIT\" \"$WORKSPACE_ROOT/build-tools/tools/buck/enforce-node-patch-requirements.ts\" --check --importer \"$BNX_NODE_PATCH_IMPORTER\"; "
     )
-
 
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import { spawn, type ChildProcess } from "node:child_process";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { getFlagStr } from "../lib/cli.ts";
 import { syncModuleContractsForApp } from "./sync-module-contracts-core.ts";
 
@@ -36,6 +38,58 @@ function killGroup(child: ChildProcess, signal: NodeJS.Signals): void {
   } catch {}
 }
 
+type WasmModuleManifest = {
+  modules?: Array<{
+    runtimeDestinations?: {
+      client?: string;
+      server?: string;
+    };
+  }>;
+};
+
+async function waitForInitialWasmSync(cwd: string, contractsDir: string, watch: ChildProcess) {
+  const manifestPath = path.join(contractsDir, "wasm-modules.manifest.json");
+  let manifest: WasmModuleManifest;
+  try {
+    manifest = JSON.parse(await fsp.readFile(manifestPath, "utf8")) as WasmModuleManifest;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`failed to read wasm manifest before dev startup: ${message}`);
+  }
+  const outputs = Array.from(
+    new Set(
+      (manifest.modules || [])
+        .flatMap((module) => [
+          String(module.runtimeDestinations?.client || "").trim(),
+          String(module.runtimeDestinations?.server || "").trim(),
+        ])
+        .filter(Boolean)
+        .map((rel) => path.resolve(cwd, rel)),
+    ),
+  );
+  if (outputs.length === 0) return;
+  const timeoutMs = Math.max(30_000, Number(getFlagStr("startup-wasm-timeout-ms", "120000")));
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (watch.exitCode != null) {
+      throw new Error(
+        `wasm watcher exited before initial sync completed (code=${String(watch.exitCode)})`,
+      );
+    }
+    const states = await Promise.all(outputs.map((abs) => fsp.stat(abs).catch(() => null)));
+    if (states.every((st) => st && st.isFile() && st.size > 0)) {
+      console.error(
+        `[dev-wasm] startup:ready outputs=${outputs.length} elapsed_ms=${Date.now() - startedAt}`,
+      );
+      return;
+    }
+    await sleep(250);
+  }
+  throw new Error(
+    `timed out waiting for initial wasm sync after ${timeoutMs}ms: ${outputs.join(", ")}`,
+  );
+}
+
 async function main() {
   const cwd = path.resolve(getFlagStr("cwd", process.cwd()) || process.cwd());
   const appTargetLabel = getFlagStr("app-target", "");
@@ -52,8 +106,9 @@ async function main() {
     `[dev-wasm] contracts:ready app_target=${synced.appTargetLabel} app_id=${synced.appId} dir=${synced.contractsDir}`,
   );
 
-  const vite = spawnShell("vite", viteCmd, cwd, childEnv);
   const watch = spawnShell("wasm-watch", watchCmd, cwd, childEnv);
+  await waitForInitialWasmSync(cwd, synced.contractsDir, watch);
+  const vite = spawnShell("vite", viteCmd, cwd, childEnv);
   let stopping = false;
   let sawFailure = false;
 

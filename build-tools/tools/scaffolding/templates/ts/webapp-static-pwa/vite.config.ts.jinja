@@ -51,7 +51,7 @@ function readStaticPwaExtraUrls(): string[] {
     );
     return [...new Set(
       parsed.modules
-        .map((entry) => path.posix.basename(entry.sourcePath))
+        .map((entry) => String(entry.runtimeDestinations.client || "").trim())
         .map((dest) => `/${dest.replace(/^\/+/, "")}`)
         .filter((dest) => dest !== "/"),
     )].sort();
@@ -69,7 +69,7 @@ function staticPwaPrecachePlugin() {
     configResolved(config: { build: { outDir: string } }) {
       outDir = config.build.outDir;
     },
-    closeBundle() {
+    writeBundle() {
       execFileSync(
         process.execPath,
         [

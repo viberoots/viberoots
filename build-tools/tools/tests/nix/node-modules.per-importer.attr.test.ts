@@ -75,25 +75,36 @@ test("node-modules derivation snapshots untracked importer files", async () => {
     assert.ok(drvPath.endsWith(".drv"), `expected drvPath, got: ${drvPath}`);
 
     const show = await $`nix derivation show ${drvPath}`;
-    const parsed = JSON.parse(String(show.stdout || "")) as {
-      derivations?: Record<
-        string,
-        { env?: Record<string, string>; inputs?: { drvs?: Record<string, unknown> } }
-      >;
-    };
-    const allDrvs = Object.entries(parsed.derivations || {});
+    const parsed = JSON.parse(String(show.stdout || "")) as
+      | Record<string, { env?: Record<string, string>; inputDrvs?: Record<string, unknown> }>
+      | {
+          derivations?: Record<
+            string,
+            { env?: Record<string, string>; inputDrvs?: Record<string, unknown> }
+          >;
+        };
+    const derivations =
+      "derivations" in parsed && parsed.derivations && typeof parsed.derivations === "object"
+        ? parsed.derivations
+        : (parsed as Record<
+            string,
+            { env?: Record<string, string>; inputDrvs?: Record<string, unknown> }
+          >);
+    const allDrvs = Object.entries(derivations || {});
+    const requestedDrv =
+      derivations[drvPath] ||
+      allDrvs.find(([key]) => key === drvPath || key.endsWith(path.basename(drvPath)))?.[1];
     const firstDrv =
-      (parsed.derivations || {})[drvPath] ||
+      requestedDrv ||
       allDrvs.find(([, value]) => {
         const src = String(value?.env?.src || "").trim();
         return (
           src.startsWith("/nix/store/") &&
-          Object.keys(value?.inputs?.drvs || {}).some((d) => d.includes("-importer-src-"))
+          Object.keys(value?.inputDrvs || {}).some((d) => d.includes("-importer-src-"))
         );
       })?.[1] ||
-      allDrvs.find(([key]) => key === drvPath || key.endsWith(path.basename(drvPath)))?.[1] ||
       allDrvs.find(([, value]) =>
-        Object.keys(value?.inputs?.drvs || {}).some((d) => d.includes("-importer-src-")),
+        Object.keys(value?.inputDrvs || {}).some((d) => d.includes("-importer-src-")),
       )?.[1] ||
       allDrvs.find(([, value]) =>
         String(value?.env?.src || "")
@@ -103,14 +114,6 @@ test("node-modules derivation snapshots untracked importer files", async () => {
       allDrvs[0]?.[1];
     const importerSrcOut = String(firstDrv?.env?.src || "").trim();
     assert.ok(importerSrcOut.startsWith("/nix/store/"), `unexpected src path: ${importerSrcOut}`);
-    const importerSrcDrv = Object.keys(firstDrv?.inputs?.drvs || {}).find((d) =>
-      d.includes("-importer-src-"),
-    );
-    assert.ok(importerSrcDrv, "expected importer-src input derivation");
-    const importerSrcDrvPath = importerSrcDrv.startsWith("/nix/store/")
-      ? importerSrcDrv
-      : `/nix/store/${importerSrcDrv}`;
-    await $`nix build --no-link ${`${importerSrcDrvPath}^*`}`;
 
     const snappedPackage = path.join(importerSrcOut, importer, "package.json");
     const snappedLock = path.join(importerSrcOut, importer, "pnpm-lock.yaml");

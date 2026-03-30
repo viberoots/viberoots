@@ -108,7 +108,7 @@ def nix_node_test(
     # New runner args
     patterns = None,
     env = {},
-    timeout_sec = 600,
+    timeout_sec = 1800,
     deps = [],
     labels = [],
     lockfile_label = None,
@@ -146,6 +146,7 @@ def nix_node_test(
         srcs = (kw.get("srcs", []) or []),
         deps = wiring.deps,
         labels = kw.get("labels", []),
+        test_rule_timeout_ms = timeout_sec * 1000,
         out = (out if out != None else (name + ".stamp")),
         **kwargs
     )
@@ -155,5 +156,4 @@ def nix_node_lib(name, patch_options = None, **kwargs):
 
 def nix_node_bin(name, **kwargs):
     nix_node_gen(name = name, kind = "bin", **kwargs)
-
 

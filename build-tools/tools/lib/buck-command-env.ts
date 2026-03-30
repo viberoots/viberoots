@@ -5,7 +5,8 @@ export function isBuckDaemonInitTransient(errText: string): boolean {
   return (
     msg.includes("Error initializing DaemonStateData") ||
     msg.includes("Error creating HTTP client") ||
-    msg.includes("Error loading system root certificates native frameworks")
+    msg.includes("Error loading system root certificates native frameworks") ||
+    msg.includes("No buckd.info timed out after")
   );
 }
 

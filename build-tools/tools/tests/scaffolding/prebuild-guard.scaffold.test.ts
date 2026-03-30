@@ -27,7 +27,7 @@ EOF
       mv .buckconfig.new .buckconfig
     `}`;
       // Rely on runInTemp's default .buckconfig (no_cgo) instead of writing our own
-      await $`scaf new go lib demo-lib --yes`;
+      await $`scaf new go lib demo-lib --yes --skip-lockfile-gen`;
       // Guard should auto-fix glue if stale and succeed
       await $`env PREBUILD_GUARD_SKEW_MS=5000 node build-tools/tools/buck/prebuild-guard.ts`;
       // Validate Buck can resolve the scaffolded target without a full build.

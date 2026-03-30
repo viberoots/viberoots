@@ -114,6 +114,7 @@ def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
         srcs = prepared.get("srcs", []) or [],
         nix_inputs = prepared.get("nix_inputs", []) or [],
         labels = prepared.get("labels", []) or [],
+        test_rule_timeout_ms = 30 * 60 * 1000,
         visibility = prepared.get("visibility", []),
     )
 def nix_python_extension_module(

@@ -44,12 +44,16 @@ async function main() {
 
   const specs = await specsFromWasmManifest(cwd, wasmManifestPath);
   for (const spec of specs) {
-    if (await exists(spec.syncOut)) continue;
+    const outputs = [spec.syncOut, ...(spec.extraSyncOuts || [])];
+    const existing = await Promise.all(outputs.map(async (abs) => await exists(abs)));
+    if (existing.every(Boolean)) continue;
     await runBuildStep(spec.buildCommand, cwd);
-    await fsp.mkdir(path.dirname(spec.syncOut), { recursive: true });
-    await fsp.copyFile(spec.buildOut, spec.syncOut);
+    for (const out of outputs) {
+      await fsp.mkdir(path.dirname(out), { recursive: true });
+      await fsp.copyFile(spec.buildOut, out);
+    }
     console.error(
-      `[wasm-assets] materialized module_key=${spec.moduleKey} out=${path.relative(cwd, spec.syncOut)}`,
+      `[wasm-assets] materialized module_key=${spec.moduleKey} out=${outputs.map((out) => path.relative(cwd, out)).join(",")}`,
     );
   }
 }
