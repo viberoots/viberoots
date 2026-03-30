@@ -49,7 +49,17 @@ async function ensureRealizedStorePath(storePath: string, $: any): Promise<void>
     await $`nix-store -r ${deriverPath}`;
     return;
   }
-  await $`nix-store -r ${storePath}`;
+}
+
+function derivationOutputPaths(
+  drv: { outputs?: Record<string, { path?: string }> } | undefined,
+): string[] {
+  return Object.values(drv?.outputs || {})
+    .map((output) => String(output?.path || "").trim())
+    .filter(Boolean)
+    .map((outputPath) =>
+      outputPath.startsWith("/nix/store/") ? outputPath : path.join("/nix/store", outputPath),
+    );
 }
 
 function findDerivationByKey<T extends object>(
@@ -207,10 +217,7 @@ test("node-modules derivation snapshots untracked importer files", async () => {
         | { derivations?: Record<string, { outputs?: { out?: { path?: string } } }> };
       const importerDerivations = selectDerivationMap(importerDrvParsed as any);
       const importerDrv = findDerivationByKey(importerDerivations, importerSrcDrvPath);
-      const importerSrcOutRaw = String(importerDrv?.outputs?.out?.path || "").trim();
-      importerSrcOut = importerSrcOutRaw.startsWith("/nix/store/")
-        ? importerSrcOutRaw
-        : path.join("/nix/store", importerSrcOutRaw);
+      importerSrcOut = derivationOutputPaths(importerDrv)[0] || "";
       await $`nix-store -r ${importerSrcDrvPath}`;
     } else if (importerSrcEnv) {
       importerSrcOut = importerSrcEnv.startsWith("/nix/store/")
@@ -231,11 +238,8 @@ test("node-modules derivation snapshots untracked importer files", async () => {
           | { derivations?: Record<string, { outputs?: { out?: { path?: string } } }> };
         const inputDerivations = selectDerivationMap(inputDrvParsed as any);
         const inputDrv = findDerivationByKey(inputDerivations, inputDrvPath);
-        const inputOutRaw = String(inputDrv?.outputs?.out?.path || "").trim();
-        const inputOut = inputOutRaw.startsWith("/nix/store/")
-          ? inputOutRaw
-          : path.join("/nix/store", inputOutRaw);
-        if (inputOut !== importerSrcOut) continue;
+        const inputOuts = derivationOutputPaths(inputDrv);
+        if (!inputOuts.includes(importerSrcOut)) continue;
         await $`nix-store -r ${inputDrvPath}`;
         break;
       }
