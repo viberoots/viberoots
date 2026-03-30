@@ -33,6 +33,25 @@ async function existingPath(candidates: string[]): Promise<string> {
   return "";
 }
 
+async function ensureRealizedStorePath(storePath: string, $: any): Promise<void> {
+  if (!storePath.startsWith("/nix/store/")) return;
+  try {
+    await fsp.access(storePath);
+    return;
+  } catch {}
+  const deriver = await $({
+    stdio: "pipe",
+    reject: false,
+    nothrow: true,
+  })`nix-store -q --deriver ${storePath}`;
+  const deriverPath = String(deriver.stdout || "").trim();
+  if (deriver.exitCode === 0 && deriverPath && deriverPath !== "unknown-deriver") {
+    await $`nix-store -r ${deriverPath}`;
+    return;
+  }
+  await $`nix-store -r ${storePath}`;
+}
+
 async function recursiveImporterFileCandidates(
   root: string,
   importer: string,
@@ -196,9 +215,7 @@ test("node-modules derivation snapshots untracked importer files", async () => {
         : path.join("/nix/store", importerSrcEnv);
     }
 
-    if (importerSrcOut) {
-      await $`nix-store -r ${importerSrcOut}`;
-    }
+    await ensureRealizedStorePath(importerSrcOut, $);
 
     assert.ok(
       importerSrcOut.startsWith("/nix/store/"),
