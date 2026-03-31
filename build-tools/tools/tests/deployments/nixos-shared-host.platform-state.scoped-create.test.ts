@@ -12,6 +12,6 @@ test("nixos-shared-host platform state scoped apply creates entries from an empt
     nixosSharedHostDeploymentFixture(),
   ]);
   assert.equal(next.deployments.length, 1);
-  assert.equal(next.deployments[0]?.deploymentId, "pleomino-dev");
-  assert.equal(next.deployments[0]?.providerTarget.hostname, "pleomino.apps.kilty.io");
+  assert.equal(next.deployments[0]?.deploymentId, "demoapp-dev");
+  assert.equal(next.deployments[0]?.providerTarget.hostname, "demoapp.apps.kilty.io");
 });

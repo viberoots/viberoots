@@ -18,13 +18,13 @@ test("nixos-shared-host rendering fails closed on duplicate backends", () => {
         appName: "other",
         targetGroup: "default",
         hostname: "other.apps.kilty.io",
-        containerName: "pleomino",
+        containerName: "demoapp",
         sharedDevTargetIdentity: "nixos-shared-host:default:other",
       },
     }),
   ]);
   assert.throws(
     () => renderNixosSharedHostConfig(state),
-    /duplicate backend identity "pleomino:3000"/,
+    /duplicate backend identity "demoapp:3000"/,
   );
 });

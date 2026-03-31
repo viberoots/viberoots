@@ -28,6 +28,8 @@ export async function runManagedCommand(opts: {
   timeoutMs?: number;
   killGraceMs?: number;
   activity?: ManagedCommandActivity;
+  onStdout?: (chunk: string) => void;
+  onStderr?: (chunk: string) => void;
 }): Promise<ManagedCommandResult> {
   const timeoutMs = Math.max(0, Number(opts.timeoutMs || 0));
   const killGraceMs = Math.max(1, Number(opts.killGraceMs || 10_000));
@@ -197,12 +199,14 @@ export async function runManagedCommand(opts: {
     activity.stdoutBytes += Buffer.byteLength(chunk, "utf8");
     activity.outputChunks += 1;
     updateSnippet(chunk);
+    opts.onStdout?.(chunk);
   });
   child.stderr?.on("data", (chunk: string) => {
     stderr += chunk;
     activity.stderrBytes += Buffer.byteLength(chunk, "utf8");
     activity.outputChunks += 1;
     updateSnippet(chunk);
+    opts.onStderr?.(chunk);
   });
 
   const result = await new Promise<ManagedCommandResult>((resolve) => {

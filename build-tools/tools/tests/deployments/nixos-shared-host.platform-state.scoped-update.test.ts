@@ -12,7 +12,7 @@ test("nixos-shared-host platform state scoped apply updates an existing deployme
   const next = applyNixosSharedHostScopedDeployments(current, [
     nixosSharedHostDeploymentFixture({
       runtime: {
-        appName: "pleomino",
+        appName: "demoapp",
         containerPort: 4173,
         healthPath: "/readyz",
       },

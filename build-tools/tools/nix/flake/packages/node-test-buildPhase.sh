@@ -39,6 +39,7 @@ if (out.length > 0) {
 ' "$PATTERNS_FILE" "$PATTERN_ARGS_FILE"
 
 FOUND=0
+MATCHED_TESTS_FILE="$TMPDIR/matched-tests.txt"
 if find . \
   -path "./node_modules" -prune -o \
   -path "./dist" -prune -o \
@@ -47,6 +48,13 @@ if find . \
   -type f \( -name "*.test.ts" -o -name "*.test.js" \) -print -quit | grep -q .; then
   FOUND=1
 fi
+find . \
+  -path "./node_modules" -prune -o \
+  -path "./dist" -prune -o \
+  -path "./build" -prune -o \
+  -path "./.vite" -prune -o \
+  -type f \( -name "*.test.ts" -o -name "*.test.js" \) -print \
+  | LC_ALL=C sort > "$MATCHED_TESTS_FILE"
 
 COVERAGE_ARGS=()
 if [ "${COVERAGE_ENV}" = "1" ]; then
@@ -129,6 +137,17 @@ for (const line of lines) {
   process.stdout.write(`${JSON.parse(line)}\n`);
 }
 ' "$PATTERN_ARGS_FILE")
+    MATCHED_TEST_COUNT="$(wc -l < "$MATCHED_TESTS_FILE" | tr -d '[:space:]')"
+    echo "[nix] importer=${IMPORTER_DIR} matched_test_files=${MATCHED_TEST_COUNT} timeout=${VITEST_TIMEOUT_SECS}s" >&2
+    if [ "${#PATTERN_ARGS[@]}" -gt 0 ]; then
+      echo "[nix] importer=${IMPORTER_DIR} pattern_args=${PATTERN_ARGS[*]}" >&2
+    else
+      echo "[nix] importer=${IMPORTER_DIR} pattern_args=<all-tests>" >&2
+    fi
+    if [ -s "$MATCHED_TESTS_FILE" ]; then
+      echo "[nix] importer=${IMPORTER_DIR} matched_tests_preview:" >&2
+      sed -n '1,20p' "$MATCHED_TESTS_FILE" >&2
+    fi
     if [ "$(basename "$VITEST_BIN")" = "vitest" ]; then
       timeout -k 15s ${VITEST_TIMEOUT_SECS}s "$VITEST_BIN" run \
         --pool forks \

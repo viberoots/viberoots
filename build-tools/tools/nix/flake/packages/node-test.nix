@@ -8,7 +8,31 @@ let
     importerDir:
       let
         importerAbs = repoRoot + ("/" + importerDir);
-        importerSnap = builtins.path { path = importerAbs; name = "importer"; };
+        importerIgnoredEntries = [
+          "node_modules"
+          "dist"
+          "build"
+          ".vite"
+          ".next"
+          ".turbo"
+          ".cache"
+          ".direnv"
+          ".pnpm-store"
+          ".pnpm-home"
+          "coverage"
+          "report"
+          "buck-out"
+        ];
+        importerSnap = builtins.path {
+          path = importerAbs;
+          name = "importer";
+          filter =
+            path: _type:
+            let
+              base = builtins.baseNameOf (toString path);
+            in
+            !(builtins.elem base importerIgnoredEntries);
+        };
 
         hasTestFiles =
           let

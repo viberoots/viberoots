@@ -15,29 +15,29 @@ function staticWebappComponent(label: string): GraphNode {
 }
 
 test("deriveNixosSharedHostProviderTarget normalizes hostname, container name, and shared identity", () => {
-  const target = deriveNixosSharedHostProviderTarget({ appName: "pleomino" });
+  const target = deriveNixosSharedHostProviderTarget({ appName: "demoapp" });
   assert.deepEqual(target, {
     host: "nixos-shared-host",
-    appName: "pleomino",
+    appName: "demoapp",
     targetGroup: "default",
-    hostname: "pleomino.apps.kilty.io",
-    containerName: "pleomino",
-    sharedDevTargetIdentity: "nixos-shared-host:default:pleomino",
+    hostname: "demoapp.apps.kilty.io",
+    containerName: "demoapp",
+    sharedDevTargetIdentity: "nixos-shared-host:default:demoapp",
   });
 });
 
 test("extractNixosSharedHostDeployments defaults protection_class to shared_nonprod", () => {
   const nodes: GraphNode[] = [
-    staticWebappComponent("//projects/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/demoapp:app"),
     {
-      name: "//projects/deployments/pleomino-dev:deploy",
+      name: "//projects/deployments/demoapp-dev:deploy",
       provider: "nixos-shared-host",
-      component: "//projects/apps/pleomino:app",
+      component: "//projects/apps/demoapp:app",
       component_kind: "static-webapp",
       publisher: "nixos-shared-host-static-webapp",
       provisioner: "nixos-shared-host-manifest",
       protection_class: "",
-      app_name: "pleomino",
+      app_name: "demoapp",
       container_port: 3000,
       health_path: "/healthz",
       target_group: "",
@@ -48,5 +48,5 @@ test("extractNixosSharedHostDeployments defaults protection_class to shared_nonp
   assert.deepEqual(errors, []);
   assert.equal(deployments.length, 1);
   assert.equal(deployments[0]?.protectionClass, "shared_nonprod");
-  assert.equal(deployments[0]?.providerTarget.hostname, "pleomino.apps.kilty.io");
+  assert.equal(deployments[0]?.providerTarget.hostname, "demoapp.apps.kilty.io");
 });

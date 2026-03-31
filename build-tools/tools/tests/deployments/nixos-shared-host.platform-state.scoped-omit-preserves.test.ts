@@ -19,11 +19,11 @@ test("nixos-shared-host platform state scoped apply does not delete out-of-scope
   ]);
   const next = applyNixosSharedHostScopedDeployments(current, [
     nixosSharedHostDeploymentFixture({
-      runtime: { appName: "pleomino", containerPort: 4173 },
+      runtime: { appName: "demoapp", containerPort: 4173 },
     }),
   ]);
   assert.deepEqual(
     next.deployments.map((deployment) => deployment.deploymentId),
-    ["other-dev", "pleomino-dev"],
+    ["demoapp-dev", "other-dev"],
   );
 });

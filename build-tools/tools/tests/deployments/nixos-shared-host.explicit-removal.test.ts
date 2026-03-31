@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers.ts";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });
-  await fsp.writeFile(path.join(root, "index.html"), "<html>pleomino</html>\n", "utf8");
+  await fsp.writeFile(path.join(root, "index.html"), "<html>demoapp</html>\n", "utf8");
 }
 
 test("nixos-shared-host deploy CLI records explicit removal and cleans up the realized target", async () => {
@@ -37,8 +37,8 @@ test("nixos-shared-host deploy CLI records explicit removal and cleans up the re
       assert.equal(record.operationKind, "deploy");
       assert.equal(record.runClassification, "explicit_removal");
       assert.equal(record.finalOutcome, "succeeded");
-      assert.equal(record.providerTargetIdentity, "nixos-shared-host:default:pleomino");
-      await assert.rejects(fsp.access(path.join(hostRoot, "containers", "pleomino")));
+      assert.equal(record.providerTargetIdentity, "nixos-shared-host:default:demoapp");
+      await assert.rejects(fsp.access(path.join(hostRoot, "containers", "demoapp")));
       const state = JSON.parse(await fsp.readFile(statePath, "utf8"));
       assert.deepEqual(state.deployments, []);
     } finally {

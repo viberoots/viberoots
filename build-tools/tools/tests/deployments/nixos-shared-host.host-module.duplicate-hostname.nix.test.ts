@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers.ts";
 import { createNixosSharedHostPlatformState } from "../../deployments/nixos-shared-host-platform.ts";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
 
@@ -24,7 +24,7 @@ test("nixos-shared-host Nix module fails closed on duplicate hostnames", async (
               host: "nixos-shared-host",
               appName: "other",
               targetGroup: "default",
-              hostname: "pleomino.apps.kilty.io",
+              hostname: "demoapp.apps.kilty.io",
               containerName: "other",
               sharedDevTargetIdentity: "nixos-shared-host:default:other",
             },

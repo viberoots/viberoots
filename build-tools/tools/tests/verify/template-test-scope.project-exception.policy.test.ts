@@ -19,7 +19,7 @@ test("project-local methodology exception changes stay on the project-impact ver
         targets: [],
         diagnostics: {
           mode: "no-template-impact",
-          changedPaths: ["projects/apps/pleomino/methodology-exceptions.json"],
+          changedPaths: ["workspace/apps/demoapp/methodology-exceptions.json"],
           changedTemplateIds: [],
           ownedChangedTestPaths: [],
           ownedChangedTestTargets: [],
@@ -31,13 +31,13 @@ test("project-local methodology exception changes stay on the project-impact ver
       }),
       resolveProjectImpactSelection: async () => ({
         mode: "project-impact",
-        targets: ["//projects/apps/pleomino/..."],
+        targets: ["//workspace/apps/demoapp/..."],
         diagnostics: {
           mode: "project-impact",
-          changedPaths: ["projects/apps/pleomino/methodology-exceptions.json"],
-          changedProjects: ["projects/apps/pleomino"],
+          changedPaths: ["workspace/apps/demoapp/methodology-exceptions.json"],
+          changedProjects: ["workspace/apps/demoapp"],
           dependentProjects: [],
-          selectedTargets: ["//projects/apps/pleomino/..."],
+          selectedTargets: ["//workspace/apps/demoapp/..."],
           reason: "project-impact-selection",
         },
       }),
@@ -45,6 +45,6 @@ test("project-local methodology exception changes stay on the project-impact ver
   });
 
   assert.equal(result.selectorMode, "project-impact");
-  assert.deepEqual(result.targets, ["//projects/apps/pleomino/..."]);
+  assert.deepEqual(result.targets, ["//workspace/apps/demoapp/..."]);
   assert.equal(result.reason, "project-impact-targeted");
 });

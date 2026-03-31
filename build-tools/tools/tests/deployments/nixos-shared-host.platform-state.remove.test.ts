@@ -17,7 +17,7 @@ test("nixos-shared-host platform state explicit removal deletes only the named d
       runtime: { appName: "other", containerPort: 4000 },
     }),
   ]);
-  const next = removeNixosSharedHostPlatformDeployment(current, "pleomino-dev");
+  const next = removeNixosSharedHostPlatformDeployment(current, "demoapp-dev");
   assert.deepEqual(
     next.deployments.map((deployment) => deployment.deploymentId),
     ["other-dev"],

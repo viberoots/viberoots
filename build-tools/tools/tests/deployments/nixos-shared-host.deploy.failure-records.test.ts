@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runNixosSharedHostStaticDeploy } from "../../deployments/nixos-shared-host-static-deploy.ts";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers.ts";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
@@ -19,7 +19,7 @@ async function writeArtifact(root: string, files: Record<string, string>): Promi
 test("nixos-shared-host deploy records smoke failure when the public health path fails", async () => {
   await runInTemp("nixos-shared-host-smoke-failure", async (tmp) => {
     const deployment = nixosSharedHostDeploymentFixture({
-      runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
+      runtime: { appName: "demoapp", containerPort: 3000, healthPath: "/healthz" },
     });
     const artifactDir = path.join(tmp, "artifact");
     const hostRoot = path.join(tmp, "host");

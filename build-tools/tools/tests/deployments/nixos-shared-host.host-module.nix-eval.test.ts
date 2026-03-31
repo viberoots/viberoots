@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers.ts";
 import { createNixosSharedHostPlatformState } from "../../deployments/nixos-shared-host-platform.ts";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
 
@@ -15,7 +15,7 @@ test("nixos-shared-host Nix module derives containers and nginx routes from auth
       JSON.stringify(
         createNixosSharedHostPlatformState([
           nixosSharedHostDeploymentFixture({
-            runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
+            runtime: { appName: "demoapp", containerPort: 3000, healthPath: "/healthz" },
           }),
         ]),
         null,
@@ -35,7 +35,7 @@ test("nixos-shared-host Nix module derives containers and nginx routes from auth
       in {
         containers = builtins.attrNames system.config.containers;
         routes = builtins.attrNames system.config.services.nginx.virtualHosts;
-        rendered = system.config.nixosSharedHost.rendered.pleomino;
+        rendered = system.config.nixosSharedHost.rendered.demoapp;
       }
     `;
     const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;
@@ -44,10 +44,10 @@ test("nixos-shared-host Nix module derives containers and nginx routes from auth
       routes: string[];
       rendered: Record<string, unknown>;
     };
-    assert.deepEqual(out.containers, ["pleomino"]);
-    assert.deepEqual(out.routes, ["pleomino.apps.kilty.io"]);
-    assert.equal(out.rendered.hostname, "pleomino.apps.kilty.io");
-    assert.equal(out.rendered.backendIdentity, "pleomino:3000");
+    assert.deepEqual(out.containers, ["demoapp"]);
+    assert.deepEqual(out.routes, ["demoapp.apps.kilty.io"]);
+    assert.equal(out.rendered.hostname, "demoapp.apps.kilty.io");
+    assert.equal(out.rendered.backendIdentity, "demoapp:3000");
     assert.equal(out.rendered.runtime, "static-app-host");
   });
 });

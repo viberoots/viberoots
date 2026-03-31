@@ -17,7 +17,7 @@ test("nixos-shared-host rendering fails closed on duplicate hostnames", () => {
         host: "nixos-shared-host",
         appName: "other",
         targetGroup: "default",
-        hostname: "pleomino.apps.kilty.io",
+        hostname: "demoapp.apps.kilty.io",
         containerName: "other",
         sharedDevTargetIdentity: "nixos-shared-host:default:other",
       },
@@ -25,6 +25,6 @@ test("nixos-shared-host rendering fails closed on duplicate hostnames", () => {
   ]);
   assert.throws(
     () => renderNixosSharedHostConfig(state),
-    /duplicate hostname "pleomino\.apps\.kilty\.io"/,
+    /duplicate hostname "demoapp\.apps\.kilty\.io"/,
   );
 });

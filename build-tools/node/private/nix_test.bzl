@@ -9,6 +9,7 @@ def _node_nix_test_impl(ctx):
 
     # Sanitize importer using canonical helper (mirrors flake-side sanitizeName)
     imp_attr = sanitize_name(imp)
+    target_label = "//%s:%s" % (ctx.label.package, ctx.label.name)
     tout = ctx.attrs.timeout_sec
 
     # Prepare environment exports (user env + optional patterns)
@@ -36,7 +37,7 @@ def _node_nix_test_impl(ctx):
         + ("export NIX_PNPM_FETCH_TIMEOUT=\"%d\"; " % (tout if tout > 0 else 1800))
         + ("export NIX_PNPM_INSTALL_TIMEOUT=\"%d\"; " % (tout if tout > 0 else 1800))
         + nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = (tout if tout > 0 else 600))
-        + ("echo '[node_nix_test] importer=%s (attr=%s)' >&2; " % (imp, imp_attr))
+        + ("echo '[node_nix_test] target=%s importer=%s (attr=%s)' >&2; " % (target_label, imp, imp_attr))
         + ("if ! (cd \"$WORKSPACE_ROOT/%s\" && (find . -type f -name \"*.test.ts\" -print -quit | grep -q . || find . -type f -name \"*.test.js\" -print -quit | grep -q .)); then echo '[node_nix_test] no tests matched; passing' >&2; exit 0; fi; " % imp)
         # If the main repo root already has a unified pnpm store, reuse it in temp workspaces
         + "if [ -n \"${REPO_ROOT:-}\" ] && [ -f \"$REPO_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
@@ -45,6 +46,7 @@ def _node_nix_test_impl(ctx):
         + "fi; "
         + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=0; "
         + nix_bootstrap_env_pnpm_store()
+        + ("echo '[node_nix_test] phase=prepare-exact-store target=%s importer=%s' >&2; " % (target_label, imp))
         + ("EXACT_PNPM_STORE=$(cd \"$FLK_ROOT\" && node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$FLK_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$FLK_ROOT/build-tools/tools/dev/prepare-exact-pnpm-store.ts\" --importer \"%s\"); " % imp)
         + "export NIX_PNPM_EXACT_STORE=\"$EXACT_PNPM_STORE\"; "
         + "echo '[node_nix_test] exact-store='$NIX_PNPM_EXACT_STORE >&2; "
@@ -52,7 +54,8 @@ def _node_nix_test_impl(ctx):
         + "NIX_MAXJ=\"${NIX_MAX_JOBS:-0}\"; NIX_CORES=\"${NIX_CORES:-0}\"; "
         + "JOBS_FLAG=\"\"; if [ -n \"$NIX_MAXJ\" ] && [ \"$NIX_MAXJ\" != \"0\" ]; then JOBS_FLAG=\"--max-jobs $NIX_MAXJ\"; fi; "
         + "CORES_FLAG=\"\"; if [ -n \"$NIX_CORES\" ] && [ \"$NIX_CORES\" != \"0\" ]; then CORES_FLAG=\"--option cores $NIX_CORES\"; fi; "
-        + "$TIMEOUT nix build \"path:$FLK_ROOT#node-test.%s\" --impure --accept-flake-config --show-trace --print-build-logs --builders \"\" $JOBS_FLAG $CORES_FLAG; " % imp_attr
+        + ("echo '[node_nix_test] phase=nix-build target=%s importer=%s attr=%s timeout='$TOUT's' >&2; " % (target_label, imp, imp_attr))
+        + ("node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$FLK_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$FLK_ROOT/build-tools/tools/dev/command-heartbeat.ts\" --prefix \"[node_nix_test]\" --label \"target=%s importer=%s step=nix-build attr=%s\" --cwd \"$FLK_ROOT\" --timeout-ms $(( TOUT * 1000 )) --no-output-warn-sec 60 -- nix build \"path:$FLK_ROOT#node-test.%s\" --impure --accept-flake-config --show-trace -L --print-build-logs --builders \"\" $JOBS_FLAG $CORES_FLAG; " % (target_label, imp, imp_attr, imp_attr))
     )
 
     # Declare a tiny deterministic output so builds have an artifact

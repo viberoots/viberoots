@@ -9,21 +9,21 @@ import {
 export function nixosSharedHostDeploymentFixture(
   overrides: Partial<NixosSharedHostDeployment> = {},
 ): NixosSharedHostDeployment {
-  const appName = overrides.runtime?.appName || "pleomino";
+  const appName = overrides.runtime?.appName || "demoapp";
   const targetGroup = overrides.runtime?.targetGroup || "default";
   const providerTarget = {
     ...deriveNixosSharedHostProviderTarget({ appName, targetGroup }),
     ...(overrides.providerTarget || {}),
   };
   return {
-    deploymentId: overrides.deploymentId || "pleomino-dev",
-    label: overrides.label || "//projects/deployments/pleomino-dev:deploy",
+    deploymentId: overrides.deploymentId || "demoapp-dev",
+    label: overrides.label || "//projects/deployments/demoapp-dev:deploy",
     name: overrides.name || "deploy",
     provider: NIXOS_SHARED_HOST_PROVIDER,
     protectionClass: overrides.protectionClass || "shared_nonprod",
     component: {
       kind: STATIC_WEBAPP_COMPONENT,
-      target: overrides.component?.target || "//projects/apps/pleomino:app",
+      target: overrides.component?.target || "//projects/apps/demoapp:app",
     },
     publisher: overrides.publisher || { type: "nixos-shared-host-static-webapp" },
     provisioner: overrides.provisioner || { type: "nixos-shared-host-manifest" },

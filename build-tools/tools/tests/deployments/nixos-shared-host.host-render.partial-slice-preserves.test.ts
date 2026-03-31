@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers.ts";
 import { createNixosSharedHostPlatformState } from "../../deployments/nixos-shared-host-platform.ts";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
 
@@ -49,10 +49,10 @@ test("nixos-shared-host apply preserves preexisting out-of-scope apps during par
       containers: Record<string, unknown>;
       nginxVirtualHosts: Record<string, unknown>;
     };
-    assert.deepEqual(Object.keys(rendered.containers).sort(), ["other", "pleomino"]);
+    assert.deepEqual(Object.keys(rendered.containers).sort(), ["demoapp", "other"]);
     assert.deepEqual(Object.keys(rendered.nginxVirtualHosts).sort(), [
+      "demoapp.apps.kilty.io",
       "other.apps.kilty.io",
-      "pleomino.apps.kilty.io",
     ]);
   });
 });

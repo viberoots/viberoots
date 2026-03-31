@@ -9,16 +9,16 @@ test("nixos-shared-host rendering derives static-app containers and nginx routes
   const rendered = renderNixosSharedHostConfig(
     createNixosSharedHostPlatformState([
       nixosSharedHostDeploymentFixture({
-        runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
+        runtime: { appName: "demoapp", containerPort: 3000, healthPath: "/healthz" },
       }),
     ]),
   );
-  assert.deepEqual(rendered.containers.pleomino, {
-    containerName: "pleomino",
+  assert.deepEqual(rendered.containers.demoapp, {
+    containerName: "demoapp",
     targetGroup: "default",
-    hostname: "pleomino.apps.kilty.io",
-    backendIdentity: "pleomino:3000",
-    backendAddress: "http://pleomino.nixos-shared-host.internal:3000",
+    hostname: "demoapp.apps.kilty.io",
+    backendIdentity: "demoapp:3000",
+    backendAddress: "http://demoapp.nixos-shared-host.internal:3000",
     runtime: "static-app-host",
     containerPort: 3000,
     publishRoot: "/srv/static-app/current",
@@ -26,10 +26,10 @@ test("nixos-shared-host rendering derives static-app containers and nginx routes
     activeReleaseLink: "/srv/static-app/live",
     healthPath: "/healthz",
   });
-  assert.deepEqual(rendered.nginxVirtualHosts["pleomino.apps.kilty.io"], {
-    hostname: "pleomino.apps.kilty.io",
-    backendIdentity: "pleomino:3000",
-    backendAddress: "http://pleomino.nixos-shared-host.internal:3000",
+  assert.deepEqual(rendered.nginxVirtualHosts["demoapp.apps.kilty.io"], {
+    hostname: "demoapp.apps.kilty.io",
+    backendIdentity: "demoapp:3000",
+    backendAddress: "http://demoapp.nixos-shared-host.internal:3000",
     targetGroup: "default",
     healthPath: "/healthz",
   });

@@ -6,7 +6,7 @@ import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts
 
 test("nixos-shared-host durable records persist canonical provider-target identity and artifact identity", () => {
   const deployment = nixosSharedHostDeploymentFixture({
-    runtime: { appName: "pleomino", containerPort: 3000, targetGroup: "shared-dev" },
+    runtime: { appName: "demoapp", containerPort: 3000, targetGroup: "shared-dev" },
   });
   const record = createNixosSharedHostDeployRecord(deployment, {
     deployRunId: "deploy-123",
@@ -14,7 +14,7 @@ test("nixos-shared-host durable records persist canonical provider-target identi
     finalOutcome: "succeeded",
     artifactIdentity: "static-webapp:abc123",
     artifactLineageId: "static-webapp:abc123",
-    publicUrl: "https://pleomino.apps.kilty.io/",
+    publicUrl: "https://demoapp.apps.kilty.io/",
   });
   assert.equal(record.schemaVersion, "deploy-record@2026-03-25");
   assert.equal(record.operationKind, "deploy");
@@ -22,7 +22,7 @@ test("nixos-shared-host durable records persist canonical provider-target identi
   assert.equal(record.lifecycleState, "finished");
   assert.equal(record.terminationReason, null);
   assert.equal(record.provider, "nixos-shared-host");
-  assert.equal(record.providerTargetIdentity, "nixos-shared-host:shared-dev:pleomino");
+  assert.equal(record.providerTargetIdentity, "nixos-shared-host:shared-dev:demoapp");
   assert.deepEqual(record.providerTarget, record.effectiveRunTarget);
   assert.equal(record.artifact?.identity, "static-webapp:abc123");
   assert.equal(record.artifactLineageId, "static-webapp:abc123");
