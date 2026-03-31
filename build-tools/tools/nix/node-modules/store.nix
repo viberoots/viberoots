@@ -44,9 +44,9 @@ in {
       exactPrefetchedInput =
         if exactPrefetchedPath == null || exactPrefetchedPath == ""
         then null
-        else if lib.hasPrefix "/" exactPrefetchedPath
-        then exactPrefetchedPath
-        else throw "NIX_PNPM_EXACT_STORE must be an absolute path";
+        else if lib.hasPrefix builtins.storeDir exactPrefetchedPath
+        then builtins.storePath exactPrefetchedPath
+        else throw "NIX_PNPM_EXACT_STORE must be a /nix/store path";
       # Do not use prefetched stores for pnpm-store FODs. They can include extra packages
       # beyond the lockfile, which makes the fixed-output hash unstable.
       preferPrefetch = false;
@@ -235,9 +235,9 @@ in {
       exactPrefetchedInput =
         if exactPrefetchedPath == null || exactPrefetchedPath == ""
         then null
-        else if lib.hasPrefix "/" exactPrefetchedPath
-        then exactPrefetchedPath
-        else throw "NIX_PNPM_EXACT_STORE must be an absolute path";
+        else if lib.hasPrefix builtins.storeDir exactPrefetchedPath
+        then builtins.storePath exactPrefetchedPath
+        else throw "NIX_PNPM_EXACT_STORE must be a /nix/store path";
     in pkgs.stdenvNoCC.mkDerivation {
       pname = "pnpm-store-unfixed";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";

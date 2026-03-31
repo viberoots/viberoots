@@ -1,5 +1,5 @@
 import { withHeartbeat } from "./heartbeat.ts";
-import { makeFilteredFlakeRef } from "./lockfile.ts";
+import { makeFilteredFlakeRef } from "./filtered-flake.ts";
 
 export async function withPnpmStoreBuildFlakeRef<T>(
   opts: { repoRoot: string; importer: string; baseFlakeRef: string },
@@ -11,7 +11,7 @@ export async function withPnpmStoreBuildFlakeRef<T>(
 
   const filtered = await withHeartbeat(
     `importer=${opts.importer} step=prepare-filtered-flake`,
-    makeFilteredFlakeRef(opts.repoRoot),
+    makeFilteredFlakeRef({ repoRoot: opts.repoRoot, attr: "pnpm" }),
   );
   try {
     if (!filtered.flakeRef.endsWith("#pnpm")) {

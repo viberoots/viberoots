@@ -26,8 +26,11 @@ function envWithFetchTimeout(timeoutSec: number, extraEnv?: NodeJS.ProcessEnv): 
 
 function exactStoreSandboxArgs(extraEnv?: NodeJS.ProcessEnv): string[] {
   const exactStorePath = String(extraEnv?.NIX_PNPM_EXACT_STORE || "").trim();
-  if (!exactStorePath || exactStorePath.startsWith("/nix/store/")) return [];
-  return ["--option", "extra-sandbox-paths", exactStorePath];
+  if (!exactStorePath) return [];
+  if (!exactStorePath.startsWith("/nix/store/")) {
+    throw new Error("NIX_PNPM_EXACT_STORE must be a /nix/store path");
+  }
+  return [];
 }
 
 function nixBuildArgs(opts: {

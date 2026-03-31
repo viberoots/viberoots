@@ -39,16 +39,18 @@ export function spawnVerifyBuck2Tests(opts: {
   targets: string[];
   zxNodeModulesOut: string;
 }): SpawnedVerifyTests {
+  const minPerTestTimeoutSecs = 20 * 60;
   const tsecRaw = Number((process.env.VERIFY_TIMEOUT_SECS || "7200").trim());
   const tsec = Number.isFinite(tsecRaw) && tsecRaw > 0 ? Math.floor(tsecRaw) : 7200;
   const tms = tsec * 1000;
-  const testNixTimeoutRaw = Number((process.env.TEST_NIX_TIMEOUT_SECS || "1800").trim());
-  const testNixTimeoutSecs =
+  const testNixTimeoutRaw = Number((process.env.TEST_NIX_TIMEOUT_SECS || "").trim());
+  const requestedTestNixTimeoutSecs =
     Number.isFinite(testNixTimeoutRaw) && testNixTimeoutRaw > 0
       ? Math.floor(testNixTimeoutRaw)
       : 1800;
+  const testNixTimeoutSecs = Math.max(minPerTestTimeoutSecs, requestedTestNixTimeoutSecs);
   // Node's per-test timeout should never be tighter than the Nix timeout budget.
-  const nodeTestTimeoutMs = Math.max(tms, testNixTimeoutSecs * 1000);
+  const nodeTestTimeoutMs = Math.max(minPerTestTimeoutSecs * 1000, tms, testNixTimeoutSecs * 1000);
 
   const consoleFlag =
     opts.console === "auto"
@@ -69,6 +71,10 @@ export function spawnVerifyBuck2Tests(opts: {
     `TEST_NODE_OPTIONS=--test-timeout=${nodeTestTimeoutMs}`,
     "--env",
     `TEST_NIX_TIMEOUT_SECS=${testNixTimeoutSecs}`,
+    "--env",
+    `NIX_PNPM_FETCH_TIMEOUT=${testNixTimeoutSecs}`,
+    "--env",
+    `NIX_PNPM_INSTALL_TIMEOUT=${testNixTimeoutSecs}`,
     "--env",
     `BNX_BUCK_REAPER_STATE_FILE=${process.env.BNX_BUCK_REAPER_STATE_FILE || ""}`,
     "--env",
