@@ -38,6 +38,13 @@ in {
       lockInput = if hasLockFs then (builtins.path { path = lockAbsStrFs; name = "pnpm-lock.yaml"; }) else (if hasLockStore then (builtins.path { path = lockAbsStrStore; name = "pnpm-lock.yaml"; }) else null);
       # Prefer an explicit mkPnpmStore argument; fall back to the global arg/env.
       chosenPrefetchedPath = if prefetchedStorePath == null || prefetchedStorePath == "" then prefetchedStorePathGlobal else prefetchedStorePath;
+      exactPrefetchedPath =
+        let s = builtins.getEnv "NIX_PNPM_EXACT_STORE"; in
+        if s != "" then s else null;
+      exactPrefetchedInput =
+        if exactPrefetchedPath == null || exactPrefetchedPath == ""
+        then null
+        else builtins.path { path = exactPrefetchedPath; name = "pnpm-exact-store"; };
       # Do not use prefetched stores for pnpm-store FODs. They can include extra packages
       # beyond the lockfile, which makes the fixed-output hash unstable.
       preferPrefetch = false;
@@ -128,9 +135,27 @@ in {
         printf '%s\n' "packages:" > pnpm-workspace.yaml
         printf '%s\n' "  - ./" >> pnpm-workspace.yaml
         printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
-        echo "[nix] pnpm install (timeout) --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir . (IT=${installTimeoutVal}s, FT=${ftVal}s)"
         IT="${installTimeoutVal}"
-        timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+        EXACT_STORE_INPUT="${if exactPrefetchedInput != null then "${exactPrefetchedInput}" else "/nonexistent"}"
+        if [ -d "$EXACT_STORE_INPUT" ]; then
+          echo "[nix] mkPnpmStore: validating exact prefetched store from $EXACT_STORE_INPUT" >&2
+          LOCAL_STORE="$(pwd)/.pnpm-exact-store"
+          rm -rf "$LOCAL_STORE"
+          mkdir -p "$LOCAL_STORE" "$out/store"
+          cp -R "$EXACT_STORE_INPUT/." "$LOCAL_STORE/"
+          chmod -R u+rwX "$LOCAL_STORE"
+          pnpm config set store-dir "$LOCAL_STORE"
+          pnpm config set package-import-method copy
+          echo "[nix] pnpm install (offline exact-store) --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir . (IT=${installTimeoutVal}s, FT=${ftVal}s)"
+          timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          cp -R "$LOCAL_STORE/." "$out/store/"
+          chmod -R u+rwX "$out/store" || true
+          echo "[nix] mkPnpmStore: exact prefetched store validated"
+        else
+          pnpm config set store-dir "$out/store"
+          echo "[nix] pnpm install (timeout) --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir . (IT=${installTimeoutVal}s, FT=${ftVal}s)"
+          timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+        fi
         echo "[nix] mkPnpmStore: install complete"
         # Normalize store timestamps and scrub volatile JSON fields to stabilize FOD output
         if [ -d "$out/store" ]; then
@@ -198,6 +223,13 @@ in {
       lockInput = if hasLockFs then (builtins.path { path = lockAbsStrFs; name = "pnpm-lock.yaml"; }) else (if hasLockStore then (builtins.path { path = lockAbsStrStore; name = "pnpm-lock.yaml"; }) else null);
       chosenPrefetchedPath = if prefetchedStorePath == null || prefetchedStorePath == "" then prefetchedStorePathGlobal else prefetchedStorePath;
       prefetchedInput = if chosenPrefetchedPath == null || chosenPrefetchedPath == "" then null else chosenPrefetchedPath;
+      exactPrefetchedPath =
+        let s = builtins.getEnv "NIX_PNPM_EXACT_STORE"; in
+        if s != "" then s else null;
+      exactPrefetchedInput =
+        if exactPrefetchedPath == null || exactPrefetchedPath == ""
+        then null
+        else builtins.path { path = exactPrefetchedPath; name = "pnpm-exact-store"; };
     in pkgs.stdenvNoCC.mkDerivation {
       pname = "pnpm-store-unfixed";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
@@ -264,9 +296,26 @@ in {
         printf '%s\n' "packages:" > pnpm-workspace.yaml
         printf '%s\n' "  - ./" >> pnpm-workspace.yaml
         printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
-        echo "[nix] mkPnpmStoreUnfixed: pnpm install --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir ."
         IT="''${NIX_PNPM_INSTALL_TIMEOUT:-1800}"
-        timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+        EXACT_STORE_INPUT="${if exactPrefetchedInput != null then "${exactPrefetchedInput}" else "/nonexistent"}"
+        if [ -d "$EXACT_STORE_INPUT" ]; then
+          echo "[nix] mkPnpmStoreUnfixed: validating exact prefetched store from $EXACT_STORE_INPUT" >&2
+          LOCAL_STORE="$(pwd)/.pnpm-exact-store"
+          rm -rf "$LOCAL_STORE"
+          mkdir -p "$LOCAL_STORE" "$out/store"
+          cp -R "$EXACT_STORE_INPUT/." "$LOCAL_STORE/"
+          chmod -R u+rwX "$LOCAL_STORE"
+          pnpm config set store-dir "$LOCAL_STORE"
+          pnpm config set package-import-method copy
+          echo "[nix] mkPnpmStoreUnfixed: pnpm install (offline exact-store) --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir ."
+          timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          cp -R "$LOCAL_STORE/." "$out/store/"
+          chmod -R u+rwX "$out/store" || true
+          echo "[nix] mkPnpmStoreUnfixed: exact prefetched store validated"
+        else
+          echo "[nix] mkPnpmStoreUnfixed: pnpm install --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir ."
+          timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+        fi
         echo "[nix] mkPnpmStoreUnfixed: install complete"
         # Normalize store timestamps and scrub volatile JSON fields to stabilize output hashing
         if [ -d "$out/store" ]; then

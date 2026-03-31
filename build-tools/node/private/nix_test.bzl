@@ -42,6 +42,9 @@ def _node_nix_test_impl(ctx):
         + "fi; "
         + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=0; "
         + nix_bootstrap_env_pnpm_store()
+        + ("EXACT_PNPM_STORE=$(cd \"$FLK_ROOT\" && node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$FLK_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$FLK_ROOT/build-tools/tools/dev/prepare-exact-pnpm-store.ts\" --importer \"%s\"); " % imp)
+        + "export NIX_PNPM_EXACT_STORE=\"$EXACT_PNPM_STORE\"; "
+        + "echo '[node_nix_test] exact-store='$NIX_PNPM_EXACT_STORE >&2; "
         + "NIX_MAXJ=\"${NIX_MAX_JOBS:-0}\"; NIX_CORES=\"${NIX_CORES:-0}\"; "
         + "JOBS_FLAG=\"\"; if [ -n \"$NIX_MAXJ\" ] && [ \"$NIX_MAXJ\" != \"0\" ]; then JOBS_FLAG=\"--max-jobs $NIX_MAXJ\"; fi; "
         + "CORES_FLAG=\"\"; if [ -n \"$NIX_CORES\" ] && [ \"$NIX_CORES\" != \"0\" ]; then CORES_FLAG=\"--option cores $NIX_CORES\"; fi; "

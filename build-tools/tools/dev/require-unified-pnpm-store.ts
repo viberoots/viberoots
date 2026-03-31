@@ -6,6 +6,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { findImporterLockfiles, computeImporterLabel } from "../lib/importers.ts";
 import { unifiedPnpmStoreEpochDigest } from "./unified-pnpm-store-epoch.ts";
+import { withExactPrefetchedStore } from "./update-pnpm-hash/lockfile.ts";
 import { mergePnpmStore } from "./update-pnpm-hash/prefetched-store.ts";
 
 function sha256Hex(s: string) {
@@ -191,14 +192,19 @@ async function main() {
     // stay on that offline path instead of retrying networked unfixed builds.
     for (const imp of uniq) {
       const attr = imp === "." ? "pnpm-store.default" : `pnpm-store.${sanitizeImporter(imp)}`;
-      // Build quietly, print logs only on failure
-      const built = await $({
-        stdio: "pipe",
-        env: {
-          ...process.env,
-          LOCAL_PNPM_STORE: unifyStore,
-        },
-      })`nix build --impure --accept-flake-config --no-link --print-out-paths path:${repo}#${attr}`.nothrow();
+      // Build quietly, print logs only on failure.
+      const built = await withExactPrefetchedStore(
+        { repoRoot: repo, importer: imp },
+        async (extraEnv) =>
+          await $({
+            stdio: "pipe",
+            env: {
+              ...extraEnv,
+              LOCAL_PNPM_STORE: unifyStore,
+            },
+          })`nix build --impure --accept-flake-config --no-link --print-out-paths path:${repo}#${attr}`.nothrow(),
+      ).catch(() => null);
+      if (!built) continue;
       if (built.exitCode !== 0) {
         // Ignore importers that fail to build unfixed store (e.g., missing lock); proceed
         continue;

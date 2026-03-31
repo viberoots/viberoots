@@ -14,11 +14,13 @@ function resolvedFetchTimeoutSec(): number {
   return Number.parseInt(String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600").trim(), 10) || 600;
 }
 
-function envWithFetchTimeout(timeoutSec: number): NodeJS.ProcessEnv {
+function envWithFetchTimeout(timeoutSec: number, extraEnv?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return {
     ...process.env,
     // Keep nix-evaluated derivation timeout aligned with managed-process timeout.
     NIX_PNPM_FETCH_TIMEOUT: String(timeoutSec),
+    NIX_PNPM_INSTALL_TIMEOUT: String(timeoutSec),
+    ...(extraEnv || {}),
   };
 }
 
@@ -54,6 +56,7 @@ export async function buildStore(
   attrPath: string,
   flakeRef: string,
   activity?: ManagedCommandActivity,
+  extraEnv?: NodeJS.ProcessEnv,
 ): Promise<{ ok: boolean; output: string; outPath?: string }> {
   const gcCfg = gcWaitConfig();
   const gcPids = await waitForNoActiveNixGc({
@@ -73,7 +76,7 @@ export async function buildStore(
     command: "nix",
     args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores }),
     cwd: process.cwd(),
-    env: envWithFetchTimeout(timeoutSec),
+    env: envWithFetchTimeout(timeoutSec, extraEnv),
     timeoutMs: timeoutSec * 1000,
     activity,
   });
@@ -99,6 +102,7 @@ export async function buildUnfixedAndHash(
   attrPath: string,
   flakeRef: string,
   activity?: ManagedCommandActivity,
+  extraEnv?: NodeJS.ProcessEnv,
 ): Promise<{ ok: boolean; sri?: string; output?: string }> {
   const gcCfg = gcWaitConfig();
   const gcPids = await waitForNoActiveNixGc({
@@ -118,7 +122,7 @@ export async function buildUnfixedAndHash(
     command: "nix",
     args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores }),
     cwd: process.cwd(),
-    env: envWithFetchTimeout(timeoutSec),
+    env: envWithFetchTimeout(timeoutSec, extraEnv),
     timeoutMs: timeoutSec * 1000,
     activity,
   });

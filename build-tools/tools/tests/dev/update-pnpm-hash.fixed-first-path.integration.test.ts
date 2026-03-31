@@ -11,14 +11,12 @@ test("update-pnpm-hash uses importer-aware fast path and fixed-first root path",
   if (!mainTxt.includes("handleNonDefaultImporter")) {
     throw new Error("update-pnpm-hash.ts must route non-default importers through dedicated flow");
   }
-  if (
-    !nondefaultTxt.includes(
-      "const fixedFlakeRef = flakeRefForImporter(opts.repoRoot, opts.importer);",
-    )
-  ) {
-    throw new Error("nondefault.ts must compute importer flake refs for fixed-first verification");
+  if (!mainTxt.includes("withExactPrefetchedStore({ repoRoot, importer }")) {
+    throw new Error(
+      "update-pnpm-hash.ts must prepare an exact pnpm store for fixed-first verification",
+    );
   }
-  if (!nondefaultTxt.includes("buildStore(opts.storeAttr, fixedFlakeRef")) {
+  if (!nondefaultTxt.includes("opts.runFixedBuild(")) {
     throw new Error("nondefault.ts must verify the fixed store before falling back to unfixed");
   }
   if (!nondefaultTxt.includes('suggestedHash = extractHash(String(verify.output || ""))')) {
@@ -33,6 +31,11 @@ test("update-pnpm-hash uses importer-aware fast path and fixed-first root path",
 
   if (!mainTxt.includes("buildStore(storeAttr, flakeRef")) {
     throw new Error("update-pnpm-hash.ts must verify fixed store first for root importer");
+  }
+  if (!mainTxt.includes("buildUnfixedAndHash(unfixedAttr, flakeRef, activity, extraEnv)")) {
+    throw new Error(
+      "update-pnpm-hash.ts must pass the exact-store env into unfixed fallback builds",
+    );
   }
   if (!mainTxt.includes("if (verify.ok) {")) {
     throw new Error(

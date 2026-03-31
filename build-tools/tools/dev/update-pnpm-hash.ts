@@ -12,6 +12,7 @@ import {
 import {
   ensureImporterLockfileFreshIfAllowed,
   generateImporterLockfile,
+  withExactPrefetchedStore,
 } from "./update-pnpm-hash/lockfile.ts";
 import { handleNonDefaultImporter } from "./update-pnpm-hash/nondefault.ts";
 import { buildStore, buildUnfixedAndHash, extractHash } from "./update-pnpm-hash/nix.ts";
@@ -59,6 +60,24 @@ async function inner() {
   const existingLockHash = await sha256File(lockAbs);
   const existingMarker = await readVerifiedMarker(markerPath);
 
+  const runFixedBuild = async (phaseLabel: string) =>
+    await withExactPrefetchedStore({ repoRoot, importer }, async (extraEnv) => {
+      const activity = newManagedCommandActivity();
+      return await withHeartbeat(phaseLabel, buildStore(storeAttr, flakeRef, activity, extraEnv), {
+        activity,
+      });
+    });
+
+  const runUnfixedBuild = async (phaseLabel: string) =>
+    await withExactPrefetchedStore({ repoRoot, importer }, async (extraEnv) => {
+      const activity = newManagedCommandActivity();
+      return await withHeartbeat(
+        phaseLabel,
+        buildUnfixedAndHash(unfixedAttr, flakeRef, activity, extraEnv),
+        { activity },
+      );
+    });
+
   if (
     await handleNonDefaultImporter({
       importer,
@@ -73,6 +92,8 @@ async function inner() {
       existingHash,
       existingLockHash,
       existingMarker,
+      runFixedBuild,
+      runUnfixedBuild,
     })
   ) {
     return;
@@ -128,12 +149,7 @@ async function inner() {
   console.log(
     `[update-pnpm-hash] importer=${importer} step=fixed-build attr=${storeAttr} timeout=${timeoutSec}s`,
   );
-  const fixedActivity = newManagedCommandActivity();
-  let verify = await withHeartbeat(
-    `importer=${importer} step=fixed-build attr=${storeAttr}`,
-    buildStore(storeAttr, flakeRef, fixedActivity),
-    { activity: fixedActivity },
-  );
+  let verify = await runFixedBuild(`importer=${importer} step=fixed-build attr=${storeAttr}`);
   if (verify.ok) {
     if (!nonDefaultImporter && hasValidExistingHash) {
       const lockHash = existingLockHash;
@@ -164,22 +180,14 @@ async function inner() {
     console.log(
       `[update-pnpm-hash] importer=${importer} step=unfixed-build attr=${unfixedAttr} timeout=${timeoutSec}s`,
     );
-    const unfixedActivity = newManagedCommandActivity();
-    let pre = await withHeartbeat(
-      `importer=${importer} step=unfixed-build attr=${unfixedAttr}`,
-      buildUnfixedAndHash(unfixedAttr, flakeRef, unfixedActivity),
-      { activity: unfixedActivity },
-    );
+    let pre = await runUnfixedBuild(`importer=${importer} step=unfixed-build attr=${unfixedAttr}`);
     if (!pre.ok) {
       await generateImporterLockfile({ repoRoot, importer });
       console.log(
         `[update-pnpm-hash] importer=${importer} step=unfixed-build-retry attr=${unfixedAttr} timeout=${timeoutSec}s`,
       );
-      const retryActivity = newManagedCommandActivity();
-      pre = await withHeartbeat(
+      pre = await runUnfixedBuild(
         `importer=${importer} step=unfixed-build-retry attr=${unfixedAttr}`,
-        buildUnfixedAndHash(unfixedAttr, flakeRef, retryActivity),
-        { activity: retryActivity },
       );
     }
     if (pre.ok && pre.sri) {
@@ -198,11 +206,8 @@ async function inner() {
   console.log(
     `[update-pnpm-hash] importer=${importer} step=fixed-build-after-hash attr=${storeAttr} timeout=${timeoutSec}s`,
   );
-  const fixedAfterActivity = newManagedCommandActivity();
-  verify = await withHeartbeat(
+  verify = await runFixedBuild(
     `importer=${importer} step=fixed-build-after-hash attr=${storeAttr}`,
-    buildStore(storeAttr, flakeRef, fixedAfterActivity),
-    { activity: fixedAfterActivity },
   );
   if (!verify.ok) {
     console.error("pnpm-store still failing after hash update\n\n" + verify.output);
