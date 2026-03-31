@@ -6,10 +6,7 @@ import { newManagedCommandActivity } from "./update-pnpm-hash/activity.ts";
 import { withHeartbeat } from "./update-pnpm-hash/heartbeat.ts";
 import { parseUpdatePnpmHashArgs } from "./update-pnpm-hash/args.ts";
 import { withPnpmStoreBuildFlakeRef } from "./update-pnpm-hash/build-flake.ts";
-import {
-  readNodeModulesHashForLockfile,
-  updateNodeModulesHashesJson,
-} from "./update-pnpm-hash/hashes-json.ts";
+import * as hashesJson from "./update-pnpm-hash/hashes-json.ts";
 import {
   ensureImporterLockfileFreshIfAllowed,
   generateImporterLockfile,
@@ -25,14 +22,7 @@ import {
   pnpmStoreUnfixedAttrFromImporter,
   repoRelativeLockfilePath,
 } from "./update-pnpm-hash/paths.ts";
-import {
-  currentVerifiedMarkerFingerprint,
-  persistVerifiedHash,
-  readVerifiedMarker,
-  restoreHashFromSharedCache,
-  sha256File,
-  verifiedMarkerPath,
-} from "./update-pnpm-hash/verified-marker.ts";
+import * as verifiedMarker from "./update-pnpm-hash/verified-marker.ts";
 
 async function inner() {
   const { lockfile, force } = parseUpdatePnpmHashArgs();
@@ -45,16 +35,16 @@ async function inner() {
   const nonDefaultImporter = normalizeImporter(importer) !== ".";
   const timeoutSec = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600").trim();
   const lockAbs = path.join(repoRoot, relLock);
-  const markerPath = verifiedMarkerPath(repoRoot, importer);
-  const builderFingerprint = await currentVerifiedMarkerFingerprint(repoRoot);
+  const markerPath = verifiedMarker.verifiedMarkerPath(repoRoot, importer);
+  const builderFingerprint = await verifiedMarker.currentVerifiedMarkerFingerprint(repoRoot);
   const key = relLock;
   const placeholderHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-  if (force) await updateNodeModulesHashesJson(key, placeholderHash);
-  const existingHash = await readNodeModulesHashForLockfile(key);
+  if (force) await hashesJson.updateNodeModulesHashesJson(key, placeholderHash);
+  const existingHash = await hashesJson.readNodeModulesHashForLockfile(key);
   const hasValidExistingHash = !force && !!existingHash && existingHash !== placeholderHash;
   await ensureImporterLockfileFreshIfAllowed({ repoRoot, importer });
-  const existingLockHash = await sha256File(lockAbs);
-  const existingMarker = await readVerifiedMarker(markerPath);
+  const existingLockHash = await verifiedMarker.sha256File(lockAbs);
+  const existingMarker = await verifiedMarker.readVerifiedMarker(markerPath);
   const runFixedBuild = async (phaseLabel: string) =>
     await withPnpmStoreBuildFlakeRef(
       { repoRoot, importer, baseFlakeRef: flakeRef },
@@ -115,7 +105,7 @@ async function inner() {
       marker.hashValue === existingHash &&
       marker.builderFingerprint === builderFingerprint
     ) {
-      await persistVerifiedHash({
+      await verifiedMarker.persistVerifiedHash({
         repoRoot,
         markerPath,
         marker: {
@@ -135,7 +125,7 @@ async function inner() {
   if (
     !nonDefaultImporter &&
     existingLockHash &&
-    (await restoreHashFromSharedCache({
+    (await verifiedMarker.restoreHashFromSharedCache({
       repoRoot,
       key,
       markerPath,
@@ -158,7 +148,7 @@ async function inner() {
     if (!nonDefaultImporter && hasValidExistingHash) {
       const lockHash = existingLockHash;
       if (lockHash) {
-        await persistVerifiedHash({
+        await verifiedMarker.persistVerifiedHash({
           repoRoot,
           markerPath,
           marker: {
@@ -203,7 +193,7 @@ async function inner() {
     );
   }
   const nextHash: string = suggested;
-  await updateNodeModulesHashesJson(key, nextHash);
+  await hashesJson.updateNodeModulesHashesJson(key, nextHash);
   console.log(
     `[update-pnpm-hash] importer=${importer} step=fixed-build-after-hash attr=${storeAttr} timeout=${timeoutSec}s`,
   );
@@ -217,7 +207,7 @@ async function inner() {
   if (!nonDefaultImporter) {
     const lockHash = existingLockHash;
     if (lockHash) {
-      await persistVerifiedHash({
+      await verifiedMarker.persistVerifiedHash({
         repoRoot,
         markerPath,
         marker: {
