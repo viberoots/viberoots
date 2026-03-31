@@ -95,7 +95,6 @@ export async function prepareExactPnpmStore(opts: {
   if (!fs.existsSync(lockfileAbs)) {
     throw new Error(`exact pnpm store prefetch requires a committed lockfile: ${lockfileAbs}`);
   }
-
   const fetchTimeout = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "").trim() || "600";
   const timeoutMs = (Number.parseInt(fetchTimeout, 10) || 600) * 1000 + 120_000;
   const lockHash = await sha256HexFile(lockfileAbs);
@@ -141,7 +140,6 @@ export async function prepareExactPnpmStore(opts: {
       return null;
     }
   };
-
   async function importExactStoreIntoNixStore(): Promise<string> {
     const safeName =
       opts.importer.replace(/[\\/]+/g, "-").replace(/[^A-Za-z0-9._-]/g, "-") || "root";
@@ -234,7 +232,6 @@ export async function prepareExactPnpmStore(opts: {
   }
   return { storeDir, nixStorePath: preparedMarker.nixStorePath, cleanup: async () => {} };
 }
-
 export async function withExactPrefetchedStore<T>(
   opts: { repoRoot: string; importer: string },
   fn: (env: NodeJS.ProcessEnv) => Promise<T>,

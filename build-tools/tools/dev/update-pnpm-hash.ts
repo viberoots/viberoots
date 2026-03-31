@@ -5,6 +5,7 @@ import { withExclusiveInstallLock } from "./install/lock.ts";
 import { newManagedCommandActivity } from "./update-pnpm-hash/activity.ts";
 import { withHeartbeat } from "./update-pnpm-hash/heartbeat.ts";
 import { parseUpdatePnpmHashArgs } from "./update-pnpm-hash/args.ts";
+import { withPnpmStoreBuildFlakeRef } from "./update-pnpm-hash/build-flake.ts";
 import {
   readNodeModulesHashForLockfile,
   updateNodeModulesHashesJson,
@@ -46,34 +47,39 @@ async function inner() {
   const markerPath = verifiedMarkerPath(repoRoot, importer);
   const builderFingerprint = await currentVerifiedMarkerFingerprint(repoRoot);
   const key = relLock;
-  if (force) {
-    await updateNodeModulesHashesJson(key, "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
-  }
+  const placeholderHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+  if (force) await updateNodeModulesHashesJson(key, placeholderHash);
   const existingHash = await readNodeModulesHashForLockfile(key);
-  const hasValidExistingHash =
-    !force &&
-    !!existingHash &&
-    existingHash !== "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+  const hasValidExistingHash = !force && !!existingHash && existingHash !== placeholderHash;
   await ensureImporterLockfileFreshIfAllowed({ repoRoot, importer });
   const existingLockHash = await sha256File(lockAbs);
   const existingMarker = await readVerifiedMarker(markerPath);
   const runFixedBuild = async (phaseLabel: string) =>
-    await withExactPrefetchedStore({ repoRoot, importer }, async (extraEnv) => {
-      const activity = newManagedCommandActivity();
-      return await withHeartbeat(phaseLabel, buildStore(storeAttr, flakeRef, activity, extraEnv), {
-        activity,
-      });
-    });
+    await withPnpmStoreBuildFlakeRef(
+      { repoRoot, importer, baseFlakeRef: flakeRef },
+      async (buildFlakeRef) =>
+        await withExactPrefetchedStore({ repoRoot, importer }, async (extraEnv) => {
+          const activity = newManagedCommandActivity();
+          return await withHeartbeat(
+            phaseLabel,
+            buildStore(storeAttr, buildFlakeRef, activity, extraEnv),
+            { activity },
+          );
+        }),
+    );
   const runUnfixedBuild = async (phaseLabel: string) =>
-    await withExactPrefetchedStore({ repoRoot, importer }, async (extraEnv) => {
-      const activity = newManagedCommandActivity();
-      return await withHeartbeat(
-        phaseLabel,
-        buildUnfixedAndHash(unfixedAttr, flakeRef, activity, extraEnv),
-        { activity },
-      );
-    });
-
+    await withPnpmStoreBuildFlakeRef(
+      { repoRoot, importer, baseFlakeRef: flakeRef },
+      async (buildFlakeRef) =>
+        await withExactPrefetchedStore({ repoRoot, importer }, async (extraEnv) => {
+          const activity = newManagedCommandActivity();
+          return await withHeartbeat(
+            phaseLabel,
+            buildUnfixedAndHash(unfixedAttr, buildFlakeRef, activity, extraEnv),
+            { activity },
+          );
+        }),
+    );
   if (
     await handleNonDefaultImporter({
       importer,

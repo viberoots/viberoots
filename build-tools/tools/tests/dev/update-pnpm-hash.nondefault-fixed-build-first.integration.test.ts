@@ -13,7 +13,12 @@ test("update-pnpm-hash nondefault importer verifies fixed build before unfixed r
       "root updater must prepare an exact pnpm store before fixed-build verification",
     );
   }
-  if (!mainTxt.includes("buildStore(storeAttr, flakeRef, activity, extraEnv)")) {
+  if (!mainTxt.includes("withPnpmStoreBuildFlakeRef")) {
+    throw new Error(
+      "root updater must choose an importer-safe build flake before fixed verification",
+    );
+  }
+  if (!mainTxt.includes("buildStore(storeAttr, buildFlakeRef, activity, extraEnv)")) {
     throw new Error(
       "root updater fixed-build verification must pass exact-store env into buildStore",
     );

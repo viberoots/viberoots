@@ -29,10 +29,15 @@ test("update-pnpm-hash uses importer-aware fast path and fixed-first root path",
     throw new Error("nondefault.ts must consult the shared lock-hash cache before rebuilding");
   }
 
-  if (!mainTxt.includes("buildStore(storeAttr, flakeRef")) {
+  if (!mainTxt.includes("withPnpmStoreBuildFlakeRef")) {
+    throw new Error(
+      "update-pnpm-hash.ts must choose an importer-safe build flake before fixed verification",
+    );
+  }
+  if (!mainTxt.includes("buildStore(storeAttr, buildFlakeRef")) {
     throw new Error("update-pnpm-hash.ts must verify fixed store first for root importer");
   }
-  if (!mainTxt.includes("buildUnfixedAndHash(unfixedAttr, flakeRef, activity, extraEnv)")) {
+  if (!mainTxt.includes("buildUnfixedAndHash(unfixedAttr, buildFlakeRef, activity, extraEnv)")) {
     throw new Error(
       "update-pnpm-hash.ts must pass the exact-store env into unfixed fallback builds",
     );
