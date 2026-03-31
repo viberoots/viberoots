@@ -53,6 +53,17 @@ export function resolveToolPathSync(tool: string, env: NodeJS.ProcessEnv = proce
   return preferredCandidate(tool, env);
 }
 
+export function ensureNixStoreToolPathSync(
+  tool: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const resolved = resolveToolPathSync(tool, env);
+  if (!isNixStorePath(resolved)) {
+    throw new Error(`required tool must resolve to /nix/store: ${tool} -> ${resolved}`);
+  }
+  return resolved;
+}
+
 export async function resolveToolPath(
   tool: string,
   env: NodeJS.ProcessEnv = process.env,

@@ -23,13 +23,23 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   ) {
     throw new Error("exact-store.ts must prefetch exact stores and reuse shared lock-hash caches");
   }
-  if (!exactStore.includes("makeFilteredFlakeRef")) {
+  if (!exactStore.includes('ensureNixStoreToolPathSync("pnpm")')) {
     throw new Error(
-      "exact-store.ts must use filtered flake snapshots for non-default importer fetches",
+      "exact-store.ts must require a Nix-managed pnpm binary for exact-store fetches",
     );
+  }
+  if (exactStore.includes("makeFilteredFlakeRef") || exactStore.includes("pnpmFlakeRef(")) {
+    throw new Error("exact-store.ts must not route exact-store fetches through live pnpm flakes");
   }
   if (!exactStoreCommand.includes("runManagedCommand")) {
     throw new Error("exact-store helpers must continue running through managed command helpers");
+  }
+  if (!exactStoreCommand.includes('command: opts.command || "nix"')) {
+    throw new Error("exact-store command helpers must support direct command execution");
+  }
+  const toolPaths = await fsp.readFile("build-tools/tools/lib/tool-paths.ts", "utf8");
+  if (!toolPaths.includes("required tool must resolve to /nix/store")) {
+    throw new Error("tool-paths.ts must fail when a required tool resolves outside /nix/store");
   }
   if (!lockfile.includes("withExactPrefetchedStore")) {
     throw new Error("lockfile.ts must continue exporting the exact-store helper");

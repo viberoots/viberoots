@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { resolveToolPathSync } from "../../lib/tool-paths.ts";
+import { ensureNixStoreToolPathSync, resolveToolPathSync } from "../../lib/tool-paths.ts";
 
 test("resolveToolPathSync prefers nix store binaries before host PATH entries", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "tool-paths-"));
@@ -25,6 +25,28 @@ test("resolveToolPathSync prefers nix store binaries before host PATH entries", 
       PATH: [hostDir, nixDir].join(path.delimiter),
     });
     assert.equal(resolved, nixTool);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("ensureNixStoreToolPathSync rejects host-only tool paths", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "tool-paths-"));
+  try {
+    const hostDir = path.join(tmp, "host");
+    await fsp.mkdir(hostDir, { recursive: true });
+    const hostTool = path.join(hostDir, "demo-tool");
+    await fsp.writeFile(hostTool, "#!/bin/sh\nexit 0\n", "utf8");
+    await fsp.chmod(hostTool, 0o755);
+
+    assert.throws(
+      () =>
+        ensureNixStoreToolPathSync("demo-tool", {
+          ...process.env,
+          PATH: hostDir,
+        }),
+      /required tool must resolve to \/nix\/store/,
+    );
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }

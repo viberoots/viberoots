@@ -4,6 +4,7 @@ import { newManagedCommandActivity } from "./activity.ts";
 import { withHeartbeat } from "./heartbeat.ts";
 
 export async function runExactStoreCommand(opts: {
+  command?: string;
   label: string;
   cwd: string;
   env: NodeJS.ProcessEnv;
@@ -14,7 +15,7 @@ export async function runExactStoreCommand(opts: {
   const result = await withHeartbeat(
     opts.label,
     runManagedCommand({
-      command: "nix",
+      command: opts.command || "nix",
       args: opts.args,
       cwd: opts.cwd,
       env: opts.env,

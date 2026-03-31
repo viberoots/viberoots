@@ -2,17 +2,12 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { ensureNixStoreToolPathSync } from "../../lib/tool-paths.ts";
 import { sharedExactPnpmStateRoot } from "../../lib/pnpm-state-paths.ts";
 import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard.ts";
 import { runExactStoreCommand } from "./exact-store-command.ts";
 import { importExactStoreIntoNixStore } from "./exact-store-import.ts";
-import { makeFilteredFlakeRef } from "./filtered-flake.ts";
-import { withHeartbeat } from "./heartbeat.ts";
-import {
-  cleanupLocalWorkspaceMarker,
-  ensureLocalWorkspaceMarker,
-  pnpmFlakeRef,
-} from "./lockfile-shared.ts";
+import { cleanupLocalWorkspaceMarker, ensureLocalWorkspaceMarker } from "./lockfile-shared.ts";
 
 const EXACT_STORE_CACHE_VERSION = 3;
 
@@ -149,51 +144,37 @@ export async function prepareExactPnpmStore(opts: {
       await fsp.rm(storeDir, { recursive: true, force: true }).catch(() => {});
       await fsp.mkdir(homeDir, { recursive: true });
       await fsp.mkdir(storeDir, { recursive: true });
-      const filtered =
-        opts.importer === "."
-          ? null
-          : await withHeartbeat(
-              `importer=${opts.importer} step=prepare-exact-store-flake`,
-              makeFilteredFlakeRef({ repoRoot: opts.repoRoot, attr: "pnpm" }),
-            );
-      const flakeRef = filtered?.flakeRef || pnpmFlakeRef(opts.repoRoot);
-      try {
-        await withHiddenNodeModules(importerAbs, async () => {
-          await runExactStoreCommand({
-            label: `importer=${opts.importer} step=exact-store-fetch`,
-            cwd: importerAbs,
-            timeoutMs,
-            env: {
-              ...process.env,
-              NIX_PNPM_ALLOW_GENERATE: "1",
-              NIX_PNPM_FETCH_TIMEOUT: fetchTimeout,
-              NIX_PNPM_INSTALL_TIMEOUT: fetchTimeout,
-              PNPM_HOME: homeDir,
-            },
-            args: [
-              "run",
-              "--accept-flake-config",
-              flakeRef,
-              "--",
-              "fetch",
-              "--force",
-              "--frozen-lockfile",
-              "--prefer-offline",
-              "--prod=false",
-              "--lockfile-dir",
-              ".",
-              "--dir",
-              ".",
-              "--store-dir",
-              storeDir,
-              "--color",
-              "never",
-            ],
-          });
+      const pnpmPath = ensureNixStoreToolPathSync("pnpm");
+      await withHiddenNodeModules(importerAbs, async () => {
+        await runExactStoreCommand({
+          command: pnpmPath,
+          label: `importer=${opts.importer} step=exact-store-fetch`,
+          cwd: importerAbs,
+          timeoutMs,
+          env: {
+            ...process.env,
+            NIX_PNPM_ALLOW_GENERATE: "1",
+            NIX_PNPM_FETCH_TIMEOUT: fetchTimeout,
+            NIX_PNPM_INSTALL_TIMEOUT: fetchTimeout,
+            PNPM_HOME: homeDir,
+          },
+          args: [
+            "fetch",
+            "--force",
+            "--frozen-lockfile",
+            "--prefer-offline",
+            "--prod=false",
+            "--lockfile-dir",
+            ".",
+            "--dir",
+            ".",
+            "--store-dir",
+            storeDir,
+            "--color",
+            "never",
+          ],
         });
-      } finally {
-        await filtered?.cleanup();
-      }
+      });
       const nixStorePath = await importExactStoreIntoNixStore({
         repoRoot: opts.repoRoot,
         importer: opts.importer,
