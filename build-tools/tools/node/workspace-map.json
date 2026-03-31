@@ -1,4 +1,3 @@
 {
-  "@apps/example-webapp": "//projects/apps/example-webapp:app",
   "@apps/pleomino": "//projects/apps/pleomino:app"
 }

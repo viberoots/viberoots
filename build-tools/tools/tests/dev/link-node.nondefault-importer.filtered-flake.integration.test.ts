@@ -14,4 +14,11 @@ test("link-node builds non-default importers from stable workspace flake ref", a
   if (!txt.includes("await tempFlake.cleanup()")) {
     throw new Error("link-node.ts must clean up temporary filtered flake snapshot");
   }
+
+  const compat = await fsp.readFile("build-tools/tools/dev/update-pnpm-hash/lockfile.ts", "utf8");
+  if (!compat.includes("export async function makeFilteredFlakeRef(repoRoot: string)")) {
+    throw new Error(
+      "lockfile.ts must keep the compatibility filtered-flake export for install callers",
+    );
+  }
 });
