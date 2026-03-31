@@ -2,15 +2,17 @@
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
-test("require-unified-pnpm-store assembles from fixed pnpm-store attrs", async () => {
+test("require-unified-pnpm-store assembles from exact prefetched stores", async () => {
   const txt = await fsp.readFile("build-tools/tools/dev/require-unified-pnpm-store.ts", "utf8");
-  if (txt.includes("pnpm-store-unfixed.")) {
-    throw new Error("require-unified-pnpm-store must not prewarm from pnpm-store-unfixed attrs");
+  if (!txt.includes("prepareExactPnpmStore")) {
+    throw new Error("require-unified-pnpm-store must prepare exact prefetched stores");
   }
-  if (
-    !txt.includes('"pnpm-store.default"') ||
-    !txt.includes("`pnpm-store.${sanitizeImporter(imp)}`")
-  ) {
-    throw new Error("require-unified-pnpm-store must assemble from fixed pnpm-store attrs");
+  if (!txt.includes("await mergePnpmStore(storeDir, unifyStore)")) {
+    throw new Error(
+      "require-unified-pnpm-store must merge exact prefetched stores into unifyStore",
+    );
+  }
+  if (txt.includes("nix build --impure")) {
+    throw new Error("require-unified-pnpm-store must not rebuild pnpm-store attrs during prewarm");
   }
 });

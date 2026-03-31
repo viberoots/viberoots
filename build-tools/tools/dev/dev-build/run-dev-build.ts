@@ -17,25 +17,20 @@ import { maybeAutoImpureFromUntrackedFiles } from "./untracked.ts";
 import { getArgvTokens } from "../../lib/cli.ts";
 import { findRepoRoot } from "../../lib/repo.ts";
 
-async function maybeResetSharedDaemonForMissingOptionalPatchDirs(opts: {
+export async function missingOptionalPatchDirsForFreshIsolation(opts: {
   root: string;
   subcmd: string;
   restArgs: string[];
-  buckIsolation: string;
-  isolationFlags: string[];
-  reuseDaemon: boolean;
-}): Promise<void> {
-  if (!opts.reuseDaemon) return;
-  if (opts.subcmd !== "build") return;
-  if (!opts.restArgs.some((t) => String(t || "").trim() === "//...")) return;
-  if (opts.isolationFlags.length === 0) return;
+}): Promise<string[]> {
+  if (opts.subcmd !== "build") return [];
+  if (!opts.restArgs.some((t) => String(t || "").trim() === "//...")) return [];
 
   const patchRoot = path.join(opts.root, "patches");
   const patchRootExists = await fsp
     .stat(patchRoot)
     .then((s) => s.isDirectory())
     .catch(() => false);
-  if (!patchRootExists) return;
+  if (!patchRootExists) return [];
 
   const optionalPatchDirs = ["cpp", "go", "node", "python", "rust"] as const;
   const missing: string[] = [];
@@ -46,17 +41,7 @@ async function maybeResetSharedDaemonForMissingOptionalPatchDirs(opts: {
       .catch(() => false);
     if (!exists) missing.push(d);
   }
-  if (missing.length === 0) return;
-
-  // Shared buckd can retain stale recursive-spec state for removed optional patch dirs.
-  // Reset once before full-repo builds so optional missing dirs are treated as empty.
-  console.warn(
-    `[dev-build] resetting shared buck daemon before full recursive build; missing optional patch dirs: ${missing.join(", ")}`,
-  );
-  await $({
-    cwd: opts.root,
-    stdio: "pipe",
-  })`buck2 --isolation-dir ${opts.buckIsolation} kill`.nothrow();
+  return missing;
 }
 
 export async function runDevBuild(): Promise<void> {
@@ -73,7 +58,31 @@ export async function runDevBuild(): Promise<void> {
     process.chdir(root);
   } catch {}
 
-  const iso = createIsolation();
+  const parsed0 = parseDevBuildArgs(getArgvTokens());
+  const parsed = {
+    ...parsed0,
+    restArgs: await normalizeDevBuildTargetArgs({
+      workspaceRoot: root,
+      baseDir: invocationCwd,
+      subcmd: parsed0.subcmd,
+      args: parsed0.restArgs,
+    }),
+  };
+  const missingOptionalPatchDirs = await missingOptionalPatchDirsForFreshIsolation({
+    root,
+    subcmd: parsed.subcmd,
+    restArgs: parsed.restArgs,
+  });
+  const useFreshIsolationForMissingPatchDirs = missingOptionalPatchDirs.length > 0;
+  if (useFreshIsolationForMissingPatchDirs) {
+    console.warn(
+      `[dev-build] using fresh buck isolation for full recursive build; missing optional patch dirs: ${missingOptionalPatchDirs.join(", ")}`,
+    );
+  }
+
+  const iso = createIsolation({
+    reuseDaemon: useFreshIsolationForMissingPatchDirs ? false : undefined,
+  });
   iso.attachSignalHandlers();
   iso.attachExitHandlers();
   await iso.startWatchdog(root);
@@ -86,16 +95,6 @@ export async function runDevBuild(): Promise<void> {
     process.exit(1);
   });
 
-  const parsed0 = parseDevBuildArgs(getArgvTokens());
-  const parsed = {
-    ...parsed0,
-    restArgs: await normalizeDevBuildTargetArgs({
-      workspaceRoot: root,
-      baseDir: invocationCwd,
-      subcmd: parsed0.subcmd,
-      args: parsed0.restArgs,
-    }),
-  };
   const auto = await maybeAutoImpureFromUntrackedFiles({
     isCI,
     root,
@@ -154,15 +153,6 @@ export async function runDevBuild(): Promise<void> {
     materialize,
     impure,
     restArgs: parsed.restArgs,
-  });
-
-  await maybeResetSharedDaemonForMissingOptionalPatchDirs({
-    root,
-    subcmd: parsed.subcmd,
-    restArgs: parsed.restArgs,
-    buckIsolation: iso.buckIsolation,
-    isolationFlags: iso.isolationFlags,
-    reuseDaemon: iso.reuseDaemon,
   });
 
   if (materialize && impure && !exportedGraphDuringMaterialize) {

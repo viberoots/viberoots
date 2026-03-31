@@ -14,6 +14,10 @@ export type Isolation = {
   startWatchdog: (repoRoot: string) => Promise<void>;
 };
 
+export type CreateIsolationOptions = {
+  reuseDaemon?: boolean;
+};
+
 async function reapChildBuckDaemonsByPrefix(prefixes: string[]): Promise<void> {
   try {
     const psPath = await resolveToolPath("ps");
@@ -47,8 +51,9 @@ async function reapExporterDaemonsFromPs(): Promise<void> {
   } catch {}
 }
 
-export function createIsolation(): Isolation {
-  const reuseDaemon = String(process.env.BUCK_DEVBUILD_REUSE_DAEMON || "1").trim() !== "0";
+export function createIsolation(opts: CreateIsolationOptions = {}): Isolation {
+  const reuseDaemon =
+    opts.reuseDaemon ?? String(process.env.BUCK_DEVBUILD_REUSE_DAEMON || "1").trim() !== "0";
   const defaultKillOnExit = !reuseDaemon;
   const killOnExit = String(process.env.BUCK_DEVBUILD_KILL_ON_EXIT || "").trim()
     ? String(process.env.BUCK_DEVBUILD_KILL_ON_EXIT || "").trim() === "1"

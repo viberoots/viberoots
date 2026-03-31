@@ -26,9 +26,14 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   }
 
   const unified = await fsp.readFile("build-tools/tools/dev/require-unified-pnpm-store.ts", "utf8");
-  if (!unified.includes("withExactPrefetchedStore")) {
+  if (!unified.includes("prepareExactPnpmStore")) {
     throw new Error(
-      "require-unified-pnpm-store.ts must prefetch exact stores before building fixed attrs",
+      "require-unified-pnpm-store.ts must prepare exact stores before unified prewarm",
+    );
+  }
+  if (unified.includes("nix build --impure")) {
+    throw new Error(
+      "require-unified-pnpm-store.ts must not rebuild fixed pnpm-store attrs during prewarm",
     );
   }
 

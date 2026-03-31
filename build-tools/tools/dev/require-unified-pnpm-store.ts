@@ -6,18 +6,11 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { findImporterLockfiles, computeImporterLabel } from "../lib/importers.ts";
 import { unifiedPnpmStoreEpochDigest } from "./unified-pnpm-store-epoch.ts";
-import { withExactPrefetchedStore } from "./update-pnpm-hash/lockfile.ts";
+import { prepareExactPnpmStore } from "./update-pnpm-hash/lockfile.ts";
 import { mergePnpmStore } from "./update-pnpm-hash/prefetched-store.ts";
 
 function sha256Hex(s: string) {
   return crypto.createHash("sha256").update(s).digest("hex");
-}
-
-function sanitizeImporter(importer: string): string {
-  return importer
-    .replace(/\/\//g, "")
-    .replace(/:/g, "-")
-    .replace(/[\/\s]+/g, "-");
 }
 
 async function readTextSafe(p: string): Promise<string> {
@@ -187,36 +180,13 @@ async function main() {
     // Always include repo-root importer '.' if lockfile present there
     const uniq = Array.from(new Set(importers));
 
-    // Build and merge each importer's verified fixed pnpm store. install-deps
-    // has already refreshed hashes and realized these stores, so prewarm must
-    // stay on that offline path instead of retrying networked unfixed builds.
+    // Build the local unified prewarm directly from exact prefetched stores.
+    // install-deps has already refreshed hashes and prefetched these stores,
+    // so avoid re-running fixed-output validation inside Nix just to assemble
+    // a shared writable cache for future local pnpm operations.
     for (const imp of uniq) {
-      const attr = imp === "." ? "pnpm-store.default" : `pnpm-store.${sanitizeImporter(imp)}`;
-      // Build quietly, print logs only on failure.
-      const built = await withExactPrefetchedStore(
-        { repoRoot: repo, importer: imp },
-        async (extraEnv) =>
-          await $({
-            stdio: "pipe",
-            env: {
-              ...extraEnv,
-              LOCAL_PNPM_STORE: unifyStore,
-            },
-          })`nix build --impure --accept-flake-config --no-link --print-out-paths path:${repo}#${attr}`.nothrow(),
-      ).catch(() => null);
-      if (!built) continue;
-      if (built.exitCode !== 0) {
-        // Ignore importers that fail to build unfixed store (e.g., missing lock); proceed
-        continue;
-      }
-      const outPath =
-        String(built.stdout || "")
-          .trim()
-          .split(/\s+/)
-          .pop() || "";
-      if (!outPath) continue;
-      const src = path.join(outPath, "store");
-      await mergePnpmStore(src, unifyStore);
+      const { storeDir } = await prepareExactPnpmStore({ repoRoot: repo, importer: imp });
+      await mergePnpmStore(storeDir, unifyStore);
     }
 
     // Ensure everything under the unified store is user-writable so buck-out is removable without sudo
