@@ -44,9 +44,9 @@ in {
       exactPrefetchedInput =
         if exactPrefetchedPath == null || exactPrefetchedPath == ""
         then null
-        else if lib.hasPrefix builtins.storeDir exactPrefetchedPath
-        then builtins.storePath exactPrefetchedPath
-        else throw "NIX_PNPM_EXACT_STORE must be a /nix/store path";
+        else if lib.hasPrefix "/" exactPrefetchedPath
+        then exactPrefetchedPath
+        else throw "NIX_PNPM_EXACT_STORE must be an absolute path";
       # Do not use prefetched stores for pnpm-store FODs. They can include extra packages
       # beyond the lockfile, which makes the fixed-output hash unstable.
       preferPrefetch = false;
@@ -138,7 +138,7 @@ in {
         printf '%s\n' "  - ./" >> pnpm-workspace.yaml
         printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
         IT="${installTimeoutVal}"
-        EXACT_STORE_ROOT="${if exactPrefetchedInput != null then "${exactPrefetchedInput}" else "/nonexistent"}"
+        EXACT_STORE_ROOT=${lib.escapeShellArg (if exactPrefetchedInput != null then exactPrefetchedInput else "/nonexistent")}
         EXACT_STORE_INPUT="$EXACT_STORE_ROOT"
         if [ -d "$EXACT_STORE_ROOT/store" ]; then
           EXACT_STORE_INPUT="$EXACT_STORE_ROOT/store"
@@ -235,9 +235,9 @@ in {
       exactPrefetchedInput =
         if exactPrefetchedPath == null || exactPrefetchedPath == ""
         then null
-        else if lib.hasPrefix builtins.storeDir exactPrefetchedPath
-        then builtins.storePath exactPrefetchedPath
-        else throw "NIX_PNPM_EXACT_STORE must be a /nix/store path";
+        else if lib.hasPrefix "/" exactPrefetchedPath
+        then exactPrefetchedPath
+        else throw "NIX_PNPM_EXACT_STORE must be an absolute path";
     in pkgs.stdenvNoCC.mkDerivation {
       pname = "pnpm-store-unfixed";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
@@ -305,7 +305,7 @@ in {
         printf '%s\n' "  - ./" >> pnpm-workspace.yaml
         printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
         IT="''${NIX_PNPM_INSTALL_TIMEOUT:-1800}"
-        EXACT_STORE_INPUT="${if exactPrefetchedInput != null then "${exactPrefetchedInput}" else "/nonexistent"}"
+        EXACT_STORE_INPUT=${lib.escapeShellArg (if exactPrefetchedInput != null then exactPrefetchedInput else "/nonexistent")}
         if [ -d "$EXACT_STORE_INPUT" ]; then
           echo "[nix] mkPnpmStoreUnfixed: validating exact prefetched store from $EXACT_STORE_INPUT" >&2
           LOCAL_STORE="$(pwd)/.pnpm-exact-store"

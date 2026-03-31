@@ -24,12 +24,19 @@ function envWithFetchTimeout(timeoutSec: number, extraEnv?: NodeJS.ProcessEnv): 
   };
 }
 
+function exactStoreSandboxArgs(extraEnv?: NodeJS.ProcessEnv): string[] {
+  const exactStorePath = String(extraEnv?.NIX_PNPM_EXACT_STORE || "").trim();
+  if (!exactStorePath || exactStorePath.startsWith("/nix/store/")) return [];
+  return ["--option", "extra-sandbox-paths", exactStorePath];
+}
+
 function nixBuildArgs(opts: {
   flakeRef: string;
   attrPath: string;
   printOutPaths: boolean;
   maxJobs: string;
   cores: string;
+  extraEnv?: NodeJS.ProcessEnv;
 }): string[] {
   const args = [
     "build",
@@ -46,6 +53,7 @@ function nixBuildArgs(opts: {
     "max-free",
     "0",
   ];
+  args.push(...exactStoreSandboxArgs(opts.extraEnv));
   if (opts.printOutPaths) args.push("--print-out-paths");
   if (opts.maxJobs && opts.maxJobs !== "0") args.push("--max-jobs", opts.maxJobs);
   if (opts.cores && opts.cores !== "0") args.push("--option", "cores", opts.cores);
@@ -74,7 +82,7 @@ export async function buildStore(
   const timeoutSec = resolvedFetchTimeoutSec();
   const res = await runManagedCommand({
     command: "nix",
-    args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores }),
+    args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores, extraEnv }),
     cwd: process.cwd(),
     env: envWithFetchTimeout(timeoutSec, extraEnv),
     timeoutMs: timeoutSec * 1000,
@@ -120,7 +128,7 @@ export async function buildUnfixedAndHash(
   const timeoutSec = resolvedFetchTimeoutSec();
   const built = await runManagedCommand({
     command: "nix",
-    args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores }),
+    args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores, extraEnv }),
     cwd: process.cwd(),
     env: envWithFetchTimeout(timeoutSec, extraEnv),
     timeoutMs: timeoutSec * 1000,

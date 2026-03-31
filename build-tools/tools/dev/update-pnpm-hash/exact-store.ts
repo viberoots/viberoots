@@ -2,9 +2,9 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { externalPnpmStateDirs } from "../../lib/pnpm-state-paths.ts";
+import { sharedExactPnpmStateRoot } from "../../lib/pnpm-state-paths.ts";
 import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard.ts";
-import { addExactStoreToNixStore, runExactStoreCommand } from "./exact-store-command.ts";
+import { runExactStoreCommand } from "./exact-store-command.ts";
 import {
   cleanupLocalWorkspaceMarker,
   ensureLocalWorkspaceMarker,
@@ -90,7 +90,7 @@ async function withExactStoreLock<T>(lockPath: string, fn: () => Promise<T>): Pr
 export async function prepareExactPnpmStore(opts: {
   repoRoot: string;
   importer: string;
-}): Promise<{ storeDir: string; nixStorePath: string; cleanup: () => Promise<void> }> {
+}): Promise<{ storeDir: string; exactStorePath: string; cleanup: () => Promise<void> }> {
   const importerAbs = path.resolve(opts.repoRoot, opts.importer);
   const lockfileAbs = path.join(importerAbs, "pnpm-lock.yaml");
   if (!fs.existsSync(lockfileAbs)) {
@@ -99,8 +99,7 @@ export async function prepareExactPnpmStore(opts: {
   const fetchTimeout = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "").trim() || "600";
   const timeoutMs = (Number.parseInt(fetchTimeout, 10) || 600) * 1000 + 120_000;
   const lockHash = await sha256HexFile(lockfileAbs);
-  const { rootDir } = await externalPnpmStateDirs(importerAbs);
-  const cacheDir = path.join(rootDir, "exact", lockHash);
+  const cacheDir = await sharedExactPnpmStateRoot(lockHash);
   const storeDir = path.join(cacheDir, "store");
   const homeDir = path.join(cacheDir, "home");
   const markerPath = path.join(cacheDir, "ready.json");
@@ -108,34 +107,24 @@ export async function prepareExactPnpmStore(opts: {
   const flakeRef = pnpmFlakeRef(opts.repoRoot);
   const readMarker = async (): Promise<{
     version: number;
-    importer: string;
     lockHash: string;
-    nixStorePath: string;
   } | null> => {
     try {
       const raw = await fsp.readFile(markerPath, "utf8");
       const parsed = JSON.parse(raw) as {
         version?: number;
-        importer?: string;
         lockHash?: string;
-        nixStorePath?: string;
       };
-      const nixStorePath = String(parsed.nixStorePath || "").trim();
       if (
         parsed.version !== EXACT_STORE_CACHE_VERSION ||
-        parsed.importer !== opts.importer ||
         parsed.lockHash !== lockHash ||
-        !fs.existsSync(storeDir) ||
-        !nixStorePath ||
-        !fs.existsSync(nixStorePath)
+        !fs.existsSync(storeDir)
       ) {
         return null;
       }
       return {
         version: EXACT_STORE_CACHE_VERSION,
-        importer: opts.importer,
         lockHash,
-        nixStorePath,
       };
     } catch {
       return null;
@@ -185,20 +174,12 @@ export async function prepareExactPnpmStore(opts: {
           ],
         });
       });
-      const nixStorePath = await addExactStoreToNixStore({
-        repoRoot: opts.repoRoot,
-        importer: opts.importer,
-        storeDir,
-        timeoutMs,
-      });
       await fsp.writeFile(
         markerPath,
         JSON.stringify(
           {
             version: EXACT_STORE_CACHE_VERSION,
-            importer: opts.importer,
             lockHash,
-            nixStorePath,
           },
           null,
           2,
@@ -207,9 +188,7 @@ export async function prepareExactPnpmStore(opts: {
       );
       preparedMarker = {
         version: EXACT_STORE_CACHE_VERSION,
-        importer: opts.importer,
         lockHash,
-        nixStorePath,
       };
     } catch (error) {
       await fsp.rm(storeDir, { recursive: true, force: true }).catch(() => {});
@@ -222,7 +201,7 @@ export async function prepareExactPnpmStore(opts: {
   if (!preparedMarker) {
     throw new Error(`exact pnpm store marker missing after preparation for ${opts.importer}`);
   }
-  return { storeDir, nixStorePath: preparedMarker.nixStorePath, cleanup: async () => {} };
+  return { storeDir, exactStorePath: storeDir, cleanup: async () => {} };
 }
 export async function withExactPrefetchedStore<T>(
   opts: { repoRoot: string; importer: string },
@@ -232,7 +211,7 @@ export async function withExactPrefetchedStore<T>(
   try {
     return await fn({
       ...process.env,
-      NIX_PNPM_EXACT_STORE: prepared.nixStorePath,
+      NIX_PNPM_EXACT_STORE: prepared.exactStorePath,
     });
   } finally {
     await prepared.cleanup();

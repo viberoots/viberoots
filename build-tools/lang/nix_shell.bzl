@@ -100,9 +100,12 @@ def nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = 600):
         ("TOUT=%d; " % tout)
         + "RAW_VERIFY_TOUT=\"${VERIFY_TIMEOUT_SECS:-}\"; "
         + "RAW_TEST_NIX_TOUT=\"${TEST_NIX_TIMEOUT_SECS:-}\"; "
+        + "RAW_PNPM_INSTALL_TOUT=\"${NIX_PNPM_INSTALL_TIMEOUT:-}\"; "
         + "for RAW_TOUT in \"$RAW_VERIFY_TOUT\" \"$RAW_TEST_NIX_TOUT\"; do "
         + "  if [ -n \"$RAW_TOUT\" ] && [ \"$RAW_TOUT\" -gt \"$TOUT\" ] 2>/dev/null; then TOUT=\"$RAW_TOUT\"; fi; "
         + "done; "
+        + "if [ -n \"$RAW_PNPM_INSTALL_TOUT\" ] && [ \"$RAW_PNPM_INSTALL_TOUT\" -gt \"$TOUT\" ] 2>/dev/null; then TOUT=\"$RAW_PNPM_INSTALL_TOUT\"; fi; "
+        + "export NIX_PNPM_INSTALL_TIMEOUT=\"$TOUT\"; "
         + "if command -v timeout >/dev/null 2>&1; then "
         + ("%s=\"timeout -k 2s ${TOUT}s\"; " % var_name)
         + "else "

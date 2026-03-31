@@ -48,6 +48,10 @@ test("node_webapp cmd prefixes nix bootstrap env and timeout wrapper", async () 
     // Should declare TIMEOUT wrapper and use it to invoke the filtered flake
     // builder entrypoint for node_webapp.
     assert.ok(out.includes("TIMEOUT="), "expected TIMEOUT= assignment in cmd");
+    assert.ok(
+      out.includes('export NIX_PNPM_INSTALL_TIMEOUT="$TOUT"'),
+      "expected timeout wrapper to export NIX_PNPM_INSTALL_TIMEOUT",
+    );
     const idxTimeout = out.indexOf("TIMEOUT");
     const idxFilteredBuilder = out.indexOf("nix-build-filtered-flake.ts");
     assert.ok(

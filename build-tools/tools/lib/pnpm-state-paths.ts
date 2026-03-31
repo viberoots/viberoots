@@ -22,6 +22,12 @@ function stablePnpmStateBase(): string {
   return path.join(tmpBase, `bucknix-pnpm${suffix}`);
 }
 
+export async function sharedExactPnpmStateRoot(lockHash: string): Promise<string> {
+  const rootDir = path.join(stablePnpmStateBase(), "exact", sanitizeFragment(lockHash));
+  await fsp.mkdir(rootDir, { recursive: true });
+  return rootDir;
+}
+
 function stateKey(scopeAbs: string): string {
   const normalized = path.resolve(scopeAbs);
   const leaf = sanitizeFragment(path.basename(normalized));

@@ -19,11 +19,12 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
     !exactStore.includes("fetch") ||
     !exactStore.includes("--frozen-lockfile") ||
     !exactStore.includes("--store-dir") ||
-    !exactStoreCommand.includes('"store", "add-path"')
+    !exactStore.includes("sharedExactPnpmStateRoot")
   ) {
-    throw new Error(
-      "exact-store.ts must prefetch exact stores and import them into /nix/store before nix builds",
-    );
+    throw new Error("exact-store.ts must prefetch exact stores and reuse shared lock-hash caches");
+  }
+  if (exactStoreCommand.includes('"store", "add-path"')) {
+    throw new Error("exact-store helpers must not import raw exact stores into /nix/store");
   }
   if (!lockfile.includes("withExactPrefetchedStore")) {
     throw new Error("lockfile.ts must continue exporting the exact-store helper");
@@ -42,11 +43,22 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   if (!store.includes('builtins.getEnv "NIX_PNPM_EXACT_STORE"')) {
     throw new Error("store.nix must read the exact-store env for fixed pnpm-store builds");
   }
-  if (!store.includes("builtins.storePath exactPrefetchedPath")) {
-    throw new Error("store.nix must treat exact-store env values as existing /nix/store paths");
+  if (!store.includes('lib.hasPrefix "/" exactPrefetchedPath')) {
+    throw new Error("store.nix must accept absolute exact-store paths for sandbox-mounted stores");
   }
   if (!store.includes("pnpm install (offline exact-store)")) {
     throw new Error("store.nix must validate exact prefetched stores offline");
+  }
+  if (!store.includes("NIX_PNPM_EXACT_STORE must be an absolute path")) {
+    throw new Error("store.nix must reject relative exact-store paths");
+  }
+
+  const nixBuildHelpers = await fsp.readFile(
+    "build-tools/tools/dev/update-pnpm-hash/nix.ts",
+    "utf8",
+  );
+  if (!nixBuildHelpers.includes('"extra-sandbox-paths"')) {
+    throw new Error("update-pnpm-hash nix helpers must mount raw exact stores into the sandbox");
   }
 
   const unified = await fsp.readFile("build-tools/tools/dev/require-unified-pnpm-store.ts", "utf8");

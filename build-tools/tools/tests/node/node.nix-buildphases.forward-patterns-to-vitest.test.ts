@@ -37,6 +37,20 @@ test("node test buildPhase decodes and forwards explicit vitest patterns", async
     throw new Error("node-test buildPhase must forward coverage flags as discrete arguments");
   }
 
+  if (
+    !script.includes(
+      'VITEST_TIMEOUT_SECS="${TEST_NIX_TIMEOUT_SECS:-${VERIFY_TIMEOUT_SECS:-${NIX_PNPM_INSTALL_TIMEOUT:-1800}}}"',
+    )
+  ) {
+    throw new Error(
+      "node-test buildPhase must derive vitest timeout from the active test/install budget",
+    );
+  }
+
+  if (script.includes("VITEST_TIMEOUT_SECS=420")) {
+    throw new Error("node-test buildPhase must not clamp vitest to a hardcoded 420s timeout");
+  }
+
   if (script.includes("${PATTERNS_VALUE}")) {
     throw new Error("node-test buildPhase must not leave PATTERNS_VALUE as a literal placeholder");
   }

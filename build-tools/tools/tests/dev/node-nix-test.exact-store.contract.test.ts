@@ -12,4 +12,7 @@ test("node_nix_test prepares and forwards exact pnpm stores into nix builds", as
       "node_nix_test must export NIX_PNPM_EXACT_STORE for downstream fixed-store builds",
     );
   }
+  if (!rule.includes("extra-sandbox-paths")) {
+    throw new Error("node_nix_test must mount raw exact-store paths into nix sandboxes");
+  }
 });

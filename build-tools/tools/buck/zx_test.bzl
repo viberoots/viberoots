@@ -2,6 +2,8 @@ load("@prelude//test:inject_test_run_info.bzl", "inject_test_run_info")
 
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
+    timeout_ms = ctx.attrs.test_rule_timeout_ms if ctx.attrs.test_rule_timeout_ms != None else 20 * 60 * 1000
+    timeout_sec = timeout_ms // 1000 if timeout_ms > 0 else 1200
     # Export NODE_V8_COVERAGE so child Node processes also write coverage data, but only when COVERAGE=1.
     run_and_report = (
         (
@@ -82,12 +84,13 @@ def _zx_test_impl(ctx):
             + "if [ \"$ZX_TEST_DIRENV\" = \"1\" ]; then if command -v direnv >/dev/null 2>&1; then eval \"$(direnv export bash)\"; fi; fi; "
             # Skip direnv in temp repos by default; specific tests can override
             # Provide a single global default timeout unless a caller overrides it
-            + "TSECS=0; "
+            + ("TSECS=%d; " % timeout_sec)
             + "for RAW_TSECS in \"${VERIFY_TIMEOUT_SECS:-}\" \"${TEST_NIX_TIMEOUT_SECS:-}\"; do "
             + "  if [ -n \"$RAW_TSECS\" ] && [ \"$RAW_TSECS\" -gt \"$TSECS\" ] 2>/dev/null; then TSECS=\"$RAW_TSECS\"; fi; "
             + "done; "
             + "if [ \"$TSECS\" -le 0 ] 2>/dev/null; then TSECS=1200; fi; "
             + "export TEST_NIX_TIMEOUT_SECS=\"$TSECS\"; "
+            + "export NIX_PNPM_INSTALL_TIMEOUT=\"$TSECS\"; "
             + "if [ -z \"$TEST_NODE_OPTIONS\" ]; then export TEST_NODE_OPTIONS=\"--test-timeout=$(( TSECS * 1000 ))\"; fi; "
             + "if [ -n \"$NODE_V8_COVERAGE\" ]; then mkdir -p \"$NODE_V8_COVERAGE\"; fi; "
             # Ensure zx-init is loaded in all node:test workers via NODE_OPTIONS

@@ -38,25 +38,3 @@ export async function runExactStoreCommand(opts: {
       : `[update-pnpm-hash] ${opts.label} ${reason}`,
   );
 }
-
-export async function addExactStoreToNixStore(opts: {
-  repoRoot: string;
-  importer: string;
-  storeDir: string;
-  timeoutMs: number;
-}): Promise<string> {
-  const safeName = opts.importer.replace(/[\\/]+/g, "-").replace(/[^A-Za-z0-9._-]/g, "-") || "root";
-  const added = await runExactStoreCommand({
-    label: `importer=${opts.importer} step=exact-store-add-path`,
-    cwd: opts.repoRoot,
-    timeoutMs: opts.timeoutMs,
-    env: { ...process.env },
-    args: ["store", "add-path", "--name", `pnpm-exact-store-${safeName}`, opts.storeDir],
-  });
-  const nixStorePath = added.stdout.trim().split(/\s+/).pop() || "";
-  if (nixStorePath.startsWith("/nix/store/")) return nixStorePath;
-  const output = `${added.stdout}${added.stderr}`.trim();
-  throw new Error(
-    `failed to import exact pnpm store into nix store for ${opts.importer}: ${output}`,
-  );
-}

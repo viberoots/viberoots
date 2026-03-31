@@ -113,7 +113,7 @@ EOF_VITE_CFG
     export VITEST_WATCH=false
     export NODE_OPTIONS="--max-old-space-size=1536 ${NODE_OPTIONS:-}"
 
-    VITEST_TIMEOUT_SECS=420
+    VITEST_TIMEOUT_SECS="${TEST_NIX_TIMEOUT_SECS:-${VERIFY_TIMEOUT_SECS:-${NIX_PNPM_INSTALL_TIMEOUT:-1800}}}"
     mapfile -t PATTERN_ARGS < <(node -e '
 const fs = require("node:fs");
 const file = process.argv[1];
