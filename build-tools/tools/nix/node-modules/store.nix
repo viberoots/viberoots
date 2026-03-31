@@ -140,10 +140,28 @@ in {
         IT="${installTimeoutVal}"
         EXACT_STORE_ROOT=${lib.escapeShellArg (if exactPrefetchedInput != null then exactPrefetchedInput else "/nonexistent")}
         EXACT_STORE_INPUT="$EXACT_STORE_ROOT"
+        EXACT_STORE_ARCHIVE=""
         if [ -d "$EXACT_STORE_ROOT/store" ]; then
           EXACT_STORE_INPUT="$EXACT_STORE_ROOT/store"
         fi
-        if [ -d "$EXACT_STORE_INPUT" ]; then
+        if [ -f "$EXACT_STORE_ROOT/store.tar" ]; then
+          EXACT_STORE_ARCHIVE="$EXACT_STORE_ROOT/store.tar"
+        fi
+        if [ -n "$EXACT_STORE_ARCHIVE" ]; then
+          echo "[nix] mkPnpmStore: validating exact prefetched store archive from $EXACT_STORE_ARCHIVE" >&2
+          LOCAL_STORE="$(pwd)/.pnpm-exact-store"
+          rm -rf "$LOCAL_STORE"
+          mkdir -p "$LOCAL_STORE" "$out/store"
+          tar -xf "$EXACT_STORE_ARCHIVE" -C "$LOCAL_STORE"
+          chmod -R u+rwX "$LOCAL_STORE"
+          pnpm config set store-dir "$LOCAL_STORE"
+          pnpm config set package-import-method copy
+          echo "[nix] pnpm install (offline exact-store) --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir . (IT=${installTimeoutVal}s, FT=${ftVal}s)"
+          timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          cp -R "$LOCAL_STORE/." "$out/store/"
+          chmod -R u+rwX "$out/store" || true
+          echo "[nix] mkPnpmStore: exact prefetched store archive validated"
+        elif [ -d "$EXACT_STORE_INPUT" ]; then
           echo "[nix] mkPnpmStore: validating exact prefetched store from $EXACT_STORE_INPUT" >&2
           LOCAL_STORE="$(pwd)/.pnpm-exact-store"
           rm -rf "$LOCAL_STORE"
@@ -305,8 +323,30 @@ in {
         printf '%s\n' "  - ./" >> pnpm-workspace.yaml
         printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
         IT="''${NIX_PNPM_INSTALL_TIMEOUT:-1800}"
-        EXACT_STORE_INPUT=${lib.escapeShellArg (if exactPrefetchedInput != null then exactPrefetchedInput else "/nonexistent")}
-        if [ -d "$EXACT_STORE_INPUT" ]; then
+        EXACT_STORE_ROOT=${lib.escapeShellArg (if exactPrefetchedInput != null then exactPrefetchedInput else "/nonexistent")}
+        EXACT_STORE_INPUT="$EXACT_STORE_ROOT"
+        EXACT_STORE_ARCHIVE=""
+        if [ -d "$EXACT_STORE_ROOT/store" ]; then
+          EXACT_STORE_INPUT="$EXACT_STORE_ROOT/store"
+        fi
+        if [ -f "$EXACT_STORE_ROOT/store.tar" ]; then
+          EXACT_STORE_ARCHIVE="$EXACT_STORE_ROOT/store.tar"
+        fi
+        if [ -n "$EXACT_STORE_ARCHIVE" ]; then
+          echo "[nix] mkPnpmStoreUnfixed: validating exact prefetched store archive from $EXACT_STORE_ARCHIVE" >&2
+          LOCAL_STORE="$(pwd)/.pnpm-exact-store"
+          rm -rf "$LOCAL_STORE"
+          mkdir -p "$LOCAL_STORE" "$out/store"
+          tar -xf "$EXACT_STORE_ARCHIVE" -C "$LOCAL_STORE"
+          chmod -R u+rwX "$LOCAL_STORE"
+          pnpm config set store-dir "$LOCAL_STORE"
+          pnpm config set package-import-method copy
+          echo "[nix] mkPnpmStoreUnfixed: pnpm install (offline exact-store) --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir ."
+          timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          cp -R "$LOCAL_STORE/." "$out/store/"
+          chmod -R u+rwX "$out/store" || true
+          echo "[nix] mkPnpmStoreUnfixed: exact prefetched store archive validated"
+        elif [ -d "$EXACT_STORE_INPUT" ]; then
           echo "[nix] mkPnpmStoreUnfixed: validating exact prefetched store from $EXACT_STORE_INPUT" >&2
           LOCAL_STORE="$(pwd)/.pnpm-exact-store"
           rm -rf "$LOCAL_STORE"

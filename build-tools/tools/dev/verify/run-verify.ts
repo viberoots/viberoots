@@ -133,6 +133,10 @@ export async function runVerify(): Promise<void> {
     lock.logFile,
     `[verify] template scope: ${summarizeTemplateScopeDecision(templateScope)}`,
   );
+  await appendVerifyLogLine(
+    lock.logFile,
+    `[verify] resolved targets: ${templateScope.targets.join(" ")}`,
+  );
   if (templateScope.diagnostics) {
     await appendVerifyLogLine(
       lock.logFile,

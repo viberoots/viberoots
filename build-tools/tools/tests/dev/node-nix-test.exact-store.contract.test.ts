@@ -18,4 +18,12 @@ test("node_nix_test prepares and forwards exact pnpm stores into nix builds", as
   if (!rule.includes("exact-store must be a /nix/store path")) {
     throw new Error("node_nix_test must require exact stores to be realized in /nix/store");
   }
+  if (!rule.includes("nix-build-filtered-flake.ts")) {
+    throw new Error("node_nix_test must build through the filtered flake helper");
+  }
+  if (rule.includes('nix build "path:$FLK_ROOT#node-test.')) {
+    throw new Error(
+      "node_nix_test must not build node-test attrs from a live path:$FLK_ROOT flake ref",
+    );
+  }
 });

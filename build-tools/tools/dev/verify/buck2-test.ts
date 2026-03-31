@@ -49,6 +49,7 @@ export function spawnVerifyBuck2Tests(opts: {
       ? Math.floor(testNixTimeoutRaw)
       : 1800;
   const testNixTimeoutSecs = Math.max(minPerTestTimeoutSecs, requestedTestNixTimeoutSecs);
+  const overallTimeoutSecs = Math.max(tsec, testNixTimeoutSecs + 5 * 60);
   // Node's per-test timeout should never be tighter than the Nix timeout budget.
   const nodeTestTimeoutMs = Math.max(minPerTestTimeoutSecs * 1000, tms, testNixTimeoutSecs * 1000);
 
@@ -113,7 +114,7 @@ export function spawnVerifyBuck2Tests(opts: {
     ...consoleFlag,
     ...(threads > 0 ? ["--num-threads", String(threads)] : []),
     "--overall-timeout",
-    `${tsec}s`,
+    `${overallTimeoutSecs}s`,
     "--target-platforms",
     "prelude//platforms:default",
     ...opts.targets,
@@ -125,7 +126,7 @@ export function spawnVerifyBuck2Tests(opts: {
   const timeoutPath = resolveToolPathSync("timeout");
   const buck2Path = resolveToolPathSync("buck2");
 
-  const proc = spawn(timeoutPath, ["-k", "10s", `${tsec}s`, buck2Path, ...buckArgs], {
+  const proc = spawn(timeoutPath, ["-k", "10s", `${overallTimeoutSecs}s`, buck2Path, ...buckArgs], {
     cwd: opts.root,
     env: {
       ...process.env,

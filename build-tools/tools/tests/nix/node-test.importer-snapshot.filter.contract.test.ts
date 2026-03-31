@@ -19,6 +19,7 @@ test("node-test importer snapshots exclude generated and cache directories", asy
     "coverage",
     "report",
     "buck-out",
+    "pnpm-workspace.yaml",
   ]) {
     assert.match(
       file,
@@ -26,4 +27,9 @@ test("node-test importer snapshots exclude generated and cache directories", asy
       `expected node-test importer snapshot to exclude ${dir}`,
     );
   }
+  assert.match(
+    file,
+    /node_modules\\\\\.lockfile-guard/,
+    "expected node-test importer snapshot to exclude lockfile guard artifacts",
+  );
 });

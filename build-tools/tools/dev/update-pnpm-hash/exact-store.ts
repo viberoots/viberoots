@@ -14,7 +14,7 @@ import {
   pnpmFlakeRef,
 } from "./lockfile-shared.ts";
 
-const EXACT_STORE_CACHE_VERSION = 2;
+const EXACT_STORE_CACHE_VERSION = 3;
 
 async function sha256HexFile(absPath: string): Promise<string> {
   const buf = await fsp.readFile(absPath);

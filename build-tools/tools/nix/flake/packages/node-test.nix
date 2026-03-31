@@ -31,7 +31,11 @@ let
             let
               base = builtins.baseNameOf (toString path);
             in
-            !(builtins.elem base importerIgnoredEntries);
+            !(
+              builtins.elem base importerIgnoredEntries
+              || base == "pnpm-workspace.yaml"
+              || builtins.match "\\.node_modules\\.lockfile-guard\\..*" base != null
+            );
         };
 
         hasTestFiles =

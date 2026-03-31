@@ -49,6 +49,11 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   if (!exactStoreImport.includes('"store", "add-path"')) {
     throw new Error("exact-store helpers must import prepared stores into /nix/store");
   }
+  if (!exactStoreImport.includes('"store.tar"')) {
+    throw new Error(
+      "exact-store helpers must archive prepared stores before importing them into /nix/store",
+    );
+  }
 
   const store = await fsp.readFile("build-tools/tools/nix/node-modules/store.nix", "utf8");
   if (!store.includes('builtins.getEnv "NIX_PNPM_EXACT_STORE"')) {
@@ -59,6 +64,9 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   }
   if (!store.includes("pnpm install (offline exact-store)")) {
     throw new Error("store.nix must validate exact prefetched stores offline");
+  }
+  if (!store.includes('if [ -f "$EXACT_STORE_ROOT/store.tar" ]; then')) {
+    throw new Error("store.nix must accept archived exact-store inputs");
   }
   if (!store.includes("NIX_PNPM_EXACT_STORE must be a /nix/store path")) {
     throw new Error("store.nix must reject non-store exact-store paths");
