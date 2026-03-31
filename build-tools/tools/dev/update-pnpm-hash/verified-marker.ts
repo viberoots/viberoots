@@ -103,6 +103,9 @@ export async function currentVerifiedMarkerFingerprint(repoRoot: string): Promis
   const files = [
     "build-tools/tools/dev/update-pnpm-hash.ts",
     "build-tools/tools/dev/update-pnpm-hash/lockfile.ts",
+    "build-tools/tools/dev/update-pnpm-hash/lockfile-shared.ts",
+    "build-tools/tools/dev/update-pnpm-hash/importer-lockfile.ts",
+    "build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
     "build-tools/tools/dev/update-pnpm-hash/nondefault.ts",
     "build-tools/tools/dev/update-pnpm-hash/nix.ts",
     "build-tools/tools/dev/update-pnpm-hash/prefetched-store.ts",

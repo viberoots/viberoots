@@ -45,7 +45,6 @@ async function inner() {
   const lockAbs = path.join(repoRoot, relLock);
   const markerPath = verifiedMarkerPath(repoRoot, importer);
   const builderFingerprint = await currentVerifiedMarkerFingerprint(repoRoot);
-
   const key = relLock;
   if (force) {
     await updateNodeModulesHashesJson(key, "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
@@ -55,11 +54,9 @@ async function inner() {
     !force &&
     !!existingHash &&
     existingHash !== "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-
   await ensureImporterLockfileFreshIfAllowed({ repoRoot, importer });
   const existingLockHash = await sha256File(lockAbs);
   const existingMarker = await readVerifiedMarker(markerPath);
-
   const runFixedBuild = async (phaseLabel: string) =>
     await withExactPrefetchedStore({ repoRoot, importer }, async (extraEnv) => {
       const activity = newManagedCommandActivity();
@@ -67,7 +64,6 @@ async function inner() {
         activity,
       });
     });
-
   const runUnfixedBuild = async (phaseLabel: string) =>
     await withExactPrefetchedStore({ repoRoot, importer }, async (extraEnv) => {
       const activity = newManagedCommandActivity();
@@ -98,7 +94,6 @@ async function inner() {
   ) {
     return;
   }
-
   if (!nonDefaultImporter && hasValidExistingHash) {
     const marker = existingMarker;
     if (
@@ -144,7 +139,6 @@ async function inner() {
   ) {
     return;
   }
-
   // Fast strict path: verify fixed-output store first. Only compute unfixed hash when needed.
   console.log(
     `[update-pnpm-hash] importer=${importer} step=fixed-build attr=${storeAttr} timeout=${timeoutSec}s`,
@@ -175,7 +169,6 @@ async function inner() {
     return;
   }
   let suggested = extractHash(verify.output || "");
-
   if (!suggested) {
     console.log(
       `[update-pnpm-hash] importer=${importer} step=unfixed-build attr=${unfixedAttr} timeout=${timeoutSec}s`,
@@ -194,14 +187,12 @@ async function inner() {
       suggested = pre.sri;
     }
   }
-
   if (!suggested) {
     throw new Error(
       "pnpm-store still failing and no suggested hash found\n\n" + (verify.output || ""),
     );
   }
   const nextHash: string = suggested;
-
   await updateNodeModulesHashesJson(key, nextHash);
   console.log(
     `[update-pnpm-hash] importer=${importer} step=fixed-build-after-hash attr=${storeAttr} timeout=${timeoutSec}s`,
@@ -231,6 +222,7 @@ async function inner() {
   }
   console.log("pnpm-store:", storeAttr, "hash updated and build succeeded");
 }
+
 async function main() {
   if (String(process.env.INSTALL_LOCK_SKIP || "").trim() === "1") {
     return inner();
@@ -247,8 +239,4 @@ async function main() {
     scopeRootAbs: lockScopeRoot,
   });
 }
-
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+void main().catch((e) => (console.error(e), process.exit(1)));

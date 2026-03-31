@@ -4,11 +4,19 @@ import { test } from "node:test";
 
 const EXPECTATIONS = [
   {
-    path: "build-tools/tools/dev/update-pnpm-hash/lockfile.ts",
+    path: "build-tools/tools/dev/update-pnpm-hash/importer-lockfile.ts",
     fragments: [
       "withHiddenNodeModules(importerAbs",
       '"install",\n      "--force",',
       '"fetch",\n      "--force",',
+    ],
+  },
+  {
+    path: "build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
+    fragments: [
+      "withHiddenNodeModules(importerAbs",
+      "fetch --force --frozen-lockfile",
+      "NIX_PNPM_INSTALL_TIMEOUT: fetchTimeout",
     ],
   },
   {
