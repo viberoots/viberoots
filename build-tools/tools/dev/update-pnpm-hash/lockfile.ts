@@ -7,6 +7,7 @@ import {
   generateImporterLockfile,
 } from "./importer-lockfile.ts";
 import { pnpmFlakeRef } from "./lockfile-shared.ts";
+import { withResolvedExactPrefetchedStore } from "./realized-store.ts";
 
 export async function makeFilteredFlakeRef(repoRoot: string): Promise<{
   flakeRef: string;
@@ -35,4 +36,5 @@ export {
   generateImporterLockfile,
   prepareExactPnpmStore,
   withExactPrefetchedStore,
+  withResolvedExactPrefetchedStore,
 };

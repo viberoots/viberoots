@@ -14,6 +14,7 @@ import {
   ensureImporterLockfileFreshIfAllowed,
   generateImporterLockfile,
   withExactPrefetchedStore,
+  withResolvedExactPrefetchedStore,
 } from "./update-pnpm-hash/lockfile.ts";
 import { handleNonDefaultImporter } from "./update-pnpm-hash/nondefault.ts";
 import { buildStore, buildUnfixedAndHash, extractHash } from "./update-pnpm-hash/nix.ts";
@@ -58,14 +59,17 @@ async function inner() {
     await withPnpmStoreBuildFlakeRef(
       { repoRoot, importer, baseFlakeRef: flakeRef },
       async (buildFlakeRef) =>
-        await withExactPrefetchedStore({ repoRoot, importer }, async (extraEnv) => {
-          const activity = newManagedCommandActivity();
-          return await withHeartbeat(
-            phaseLabel,
-            buildStore(storeAttr, buildFlakeRef, activity, extraEnv),
-            { activity },
-          );
-        }),
+        await withResolvedExactPrefetchedStore(
+          { repoRoot, importer, flakeRef: buildFlakeRef, attrPath: storeAttr },
+          async (extraEnv) => {
+            const activity = newManagedCommandActivity();
+            return await withHeartbeat(
+              phaseLabel,
+              buildStore(storeAttr, buildFlakeRef, activity, extraEnv),
+              { activity },
+            );
+          },
+        ),
     );
   const runUnfixedBuild = async (phaseLabel: string) =>
     await withPnpmStoreBuildFlakeRef(
@@ -245,4 +249,6 @@ async function main() {
     scopeRootAbs: lockScopeRoot,
   });
 }
-void main().catch((e) => (console.error(e), process.exit(1)));
+void main().catch(
+  (e) => (console.error(e instanceof Error ? e.message : String(e)), process.exit(1)),
+);

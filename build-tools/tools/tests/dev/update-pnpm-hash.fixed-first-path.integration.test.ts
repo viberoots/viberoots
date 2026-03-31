@@ -34,6 +34,11 @@ test("update-pnpm-hash uses importer-aware fast path and fixed-first root path",
       "update-pnpm-hash.ts must choose an importer-safe build flake before fixed verification",
     );
   }
+  if (!mainTxt.includes("withResolvedExactPrefetchedStore")) {
+    throw new Error(
+      "update-pnpm-hash.ts fixed-store verification must reuse realized pnpm-store outputs before exact prefetch",
+    );
+  }
   if (!mainTxt.includes("buildStore(storeAttr, buildFlakeRef")) {
     throw new Error("update-pnpm-hash.ts must verify fixed store first for root importer");
   }

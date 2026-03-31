@@ -7,6 +7,10 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
     "build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
     "utf8",
   );
+  const exactStoreCommand = await fsp.readFile(
+    "build-tools/tools/dev/update-pnpm-hash/exact-store-command.ts",
+    "utf8",
+  );
   const lockfile = await fsp.readFile("build-tools/tools/dev/update-pnpm-hash/lockfile.ts", "utf8");
   if (!exactStore.includes("export async function withExactPrefetchedStore")) {
     throw new Error("lockfile.ts must expose an exact-store helper for fixed pnpm-store builds");
@@ -15,7 +19,7 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
     !exactStore.includes("fetch") ||
     !exactStore.includes("--frozen-lockfile") ||
     !exactStore.includes("--store-dir") ||
-    !exactStore.includes("nix store add-path")
+    !exactStoreCommand.includes('"store", "add-path"')
   ) {
     throw new Error(
       "exact-store.ts must prefetch exact stores and import them into /nix/store before nix builds",
@@ -23,6 +27,15 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   }
   if (!lockfile.includes("withExactPrefetchedStore")) {
     throw new Error("lockfile.ts must continue exporting the exact-store helper");
+  }
+  if (
+    !exactStore.includes("runExactStoreCommand") ||
+    !exactStoreCommand.includes("withHeartbeat") ||
+    !exactStoreCommand.includes("runManagedCommand")
+  ) {
+    throw new Error(
+      "exact-store helpers must run exact-store stages through managed command helpers",
+    );
   }
 
   const store = await fsp.readFile("build-tools/tools/nix/node-modules/store.nix", "utf8");

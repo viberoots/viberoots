@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { externalPnpmStateDirs } from "../../lib/pnpm-state-paths.ts";
 import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard.ts";
+import { addExactStoreToNixStore, runExactStoreCommand } from "./exact-store-command.ts";
 import {
   cleanupLocalWorkspaceMarker,
   ensureLocalWorkspaceMarker,
@@ -140,30 +141,6 @@ export async function prepareExactPnpmStore(opts: {
       return null;
     }
   };
-  async function importExactStoreIntoNixStore(): Promise<string> {
-    const safeName =
-      opts.importer.replace(/[\\/]+/g, "-").replace(/[^A-Za-z0-9._-]/g, "-") || "root";
-    const added = await $({
-      cwd: opts.repoRoot,
-      stdio: "pipe",
-      timeout: timeoutMs,
-      env: {
-        ...process.env,
-      },
-    })`nix store add-path --name pnpm-exact-store-${safeName} ${storeDir}`;
-    const nixStorePath =
-      String(added.stdout || "")
-        .trim()
-        .split(/\s+/)
-        .pop() || "";
-    if (!nixStorePath || !nixStorePath.startsWith("/nix/store/")) {
-      throw new Error(
-        `failed to import exact pnpm store into nix store for ${opts.importer}: ${String(added.stdout || added.stderr || "").trim()}`,
-      );
-    }
-    return nixStorePath;
-  }
-
   let preparedMarker = await readMarker();
   await fsp.mkdir(cacheDir, { recursive: true });
   await withExactStoreLock(lockPath, async () => {
@@ -176,10 +153,10 @@ export async function prepareExactPnpmStore(opts: {
       await fsp.mkdir(homeDir, { recursive: true });
       await fsp.mkdir(storeDir, { recursive: true });
       await withHiddenNodeModules(importerAbs, async () => {
-        const prefetched = await $({
+        await runExactStoreCommand({
+          label: `importer=${opts.importer} step=exact-store-fetch`,
           cwd: importerAbs,
-          stdio: "pipe",
-          timeout: timeoutMs,
+          timeoutMs,
           env: {
             ...process.env,
             NIX_PNPM_ALLOW_GENERATE: "1",
@@ -187,18 +164,33 @@ export async function prepareExactPnpmStore(opts: {
             NIX_PNPM_INSTALL_TIMEOUT: fetchTimeout,
             PNPM_HOME: homeDir,
           },
-        })`nix run --accept-flake-config ${flakeRef} -- fetch --force --frozen-lockfile --prefer-offline --prod=false --lockfile-dir . --dir . --store-dir ${storeDir} --color never`.nothrow();
-        const stdout = String(prefetched.stdout || "");
-        const stderr = String(prefetched.stderr || "");
-        if (stdout) process.stderr.write(stdout);
-        if (stderr) process.stderr.write(stderr);
-        if (prefetched.exitCode !== 0) {
-          throw new Error(
-            stderr.trim() || stdout.trim() || `exact pnpm store fetch failed for ${opts.importer}`,
-          );
-        }
+          args: [
+            "run",
+            "--accept-flake-config",
+            flakeRef,
+            "--",
+            "fetch",
+            "--force",
+            "--frozen-lockfile",
+            "--prefer-offline",
+            "--prod=false",
+            "--lockfile-dir",
+            ".",
+            "--dir",
+            ".",
+            "--store-dir",
+            storeDir,
+            "--color",
+            "never",
+          ],
+        });
       });
-      const nixStorePath = await importExactStoreIntoNixStore();
+      const nixStorePath = await addExactStoreToNixStore({
+        repoRoot: opts.repoRoot,
+        importer: opts.importer,
+        storeDir,
+        timeoutMs,
+      });
       await fsp.writeFile(
         markerPath,
         JSON.stringify(

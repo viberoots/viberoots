@@ -17,6 +17,18 @@ export type SharedPnpmStoreHashCacheEntry = {
   builderFingerprint: string;
 };
 
+const pnpmStoreBuilderFingerprintFiles = [
+  "flake.lock",
+  "build-tools/tools/nix/flake/for-all-systems.nix",
+  "build-tools/tools/nix/flake/per-system-context.nix",
+  "build-tools/tools/nix/flake/packages/default.nix",
+  "build-tools/tools/nix/flake/packages/node-mods.nix",
+  "build-tools/tools/nix/node-modules.nix",
+  "build-tools/tools/nix/node-modules/common.nix",
+  "build-tools/tools/nix/node-modules/store.nix",
+  "build-tools/tools/nix/node-modules/modules.nix",
+] as const;
+
 export function verifiedMarkerPath(repoRoot: string, importer: string): string {
   const key =
     importer === "." ? "root" : importer.replace(/[\\/]+/g, "-").replace(/[^A-Za-z0-9._-]/g, "-");
@@ -100,24 +112,10 @@ export async function readSharedHashCache(opts: {
 }
 
 export async function currentVerifiedMarkerFingerprint(repoRoot: string): Promise<string> {
-  const files = [
-    "build-tools/tools/dev/update-pnpm-hash.ts",
-    "build-tools/tools/dev/update-pnpm-hash/lockfile.ts",
-    "build-tools/tools/dev/update-pnpm-hash/lockfile-shared.ts",
-    "build-tools/tools/dev/update-pnpm-hash/importer-lockfile.ts",
-    "build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
-    "build-tools/tools/dev/update-pnpm-hash/nondefault.ts",
-    "build-tools/tools/dev/update-pnpm-hash/nix.ts",
-    "build-tools/tools/dev/update-pnpm-hash/prefetched-store.ts",
-    "build-tools/tools/nix/node-modules/store.nix",
-    "build-tools/tools/nix/node-modules/modules.nix",
-    "build-tools/tools/lib/pnpm-importer-lockfile.ts",
-    "build-tools/tools/lib/pnpm-state-paths.ts",
-  ];
   const hash = crypto.createHash("sha256");
   hash.update(`platform=${process.platform}\n`);
   hash.update(`arch=${process.arch}\n`);
-  for (const rel of files) {
+  for (const rel of pnpmStoreBuilderFingerprintFiles) {
     hash.update(`file=${rel}\n`);
     try {
       hash.update(await fsp.readFile(path.join(repoRoot, rel), "utf8"));

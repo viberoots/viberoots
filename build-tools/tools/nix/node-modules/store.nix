@@ -138,7 +138,11 @@ in {
         printf '%s\n' "  - ./" >> pnpm-workspace.yaml
         printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
         IT="${installTimeoutVal}"
-        EXACT_STORE_INPUT="${if exactPrefetchedInput != null then "${exactPrefetchedInput}" else "/nonexistent"}"
+        EXACT_STORE_ROOT="${if exactPrefetchedInput != null then "${exactPrefetchedInput}" else "/nonexistent"}"
+        EXACT_STORE_INPUT="$EXACT_STORE_ROOT"
+        if [ -d "$EXACT_STORE_ROOT/store" ]; then
+          EXACT_STORE_INPUT="$EXACT_STORE_ROOT/store"
+        fi
         if [ -d "$EXACT_STORE_INPUT" ]; then
           echo "[nix] mkPnpmStore: validating exact prefetched store from $EXACT_STORE_INPUT" >&2
           LOCAL_STORE="$(pwd)/.pnpm-exact-store"
