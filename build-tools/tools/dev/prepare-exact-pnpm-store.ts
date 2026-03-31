@@ -18,7 +18,7 @@ async function main() {
   const importer = parseImporterArg();
   const repoRoot = process.cwd();
   const prepared = await prepareExactPnpmStore({ repoRoot, importer });
-  process.stdout.write(path.resolve(prepared.storeDir) + "\n");
+  process.stdout.write(path.resolve(prepared.nixStorePath) + "\n");
 }
 
 main().catch((error) => {

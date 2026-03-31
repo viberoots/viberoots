@@ -89,7 +89,7 @@ async function withExactStoreLock<T>(lockPath: string, fn: () => Promise<T>): Pr
 export async function prepareExactPnpmStore(opts: {
   repoRoot: string;
   importer: string;
-}): Promise<{ storeDir: string; cleanup: () => Promise<void> }> {
+}): Promise<{ storeDir: string; nixStorePath: string; cleanup: () => Promise<void> }> {
   const importerAbs = path.resolve(opts.repoRoot, opts.importer);
   const lockfileAbs = path.join(importerAbs, "pnpm-lock.yaml");
   if (!fs.existsSync(lockfileAbs)) {
@@ -106,24 +106,71 @@ export async function prepareExactPnpmStore(opts: {
   const markerPath = path.join(cacheDir, "ready.json");
   const lockPath = path.join(cacheDir, ".prepare.lock");
   const flakeRef = pnpmFlakeRef(opts.repoRoot);
-  const markerMatches = async (): Promise<boolean> => {
+  const readMarker = async (): Promise<{
+    version: number;
+    importer: string;
+    lockHash: string;
+    nixStorePath: string;
+  } | null> => {
     try {
       const raw = await fsp.readFile(markerPath, "utf8");
-      const parsed = JSON.parse(raw) as { version?: number; importer?: string; lockHash?: string };
-      return (
-        parsed.version === EXACT_STORE_CACHE_VERSION &&
-        parsed.importer === opts.importer &&
-        parsed.lockHash === lockHash &&
-        fs.existsSync(storeDir)
-      );
+      const parsed = JSON.parse(raw) as {
+        version?: number;
+        importer?: string;
+        lockHash?: string;
+        nixStorePath?: string;
+      };
+      const nixStorePath = String(parsed.nixStorePath || "").trim();
+      if (
+        parsed.version !== EXACT_STORE_CACHE_VERSION ||
+        parsed.importer !== opts.importer ||
+        parsed.lockHash !== lockHash ||
+        !fs.existsSync(storeDir) ||
+        !nixStorePath ||
+        !fs.existsSync(nixStorePath)
+      ) {
+        return null;
+      }
+      return {
+        version: EXACT_STORE_CACHE_VERSION,
+        importer: opts.importer,
+        lockHash,
+        nixStorePath,
+      };
     } catch {
-      return false;
+      return null;
     }
   };
 
+  async function importExactStoreIntoNixStore(): Promise<string> {
+    const safeName =
+      opts.importer.replace(/[\\/]+/g, "-").replace(/[^A-Za-z0-9._-]/g, "-") || "root";
+    const added = await $({
+      cwd: opts.repoRoot,
+      stdio: "pipe",
+      timeout: timeoutMs,
+      env: {
+        ...process.env,
+      },
+    })`nix store add-path --name pnpm-exact-store-${safeName} ${storeDir}`;
+    const nixStorePath =
+      String(added.stdout || "")
+        .trim()
+        .split(/\s+/)
+        .pop() || "";
+    if (!nixStorePath || !nixStorePath.startsWith("/nix/store/")) {
+      throw new Error(
+        `failed to import exact pnpm store into nix store for ${opts.importer}: ${String(added.stdout || added.stderr || "").trim()}`,
+      );
+    }
+    return nixStorePath;
+  }
+
+  let preparedMarker = await readMarker();
   await fsp.mkdir(cacheDir, { recursive: true });
   await withExactStoreLock(lockPath, async () => {
-    if (await markerMatches()) return;
+    preparedMarker = await readMarker();
+    if (preparedMarker) return;
     const { workspaceFileAbs, hadLocalWorkspaceFile } =
       await ensureLocalWorkspaceMarker(importerAbs);
     try {
@@ -153,6 +200,7 @@ export async function prepareExactPnpmStore(opts: {
           );
         }
       });
+      const nixStorePath = await importExactStoreIntoNixStore();
       await fsp.writeFile(
         markerPath,
         JSON.stringify(
@@ -160,12 +208,19 @@ export async function prepareExactPnpmStore(opts: {
             version: EXACT_STORE_CACHE_VERSION,
             importer: opts.importer,
             lockHash,
+            nixStorePath,
           },
           null,
           2,
         ) + "\n",
         "utf8",
       );
+      preparedMarker = {
+        version: EXACT_STORE_CACHE_VERSION,
+        importer: opts.importer,
+        lockHash,
+        nixStorePath,
+      };
     } catch (error) {
       await fsp.rm(storeDir, { recursive: true, force: true }).catch(() => {});
       await fsp.rm(markerPath, { force: true }).catch(() => {});
@@ -174,7 +229,10 @@ export async function prepareExactPnpmStore(opts: {
       await cleanupLocalWorkspaceMarker({ workspaceFileAbs, hadLocalWorkspaceFile });
     }
   });
-  return { storeDir, cleanup: async () => {} };
+  if (!preparedMarker) {
+    throw new Error(`exact pnpm store marker missing after preparation for ${opts.importer}`);
+  }
+  return { storeDir, nixStorePath: preparedMarker.nixStorePath, cleanup: async () => {} };
 }
 
 export async function withExactPrefetchedStore<T>(
@@ -185,7 +243,7 @@ export async function withExactPrefetchedStore<T>(
   try {
     return await fn({
       ...process.env,
-      NIX_PNPM_EXACT_STORE: prepared.storeDir,
+      NIX_PNPM_EXACT_STORE: prepared.nixStorePath,
     });
   } finally {
     await prepared.cleanup();

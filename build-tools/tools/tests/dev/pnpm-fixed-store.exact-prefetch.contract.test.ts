@@ -14,10 +14,11 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   if (
     !exactStore.includes("fetch") ||
     !exactStore.includes("--frozen-lockfile") ||
-    !exactStore.includes("--store-dir")
+    !exactStore.includes("--store-dir") ||
+    !exactStore.includes("nix store add-path")
   ) {
     throw new Error(
-      "exact-store.ts must prefetch exact stores with frozen lockfiles before nix builds",
+      "exact-store.ts must prefetch exact stores and import them into /nix/store before nix builds",
     );
   }
   if (!lockfile.includes("withExactPrefetchedStore")) {
@@ -27,6 +28,9 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   const store = await fsp.readFile("build-tools/tools/nix/node-modules/store.nix", "utf8");
   if (!store.includes('builtins.getEnv "NIX_PNPM_EXACT_STORE"')) {
     throw new Error("store.nix must read the exact-store env for fixed pnpm-store builds");
+  }
+  if (!store.includes("builtins.storePath exactPrefetchedPath")) {
+    throw new Error("store.nix must treat exact-store env values as existing /nix/store paths");
   }
   if (!store.includes("pnpm install (offline exact-store)")) {
     throw new Error("store.nix must validate exact prefetched stores offline");
