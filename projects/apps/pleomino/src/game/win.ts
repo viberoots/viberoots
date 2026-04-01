@@ -7,7 +7,23 @@ export function computeWinState(state: GameState): boolean {
     return false;
   }
 
+  const boardCellCount = state.board.size.columns * state.board.size.rows;
   const pieceById = new Map(state.pieceCatalog.map((piece) => [piece.pieceId, piece]));
+  let coveredCellBudget = 0;
+  for (const placed of state.board.placedPieces) {
+    const definition = pieceById.get(placed.pieceId);
+    if (!definition || !placed.isPlaced) {
+      continue;
+    }
+    coveredCellBudget += definition.baseCells.length;
+    if (coveredCellBudget > boardCellCount) {
+      return false;
+    }
+  }
+  if (coveredCellBudget !== boardCellCount) {
+    return false;
+  }
+
   const occupied = new Set<string>();
 
   for (const placed of state.board.placedPieces) {
@@ -36,5 +52,5 @@ export function computeWinState(state: GameState): boolean {
     }
   }
 
-  return occupied.size === state.board.size.columns * state.board.size.rows;
+  return occupied.size === boardCellCount;
 }

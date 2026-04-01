@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { FILTERED_FLAKE_RSYNC_EXCLUDES } from "../../dev/nix-build-filtered-flake-lib.ts";
 
 test("filtered flake snapshot excludes large generated artifacts", async () => {
   const updaterHelper = await fsp.readFile(
@@ -9,20 +10,20 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
   );
   const helper = await fsp.readFile("build-tools/tools/dev/nix-build-filtered-flake.ts", "utf8");
   const required = [
-    "--exclude coverage",
-    "--exclude .clinic",
-    "--exclude .turbo",
-    "--exclude .cache",
-    "--exclude pnpm-workspace.yaml",
-    "--exclude .node_modules.lockfile-guard.*",
-    "--exclude result-*",
+    "coverage",
+    ".clinic",
+    ".turbo",
+    ".cache",
+    "pnpm-workspace.yaml",
+    ".node_modules.lockfile-guard.*",
+    "result-*",
   ];
 
   for (const token of required) {
-    if (!updaterHelper.includes(token)) {
-      throw new Error(`update-pnpm-hash filtered snapshot must include ${token}`);
+    if (!updaterHelper.includes(`--exclude ${token}`)) {
+      throw new Error(`update-pnpm-hash filtered snapshot must include --exclude ${token}`);
     }
-    if (!helper.includes(token)) {
+    if (!FILTERED_FLAKE_RSYNC_EXCLUDES.includes(token)) {
       throw new Error(`nix-build-filtered-flake snapshot must include ${token}`);
     }
   }

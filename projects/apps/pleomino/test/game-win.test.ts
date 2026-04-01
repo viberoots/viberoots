@@ -103,4 +103,46 @@ describe("computeWinState", () => {
     expect(computeWinState(withGap)).toBe(false);
     expect(computeWinState(withOverlap)).toBe(false);
   });
+
+  it("returns false when placed cell budget exceeds the board before geometry checks", () => {
+    const overfilled = createState([
+      {
+        instanceId: "unit#0",
+        pieceId: "unit",
+        transform: { rotation: 0, flipped: false },
+        position: { x: 0, y: 0 },
+        isPlaced: true,
+      },
+      {
+        instanceId: "unit#1",
+        pieceId: "unit",
+        transform: { rotation: 0, flipped: false },
+        position: { x: 1, y: 0 },
+        isPlaced: true,
+      },
+      {
+        instanceId: "unit#2",
+        pieceId: "unit",
+        transform: { rotation: 0, flipped: false },
+        position: { x: 0, y: 1 },
+        isPlaced: true,
+      },
+      {
+        instanceId: "unit#3",
+        pieceId: "unit",
+        transform: { rotation: 0, flipped: false },
+        position: { x: 1, y: 1 },
+        isPlaced: true,
+      },
+      {
+        instanceId: "unit#4",
+        pieceId: "unit",
+        transform: { rotation: 0, flipped: false },
+        position: { x: 0, y: 0 },
+        isPlaced: true,
+      },
+    ]);
+
+    expect(computeWinState(overfilled)).toBe(false);
+  });
 });

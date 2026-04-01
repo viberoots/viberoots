@@ -1,5 +1,6 @@
 import React from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { flushSync } from "react-dom";
 import {
   loadPersistedGameStateFromHash,
   savePersistedGameStateToHash,
@@ -39,7 +40,9 @@ export function renderGameScreen(): { container: HTMLDivElement; root: Root } {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-  root.render(<GameScreen url="/games/pleomino" />);
+  flushSync(() => {
+    root.render(<GameScreen url="/games/pleomino" />);
+  });
   return { container, root };
 }
 
