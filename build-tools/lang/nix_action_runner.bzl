@@ -33,9 +33,17 @@ def nix_action_export_graph_cmd(
         query_roots = ",".join(roots + ["go", "cpp", "third_party"])
     return (
         "mkdir -p \"$WORKSPACE_ROOT/build-tools/tools/buck\"; "
-        + ("BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_QUERY_ROOTS=\"%s\" " % query_roots)
+        + "BNX_NODE_ZX_INIT=\"$WORKSPACE_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
+        + "if command -v node >/dev/null 2>&1; then "
+        + ("  BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_QUERY_ROOTS=\"%s\" " % query_roots)
+        + "node --experimental-top-level-await --disable-warning=ExperimentalWarning "
+        + "--experimental-strip-types --import \"$BNX_NODE_ZX_INIT\" "
+        + ("\"$WORKSPACE_ROOT/build-tools/tools/buck/export-graph.ts\" --out \"%s\"; " % out_graph)
+        + "else "
+        + ("  BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_QUERY_ROOTS=\"%s\" " % query_roots)
         + ("nix run --accept-flake-config \"%s\" -- " % zx_wrapper)
         + ("build-tools/tools/buck/export-graph.ts --out \"%s\"; " % out_graph)
+        + "fi; "
     )
 
 
@@ -64,5 +72,4 @@ def nix_action_build_selected_out_path_cmd(
 
 def nix_action_shell_prefix_core():
     return nix_bootstrap_env_core()
-
 
