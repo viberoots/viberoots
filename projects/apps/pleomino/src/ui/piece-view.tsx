@@ -74,7 +74,7 @@ function PieceViewBase(props: {
       }
       props.onStartDrag(props.piece.pieceId, pointer, grabbedOffsetPx, event.nativeEvent.button);
     },
-    [grabbedOffsetFromPointer, props],
+    [grabbedOffsetFromPointer, props.onStartDrag, props.piece.canDrag, props.piece.pieceId],
   );
 
   return (

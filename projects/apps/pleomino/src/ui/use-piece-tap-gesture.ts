@@ -28,6 +28,7 @@ export function usePieceTapGesture(args: {
   dispatch: React.Dispatch<GameAction>;
   dragSessionRef: React.MutableRefObject<ActiveDragSession | null>;
 }) {
+  const { dispatch, dragSessionRef } = args;
   const pendingTapRef = React.useRef<PendingTap | null>(null);
   const recentTapRef = React.useRef<RecentTap | null>(null);
   const tapSuppressedUntilRef = React.useRef(0);
@@ -43,7 +44,7 @@ export function usePieceTapGesture(args: {
 
   const handleTapGesture = React.useCallback(
     (pieceId: string, instanceId: string | null, mouseButton: number | null, pointer: Pointer) => {
-      if (args.dragSessionRef.current || Date.now() < tapSuppressedUntilRef.current) {
+      if (dragSessionRef.current || Date.now() < tapSuppressedUntilRef.current) {
         return;
       }
       const key = tapTargetKey(pieceId, instanceId);
@@ -63,14 +64,14 @@ export function usePieceTapGesture(args: {
       if (pendingTap && pendingTap.targetKey === key) {
         clearTimeout(pendingTap.timeoutId);
         pendingTapRef.current = null;
-        args.dispatch({ type: "piece/flip", pieceId, instanceId });
+        dispatch({ type: "piece/flip", pieceId, instanceId });
         return;
       }
       clearPendingTap();
       pendingTapRef.current = {
         targetKey: key,
         timeoutId: setTimeout(() => {
-          args.dispatch({
+          dispatch({
             type: "piece/rotate",
             pieceId,
             instanceId,
@@ -82,7 +83,7 @@ export function usePieceTapGesture(args: {
         }, DOUBLE_TAP_WINDOW_MS),
       };
     },
-    [args, clearPendingTap],
+    [clearPendingTap, dispatch, dragSessionRef],
   );
 
   const suppressTapAfterDrag = React.useCallback(() => {
