@@ -1,12 +1,22 @@
 { pkgs }:
 let
-  toolchain = name: pkg:
+  toolchain = name: packages:
     pkgs.symlinkJoin {
       name = name;
-      paths = [ pkg ];
+      paths = if builtins.isList packages then packages else [ packages ];
     };
 in
 {
   go = toolchain "toolchain-go" pkgs.go;
+  cxx = toolchain "toolchain-cxx" [
+    pkgs.llvmPackages.clang
+    pkgs.llvmPackages.llvm
+  ];
+  emscripten = toolchain "toolchain-emscripten" pkgs.emscripten;
+  tinygo = toolchain "toolchain-tinygo" [
+    pkgs.tinygo
+    pkgs.llvmPackages.clang
+    pkgs.llvmPackages.lld
+  ];
   python = toolchain "toolchain-python" pkgs.python3;
 }

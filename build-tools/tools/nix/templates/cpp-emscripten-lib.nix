@@ -50,6 +50,28 @@ in {
       in "[${quoted}]";
     emcc = "${pkgs.emscripten}/bin/emcc";
     empp = "${pkgs.emscripten}/bin/em++";
+    emscriptenCacheSeed = pkgs.runCommand "emscripten-cache-seed-${pkgs.emscripten.version}" {
+      nativeBuildInputs = [ pkgs.emscripten pkgs.which ];
+    } ''
+      set -euo pipefail
+      export HOME="$TMPDIR/home"
+      export EM_CACHE="$TMPDIR/emscripten-cache"
+      mkdir -p "$HOME" "$EM_CACHE"
+      cat > "$TMPDIR/seed.cc" <<'EOF'
+      extern "C" int emscripten_cache_seed() { return 0; }
+      EOF
+      "${pkgs.emscripten}/bin/em++" \
+        -O2 \
+        -s STANDALONE_WASM=1 \
+        --no-entry \
+        -s ENVIRONMENT=node \
+        -s MODULARIZE=1 \
+        -s EXPORT_NAME=ModuleFactory \
+        "$TMPDIR/seed.cc" \
+        -o "$TMPDIR/seed.js"
+      mkdir -p "$out"
+      cp -a "$EM_CACHE/." "$out"/
+    '';
     exportedFunctionsList = if builtins.isList exportedFunctions then exportedFunctions else [];
     exportedFunctionFlags =
       if exportedFunctionsList != []
@@ -95,6 +117,8 @@ in {
       export SOURCE_DATE_EPOCH=1
       export EM_CACHE="$TMPDIR/emscripten-cache"
       mkdir -p "$out/lib" "$out/include" "$TMPDIR/obj" "$EM_CACHE"
+      cp -a ${emscriptenCacheSeed}/. "$EM_CACHE"/
+      chmod -R u+w "$EM_CACHE"
 
       # Discover sources deterministically (Nix-computed command)
       mapfile -t SRCS < <(${srcsCmd})
@@ -139,5 +163,3 @@ in {
     '';
   };
 }
-
-
