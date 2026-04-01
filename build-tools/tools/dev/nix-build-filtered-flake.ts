@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagStr } from "../lib/cli.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli.ts";
 import {
   computeSelectedCppPackageClosure,
   FILTERED_FLAKE_RSYNC_EXCLUDES,
@@ -48,16 +48,46 @@ async function readSelectedCppSnapshotSources(
   return { packagePaths, rsyncSources };
 }
 
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(ms < 10_000 ? 2 : 1)}s`;
+  const mins = Math.floor(ms / 60_000);
+  const secs = ((ms % 60_000) / 1000).toFixed(1);
+  return `${mins}m${secs}s`;
+}
+
+function readInt(value: unknown): number {
+  const n = Number.parseInt(String(value || "").trim(), 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+async function readSnapshotStats(
+  dir: string,
+): Promise<{ fileCount: number; dirCount: number; kb: number }> {
+  const [{ stdout: files }, { stdout: dirs }, { stdout: kb }] = await Promise.all([
+    $({ stdio: "pipe" })`find ${dir} -type f | wc -l`,
+    $({ stdio: "pipe" })`find ${dir} -type d | wc -l`,
+    $({ stdio: "pipe" })`du -sk ${dir}`,
+  ]);
+  return {
+    fileCount: readInt(files),
+    dirCount: readInt(dirs),
+    kb: readInt(String(kb || "").split(/\s+/)[0]),
+  };
+}
+
 async function main(): Promise<void> {
   const attr = getFlagStr("attr", "");
   if (!attr) {
     console.error("[nix-build-filtered-flake] missing --attr");
     process.exit(2);
   }
+  const snapshotOnly = getFlagBool("snapshot-only");
   const root = path.resolve(String(process.env.WORKSPACE_ROOT || process.cwd()).trim());
   const tmpBase = process.env.TMPDIR || "/tmp";
   const workDir = await fsp.mkdtemp(path.join(tmpBase, "bnx-flake-"));
   const snapDir = path.join(workDir, "src");
+  let keepSnapshot = snapshotOnly;
   const withHeartbeat = async <T>(label: string, p: Promise<T>): Promise<T> => {
     const started = Date.now();
     const timer = setInterval(() => {
@@ -74,12 +104,15 @@ async function main(): Promise<void> {
     await fsp.mkdir(snapDir, { recursive: true });
     const rsyncExcludes = FILTERED_FLAKE_RSYNC_EXCLUDES.map((entry) => ["--exclude", entry]).flat();
     const selectedCppSources = await readSelectedCppSnapshotSources(root);
+    const snapshotStart = Date.now();
     if (selectedCppSources != null) {
       console.error(
         "[nix-build-filtered-flake] creating selected cpp snapshot:",
         snapDir,
         "packages=",
         selectedCppSources.packagePaths.join(","),
+        "rsyncSources=",
+        String(selectedCppSources.rsyncSources.length),
       );
       await withHeartbeat(
         "snapshot-rsync",
@@ -96,6 +129,17 @@ async function main(): Promise<void> {
         })`rsync -a --delete ${rsyncExcludes} ${root}/ ${snapDir}/`,
       );
     }
+    const snapshotStats = await readSnapshotStats(snapDir);
+    console.error(
+      `[nix-build-filtered-flake] snapshot ready in ${formatDuration(Date.now() - snapshotStart)} files=${snapshotStats.fileCount} dirs=${snapshotStats.dirCount} kb=${snapshotStats.kb}`,
+    );
+    if (snapshotOnly) {
+      console.error(
+        `[nix-build-filtered-flake] snapshot-only mode; keeping snapshot at ${snapDir}`,
+      );
+      process.stdout.write(`${snapDir}\n`);
+      return;
+    }
     const flakeRef = `path:${snapDir}#${attr}`;
     console.error("[nix-build-filtered-flake] building attr:", attr);
     const nixEnv =
@@ -106,6 +150,7 @@ async function main(): Promise<void> {
             BUCK_TEST_SRC: snapDir,
           }
         : process.env;
+    const buildStart = Date.now();
     const res = await withHeartbeat(
       "nix-build",
       $({
@@ -113,9 +158,20 @@ async function main(): Promise<void> {
         env: nixEnv,
       })`nix build --impure ${flakeRef} --accept-flake-config --option min-free 0 --option max-free 0 --no-link --print-out-paths`,
     );
+    const outPath =
+      String(res.stdout || "")
+        .trim()
+        .split(/\n+/)
+        .filter(Boolean)
+        .at(-1) || "";
+    console.error(
+      `[nix-build-filtered-flake] nix build finished in ${formatDuration(Date.now() - buildStart)}${outPath ? ` out=${outPath}` : ""}`,
+    );
     process.stdout.write(String(res.stdout || ""));
   } finally {
-    await fsp.rm(workDir, { recursive: true, force: true }).catch(() => {});
+    if (!keepSnapshot) {
+      await fsp.rm(workDir, { recursive: true, force: true }).catch(() => {});
+    }
   }
 }
 

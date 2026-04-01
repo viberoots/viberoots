@@ -114,5 +114,20 @@ EOF'`;
       String(build.stdout || "").includes("core_emscripten.stamp"),
       "expected nix_cpp_wasm_emscripten_lib to produce a stamp output",
     );
+    const stampPath = String(build.stdout || "")
+      .trim()
+      .split(/\s+/)
+      .at(-1);
+    assert.ok(stampPath, "expected buck2 build --show-output to print the stamp path");
+    const stampAbs = path.isAbsolute(String(stampPath))
+      ? String(stampPath)
+      : path.join(tmp, String(stampPath));
+    const stampText = await fsp.readFile(stampAbs, "utf8");
+    assert.ok(stampText.includes("build_log="), "expected emscripten stamp to expose build_log");
+    assert.ok(stampText.includes("phase_log="), "expected emscripten stamp to expose phase_log");
+    assert.ok(
+      stampText.includes("selected_build_secs="),
+      "expected emscripten stamp to expose selected build timing",
+    );
   });
 });

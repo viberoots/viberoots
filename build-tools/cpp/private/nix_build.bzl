@@ -56,11 +56,14 @@ def _cpp_nix_build_impl(ctx):
         nix_action_workspace_setup_from_args()
         + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
         + nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)
+        + "SECONDS=0; "
         + "cd \"$FLK_ROOT\"; "
+        + "graph_export_start=$SECONDS; "
         + nix_action_export_graph_cmd(
             out_graph = "$WORKSPACE_ROOT/build-tools/tools/buck/graph.json",
             zx_wrapper = "path:$FLK_ROOT#zx-wrapper",
         )
+        + "graph_export_secs=$((SECONDS - graph_export_start)); "
         # Require a pre-exported Buck graph for the temp workspace (fail fast if missing)
         + "echo \"[cpp_nix_build] WR=$WORKSPACE_ROOT FLK=$FLK_ROOT\" >&2; "
         + "ls -la \"$WORKSPACE_ROOT/build-tools/tools/buck\" >/dev/null 2>&1 || true; "
@@ -76,12 +79,15 @@ def _cpp_nix_build_impl(ctx):
         + ("export BUCK_TARGET=\"%s\"; " % raw)
         + "export BUCK_TEST_SRC=\"$WORKSPACE_ROOT\"; "
         + "OUT_PATHS_FILE=\"$TMP/bnx-nix-outpaths.txt\"; "
+        + "selected_build_start=$SECONDS; "
         + (
             "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning "
             + "--experimental-strip-types --import \"$BNX_NODE_ZX_INIT\" "
             + "\"$WORKSPACE_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
             + "\"graph-generator-selected\" > \"$OUT_PATHS_FILE\"; "
         )
+        + "selected_build_secs=$((SECONDS - selected_build_start)); "
+        + "action_total_secs=$SECONDS; "
         + "OUT_LAST_FILE=\"$OUT_PATHS_FILE.last\"; "
         + "tail -n1 \"$OUT_PATHS_FILE\" > \"$OUT_LAST_FILE\"; "
         + "outPath=\"\"; read -r outPath < \"$OUT_LAST_FILE\" 2>/dev/null || true; "
@@ -104,7 +110,19 @@ def _cpp_nix_build_impl(ctx):
             + "  exit 2; "
             + "fi; "
             + "DEST=\"$0\"; "
-            + "printf 'kind=emscripten\\nlabel=%s\\njs=%s\\nwasm=%s\\n' > \"$DEST\"; "
+            + "printf '%%s\\n' "
+            + "  'kind=emscripten' "
+            + "  'label=%s' "
+            + "  \"nix_out=$outPath\" "
+            + "  \"build_log=$outPath/build.log\" "
+            + "  \"phase_log=$outPath/diagnostics/emscripten/phase-times.tsv\" "
+            + "  \"compile_log=$outPath/diagnostics/emscripten/compile-times.tsv\" "
+            + "  \"source_log=$outPath/diagnostics/emscripten/source-list.txt\" "
+            + "  \"graph_export_secs=$graph_export_secs\" "
+            + "  \"selected_build_secs=$selected_build_secs\" "
+            + "  \"action_total_secs=$action_total_secs\" "
+            + "  \"js=$outPath/%s\" "
+            + "  \"wasm=$outPath/%s\" > \"$DEST\"; "
             + "else "
             + "DEST=\"$0\"; cp -f \"$outPath/%s\" \"$DEST\"; "
             + "fi; "
