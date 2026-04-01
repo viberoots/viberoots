@@ -103,6 +103,31 @@ EOF'`;
       "expected patch_scope:package-local label on target",
     );
 
+    const probeNixInputs = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute nix_inputs //projects/apps/demo:core_emscripten`;
+    assert.equal(
+      probeNixInputs.exitCode,
+      0,
+      String(probeNixInputs.stderr || probeNixInputs.stdout || ""),
+    );
+    const nixInputsOut = String(probeNixInputs.stdout || "");
+    assert.ok(
+      nixInputsOut.includes("//build-tools/tools/buck:runtime_ts"),
+      "expected exporter runtime filegroup in nix_inputs for emscripten target",
+    );
+    assert.ok(
+      nixInputsOut.includes("//build-tools/tools/dev:runtime_ts"),
+      "expected selected-build runtime filegroup in nix_inputs for emscripten target",
+    );
+    assert.ok(
+      nixInputsOut.includes("//build-tools/tools/nix:runtime_nix"),
+      "expected planner runtime filegroup in nix_inputs for emscripten target",
+    );
+
     const build = await $({
       cwd: tmp,
       stdio: "pipe",

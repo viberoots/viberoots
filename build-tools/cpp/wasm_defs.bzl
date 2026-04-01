@@ -4,10 +4,10 @@ load(
     "merge_link_intent_deps",
     "prepare_language_wiring",
 )
-load("//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
 load("//build-tools/lang:sanitize.bzl", "sanitize_name")
 load("//build-tools/lang:module_surface.bzl", "module_surface")
 load("//build-tools/cpp/private:nix_build.bzl", "cpp_nix_build")
+load("//build-tools/cpp/private:runtime_inputs.bzl", "cpp_runtime_nix_inputs")
 load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _wasm_target_for_abi(wasm_abi):
@@ -46,7 +46,7 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
     kw["link_deps"] = link_deps
     kw["header_deps"] = header_deps
     merged = merge_link_intent_deps(deps, link_deps, header_deps)
-    nix_inputs = global_nix_inputs()
+    nix_inputs = cpp_runtime_nix_inputs()
     wiring = prepare_language_wiring(
         name = name,
         kwargs = kw,
@@ -128,7 +128,7 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
         srcs = prepared.get("srcs", []) or [],
         labels = prepared.get("labels", []) or [],
         exported_functions = prepared.get("exported_functions", []) or [],
-        nix_inputs = global_nix_inputs(),
+        nix_inputs = cpp_runtime_nix_inputs(),
         visibility = prepared.get("visibility", []),
     )
 

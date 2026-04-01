@@ -1,0 +1,10 @@
+load("@prelude//:rules.bzl", "filegroup")
+
+filegroup(
+    name = "runtime_ts",
+    srcs = glob([
+        "**/*.json",
+        "**/*.ts",
+    ]),
+    visibility = ["PUBLIC"],
+)

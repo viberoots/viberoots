@@ -37,6 +37,22 @@ test("cpp macros do not couple to overlay in nix_inputs (cquery)", async () => {
     const out = String(probe.stdout || "");
     assert.ok(out.includes(":flake.lock"), "expected flake.lock to be present in nix_inputs");
     assert.ok(
+      out.includes("//build-tools/tools/buck:runtime_ts"),
+      "expected Buck exporter runtime filegroup to be present in nix_inputs",
+    );
+    assert.ok(
+      out.includes("//build-tools/tools/dev:runtime_ts"),
+      "expected selected-build helper runtime filegroup to be present in nix_inputs",
+    );
+    assert.ok(
+      out.includes("//build-tools/tools/lib:runtime_ts"),
+      "expected shared TypeScript helper runtime filegroup to be present in nix_inputs",
+    );
+    assert.ok(
+      out.includes("//build-tools/tools/nix:runtime_nix"),
+      "expected planner runtime filegroup to be present in nix_inputs",
+    );
+    assert.ok(
       !out.includes("build-tools/tools/nix/overlays:cpp-patches.nix"),
       "overlay cpp-patches.nix must not be present in nix_inputs",
     );

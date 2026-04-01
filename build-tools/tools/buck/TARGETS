@@ -1,7 +1,17 @@
-load("@prelude//:rules.bzl", "export_file")
+load("@prelude//:rules.bzl", "export_file", "filegroup")
 
 export_file(
     name = "workspace-root.env",
     src = "workspace-root.env",
+    visibility = ["PUBLIC"],
+)
+
+filegroup(
+    name = "runtime_ts",
+    srcs = glob([
+        "**/*.ts",
+    ], exclude = [
+        "**/.export-cache/**",
+    ]),
     visibility = ["PUBLIC"],
 )

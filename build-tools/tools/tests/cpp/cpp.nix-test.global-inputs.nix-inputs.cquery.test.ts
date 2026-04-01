@@ -34,5 +34,13 @@ test("nix_cpp_test passes global Nix inputs through cpp_nix_test(nix_inputs)", a
       out.includes(":flake.lock"),
       "expected //:flake.lock to be present in nix_inputs via global_nix_inputs()",
     );
+    assert.ok(
+      out.includes("//build-tools/tools/dev:runtime_ts"),
+      "expected selected-build runtime filegroup to be present in nix_inputs",
+    );
+    assert.ok(
+      out.includes("//build-tools/tools/nix:runtime_nix"),
+      "expected planner runtime filegroup to be present in nix_inputs",
+    );
   });
 });

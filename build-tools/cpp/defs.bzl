@@ -9,11 +9,11 @@ load(
     "wire_package_local_planner_visible_stub",
     "wire_package_local_wasm_planner_visible_stub",
 )
-load("//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
 load("//build-tools/cpp/private:sanitize.bzl", _cpp_sanitize_probe="cpp_sanitize_probe")
 load("//build-tools/lang:sanitize.bzl", "sanitize_name")
 load("//build-tools/cpp/private:nix_test.bzl", "cpp_nix_test")
 load("//build-tools/cpp/private:nix_build.bzl", "cpp_nix_build")
+load("//build-tools/cpp/private:runtime_inputs.bzl", "cpp_runtime_nix_inputs")
 load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
 load(
     "//build-tools/cpp:wasm_defs.bzl",
@@ -22,7 +22,7 @@ load(
 )
 
 def _cpp_common(name, kind, kwargs):
-    nix_inputs = global_nix_inputs()
+    nix_inputs = cpp_runtime_nix_inputs()
     kw = dict(kwargs)
     deps = kw.pop("deps", []) or []
     link_deps = kw.pop("link_deps", []) or []
@@ -138,7 +138,7 @@ def nix_cpp_headers(name, **kwargs):
         link_mode = prepared.get("link_mode", link_mode),
         srcs = prepared.get("srcs", []) or [],
         labels = prepared.get("labels", []) or [],
-        nix_inputs = global_nix_inputs(),
+        nix_inputs = cpp_runtime_nix_inputs(),
         visibility = prepared.get("visibility", []),
     )
 
@@ -183,7 +183,7 @@ def nix_cpp_test(name, **kwargs):
         out = name + ".stamp",
         planner_label = "//%s:%s" % (native.package_name(), planner_name),
         planner = ":%s" % planner_name,
-        nix_inputs = global_nix_inputs(),
+        nix_inputs = cpp_runtime_nix_inputs(),
     )
 
 
@@ -220,4 +220,3 @@ __all__ = [
     "nix_cpp_wasm_emscripten_lib",
     "cpp_sanitize_probe",
 ]
-

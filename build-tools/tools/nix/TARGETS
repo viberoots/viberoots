@@ -1,0 +1,17 @@
+load("@prelude//:rules.bzl", "filegroup")
+
+filegroup(
+    name = "runtime_nix",
+    srcs = glob([
+        "*.json",
+        "*.nix",
+        "flake/**/*.nix",
+        "lib/**/*.nix",
+        "node-modules/**/*.nix",
+        "planner/**/*.nix",
+        "templates/**/*.nix",
+        "toolchains/**/*.nix",
+        "uv2nix-*.nix",
+    ]),
+    visibility = ["PUBLIC"],
+)
