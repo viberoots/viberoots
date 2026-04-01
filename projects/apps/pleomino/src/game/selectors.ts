@@ -1,7 +1,13 @@
 import { PIECE_TYPE_INITIAL_SUPPLY } from "./board";
-import { transformCells, translateCells } from "./geometry";
+import { translateCells } from "./geometry";
 import { cellKey } from "./placement";
 import { DEFAULT_PIECE_TRANSFORM } from "./piece-transform";
+import {
+  buildOccupiedCellMap,
+  countPlacedByType,
+  createTransformedCellsForPiece,
+  type OccupiedCell,
+} from "./selectors-helpers";
 import { computeWinState } from "./win";
 import type { Cell, GameState, PieceDefinition, PieceTransform, PlacedPiece } from "./types";
 
@@ -60,94 +66,11 @@ export type GameViewModel = {
 
 export type GameViewSelector = (state: GameState) => GameViewModel;
 
-type OccupiedCell = {
-  pieceId: string;
-  instanceId: string;
-  localCell: Cell;
-  color: string;
-};
-
-function indexPiecesById(catalog: readonly PieceDefinition[]): Map<string, PieceDefinition> {
-  return new Map(catalog.map((piece) => [piece.pieceId, piece]));
-}
-
-function countPlacedByType(placedPieces: readonly PlacedPiece[]): Map<string, number> {
-  const countByType = new Map<string, number>();
-  for (const piece of placedPieces) {
-    countByType.set(piece.pieceId, (countByType.get(piece.pieceId) ?? 0) + 1);
-  }
-  return countByType;
-}
-
-function buildOccupiedCellMap(state: GameState): Map<string, OccupiedCell> {
-  const pieceById = indexPiecesById(state.pieceCatalog);
-  const transformedCellsBySignature = new Map<string, readonly Cell[]>();
-  const occupiedByCell = new Map<string, OccupiedCell>();
-
-  const transformedCellsForPiece = (
-    pieceId: string,
-    transform: PieceTransform,
-  ): readonly Cell[] | null => {
-    const cacheKey = `${pieceId}|${transform.rotation}|${transform.flipped ? "1" : "0"}`;
-    const cached = transformedCellsBySignature.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
-    const definition = pieceById.get(pieceId);
-    if (!definition) {
-      return null;
-    }
-    const transformed = transformCells(definition.baseCells, transform);
-    transformedCellsBySignature.set(cacheKey, transformed);
-    return transformed;
-  };
-
-  for (const placed of state.board.placedPieces) {
-    const definition = pieceById.get(placed.pieceId);
-    if (!definition || !placed.isPlaced) {
-      continue;
-    }
-    const transformed = transformedCellsForPiece(placed.pieceId, placed.transform);
-    if (!transformed) {
-      continue;
-    }
-    const boardCells = translateCells(transformed, placed.position);
-    for (let index = 0; index < boardCells.length; index += 1) {
-      const cell = boardCells[index];
-      const localCell = transformed[index];
-      occupiedByCell.set(cellKey(cell), {
-        pieceId: placed.pieceId,
-        instanceId: placed.instanceId,
-        localCell,
-        color: definition.color,
-      });
-    }
-  }
-
-  return occupiedByCell;
-}
-
 export function selectBoardView(state: GameState): BoardViewModel {
-  const pieceById = indexPiecesById(state.pieceCatalog);
-  const transformedCellsBySignature = new Map<string, readonly Cell[]>();
-  const transformedCellsForPiece = (
-    pieceId: string,
-    transform: PieceTransform,
-  ): readonly Cell[] | null => {
-    const cacheKey = `${pieceId}|${transform.rotation}|${transform.flipped ? "1" : "0"}`;
-    const cached = transformedCellsBySignature.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
-    const definition = pieceById.get(pieceId);
-    if (!definition) {
-      return null;
-    }
-    const transformed = transformCells(definition.baseCells, transform);
-    transformedCellsBySignature.set(cacheKey, transformed);
-    return transformed;
-  };
-  const occupiedByCell = buildOccupiedCellMap(state);
+  const { pieceById, transformedCellsForPiece } = createTransformedCellsForPiece(
+    state.pieceCatalog,
+  );
+  const occupiedByCell = buildOccupiedCellMap(state, pieceById, transformedCellsForPiece);
   const previewByCell = new Map<string, OccupiedCell>();
   const boardColumns = state.board.size.columns;
   const boardRows = state.board.size.rows;
@@ -212,7 +135,7 @@ export function selectBoardView(state: GameState): BoardViewModel {
 
 export function selectPieceTrayView(state: GameState): PieceTrayViewModel {
   const placedCountByType = countPlacedByType(state.board.placedPieces);
-  const transformedCellsBySignature = new Map<string, readonly Cell[]>();
+  const { transformedCellsForPiece } = createTransformedCellsForPiece(state.pieceCatalog);
 
   return {
     selectedPieceId: state.selectedPieceId,
@@ -221,14 +144,7 @@ export function selectPieceTrayView(state: GameState): PieceTrayViewModel {
       const placedCount = placedCountByType.get(piece.pieceId) ?? 0;
       const remainingCount = Math.max(0, PIECE_TYPE_INITIAL_SUPPLY - placedCount);
       const trayTransform = state.transformByPieceId[piece.pieceId] ?? DEFAULT_PIECE_TRANSFORM;
-      const cacheKey = `${piece.pieceId}|${trayTransform.rotation}|${trayTransform.flipped ? "1" : "0"}`;
-      const cells =
-        transformedCellsBySignature.get(cacheKey) ??
-        (() => {
-          const transformed = transformCells(piece.baseCells, trayTransform);
-          transformedCellsBySignature.set(cacheKey, transformed);
-          return transformed;
-        })();
+      const cells = transformedCellsForPiece(piece.pieceId, trayTransform) ?? piece.baseCells;
       return {
         pieceId: piece.pieceId,
         color: piece.color,
