@@ -3,6 +3,10 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
+  stageTempRepoPaths,
+} from "../lib/test-helpers/git-stage.ts";
 import { runInTemp } from "../lib/test-helpers";
 
 const TEST_TIMEOUT_MS =
@@ -104,10 +108,12 @@ node_asset_stage(
         })`zx-wrapper ../../../build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
         // deps-main --glue-only already runs glue-pipeline (graph export + provider sync + auto-map).
         // Keep test setup single-pass to avoid avoidable verify-time contention.
-        await $({
-          cwd: tmp,
-          stdio: "pipe",
-        })`git add -A projects/apps/demo-web projects/libs/demo-wasm build-tools/tools/nix/node-modules.hashes.json build-tools/tools/nix/langs.nix build-tools/lang/importer_roots.bzl build-tools/tools/buck third_party/providers`;
+        await stageTempRepoPaths({
+          tmp,
+          _$,
+          recursiveRoots: ["projects/apps/demo-web", "projects/libs/demo-wasm"],
+          explicitPaths: [...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS],
+        });
 
         const lockfile = path.join("projects", "apps", "demo-web", "pnpm-lock.yaml");
         const envWithPrefetch = { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" } as Record<

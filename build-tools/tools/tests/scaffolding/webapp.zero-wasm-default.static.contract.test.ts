@@ -20,7 +20,7 @@ test(
   async () => {
     await runInTemp("webapp-zero-wasm-default-static", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-static demo-web --yes --no-tests`;
+      await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-store-hash-refresh`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");
       const targetsPath = path.join(appAbs, "TARGETS");
       const targetsRaw = await fsp.readFile(targetsPath, "utf8");
@@ -55,8 +55,6 @@ test(
         await fsp.readFile(contracts.tsManifestPath, "utf8"),
         "utf8",
       );
-
-      await _$({ cwd: tmp, stdio: "pipe" })`git add -A projects/apps/demo-web`;
       await _$({
         cwd: tmp,
         stdio: "inherit",

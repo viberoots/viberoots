@@ -10,6 +10,10 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { inferRunnableFromOutPath } from "../../lib/runnables.ts";
 import { parseWasmModuleManifest } from "../../scaffolding/webapp-module-manifests.ts";
 import { terminateChildTree } from "./process-tree.ts";
+import {
+  DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
+  stageTempRepoPaths,
+} from "./test-helpers/git-stage.ts";
 import { exists } from "./test-helpers.ts";
 
 async function httpGet(
@@ -158,10 +162,12 @@ export async function scaffoldBuildAndSmoke(
     env: { ...process.env },
     stdio: "inherit",
   })`zx-wrapper ../../../build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
-  await _$({
-    cwd: tmp,
-    stdio: "pipe",
-  })`git add -A ${importer} build-tools/tools/nix/node-modules.hashes.json build-tools/tools/nix/langs.nix build-tools/lang/importer_roots.bzl build-tools/tools/buck third_party/providers`;
+  await stageTempRepoPaths({
+    tmp,
+    _$,
+    recursiveRoots: [importer],
+    explicitPaths: [...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS],
+  });
   const outPath = await buildSsrWebappOutPath(
     tmp,
     importer,

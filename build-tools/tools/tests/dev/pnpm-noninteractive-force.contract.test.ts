@@ -1,8 +1,13 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
-const EXPECTATIONS = [
+const EXPECTATIONS: Array<{
+  path: string;
+  fragments: string[];
+  checks?: Array<(source: string, file: string) => void>;
+}> = [
   {
     path: "build-tools/tools/dev/update-pnpm-hash/importer-lockfile.ts",
     fragments: [
@@ -13,10 +18,15 @@ const EXPECTATIONS = [
   },
   {
     path: "build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
-    fragments: [
-      "withHiddenNodeModules(importerAbs",
-      "fetch --force --frozen-lockfile",
-      "NIX_PNPM_INSTALL_TIMEOUT: fetchTimeout",
+    fragments: ["withHiddenNodeModules(importerAbs", "NIX_PNPM_INSTALL_TIMEOUT: fetchTimeout"],
+    checks: [
+      (source, file) => {
+        assert.match(
+          source,
+          /["']fetch["'],\s*["']--force["'],\s*["']--frozen-lockfile["']/,
+          `${file} must keep exact-store fetch non-interactive and forceful`,
+        );
+      },
     ],
   },
   {
@@ -53,5 +63,6 @@ test("non-interactive pnpm install paths force through modules-dir purges", asyn
         );
       }
     }
+    for (const check of expectation.checks || []) check(source, expectation.path);
   }
 });

@@ -4,6 +4,10 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { exists, runInTemp } from "../lib/test-helpers";
+import {
+  DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
+  stageTempRepoPaths,
+} from "../lib/test-helpers/git-stage.ts";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -22,11 +26,14 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
         cwd: path.join(tmp, "projects", "apps", "demo-web"),
         env: { ...process.env },
       })`zx-wrapper ../../../build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
-      // runInTemp commits the initial seed; stage generated importer + glue outputs so git-flake evaluation sees them.
-      await $({
-        cwd: tmp,
-        stdio: "pipe",
-      })`git add -A projects/apps/demo-web build-tools/tools/nix/node-modules.hashes.json build-tools/tools/nix/langs.nix build-tools/lang/importer_roots.bzl build-tools/tools/buck third_party/providers`;
+      // Stage scaffold outputs and the exact glue files used by flake evaluation, while
+      // avoiding node_modules and other large transient trees under the importer.
+      await stageTempRepoPaths({
+        tmp,
+        _$,
+        recursiveRoots: ["projects/apps/demo-web"],
+        explicitPaths: [...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS],
+      });
       // No longer modify flake envs for LOCAL_PNPM_STORE; pure Nix path only
       // Build via Nix directly to avoid nested buck invocations from within a buck test
       const importer = "projects/apps/demo-web";

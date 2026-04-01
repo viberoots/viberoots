@@ -6,6 +6,7 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { ensureNodeModulesForDevApp } from "./lib/dev-node-modules";
 import { httpGet, pickFreePort, stopServer } from "./lib/webapp-static-hmr";
 import {
   assertSingleQueueInvariant,
@@ -26,16 +27,18 @@ test(
       const $ = _$({ cwd: tmp, stdio: "inherit" });
       await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");
+      const appRel = "projects/apps/demo-web";
       const producerPayloadPath = path.join(appAbs, "src", "wasm-producer", "payload.txt");
       await fsp.mkdir(path.dirname(producerPayloadPath), { recursive: true });
       await fsp.writeFile(producerPayloadPath, "phase2-a", "utf8");
 
-      await _$({ cwd: tmp, stdio: "pipe" })`git add -A projects/apps/demo-web`;
-      await _$({
-        cwd: tmp,
-        stdio: "inherit",
-        env: { ...process.env, CI: "1" },
-      })`pnpm --dir ${tmp} install --filter ./projects/apps/demo-web... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+      const { esbuildBin } = await ensureNodeModulesForDevApp({
+        tmp,
+        appAbs,
+        appRel,
+        $,
+        _$,
+      });
 
       const port = await pickFreePort();
       const serverStdout: string[] = [];
@@ -48,6 +51,7 @@ test(
           ...process.env,
           NODE_ENV: "development",
           NODE_OPTIONS: "",
+          ESBUILD_BINARY_PATH: esbuildBin,
           PORT: String(port),
         },
       });

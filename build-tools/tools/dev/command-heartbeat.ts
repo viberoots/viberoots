@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import process from "node:process";
 import timers from "node:timers";
+import { getArgvTokens, removeKnownFlags } from "../lib/cli.ts";
 import { runManagedCommand, type ManagedCommandActivity } from "../lib/managed-command.ts";
 
 type Options = {
@@ -19,50 +20,30 @@ function usage(): never {
   );
 }
 
-function parseArgs(argv: string[]): Options {
-  let prefix = "[command-heartbeat]";
-  let label = "";
-  let cwd = process.cwd();
-  let timeoutMs = 0;
-  let noOutputWarnSec = 60;
-  let split = -1;
-  for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === "--") {
-      split = i;
-      break;
-    }
-  }
+function parsePositiveInt(raw: string, fallback: number): number {
+  const parsed = Number(raw || 0);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function parseArgs(): Options {
+  const argv = getArgvTokens();
+  const split = argv.indexOf("--");
   if (split < 0) usage();
   const flags = argv.slice(0, split);
-  const commandArgs = argv.slice(split + 1);
-  for (let i = 0; i < flags.length; i++) {
-    const token = String(flags[i] || "").trim();
-    if (!token) continue;
-    if (token === "--label") {
-      label = String(flags[++i] || "").trim();
-      continue;
-    }
-    if (token === "--prefix") {
-      prefix = String(flags[++i] || "").trim() || prefix;
-      continue;
-    }
-    if (token === "--cwd") {
-      cwd = String(flags[++i] || "").trim() || cwd;
-      continue;
-    }
-    if (token === "--timeout-ms") {
-      const parsed = Number(flags[++i] || 0);
-      timeoutMs = Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
-      continue;
-    }
-    if (token === "--no-output-warn-sec") {
-      const parsed = Number(flags[++i] || 0);
-      noOutputWarnSec = Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 60;
-      continue;
-    }
-    usage();
-  }
+  const commandArgs = argv.slice(split + 1).filter((token) => String(token || "").trim() !== "");
+  const { argv: leftover, seen } = removeKnownFlags(flags, {
+    presence: [],
+    takesValue: ["--label", "--prefix", "--cwd", "--timeout-ms", "--no-output-warn-sec"],
+  });
+  if (leftover.length !== 0) usage();
+
+  const label = String(seen["--label"] || "").trim();
   if (!label || commandArgs.length === 0) usage();
+
+  const prefix = String(seen["--prefix"] || "").trim() || "[command-heartbeat]";
+  const cwd = String(seen["--cwd"] || "").trim() || process.cwd();
+  const timeoutMs = parsePositiveInt(String(seen["--timeout-ms"] || ""), 0);
+  const noOutputWarnSec = parsePositiveInt(String(seen["--no-output-warn-sec"] || ""), 60);
   return {
     prefix,
     label,
@@ -122,7 +103,7 @@ function startHeartbeat(
 }
 
 async function main(): Promise<void> {
-  const opts = parseArgs(process.argv.slice(2));
+  const opts = parseArgs();
   const activity: ManagedCommandActivity = {
     startedAtMs: Date.now(),
     lastOutputAtMs: 0,

@@ -5,6 +5,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { ensureNodeModulesForDevApp } from "./lib/dev-node-modules";
 import { assertSingleQueueInvariant, producerByteLength, waitForValue } from "./lib/wasm-watch";
 import { httpGet, pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
 
@@ -21,6 +22,7 @@ test(
       const $ = _$({ cwd: tmp, stdio: "inherit" });
       await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --no-tests --skip-lockfile-gen`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-vite-ssr");
+      const appRel = "projects/apps/demo-vite-ssr";
       const payloadPath = path.join(appAbs, "src", "wasm-producer", "payload.txt");
       const entryClientPath = path.join(appAbs, "src", "entry-client.ts");
       const entryServerPath = path.join(appAbs, "src", "entry-server.ts");
@@ -57,12 +59,13 @@ test(
         "utf8",
       );
 
-      await _$({ cwd: tmp, stdio: "pipe" })`git add -A projects/apps/demo-vite-ssr`;
-      await _$({
-        cwd: tmp,
-        stdio: "inherit",
-        env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-      })`pnpm --dir ${tmp} install --filter ./projects/apps/demo-vite-ssr... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+      const { esbuildBin } = await ensureNodeModulesForDevApp({
+        tmp,
+        appAbs,
+        appRel,
+        $,
+        _$,
+      });
       const port = await pickFreePort();
       const serverStdout: string[] = [];
       const serverStderr: string[] = [];
@@ -78,6 +81,7 @@ test(
           ...process.env,
           NODE_ENV: "development",
           NODE_OPTIONS: "",
+          ESBUILD_BINARY_PATH: esbuildBin,
           NEXT_TELEMETRY_DISABLED: "1",
           PORT: String(port),
         },

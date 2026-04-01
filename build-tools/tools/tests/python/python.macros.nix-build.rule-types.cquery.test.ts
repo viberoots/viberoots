@@ -5,6 +5,8 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
+const TARGET_PLATFORM = "//:no_cgo";
+
 test("python macros: nix_python_* targets use Nix-backed rules", async () => {
   await runInTemp("python-nix-build-rule-types", async (tmp, $) => {
     const appDir = path.join(tmp, "projects", "apps", "pyapp");
@@ -37,7 +39,7 @@ test("python macros: nix_python_* targets use Nix-backed rules", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir python_nix_build_rule_types cquery "kind(python_nix_build, //projects/apps/pyapp:pyapp_lib)"`;
+    })`buck2 --isolation-dir python_nix_build_rule_types cquery --target-platforms ${TARGET_PLATFORM} "kind(python_nix_build, //projects/apps/pyapp:pyapp_lib)"`;
     assert.ok(String(libProbe.stdout || "").includes("//projects/apps/pyapp:pyapp_lib"));
 
     const binProbe = await $({
@@ -45,7 +47,7 @@ test("python macros: nix_python_* targets use Nix-backed rules", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir python_nix_build_rule_types cquery "kind(python_nix_build, //projects/apps/pyapp:pyapp)"`;
+    })`buck2 --isolation-dir python_nix_build_rule_types cquery --target-platforms ${TARGET_PLATFORM} "kind(python_nix_build, //projects/apps/pyapp:pyapp)"`;
     assert.ok(String(binProbe.stdout || "").includes("//projects/apps/pyapp:pyapp"));
 
     const testProbe = await $({
@@ -53,7 +55,7 @@ test("python macros: nix_python_* targets use Nix-backed rules", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir python_nix_build_rule_types cquery "kind(python_nix_test, //projects/apps/pyapp:pyapp_test)"`;
+    })`buck2 --isolation-dir python_nix_build_rule_types cquery --target-platforms ${TARGET_PLATFORM} "kind(python_nix_test, //projects/apps/pyapp:pyapp_test)"`;
     assert.ok(String(testProbe.stdout || "").includes("//projects/apps/pyapp:pyapp_test"));
 
     const libBuck = await $({
@@ -61,7 +63,7 @@ test("python macros: nix_python_* targets use Nix-backed rules", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir python_nix_build_rule_types cquery "kind(python_library, //projects/apps/pyapp:pyapp_lib)"`;
+    })`buck2 --isolation-dir python_nix_build_rule_types cquery --target-platforms ${TARGET_PLATFORM} "kind(python_library, //projects/apps/pyapp:pyapp_lib)"`;
     assert.equal(String(libBuck.stdout || "").trim(), "");
 
     const binBuck = await $({
@@ -69,7 +71,7 @@ test("python macros: nix_python_* targets use Nix-backed rules", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir python_nix_build_rule_types cquery "kind(python_binary, //projects/apps/pyapp:pyapp)"`;
+    })`buck2 --isolation-dir python_nix_build_rule_types cquery --target-platforms ${TARGET_PLATFORM} "kind(python_binary, //projects/apps/pyapp:pyapp)"`;
     assert.equal(String(binBuck.stdout || "").trim(), "");
 
     const testBuck = await $({
@@ -77,7 +79,7 @@ test("python macros: nix_python_* targets use Nix-backed rules", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir python_nix_build_rule_types cquery "kind(python_test, //projects/apps/pyapp:pyapp_test)"`;
+    })`buck2 --isolation-dir python_nix_build_rule_types cquery --target-platforms ${TARGET_PLATFORM} "kind(python_test, //projects/apps/pyapp:pyapp_test)"`;
     assert.equal(String(testBuck.stdout || "").trim(), "");
   });
 });

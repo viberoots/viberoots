@@ -20,7 +20,7 @@ test(
   async () => {
     await runInTemp("webapp-zero-wasm-default-ssr-vite", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      await $`scaf new ts webapp-ssr-vite demo-vite --yes --no-tests --skip-lockfile-gen`;
+      await $`scaf new ts webapp-ssr-vite demo-vite --yes --no-tests --skip-store-hash-refresh`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-vite");
       const targetsPath = path.join(appAbs, "TARGETS");
       const targetsRaw = await fsp.readFile(targetsPath, "utf8");
@@ -45,8 +45,6 @@ test(
       );
       assert.equal(wasmManifest.modules.length, 0);
       assert.equal(wasmManifest.defaultModuleKey, "");
-
-      await _$({ cwd: tmp, stdio: "pipe" })`git add -A projects/apps/demo-vite`;
       await fsp.rm(path.join(appAbs, "node_modules"), {
         recursive: true,
         force: true,
@@ -55,7 +53,7 @@ test(
         cwd: appAbs,
         stdio: "inherit",
         env: { ...process.env, CI: "1", NEXT_TELEMETRY_DISABLED: "1" },
-      })`pnpm --dir ${appAbs} install --ignore-workspace --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+      })`pnpm --dir ${appAbs} install --ignore-workspace --frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
       await _$({ cwd: appAbs, stdio: "inherit" })`pnpm --dir ${appAbs} run build:ssr`;
 
       const port = await pickFreePort();

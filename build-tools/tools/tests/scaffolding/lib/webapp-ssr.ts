@@ -9,6 +9,10 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { formatRunnableLine, inferRunnableFromOutPath } from "../../../lib/runnables.ts";
 import { terminateChildTree } from "../../lib/process-tree.ts";
+import {
+  DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
+  stageTempRepoPaths,
+} from "../../lib/test-helpers/git-stage.ts";
 
 export const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -71,10 +75,12 @@ export async function scaffoldAndPrepareWorkspace(
   })`zx-wrapper build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
   // deps-main --glue-only is the single authoritative glue path for this flow.
   await fsp.access(graphJsonAbs);
-  await _$({
-    cwd: tmp,
-    stdio: "pipe",
-  })`git add -A ${appRel} build-tools/tools/nix/node-modules.hashes.json build-tools/tools/nix/langs.nix build-tools/lang/importer_roots.bzl build-tools/tools/buck third_party/providers`;
+  await stageTempRepoPaths({
+    tmp,
+    _$,
+    recursiveRoots: [appRel],
+    explicitPaths: [...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS],
+  });
   await _$({
     cwd: tmp,
     stdio: "inherit",

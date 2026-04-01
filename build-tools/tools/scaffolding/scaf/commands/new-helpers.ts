@@ -18,6 +18,29 @@ const FORMAT_EXTENSIONS = new Set([
   ".html",
 ]);
 
+const FORMAT_EXCLUDED_DIRS = new Set([
+  ".cache",
+  ".direnv",
+  ".git",
+  ".next",
+  ".turbo",
+  ".vite",
+  "buck-out",
+  "build",
+  "coverage",
+  "dist",
+  "node_modules",
+]);
+
+function shouldSkipFormatDir(name: string): boolean {
+  return (
+    FORMAT_EXCLUDED_DIRS.has(name) ||
+    name === ".wasm-producer" ||
+    name === "result" ||
+    name.startsWith("result-")
+  );
+}
+
 async function collectFormattableFiles(root: string): Promise<string[]> {
   const out: string[] = [];
   async function walk(dir: string) {
@@ -30,6 +53,7 @@ async function collectFormattableFiles(root: string): Promise<string[]> {
     for (const entry of entries) {
       const abs = path.join(dir, entry.name);
       if (entry.isDirectory()) {
+        if (shouldSkipFormatDir(entry.name)) continue;
         await walk(abs);
         continue;
       }
@@ -46,7 +70,11 @@ async function collectFormattableFiles(root: string): Promise<string[]> {
 export async function formatScaffoldOutput(dest: string): Promise<void> {
   const files = await collectFormattableFiles(dest);
   if (files.length === 0) return;
-  await runScafCommand("prettier", ["--write", ...files], process.cwd());
+  const chunkSize = 128;
+  for (let idx = 0; idx < files.length; idx += chunkSize) {
+    const chunk = files.slice(idx, idx + chunkSize);
+    await runScafCommand("prettier", ["--write", ...chunk], process.cwd());
+  }
 }
 
 export async function removeScaffoldTemplateConfig(dest: string): Promise<void> {

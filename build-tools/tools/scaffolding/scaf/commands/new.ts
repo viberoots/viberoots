@@ -159,6 +159,9 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
     const skipLockfileGen = ["true", "1", "yes"].includes(
       String(flags["skip-lockfile-gen"] || "").toLowerCase(),
     );
+    const skipStoreHashRefresh = ["true", "1", "yes"].includes(
+      String(flags["skip-store-hash-refresh"] || "").toLowerCase(),
+    );
 
     if (skipLockfileGen) {
       printSkip("not-applicable", "skipping importer lockfile regeneration");
@@ -189,8 +192,12 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
       }
       // Keep lockfile contents stable before computing fixed-output pnpm store hashes.
       await formatImporterLockfiles(repoRoot, importersToRefresh);
-      for (const imp of importersToRefresh) {
-        await refreshImporterStoreHash(repoRoot, imp);
+      if (skipStoreHashRefresh) {
+        printSkip("not-applicable", "skipping importer pnpm-store hash refresh");
+      } else {
+        for (const imp of importersToRefresh) {
+          await refreshImporterStoreHash(repoRoot, imp);
+        }
       }
     }
   }

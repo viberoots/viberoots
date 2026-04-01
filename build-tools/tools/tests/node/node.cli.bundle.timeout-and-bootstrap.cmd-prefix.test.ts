@@ -35,7 +35,8 @@ test("nix_node_cli_bin(bundle=True) cmd prefixes nix bootstrap env and timeout w
       // Environment not fully available in temp — skip to avoid false negatives
       return;
     }
-    const out = String(probe.stdout || "");
+    const raw = JSON.parse(String(probe.stdout || "")) as Record<string, { cmd?: string }>;
+    const out = String(Object.values(raw)[0]?.cmd || "");
     // Should include nix bootstrap core markers
     assert.ok(
       out.includes("export WORKSPACE_ROOT=") || out.includes("FLK_ROOT="),

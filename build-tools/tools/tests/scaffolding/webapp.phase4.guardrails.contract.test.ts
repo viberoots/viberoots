@@ -10,17 +10,72 @@ type InstallGuardrailExpectation = {
   forbidden: string[];
 };
 
-const LIGHTWEIGHT_SOURCE_ONLY_EXPECTATIONS: InstallGuardrailExpectation[] = [
+const LIGHTWEIGHT_LOCAL_RUNTIME_EXPECTATIONS: InstallGuardrailExpectation[] = [
   {
     file: "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.static.contract.test.ts",
     required: [
+      "--skip-store-hash-refresh",
       "pnpm --dir ${tmp} install",
       "--filter ./projects/apps/demo-web...",
       "--frozen-lockfile",
       "--prefer-offline",
       "--ignore-scripts",
     ],
-    forbidden: ["--skip-lockfile-gen", "--no-frozen-lockfile"],
+    forbidden: ["--skip-lockfile-gen", "--no-frozen-lockfile", "git add -A projects/apps/demo-web"],
+  },
+  {
+    file: "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.ssr-next.contract.test.ts",
+    required: [
+      "--skip-store-hash-refresh",
+      "pnpm --dir ${tmp} install",
+      "--filter ./projects/apps/demo-next...",
+      "--frozen-lockfile",
+      "--prefer-offline",
+      "--ignore-scripts",
+    ],
+    forbidden: [
+      "--skip-lockfile-gen",
+      "--no-frozen-lockfile",
+      "git add -A projects/apps/demo-next",
+    ],
+  },
+  {
+    file: "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.ssr-vite.contract.test.ts",
+    required: [
+      "--skip-store-hash-refresh",
+      "pnpm --dir ${appAbs} install",
+      "--ignore-workspace",
+      "--frozen-lockfile",
+      "--prefer-offline",
+      "--ignore-scripts",
+    ],
+    forbidden: [
+      "--skip-lockfile-gen",
+      "--no-frozen-lockfile",
+      "--filter ./projects/apps/demo-vite...",
+      "git add -A projects/apps/demo-vite",
+    ],
+  },
+  {
+    file: "build-tools/tools/tests/scaffolding/webapp-static-pwa.runtime-offline.contract.test.ts",
+    required: [
+      "--skip-store-hash-refresh",
+      "pnpm --dir ${appAbs} install",
+      "--ignore-workspace",
+      "--frozen-lockfile",
+      "--prefer-offline",
+      "--ignore-scripts",
+      "pnpm --dir ${appAbs} run build",
+    ],
+    forbidden: [
+      "--skip-lockfile-gen",
+      "--no-frozen-lockfile",
+      "deps-main.ts --verbose --glue-only",
+      "update-pnpm-hash.ts --lockfile",
+      "nix build",
+      "--filter ./projects/apps/demo-pwa...",
+      "git add -A projects/apps/demo-pwa",
+    ],
   },
 ];
 
@@ -29,11 +84,8 @@ const HEAVY_RUNTIME_EXPECTATIONS: InstallGuardrailExpectation[] = [
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-reload.wasm-producer.test.ts",
     required: [
       "--skip-lockfile-gen",
-      "pnpm --dir ${tmp} install",
-      "--filter ./projects/apps/demo-vite-ssr...",
-      "--no-frozen-lockfile",
-      "--prefer-offline",
-      "--ignore-scripts",
+      'import { ensureNodeModulesForDevApp } from "./lib/dev-node-modules";',
+      "ensureNodeModulesForDevApp({",
     ],
     forbidden: ["--frozen-lockfile"],
   },
@@ -58,36 +110,6 @@ const HEAVY_RUNTIME_EXPECTATIONS: InstallGuardrailExpectation[] = [
       "--ignore-workspace",
     ],
     forbidden: ["--frozen-lockfile"],
-  },
-  {
-    file: "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.ssr-vite.contract.test.ts",
-    required: [
-      "--skip-lockfile-gen",
-      "pnpm --dir ${appAbs} install",
-      "--no-frozen-lockfile",
-      "--prefer-offline",
-      "--ignore-scripts",
-      "--ignore-workspace",
-    ],
-    forbidden: ["--frozen-lockfile", "--filter ./projects/apps/demo-vite..."],
-  },
-  {
-    file: "build-tools/tools/tests/scaffolding/webapp-static-pwa.runtime-offline.contract.test.ts",
-    required: [
-      "--skip-lockfile-gen",
-      "pnpm --dir ${appAbs} install",
-      "--no-frozen-lockfile",
-      "--prefer-offline",
-      "--ignore-scripts",
-      "--ignore-workspace",
-      "pnpm --dir ${appAbs} run build",
-    ],
-    forbidden: [
-      "deps-main.ts --verbose --glue-only",
-      "update-pnpm-hash.ts --lockfile",
-      "nix build",
-      "--filter ./projects/apps/demo-pwa...",
-    ],
   },
 ];
 
@@ -193,8 +215,8 @@ async function assertContract(expectation: InstallGuardrailExpectation): Promise
   }
 }
 
-test("phase4 guardrails: lightweight source-only contract tests keep frozen installs", async () => {
-  for (const expectation of LIGHTWEIGHT_SOURCE_ONLY_EXPECTATIONS) {
+test("phase4 guardrails: lightweight local-runtime tests keep scaffold lockfiles and frozen installs", async () => {
+  for (const expectation of LIGHTWEIGHT_LOCAL_RUNTIME_EXPECTATIONS) {
     await assertContract(expectation);
   }
 });

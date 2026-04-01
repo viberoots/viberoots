@@ -330,6 +330,7 @@ function isolationId(prefix: string): string {
 
 const templateConventionsIsolation = isolationId("template_conventions_metadata_cquery");
 const buckEnv = { ...buckCommandEnv(), IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1" };
+const TARGET_PLATFORM = "prelude//platforms:default";
 
 async function withBuckTransientRetry<T>(run: () => Promise<T>): Promise<T> {
   try {
@@ -358,7 +359,7 @@ test("template-owned tests expose labels and template inputs", async () => {
       await $({
         stdio: "pipe",
         env: buckEnv,
-      })`buck2 --isolation-dir ${templateConventionsIsolation} cquery ${query} --json --output-attribute labels --output-attribute template_inputs`,
+      })`buck2 --isolation-dir ${templateConventionsIsolation} cquery --target-platforms ${TARGET_PLATFORM} ${query} --json --output-attribute labels --output-attribute template_inputs`,
   );
   const raw = JSON.parse(out.stdout) as Record<
     string,
@@ -409,7 +410,7 @@ test("non-template tests do not carry template labels", async () => {
       await $({
         stdio: "pipe",
         env: buckEnv,
-      })`buck2 --isolation-dir ${templateConventionsIsolation} cquery //:scaffolding_macros_exports_present --json --output-attribute labels`,
+      })`buck2 --isolation-dir ${templateConventionsIsolation} cquery --target-platforms ${TARGET_PLATFORM} //:scaffolding_macros_exports_present --json --output-attribute labels`,
   );
   const raw = JSON.parse(out.stdout) as Record<string, { labels?: string[] }>;
   const first = Object.values(raw)[0] || {};

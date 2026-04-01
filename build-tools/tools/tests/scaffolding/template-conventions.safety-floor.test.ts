@@ -7,6 +7,7 @@ const SAFETY_FLOOR_TARGETS = [
   "//:scaffolding_smoke_cli_readme",
   "//:scaffolding_python_wasm_app_scaffold_smoke",
 ];
+const TARGET_PLATFORM = "prelude//platforms:default";
 
 function isolationId(prefix: string): string {
   return `${prefix}_${process.pid}_${Date.now()}`;
@@ -32,7 +33,7 @@ test("template safety-floor targets are resolvable", async () => {
         await $({
           stdio: "pipe",
           env,
-        })`buck2 --isolation-dir ${isolationDir} cquery ${query} --json --output-attribute name`,
+        })`buck2 --isolation-dir ${isolationDir} cquery --target-platforms ${TARGET_PLATFORM} ${query} --json --output-attribute name`,
     );
     const raw = JSON.parse(out.stdout) as Record<string, { name?: string }>;
     const resolved = Object.keys(raw).map((k) => k.replace(/\s+\([^)]*\)$/, ""));
