@@ -38,13 +38,14 @@ def _node_nix_test_impl(ctx):
         + ("export NIX_PNPM_INSTALL_TIMEOUT=\"%d\"; " % (tout if tout > 0 else 1800))
         + nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = (tout if tout > 0 else 600))
         + ("echo '[node_nix_test] target=%s importer=%s (attr=%s)' >&2; " % (target_label, imp, imp_attr))
-        + ("if ! (cd \"$WORKSPACE_ROOT/%s\" && (find . -type f -name \"*.test.ts\" -print -quit | grep -q . || find . -type f -name \"*.test.js\" -print -quit | grep -q .)); then echo '[node_nix_test] no tests matched; passing' >&2; exit 0; fi; " % imp)
+        + ("if ! (cd \"$WORKSPACE_ROOT/%s\" && (find . -type f -name \"*.test.ts\" -print -quit | grep -q . || find . -type f -name \"*.test.tsx\" -print -quit | grep -q . || find . -type f -name \"*.test.js\" -print -quit | grep -q .)); then echo '[node_nix_test] no tests matched; passing' >&2; exit 0; fi; " % imp)
         # If the main repo root already has a unified pnpm store, reuse it in temp workspaces
         + "if [ -n \"${REPO_ROOT:-}\" ] && [ -f \"$REPO_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
         + "  export NIX_USE_PREFETCHED_PNPM_STORE=1; "
         + "  export LOCAL_PNPM_STORE=\"$(cat \"$REPO_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null || true)\"; "
         + "fi; "
         + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=0; "
+        + "export BNX_STREAM_NIX_BUILD_LOGS=\"${BNX_STREAM_NIX_BUILD_LOGS:-1}\"; "
         + nix_bootstrap_env_pnpm_store()
         + ("echo '[node_nix_test] phase=prepare-exact-store target=%s importer=%s' >&2; " % (target_label, imp))
         + ("EXACT_PNPM_STORE=$(cd \"$FLK_ROOT\" && node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$FLK_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$FLK_ROOT/build-tools/tools/dev/prepare-exact-pnpm-store.ts\" --importer \"%s\"); " % imp)

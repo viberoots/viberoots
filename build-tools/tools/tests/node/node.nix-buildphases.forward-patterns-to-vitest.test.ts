@@ -54,4 +54,12 @@ test("node test buildPhase decodes and forwards explicit vitest patterns", async
   if (script.includes("${PATTERNS_VALUE}")) {
     throw new Error("node-test buildPhase must not leave PATTERNS_VALUE as a literal placeholder");
   }
+
+  if (!script.includes('-name "*.test.tsx"')) {
+    throw new Error("node-test buildPhase must include .test.tsx files in matched-test discovery");
+  }
+
+  if (!script.includes("[nix] vitest exited with status")) {
+    throw new Error("node-test buildPhase must summarize JUnit failures when vitest exits nonzero");
+  }
 });

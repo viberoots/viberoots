@@ -92,7 +92,9 @@ def _zx_test_impl(ctx):
             + "export TEST_NIX_TIMEOUT_SECS=\"$TSECS\"; "
             + "export NIX_PNPM_FETCH_TIMEOUT=\"$TSECS\"; "
             + "export NIX_PNPM_INSTALL_TIMEOUT=\"$TSECS\"; "
+            + "export BNX_STREAM_NIX_BUILD_LOGS=\"${BNX_STREAM_NIX_BUILD_LOGS:-1}\"; "
             + "if [ -z \"$TEST_NODE_OPTIONS\" ]; then export TEST_NODE_OPTIONS=\"--test-timeout=$(( TSECS * 1000 ))\"; fi; "
+            + "echo \"[zx_test] timeout target=$BUCK_TEST_TARGET tsecs=$TSECS node_options=${TEST_NODE_OPTIONS:-}\" >&2; "
             + "if [ -n \"$NODE_V8_COVERAGE\" ]; then mkdir -p \"$NODE_V8_COVERAGE\"; fi; "
             # Ensure zx-init is loaded in all node:test workers via NODE_OPTIONS
             + "if [ -n \"$NODE_PATH\" ]; then export NODE_PATH=\"$WORKSPACE_ROOT/node_modules:$NODE_PATH\"; else export NODE_PATH=\"$WORKSPACE_ROOT/node_modules\"; fi; "

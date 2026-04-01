@@ -149,31 +149,25 @@ in {
         fi
         if [ -n "$EXACT_STORE_ARCHIVE" ]; then
           echo "[nix] mkPnpmStore: validating exact prefetched store archive from $EXACT_STORE_ARCHIVE" >&2
-          LOCAL_STORE="$(pwd)/.pnpm-exact-store"
-          rm -rf "$LOCAL_STORE"
-          mkdir -p "$LOCAL_STORE" "$out/store"
-          tar -xf "$EXACT_STORE_ARCHIVE" -C "$LOCAL_STORE"
-          chmod -R u+rwX "$LOCAL_STORE"
-          pnpm config set store-dir "$LOCAL_STORE"
+          rm -rf "$out/store"
+          mkdir -p "$out/store"
+          tar -xf "$EXACT_STORE_ARCHIVE" -C "$out/store"
+          chmod -R u+rwX "$out/store"
+          pnpm config set store-dir "$out/store"
           pnpm config set package-import-method copy
           echo "[nix] pnpm install (offline exact-store) --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir . (IT=${installTimeoutVal}s, FT=${ftVal}s)"
           timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
-          cp -R "$LOCAL_STORE/." "$out/store/"
-          chmod -R u+rwX "$out/store" || true
           echo "[nix] mkPnpmStore: exact prefetched store archive validated"
         elif [ -d "$EXACT_STORE_INPUT" ]; then
           echo "[nix] mkPnpmStore: validating exact prefetched store from $EXACT_STORE_INPUT" >&2
-          LOCAL_STORE="$(pwd)/.pnpm-exact-store"
-          rm -rf "$LOCAL_STORE"
-          mkdir -p "$LOCAL_STORE" "$out/store"
-          cp -R "$EXACT_STORE_INPUT/." "$LOCAL_STORE/"
-          chmod -R u+rwX "$LOCAL_STORE"
-          pnpm config set store-dir "$LOCAL_STORE"
+          rm -rf "$out/store"
+          mkdir -p "$out/store"
+          cp -R "$EXACT_STORE_INPUT/." "$out/store/"
+          chmod -R u+rwX "$out/store"
+          pnpm config set store-dir "$out/store"
           pnpm config set package-import-method copy
           echo "[nix] pnpm install (offline exact-store) --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir . (IT=${installTimeoutVal}s, FT=${ftVal}s)"
           timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
-          cp -R "$LOCAL_STORE/." "$out/store/"
-          chmod -R u+rwX "$out/store" || true
           echo "[nix] mkPnpmStore: exact prefetched store validated"
         else
           pnpm config set store-dir "$out/store"

@@ -17,4 +17,14 @@ test("linting: zx_test forwards pnpm fetch timeout and wraps node --test with co
     /command-heartbeat\.ts/,
     "expected zx_test to wrap node --test in the heartbeat runner for long-running diagnostics",
   );
+  assert.match(
+    txt,
+    /BNX_STREAM_NIX_BUILD_LOGS/,
+    "expected zx_test to enable streamed nix build logs for long-running test diagnostics",
+  );
+  assert.match(
+    txt,
+    /\[zx_test\] timeout target=/,
+    "expected zx_test to log the resolved per-target timeout budget",
+  );
 });

@@ -89,6 +89,14 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   if (!nixBuildHelpers.includes("must be a /nix/store path")) {
     throw new Error("update-pnpm-hash nix helpers must reject non-store exact-store paths");
   }
+  if (!nixBuildHelpers.includes("--print-build-logs")) {
+    throw new Error("update-pnpm-hash nix helpers must stream builder logs for stall diagnosis");
+  }
+  if (!nixBuildHelpers.includes("BNX_STREAM_NIX_BUILD_LOGS")) {
+    throw new Error(
+      "update-pnpm-hash nix helpers must support explicit streaming of nix builder logs",
+    );
+  }
 
   const unified = await fsp.readFile("build-tools/tools/dev/require-unified-pnpm-store.ts", "utf8");
   if (!unified.includes("prepareExactPnpmStore")) {

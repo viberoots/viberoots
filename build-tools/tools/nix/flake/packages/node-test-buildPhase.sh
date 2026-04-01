@@ -45,7 +45,7 @@ if find . \
   -path "./dist" -prune -o \
   -path "./build" -prune -o \
   -path "./.vite" -prune -o \
-  -type f \( -name "*.test.ts" -o -name "*.test.js" \) -print -quit | grep -q .; then
+  -type f \( -name "*.test.ts" -o -name "*.test.tsx" -o -name "*.test.js" \) -print -quit | grep -q .; then
   FOUND=1
 fi
 find . \
@@ -53,7 +53,7 @@ find . \
   -path "./dist" -prune -o \
   -path "./build" -prune -o \
   -path "./.vite" -prune -o \
-  -type f \( -name "*.test.ts" -o -name "*.test.js" \) -print \
+  -type f \( -name "*.test.ts" -o -name "*.test.tsx" -o -name "*.test.js" \) -print \
   | LC_ALL=C sort > "$MATCHED_TESTS_FILE"
 
 COVERAGE_ARGS=()
@@ -149,6 +149,7 @@ for (const line of lines) {
       sed -n '1,20p' "$MATCHED_TESTS_FILE" >&2
     fi
     if [ "$(basename "$VITEST_BIN")" = "vitest" ]; then
+      set +e
       timeout -k 15s ${VITEST_TIMEOUT_SECS}s "$VITEST_BIN" run \
         --pool forks \
         --maxWorkers 1 \
@@ -160,7 +161,10 @@ for (const line of lines) {
         --passWithNoTests \
         "${COVERAGE_ARGS[@]}" \
         "${PATTERN_ARGS[@]}"
+      VITEST_STATUS=$?
+      set -e
     else
+      set +e
       timeout -k 15s ${VITEST_TIMEOUT_SECS}s node "$VITEST_BIN" run \
         --pool forks \
         --maxWorkers 1 \
@@ -172,11 +176,53 @@ for (const line of lines) {
         --passWithNoTests \
         "${COVERAGE_ARGS[@]}" \
         "${PATTERN_ARGS[@]}"
+      VITEST_STATUS=$?
+      set -e
     fi
 
     if [ ! -s report/junit.xml ]; then
       echo "[nix] junit reporter did not emit a file; writing minimal placeholder" >&2
       echo "<testsuites/>" > report/junit.xml
+    fi
+
+    if [ "${VITEST_STATUS:-0}" -ne 0 ]; then
+      echo "[nix] vitest exited with status ${VITEST_STATUS}; failing testcases:" >&2
+      node - <<'EOF_JUNIT_SUMMARY' report/junit.xml >&2 || true
+const fs = require("node:fs");
+const file = process.argv[2];
+const xml = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+const decode = (text) =>
+  String(text || "")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+const cases = Array.from(
+  xml.matchAll(/<testcase\b([^>]*)>([\s\S]*?)<\/testcase>|<testcase\b([^>]*)\/>/g),
+);
+let printed = 0;
+for (const match of cases) {
+  const attrs = match[1] || match[3] || "";
+  const body = match[2] || "";
+  if (!/<failure\b|<error\b/.test(body)) continue;
+  const name = decode((attrs.match(/\bname="([^"]*)"/) || [])[1] || "<unnamed>");
+  const classname = decode((attrs.match(/\bclassname="([^"]*)"/) || [])[1] || "");
+  const failure = body.match(/<(failure|error)\b([^>]*)>([\s\S]*?)<\/\1>/);
+  const message = decode((failure?.[2].match(/\bmessage="([^"]*)"/) || [])[1] || "");
+  const details = decode(String(failure?.[3] || "").replace(/<[^>]+>/g, " "));
+  const label = classname ? `${classname} :: ${name}` : name;
+  const suffix = message || details ? ` -- ${message || details}` : "";
+  console.error(`[nix]   FAIL ${label}${suffix}`);
+  printed += 1;
+}
+if (printed === 0) {
+  console.error("[nix]   (no junit failure details found)");
+}
+EOF_JUNIT_SUMMARY
+      exit "${VITEST_STATUS}"
     fi
 
     if [ "${COVERAGE_ENV}" = "1" ]; then

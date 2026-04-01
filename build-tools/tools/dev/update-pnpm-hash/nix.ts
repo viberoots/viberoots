@@ -49,6 +49,7 @@ function nixBuildArgs(opts: {
     "--accept-flake-config",
     "--builders",
     "",
+    "--print-build-logs",
     "--option",
     "min-free",
     "0",
@@ -83,6 +84,7 @@ export async function buildStore(
   const maxJobs = String(process.env.NIX_MAX_JOBS || "").trim() || "0";
   const cores = String(process.env.NIX_CORES || "").trim() || "0";
   const timeoutSec = resolvedFetchTimeoutSec();
+  const streamBuildLogs = String(process.env.BNX_STREAM_NIX_BUILD_LOGS || "").trim() !== "0";
   const res = await runManagedCommand({
     command: "nix",
     args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores, extraEnv }),
@@ -90,6 +92,7 @@ export async function buildStore(
     env: envWithFetchTimeout(timeoutSec, extraEnv),
     timeoutMs: timeoutSec * 1000,
     activity,
+    onStderr: streamBuildLogs ? (chunk) => process.stderr.write(chunk) : undefined,
   });
   const output = String(res.stdout || "") + String(res.stderr || "");
   if (res.timedOut) {
@@ -129,6 +132,7 @@ export async function buildUnfixedAndHash(
   const maxJobs = String(process.env.NIX_MAX_JOBS || "").trim() || "0";
   const cores = String(process.env.NIX_CORES || "").trim() || "0";
   const timeoutSec = resolvedFetchTimeoutSec();
+  const streamBuildLogs = String(process.env.BNX_STREAM_NIX_BUILD_LOGS || "").trim() !== "0";
   const built = await runManagedCommand({
     command: "nix",
     args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores, extraEnv }),
@@ -136,6 +140,7 @@ export async function buildUnfixedAndHash(
     env: envWithFetchTimeout(timeoutSec, extraEnv),
     timeoutMs: timeoutSec * 1000,
     activity,
+    onStderr: streamBuildLogs ? (chunk) => process.stderr.write(chunk) : undefined,
   });
   if (!built.ok) {
     const output = String(built.stdout || "") + String(built.stderr || "");
