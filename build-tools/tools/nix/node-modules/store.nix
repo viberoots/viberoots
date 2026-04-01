@@ -73,10 +73,10 @@ in {
       pname = "pnpm-store";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
       inherit src;
-      nativeBuildInputs = [ node pnpm pkgs.coreutils pkgs.patchelf ];
-      # Non-Linux builders may still materialize foreign ELF payloads in the store for
-      # deterministic lockfile coverage, but only Linux can meaningfully run patchelf on them.
-      dontPatchELF = !pkgs.stdenvNoCC.hostPlatform.isLinux;
+      nativeBuildInputs = [ node pnpm pkgs.coreutils ];
+      # These outputs are package-cache snapshots, not runtime executables, so generic
+      # fixup spends time scanning vendored payloads without improving correctness.
+      dontFixup = true;
       preferLocalBuild = true;
       allowSubstitutes = false;
       dontPatchShebangs = true;
@@ -254,10 +254,9 @@ in {
       pname = "pnpm-store-unfixed";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
       inherit src;
-      nativeBuildInputs = [ node pnpm pkgs.coreutils pkgs.patchelf ];
-      # Same rationale as the fixed-output store above: suppress Linux-only ELF patching
-      # on builders that cannot execute it, while preserving the real Linux path.
-      dontPatchELF = !pkgs.stdenvNoCC.hostPlatform.isLinux;
+      nativeBuildInputs = [ node pnpm pkgs.coreutils ];
+      # This unfixed cache output has the same package-store shape as mkPnpmStore above.
+      dontFixup = true;
       preferLocalBuild = true;
       allowSubstitutes = false;
       dontPatchShebangs = true;

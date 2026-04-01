@@ -101,6 +101,9 @@ export function GameScreen(_props: { url: string }) {
     interactions.clearPendingTap();
     void solve.handleSolve();
   }, [interactions, solve]);
+  const handleBoardGridElement = React.useCallback((element: HTMLElement | null) => {
+    boardGridElementRef.current = element;
+  }, []);
 
   const persistenceReady = useGameScreenPersistence(presentState);
   useGameScreenReveal({ persistenceReady, viewport });
@@ -153,9 +156,7 @@ export function GameScreen(_props: { url: string }) {
             showSolveOverlay={solve.solveState === "solving"}
             onStartDragPlaced={interactions.handleStartDragPlaced}
             snapTargetCellKeys={interactions.snapTargetKeySet}
-            onBoardGridElement={(element) => {
-              boardGridElementRef.current = element;
-            }}
+            onBoardGridElement={handleBoardGridElement}
           />
           <PieceTray
             tray={viewModel.tray}

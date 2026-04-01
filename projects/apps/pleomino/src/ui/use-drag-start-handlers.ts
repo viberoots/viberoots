@@ -12,6 +12,8 @@ export function useDragStartHandlers(args: {
   placedByInstanceId: Map<string, PlacedPiece>;
   dragSessionRef: React.MutableRefObject<ActiveDragSession | null>;
 }) {
+  const { dispatch, dragSessionRef, interactionLocked, placedByInstanceId, state } = args;
+
   const handleStartDrag = React.useCallback(
     (
       pieceId: string,
@@ -19,7 +21,7 @@ export function useDragStartHandlers(args: {
       grabbedOffsetPx: PixelPoint | null,
       mouseButton?: number,
     ) => {
-      if (!grabbedOffsetPx || args.interactionLocked) {
+      if (!grabbedOffsetPx || interactionLocked) {
         return;
       }
       startDragFromTray({
@@ -27,12 +29,12 @@ export function useDragStartHandlers(args: {
         pointer,
         grabbedOffsetPx,
         mouseButton,
-        state: args.state,
-        dispatch: args.dispatch,
-        dragSessionRef: args.dragSessionRef,
+        state,
+        dispatch,
+        dragSessionRef,
       });
     },
-    [args],
+    [dispatch, dragSessionRef, interactionLocked, state],
   );
 
   const handleStartDragPlaced = React.useCallback(
@@ -43,7 +45,7 @@ export function useDragStartHandlers(args: {
       pointer: Pointer,
       mouseButton?: number,
     ) => {
-      if (args.interactionLocked) {
+      if (interactionLocked) {
         return;
       }
       startDragFromPlaced({
@@ -52,13 +54,13 @@ export function useDragStartHandlers(args: {
         grabbedOffsetPx,
         pointer,
         mouseButton,
-        state: args.state,
-        dispatch: args.dispatch,
-        placedByInstanceId: args.placedByInstanceId,
-        dragSessionRef: args.dragSessionRef,
+        state,
+        dispatch,
+        placedByInstanceId,
+        dragSessionRef,
       });
     },
-    [args],
+    [dispatch, dragSessionRef, interactionLocked, placedByInstanceId, state],
   );
 
   return { handleStartDrag, handleStartDragPlaced };

@@ -81,6 +81,10 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   if (!store.includes("NIX_PNPM_EXACT_STORE must be a /nix/store path")) {
     throw new Error("store.nix must reject non-store exact-store paths");
   }
+  const dontFixupMatches = store.match(/dontFixup = true;/g) ?? [];
+  if (dontFixupMatches.length < 2) {
+    throw new Error("store.nix must skip generic fixup work for both pnpm-store cache derivations");
+  }
 
   const nixBuildHelpers = await fsp.readFile(
     "build-tools/tools/dev/update-pnpm-hash/nix.ts",

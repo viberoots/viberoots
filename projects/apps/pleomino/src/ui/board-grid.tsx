@@ -6,7 +6,9 @@ import { cellKey } from "../game/placement";
 import { grabbedOffsetFromBoardCellEvent, pointerFromBoardEvent } from "./board-grid-drag";
 import { boardGridStyles as styles } from "./board-grid-styles";
 
-export function BoardGrid(props: {
+const EMPTY_SNAP_TARGET_CELL_KEYS = new Set<string>();
+
+function BoardGridBase(props: {
   board: BoardViewModel;
   cellSize: number;
   shakeToken?: number;
@@ -24,7 +26,7 @@ export function BoardGrid(props: {
 }) {
   const [isShaking, setIsShaking] = React.useState(false);
   const [isFailureFlashing, setIsFailureFlashing] = React.useState(false);
-  const snapTargetCellSet = props.snapTargetCellKeys ?? new Set<string>();
+  const snapTargetCellSet = props.snapTargetCellKeys ?? EMPTY_SNAP_TARGET_CELL_KEYS;
 
   React.useEffect(() => {
     if (!props.shakeToken) {
@@ -65,26 +67,28 @@ export function BoardGrid(props: {
     [snapTargetCellSet],
   );
 
-  const rows = [];
-  for (let row = 0; row < props.board.rows; row += 1) {
-    const rowStart = row * props.board.columns;
-    const rowCells = props.board.cells.slice(rowStart, rowStart + props.board.columns);
-    rows.push(
-      <View key={row} style={styles.boardRow} testID="pleomino-board-row">
-        {rowCells.map((cell) =>
-          (() => {
-            const isSnapTarget = props.snapTargetCellKeys?.has(cell.key) ?? false;
+  const rows = React.useMemo(() => {
+    const nextRows = [];
+    for (let row = 0; row < props.board.rows; row += 1) {
+      const rowStart = row * props.board.columns;
+      const rowCells = props.board.cells.slice(rowStart, rowStart + props.board.columns);
+      nextRows.push(
+        <View key={row} style={styles.boardRow} testID="pleomino-board-row">
+          {rowCells.map((cell) => {
+            const canStartPlacedDrag =
+              cell.state === "placed" && cell.pieceId && cell.instanceId && cell.localCell;
+            const isSnapTarget = snapTargetCellSet.has(cell.key);
             return (
               <View
                 key={cell.key}
                 onMouseDown={
-                  cell.state === "placed" && cell.pieceId && cell.instanceId && cell.localCell
+                  canStartPlacedDrag
                     ? (event) => {
                         const pointer = pointerFromBoardEvent(event);
                         event.preventDefault();
                         const grabbedOffsetPx = grabbedOffsetFromBoardCellEvent(
                           event,
-                          cell.localCell!,
+                          cell.localCell,
                           pointer,
                           props.cellSize,
                         );
@@ -92,8 +96,8 @@ export function BoardGrid(props: {
                           return;
                         }
                         props.onStartDragPlaced(
-                          cell.pieceId!,
-                          cell.instanceId!,
+                          cell.pieceId,
+                          cell.instanceId,
                           grabbedOffsetPx,
                           pointer,
                           event.nativeEvent.button,
@@ -102,13 +106,13 @@ export function BoardGrid(props: {
                     : undefined
                 }
                 onTouchStart={
-                  cell.state === "placed" && cell.pieceId && cell.instanceId && cell.localCell
+                  canStartPlacedDrag
                     ? (event) => {
                         const pointer = pointerFromBoardEvent(event);
                         event.preventDefault();
                         const grabbedOffsetPx = grabbedOffsetFromBoardCellEvent(
                           event,
-                          cell.localCell!,
+                          cell.localCell,
                           pointer,
                           props.cellSize,
                         );
@@ -116,8 +120,8 @@ export function BoardGrid(props: {
                           return;
                         }
                         props.onStartDragPlaced(
-                          cell.pieceId!,
-                          cell.instanceId!,
+                          cell.pieceId,
+                          cell.instanceId,
                           grabbedOffsetPx,
                           pointer,
                           event.nativeEvent.button,
@@ -149,11 +153,18 @@ export function BoardGrid(props: {
                 }
               />
             );
-          })(),
-        )}
-      </View>,
-    );
-  }
+          })}
+        </View>,
+      );
+    }
+    return nextRows;
+  }, [
+    props.board,
+    props.cellSize,
+    props.onStartDragPlaced,
+    snapOutlineStyleForCell,
+    snapTargetCellSet,
+  ]);
 
   return (
     <View
@@ -184,3 +195,5 @@ export function BoardGrid(props: {
     </View>
   );
 }
+
+export const BoardGrid = React.memo(BoardGridBase);
