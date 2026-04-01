@@ -2,10 +2,13 @@
 let
   lib = pkgs.lib;
   H = import ./lib/lang-helpers.nix { inherit pkgs; };
-  # Allow tests to override the repo root via BUCK_TEST_SRC; default to provided flake src
+  filteredFlakeSnapshot = (builtins.getEnv "BNX_FILTERED_FLAKE_SNAPSHOT") != "";
   buckTestSrcEnv = builtins.getEnv "BUCK_TEST_SRC";
-  repoRootStr = if buckTestSrcEnv != "" then buckTestSrcEnv else builtins.toString src;
-  repoRootBase = builtins.toPath repoRootStr;
+  repoRootStr =
+    if filteredFlakeSnapshot then builtins.toString src
+    else if buckTestSrcEnv != "" then buckTestSrcEnv
+    else builtins.toString src;
+  repoRootBase = if filteredFlakeSnapshot then src else builtins.toPath repoRootStr;
   traceEnabled = (builtins.getEnv "PLANNER_TRACE") != "";
   onlyCpp = (builtins.getEnv "PLANNER_ONLY_CPP") != "";
   selectedTargetName = builtins.getEnv "BUCK_TARGET";
@@ -27,9 +30,9 @@ let
     in
       isRoot || isProjects || isProjectsApps || isProjectsLibs || inProjectsApps || inProjectsLibs
       || isBuildTools || isBuildToolsTools || inBuildToolsTools;
-  # Filtered source that includes both projects/apps/* and projects/libs/* so local replaces resolve.
-  # In BUCK_TEST_SRC mode, use builtins.path to keep temp-repo test fixtures (including untracked files).
-  appsLibsSrc = if buckTestSrcEnv != ""
+  appsLibsSrc = if filteredFlakeSnapshot
+    then src
+    else if buckTestSrcEnv != ""
     then builtins.path { path = repoRootBase; name = "buck-test-src-apps-libs"; filter = keepAppsLibsPath; }
     else lib.cleanSourceWith {
       src = repoRootBase;
@@ -534,5 +537,4 @@ in
   inherit cppTargets cppTargetsFlat all selected;
   inherit selectedWasm;
 }
-
 

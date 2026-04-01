@@ -146,10 +146,14 @@ async function main(): Promise<void> {
       selectedCppSources != null
         ? {
             ...process.env,
+            BNX_FILTERED_FLAKE_SNAPSHOT: "1",
             BUCK_GRAPH_JSON: path.join(snapDir, "build-tools", "tools", "buck", "graph.json"),
             BUCK_TEST_SRC: snapDir,
           }
-        : process.env;
+        : {
+            ...process.env,
+            BNX_FILTERED_FLAKE_SNAPSHOT: "1",
+          };
     const buildStart = Date.now();
     const res = await withHeartbeat(
       "nix-build",
