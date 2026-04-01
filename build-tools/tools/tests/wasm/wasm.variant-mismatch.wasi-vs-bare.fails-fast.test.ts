@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { exportGraphInTemp, runBuildSelected, runInTemp } from "../lib/test-helpers";
 
 test("wasm: variant mismatch (TinyGo WASI vs bare lib) fails fast with targeted error", async () => {
   await runInTemp("wasm-variant-mismatch-wasi-vs-bare", async (tmp, $) => {
@@ -73,20 +73,14 @@ nix_go_tiny_wasm_lib(
 `,
     );
 
-    await $({
-      stdio: "inherit",
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    await exportGraphInTemp({ tmp, $ });
 
-    const res = await $({
-      stdio: "pipe",
-      env: {
-        ...process.env,
-        BUCK_TARGET: "//projects/libs/math-api:wasm",
-        WEB_WASM_BACKEND: "wasi_single",
-      },
-      reject: false,
-      nothrow: true,
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
+    const res = await runBuildSelected({
+      tmp,
+      $,
+      target: "//projects/libs/math-api:wasm",
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
 
     if (res.exitCode === 0) {
       throw new Error("expected build-selected to fail on wasm variant mismatch, but it succeeded");

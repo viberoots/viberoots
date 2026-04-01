@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { buildSelectedOutPath, runInTemp } from "../lib/test-helpers";
 
 test("ts package packaging with conditional exports and artifact staging", async () => {
   await runInTemp("packaging", async (tmp, $) => {
@@ -300,45 +300,19 @@ genrule(
 
     // 7) Build artifacts via selected builders and stage to dist/ manually (equivalent to the genrule)
     // Build TinyGo wasm via build-selected (same path used for addon below).
-    const { stdout: outWasmSel } = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-      env: {
-        ...process.env,
-        BUCK_TARGET: "//projects/libs/math-api:wasm",
-        WORKSPACE_ROOT: tmp,
-        BUCK_TEST_SRC: tmp,
-      },
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
-    const outWasmPath =
-      String(outWasmSel || "")
-        .trim()
-        .split(/\n+/)
-        .pop() || "";
-    if (!outWasmPath) throw new Error("no out path from build-selected for wasm");
+    const outWasmPath = await buildSelectedOutPath({
+      tmp,
+      $,
+      target: "//projects/libs/math-api:wasm",
+    });
     const wasmSrc = path.join(outWasmPath, "lib", "top.wasm");
 
     // Build Node addon (selected)
-    const { stdout: outAddonSel } = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-      env: {
-        ...process.env,
-        BUCK_TARGET: "//projects/libs/math-native:napi_addon",
-        WORKSPACE_ROOT: tmp,
-        BUCK_TEST_SRC: tmp,
-      },
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
-    const outAddonPath =
-      String(outAddonSel || "")
-        .trim()
-        .split(/\n+/)
-        .pop() || "";
-    if (!outAddonPath) throw new Error("no out path from build-selected for addon");
+    const outAddonPath = await buildSelectedOutPath({
+      tmp,
+      $,
+      target: "//projects/libs/math-native:napi_addon",
+    });
     // Probe addon .node path (lib/*.node)
     const addonLibDir = path.join(outAddonPath, "lib");
     const addonFiles = await fs.readdir(addonLibDir);

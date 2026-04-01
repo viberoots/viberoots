@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { buildSelectedOutPath, runInTemp } from "../lib/test-helpers";
 
 test("Node N-API addon builds and returns add(2,3)=5 (temp repo)", async () => {
   await runInTemp("node-addon", async (tmp, $) => {
@@ -135,26 +135,11 @@ EOF'`;
     })`${process.execPath} build-tools/tools/dev/install/deps-main.ts --glue-only`;
 
     // Build the addon via the flake-selected builder (same path used by cpp_nix_build)
-    const { stdout: outSel } = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-      env: {
-        ...process.env,
-        BUCK_TARGET: "//projects/libs/math-native:napi_addon",
-        WORKSPACE_ROOT: tmp,
-        BUCK_TEST_SRC: tmp,
-      },
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
-    const outPath =
-      String(outSel || "")
-        .trim()
-        .split(/\n+/)
-        .pop() || "";
-    if (!outPath) {
-      throw new Error("nix build-selected did not emit an out path");
-    }
+    const outPath = await buildSelectedOutPath({
+      tmp,
+      $,
+      target: "//projects/libs/math-native:napi_addon",
+    });
     const addonPath = path.join(outPath, "lib", "projects-libs-math-native-napi_addon.node");
     const probe = await $({
       cwd: tmp,

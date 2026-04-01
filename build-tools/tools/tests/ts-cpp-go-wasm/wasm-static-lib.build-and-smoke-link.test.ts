@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { buildSelectedOutPath, runInTemp } from "../lib/test-helpers";
 
 test("wasm static lib builds and exports headers (smoke link optional)", async () => {
   await runInTemp("wasm-static-lib", async (tmp, $) => {
@@ -96,21 +96,11 @@ nix_cpp_wasm_static_lib(
     await $`buck2 build --target-platforms prelude//platforms:default //projects/libs/math-core:core_wasm`;
 
     // Query the Nix out path for the selected target and verify archive + headers
-    const sel = await $({
-      cwd: tmp,
-      env: {
-        ...process.env,
-        BUCK_TARGET: "//projects/libs/math-core:core_wasm",
-        WORKSPACE_ROOT: tmp,
-        BUCK_TEST_SRC: tmp,
-      },
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
-    const outPath =
-      String(sel.stdout || "")
-        .trim()
-        .split(/\n+/)
-        .pop() || "";
-    if (!outPath) throw new Error("no out path emitted by build-selected.ts");
+    const outPath = await buildSelectedOutPath({
+      tmp,
+      $,
+      target: "//projects/libs/math-core:core_wasm",
+    });
     const libGlob =
       await $`bash --noprofile --norc -c ${`ls -1 ${outPath}/lib/lib*.a | head -n 1`}`.nothrow();
     const libPath = String(libGlob.stdout || "").trim();

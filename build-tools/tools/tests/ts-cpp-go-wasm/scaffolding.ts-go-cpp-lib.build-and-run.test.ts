@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { exportGraphInTemp, runInTemp } from "../lib/test-helpers";
 
 const bashProbe = spawnSync("/bin/bash", ["-lc", "echo ok"], { stdio: "ignore" });
 const SKIP_PR8 = !!bashProbe.error || !existsSync("/bin/bash");
@@ -44,10 +44,7 @@ test("scaffold ts go-cpp-lib; build addon + wasm; both return 5", { skip: SKIP_P
     );
 
     // 3) Export Buck graph for the temp repo (avoid broader glue to keep scope minimal)
-    await $({
-      cwd: tmp,
-      stdio: "inherit",
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    await exportGraphInTemp({ tmp, $ });
 
     // 4) Produce a minimal WASM module that exports `add(i32,i32)->i32` directly (no toolchain)
     const wasmTmp = path.join(tmp, "top.wasm");

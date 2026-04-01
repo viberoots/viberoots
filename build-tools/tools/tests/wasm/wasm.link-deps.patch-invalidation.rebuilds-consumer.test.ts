@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { buildSelectedOutPath, exportGraphInTemp, runInTemp } from "../lib/test-helpers";
 
 async function instantiateWasmFromFile(filePath: string): Promise<WebAssembly.Instance> {
   const bytes = await fs.readFile(filePath);
@@ -33,26 +33,6 @@ async function instantiateWasmFromFile(filePath: string): Promise<WebAssembly.In
     if (typeof wasi.start === "function") wasi.start(instance);
     return instance;
   }
-}
-
-async function buildSelectedOutPath(args: {
-  tmp: string;
-  $: any;
-  target: string;
-}): Promise<string> {
-  const { tmp, $, target } = args;
-  const res = await $({
-    cwd: tmp,
-    stdio: "pipe",
-    env: { ...process.env, BUCK_TARGET: target, WEB_WASM_BACKEND: "wasi_single" },
-  })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
-  const outPath =
-    String(res.stdout || "")
-      .trim()
-      .split(/\n+/)
-      .pop() || "";
-  if (!outPath) throw new Error("no out path emitted by build-selected.ts");
-  return outPath;
 }
 
 test("wasm: patch change in linked C++ wasm producer rebuilds TinyGo consumer", async () => {
@@ -135,12 +115,14 @@ nix_go_tiny_wasm_lib(
 `,
     );
 
-    await $({
-      cwd: tmp,
-      stdio: "inherit",
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    await exportGraphInTemp({ tmp, $ });
 
-    const out1 = await buildSelectedOutPath({ tmp, $, target: "//projects/libs/math-api:wasm" });
+    const out1 = await buildSelectedOutPath({
+      tmp,
+      $,
+      target: "//projects/libs/math-api:wasm",
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
     const wasm1 = path.join(out1, "lib", "top.wasm");
     await fs.access(wasm1);
     const inst1 = await instantiateWasmFromFile(wasm1);
@@ -153,7 +135,12 @@ nix_go_tiny_wasm_lib(
     );
     await fs.writeFile(patchFile, patchV2, "utf8");
 
-    const out2 = await buildSelectedOutPath({ tmp, $, target: "//projects/libs/math-api:wasm" });
+    const out2 = await buildSelectedOutPath({
+      tmp,
+      $,
+      target: "//projects/libs/math-api:wasm",
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
     if (out2 === out1)
       throw new Error(
         `expected consumer output store path to change after producer patch edit; out=${out1}`,

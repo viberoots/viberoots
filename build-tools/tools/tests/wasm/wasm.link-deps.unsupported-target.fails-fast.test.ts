@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { exportGraphInTemp, runBuildSelected, runInTemp } from "../lib/test-helpers";
 
 test("wasm: unsupported target in link_deps fails fast with targeted error", async () => {
   await runInTemp("wasm-link-deps-unsupported-target", async (tmp, $) => {
@@ -27,22 +27,14 @@ test("wasm: unsupported target in link_deps fails fast with targeted error", asy
       ].join("\n"),
     );
 
-    await $({
-      cwd: tmp,
-      stdio: "inherit",
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    await exportGraphInTemp({ tmp, $ });
 
-    const res = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-      env: {
-        ...process.env,
-        BUCK_TARGET: "//projects/libs/api:wasm",
-        WEB_WASM_BACKEND: "wasi_single",
-      },
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
+    const res = await runBuildSelected({
+      tmp,
+      $,
+      target: "//projects/libs/api:wasm",
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
 
     if (res.exitCode === 0) {
       throw new Error("expected build-selected to fail on unsupported link_deps, but it succeeded");

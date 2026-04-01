@@ -1,6 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { buckCommandEnv, isBuckDaemonInitTransient } from "../../lib/buck-command-env.ts";
+import {
+  buckCommandEnv,
+  isBuckDaemonInitTransient,
+  resolveNestedBuckIsolation,
+} from "../../lib/buck-command-env.ts";
 
 const SAFETY_FLOOR_TARGETS = [
   "//:scaffolding_smoke_lib_readme",
@@ -9,13 +13,11 @@ const SAFETY_FLOOR_TARGETS = [
 ];
 const TARGET_PLATFORM = "prelude//platforms:default";
 
-function isolationId(prefix: string): string {
-  return `${prefix}_${process.pid}_${Date.now()}`;
-}
-
 test("template safety-floor targets are resolvable", async () => {
   const query = `set(${SAFETY_FLOOR_TARGETS.join(" ")})`;
-  const isolationDir = isolationId("template_conventions_safety_floor");
+  const { isolationDir, ownsIsolation } = resolveNestedBuckIsolation({
+    prefix: "template-conventions",
+  });
   const env = { ...buckCommandEnv(), IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1" };
   const withTransientRetry = async <T>(run: () => Promise<T>): Promise<T> => {
     try {
@@ -44,10 +46,12 @@ test("template safety-floor targets are resolvable", async () => {
       }
     }
   } finally {
-    await $({
-      stdio: "ignore",
-      reject: false,
-      env,
-    })`buck2 --isolation-dir ${isolationDir} kill`;
+    if (ownsIsolation) {
+      await $({
+        stdio: "ignore",
+        reject: false,
+        env,
+      })`buck2 --isolation-dir ${isolationDir} kill`;
+    }
   }
 });

@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { buildSelectedOutPath, exportGraphInTemp, runInTemp } from "../lib/test-helpers";
 
 async function instantiateWasmFromFile(filePath: string): Promise<WebAssembly.Instance> {
   const bytes = await fs.readFile(filePath);
@@ -137,29 +137,19 @@ nix_go_tiny_wasm_lib(
 `,
     );
 
-    await $({
-      stdio: "inherit",
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    await exportGraphInTemp({ tmp, $ });
 
     await $({
       stdio: "inherit",
       env: { ...process.env, WEB_WASM_BACKEND: "wasi_single" },
     })`buck2 build --target-platforms prelude//platforms:default //projects/libs/api:wasm`;
 
-    const sel = await $({
-      stdio: "pipe",
-      env: {
-        ...process.env,
-        BUCK_TARGET: "//projects/libs/api:wasm",
-        WEB_WASM_BACKEND: "wasi_single",
-      },
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
-    const outPath =
-      String(sel.stdout || "")
-        .trim()
-        .split(/\n+/)
-        .pop() || "";
-    if (!outPath) throw new Error("no out path emitted by build-selected.ts");
+    const outPath = await buildSelectedOutPath({
+      tmp,
+      $,
+      target: "//projects/libs/api:wasm",
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
 
     const wasmPath = path.join(outPath, "lib", "top.wasm");
     await fs.access(wasmPath);

@@ -2,27 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
-
-async function buildSelectedOutPath(args: {
-  tmp: string;
-  $: any;
-  target: string;
-}): Promise<string> {
-  const { tmp, $, target } = args;
-  const res = await $({
-    cwd: tmp,
-    stdio: "pipe",
-    env: { ...process.env, BUCK_TARGET: target, WEB_WASM_BACKEND: "wasi_single" },
-  })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
-  const outPath =
-    String(res.stdout || "")
-      .trim()
-      .split(/\n+/)
-      .pop() || "";
-  if (!outPath) throw new Error("no out path emitted by build-selected.ts");
-  return outPath;
-}
+import { buildSelectedOutPath, exportGraphInTemp, runInTemp } from "../lib/test-helpers";
 
 test("wasm: tinygo per-dep link closure overrides are observable and deterministic", async () => {
   await runInTemp("wasm-tinygo-link-closure-overrides", async (tmp, $) => {
@@ -78,12 +58,14 @@ test("wasm: tinygo per-dep link closure overrides are observable and determinist
       ].join("\n"),
     );
 
-    await $({
-      cwd: tmp,
-      stdio: "inherit",
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    await exportGraphInTemp({ tmp, $ });
 
-    const outPath = await buildSelectedOutPath({ tmp, $, target: "//projects/libs/api:wasm" });
+    const outPath = await buildSelectedOutPath({
+      tmp,
+      $,
+      target: "//projects/libs/api:wasm",
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
     const log = await fs.readFile(path.join(outPath, "build.log"), "utf8");
 
     const libLabels =

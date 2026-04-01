@@ -1,6 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import { after, test } from "node:test";
-import { buckCommandEnv, isBuckDaemonInitTransient } from "../../lib/buck-command-env.ts";
+import {
+  buckCommandEnv,
+  isBuckDaemonInitTransient,
+  resolveNestedBuckIsolation,
+} from "../../lib/buck-command-env.ts";
 
 type TemplateExpectation = {
   script: string;
@@ -324,11 +328,10 @@ function normalizeTarget(target: string): string {
   return target.replace(/\s+\([^)]*\)$/, "");
 }
 
-function isolationId(prefix: string): string {
-  return `${prefix}_${process.pid}_${Date.now()}`;
-}
-
-const templateConventionsIsolation = isolationId("template_conventions_metadata_cquery");
+const {
+  isolationDir: templateConventionsIsolation,
+  ownsIsolation: ownsTemplateConventionsIsolation,
+} = resolveNestedBuckIsolation({ prefix: "template-conventions" });
 const buckEnv = { ...buckCommandEnv(), IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1" };
 const TARGET_PLATFORM = "prelude//platforms:default";
 
@@ -344,6 +347,7 @@ async function withBuckTransientRetry<T>(run: () => Promise<T>): Promise<T> {
 }
 
 after(async () => {
+  if (!ownsTemplateConventionsIsolation) return;
   await $({
     stdio: "ignore",
     reject: false,

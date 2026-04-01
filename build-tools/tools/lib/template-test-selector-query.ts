@@ -1,6 +1,10 @@
 import process from "node:process";
 import "../dev/zx-init.mjs";
-import { buckCommandEnv, isBuckDaemonInitTransient } from "./buck-command-env.ts";
+import {
+  buckCommandEnv,
+  isBuckDaemonInitTransient,
+  resolveNestedBuckIsolation,
+} from "./buck-command-env.ts";
 
 const CONFIG_SUFFIX = /\s+\([^)]*\)$/;
 
@@ -21,7 +25,10 @@ export async function queryTargetsForTemplateLabel(
   root: string,
   templateId: string,
 ): Promise<string[]> {
-  const isolationDir = `template_selector_${process.pid}_${Date.now()}`;
+  const { isolationDir, ownsIsolation } = resolveNestedBuckIsolation({
+    root,
+    prefix: "template-selector",
+  });
   const query = `attrfilter(labels, "template:${templateId}", //...)`;
   const targetPlatform =
     String(process.env.BUCK_TARGET_PLATFORMS || process.env.BUCK_TARGET_PLATFORM || "").trim() ||
@@ -62,11 +69,13 @@ export async function queryTargetsForTemplateLabel(
     >;
     return toSortedUnique(Object.keys(raw).map((k) => normalizeTarget(k)));
   } finally {
-    await $({
-      cwd: root,
-      stdio: "ignore",
-      reject: false,
-      env: buckCommandEnv(),
-    })`buck2 --isolation-dir ${isolationDir} kill`;
+    if (ownsIsolation) {
+      await $({
+        cwd: root,
+        stdio: "ignore",
+        reject: false,
+        env: buckCommandEnv(),
+      })`buck2 --isolation-dir ${isolationDir} kill`;
+    }
   }
 }

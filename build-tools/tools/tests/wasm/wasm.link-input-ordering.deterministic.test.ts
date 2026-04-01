@@ -2,27 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
-
-async function buildSelectedOutPath(args: {
-  tmp: string;
-  $: any;
-  target: string;
-}): Promise<string> {
-  const { tmp, $, target } = args;
-  const res = await $({
-    cwd: tmp,
-    stdio: "pipe",
-    env: { ...process.env, BUCK_TARGET: target, WEB_WASM_BACKEND: "wasi_single" },
-  })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
-  const outPath =
-    String(res.stdout || "")
-      .trim()
-      .split(/\n+/)
-      .pop() || "";
-  if (!outPath) throw new Error("no out path emitted by build-selected.ts");
-  return outPath;
-}
+import { buildSelectedOutPath, exportGraphInTemp, runInTemp } from "../lib/test-helpers";
 
 test("wasm: link input ordering is deterministic (logged by template)", async () => {
   await runInTemp("wasm-link-input-ordering-deterministic", async (tmp, $) => {
@@ -75,13 +55,20 @@ test("wasm: link input ordering is deterministic (logged by template)", async ()
       ].join("\n"),
     );
 
-    await $({
-      cwd: tmp,
-      stdio: "inherit",
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    await exportGraphInTemp({ tmp, $ });
 
-    const out1 = await buildSelectedOutPath({ tmp, $, target: "//projects/libs/api:wasm" });
-    const out2 = await buildSelectedOutPath({ tmp, $, target: "//projects/libs/api:wasm" });
+    const out1 = await buildSelectedOutPath({
+      tmp,
+      $,
+      target: "//projects/libs/api:wasm",
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
+    const out2 = await buildSelectedOutPath({
+      tmp,
+      $,
+      target: "//projects/libs/api:wasm",
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
 
     const log1 = await fs.readFile(path.join(out1, "build.log"), "utf8");
     const log2 = await fs.readFile(path.join(out2, "build.log"), "utf8");

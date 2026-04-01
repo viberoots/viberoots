@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { buildSelectedOutPath, exportGraphInTemp, runInTemp } from "../lib/test-helpers";
 
 test("wasi_single backend builds and runs add(2,3)=5 via node:wasi", async () => {
   await runInTemp("wasi-backend", async (tmp, $) => {
@@ -54,31 +54,15 @@ nix_cpp_wasm_static_lib(
     );
 
     // 3) Export graph once
-    await $({
-      cwd: tmp,
-      stdio: "inherit",
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    await exportGraphInTemp({ tmp, $ });
 
     // 4) Build C++ WASI static lib via selected (planner routes flavor:wasm + wasm:wasi)
-    const { stdout: outCppSel } = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-      env: {
-        ...process.env,
-        BUCK_TARGET: "//projects/libs/math-core:core_wasm",
-        PLANNER_ONLY_CPP: "1",
-        WORKSPACE_ROOT: tmp,
-        BUCK_TEST_SRC: tmp,
-      },
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
-    const outCppPath =
-      String(outCppSel || "")
-        .trim()
-        .split(/\n+/)
-        .pop() || "";
-    if (!outCppPath) throw new Error("no out path from build-selected for wasi static lib");
+    const outCppPath = await buildSelectedOutPath({
+      tmp,
+      $,
+      target: "//projects/libs/math-core:core_wasm",
+      env: { PLANNER_ONLY_CPP: "1" },
+    });
     // Basic artifact presence check
     const libDir = path.join(outCppPath, "lib");
     const files = (await fs.pathExists(libDir)) ? await fs.readdir(libDir) : [];
@@ -123,25 +107,12 @@ nix_go_tiny_wasm_lib(
     );
 
     // 6) Build TinyGo WASI wasm via graph-generator-selected-wasm (WEB_WASM_BACKEND=wasi_single)
-    const { stdout: outWasmSel } = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-      env: {
-        ...process.env,
-        BUCK_TARGET: "//projects/libs/math-api:wasm",
-        WEB_WASM_BACKEND: "wasi_single",
-        WORKSPACE_ROOT: tmp,
-        BUCK_TEST_SRC: tmp,
-      },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected-wasm`} --accept-flake-config --no-link --print-out-paths`;
-    const outWasmPath =
-      String(outWasmSel || "")
-        .trim()
-        .split(/\n+/)
-        .pop() || "";
-    if (!outWasmPath) throw new Error("no out path from graph-generator-selected-wasm (wasi)");
+    const outWasmPath = await buildSelectedOutPath({
+      tmp,
+      $,
+      target: "//projects/libs/math-api:wasm",
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
     const wasiWasm = path.join(outWasmPath, "lib", "top.wasm");
     const ok =
       await $`bash --noprofile --norc -c ${`test -f ${wasiWasm} && echo ok || true`}`.nothrow();

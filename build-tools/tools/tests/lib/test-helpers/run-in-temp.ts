@@ -23,6 +23,7 @@ import {
   pinnedNixpkgsOutPathExpr,
 } from "../../../lib/pinned-nixpkgs.ts";
 import { externalPnpmStateDirs } from "../../../lib/pnpm-state-paths.ts";
+import { stableBuckIsolation } from "../../../lib/buck-command-env.ts";
 
 let cachedDevEnvExport: Promise<string> | null = null;
 let cachedPinnedNixpkgsPath: Promise<string> | null = null;
@@ -258,10 +259,13 @@ export async function runInTemp<T>(
   const xdgCacheHome = await stableXdgCacheRoot();
   const activeXdgCacheHome = process.env.XDG_CACHE_HOME || xdgCacheHome;
   await ensureSharedNixTarballCacheRepo(activeXdgCacheHome);
+  const tempNestedIso = stableBuckIsolation(tmp, "zxtest-shared");
   const tempSetupEnv = {
     ...process.env,
     WORKSPACE_ROOT: tmp,
     BUCK_TEST_SRC: tmp,
+    BUCK_NESTED_ISO: tempNestedIso,
+    BUCK_EXPORTER_REUSE_DAEMON: process.env.BUCK_EXPORTER_REUSE_DAEMON || "1",
     REPO_ROOT: process.cwd(),
     HOME: home,
     XDG_CACHE_HOME: activeXdgCacheHome,
@@ -357,6 +361,8 @@ export async function runInTemp<T>(
   } catch {}
   exportEnv.WORKSPACE_ROOT = tmp;
   exportEnv.BUCK_TEST_SRC = tmp;
+  exportEnv.BUCK_NESTED_ISO = tempNestedIso;
+  exportEnv.BUCK_EXPORTER_REUSE_DAEMON = exportEnv.BUCK_EXPORTER_REUSE_DAEMON || "1";
   exportEnv.HOME = home;
   exportEnv.XDG_CACHE_HOME = exportEnv.XDG_CACHE_HOME || xdgCacheHome;
   if (!exportEnv.BUCK2_REAL_HOME && realHome) {

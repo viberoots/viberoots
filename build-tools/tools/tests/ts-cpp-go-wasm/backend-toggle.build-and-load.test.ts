@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { buildSelectedOutPath, exportGraphInTemp, runInTemp } from "../lib/test-helpers";
 
 test("backend toggle tinygo_single and emscripten_dual both return add(2,3)=5", async () => {
   await runInTemp("backend-toggle", async (tmp, $) => {
@@ -99,25 +99,15 @@ nix_go_tiny_wasm_lib(
     );
 
     // 4) Export graph once
-    await $({
-      cwd: tmp,
-      stdio: "inherit",
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    await exportGraphInTemp({ tmp, $ });
 
     // 5) Build TinyGo wasm via selected-wasm
-    const { stdout: outWasmSel } = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-      env: { ...process.env, BUCK_TARGET: "//projects/libs/math-api:wasm" },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected-wasm`} --accept-flake-config --no-link --print-out-paths`;
-    const outWasmPath =
-      String(outWasmSel || "")
-        .trim()
-        .split(/\n+/)
-        .pop() || "";
-    if (!outWasmPath) throw new Error("no out path from graph-generator-selected-wasm");
+    const outWasmPath = await buildSelectedOutPath({
+      tmp,
+      $,
+      target: "//projects/libs/math-api:wasm",
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
     const tinygoWasm = path.join(outWasmPath, "lib", "top.wasm");
     {
       const ok =
@@ -132,25 +122,12 @@ nix_go_tiny_wasm_lib(
     }
 
     // 6) Build Emscripten C++ bundle via selected (planner routes wasm:emscripten)
-    const { stdout: outEmsSel } = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-      env: {
-        ...process.env,
-        BUCK_TARGET: "//projects/libs/math-core:core_emscripten",
-        PLANNER_ONLY_CPP: "1",
-        WORKSPACE_ROOT: tmp,
-        BUCK_TEST_SRC: tmp,
-      },
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/dev/build-selected.ts`;
-    const outEmsPath =
-      String(outEmsSel || "")
-        .trim()
-        .split(/\n+/)
-        .pop() || "";
-    if (!outEmsPath) throw new Error("no out path from build-selected for emscripten bundle");
+    const outEmsPath = await buildSelectedOutPath({
+      tmp,
+      $,
+      target: "//projects/libs/math-core:core_emscripten",
+      env: { PLANNER_ONLY_CPP: "1" },
+    });
     // Probe artifact names (lib/<sanitized>.js/.wasm)
     const libDir = path.join(outEmsPath, "lib");
     const files = await fsp.readdir(libDir);

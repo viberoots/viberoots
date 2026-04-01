@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { buildSelectedOutPath, exportGraphInTemp, runInTemp } from "../lib/test-helpers";
 
 test("tinygo top.wasm builds and loader returns add(2,3)=5", async () => {
   await runInTemp("tinygo-wasm", async (tmp, $) => {
@@ -89,23 +89,13 @@ nix_go_tiny_wasm_lib(
     );
 
     // 4) Export graph and build TinyGo wasm via graph-generator-selected-wasm
-    await $({
-      cwd: tmp,
-      stdio: "inherit",
-    })`nix run --accept-flake-config ${`path:${tmp}#zx-wrapper`} -- build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
-    const { stdout: outSel } = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-      env: { ...process.env, BUCK_TARGET: "//projects/libs/math-api:wasm" },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected-wasm`} --accept-flake-config --no-link --print-out-paths`;
-    const outPath =
-      String(outSel || "")
-        .trim()
-        .split(/\n+/)
-        .pop() || "";
-    if (!outPath) throw new Error("no out path from graph-generator-selected-wasm");
+    await exportGraphInTemp({ tmp, $ });
+    const outPath = await buildSelectedOutPath({
+      tmp,
+      $,
+      target: "//projects/libs/math-api:wasm",
+      env: { WEB_WASM_BACKEND: "wasi_single" },
+    });
     const wasmPath = path.join(outPath, "lib", "top.wasm");
     const ok =
       await $`bash --noprofile --norc -c ${`test -f ${wasmPath} && echo ok || true`}`.nothrow();

@@ -3,6 +3,10 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import {
+  DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
+  stageTempRepoPaths,
+} from "../lib/test-helpers/git-stage.ts";
 
 // Verify that the nix_node_test external runner propagates test failures to Buck (non-zero).
 const TEST_TIMEOUT_MS =
@@ -18,12 +22,10 @@ test(
       const $ = _$({ cwd: tmp, stdio: "inherit" });
 
       await $`git init`;
-      // IMPORTANT: rely on runInTemp's injected env (WORKSPACE_ROOT/HOME/etc). Do not spread
-      // process.env here; Buck tests set WORKSPACE_ROOT/BUCK_TEST_SRC for the *outer* repo.
       await $`scaf new ts lib demo --yes --skip-lockfile-gen`;
       await $(
         {},
-      )`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
+      )`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test'`;
 
       const importer = "projects/libs/demo";
       // Overwrite TARGETS to enforce allow-generate semantics in the runner
@@ -72,9 +74,14 @@ test(
 
       // Nix flakes read sources from git-tracked files; ensure the injected failing test and TARGETS
       // are visible to the flake evaluation inside the external runner.
+      await stageTempRepoPaths({
+        tmp,
+        _$,
+        recursiveRoots: [importer],
+        explicitPaths: [`${importer}/pnpm-lock.yaml`, ...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS],
+      });
       await $({})`bash --noprofile --norc -c '
       set -euo pipefail
-      git -C ${tmp} add -A
       if git -C ${tmp} diff --cached --quiet; then
         echo \"expected staged changes for injected failing test, but index is empty\" >&2
         git -C ${tmp} status --porcelain=v1 || true

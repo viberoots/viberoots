@@ -29,6 +29,11 @@ def _zx_test_impl(ctx):
             + "export BUCK_TEST_TARGET=\"%s\"; "
             + "export TEST_LOG_DIR=\"${TEST_LOG_DIR:-$(pwd)/buck-out/test-logs}\"; "
             + "if [ -z \"$NODE_BIN\" ]; then export NODE_BIN=\"$(command -v node)\"; fi; "
+            + "export BUCK_EXPORTER_REUSE_DAEMON=\"${BUCK_EXPORTER_REUSE_DAEMON:-1}\"; "
+            + "if [ -z \"$BUCK_NESTED_ISO\" ]; then "
+            + "  ISO_HASH=\"$($NODE_BIN -e 'const crypto=require(\"node:crypto\"); const path=require(\"node:path\"); const root=path.resolve(process.argv[1] || process.cwd()); process.stdout.write(crypto.createHash(\"sha256\").update(root).digest(\"hex\").slice(0, 10));' \"$WORKSPACE_ROOT\")\"; "
+            + "  export BUCK_NESTED_ISO=\"zxtest-shared-$ISO_HASH\"; "
+            + "fi; "
             # Ensure a valid TMPDIR inside the sandbox to avoid stale host TMPDIR paths
             + "export TMPDIR=\"${TMPDIR:-$WORKSPACE_ROOT/buck-out/tmp}\"; mkdir -p \"$TMPDIR\"; "
             + ""

@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { sanitizeName } from "../../lib/sanitize";
+import { buckCommandEnv, isBuckDaemonInitTransient } from "../../lib/buck-command-env.ts";
 
 type Case = {
   target: string;
@@ -35,20 +36,7 @@ function displayName(importer: string): string {
 }
 
 function buckEnv(): NodeJS.ProcessEnv {
-  return {
-    ...process.env,
-    HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
-    SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
-  };
-}
-
-function isBuckDaemonInitTransient(text: string): boolean {
-  const msg = String(text || "");
-  return (
-    msg.includes("Error initializing DaemonStateData") ||
-    msg.includes("Error creating HTTP client") ||
-    msg.includes("Error loading system root certificates native frameworks")
-  );
+  return buckCommandEnv();
 }
 
 async function runBuckWithTransientRetry(run: () => Promise<any>): Promise<any> {
