@@ -92,6 +92,14 @@ keep the later control-plane and host realization work deterministic.
 - `buck2 test //...`
 - `buck2 cquery //projects/deployments/...`
 
+### Expected Regression Scope
+
+- `mixed`
+- This PR is expected to touch both deployment/build-system code and at least one concrete
+  `projects/...` deployment package. Under the current verify policy, build-system changes are
+  authoritative, so default `v` / CI runs the full build-system verify scope rather than narrowing
+  to project-only selection.
+
 ### Acceptance Criteria
 
 - `TARGETS` can express a valid `nixos-shared-host` static-webapp deployment.
@@ -177,6 +185,13 @@ and nginx routing generation, but stops short of the artifact publisher.
 - `buck2 test //...`
 - host-generation evaluation command for the `nixos-shared-host` module as introduced in this PR
 
+### Expected Regression Scope
+
+- `build-system only`
+- This PR should stay within deployment/control-plane, host-realization, and test infrastructure
+  paths. Under the current verify policy, those build-system changes broaden default `v` / CI to
+  the full build-system verify scope rather than `project-impact` selection.
+
 ### Acceptance Criteria
 
 - `nixos-shared-host` realizes declarative shared-dev host state from one authoritative cumulative input.
@@ -260,6 +275,13 @@ hostname under `*.apps.kilty.io`.
 - `buck2 test //...`
 - the first end-to-end shared-dev deploy command sequence introduced in this PR
 
+### Expected Regression Scope
+
+- `mixed`
+- This PR is expected to change the deploy/publish tooling and the first concrete shared-dev sample
+  wiring used for the end-to-end flow. Because build-system changes are present, default `v` / CI
+  still runs the full build-system verify scope rather than a project-targeted subset.
+
 ### Acceptance Criteria
 
 - A static webapp can be deployed end to end to `mini`.
@@ -335,6 +357,13 @@ identity, artifact identity, lifecycle state, and outcome using the repository's
 
 - `buck2 test //...`
 - any record-inspection CLI or fixture verification command introduced in this PR
+
+### Expected Regression Scope
+
+- `build-system only`
+- This PR should be confined to deployment runtime, persistence, and record-model code plus owned
+  tests. Under the current verify policy, those build-system changes keep default `v` / CI on the
+  full build-system verify scope.
 
 ### Acceptance Criteria
 
@@ -510,6 +539,13 @@ Nix configuration cannot be updated through a reviewed managed path.
 - install dry-run command for a fixture host root introduced in this PR
 - uninstall dry-run command for a fixture host root introduced in this PR
 
+### Expected Regression Scope
+
+- `build-system only`
+- This PR should live in installer, host-management, and related test/doc paths rather than
+  project-owned app code. Under the current verify policy, default `v` / CI therefore runs the full
+  build-system verify scope.
+
 ### Acceptance Criteria
 
 - A real NixOS host such as `mini` can be put into a reviewed `nixos-shared-host` shape without
@@ -547,6 +583,690 @@ plane is fully in place.
 
 Implement before the shared-control-plane PR so real hosts can be brought under the reviewed
 `nixos-shared-host` shape safely and repeatably.
+
+---
+
+## PR-4.5.1: Deployment-domain test labels + reviewed ownership boundary for verify scoping
+
+### Description
+
+I will make deployment-only verify scoping possible without relying on loose path heuristics by
+first establishing an explicit reviewed deployment domain. This PR introduces the first deployment
+test taxonomy and the narrow ownership boundary that later selector logic can trust.
+
+### Scope & Changes
+
+- Add an explicit deployment-domain test label, for example:
+  - `domain:deployment`
+- Ensure deployment-owned tests under the reviewed deployment test area receive that label
+  deterministically.
+- Introduce the first reviewed deployment-owned path contract for verify policy purposes only.
+- Keep the initial deployment-owned allowlist intentionally narrow and explicit, covering only paths
+  that are owned by the deployment system rather than the general build system.
+- Introduce the complementary reviewed shared-path set that must still broaden to full build-system
+  verify, including:
+  - shared verify tooling
+  - shared Buck/lib/dev helpers
+  - prelude, toolchains, and provider infrastructure
+  - root Buck/Nix config files
+- Add fail-closed guardrails for taxonomy drift:
+  - deployment-owned tests must carry the deployment-domain label
+  - non-deployment tests must not acquire the deployment-domain label accidentally
+- Keep this PR non-executing:
+  - no new verify selector behavior yet
+  - no deployment-only skipping of the broad build-system suite yet
+
+### Tests (in this PR)
+
+- Add Buck label/cquery tests proving deployment-owned tests are queryable by the reviewed
+  deployment-domain label.
+- Add policy tests proving reviewed deployment-owned test files are labeled and reviewed
+  non-deployment test files are not.
+- Add contract tests proving the reviewed shared-path set stays out of the deployment-owned domain.
+- Add fail-closed tests proving taxonomy drift is rejected with actionable diagnostics.
+
+### Docs (in this PR)
+
+- Document the reviewed deployment-domain test label and its intended use.
+- Document the first reviewed deployment-owned path boundary for verify scoping.
+- Document the explicit non-goal that shared build-system paths remain on the full build-system
+  verify path.
+
+### Verification Commands
+
+- `buck2 test //...`
+- deployment label inspection commands introduced in this PR
+
+### Expected Regression Scope
+
+- `build-system only`
+- This PR changes shared test-target generation, verify policy metadata, and related tests. Under the
+  current verify policy, default `v` / CI therefore runs the full build-system verify scope.
+
+### Acceptance Criteria
+
+- Deployment-owned tests are queryable through one reviewed Buck label.
+- The reviewed deployment-owned boundary is explicit and test-enforced.
+- Shared build-system paths are still clearly outside the deployment-only domain.
+- The repo has enough explicit metadata to build a fail-closed deployment selector later.
+
+### Risks
+
+If the first deployment-domain boundary is too broad, later deployment-only scoping can silently
+skip important non-deployment build-system coverage.
+
+### Mitigation
+
+Keep the allowlist intentionally small, test the negative cases, and require explicit reviewed
+labels rather than implicit directory guesses alone.
+
+### Consequence of Not Implementing
+
+Any later deployment-only selector would be forced to guess which tests and paths belong to the
+deployment system.
+
+### Downsides for Implementing
+
+Adds taxonomy and maintenance overhead before any verify-runtime savings are visible.
+
+### Recommendation
+
+Implement first so later selector logic rests on explicit reviewed ownership instead of inference.
+
+---
+
+## PR-4.5.2: Fail-closed deployment-impact classifier for `deployment-only` versus full build-system changes
+
+### Description
+
+I will introduce the conservative changed-path classifier that decides whether a change is truly
+deployment-only or must still run the full build-system suite. This PR remains intentionally
+fail-closed: any ambiguity, shared-path touch, or unknown build-tools path still broadens back to
+the current full build-system behavior.
+
+### Scope & Changes
+
+- Add a reviewed deployment-impact classifier over changed repo paths.
+- Introduce stable classifier modes for the new policy, for example:
+  - `deployment-only`
+  - `deployment-and-project-impact`
+  - `mixed-build-system`
+  - `no-deployment-impact`
+- Classify a change as `deployment-only` only when every relevant build-system-owned path is inside
+  the reviewed deployment-owned allowlist from PR-4.5.1.
+- Treat any touch to reviewed shared paths as an immediate full build-system broadening condition.
+- Treat any unknown or unowned `build-tools` path as an immediate full build-system broadening
+  condition.
+- Recognize deployment project declarations under `projects/deployments/**` as deployment-related
+  inputs for selector diagnostics and later union behavior.
+- Emit stable diagnostics describing:
+  - changed paths
+  - deployment-owned paths
+  - shared/full-build-system trigger paths
+  - project paths
+  - classifier mode and reason
+- Keep this PR non-executing:
+  - the classifier is inspectable and testable
+  - default `v` / CI behavior remains unchanged until the next PR
+
+### Tests (in this PR)
+
+- Add classifier tests for safe `deployment-only` changes confined to the reviewed deployment-owned
+  allowlist.
+- Add tests proving any touch to shared helpers, verify tooling, prelude, toolchains, providers, or
+  root Buck/Nix files broadens to the full build-system mode.
+- Add fail-closed tests for unknown `build-tools` paths and ambiguous ownership.
+- Add diagnostics snapshot tests locking the classifier's stable JSON output.
+- Add tests covering deployment package paths under `projects/deployments/**` and their interaction
+  with deployment-owned build-system paths.
+
+### Docs (in this PR)
+
+- Document the deployment-impact classifier modes and decision order.
+- Document the fail-closed rule that any ambiguity or shared-path touch broadens to full
+  build-system verify.
+- Document the meaning of deployment-related `projects/deployments/**` changes in the new policy.
+
+### Verification Commands
+
+- `buck2 test //...`
+- deployment-impact inspection or explain commands introduced in this PR
+
+### Expected Regression Scope
+
+- `build-system only`
+- This PR changes verify selection policy code and shared path-classification helpers. Under the
+  current verify policy, default `v` / CI therefore runs the full build-system verify scope.
+
+### Acceptance Criteria
+
+- The repo can classify a change as safely `deployment-only` only when every relevant touched path is
+  explicitly reviewed as deployment-owned.
+- Any shared or ambiguous path broadens back to the existing full build-system behavior.
+- The classifier emits stable diagnostics suitable for explain-selection, CI logs, and future policy
+  debugging.
+
+### Risks
+
+The classifier can become unsafely permissive if it tries to "help" by inferring ownership for
+paths that were never explicitly reviewed.
+
+### Mitigation
+
+Fail closed on any unknown path, keep the ownership table explicit, and test all broadening
+conditions directly.
+
+### Consequence of Not Implementing
+
+There is no safe mechanism to distinguish true deployment-only changes from broader build-system
+changes.
+
+### Downsides for Implementing
+
+Adds another reviewed policy table that must be kept in sync as deployment code evolves.
+
+### Recommendation
+
+Implement second so execution wiring can depend on one conservative classifier instead of bespoke
+fallback logic.
+
+---
+
+## PR-4.5.3: Verify/CI deployment-only execution path + deployment/project union semantics
+
+### Description
+
+I will wire the new deployment-only policy into `v` and CI so truly deployment-only changes can run
+the reviewed deployment suite instead of the full non-deployment build-system suite, while any
+shared-path impact still broadens immediately to the current full build-system behavior.
+
+### Scope & Changes
+
+- Add a first-class deployment test scope control, for example:
+  - `BNX_DEPLOYMENT_TEST_SCOPE=auto|always|never`
+- In `auto`, use the deployment-impact classifier from PR-4.5.2.
+- Add verify execution behavior:
+  - `deployment-only`: run the deployment-domain Buck test targets plus a reviewed deployment safety
+    floor
+  - `deployment-and-project-impact`: run the union of the reviewed deployment suite and the existing
+    project-impact selection
+  - `mixed-build-system`: keep the current full build-system verify scope
+  - `no-deployment-impact`: keep existing non-deployment selector behavior
+- Add a reviewed deployment safety floor so deployment-only runs cannot silently become empty if the
+  label set drifts.
+- Add fail-fast guardrails for:
+  - `always` requested when the change is not safely `deployment-only`
+  - zero resolved deployment-domain test targets
+  - zero deployment safety-floor targets
+- Keep cheap policy and lint preflight behavior intact where appropriate; only the heavy Buck test
+  scope is narrowed for safe deployment-only changes.
+- Extend explain-selection output so operators and CI can see whether deployment-only or full
+  build-system verify was chosen and why.
+
+### Tests (in this PR)
+
+- Add verify policy tests proving safe deployment-only changes select the reviewed deployment suite.
+- Add tests proving deployment-plus-project changes select the reviewed union of deployment scope and
+  project-impact scope.
+- Add tests proving any shared-path or ambiguous-path change still falls back to the full
+  build-system verify scope.
+- Add tests for `always` and `never` control behavior, including actionable diagnostics on
+  misclassification.
+- Add integration-style selection tests proving the deployment-domain Buck query and deployment
+  safety floor resolve to stable non-empty targets.
+
+### Docs (in this PR)
+
+- Document the new deployment test scope control and selection behavior.
+- Document the distinction between:
+  - safe deployment-only changes
+  - deployment-plus-project changes
+  - full build-system fallback
+- Document the operator expectation that touching any non-deployment build-system path still triggers
+  the full build-system verify suite.
+
+### Verification Commands
+
+- `buck2 test //...`
+- deployment-aware `v --explain-selection` or equivalent verify commands introduced in this PR
+
+### Expected Regression Scope
+
+- `build-system only`
+- This PR changes verify execution wiring and selector integration in shared tooling. Under the
+  current verify policy, default `v` / CI therefore runs the full build-system verify scope while
+  this behavior is being introduced.
+
+### Acceptance Criteria
+
+- Safe deployment-only changes can run the reviewed deployment suite instead of the heavy
+  non-deployment build-system suite.
+- Deployment-plus-project changes run the reviewed union of deployment coverage and project-impact
+  coverage.
+- Any shared build-system impact still broadens to the existing full build-system verify path.
+- Explain-selection and CI logs make the policy decision auditable.
+
+### Risks
+
+Selector wiring is where a sound classifier can still become unsafe if execution broadens or
+narrows the wrong scope.
+
+### Mitigation
+
+Keep the deployment-only path opt-in-able, fail fast on empty deployment selections, and preserve
+the current full build-system fallback whenever the classifier is not unquestionably safe.
+
+### Consequence of Not Implementing
+
+The repo would have a documented deployment-only policy boundary but no actual verify/CI execution
+path that uses it.
+
+### Downsides for Implementing
+
+Adds another selector path to verify/CI and more policy diagnostics to maintain.
+
+### Recommendation
+
+Implement third so the deployment-only policy becomes useful in practice only after labels,
+ownership, and fail-closed classification are already in place.
+
+---
+
+## PR-4.6: Profile-aware remote target resolution + deploy-plan contract for direct `nixos-shared-host` flows
+
+### Description
+
+I will make the reviewed dev-machine install manifest actionable by deploy-side tooling instead of
+leaving it as recorded metadata only. This PR introduces a narrow, explicit remote-target contract
+for the current direct-mutation `nixos-shared-host` flow without claiming to satisfy the later
+shared-control-plane design.
+
+### Scope & Changes
+
+- Teach the deploy-side tooling to read the reviewed `nixos-shared-host` client manifest produced by
+  the installer from PR-4.5.
+- Add explicit remote-target selection by named profile, for example `--profile mini`, or an
+  equivalent reviewed selector surface.
+- Define and enforce precedence rules between:
+  - profile-derived remote host metadata
+  - explicit CLI overrides
+- Add a reviewed non-mutating dry-run / plan mode that prints:
+  - selected deployment id and label
+  - selected profile and destination
+  - remote repo path
+  - remote authoritative state path
+  - remote runtime root
+  - remote records root
+  - selected artifact source contract
+  - whether host apply is expected as a later step
+- Fail closed on:
+  - missing profile
+  - malformed client manifest
+  - unsupported reviewed transport mode
+  - ambiguous or conflicting explicit overrides
+- Keep this PR non-transporting and non-mutating:
+  - no SSH execution yet
+  - no remote artifact copy yet
+  - no remote `nixos-rebuild switch` yet
+
+### Tests (in this PR)
+
+- Add profile-consumption tests proving deploy-side tooling reads the reviewed client manifest
+  deterministically.
+- Add tests for precedence and conflict behavior between profile-derived values and explicit CLI
+  flags.
+- Add dry-run / plan snapshot tests locking:
+  - destination selection
+  - remote path rendering
+  - artifact selection summary
+- Add fail-closed tests for:
+  - missing profile
+  - malformed manifest
+  - unsupported transport mode
+
+### Docs (in this PR)
+
+- Document the reviewed remote-target profile contract for direct `nixos-shared-host` deploys.
+- Document dry-run / plan output and how operators should use it before remote execution exists.
+- Document that this remains an interim direct-mutation path and not the later shared-control-plane
+  model.
+
+### Verification Commands
+
+- `buck2 test //...`
+- the deploy dry-run / plan commands introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should stay within reviewed
+  deployment-owned paths and deployment-domain tests. Under the deployment-only verify policy,
+  default `v` / CI can run the reviewed deployment suite instead of the full non-deployment
+  build-system verify scope.
+
+### Acceptance Criteria
+
+- Operators can select a reviewed remote `nixos-shared-host` target by profile without manually
+  retyping the remote repo/state/runtime/records paths.
+- The deploy-side tooling fails closed on profile drift or unsupported reviewed transport inputs.
+- Dry-run / plan output is deterministic and suitable for both interactive operator use and CI
+  preflight.
+
+### Risks
+
+If the profile contract is vague, later remote execution and CI work will inherit ambiguous path and
+override behavior.
+
+### Mitigation
+
+Keep the profile surface narrow, deterministic, and explicit about precedence and unsupported modes.
+
+### Consequence of Not Implementing
+
+The reviewed dev-machine install manifest remains disconnected from actual deploy execution.
+
+### Downsides for Implementing
+
+Adds another reviewed contract surface before remote transport is actually available.
+
+### Recommendation
+
+Implement first in the interim remote-flow sequence so transport and CI layers can depend on one
+stable profile contract.
+
+---
+
+## PR-4.7: Reviewed SSH transport + remote artifact staging for direct `mini` deploys
+
+### Description
+
+I will make the current `mini` shared-dev flow executable from outside the host by adding a reviewed
+remote transport and exact-artifact staging path. This PR keeps the mutation model intentionally
+narrow: it still runs the existing direct deploy on `mini`, but it no longer requires operators or
+CI to shell into `mini` manually.
+
+### Scope & Changes
+
+- Add a reviewed remote execution path for the current direct `nixos-shared-host` deployment flow.
+- Support at least one reviewed transport mode:
+  - `ssh`
+- Stage an explicit local artifact directory onto the remote host before remote deploy execution.
+- Invoke the existing deploy implementation on the remote repo checkout using:
+  - the staged remote artifact path
+  - the remote authoritative state path
+  - the remote runtime root
+  - the remote records root
+  - the selected deployment label
+- Return a stable machine-readable deploy summary from the remote execution path.
+- Keep remote repo checkout management out of scope:
+  - the remote repo path must already exist
+  - the tool must fail closed when the remote repo checkout is missing or unusable
+- Keep host apply out of scope in this PR:
+  - no automatic remote `nixos-rebuild switch` yet
+- Add reviewed staged-artifact cleanup semantics for:
+  - normal completion
+  - explicit opt-in retention for debugging
+
+### Tests (in this PR)
+
+- Add transport command-assembly tests for the reviewed SSH path.
+- Add fixture-based remote execution tests using an isolated fake remote root or reviewed local
+  transport shim.
+- Add integration tests proving:
+  - local artifact is staged remotely
+  - remote deploy runs against the staged artifact
+  - remote records are written under the reviewed records root
+- Add fail-closed tests for:
+  - missing remote repo checkout
+  - artifact staging failure
+  - transport failure
+  - remote deploy failure propagation
+
+### Docs (in this PR)
+
+- Document the reviewed direct remote deploy flow for `mini`.
+- Document remote artifact staging and cleanup semantics.
+- Document what this PR still does not do:
+  - no host apply orchestration
+  - no shared-control-plane authority
+
+### Verification Commands
+
+- `buck2 test //...`
+- the remote deploy commands introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should stay in reviewed
+  deployment-owned transport, staging, deploy-wrapper, and deployment-domain test code. Under the
+  deployment-only verify policy, default `v` / CI can run the reviewed deployment suite instead of
+  the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- A developer machine can stage a Pleomino artifact to `mini` and run the reviewed direct deploy
+  flow without an interactive manual SSH session.
+- The remote execution path produces a stable machine-readable result and fails closed on transport,
+  staging, or remote deploy errors.
+- The implementation reuses the existing direct deploy on `mini` rather than introducing a second
+  mutation path.
+
+### Risks
+
+Remote execution can accidentally become a hidden second deploy implementation instead of a transport
+wrapper around the existing one.
+
+### Mitigation
+
+Keep the remote layer transport-only: stage the artifact, invoke the existing deploy, return the
+result, and avoid duplicating deploy semantics.
+
+### Consequence of Not Implementing
+
+Operators and CI would still need ad hoc manual SSH sessions to use the current `mini` slice from
+outside the host.
+
+### Downsides for Implementing
+
+Adds transport, staging, and remote-error-surface complexity before the shared control plane exists.
+
+### Recommendation
+
+Implement second so the direct `mini` slice becomes remotely usable before host apply and CI polish
+are layered on top.
+
+---
+
+## PR-4.8: Reviewed remote host-apply orchestration for managed `nixos-shared-host`
+
+### Description
+
+I will close the largest remaining operator gap in the interim direct path by adding a reviewed host
+apply step for managed `nixos-shared-host` instances. This PR makes the remote flow feel complete
+for `mini` while still staying intentionally outside the later shared-control-plane model.
+
+### Scope & Changes
+
+- Add a reviewed remote host-apply step that can run after a successful remote deploy.
+- Support an explicit operator-controlled apply mode, for example:
+  - `--apply-host`
+  - or a separate reviewed apply subcommand
+- Execute the reviewed host apply against the managed `nixos-shared-host` configuration on the
+  selected remote host.
+- Require explicit opt-in for host apply:
+  - remote deploy without apply remains allowed
+  - host apply must not happen implicitly by ambient defaults
+- Add reviewed preflight checks before host apply:
+  - server is managed
+  - expected managed wiring is present or inspectable
+  - required remote config paths exist
+- Add dry-run support for the host-apply step.
+- Keep scope limited to the current managed `nixos-shared-host` path:
+  - no generic multi-provider apply abstraction yet
+  - no control-plane admission/approval semantics yet
+
+### Tests (in this PR)
+
+- Add host-apply command-assembly tests for the reviewed remote path.
+- Add fixture-based tests proving host apply:
+  - is opt-in
+  - fails closed when the host is unmanaged
+  - fails closed when managed wiring is missing
+  - respects dry-run
+- Add integration-style tests for remote deploy plus remote apply using isolated fixture hosts or
+  reviewed command shims instead of mutating a live system.
+- Add failure-propagation tests proving apply errors remain visible and do not silently report deploy
+  success.
+
+### Docs (in this PR)
+
+- Document the reviewed remote host-apply step for managed `nixos-shared-host` instances.
+- Document the required operator preconditions for remote apply.
+- Document the distinction between:
+  - remote deploy
+  - remote host apply
+  - the later shared-control-plane model
+
+### Verification Commands
+
+- `buck2 test //...`
+- the remote host-apply commands introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should stay within reviewed
+  deployment-owned host-apply orchestration, preflight logic, and deployment-domain fixture
+  coverage. Under the deployment-only verify policy, default `v` / CI can run the reviewed
+  deployment suite instead of the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- A developer machine can complete the current direct Pleomino-to-`mini` flow without a second
+  manual SSH step to run `nixos-rebuild switch`.
+- Host apply is explicit, dry-runnable, and fail-closed on unmanaged or drifted hosts.
+- The implementation remains limited to the current managed `nixos-shared-host` slice and does not
+  pretend to satisfy shared-control-plane requirements.
+
+### Risks
+
+Remote host apply is the riskiest direct-mutation convenience step because it touches real host
+state.
+
+### Mitigation
+
+Require explicit opt-in, preflight checks, dry-run support, and fixture-based testing rather than
+making host apply an implicit side effect of every remote deploy.
+
+### Consequence of Not Implementing
+
+The remote flow would still require a hand-run host-apply step, which keeps Jenkins and dev-machine
+automation incomplete.
+
+### Downsides for Implementing
+
+Adds more host-operations logic to an interim path that the later shared-control-plane model will
+partially supersede.
+
+### Recommendation
+
+Implement third so the interim direct remote flow is actually complete for real Pleomino-to-`mini`
+use.
+
+---
+
+## PR-4.9: Jenkins-ready direct remote deploy flow for Pleomino `dev` on `mini`
+
+### Description
+
+I will package the reviewed direct remote flow into a CI-usable, non-interactive operator surface so
+Pleomino can be deployed to `mini` from Jenkins before the later shared-control-plane path exists.
+This PR is intentionally narrow and explicitly interim: it standardizes the current direct remote
+flow for CI without redefining it as the final shared deployment model.
+
+### Scope & Changes
+
+- Add a reviewed CI-friendly entrypoint or wrapper around the remote direct deploy path introduced in
+  PR-4.6 through PR-4.8.
+- Make the CI entrypoint explicitly non-interactive and machine-readable.
+- Define the minimum reviewed Jenkins contract:
+  - remote destination/profile selection
+  - artifact input path
+  - whether host apply is required
+  - required SSH credential and host-key expectations
+  - required remote repo checkout expectations
+- Add reviewed JSON output suitable for Jenkins parsing and post-step reporting.
+- Add a concrete Pleomino `dev` example flow for `mini`.
+- Keep scope limited to the current direct path:
+  - no shared-control-plane submission
+  - no admission or locking
+  - no Cloudflare or multi-environment promotion
+
+### Tests (in this PR)
+
+- Add CI-entrypoint contract tests proving the flow is non-interactive.
+- Add fail-closed tests for:
+  - missing required artifact input
+  - missing required credential or host metadata
+  - incompatible flag combinations
+- Add fixture-based integration tests proving the CI wrapper can:
+  - stage the Pleomino artifact
+  - run the remote direct deploy
+  - optionally run host apply
+  - emit stable JSON results
+
+### Docs (in this PR)
+
+- Document the reviewed Jenkins flow for deploying Pleomino `dev` to `mini`.
+- Document the minimum CI prerequisites and non-goals.
+- Document that this CI path is an interim direct-mutation route pending the later shared-control-plane
+  implementation.
+
+### Verification Commands
+
+- `buck2 test //...`
+- the Jenkins-oriented direct deploy commands introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should package the existing Pleomino
+  `dev` target into a CI-facing deployment wrapper without touching shared build-system paths or new
+  project-owned deployment metadata. Under the deployment-only verify policy, default `v` / CI can
+  run the reviewed deployment suite instead of the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- Jenkins can deploy Pleomino `dev` to `mini` through a reviewed non-interactive flow using the
+  direct remote path.
+- The CI-facing contract is explicit, machine-readable, and fail-closed on missing inputs.
+- The documented operator expectations match the implemented CI entrypoint and tests.
+
+### Risks
+
+There is pressure to treat the first working Jenkins path as "good enough" and never return to the
+shared-control-plane design.
+
+### Mitigation
+
+Keep the CI flow explicitly documented as an interim direct path and ensure the wrapper reuses the
+same reviewed remote layers instead of creating provider-local CI-only semantics.
+
+### Consequence of Not Implementing
+
+The current `mini` slice could be used manually or semi-manually, but not through one reviewed CI
+entrypoint for Pleomino.
+
+### Downsides for Implementing
+
+Adds CI-facing surface area that will later need to be realigned with the shared-control-plane
+submission path.
+
+### Recommendation
+
+Implement fourth so teams can use a reviewed Pleomino-to-`mini` CI path while PR-5 and later
+control-plane work are still pending.
 
 ---
 
@@ -589,6 +1309,15 @@ reviewed execution boundaries rather than advanced artifact replay.
 
 - `buck2 test //...`
 - the shared-control-plane submission command sequence introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should land in reviewed
+  deployment-owned control-plane, locking, admission, and deployment-domain test infrastructure
+  while reusing existing deployment packages. Under the deployment-only verify policy, default `v`
+  / CI can run the reviewed deployment suite instead of the full non-deployment build-system verify
+  scope.
 
 ### Acceptance Criteria
 
@@ -656,6 +1385,14 @@ re-run shared deployments from recorded artifact identity rather than ambient lo
 
 - `buck2 test //...`
 - artifact-resolution or replay-inspection commands introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should stay in reviewed
+  deployment-owned artifact selection, provenance, replay persistence, and deployment-domain tests.
+  Under the deployment-only verify policy, default `v` / CI can run the reviewed deployment suite
+  instead of the full non-deployment build-system verify scope.
 
 ### Acceptance Criteria
 
@@ -728,6 +1465,14 @@ operator flows: retry, exact-artifact publish-only, and same-deployment rollback
 - `buck2 test //...`
 - retry, rollback, and publish-only command flows introduced in this PR
 
+### Expected Regression Scope
+
+- `deployment-only`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should change replay/recovery logic and
+  deployment-domain tests without adding new project-owned deployment packages or shared
+  build-system path touches. Under the deployment-only verify policy, default `v` / CI can run the
+  reviewed deployment suite instead of the full non-deployment build-system verify scope.
+
 ### Acceptance Criteria
 
 - Shared retry, publish-only, and rollback work for `mini` static-webapp deployments.
@@ -797,6 +1542,15 @@ deployment design requires for protected/shared deployments.
 
 - `buck2 test //...`
 - admission and lane-policy inspection commands introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR is expected to touch shared
+  build-system surfaces in addition to deployment work, because protected/shared deployments likely
+  need new reviewed metadata fields and target-definition/extraction support as well as concrete
+  deployment declarations. Under the deployment-only verify policy, default `v` / CI must still run
+  the full build-system verify scope.
 
 ### Acceptance Criteria
 
@@ -872,6 +1626,15 @@ Pages in the same deployment system rather than only on `mini`.
 
 - `buck2 test //...`
 - Cloudflare Pages deploy verification commands introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR is expected to combine new
+  provider/control-plane code with concrete Pleomino `projects/deployments/...` packages and the
+  reviewed shared build-system surface needed to declare and extract the new provider slice. Under
+  the deployment-only verify policy, default `v` / CI must still run the full build-system verify
+  scope.
 
 ### Acceptance Criteria
 
@@ -953,6 +1716,14 @@ through `staging` and `prod` using the repository's default `same_artifact` mode
 - `buck2 test //...`
 - Pleomino promotion command flows introduced in this PR
 
+### Expected Regression Scope
+
+- `deployment-only`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should add promotion logic on top of the
+  Pleomino deployment packages already introduced earlier without touching shared build-system
+  paths. Under the deployment-only verify policy, default `v` / CI can run the reviewed deployment
+  suite instead of the full non-deployment build-system verify scope.
+
 ### Acceptance Criteria
 
 - Pleomino can move through a real `dev -> staging -> prod` flow using exact static-webapp artifacts.
@@ -1022,6 +1793,14 @@ promotion support for all compatible lanes using the repository's default `same_
 - `buck2 test //...`
 - promotion command flows introduced in this PR
 
+### Expected Regression Scope
+
+- `deployment-only`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should generalize promotion behavior in
+  reviewed deployment-owned control-plane code and deployment-domain tests without touching shared
+  build-system surfaces. Under the deployment-only verify policy, default `v` / CI can run the
+  reviewed deployment suite instead of the full non-deployment build-system verify scope.
+
 ### Acceptance Criteria
 
 - Promotion across distinct deployments works with exact artifact reuse.
@@ -1087,6 +1866,14 @@ cleanup semantics, consistent with the main design.
 - `buck2 test //...`
 - preview publish and cleanup commands introduced in this PR
 
+### Expected Regression Scope
+
+- `deployment-only`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should stay in reviewed
+  deployment-owned provider-capability, preview lifecycle, cleanup, and record logic plus
+  deployment-domain tests. Under the deployment-only verify policy, default `v` / CI can run the
+  reviewed deployment suite instead of the full non-deployment build-system verify scope.
+
 ### Acceptance Criteria
 
 - Preview uses explicit isolated target identity.
@@ -1150,6 +1937,14 @@ turn repo changes into auditable per-deployment runs without inventing a second 
 - `buck2 test //...`
 - changed-based submission commands introduced in this PR
 
+### Expected Regression Scope
+
+- `deployment-only`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should live in reviewed deployment-owned
+  change-selection/orchestration code and deployment-domain tests rather than shared build-system
+  selector paths. Under the deployment-only verify policy, default `v` / CI can run the reviewed
+  deployment suite instead of the full non-deployment build-system verify scope.
+
 ### Acceptance Criteria
 
 - One changed-based invocation can produce auditable per-deployment runs.
@@ -1212,6 +2007,14 @@ the system can model larger deployments without drifting into ad hoc component o
 - `buck2 test //...`
 - multi-component deploy verification commands introduced in this PR
 
+### Expected Regression Scope
+
+- `mixed-build-system`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR is expected to combine multi-component
+  deployment machinery with at least one concrete reviewed deployment shape and the shared
+  build-system surface needed to express that richer metadata shape. Under the deployment-only
+  verify policy, default `v` / CI must still run the full build-system verify scope.
+
 ### Acceptance Criteria
 
 - At least one reviewed multi-component deployment shape is supported end to end.
@@ -1270,6 +2073,15 @@ that require distinct admitted artifacts per stage without weakening the shared-
 
 - `buck2 test //...`
 - rebuild-per-stage promotion commands introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-and-project-impact`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should stay within reviewed
+  deployment-owned lane-policy/admission/promotion code while also adding at least one concrete
+  deployment declaration to exercise the new lane mode, without touching shared build-system
+  surfaces. Under the deployment-only verify policy, default `v` / CI can run the reviewed union of
+  deployment coverage and project-impact coverage instead of the full build-system verify scope.
 
 ### Acceptance Criteria
 
@@ -1339,6 +2151,15 @@ migration or alias exception support for controlled target ownership transitions
 - `buck2 test //...`
 - any release-action or migration verification commands introduced in this PR
 
+### Expected Regression Scope
+
+- `mixed-build-system`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this closeout PR is expected to touch both
+  cross-cutting deployment/control-plane code and the shared build-system surface needed to declare
+  new secret/config/release-action/migration metadata, along with concrete deployment declarations
+  or exceptions. Under the deployment-only verify policy, default `v` / CI must still run the full
+  build-system verify scope.
+
 ### Acceptance Criteria
 
 - The remaining major cross-cutting design requirements are implemented and tested.
@@ -1373,13 +2194,19 @@ are stable.
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
    rails.
-2. PR-4 through PR-8: turn that first provider slice into a real shared deployment system with
-   records, control-plane authority, immutable artifacts, replay, and admission.
-3. PR-9 through PR-10: reach the secondary milestone by adding Cloudflare Pages static-webapp deploys
+2. PR-4 through PR-4.5: add durable records and bring real `nixos-shared-host` instances under a
+   reviewed install / uninstall model.
+3. PR-4.5.1 through PR-4.5.3: add the fail-closed deployment-only verify policy so deployment
+   system changes can avoid the heavy non-deployment build-system suite without weakening safety.
+4. PR-4.6 through PR-4.9: add the interim direct remote-execution path so Pleomino can deploy to
+   `mini` from a dev machine and Jenkins before the shared control plane exists.
+5. PR-5 through PR-8: turn that first provider slice into a real shared deployment system with
+   control-plane authority, immutable artifacts, replay, and admission.
+6. PR-9 through PR-10: reach the secondary milestone by adding Cloudflare Pages static-webapp deploys
    and a full Pleomino `dev -> staging -> prod` flow.
-4. PR-11 through PR-13: generalize that second milestone across providers, preview, and changed-based
+7. PR-11 through PR-13: generalize that second milestone across providers, preview, and changed-based
    orchestration.
-5. PR-14 through PR-16: close the remaining model gaps for multi-component rollout, rebuild-per-stage,
+8. PR-14 through PR-16: close the remaining model gaps for multi-component rollout, rebuild-per-stage,
    and cross-cutting protected/shared semantics.
 
 ## Companion Docs

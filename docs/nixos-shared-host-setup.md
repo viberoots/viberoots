@@ -343,6 +343,13 @@ The generated profile lives under:
 
 Override with `--output-root` when needed.
 
+Current limitation:
+
+- the client installer records connection and path metadata only
+- it does not yet make `build-tools/tools/bin/deploy` consume `--profile`
+- it does not yet perform SSH transport, remote artifact copy, or remote
+  `nixos-rebuild switch` on your behalf
+
 Client lifecycle commands:
 
 - list installed client profiles:
@@ -435,6 +442,135 @@ Then apply server config as usual:
 ```bash
 sudo nixos-rebuild switch
 ```
+
+## Deploying Pleomino To `mini` From Jenkins
+
+Current workable pattern:
+
+- Jenkins must run the deploy on `mini` itself, or SSH into `mini` and run the
+  deploy there
+- the current deploy tool mutates local paths and does not have built-in remote
+  transport
+- `mini` must already be installed as a managed `nixos-shared-host`
+- `mini` must already have a repo checkout that Jenkins can update or use
+
+Why this shape is required today:
+
+- `build-tools/tools/bin/deploy` expects local filesystem paths such as
+  `--host-root`, `--state`, and `--records-root`
+- if Jenkins builds artifacts elsewhere, it must still copy them to `mini` and
+  then invoke deploy on `mini` with a path that exists on `mini`
+- there is not yet a Jenkins-native wrapper, shared-control-plane submission
+  path, or `deploy --profile mini` remote executor
+
+If Jenkins can SSH to `mini`, the simplest current pattern is:
+
+```bash
+ssh mini '
+  set -euo pipefail
+  cd /srv/common
+  direnv exec . build-tools/tools/bin/deploy \
+    --deployment //projects/deployments/pleomino-dev:deploy \
+    --host-root /var/lib/bucknix/nixos-shared-host/runtime \
+    --state /var/lib/bucknix/nixos-shared-host/platform-state.json \
+    --records-root /var/lib/bucknix/nixos-shared-host/records
+  sudo nixos-rebuild switch
+'
+```
+
+If Jenkins wants to build the artifact before the deploy step, the current
+manual variant is:
+
+1. Build the Pleomino artifact in Jenkins.
+2. Copy the artifact directory to `mini`.
+3. Run deploy on `mini` with `--artifact-dir <path-on-mini>`.
+4. Run `sudo nixos-rebuild switch` on `mini`.
+
+Example shape:
+
+```bash
+rsync -az ./dist/ mini:/tmp/pleomino-dist/
+ssh mini '
+  set -euo pipefail
+  cd /srv/common
+  direnv exec . build-tools/tools/bin/deploy \
+    --deployment //projects/deployments/pleomino-dev:deploy \
+    --artifact-dir /tmp/pleomino-dist \
+    --host-root /var/lib/bucknix/nixos-shared-host/runtime \
+    --state /var/lib/bucknix/nixos-shared-host/platform-state.json \
+    --records-root /var/lib/bucknix/nixos-shared-host/records
+  sudo nixos-rebuild switch
+'
+```
+
+Not yet implemented, but required for a finished Jenkins flow:
+
+- a reviewed Jenkins pipeline or wrapper that owns the SSH/transport step
+- a built-in remote deploy path instead of "run deploy on `mini`"
+- first-class consumption of client/profile metadata from CI
+- shared-control-plane submission, locking, and admission for shared deploys
+- immutable artifact replay/promotion support beyond the current direct deploy
+  path
+
+## Deploying Pleomino From Your Dev Machine Via A Finished Remote Flow
+
+The fully finished remote flow is not implemented yet.
+
+Today, the client installer helps you record reviewed connection metadata for a
+real `nixos-shared-host`, but that metadata is not yet consumed by the deploy
+tool. In the current implementation, "remote deploy from my dev machine" still
+means "SSH to `mini` and run the deploy on `mini`."
+
+Current workable operator flow:
+
+1. Install the server side on `mini`.
+2. Optionally record a local client profile with `client install`.
+3. SSH to `mini`.
+4. Run `build-tools/tools/bin/deploy` from the repo checkout on `mini`.
+5. Run `sudo nixos-rebuild switch` on `mini`.
+
+Example:
+
+```bash
+direnv exec . build-tools/tools/bin/nixos-shared-host-install \
+  client install \
+  --profile mini \
+  --destination mini \
+  --remote-repo-path /srv/common \
+  --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json \
+  --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime \
+  --remote-records-root /var/lib/bucknix/nixos-shared-host/records \
+  --ssh-mode ssh
+
+ssh mini '
+  set -euo pipefail
+  cd /srv/common
+  direnv exec . build-tools/tools/bin/deploy \
+    --deployment //projects/deployments/pleomino-dev:deploy \
+    --host-root /var/lib/bucknix/nixos-shared-host/runtime \
+    --state /var/lib/bucknix/nixos-shared-host/platform-state.json \
+    --records-root /var/lib/bucknix/nixos-shared-host/records
+  sudo nixos-rebuild switch
+'
+```
+
+If you want to build locally and deploy that exact artifact, you still need a
+manual copy step today:
+
+1. Build Pleomino locally.
+2. Copy the built artifact to `mini`.
+3. SSH to `mini` and run deploy with `--artifact-dir <path-on-mini>`.
+4. Run `sudo nixos-rebuild switch` on `mini`.
+
+Not yet implemented, but required for a finished dev-machine remote flow:
+
+- `build-tools/tools/bin/deploy --profile mini` or equivalent profile-aware
+  command
+- built-in SSH execution or another reviewed transport layer
+- remote artifact staging that uses the installed client profile automatically
+- remote `nixos-rebuild switch` orchestration or a reviewed apply wrapper
+- a shared-control-plane path instead of direct host mutation from the operator
+  path
 
 ## Upgrade Guidance
 
