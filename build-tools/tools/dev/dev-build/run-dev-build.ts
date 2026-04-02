@@ -14,6 +14,7 @@ import { ensureDevBuildStoreSpace } from "./safety-rails.ts";
 import { runStartupCheck } from "./startup.ts";
 import { normalizeDevBuildTargetArgs } from "./target-args.ts";
 import { maybeAutoImpureFromUntrackedFiles } from "./untracked.ts";
+import { pruneDeadDevBuildIsolationDirs } from "../clean-temp-outs-lib.ts";
 import { getArgvTokens } from "../../lib/cli.ts";
 import { findRepoRoot } from "../../lib/repo.ts";
 
@@ -57,6 +58,13 @@ export async function runDevBuild(): Promise<void> {
   try {
     process.chdir(root);
   } catch {}
+
+  const removedDeadDevBuildIsos = await pruneDeadDevBuildIsolationDirs(root).catch(() => []);
+  if (removedDeadDevBuildIsos.length > 0) {
+    console.warn(
+      `[dev-build] pruned dead buck-out/devbuild-* dirs before startup: ${removedDeadDevBuildIsos.join(", ")}`,
+    );
+  }
 
   const parsed0 = parseDevBuildArgs(getArgvTokens());
   const parsed = {
