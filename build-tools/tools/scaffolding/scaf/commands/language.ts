@@ -7,7 +7,21 @@ import * as fsp from "node:fs/promises";
 import { confirmOrExit } from "../confirm.ts";
 import { runScafNodeTool } from "../command-runner.ts";
 import { exists } from "../fs.ts";
+import { formatScaffoldPaths } from "./new-helpers.ts";
 import { cmdNew } from "./new.ts";
+
+function languageKitFormatTargets(id: string): string[] {
+  return [
+    path.join(id),
+    path.join("patches", id),
+    path.join("build-tools", "tools", "buck", "providers", `${id}.ts`),
+    path.join("build-tools", "tools", "buck", "exporter", "lang", `${id}.ts`),
+    path.join("build-tools", "tools", "nix", "planner", `${id}.nix`),
+    path.join("build-tools", "tools", "nix", "templates", `${id}.nix`),
+    path.join("build-tools", "tools", "nix", "langs.json"),
+    path.join("build-tools", "tools", "tests", id),
+  ];
+}
 
 export async function cmdLanguage(args: string[], flags: ScafFlags) {
   const [sub, id] = args;
@@ -136,6 +150,8 @@ export async function cmdLanguage(args: string[], flags: ScafFlags) {
         console.warn("warning: codegen failed:", e);
       }
     }
+
+    await formatScaffoldPaths(languageKitFormatTargets(id));
 
     console.log(
       [

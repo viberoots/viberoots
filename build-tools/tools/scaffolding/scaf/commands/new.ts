@@ -220,9 +220,11 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
   }
 
   // Keep all scaffold outputs formatting-clean immediately, regardless of language.
-  await timeAsyncDetail("scafNew formatScaffoldOutput", async () => {
-    await formatScaffoldOutput(dest);
-  });
+  if (!isLangKit) {
+    await timeAsyncDetail("scafNew formatScaffoldOutput", async () => {
+      await formatScaffoldOutput(dest);
+    });
+  }
 
   console.log("created:", dest);
 }

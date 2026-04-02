@@ -22,13 +22,22 @@ export async function pickFreePort(): Promise<number> {
   return addr.port;
 }
 
-export async function httpGet(url: string): Promise<{ status: number; body: string }> {
+export async function httpGet(
+  url: string,
+  timeoutMs = Number(process.env.TEST_HTTP_GET_TIMEOUT_MS || "5000"),
+): Promise<{ status: number; body: string }> {
   return await new Promise((resolve, reject) => {
     const req = http.get(url, (res) => {
       let body = "";
       res.setEncoding("utf8");
+      res.setTimeout(timeoutMs, () => {
+        req.destroy(new Error(`response timed out after ${timeoutMs}ms for ${url}`));
+      });
       res.on("data", (chunk) => (body += chunk));
       res.on("end", () => resolve({ status: res.statusCode || 0, body }));
+    });
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`request timed out after ${timeoutMs}ms for ${url}`));
     });
     req.on("error", reject);
     req.end();
@@ -39,7 +48,8 @@ export async function waitForHttpOk(url: string, timeoutMs = 45000): Promise<voi
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
-      const res = await httpGet(url);
+      const remainingMs = Math.max(250, timeoutMs - (Date.now() - start));
+      const res = await httpGet(url, Math.min(5000, remainingMs));
       if (res.status === 200) return;
     } catch {}
     await sleep(300);

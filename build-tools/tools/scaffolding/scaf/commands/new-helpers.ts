@@ -42,7 +42,8 @@ function shouldSkipFormatDir(name: string): boolean {
 }
 
 async function collectFormattableFiles(root: string): Promise<string[]> {
-  const out: string[] = [];
+  const out = new Set<string>();
+
   async function walk(dir: string) {
     let entries: Dirent[] = [];
     try {
@@ -60,21 +61,55 @@ async function collectFormattableFiles(root: string): Promise<string[]> {
       if (!entry.isFile()) continue;
       if (entry.name === "pnpm-lock.yaml") continue;
       if (!FORMAT_EXTENSIONS.has(path.extname(entry.name))) continue;
-      out.push(path.resolve(abs));
+      out.add(path.resolve(abs));
     }
   }
-  await walk(root);
-  return out.sort();
+
+  async function visit(target: string) {
+    let stat: Dirent | null = null;
+    try {
+      const abs = path.resolve(target);
+      const fileStat = await fsp.stat(abs);
+      if (fileStat.isDirectory()) {
+        await walk(abs);
+        return;
+      }
+      if (!fileStat.isFile()) return;
+      const name = path.basename(abs);
+      if (name === "pnpm-lock.yaml") return;
+      if (!FORMAT_EXTENSIONS.has(path.extname(name))) return;
+      out.add(abs);
+      return;
+    } catch {
+      stat = null;
+    }
+    void stat;
+  }
+
+  await visit(root);
+  return Array.from(out).sort();
+}
+
+export async function formatScaffoldPaths(paths: string[]): Promise<void> {
+  const unique = Array.from(
+    new Set(paths.map((value) => path.resolve(value)).filter((value) => value.length > 0)),
+  );
+  const files = (
+    await Promise.all(unique.map(async (target) => await collectFormattableFiles(target)))
+  )
+    .flat()
+    .sort();
+  const deduped = Array.from(new Set(files));
+  if (deduped.length === 0) return;
+  const chunkSize = 128;
+  for (let idx = 0; idx < deduped.length; idx += chunkSize) {
+    const chunk = deduped.slice(idx, idx + chunkSize);
+    await runScafCommand("prettier", ["--write", ...chunk], process.cwd());
+  }
 }
 
 export async function formatScaffoldOutput(dest: string): Promise<void> {
-  const files = await collectFormattableFiles(dest);
-  if (files.length === 0) return;
-  const chunkSize = 128;
-  for (let idx = 0; idx < files.length; idx += chunkSize) {
-    const chunk = files.slice(idx, idx + chunkSize);
-    await runScafCommand("prettier", ["--write", ...chunk], process.cwd());
-  }
+  await formatScaffoldPaths([dest]);
 }
 
 export async function removeScaffoldTemplateConfig(dest: string): Promise<void> {

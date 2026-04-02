@@ -9,6 +9,11 @@ test("linting: zx_test forwards pnpm fetch timeout and wraps node --test with co
   const txt = await fsp.readFile(p, "utf8");
   assert.match(
     txt,
+    /clone_rule\(\s*"sh_test"/,
+    "expected zx_test to inherit the sh_test rule schema so Buck honors test_rule_timeout_ms",
+  );
+  assert.match(
+    txt,
     /export NIX_PNPM_FETCH_TIMEOUT=.*TSECS/,
     "expected zx_test to align pnpm fetch timeout with the per-test budget",
   );

@@ -1,4 +1,5 @@
 load("@prelude//test:inject_test_run_info.bzl", "inject_test_run_info")
+load("@prelude//:rules.bzl", "clone_rule")
 
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
@@ -168,15 +169,13 @@ def _zx_test_impl(ctx):
         ),
     ]
 
-zx_test = rule(
-    impl = _zx_test_impl,
-    attrs = {
+zx_test = clone_rule(
+    "sh_test",
+    extra_attrs = {
         "script": attrs.source(),
         # Ensure a default output so Buck always recognizes an output artifact
         "out": attrs.string(default = "zx_test.stamp"),
-        "test_rule_timeout_ms": attrs.option(attrs.int(), default = None),
-        "labels": attrs.list(attrs.string(), default = []),
         "template_inputs": attrs.list(attrs.source(), default = []),
-        "_inject_test_env": attrs.default_only(attrs.dep(default = "prelude//test/tools:inject_test_env")),
     },
+    impl_override = _zx_test_impl,
 )
