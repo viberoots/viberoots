@@ -255,10 +255,18 @@ export async function runInTemp<T>(
       console.log(`TMP ${tmp}`);
     } catch {}
   }
-  const { home, removeOnExit: removeHome } = await resolveTestHome();
-  const xdgCacheHome = await stableXdgCacheRoot();
+  const { home, removeOnExit: removeHome } = await timeAsync(
+    "runInTemp resolveTestHome",
+    async () => await resolveTestHome(),
+  );
+  const xdgCacheHome = await timeAsync(
+    "runInTemp stableXdgCacheRoot",
+    async () => await stableXdgCacheRoot(),
+  );
   const activeXdgCacheHome = process.env.XDG_CACHE_HOME || xdgCacheHome;
-  await ensureSharedNixTarballCacheRepo(activeXdgCacheHome);
+  await timeAsync("runInTemp ensureSharedNixTarballCacheRepo", async () => {
+    await ensureSharedNixTarballCacheRepo(activeXdgCacheHome);
+  });
   const tempNestedIso = stableBuckIsolation(tmp, "zxtest-shared");
   const tempSetupEnv = {
     ...process.env,
@@ -270,45 +278,60 @@ export async function runInTemp<T>(
     HOME: home,
     XDG_CACHE_HOME: activeXdgCacheHome,
   };
-  const goModCacheRoot = await stableGoModCacheRoot();
-  const initMode = await initTempRepoFromSeedStore({
-    tmpDir: tmp,
-    deps: { rsyncRepoTo, timeAsync },
+  const goModCacheRoot = await timeAsync(
+    "runInTemp stableGoModCacheRoot",
+    async () => await stableGoModCacheRoot(),
+  );
+  const initMode = await timeAsync("runInTemp initTempRepoFromSeedStore", async () => {
+    return await initTempRepoFromSeedStore({
+      tmpDir: tmp,
+      deps: { rsyncRepoTo, timeAsync },
+    });
   });
-  await removeCppReqsIfRequested(tmp);
+  await timeAsync("runInTemp removeCppReqsIfRequested", async () => {
+    await removeCppReqsIfRequested(tmp);
+  });
 
   const wantGit = opts?.git !== false && process.env.TEST_TEMP_GIT !== "0";
   if (wantGit) {
     const $tmp = $({ cwd: tmp, stdio: "pipe", env: tempSetupEnv });
-    try {
-      if (initMode === "rsync") {
-        await $tmp`git -c init.defaultBranch=main -c advice.defaultBranchName=false init -q`;
-        await $tmp`git add -A`;
-        await $tmp`git -c user.name=tmp -c user.email=tmp@example.com commit -q -m init --allow-empty`.nothrow();
-      } else {
-        const ok = await $tmp`git rev-parse --is-inside-work-tree`.nothrow();
-        const inside = String(ok.stdout || "").trim();
-        if (inside !== "true") {
-          throw new Error(
-            `runInTemp: expected seeded temp repo to be a git worktree (mode=${initMode})`,
-          );
+    await timeAsync("runInTemp gitBootstrap", async () => {
+      try {
+        if (initMode === "rsync") {
+          await $tmp`git -c init.defaultBranch=main -c advice.defaultBranchName=false init -q`;
+          await $tmp`git add -A`;
+          await $tmp`git -c user.name=tmp -c user.email=tmp@example.com commit -q -m init --allow-empty`.nothrow();
+        } else {
+          const ok = await $tmp`git rev-parse --is-inside-work-tree`.nothrow();
+          const inside = String(ok.stdout || "").trim();
+          if (inside !== "true") {
+            throw new Error(
+              `runInTemp: expected seeded temp repo to be a git worktree (mode=${initMode})`,
+            );
+          }
+          const head = await $tmp`git rev-parse HEAD`.nothrow();
+          if (head.exitCode !== 0) {
+            throw new Error(
+              `runInTemp: expected seeded temp repo to have an initial commit (mode=${initMode})`,
+            );
+          }
         }
-        const head = await $tmp`git rev-parse HEAD`.nothrow();
-        if (head.exitCode !== 0) {
-          throw new Error(
-            `runInTemp: expected seeded temp repo to have an initial commit (mode=${initMode})`,
-          );
-        }
+      } catch {
+        throw new Error("runInTemp: git is required for deterministic temp-repo nix builds");
       }
-    } catch {
-      throw new Error("runInTemp: git is required for deterministic temp-repo nix builds");
-    }
+    });
   }
 
   const $setup = $({ cwd: tmp, env: tempSetupEnv, stdio: "pipe" });
-  await ensureBuckConfigForTempRepo(tmp, $setup);
-  await ensureWorkspaceRootEnvFile(tmp);
-  await ensureToolchainPathsForTempRepo(tmp, $setup);
+  await timeAsync("runInTemp ensureBuckConfigForTempRepo", async () => {
+    await ensureBuckConfigForTempRepo(tmp, $setup);
+  });
+  await timeAsync("runInTemp ensureWorkspaceRootEnvFile", async () => {
+    await ensureWorkspaceRootEnvFile(tmp);
+  });
+  await timeAsync("runInTemp ensureToolchainPathsForTempRepo", async () => {
+    await ensureToolchainPathsForTempRepo(tmp, $setup);
+  });
 
   if ((process.env.TEST_NEED_DEV_ENV || "") === "1") {
     const chk =
@@ -376,7 +399,9 @@ export async function runInTemp<T>(
   exportEnv.GOSUMDB = exportEnv.GOSUMDB || "sum.golang.org";
   exportEnv.GOMODCACHE = exportEnv.GOMODCACHE || goModCacheRoot;
   try {
-    const pinnedNixpkgs = await pinnedNixpkgsPathOncePerWorker($);
+    const pinnedNixpkgs = await timeAsync("runInTemp pinnedNixpkgsPath", async () => {
+      return await pinnedNixpkgsPathOncePerWorker($);
+    });
     if (pinnedNixpkgs) {
       const nixPathEntries = String(exportEnv.NIX_PATH || "")
         .split(":")
@@ -391,7 +416,9 @@ export async function runInTemp<T>(
   }
   if (!exportEnv.SSL_CERT_FILE) {
     try {
-      const pinnedCacert = await pinnedCacertPathOncePerWorker($);
+      const pinnedCacert = await timeAsync("runInTemp pinnedCacertPath", async () => {
+        return await pinnedCacertPathOncePerWorker($);
+      });
       if (pinnedCacert) {
         exportEnv.SSL_CERT_FILE = pinnedCacert;
         exportEnv.NIX_SSL_CERT_FILE = pinnedCacert;
@@ -414,8 +441,12 @@ export async function runInTemp<T>(
   const wantsUnifiedPnpmStore =
     String(process.env.TEST_DISABLE_UNIFIED_PNPM_STORE || "").trim() !== "1";
   if (wantsUnifiedPnpmStore) {
-    const unified = await ensureUnifiedPnpmStoreOncePerWorker($);
-    const pnpmState = await externalPnpmStateDirs(tmp);
+    const unified = await timeAsync("runInTemp ensureUnifiedPnpmStore", async () => {
+      return await ensureUnifiedPnpmStoreOncePerWorker($);
+    });
+    const pnpmState = await timeAsync("runInTemp externalPnpmStateDirs", async () => {
+      return await externalPnpmStateDirs(tmp);
+    });
     exportEnv.PNPM_HOME = exportEnv.PNPM_HOME || pnpmState.homeDir;
     if (unified) {
       exportEnv.LOCAL_PNPM_STORE = exportEnv.LOCAL_PNPM_STORE || unified;
@@ -468,13 +499,17 @@ export async function runInTemp<T>(
 
   const forceZxProbe = String(process.env.TEST_FORCE_ZX_INIT_PROBE || "").trim() === "1";
   if ((process.env.TEST_NEED_DEV_ENV || "") === "1" || forceZxProbe) {
-    await ensureZxInitProbedOnce({ tmp, $, exportEnv });
+    await timeAsync("runInTemp ensureZxInitProbedOnce", async () => {
+      await ensureZxInitProbedOnce({ tmp, $, exportEnv });
+    });
   }
   const _$ = $({ cwd: tmp, env: exportEnv });
   await timeAsync("buck-daemon-reaper setup", async () => await ensureBuckReaperStarted(tmp, _$));
 
   try {
-    return await withTempProcessEnv(exportEnv, async () => await fn(tmp, _$));
+    return await timeAsync("runInTemp testBody", async () => {
+      return await withTempProcessEnv(exportEnv, async () => await fn(tmp, _$));
+    });
   } finally {
     await timeAsync("temp process cleanup", async () => {
       await cleanupTempRepoProcesses({ roots: [tmp] }).catch(() => {});

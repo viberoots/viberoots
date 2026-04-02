@@ -1,1 +1,1 @@
-# Package marker for shared deployment macros loaded from //projects/deployments:defs.bzl.
+# Package marker for deployment declarations under projects/deployments/.

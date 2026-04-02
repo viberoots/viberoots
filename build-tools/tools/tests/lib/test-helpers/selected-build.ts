@@ -1,4 +1,5 @@
 import path from "node:path";
+import { timeAsync } from "./timing";
 
 type ZxShell = any;
 type ZxResult = any;
@@ -30,11 +31,13 @@ export async function exportGraphInTemp(args: {
   stdio?: "inherit" | "pipe";
 }): Promise<ZxResult> {
   const { tmp, $, env, stdio = "inherit" } = args;
-  return await $({
-    cwd: tmp,
-    stdio,
-    env: selectedBuildEnv({ tmp, env }),
-  })`${process.execPath} --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+  return await timeAsync("selectedBuild exportGraphInTemp", async () => {
+    return await $({
+      cwd: tmp,
+      stdio,
+      env: selectedBuildEnv({ tmp, env }),
+    })`${process.execPath} --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+  });
 }
 
 export async function runBuildSelected(args: {
@@ -47,13 +50,15 @@ export async function runBuildSelected(args: {
   nothrow?: boolean;
 }): Promise<ZxResult> {
   const { tmp, $, target, env, stdio = "pipe", reject = false, nothrow = true } = args;
-  return await $({
-    cwd: tmp,
-    stdio,
-    reject,
-    nothrow,
-    env: selectedBuildEnv({ tmp, target, env }),
-  })`${process.execPath} --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/dev/build-selected.ts`;
+  return await timeAsync("selectedBuild runBuildSelected", async () => {
+    return await $({
+      cwd: tmp,
+      stdio,
+      reject,
+      nothrow,
+      env: selectedBuildEnv({ tmp, target, env }),
+    })`${process.execPath} --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/dev/build-selected.ts`;
+  });
 }
 
 export async function buildSelectedOutPath(args: {
@@ -64,15 +69,17 @@ export async function buildSelectedOutPath(args: {
 }): Promise<string> {
   const { tmp, $, target, env } = args;
   const res = await runBuildSelected({ tmp, $, target, env, stdio: "pipe" });
-  if (Number(res.exitCode || 0) !== 0) {
-    const combined = `${String(res.stdout || "")}\n${String(res.stderr || "")}`.trim();
-    throw new Error(`build-selected.ts failed for ${target}\n${combined}`);
-  }
-  const outPath =
-    String(res.stdout || "")
-      .trim()
-      .split(/\n+/)
-      .pop() || "";
-  if (!outPath) throw new Error(`no out path from build-selected.ts for ${target}`);
-  return outPath;
+  return await timeAsync("selectedBuild parseOutPath", async () => {
+    if (Number(res.exitCode || 0) !== 0) {
+      const combined = `${String(res.stdout || "")}\n${String(res.stderr || "")}`.trim();
+      throw new Error(`build-selected.ts failed for ${target}\n${combined}`);
+    }
+    const outPath =
+      String(res.stdout || "")
+        .trim()
+        .split(/\n+/)
+        .pop() || "";
+    if (!outPath) throw new Error(`no out path from build-selected.ts for ${target}`);
+    return outPath;
+  });
 }

@@ -2,6 +2,21 @@ set -euo pipefail
 
 cd "$IMPORTER_DIR"
 export SOURCE_DATE_EPOCH=1
+PHASE_DIAG="${BNX_NODE_PHASE_DIAGNOSTICS:-}"
+phase_timer_begin() {
+  if [ -n "$PHASE_DIAG" ]; then
+    date +%s
+  fi
+}
+phase_timer_end() {
+  local label="$1"
+  local started="${2:-}"
+  if [ -n "$PHASE_DIAG" ] && [ -n "$started" ]; then
+    echo "[node-test][phase] ${label} seconds=$(( $(date +%s) - started ))" >&2
+  fi
+}
+PHASE_TOTAL_T0="$(phase_timer_begin)"
+trap 'phase_timer_end "total" "$PHASE_TOTAL_T0"' EXIT
 
 if [ -n "${HAS_NATIVE:-}" ]; then
   mkdir -p native
@@ -13,6 +28,7 @@ fi
 VITEST_BIN=""
 PATTERNS_FILE="$TMPDIR/patterns.txt"
 PATTERN_ARGS_FILE="$TMPDIR/pattern-args.txt"
+PHASE_T0="$(phase_timer_begin)"
 node -e '
 const raw = process.env.PATTERNS_VALUE ?? "\"\"";
 const parsed = JSON.parse(raw);
@@ -21,7 +37,9 @@ if (typeof parsed !== "string") {
 }
 process.stdout.write(parsed.replace(/\r\n/g, "\n"));
 ' > "$PATTERNS_FILE"
+phase_timer_end "patterns-decode" "$PHASE_T0"
 
+PHASE_T0="$(phase_timer_begin)"
 node -e '
 const fs = require("node:fs");
 const input = fs.readFileSync(process.argv[1], "utf8");
@@ -37,7 +55,9 @@ if (out.length > 0) {
   fs.writeFileSync(process.argv[2], "");
 }
 ' "$PATTERNS_FILE" "$PATTERN_ARGS_FILE"
+phase_timer_end "pattern-args-encode" "$PHASE_T0"
 
+PHASE_T0="$(phase_timer_begin)"
 FOUND=0
 MATCHED_TESTS_FILE="$TMPDIR/matched-tests.txt"
 if find . \
@@ -55,6 +75,7 @@ find . \
   -path "./.vite" -prune -o \
   -type f \( -name "*.test.ts" -o -name "*.test.tsx" -o -name "*.test.js" \) -print \
   | LC_ALL=C sort > "$MATCHED_TESTS_FILE"
+phase_timer_end "test-discovery" "$PHASE_T0"
 
 COVERAGE_ARGS=()
 if [ "${COVERAGE_ENV}" = "1" ]; then
@@ -80,12 +101,14 @@ else
   fi
 
   NM_TARGET="${NM_PATH}/node_modules"
+  PHASE_T0="$(phase_timer_begin)"
   if [ -L node_modules ] && [ "$(readlink node_modules)" = "$NM_TARGET" ]; then
     :
   else
     rm -rf node_modules
     ln -s "$NM_TARGET" node_modules
   fi
+  phase_timer_end "node-modules-link" "$PHASE_T0"
   if [ -x "node_modules/.bin/vitest" ] || [ -f "node_modules/.bin/vitest" ]; then
     VITEST_BIN="node_modules/.bin/vitest"
   else
@@ -148,6 +171,7 @@ for (const line of lines) {
       echo "[nix] importer=${IMPORTER_DIR} matched_tests_preview:" >&2
       sed -n '1,20p' "$MATCHED_TESTS_FILE" >&2
     fi
+    VITEST_T0="$(phase_timer_begin)"
     if [ "$(basename "$VITEST_BIN")" = "vitest" ]; then
       set +e
       timeout -k 15s ${VITEST_TIMEOUT_SECS}s "$VITEST_BIN" run \
@@ -179,6 +203,7 @@ for (const line of lines) {
       VITEST_STATUS=$?
       set -e
     fi
+    phase_timer_end "vitest-run" "$VITEST_T0"
 
     if [ ! -s report/junit.xml ]; then
       echo "[nix] junit reporter did not emit a file; writing minimal placeholder" >&2
@@ -187,6 +212,7 @@ for (const line of lines) {
 
     if [ "${VITEST_STATUS:-0}" -ne 0 ]; then
       echo "[nix] vitest exited with status ${VITEST_STATUS}; failing testcases:" >&2
+      JUNIT_T0="$(phase_timer_begin)"
       node - <<'EOF_JUNIT_SUMMARY' report/junit.xml >&2 || true
 const fs = require("node:fs");
 const file = process.argv[2];
@@ -222,6 +248,7 @@ if (printed === 0) {
   console.error("[nix]   (no junit failure details found)");
 }
 EOF_JUNIT_SUMMARY
+      phase_timer_end "junit-failure-summary" "$JUNIT_T0"
       exit "${VITEST_STATUS}"
     fi
 

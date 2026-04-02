@@ -20,6 +20,19 @@ let
           set -euo pipefail
           PHASE_T0="$(date +%s)"
           phase_log() { echo "[node-webapp][phase] $1 t=$(date +%s)"; }
+          PHASE_DIAG="${if (builtins.getEnv "TEST_TIMING" != "") || (builtins.getEnv "TEST_TIMING_SUMMARY" != "") then "1" else ""}"
+          phase_diag_begin() {
+            if [ -n "$PHASE_DIAG" ]; then
+              date +%s
+            fi
+          }
+          phase_diag_end() {
+            local label="$1"
+            local started="''${2:-}"
+            if [ -n "$PHASE_DIAG" ] && [ -n "$started" ]; then
+              echo "[node-webapp][phase-diag] $label seconds=$(( $(date +%s) - started ))"
+            fi
+          }
           phase_log "begin"
           REPO_ROOT="$PWD"
           export WORKSPACE_ROOT="$REPO_ROOT"
@@ -131,26 +144,40 @@ EOF
             done
           ) &
           HB_PID="$!"
+          PHASE_STEP_T0="$(phase_diag_begin)"
           sync_module_contracts
+          phase_diag_end "sync-module-contracts" "$PHASE_STEP_T0"
           if [ "$WEBAPP_FRAMEWORK" = "static" ]; then
             if [ ! -x "$VITE_BIN" ]; then
               echo "[nix] ERROR: vite binary missing for static webapp build" >&2
               exit 3
             fi
+            PHASE_STEP_T0="$(phase_diag_begin)"
             "$VITE_BIN" build
+            phase_diag_end "vite-build-static" "$PHASE_STEP_T0"
             test -d dist
+            PHASE_STEP_T0="$(phase_diag_begin)"
             stage_wasm_contract "src/wasm-contract/top.wasm" "dist" "dist/server/wasm"
+            phase_diag_end "stage-wasm-contract" "$PHASE_STEP_T0"
           elif [ "$WEBAPP_FRAMEWORK" = "express" ] || [ "$WEBAPP_FRAMEWORK" = "vite" ]; then
             if [ ! -x "$VITE_BIN" ] || [ ! -x "$TSC_BIN" ]; then
               echo "[nix] ERROR: expected vite and tsc binaries for Express/Vite SSR build" >&2
               exit 3
             fi
+            PHASE_STEP_T0="$(phase_diag_begin)"
             "$VITE_BIN" build --outDir dist/client
+            phase_diag_end "vite-build-client" "$PHASE_STEP_T0"
+            PHASE_STEP_T0="$(phase_diag_begin)"
             "$VITE_BIN" build --ssr src/entry-server.ts --outDir dist/server
+            phase_diag_end "vite-build-ssr" "$PHASE_STEP_T0"
+            PHASE_STEP_T0="$(phase_diag_begin)"
             "$TSC_BIN" -p tsconfig.server.json
+            phase_diag_end "tsc-server" "$PHASE_STEP_T0"
             test -d dist/client
             test -f dist/server/index.js
+            PHASE_STEP_T0="$(phase_diag_begin)"
             stage_wasm_contract "src/wasm-contract/top.wasm" "dist/client" "dist/server/wasm"
+            phase_diag_end "stage-wasm-contract" "$PHASE_STEP_T0"
             if [ -f src/wasm-modules.manifest.json ]; then
               cp -f src/wasm-modules.manifest.json dist/server/wasm-modules.manifest.json
             fi
@@ -162,9 +189,14 @@ EOF
               echo "[nix] ERROR: expected next and tsc binaries for Next SSR build" >&2
               exit 3
             fi
+            PHASE_STEP_T0="$(phase_diag_begin)"
             "$NEXT_BIN" build
+            phase_diag_end "next-build" "$PHASE_STEP_T0"
+            PHASE_STEP_T0="$(phase_diag_begin)"
             "$TSC_BIN" -p tsconfig.server.json
+            phase_diag_end "tsc-server" "$PHASE_STEP_T0"
             test -d .next
+            PHASE_STEP_T0="$(phase_diag_begin)"
             mkdir -p dist/client
             cp -R .next dist/client/.next
             if [ -d public ]; then cp -R public dist/client/public; fi
@@ -180,10 +212,13 @@ const __dirname = path.dirname(__filename);
 process.chdir(path.resolve(__dirname, "../client"));
 await import("./server-main.js");
 EOF
+            phase_diag_end "stage-next-output" "$PHASE_STEP_T0"
             test -d dist/client
             test -f dist/server/index.js
             test -f dist/server/server-main.js
+            PHASE_STEP_T0="$(phase_diag_begin)"
             stage_wasm_contract "app/wasm-contract/top.wasm" "dist/client/public" "dist/server/wasm"
+            phase_diag_end "stage-wasm-contract" "$PHASE_STEP_T0"
             if [ -f app/wasm-modules.manifest.json ]; then
               cp -f app/wasm-modules.manifest.json dist/server/wasm-modules.manifest.json
             fi
@@ -197,13 +232,29 @@ EOF
         installPhase = ''
           set -euo pipefail
           phase_log() { echo "[node-webapp][phase] $1 t=$(date +%s)"; }
+          PHASE_DIAG="${if (builtins.getEnv "TEST_TIMING" != "") || (builtins.getEnv "TEST_TIMING_SUMMARY" != "") then "1" else ""}"
+          phase_diag_begin() {
+            if [ -n "$PHASE_DIAG" ]; then
+              date +%s
+            fi
+          }
+          phase_diag_end() {
+            local label="$1"
+            local started="''${2:-}"
+            if [ -n "$PHASE_DIAG" ] && [ -n "$started" ]; then
+              echo "[node-webapp][phase-diag] $label seconds=$(( $(date +%s) - started ))"
+            fi
+          }
           phase_log "install-begin"
           mkdir -p $out
+          PHASE_STEP_T0="$(phase_diag_begin)"
           if [ -d dist ]; then cp -R dist $out/; else echo "dist missing" >&2; exit 2; fi
+          phase_diag_end "install-copy-dist" "$PHASE_STEP_T0"
+          PHASE_STEP_T0="$(phase_diag_begin)"
           ln -s "${nm}/node_modules" "$out/node_modules"
+          phase_diag_end "install-link-node-modules" "$PHASE_STEP_T0"
           phase_log "install-complete"
         '';
       };
 in
 builtins.listToAttrs (map (imp: { name = sanitize imp; value = makeWebapp imp; }) importerDirs)
-

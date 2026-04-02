@@ -108,6 +108,11 @@ let
         patternsEnv = builtins.getEnv "NIX_NODE_TEST_PATTERNS";
         patternsValue = patternsEnv;
         coverageEnv = builtins.getEnv "COVERAGE";
+        innerPhaseDiagnostics =
+          if (builtins.getEnv "TEST_TIMING" != "") || (builtins.getEnv "TEST_TIMING_SUMMARY" != "") then
+            "1"
+          else
+            "";
       in
       if (!hasTestFiles) then
         pkgs.stdenvNoCC.mkDerivation {
@@ -171,6 +176,7 @@ let
               export ADDON_SRC="${addonSrc}"
               export COVERAGE_ENV="${coverageEnv}"
               export PATTERNS_VALUE='${builtins.toJSON patternsValue}'
+              export BNX_NODE_PHASE_DIAGNOSTICS="${innerPhaseDiagnostics}"
               ${builtins.readFile ./node-test-buildPhase.sh}
             '';
             installPhase = ''

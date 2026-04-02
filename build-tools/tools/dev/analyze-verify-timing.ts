@@ -8,10 +8,12 @@ import {
   findLastFullSuiteWindowStart,
   parseVerifyBeginEpochSec,
   parseBuck2ExitMarker,
-  parseLineFromBuckLogForMatching,
 } from "../lib/verify-log-status/parsing.ts";
-
-type TimingBucketAgg = { msTotal: number; count: number };
+import {
+  collectVerifyTimingStats,
+  type TargetTimingBreakdown,
+  type TimingBucket,
+} from "./analyze-verify-timing-helpers.ts";
 
 export type VerifyTimingAnalysis = {
   logPath: string;
@@ -21,57 +23,9 @@ export type VerifyTimingAnalysis = {
   testsWithDurations: number;
   sumTestDurationsSec: number;
   effectiveParallelism?: number;
-  buckets: Array<{
-    label: string;
-    msTotal: number;
-    count: number;
-    avgMs: number;
-    estWallSec?: number;
-  }>;
+  buckets: TimingBucket[];
+  targetTimings: TargetTimingBreakdown[];
 };
-
-function normalizeTimingBucketLabel(label: string): string {
-  // Many timing labels include per-test identifiers in parentheses, e.g.:
-  // - rsyncRepoTo(tmp-XXXX)
-  // - cloneSeedRepoTo(tmp-YYYY)
-  // For suite-level aggregation, collapse these to a stable form:
-  // - rsyncRepoTo(...)
-  const trimmed = String(label || "").trim();
-  const m = /^([A-Za-z0-9_\-]+)\(.*\)$/.exec(trimmed);
-  if (!m) return trimmed;
-  const head = String(m[1] || "").trim();
-  return head ? `${head}(...)` : trimmed;
-}
-
-function parseTimingSummaryLine(
-  s: string,
-): { label: string; msTotal: number; count: number } | null {
-  // [timing] 1392.1ms total  (511x, avg 2.7ms): rsyncRepoTo(tmp-abc)
-  const re =
-    /^\[timing\]\s+(\d+(?:\.\d+)?)ms\s+total\s+\((\d+)x,\s+avg\s+(\d+(?:\.\d+)?)ms\):\s+(.+)$/;
-  const m = re.exec(s.trim());
-  if (!m) return null;
-  const msTotal = Number(m[1]);
-  const count = Number(m[2]);
-  const label = normalizeTimingBucketLabel(String(m[4] || "").trim());
-  if (!label) return null;
-  if (!Number.isFinite(msTotal) || !Number.isFinite(count)) return null;
-  return { label, msTotal, count };
-}
-
-function parseBuckCompletionDurationSec(line: string): number | null {
-  // Examples:
-  // ✓ Pass: root//:some_test (1.0s)
-  // ✗ Fail: root//:some_test (12.34s)
-  // Skip: root//:some_test (0.1s)
-  const durRe = /\((\d+(?:\.\d+)?)(ms|s)\)\s*$/;
-  const m = durRe.exec(line.trim());
-  if (!m) return null;
-  const n = Number(m[1]);
-  if (!Number.isFinite(n) || n < 0) return null;
-  const unit = m[2];
-  return unit === "ms" ? n / 1000 : n;
-}
 
 export function analyzeVerifyTimingFromLogText(opts: {
   logPath: string;
@@ -86,68 +40,40 @@ export function analyzeVerifyTimingFromLogText(opts: {
   const exit = parseBuck2ExitMarker(window);
   const end = exit.endSec;
   const wallSec = begin !== undefined && end !== undefined && end > begin ? end - begin : undefined;
-
-  let testsWithDurations = 0;
-  let sumTestDurationsSec = 0;
-  for (const raw of window) {
-    const { normalized, isComment } = parseLineFromBuckLogForMatching(raw);
-    if (isComment) continue;
-    const d = parseBuckCompletionDurationSec(normalized);
-    if (d === null) continue;
-    testsWithDurations++;
-    sumTestDurationsSec += d;
-  }
-
+  const durationStats = collectVerifyTimingStats(window);
   const effectiveParallelism =
-    wallSec !== undefined && wallSec > 0 && sumTestDurationsSec > 0
-      ? sumTestDurationsSec / wallSec
+    wallSec !== undefined && wallSec > 0 && durationStats.sumTestDurationsSec > 0
+      ? durationStats.sumTestDurationsSec / wallSec
       : undefined;
-
-  const timingAgg: Map<string, TimingBucketAgg> = new Map();
-  for (const raw of window) {
-    const { normalized } = parseLineFromBuckLogForMatching(raw);
-    const parsed = parseTimingSummaryLine(normalized);
-    if (!parsed) continue;
-    const cur = timingAgg.get(parsed.label) || { msTotal: 0, count: 0 };
-    cur.msTotal += parsed.msTotal;
-    cur.count += parsed.count;
-    timingAgg.set(parsed.label, cur);
-  }
-
-  const buckets = Array.from(timingAgg.entries())
-    .map(([label, agg]) => {
-      const avgMs = agg.count > 0 ? agg.msTotal / agg.count : 0;
-      const estWallSec =
-        effectiveParallelism !== undefined && effectiveParallelism > 0
-          ? agg.msTotal / 1000 / effectiveParallelism
-          : undefined;
-      return {
-        label,
-        msTotal: agg.msTotal,
-        count: agg.count,
-        avgMs,
-        estWallSec,
-      };
-    })
-    .sort((a, b) => b.msTotal - a.msTotal);
+  const stats = collectVerifyTimingStats(window, effectiveParallelism);
 
   return {
     logPath: path.normalize(opts.logPath),
     wallSec,
     beginEpochSec: begin,
     endEpochSec: end,
-    testsWithDurations,
-    sumTestDurationsSec,
+    testsWithDurations: durationStats.testsWithDurations,
+    sumTestDurationsSec: durationStats.sumTestDurationsSec,
     effectiveParallelism,
-    buckets,
+    buckets: stats.buckets,
+    targetTimings: stats.targetTimings,
   };
 }
 
 export function formatVerifyTimingAnalysisText(
   a: VerifyTimingAnalysis,
-  opts?: { maxBuckets?: number; comment?: boolean },
+  opts?: {
+    maxBuckets?: number;
+    comment?: boolean;
+    slowTargetSec?: number;
+    maxTargets?: number;
+    maxTargetBuckets?: number;
+  },
 ): string {
   const maxBuckets = opts?.maxBuckets ?? 15;
+  const slowTargetSec = opts?.slowTargetSec ?? 30;
+  const maxTargets = opts?.maxTargets ?? 5;
+  const maxTargetBuckets = opts?.maxTargetBuckets ?? 5;
   const prefix = opts?.comment ? "# " : "";
   const fmtNum = (n: number) => (Number.isFinite(n) ? n.toFixed(2) : "?");
   const fmtSec = (n?: number) => (n === undefined ? "?" : fmtNum(n));
@@ -187,6 +113,34 @@ export function formatVerifyTimingAnalysisText(
   if (a.buckets.length > maxBuckets) {
     lines.push(`${prefix}[timing] ... ${a.buckets.length - maxBuckets} more`);
   }
+
+  const slowTargets = a.targetTimings.filter((target) => target.durationSec >= slowTargetSec);
+  if (slowTargets.length === 0) {
+    lines.push(`${prefix}[timing] slow_targets_with_timing=0 threshold=${fmtNum(slowTargetSec)}s`);
+    return lines.join("\n");
+  }
+
+  lines.push(
+    `${prefix}[timing] slow_targets_with_timing=${slowTargets.length} threshold=${fmtNum(slowTargetSec)}s`,
+  );
+  for (const target of slowTargets.slice(0, Math.max(0, maxTargets))) {
+    lines.push(
+      `${prefix}[timing] slow-target ${fmtSec(target.durationSec)}s ${target.status} ${target.target} (${target.rawDuration})`,
+    );
+    for (const bucket of target.buckets.slice(0, Math.max(0, maxTargetBuckets))) {
+      lines.push(
+        `${prefix}[timing] target-bucket ${(bucket.msTotal / 1000).toFixed(2)}s total (${bucket.count}x, avg ${fmtNum(bucket.avgMs)}ms): ${bucket.label}`,
+      );
+    }
+    if (target.buckets.length > maxTargetBuckets) {
+      lines.push(
+        `${prefix}[timing] target-bucket ... ${target.buckets.length - maxTargetBuckets} more for ${target.target}`,
+      );
+    }
+  }
+  if (slowTargets.length > maxTargets) {
+    lines.push(`${prefix}[timing] slow-target ... ${slowTargets.length - maxTargets} more`);
+  }
   return lines.join("\n");
 }
 
@@ -203,12 +157,21 @@ async function main(): Promise<number> {
   const comment = getFlagBool("comment");
   const maxBucketsRaw = getFlagStr("max-buckets", "").trim();
   const maxBuckets = maxBucketsRaw ? Number(maxBucketsRaw) : undefined;
+  const slowTargetSecRaw = getFlagStr("slow-target-sec", "").trim();
+  const maxTargetsRaw = getFlagStr("max-targets", "").trim();
+  const maxTargetBucketsRaw = getFlagStr("max-target-buckets", "").trim();
+  const slowTargetSec = slowTargetSecRaw ? Number(slowTargetSecRaw) : undefined;
+  const maxTargets = maxTargetsRaw ? Number(maxTargetsRaw) : undefined;
+  const maxTargetBuckets = maxTargetBucketsRaw ? Number(maxTargetBucketsRaw) : undefined;
 
   const text = await fsp.readFile(log, "utf8");
   const analysis = analyzeVerifyTimingFromLogText({ logPath: log, text });
   const out = formatVerifyTimingAnalysisText(analysis, {
     comment,
     maxBuckets: Number.isFinite(maxBuckets) ? (maxBuckets as number) : undefined,
+    slowTargetSec: Number.isFinite(slowTargetSec) ? (slowTargetSec as number) : undefined,
+    maxTargets: Number.isFinite(maxTargets) ? (maxTargets as number) : undefined,
+    maxTargetBuckets: Number.isFinite(maxTargetBuckets) ? (maxTargetBuckets as number) : undefined,
   });
   process.stdout.write(out + "\n");
   return 0;

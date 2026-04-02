@@ -6,6 +6,7 @@ import * as fsp from "node:fs/promises";
 
 import { ensureImporterLockfileFresh } from "../../../dev/update-pnpm-hash/lockfile.ts";
 import { printSkip } from "../../../lib/errors.ts";
+import { timeAsyncDetail } from "../../../lib/timing-detail.ts";
 import { confirmOrExit } from "../confirm.ts";
 import { runScafNodeTool } from "../command-runner.ts";
 import {
@@ -111,10 +112,18 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
   try {
     await fsp.mkdir(path.dirname(dest), { recursive: true });
   } catch {}
-  await runCopierCopy(root, dest, data);
-  await recordSource(dest, canonicalLanguage, template);
-  await runPostSteps(dest);
-  await removeScaffoldTemplateConfig(dest);
+  await timeAsyncDetail("scafNew runCopierCopy", async () => {
+    await runCopierCopy(root, dest, data);
+  });
+  await timeAsyncDetail("scafNew recordSource", async () => {
+    await recordSource(dest, canonicalLanguage, template);
+  });
+  await timeAsyncDetail("scafNew runPostSteps", async () => {
+    await runPostSteps(dest);
+  });
+  await timeAsyncDetail("scafNew removeScaffoldTemplateConfig", async () => {
+    await removeScaffoldTemplateConfig(dest);
+  });
 
   if (isLangKit) {
     const withPlanner = ["true", "1", "yes"].includes((flags["with-planner"] || "").toLowerCase());
@@ -137,7 +146,9 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
         await fsp.writeFile(cfgPath, cfg, "utf8");
       }
       try {
-        await runScafNodeTool("build-tools/tools/dev/planner-gen.ts", ["--lang", langId]);
+        await timeAsyncDetail("scafNew plannerGen", async () => {
+          await runScafNodeTool("build-tools/tools/dev/planner-gen.ts", ["--lang", langId]);
+        });
         console.log(`planner generated: build-tools/tools/nix/planner/${langId}.nix`);
       } catch (e) {
         console.warn("warning: planner-gen failed:", e);
@@ -187,23 +198,31 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
       });
       for (const imp of importersToRefresh) {
         if (imp === importer) {
-          await ensureImporterLockfileFresh({ repoRoot, importer: imp });
+          await timeAsyncDetail("scafNew ensureImporterLockfileFresh", async () => {
+            await ensureImporterLockfileFresh({ repoRoot, importer: imp });
+          });
         }
       }
       // Keep lockfile contents stable before computing fixed-output pnpm store hashes.
-      await formatImporterLockfiles(repoRoot, importersToRefresh);
+      await timeAsyncDetail("scafNew formatImporterLockfiles", async () => {
+        await formatImporterLockfiles(repoRoot, importersToRefresh);
+      });
       if (skipStoreHashRefresh) {
         printSkip("not-applicable", "skipping importer pnpm-store hash refresh");
       } else {
         for (const imp of importersToRefresh) {
-          await refreshImporterStoreHash(repoRoot, imp);
+          await timeAsyncDetail("scafNew refreshImporterStoreHash", async () => {
+            await refreshImporterStoreHash(repoRoot, imp);
+          });
         }
       }
     }
   }
 
   // Keep all scaffold outputs formatting-clean immediately, regardless of language.
-  await formatScaffoldOutput(dest);
+  await timeAsyncDetail("scafNew formatScaffoldOutput", async () => {
+    await formatScaffoldOutput(dest);
+  });
 
   console.log("created:", dest);
 }

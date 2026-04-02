@@ -48,7 +48,7 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
     await fsp.writeFile(
       deployTargetsPath,
       [
-        'load("//projects/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
+        'load("//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
         "",
         "nixos_shared_host_static_webapp_deployment(",
         '    name = "deploy",',

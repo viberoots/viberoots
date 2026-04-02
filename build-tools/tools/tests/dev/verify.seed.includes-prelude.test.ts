@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
-test("verify test-seed includes prelude path", async () => {
+test("verify test-seed includes build-system paths needed by temp Buck repos", async () => {
   const out = await $({
     stdio: "pipe",
   })`nix build --impure .#test-seed --accept-flake-config --no-link --print-out-paths`;
@@ -16,9 +16,13 @@ test("verify test-seed includes prelude path", async () => {
   assert.ok(seedPath, "expected nix build .#test-seed to output a store path");
 
   const prelude = path.join(seedPath, "prelude");
-  const st = await fsp.lstat(prelude);
+  const preludeStat = await fsp.lstat(prelude);
   assert.ok(
-    st.isDirectory() || st.isSymbolicLink(),
+    preludeStat.isDirectory() || preludeStat.isSymbolicLink(),
     "expected prelude in verify test-seed snapshot",
   );
+
+  const deploymentDefs = path.join(seedPath, "build-tools", "deployments", "defs.bzl");
+  const deploymentDefsStat = await fsp.lstat(deploymentDefs);
+  assert.ok(deploymentDefsStat.isFile(), "expected deployment defs in verify test-seed snapshot");
 });

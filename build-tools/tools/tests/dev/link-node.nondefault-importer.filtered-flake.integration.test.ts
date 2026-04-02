@@ -21,4 +21,22 @@ test("link-node builds non-default importers from stable workspace flake ref", a
       "lockfile.ts must keep the compatibility filtered-flake export for install callers",
     );
   }
+
+  const filtered = await fsp.readFile("build-tools/tools/dev/filtered-flake.ts", "utf8");
+  if (!filtered.includes("dirty-tree entries=") || !filtered.includes("snapshot ready in")) {
+    throw new Error("filtered-flake.ts must expose dirty-tree and snapshot-size diagnostics");
+  }
+
+  const filteredCompat = await fsp.readFile(
+    "build-tools/tools/dev/update-pnpm-hash/filtered-flake.ts",
+    "utf8",
+  );
+  if (
+    !filteredCompat.includes("dirty-tree entries=") ||
+    !filteredCompat.includes("snapshot ready in")
+  ) {
+    throw new Error(
+      "update-pnpm-hash filtered flake must expose dirty-tree and snapshot-size diagnostics",
+    );
+  }
 });
