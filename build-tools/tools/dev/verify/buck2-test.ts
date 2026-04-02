@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import process from "node:process";
 import { type Buck2Completion, parseBuck2ProgressFromLines } from "./buck2-output";
+import { buildVerifyTestEnvArgs } from "./buck2-test-env.ts";
 import { resolveToolPathSync } from "../../lib/tool-paths.ts";
 
 export type SpawnedVerifyTests = {
@@ -62,54 +63,15 @@ export function spawnVerifyBuck2Tests(opts: {
         ? ["--console", "super"]
         : ["--console", "simple"];
 
-  const extraEnvArgs: string[] = [];
-  if (process.env.TEST_TIMING) extraEnvArgs.push("--env", `TEST_TIMING=${process.env.TEST_TIMING}`);
-  if (process.env.TEST_TIMING_SUMMARY)
-    extraEnvArgs.push("--env", `TEST_TIMING_SUMMARY=${process.env.TEST_TIMING_SUMMARY}`);
-
-  const testEnvArgs: string[] = [
-    "--env",
-    `COVERAGE=${process.env.COVERAGE || "0"}`,
-    "--env",
-    `TEST_NODE_OPTIONS=--test-timeout=${nodeTestTimeoutMs}`,
-    "--env",
-    `TEST_NIX_TIMEOUT_SECS=${testNixTimeoutSecs}`,
-    "--env",
-    `NIX_PNPM_FETCH_TIMEOUT=${testNixTimeoutSecs}`,
-    "--env",
-    `NIX_PNPM_INSTALL_TIMEOUT=${testNixTimeoutSecs}`,
-    "--env",
-    `BNX_BUCK_REAPER_STATE_FILE=${process.env.BNX_BUCK_REAPER_STATE_FILE || ""}`,
-    "--env",
-    `BNX_VERIFY_LOCK_DIR=${process.env.BNX_VERIFY_LOCK_DIR || ""}`,
-    "--env",
-    `BNX_VERIFY_LOG_FILE=${process.env.BNX_VERIFY_LOG_FILE || ""}`,
-    "--env",
-    `BNX_TEST_SEED_STORE_PATH=${process.env.BNX_TEST_SEED_STORE_PATH || ""}`,
-    "--env",
-    `BNX_TEST_SEED_KEY=${process.env.BNX_TEST_SEED_KEY || ""}`,
-    "--env",
-    `BNX_TEST_SEED_PIN_DIR=${process.env.BNX_TEST_SEED_PIN_DIR || ""}`,
-    "--env",
-    `BNX_SHARED_PRELUDE_PATH=${process.env.BNX_SHARED_PRELUDE_PATH || ""}`,
-    "--env",
-    `TEST_RSYNC_ROOTS=${process.env.TEST_RSYNC_ROOTS || ""}`,
-    "--env",
-    `TEST_PARTIAL_CLONE_GO_ONLY=${process.env.TEST_PARTIAL_CLONE_GO_ONLY || ""}`,
-    "--env",
-    `TEST_EXCLUDE_CPP_REQS=${process.env.TEST_EXCLUDE_CPP_REQS || ""}`,
-    "--env",
-    `ZX_TEST_NODE_MODULES_OUT=${opts.zxNodeModulesOut}`,
-    "--env",
-    `NIX_PATH=${process.env.NIX_PATH || ""}`,
-    ...extraEnvArgs,
-  ];
-  if ((process.env.COVERAGE || "0") === "1" && process.env.NODE_V8_COVERAGE) {
-    testEnvArgs.push("--env", `NODE_V8_COVERAGE=${process.env.NODE_V8_COVERAGE}`);
-  }
-
   const threads = opts.threadsOverride ?? verifyBuck2Threads();
   const passName = String(opts.passName || "shared");
+  const testEnvArgs = buildVerifyTestEnvArgs({
+    iso: opts.iso,
+    passName,
+    zxNodeModulesOut: opts.zxNodeModulesOut,
+    nodeTestTimeoutMs,
+    testNixTimeoutSecs,
+  });
   const buckArgs = [
     "--isolation-dir",
     opts.iso,

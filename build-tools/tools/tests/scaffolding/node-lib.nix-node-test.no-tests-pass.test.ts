@@ -1,11 +1,33 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 // Ensure dev env tooling when spawning Buck/Nix inside temp repos
 process.env.TEST_NEED_DEV_ENV = "1";
+
+const TEST_FILE_RE = /\.test\.[cm]?[jt]sx?$/;
+const TEST_DIRS = new Set(["__tests__", "test", "tests"]);
+
+async function removeImporterTests(absDir: string): Promise<void> {
+  const entries = await fsp.readdir(absDir, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    const child = path.join(absDir, entry.name);
+    if (entry.isDirectory()) {
+      if (TEST_DIRS.has(entry.name)) {
+        await fs.remove(child);
+        continue;
+      }
+      await removeImporterTests(child);
+      continue;
+    }
+    if (entry.isFile() && TEST_FILE_RE.test(entry.name)) {
+      await fs.remove(child);
+    }
+  }
+}
 
 test("node lib: nix_node_test target passes when no tests present", async () => {
   await runInTemp("node-lib-nix-node-test", async (tmp, _$) => {
@@ -18,8 +40,8 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
 
     // Keep devDependencies; update-pnpm-hash will align lockfile/FOD
 
-    // Remove any sample tests so the runner passes with no matches
-    await fs.remove(path.join(tmp, "projects", "libs", "demo", "test"));
+    // Remove any scaffolded sample tests so the runner truly exercises the no-tests path.
+    await removeImporterTests(path.join(tmp, "projects", "libs", "demo"));
 
     // Commit scaffold and lockfile so Nix flake sees importer under git+file sources
     await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
