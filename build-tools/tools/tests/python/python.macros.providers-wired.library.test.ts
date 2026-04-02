@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("python macros: provider wiring present in deps() for nix_python_library", async () => {
   await runInTemp("py-macros-providers-wired-lib", async (tmp, $) => {
@@ -49,7 +49,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir py_prov_lib cquery "deps(//projects/apps/demo:lib)" --json --output-attribute name`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("py_prov_lib")} cquery "deps(//projects/apps/demo:lib)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     const out = String(probe.stdout || "");

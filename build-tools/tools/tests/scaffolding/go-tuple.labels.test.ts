@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
 import { buckCommandEnv, isBuckDaemonInitTransient } from "../../lib/buck-command-env.ts";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("nix_go_library stamps gotags and goenv tuple labels deterministically", async () => {
   await runInTemp("go-tuple-labels", async (tmp, $) => {
@@ -27,7 +27,7 @@ EOF'`;
         reject: false,
         nothrow: true,
         env: buckCommandEnv(),
-      })`buck2 --isolation-dir go_tuple_labels cquery --target-platforms //:no_cgo --json --output-attribute labels //tmp:lib`;
+      })`buck2 --isolation-dir ${inheritedBuckIsolation("go_tuple_labels")} cquery --target-platforms //:no_cgo --json --output-attribute labels //tmp:lib`;
     let probe = await runProbe();
     if (probe.exitCode !== 0) {
       const msg = String(probe.stderr || probe.stdout || "");

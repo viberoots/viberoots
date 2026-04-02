@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("python macros: provider wiring present in deps() for wasm app", async () => {
   await runInTemp("py-macros-providers-wired", async (tmp, $) => {
@@ -62,7 +62,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir py_prov cquery "deps(//projects/apps/demo:wasm_app)" --json --output-attribute name`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("py_prov")} cquery "deps(//projects/apps/demo:wasm_app)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
     const out = String(probe.stdout || "");
     if (!out.includes("//third_party/providers:prov")) {

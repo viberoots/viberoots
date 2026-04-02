@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("nix_go_library stamps cgo:enabled and nixpkg:pkgs.openssl when nixpkg_deps set", async () => {
   await runInTemp("go-cgo-openssl-labels", async (tmp, $) => {
@@ -21,7 +21,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cgo_openssl_labels cquery --target-platforms //:no_cgo --json --output-attribute labels //tmp:lib`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cgo_openssl_labels")} cquery --target-platforms //:no_cgo --json --output-attribute labels //tmp:lib`;
     if (probe.exitCode !== 0) {
       console.error(String(probe.stderr || probe.stdout || ""));
       process.exit(2);

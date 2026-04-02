@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("repo_cgo_deps wires local cpp lib and runs", async () => {
   await runInTemp("go-cgo-repo-lib", async (tmp, $) => {
@@ -33,7 +33,7 @@ test("repo_cgo_deps wires local cpp lib and runs", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cgo_repo_lib cquery "deps(//projects/apps/demo-cli:demo)" --json --output-attribute name`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cgo_repo_lib")} cquery "deps(//projects/apps/demo-cli:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) {
       // Skip on environments without prelude
       return;

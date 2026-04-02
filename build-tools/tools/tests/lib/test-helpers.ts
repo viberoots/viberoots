@@ -11,3 +11,10 @@ export {
   exportGraphInTemp,
   runBuildSelected,
 } from "./test-helpers/selected-build";
+
+export function inheritedBuckIsolation(
+  defaultIsolation: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  return String(env.BUCK_ISOLATION_DIR || env.BUCK_NESTED_ISO || defaultIsolation).trim();
+}

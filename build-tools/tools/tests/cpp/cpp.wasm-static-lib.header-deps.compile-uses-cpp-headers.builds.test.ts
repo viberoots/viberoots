@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import fs from "fs-extra";
 import path from "node:path";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("cpp wasm static lib compiles with header_deps via nix_cpp_headers (build)", async () => {
   await runInTemp("cpp-wasm-static-lib-header-deps-builds", async (tmp, $) => {
@@ -63,7 +63,7 @@ test("cpp wasm static lib compiles with header_deps via nix_cpp_headers (build)"
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_wasm_hdr_deps cquery "deps(//projects/libs/core:core_wasm)" --json --output-attribute name`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_wasm_hdr_deps")} cquery "deps(//projects/libs/core:core_wasm)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({

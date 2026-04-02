@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("python macros: nix_python_wasm_* targets use Nix-backed rules", async () => {
   await runInTemp("python-wasm-nix-build-rule-types", async (tmp, $) => {
@@ -30,7 +30,7 @@ test("python macros: nix_python_wasm_* targets use Nix-backed rules", async () =
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir python_wasm_nix_build_rule_types cquery "kind(python_nix_wasm_build, //projects/apps/pywasm:pywasm_lib)"`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("python_wasm_nix_build_rule_types")} cquery "kind(python_nix_wasm_build, //projects/apps/pywasm:pywasm_lib)"`;
     assert.ok(String(libProbe.stdout || "").includes("//projects/apps/pywasm:pywasm_lib"));
 
     const appProbe = await $({
@@ -38,7 +38,7 @@ test("python macros: nix_python_wasm_* targets use Nix-backed rules", async () =
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir python_wasm_nix_build_rule_types cquery "kind(python_nix_wasm_build, //projects/apps/pywasm:pywasm_app)"`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("python_wasm_nix_build_rule_types")} cquery "kind(python_nix_wasm_build, //projects/apps/pywasm:pywasm_app)"`;
     assert.ok(String(appProbe.stdout || "").includes("//projects/apps/pywasm:pywasm_app"));
 
     const libBuck = await $({
@@ -46,7 +46,7 @@ test("python macros: nix_python_wasm_* targets use Nix-backed rules", async () =
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir python_wasm_nix_build_rule_types cquery "kind(python_library, //projects/apps/pywasm:pywasm_lib)"`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("python_wasm_nix_build_rule_types")} cquery "kind(python_library, //projects/apps/pywasm:pywasm_lib)"`;
     assert.equal(String(libBuck.stdout || "").trim(), "");
 
     const appBuck = await $({
@@ -54,7 +54,7 @@ test("python macros: nix_python_wasm_* targets use Nix-backed rules", async () =
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir python_wasm_nix_build_rule_types cquery "kind(python_library, //projects/apps/pywasm:pywasm_app)"`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("python_wasm_nix_build_rule_types")} cquery "kind(python_library, //projects/apps/pywasm:pywasm_app)"`;
     assert.equal(String(appBuck.stdout || "").trim(), "");
   });
 });

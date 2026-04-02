@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { sanitizeName } from "../../lib/sanitize";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 function extractBuildLogLine(buildLog: string, key: string): string {
   const prefix = `${key}=`;
@@ -136,7 +136,7 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_link_closure_overrides cquery "deps(//projects/apps/demo:demo)" --json --output-attribute name`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_link_closure_overrides")} cquery "deps(//projects/apps/demo:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({

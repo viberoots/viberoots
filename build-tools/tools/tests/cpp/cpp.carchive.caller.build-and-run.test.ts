@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 // This test scaffolds a minimal Go c-archive and a C++ caller in a temp repo,
 // exports the graph, and builds the selected target via graph-generator-selected.
@@ -77,7 +77,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_carchive cquery "deps(//projects/apps/caller:caller)" --json --output-attribute name`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_carchive")} cquery "deps(//projects/apps/caller:caller)" --json --output-attribute name`;
     if (probe.exitCode !== 0) {
       // Skip if prelude/toolchain not available in the environment
       return;

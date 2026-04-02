@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("nixpkg_deps wires provider dep for openssl", async () => {
   await runInTemp("go-cgo-openssl-wiring", async (tmp, $) => {
@@ -52,7 +52,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cgo_openssl cquery "deps(//projects/apps/demo-cli:demo)" --json --output-attribute name`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cgo_openssl")} cquery "deps(//projects/apps/demo-cli:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
     const raw = String(probe.stdout || "").trim();
     if (!raw) return; // skip if no JSON produced (empty graph/older buck)

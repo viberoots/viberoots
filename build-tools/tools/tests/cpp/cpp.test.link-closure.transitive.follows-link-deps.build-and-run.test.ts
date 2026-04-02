@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import fs from "fs-extra";
 import path from "node:path";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("nix_cpp_test follows transitive link_deps with link_closure=transitive", async () => {
   await runInTemp("cpp-test-link-closure-transitive", async (tmp, $) => {
@@ -116,12 +116,14 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_test_link_closure cquery "deps(//projects/apps/demo:t)" --json --output-attribute name`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_test_link_closure")} cquery "deps(//projects/apps/demo:t)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({
       cwd: tmp,
     })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
-    await $({ cwd: tmp })`buck2 --isolation-dir cpp_test_link_closure test //projects/apps/demo:t`;
+    await $({
+      cwd: tmp,
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_test_link_closure")} test //projects/apps/demo:t`;
   });
 });

@@ -5,7 +5,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { readGraph } from "../../lib/graph";
 import { normalizeTargetLabel } from "../../lib/labels.ts";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 function normalizeLabelList(xs: unknown): string[] {
   const raw = Array.isArray(xs) ? (xs as unknown[]) : [];
@@ -95,7 +95,7 @@ test("cpp wasm static lib preserves link intent attrs in build-tools/tools/buck/
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_wasm_link_intent cquery "deps(//projects/libs/core:core_wasm)" --json --output-attribute name`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_wasm_link_intent")} cquery "deps(//projects/libs/core:core_wasm)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({

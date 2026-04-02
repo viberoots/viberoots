@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("python macros: wasm app/lib parse and stamp labels", async () => {
   await runInTemp("py-macros-parse-stamp", async (tmp, $) => {
@@ -45,7 +45,7 @@ test("python macros: wasm app/lib parse and stamp labels", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir py_macros cquery --json --output-attribute labels //projects/apps/demo:wasm_app`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("py_macros")} cquery --json --output-attribute labels //projects/apps/demo:wasm_app`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
     const parsed = JSON.parse(String(probe.stdout || "")) as unknown;
     const values = Array.isArray(parsed)

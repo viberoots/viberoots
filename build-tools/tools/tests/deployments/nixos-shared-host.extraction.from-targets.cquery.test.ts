@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { nodesFromCqueryJson } from "../../buck/exporter/cquery/nodes.ts";
 import { extractNixosSharedHostDeployments } from "../../deployments/contract.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers.ts";
 
 const ATTRS = [
   "name",
@@ -71,7 +71,7 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
         HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
         SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
       },
-    })`buck2 --isolation-dir deployment-cquery cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-cquery")} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
     const merged = JSON.parse(String(cquery.stdout || "")) as Record<string, any>;
     const { deployments, errors } = extractNixosSharedHostDeployments(nodesFromCqueryJson(merged));
     assert.deepEqual(errors, []);

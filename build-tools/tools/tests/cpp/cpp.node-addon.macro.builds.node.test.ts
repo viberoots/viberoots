@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("nix_cpp_node_addon builds a .node artifact via Buck/Nix", async () => {
   await runInTemp("cpp-node-addon-macro", async (tmp, _$) => {
@@ -40,7 +40,7 @@ nix_cpp_node_addon(
 EOF'`;
 
     // Build once via buck to exercise the rule wrapper
-    await $`buck2 --isolation-dir cpp_addon_macro build //projects/libs/demo-native:napi_addon`;
+    await $`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_addon_macro")} build //projects/libs/demo-native:napi_addon`;
 
     // Assert the .node artifact exists under buck-out (sanitized name from sanitizer)
     const probe = await $({

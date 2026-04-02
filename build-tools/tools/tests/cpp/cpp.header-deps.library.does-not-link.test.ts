@@ -4,7 +4,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { sanitizeName } from "../../lib/sanitize";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 function parseOutPath(stdout: unknown): string {
   return String(stdout || "")
@@ -95,7 +95,7 @@ test("cpp: header_deps on a library does not add link inputs", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_header_deps_lib_nolink cquery "deps(//projects/apps/demo:demo)" --json --output-attribute name`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_header_deps_lib_nolink")} cquery "deps(//projects/apps/demo:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({

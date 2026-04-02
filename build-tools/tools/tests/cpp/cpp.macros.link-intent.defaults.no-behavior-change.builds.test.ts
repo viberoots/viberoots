@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("nix_cpp_binary: defaults build unchanged when no link intent attrs are provided", async () => {
   await runInTemp("cpp-macros-link-intent-defaults-build", async (tmp, $) => {
@@ -31,7 +31,7 @@ test("nix_cpp_binary: defaults build unchanged when no link intent attrs are pro
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_link_intent_defaults cquery "deps(//projects/apps/link_intent_defaults:demo)" --json --output-attribute name`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_link_intent_defaults")} cquery "deps(//projects/apps/link_intent_defaults:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return; // skip when Buck/prelude/toolchains unavailable
 
     await $({

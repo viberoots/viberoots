@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("cpp: header_deps on a library still compiles with header-only usage", async () => {
   await runInTemp("cpp-header-deps-library-compiles", async (tmp, $) => {
@@ -68,7 +68,7 @@ test("cpp: header_deps on a library still compiles with header-only usage", asyn
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_header_deps_lib_compiles cquery "deps(//projects/apps/demo:demo)" --json --output-attribute name`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_header_deps_lib_compiles")} cquery "deps(//projects/apps/demo:demo)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({

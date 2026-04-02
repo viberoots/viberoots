@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import fs from "fs-extra";
 import path from "node:path";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 function parseOutPath(stdout: unknown): string {
   return String(stdout || "")
@@ -95,7 +95,7 @@ test("cpp Node-API addon links a shared C++ lib via link_deps (build + load)", a
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir cpp_addon_shared cquery "deps(//projects/libs/addon-native:addon)" --json --output-attribute name`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_addon_shared")} cquery "deps(//projects/libs/addon-native:addon)" --json --output-attribute name`;
     if (probe.exitCode !== 0) return;
 
     await $({

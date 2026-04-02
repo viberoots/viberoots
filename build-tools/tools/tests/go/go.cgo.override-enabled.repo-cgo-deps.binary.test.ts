@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 function firstCqueryNode<T>(json: unknown): T | null {
   if (Array.isArray(json)) return (json[0] as T) ?? null;
@@ -49,7 +49,7 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir go_cgo_override_repo_bin cquery --target-platforms //:no_cgo --json --output-attribute override_cgo_enabled --output-attribute labels //tmp:demo`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("go_cgo_override_repo_bin")} cquery --target-platforms //:no_cgo --json --output-attribute override_cgo_enabled --output-attribute labels //tmp:demo`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
 
     const node = firstCqueryNode<{

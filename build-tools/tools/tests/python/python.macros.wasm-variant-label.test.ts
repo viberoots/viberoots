@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("python macros: nix_python_wasm_* stamp wasm:wasi variant", async () => {
   await runInTemp("py-wasm-variant", async (tmp, $) => {
@@ -41,7 +41,7 @@ test("python macros: nix_python_wasm_* stamp wasm:wasi variant", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir py_wasm_variant cquery --json --output-attribute labels //projects/apps/demo:wasm_lib`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("py_wasm_variant")} cquery --json --output-attribute labels //projects/apps/demo:wasm_lib`;
     if (probe.exitCode !== 0) return;
     const parsed = JSON.parse(String(probe.stdout || "")) as unknown;
     const values = Array.isArray(parsed)
