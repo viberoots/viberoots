@@ -4,6 +4,7 @@
  * Best-effort cleanup of ephemeral Buck/Nix temp artifacts to avoid GC roots/bloat.
  *
  * - Removes buck-out/tmp/buck-impure-* directories older than N minutes (default 30).
+ * - Removes dead one-shot buck-out/devbuild-* isolation directories immediately.
  * - Removes buck-out/tmp/node-v8-coverage/v-* directories older than N minutes (default 30).
  * - Removes buck-out/tmp/verify-logs/verify-* log files older than N minutes (default 30).
  * - Optionally removes a repo-root "result" symlink if present and dangling.
@@ -12,6 +13,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { getFlagStr } from "../lib/cli.ts";
+import { shouldRemoveDeadDevBuildIsolationDir } from "./clean-temp-outs-lib.ts";
 
 type Args = { minutes?: string };
 
@@ -32,6 +34,16 @@ async function rmRf(p: string): Promise<void> {
   try {
     await fsp.rm(p, { recursive: true, force: true });
   } catch {}
+}
+
+function isPidAlive(pid: number): boolean {
+  if (!Number.isFinite(pid) || pid <= 1) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function main() {
@@ -56,6 +68,21 @@ async function main() {
     if (mtime > 0 && mtime < cutoffMs) {
       await rmRf(p);
     }
+  }
+
+  // 1.5) Remove dead one-shot dev-build isolation dirs under buck-out.
+  // These are per-run scratch Buck state directories and can explode Linux watcher counts
+  // if they accumulate between runs.
+  const buckOutDir = path.join(repoRoot, "buck-out");
+  let buckOutNames: string[] = [];
+  try {
+    buckOutNames = await fsp.readdir(buckOutDir);
+  } catch {
+    buckOutNames = [];
+  }
+  for (const name of buckOutNames) {
+    if (!shouldRemoveDeadDevBuildIsolationDir(name, isPidAlive)) continue;
+    await rmRf(path.join(buckOutDir, name));
   }
 
   // 2) Remove stale per-verify raw coverage dirs under buck-out/tmp/node-v8-coverage
