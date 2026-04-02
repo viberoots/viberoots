@@ -8,7 +8,6 @@ import { ensureBuckPreludeConfig } from "../dev-build/prelude.ts";
 import { runStartupCheck } from "../dev-build/startup.ts";
 import { parseVerifyArgs } from "./args.ts";
 import { cleanupOrphanBuckDaemons, cleanupRegisteredTempRepos } from "./buck-orphan-cleanup.ts";
-import { spawnVerifyBuck2Tests } from "./buck2-test.ts";
 import { runMergedCoverageReport, setupCoverage } from "./coverage.ts";
 import {
   enforceVerifyDiskGate,
@@ -31,11 +30,11 @@ import {
   startBuckWatchdog,
   writeVerifyIsoMarker,
 } from "./process-control.ts";
-import { startVerifySafetyRails } from "./safety-rails.ts";
 import { prepareVerifySeed, shouldPrepareVerifySeedForRequestedTargets } from "./seed.ts";
 import { isProjectsOnlyVerifyTargets } from "./target-scope.ts";
 import { summarizeTemplateScopeDecision } from "./template-test-scope.ts";
 import { ensureRepoLocalTmpRoot } from "./tmp-root.ts";
+import { runVerifyBuckPasses } from "./verify-passes.ts";
 import { computeZxTestNodeModulesOut } from "./zx-node-modules.ts";
 
 export async function runVerify(): Promise<void> {
@@ -190,30 +189,19 @@ export async function runVerify(): Promise<void> {
     } catch {}
   }
   const zxNodeModulesOut = await computeZxTestNodeModulesOut(root, zxInitPath);
-  const spawned = spawnVerifyBuck2Tests({
+  const status = await runVerifyBuckPasses({
     root,
     iso,
     logFile: lock.logFile,
     console: args.console,
     targets: templateScope.targets,
     zxNodeModulesOut,
-  });
-  pgid = spawned.pgid;
-  const rails = await startVerifySafetyRails({
-    root,
     analysisDir,
-    processGroupIdToKill: pgid,
-    onTrigger: async (reason) =>
-      appendVerifyLogLine(
-        lock.logFile,
-        reason.startsWith("[notice] ")
-          ? `[verify] safety-rails notice: ${reason.slice(9)}`
-          : `[verify] safety-rails stop: ${reason}`,
-      ),
+    onPgid: (nextPgid) => {
+      pgid = nextPgid;
+    },
   });
-  const status = await spawned.wait();
   if (shutdownPromise) await shutdownPromise;
-  rails.stop();
   try {
     const res = await cleanupRegisteredTempRepos({
       stateFile,

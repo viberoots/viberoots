@@ -38,6 +38,8 @@ export function spawnVerifyBuck2Tests(opts: {
   console: "auto" | "super" | "simple";
   targets: string[];
   zxNodeModulesOut: string;
+  threadsOverride?: number;
+  passName?: string;
 }): SpawnedVerifyTests {
   const minPerTestTimeoutSecs = 20 * 60;
   const tsecRaw = Number((process.env.VERIFY_TIMEOUT_SECS || "7200").trim());
@@ -106,7 +108,8 @@ export function spawnVerifyBuck2Tests(opts: {
     testEnvArgs.push("--env", `NODE_V8_COVERAGE=${process.env.NODE_V8_COVERAGE}`);
   }
 
-  const threads = verifyBuck2Threads();
+  const threads = opts.threadsOverride ?? verifyBuck2Threads();
+  const passName = String(opts.passName || "shared");
   const buckArgs = [
     "--isolation-dir",
     opts.iso,
@@ -161,7 +164,7 @@ export function spawnVerifyBuck2Tests(opts: {
   if (opts.logFile) {
     void fsp.appendFile(
       opts.logFile,
-      `[verify] buck2 test begin iso=${opts.iso} start_s=${startS} threads=${threads > 0 ? threads : "default"}\n`,
+      `[verify] buck2 test begin iso=${opts.iso} pass=${passName} start_s=${startS} threads=${threads > 0 ? threads : "default"}\n`,
       "utf8",
     );
   }
@@ -214,13 +217,13 @@ export function spawnVerifyBuck2Tests(opts: {
       await fsp
         .appendFile(
           opts.logFile,
-          `[verify] buck2 test exit iso=${opts.iso} status=${exitCode} end_s=${endS}\n`,
+          `[verify] buck2 test exit iso=${opts.iso} pass=${passName} status=${exitCode} end_s=${endS}\n`,
           "utf8",
         )
         .catch(() => {});
     }
     if (opts.logFile && slowest.length > 0) {
-      const header = `[verify] slowest targets (top ${Math.min(SLOWEST_MAX, slowest.length)}):`;
+      const header = `[verify] slowest targets pass=${passName} (top ${Math.min(SLOWEST_MAX, slowest.length)}):`;
       const lines = slowest.map((c) => {
         const secs = c.durationSec.toFixed(1);
         return `[verify] slow ${secs}s ${c.status} ${c.target} (${c.rawDuration})`;
