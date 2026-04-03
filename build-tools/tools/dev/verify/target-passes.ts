@@ -183,3 +183,13 @@ export function resolveVerifyTargetPlan(opts: {
     passes: planVerifyTargetPasses(targetLabels),
   };
 }
+
+export function assertVerifyTargetPlanNotEmpty(opts: {
+  requestedTargets: string[];
+  plan: VerifyTargetPlan;
+}): void {
+  if (opts.requestedTargets.length === 0 || opts.plan.targetLabels.length > 0) return;
+  throw new Error(
+    `verify resolved zero concrete Buck test targets from selectors: ${opts.requestedTargets.join(" ")}`,
+  );
+}

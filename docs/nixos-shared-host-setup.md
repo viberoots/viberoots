@@ -345,11 +345,11 @@ Override with `--output-root` when needed.
 
 Current limitation:
 
-- the client installer records connection and path metadata only
-- `build-tools/tools/bin/deploy` now consumes `--profile` for non-mutating
-  `--plan` / `--dry-run` only
-- it does not yet perform SSH transport, remote artifact copy, or remote
-  `nixos-rebuild switch` on your behalf
+- the client installer records the reviewed remote target contract only
+- `build-tools/tools/bin/deploy --profile <name>` now performs reviewed SSH
+  transport and remote artifact staging for the current direct deploy flow
+- it still does not perform remote host apply or `nixos-rebuild switch` on
+  your behalf
 
 Client lifecycle commands:
 
@@ -424,7 +424,13 @@ Transport contract in this interim slice:
 
 - the only reviewed transport mode is `ssh`
 - unsupported transport values fail closed
-- `--profile` mode is still non-mutating in this PR
+- `--profile` mode stages a local artifact onto the reviewed remote host and
+  then runs the existing deploy wrapper from the remote repo checkout
+- staged artifacts land under:
+  - `<remoteRuntimeRoot>/.deploy-artifacts/<deployment>/<run-id>`
+- staged artifacts are removed by default after the remote deploy returns
+- pass `--retain-remote-artifact` to keep the staged remote artifact for
+  debugging
 - this is still an interim direct-mutation operator aid, not the later
   shared-control-plane submission model
 
@@ -496,81 +502,43 @@ sudo nixos-rebuild switch
 
 Current workable pattern:
 
-- Jenkins must run the deploy on `mini` itself, or SSH into `mini` and run the
-  deploy there
+- Jenkins can now run the reviewed remote wrapper from another machine
 - the current deploy tool mutates local paths and does not have built-in remote
-  transport
+  host apply
 - `mini` must already be installed as a managed `nixos-shared-host`
 - `mini` must already have a repo checkout that Jenkins can update or use
+- Jenkins still owns any later host-apply step
 
 Why this shape is required today:
 
-- `build-tools/tools/bin/deploy` expects local filesystem paths such as
-  `--host-root`, `--state`, and `--records-root`
-- if Jenkins builds artifacts elsewhere, it must still copy them to `mini` and
-  then invoke deploy on `mini` with a path that exists on `mini`
-- there is not yet a Jenkins-native wrapper, shared-control-plane submission
-  path, or built-in remote executor beyond non-mutating
-  `deploy --profile mini --plan`
-
-If Jenkins can SSH to `mini`, the simplest current pattern is:
-
-```bash
-ssh mini '
-  set -euo pipefail
-  cd /srv/common
-  direnv exec . build-tools/tools/bin/deploy \
-    --deployment //projects/deployments/pleomino-dev:deploy \
-    --host-root /var/lib/bucknix/nixos-shared-host/runtime \
-    --state /var/lib/bucknix/nixos-shared-host/platform-state.json \
-    --records-root /var/lib/bucknix/nixos-shared-host/records
-  sudo nixos-rebuild switch
-'
-```
-
-If Jenkins wants to build the artifact before the deploy step, the current
-manual variant is:
-
-1. Build the Pleomino artifact in Jenkins.
-2. Copy the artifact directory to `mini`.
-3. Run deploy on `mini` with `--artifact-dir <path-on-mini>`.
-4. Run `sudo nixos-rebuild switch` on `mini`.
+- `build-tools/tools/bin/deploy --profile <name>` now owns the reviewed SSH
+  transport and exact-artifact staging path
+- there is not yet a Jenkins-native pipeline wrapper, shared-control-plane
+  submission path, or automatic host apply step
 
 Example shape:
 
 ```bash
-rsync -az ./dist/ mini:/tmp/pleomino-dist/
-ssh mini '
-  set -euo pipefail
-  cd /srv/common
-  direnv exec . build-tools/tools/bin/deploy \
-    --deployment //projects/deployments/pleomino-dev:deploy \
-    --artifact-dir /tmp/pleomino-dist \
-    --host-root /var/lib/bucknix/nixos-shared-host/runtime \
-    --state /var/lib/bucknix/nixos-shared-host/platform-state.json \
-    --records-root /var/lib/bucknix/nixos-shared-host/records
-  sudo nixos-rebuild switch
-'
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --artifact-dir ./dist
 ```
 
 Not yet implemented, but required for a finished Jenkins flow:
 
 - a reviewed Jenkins pipeline or wrapper that owns the SSH/transport step
-- a built-in remote deploy path instead of "run deploy on `mini`"
 - first-class consumption of client/profile metadata from CI
 - shared-control-plane submission, locking, and admission for shared deploys
 - immutable artifact replay/promotion support beyond the current direct deploy
   path
 
-## Deploying Pleomino From Your Dev Machine Via A Finished Remote Flow
+## Deploying Pleomino From Your Dev Machine Via The Reviewed Remote Flow
 
-The fully finished remote flow is not implemented yet.
-
-Today, the client installer records reviewed connection metadata for a real
-`nixos-shared-host`, and the deploy tool consumes that metadata for
-non-mutating `--plan` / `--dry-run` output. Actual remote execution is still
-manual, so "remote deploy from my dev machine" still means "SSH to `mini` and
-run the deploy on `mini`."
+The reviewed remote flow now stages a local artifact to the target host over
+SSH and then runs the existing deploy wrapper from the remote repo checkout.
+This keeps the mutation model narrow: the remote layer transports the artifact
+and invokes the same deploy implementation the host would run locally.
 
 Reviewed preflight plan:
 
@@ -586,10 +554,10 @@ Current workable operator flow:
 1. Install the server side on `mini`.
 2. Optionally record a local client profile with `client install`.
 3. Optionally render `deploy --profile mini --plan` to confirm the reviewed
-   remote repo/state/runtime/records contract before transport.
-4. SSH to `mini`.
-5. Run `build-tools/tools/bin/deploy` from the repo checkout on `mini`.
-6. Run `sudo nixos-rebuild switch` on `mini`.
+   remote repo/state/runtime/records/staging contract before execution.
+4. Run the reviewed remote deploy wrapper from your machine.
+5. If you want the host config applied too, run that as a separate explicit
+   step on `mini`.
 
 Example:
 
@@ -604,32 +572,33 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --remote-records-root /var/lib/bucknix/nixos-shared-host/records \
   --ssh-mode ssh
 
-ssh mini '
-  set -euo pipefail
-  cd /srv/common
-  direnv exec . build-tools/tools/bin/deploy \
-    --deployment //projects/deployments/pleomino-dev:deploy \
-    --host-root /var/lib/bucknix/nixos-shared-host/runtime \
-    --state /var/lib/bucknix/nixos-shared-host/platform-state.json \
-    --records-root /var/lib/bucknix/nixos-shared-host/records
-  sudo nixos-rebuild switch
-'
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --artifact-dir ./dist
 ```
 
-If you want to build locally and deploy that exact artifact, you still need a
-manual copy step today:
+If you want to keep the staged remote artifact for inspection, add:
 
-1. Build Pleomino locally.
-2. Copy the built artifact to `mini`.
-3. SSH to `mini` and run deploy with `--artifact-dir <path-on-mini>`.
-4. Run `sudo nixos-rebuild switch` on `mini`.
+```bash
+--retain-remote-artifact
+```
+
+The remote summary reports:
+
+- the reviewed remote repo/state/runtime/records roots
+- the exact staged remote artifact path
+- whether the stage was removed or retained
+- the remote deploy result JSON, including the remote record path
+
+This flow still does not do:
+
+- remote `nixos-rebuild switch`
+- shared-control-plane submission or locking
+- remote repo checkout management
 
 Not yet implemented, but required for a finished dev-machine remote flow:
 
-- transport execution behind `build-tools/tools/bin/deploy --profile mini`
-  instead of plan-only output
-- built-in SSH execution or another reviewed transport layer
-- remote artifact staging that uses the installed client profile automatically
 - remote `nixos-rebuild switch` orchestration or a reviewed apply wrapper
 - a shared-control-plane path instead of direct host mutation from the operator
   path

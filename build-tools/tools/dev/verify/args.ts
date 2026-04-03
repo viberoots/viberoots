@@ -1,4 +1,5 @@
 import path from "node:path";
+import * as fsp from "node:fs/promises";
 import { getArgvTokens } from "../../lib/cli.ts";
 import { normalizeDevBuildTargetArgs } from "../dev-build/target-args.ts";
 
@@ -13,6 +14,9 @@ export type VerifyArgs = {
   requestedProjects: string[];
   explainSelection: boolean;
 };
+
+const ROOT_ZX_TEST_PREFIX = "build-tools/tools/tests/";
+const ROOT_ZX_TEST_EXTRA_FILES = new Set(["build-tools/tools/tests/e2e-provider-wiring.ts"]);
 
 function parseProjectsCsv(raw: string): string[] {
   return String(raw || "")
@@ -145,9 +149,19 @@ export async function normalizeVerifyTargets(opts: {
     subcmd: "test",
     args: opts.targets,
   });
-  return normalized.map((t, i) => {
+  const out: string[] = [];
+  for (const [i, t] of normalized.entries()) {
     const original = String(opts.targets[i] || "").trim();
     const normalizedTarget = String(t || "").trim();
+    const rootZxLabel = await resolveRootZxTestLabel({
+      workspaceRoot: opts.workspaceRoot,
+      baseDir: opts.baseDir,
+      original,
+    });
+    if (rootZxLabel) {
+      out.push(rootZxLabel);
+      continue;
+    }
     const isExplicitBuckLabel =
       original.startsWith("//") || original.startsWith("root//") || original.startsWith(":");
     const looksPathLike =
@@ -158,16 +172,66 @@ export async function normalizeVerifyTargets(opts: {
         original.startsWith("../") ||
         original.startsWith("/") ||
         original.includes("/"));
-    if (!looksPathLike) return normalizedTarget;
+    if (!looksPathLike) {
+      out.push(normalizedTarget);
+      continue;
+    }
     if (normalizedTarget === "." && (original === "." || original === "./")) {
       const baseAbs = path.resolve(opts.baseDir);
       const rootAbs = path.resolve(opts.workspaceRoot);
-      if (baseAbs === rootAbs) return "//...";
+      if (baseAbs === rootAbs) {
+        out.push("//...");
+        continue;
+      }
     }
-    if (!normalizedTarget.startsWith("//")) return normalizedTarget;
-    if (normalizedTarget.includes("...")) return normalizedTarget;
+    if (!normalizedTarget.startsWith("//")) {
+      out.push(normalizedTarget);
+      continue;
+    }
+    if (normalizedTarget.includes("...")) {
+      out.push(normalizedTarget);
+      continue;
+    }
     const pkg = normalizedTarget.split(":")[0];
-    if (!pkg || !pkg.startsWith("//")) return normalizedTarget;
-    return `${pkg}/...`;
-  });
+    if (!pkg || !pkg.startsWith("//")) {
+      out.push(normalizedTarget);
+      continue;
+    }
+    out.push(`${pkg}/...`);
+  }
+  return out;
+}
+
+async function resolveRootZxTestLabel(opts: {
+  workspaceRoot: string;
+  baseDir: string;
+  original: string;
+}): Promise<string | null> {
+  const raw = String(opts.original || "").trim();
+  if (!raw || raw.startsWith("//") || raw.startsWith("root//") || raw.startsWith(":")) {
+    return null;
+  }
+  const absPath = path.isAbsolute(raw)
+    ? path.resolve(raw)
+    : path.resolve(String(opts.baseDir || opts.workspaceRoot), raw);
+  const relPath = path.relative(path.resolve(opts.workspaceRoot), absPath);
+  if (!relPath || relPath.startsWith("..") || path.isAbsolute(relPath)) {
+    return null;
+  }
+  let stat;
+  try {
+    stat = await fsp.stat(absPath);
+  } catch {
+    return null;
+  }
+  if (!stat.isFile()) return null;
+  const relPosix = relPath.replace(/\\/g, "/");
+  const isRootZxTest =
+    relPosix.startsWith(ROOT_ZX_TEST_PREFIX) &&
+    (relPosix.endsWith(".test.ts") || ROOT_ZX_TEST_EXTRA_FILES.has(relPosix));
+  if (!isRootZxTest) return null;
+  let name = relPosix.slice(ROOT_ZX_TEST_PREFIX.length);
+  if (name.endsWith(".ts")) name = name.slice(0, -3);
+  if (name.endsWith(".test")) name = name.slice(0, -5);
+  return `//:${name.replace(/[/.-]/g, "_")}`;
 }

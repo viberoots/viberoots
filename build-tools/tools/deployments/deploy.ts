@@ -1,14 +1,14 @@
 #!/usr/bin/env zx-wrapper
 import * as fs from "node:fs/promises";
 import path from "node:path";
-import { ensureGraph } from "../buck/glue-run.ts";
+import { nodesFromCqueryJson } from "../buck/exporter/cquery/nodes.ts";
 import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
 import { resolveSelectedTargetLabel } from "../dev/target-label-resolver.ts";
 import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
-import { readCompositeGraph } from "../lib/graph-view.ts";
+import { normalizeTargetLabel } from "../lib/labels.ts";
 import { findRepoRoot } from "../lib/repo.ts";
 import { extractNixosSharedHostDeployments, type NixosSharedHostDeployment } from "./contract.ts";
-import { createNixosSharedHostRemotePlan } from "./nixos-shared-host-remote-target.ts";
+import { maybeRunNixosSharedHostRemoteProfile } from "./nixos-shared-host-remote-cli.ts";
 import { runNixosSharedHostExplicitRemoval } from "./nixos-shared-host-explicit-removal.ts";
 import { runNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy.ts";
 
@@ -16,6 +16,75 @@ function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();
   if (!value) throw new Error(`missing required --${name}`);
   return value;
+}
+
+const DEPLOYMENT_CQUERY_ATTRS = [
+  "name",
+  "rule_type",
+  "provider",
+  "component",
+  "component_kind",
+  "publisher",
+  "provisioner",
+  "protection_class",
+  "app_name",
+  "container_port",
+  "health_path",
+  "target_group",
+  "labels",
+];
+
+function deploymentBuckEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
+    SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
+  };
+}
+
+function deploymentIsolationArgs(): string[] {
+  if (process.env.BUCK_NO_ISOLATION === "1") return [];
+  const isolationDir = String(
+    process.env.BUCK_ISOLATION_DIR ||
+      process.env.BUCK_ISOLATION_DIR_EXPORTER ||
+      process.env.BUCK_NESTED_ISO ||
+      "",
+  ).trim();
+  return isolationDir ? ["--isolation-dir", isolationDir] : [];
+}
+
+async function queryDeploymentNodes(
+  workspaceRoot: string,
+  labels: string[],
+): Promise<ReturnType<typeof nodesFromCqueryJson>> {
+  const normalizedLabels = Array.from(new Set(labels.map((label) => normalizeTargetLabel(label))));
+  const attrFlags = DEPLOYMENT_CQUERY_ATTRS.flatMap((attr) => ["--output-attribute", attr]);
+  const query = `set(${normalizedLabels.join(" ")})`;
+  const { stdout } = await $({
+    cwd: workspaceRoot,
+    stdio: "pipe",
+    env: deploymentBuckEnv(),
+  })`buck2 ${deploymentIsolationArgs()} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
+  return nodesFromCqueryJson(JSON.parse(String(stdout || "{}")) as Record<string, any>);
+}
+
+async function resolveDeploymentFromTarget(
+  workspaceRoot: string,
+  deploymentTarget: string,
+): Promise<NixosSharedHostDeployment> {
+  const deploymentNodes = await queryDeploymentNodes(workspaceRoot, [deploymentTarget]);
+  const deploymentNode = deploymentNodes.find((node) => node.name === deploymentTarget);
+  if (!deploymentNode) throw new Error(`deployment target not found: ${deploymentTarget}`);
+  const componentTarget = normalizeTargetLabel(String((deploymentNode as any).component || ""));
+  const nodes =
+    componentTarget && componentTarget !== deploymentTarget
+      ? await queryDeploymentNodes(workspaceRoot, [deploymentTarget, componentTarget])
+      : deploymentNodes;
+  const extracted = extractNixosSharedHostDeployments(nodes);
+  if (extracted.errors.length > 0) throw new Error(extracted.errors.join("\n"));
+  const hit = extracted.deployments.find((deployment) => deployment.label === deploymentTarget);
+  if (!hit) throw new Error(`deployment target not found: ${deploymentTarget}`);
+  return hit;
 }
 
 async function readDeploymentFromJson(filePath: string): Promise<NixosSharedHostDeployment> {
@@ -33,7 +102,6 @@ async function readDeploymentFromJson(filePath: string): Promise<NixosSharedHost
 async function resolveDeployment(workspaceRoot: string): Promise<NixosSharedHostDeployment> {
   const deploymentJson = getFlagStr("deployment-json", "").trim();
   if (deploymentJson) return await readDeploymentFromJson(deploymentJson);
-  await ensureGraph();
   const deploymentTarget = await resolveSelectedTargetLabel(
     workspaceRoot,
     requireFlag("deployment"),
@@ -41,12 +109,7 @@ async function resolveDeployment(workspaceRoot: string): Promise<NixosSharedHost
       baseDir: process.cwd(),
     },
   );
-  const { nodes } = await readCompositeGraph({});
-  const extracted = extractNixosSharedHostDeployments(nodes);
-  if (extracted.errors.length > 0) throw new Error(extracted.errors.join("\n"));
-  const hit = extracted.deployments.find((deployment) => deployment.label === deploymentTarget);
-  if (!hit) throw new Error(`deployment target not found: ${deploymentTarget}`);
-  return hit;
+  return await resolveDeploymentFromTarget(workspaceRoot, deploymentTarget);
 }
 
 async function resolveArtifactDir(
@@ -66,96 +129,10 @@ function requireNamedFlagValue(name: string): string {
   return value;
 }
 
-function collectRemoteOverrides(): Partial<{
-  destination: string;
-  remoteRepoPath: string;
-  remoteStatePath: string;
-  remoteRuntimeRoot: string;
-  remoteRecordsRoot: string;
-  sshMode: string;
-}> {
-  return {
-    ...(hasFlag("destination") ? { destination: requireNamedFlagValue("destination") } : {}),
-    ...(hasFlag("remote-repo-path")
-      ? { remoteRepoPath: requireNamedFlagValue("remote-repo-path") }
-      : {}),
-    ...(hasFlag("remote-state-path")
-      ? { remoteStatePath: requireNamedFlagValue("remote-state-path") }
-      : {}),
-    ...(hasFlag("remote-runtime-root")
-      ? { remoteRuntimeRoot: requireNamedFlagValue("remote-runtime-root") }
-      : {}),
-    ...(hasFlag("remote-records-root")
-      ? { remoteRecordsRoot: requireNamedFlagValue("remote-records-root") }
-      : {}),
-    ...(hasFlag("ssh-mode") ? { sshMode: requireNamedFlagValue("ssh-mode") } : {}),
-  };
-}
-
-function collectProfileModeConflicts(): string[] {
-  const conflicts = [
-    "host-root",
-    "state",
-    "records-root",
-    "host-config-out",
-    "smoke-connect-host",
-    "smoke-connect-port",
-    "smoke-connect-protocol",
-  ].filter((flag) => hasFlag(flag));
-  if (hasFlag("remove")) conflicts.push("remove");
-  return conflicts.map((flag) => `--${flag}`);
-}
-
-async function maybeRunRemotePlan(
-  workspaceRoot: string,
-  deployment: NixosSharedHostDeployment,
-): Promise<boolean> {
-  const profileRequested = hasFlag("profile") || hasFlag("profile-root");
-  const profileName = hasFlag("profile") ? requireNamedFlagValue("profile") : "";
-  const planMode = getFlagBool("plan") || getFlagBool("dry-run");
-  const remoteOverrides = collectRemoteOverrides();
-  if (!profileName) {
-    if (profileRequested || Object.keys(remoteOverrides).length > 0) {
-      throw new Error("remote target selection requires --profile <name>");
-    }
-    if (planMode) throw new Error("--plan/--dry-run requires --profile <name>");
-    return false;
-  }
-  const conflicts = collectProfileModeConflicts();
-  if (conflicts.length > 0) {
-    throw new Error(
-      `--profile cannot be combined with local execution flags: ${conflicts.join(", ")}`,
-    );
-  }
-  if (!planMode) {
-    throw new Error(
-      "remote profile selection is plan-only in PR-4.6; rerun with --plan or --dry-run",
-    );
-  }
-  const profileRoot = hasFlag("profile-root")
-    ? path.resolve(requireNamedFlagValue("profile-root"))
-    : path.join(workspaceRoot, ".local", "deployments", "nixos-shared-host", "clients");
-  const artifactDir = hasFlag("artifact-dir") ? requireNamedFlagValue("artifact-dir") : undefined;
-  console.log(
-    JSON.stringify(
-      await createNixosSharedHostRemotePlan({
-        deployment,
-        profileName,
-        profileRoot,
-        overrides: remoteOverrides,
-        artifactDir,
-      }),
-      null,
-      2,
-    ),
-  );
-  return true;
-}
-
 async function main() {
   const workspaceRoot = await findRepoRoot(process.cwd());
   const deployment = await resolveDeployment(workspaceRoot);
-  if (await maybeRunRemotePlan(workspaceRoot, deployment)) return;
+  if (await maybeRunNixosSharedHostRemoteProfile({ workspaceRoot, deployment })) return;
   const remove = getFlagBool("remove");
   const hostRoot = path.resolve(
     getFlagStr("host-root", path.join(workspaceRoot, ".local", "deployments", "nixos-shared-host")),

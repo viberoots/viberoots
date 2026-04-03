@@ -2,7 +2,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { spawnVerifyBuck2Tests } from "./buck2-test.ts";
 import { startVerifySafetyRails } from "./safety-rails.ts";
-import { resolveVerifyTargetPlan, summarizeVerifyTargetPlan } from "./target-passes.ts";
+import {
+  assertVerifyTargetPlanNotEmpty,
+  resolveVerifyTargetPlan,
+  summarizeVerifyTargetPlan,
+} from "./target-passes.ts";
 
 async function appendVerifyPassLog(file: string | null, line: string): Promise<void> {
   if (!file) return;
@@ -20,6 +24,14 @@ export async function runVerifyBuckPasses(opts: {
   onPgid: (pgid: number) => void;
 }): Promise<number> {
   const plan = resolveVerifyTargetPlan({ root: opts.root, iso: opts.iso, targets: opts.targets });
+  try {
+    assertVerifyTargetPlanNotEmpty({ requestedTargets: opts.targets, plan });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`${message}\n`);
+    await appendVerifyPassLog(opts.logFile, `[verify] target resolution failed: ${message}`);
+    return 2;
+  }
   const passes = plan.passes;
   const expanded = summarizeVerifyTargetPlan(plan);
   await appendVerifyPassLog(

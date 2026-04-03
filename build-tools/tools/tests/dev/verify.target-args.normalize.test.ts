@@ -39,6 +39,32 @@ test("verify normalizes path-like targets from invocation directory", async () =
   });
 });
 
+test("verify normalizes root zx test file paths to generated root labels", async () => {
+  await runInTemp("verify-target-args-root-zx-file", async (tmp) => {
+    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    await fsp.mkdir(graphDir, { recursive: true });
+    await fsp.writeFile(path.join(graphDir, "graph.json"), "[]\n", "utf8");
+
+    const testFile = path.join(
+      tmp,
+      "build-tools",
+      "tools",
+      "tests",
+      "deployments",
+      "nixos-shared-host.deploy.remote-exec.test.ts",
+    );
+    await fsp.mkdir(path.dirname(testFile), { recursive: true });
+    await fsp.writeFile(testFile, "// test fixture\n", "utf8");
+
+    const normalized = await normalizeVerifyTargets({
+      workspaceRoot: tmp,
+      baseDir: tmp,
+      targets: ["build-tools/tools/tests/deployments/nixos-shared-host.deploy.remote-exec.test.ts"],
+    });
+    assert.deepEqual(normalized, ["//:deployments_nixos_shared_host_deploy_remote_exec"]);
+  });
+});
+
 test("verify keeps explicit labels and query expressions untouched", async () => {
   await runInTemp("verify-target-args-safe", async (tmp) => {
     const graphDir = path.join(tmp, "build-tools", "tools", "buck");

@@ -1,6 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
+import { sanitizeName } from "../lib/sanitize.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
+import { normalizeHostLogicalPath } from "./nixos-shared-host-install-contract.ts";
 import {
   readNixosSharedHostClientProfile,
   type ClientInput,
@@ -21,7 +23,7 @@ export type NixosSharedHostRemoteArtifactSource =
 
 export type NixosSharedHostRemotePlan = {
   planMode: true;
-  remoteExecutionImplemented: false;
+  remoteExecutionImplemented: true;
   deploymentId: string;
   deploymentLabel: string;
   profileName: string;
@@ -31,7 +33,12 @@ export type NixosSharedHostRemotePlan = {
   remoteStatePath: string;
   remoteRuntimeRoot: string;
   remoteRecordsRoot: string;
+  remoteArtifactStageRoot: string;
   artifactSource: NixosSharedHostRemoteArtifactSource;
+  stagedArtifactCleanup: {
+    defaultMode: "remove";
+    retainFlag: "--retain-remote-artifact";
+  };
   hostApplyExpectedLater: true;
 };
 
@@ -49,6 +56,25 @@ function requireRemoteValue(profileName: string, field: RemoteOverrideKey, value
     throw new Error(`profile "${profileName}" has invalid ${field}`);
   }
   return normalized;
+}
+
+function requireRemotePath(profileName: string, field: RemoteOverrideKey, value: string): string {
+  return normalizeHostLogicalPath(requireRemoteValue(profileName, field, value));
+}
+
+export function remoteArtifactStageRootFor(remoteRuntimeRoot: string): string {
+  return path.posix.join(normalizeHostLogicalPath(remoteRuntimeRoot), ".deploy-artifacts");
+}
+
+export function createNixosSharedHostRemoteArtifactPath(
+  plan: Pick<NixosSharedHostRemotePlan, "deploymentLabel" | "remoteArtifactStageRoot">,
+  executionId: string,
+): string {
+  return path.posix.join(
+    plan.remoteArtifactStageRoot,
+    sanitizeName(plan.deploymentLabel),
+    sanitizeName(executionId),
+  );
 }
 
 function artifactSourceFor(
@@ -82,22 +108,22 @@ function applyRemoteOverrides(
       "destination",
       overrides.destination ?? manifest.destination,
     ),
-    remoteRepoPath: requireRemoteValue(
+    remoteRepoPath: requireRemotePath(
       profileName,
       "remoteRepoPath",
       overrides.remoteRepoPath ?? manifest.remoteRepoPath,
     ),
-    remoteStatePath: requireRemoteValue(
+    remoteStatePath: requireRemotePath(
       profileName,
       "remoteStatePath",
       overrides.remoteStatePath ?? manifest.remoteStatePath,
     ),
-    remoteRuntimeRoot: requireRemoteValue(
+    remoteRuntimeRoot: requireRemotePath(
       profileName,
       "remoteRuntimeRoot",
       overrides.remoteRuntimeRoot ?? manifest.remoteRuntimeRoot,
     ),
-    remoteRecordsRoot: requireRemoteValue(
+    remoteRecordsRoot: requireRemotePath(
       profileName,
       "remoteRecordsRoot",
       overrides.remoteRecordsRoot ?? manifest.remoteRecordsRoot,
@@ -136,7 +162,7 @@ export async function createNixosSharedHostRemotePlan(opts: {
   }
   return {
     planMode: true,
-    remoteExecutionImplemented: false,
+    remoteExecutionImplemented: true,
     deploymentId: opts.deployment.deploymentId,
     deploymentLabel: opts.deployment.label,
     profileName,
@@ -146,7 +172,12 @@ export async function createNixosSharedHostRemotePlan(opts: {
     remoteStatePath: selected.remoteStatePath,
     remoteRuntimeRoot: selected.remoteRuntimeRoot,
     remoteRecordsRoot: selected.remoteRecordsRoot,
+    remoteArtifactStageRoot: remoteArtifactStageRootFor(selected.remoteRuntimeRoot),
     artifactSource: artifactSourceFor(opts.deployment, opts.artifactDir),
+    stagedArtifactCleanup: {
+      defaultMode: "remove",
+      retainFlag: "--retain-remote-artifact",
+    },
     hostApplyExpectedLater: true,
   };
 }

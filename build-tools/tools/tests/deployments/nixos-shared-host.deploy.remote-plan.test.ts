@@ -33,7 +33,7 @@ test("deploy plan reads the reviewed remote profile deterministically", async ()
       await $`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --profile mini --profile-root ${profileRoot} --dry-run`;
     assert.deepEqual(JSON.parse(String(result.stdout)), {
       planMode: true,
-      remoteExecutionImplemented: false,
+      remoteExecutionImplemented: true,
       deploymentId: "demoapp-dev",
       deploymentLabel: "//projects/deployments/demoapp-dev:deploy",
       profileName: "mini",
@@ -43,11 +43,16 @@ test("deploy plan reads the reviewed remote profile deterministically", async ()
       remoteStatePath: "/var/lib/bucknix/nixos-shared-host/platform-state.json",
       remoteRuntimeRoot: "/var/lib/bucknix/nixos-shared-host/runtime",
       remoteRecordsRoot: "/var/lib/bucknix/nixos-shared-host/records",
+      remoteArtifactStageRoot: "/var/lib/bucknix/nixos-shared-host/runtime/.deploy-artifacts",
       artifactSource: {
         kind: "component-dist",
         componentTarget: "//projects/apps/demoapp:app",
         outputSubdir: "dist",
         remoteTransportRequired: true,
+      },
+      stagedArtifactCleanup: {
+        defaultMode: "remove",
+        retainFlag: "--retain-remote-artifact",
       },
       hostApplyExpectedLater: true,
     });

@@ -7,8 +7,10 @@ _REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-verify-scope.boundary.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.contract.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.e2e.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.deploy.remote-exec.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.failure-records.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.remote-plan.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.deploy.remote-ssh.command-assembly.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.explicit-removal.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.extraction.from-targets.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.host-module.duplicate-hostname.nix.test.ts": True,
@@ -30,6 +32,7 @@ _REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/nixos-shared-host.platform-state.scoped-update.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.publish.missing-target.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.publisher.contract.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.remote-transport.fake.ts": False,
     "build-tools/tools/tests/deployments/nixos-shared-host.records.contract.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.validation.test.ts": True,
 }
