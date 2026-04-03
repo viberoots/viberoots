@@ -1,9 +1,9 @@
 # Deployment Verify Scope
 
 This document records the first reviewed deployment-domain test label and the first reviewed
-build-system ownership boundary from PR-4.5.1, plus the fail-closed path classifier from
-PR-4.5.2. The goal is to make later deployment-only verify selection rest on explicit metadata
-instead of path guesses.
+build-system ownership boundary from PR-4.5.1, the fail-closed path classifier from PR-4.5.2, and
+the deployment-aware verify/CI execution path from PR-4.5.3. The goal is to keep deployment-only
+selection resting on explicit metadata instead of path guesses.
 
 ## Reviewed Buck label
 
@@ -75,7 +75,31 @@ zx-wrapper build-tools/tools/dev/inspect-deployment-impact.ts \
   --changed build-tools/deployments/defs.bzl,projects/deployments/pleomino-dev/TARGETS
 ```
 
-## Non-goals for PR-4.5.2
+## Deployment-aware verify execution
+
+PR-4.5.3 adds the first execution control:
+
+- `BNX_DEPLOYMENT_TEST_SCOPE=auto|always|never`
+- `auto`:
+  - `deployment-only` runs `domain:deployment` targets plus the reviewed deployment safety floor
+  - `deployment-and-project-impact` runs that same deployment suite plus project-impact targets for
+    the changed app/lib/deployment projects
+  - `mixed-build-system` keeps the existing full build-system verify path
+  - `no-deployment-impact` keeps the existing non-deployment selector behavior
+- `always` requires the change-set to classify as safe `deployment-only`; otherwise verify/CI fails
+  fast with diagnostics
+- `never` bypasses the deployment-aware override and keeps the existing selector behavior
+
+The reviewed deployment safety floor is intentionally non-empty and currently includes:
+
+- `//:deployment_domain_labels_cquery`
+- `//:deployment_domain_taxonomy_drift`
+- `//:deployment_verify_scope_boundary`
+
+Verify and CI both log the resolved deployment selection so operators can audit why a deployment
+suite, union scope, or full build-system scope ran.
+
+## Historical non-goals for PR-4.5.2
 
 - This PR does not change verify selector behavior yet.
 - This PR does not make deployment-only skipping available yet.

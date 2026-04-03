@@ -748,6 +748,35 @@ changes that do not touch build-system paths.
   - required verify/CI gates remain strict (`--scope=source --fail=true`) because the exception
     contract is part of the policy, not a runtime bypass flag
 
+## Verify deployment-aware selector contract (PR-4.5.3)
+
+I add the first deployment-only execution path on top of the existing selector stack without
+weakening the fail-closed build-system rules.
+
+- Invocation contract:
+  - `BNX_DEPLOYMENT_TEST_SCOPE=auto|always|never v`
+  - the same env var applies to CI `buck-test` stage resolution
+- Decision order:
+  - explicit Buck targets and explicit `project-closure` keep their existing precedence
+  - `never` keeps the existing non-deployment selector behavior
+  - `always` requires deployment-impact mode `deployment-only`
+  - `auto` consults the reviewed deployment-impact classifier from PR-4.5.2
+- Execution contract:
+  - `deployment-only`: run `attrfilter(labels, "domain:deployment", //...)` plus the reviewed
+    deployment safety floor
+  - `deployment-and-project-impact`: run that same deployment suite plus project-impact targets for
+    changed app/lib/deployment projects
+  - `mixed-build-system`: keep the current full build-system verify path
+  - `no-deployment-impact`: keep the existing non-deployment selector behavior
+- Guardrails:
+  - fail when `BNX_DEPLOYMENT_TEST_SCOPE=always` is requested for anything except safe
+    `deployment-only`
+  - fail when the reviewed deployment-domain Buck query resolves zero targets
+  - fail when the reviewed deployment safety floor is empty
+- Diagnostics contract:
+  - verify and CI log the requested deployment mode, resolved deployment classifier mode, selected
+    deployment targets, selected project targets, and final selector set
+
 ## Verify project-closure selector contract (PR-1.6)
 
 I add an explicit compliance selector without changing default verify behavior.

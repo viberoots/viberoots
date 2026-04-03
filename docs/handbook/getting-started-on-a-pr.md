@@ -94,6 +94,13 @@ When adding or materially editing scaffold command guidance:
   - selected test scope = changed projects + full recursive downstream dependents
   - project-local methodology exception edits (for example `projects/apps/<name>/methodology-exceptions.json`) stay on this project-impact path
   - build-system edits still keep existing broad-scope/fallback behavior
+- Verify deployment-aware build-system scope (PR-4.5.3):
+  - `BNX_DEPLOYMENT_TEST_SCOPE=auto|always|never v`
+  - `auto`: safe deployment-owned build-system edits run the reviewed deployment suite plus safety floor
+  - `auto`: `projects/deployments/**` changes run the union of deployment coverage and project-impact coverage
+  - `auto`: shared or ambiguous build-system paths still broaden to the existing full build-system scope
+  - `always`: require a safe `deployment-only` change-set and fail fast otherwise
+  - `never`: bypass deployment-aware narrowing and keep the prior selector behavior
 - Verify project-closure opt-in (PR-1.6):
   - use this only for compliance/release-gate runs that must verify one or more projects plus their full recursive dependency closure
   - invocation: `v --selector project-closure --project projects/apps/pleomino`

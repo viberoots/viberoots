@@ -21,7 +21,8 @@ import { ensureVerifyPinnedNixpkgs } from "./nix-env.ts";
 import { activeNixGcProcesses, logVerifyRevision } from "./preflight.ts";
 import { prewarmVerifyOnce } from "./prewarm.ts";
 import { cleanupVerifyLegacyPnpmState } from "./pnpm-state.ts";
-import { printVerifySelection, resolveRequestedVerifyScope } from "./requested-scope.ts";
+import { resolveRequestedVerifyScope } from "./requested-scope.ts";
+import { printVerifySelection, summarizeVerifyScopeDecision } from "./selection-output.ts";
 import {
   appendVerifyLogLine,
   killBuckIsolation,
@@ -32,7 +33,6 @@ import {
 } from "./process-control.ts";
 import { prepareVerifySeed, shouldPrepareVerifySeedForRequestedTargets } from "./seed.ts";
 import { isProjectsOnlyVerifyTargets } from "./target-scope.ts";
-import { summarizeTemplateScopeDecision } from "./template-test-scope.ts";
 import { ensureRepoLocalTmpRoot } from "./tmp-root.ts";
 import { resolveVerifyTargetPlan, summarizeVerifyTargetPlan } from "./target-passes.ts";
 import { runVerifyBuckPasses } from "./verify-passes.ts";
@@ -41,7 +41,7 @@ import { computeZxTestNodeModulesOut } from "./zx-node-modules.ts";
 export async function runVerify(): Promise<void> {
   const invocationCwd = process.cwd();
   const root = repoRoot();
-  const { args, templateScope } = await resolveRequestedVerifyScope({
+  const { args, selection } = await resolveRequestedVerifyScope({
     root,
     invocationCwd,
     args: parseVerifyArgs(),
@@ -52,16 +52,16 @@ export async function runVerify(): Promise<void> {
     const plan = resolveVerifyTargetPlan({
       root,
       iso: "v-explain-selection",
-      targets: templateScope.targets,
+      targets: selection.targets,
     });
-    printVerifySelection(templateScope, summarizeVerifyTargetPlan(plan));
+    printVerifySelection(selection, summarizeVerifyTargetPlan(plan));
     return;
   }
   await runStartupCheck(root);
   process.chdir(root);
-  const projectsOnlyScope = isProjectsOnlyVerifyTargets(templateScope.targets);
+  const projectsOnlyScope = isProjectsOnlyVerifyTargets(selection.targets);
   await runVerifyLintPreflight(root, zxInitPath, {
-    lintFilters: templateScope.lintFilters,
+    lintFilters: selection.lintFilters,
     includeBuildSystemPolicy: !projectsOnlyScope,
   });
   if (!projectsOnlyScope) {
@@ -93,7 +93,7 @@ export async function runVerify(): Promise<void> {
   await ensureBuckPreludeConfig(root);
   process.env.BNX_SHARED_PRELUDE_PATH = path.join(root, "prelude");
   const targetFreeGiB = verifyTargetFreeGiBDefault(args.coverage);
-  const runNixStoreOptimize = shouldRunNixStoreOptimizeForRequestedTargets(templateScope.targets);
+  const runNixStoreOptimize = shouldRunNixStoreOptimizeForRequestedTargets(selection.targets);
   const { freeGiB } = await runVerifyHousekeeping({
     root,
     targetFreeGiB,
@@ -136,20 +136,20 @@ export async function runVerify(): Promise<void> {
   await prewarmVerifyOnce(root, zxInitPath);
   await appendVerifyLogLine(
     lock.logFile,
-    `[verify] template scope: ${summarizeTemplateScopeDecision(templateScope)}`,
+    `[verify] selection: ${summarizeVerifyScopeDecision(selection)}`,
   );
   await appendVerifyLogLine(
     lock.logFile,
-    `[verify] resolved targets: ${templateScope.targets.join(" ")}`,
+    `[verify] resolved targets: ${selection.targets.join(" ")}`,
   );
-  if (templateScope.diagnostics) {
+  if (selection.diagnostics) {
     await appendVerifyLogLine(
       lock.logFile,
-      `[verify] template scope diagnostics: ${JSON.stringify(templateScope.diagnostics)}`,
+      `[verify] selection diagnostics: ${JSON.stringify(selection.diagnostics)}`,
     );
   }
   let seedCleanup: (() => Promise<void>) | null = null;
-  if (shouldPrepareVerifySeedForRequestedTargets(templateScope.targets)) {
+  if (shouldPrepareVerifySeedForRequestedTargets(selection.targets)) {
     const seed = await prepareVerifySeed({ root, iso });
     process.env.BNX_TEST_SEED_STORE_PATH = seed.seedPath;
     process.env.BNX_TEST_SEED_KEY = seed.seedKey;
@@ -200,7 +200,7 @@ export async function runVerify(): Promise<void> {
     iso,
     logFile: lock.logFile,
     console: args.console,
-    targets: templateScope.targets,
+    targets: selection.targets,
     zxNodeModulesOut,
     analysisDir,
     onPgid: (nextPgid) => {
