@@ -98,14 +98,14 @@ function guardTemplateSelection(diagnostics: TemplateTestSelectorDiagnostics): v
 
 export function summarizeTemplateScopeDecision(d: VerifyTemplateScopeDecision): string {
   const base = `requested=${d.requestedMode} selector=${d.selectorMode} reason=${d.reason}`;
-  if (!d.diagnostics) return `${base} targets=${d.targets.length}`;
+  if (!d.diagnostics) return `${base} targetSelectors=${d.targets.length}`;
   if ("requestedProjects" in d.diagnostics) {
-    return `${base} requestedProjectCount=${d.diagnostics.requestedProjects.length} closureProjectCount=${d.diagnostics.resolvedDependencyClosure.length} targets=${d.targets.length}`;
+    return `${base} requestedProjectCount=${d.diagnostics.requestedProjects.length} closureProjectCount=${d.diagnostics.resolvedDependencyClosure.length} targetSelectors=${d.targets.length}`;
   }
   if ("changedProjects" in d.diagnostics) {
-    return `${base} changedProjects=${d.diagnostics.changedProjects.join(",") || "none"} dependentProjects=${d.diagnostics.dependentProjects.join(",") || "none"} targets=${d.targets.length}`;
+    return `${base} changedProjects=${d.diagnostics.changedProjects.join(",") || "none"} dependentProjects=${d.diagnostics.dependentProjects.join(",") || "none"} targetSelectors=${d.targets.length}`;
   }
-  return `${base} templates=${d.diagnostics.changedTemplateIds.join(",") || "none"} targets=${d.targets.length}`;
+  return `${base} templates=${d.diagnostics.changedTemplateIds.join(",") || "none"} targetSelectors=${d.targets.length}`;
 }
 
 export async function resolveVerifyTemplateTestScope(opts: {

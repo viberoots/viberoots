@@ -110,3 +110,7 @@ export function selectedCppSnapshotRelPaths(packagePaths: readonly string[]): st
   }
   return [...ordered];
 }
+
+export function selectedCppSnapshotRsyncSources(relPaths: readonly string[]): string[] {
+  return relPaths.map((relPath) => `./${relPath}`);
+}

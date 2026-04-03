@@ -1,7 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveVerifyTemplateTestScope } from "../../dev/verify/template-test-scope.ts";
+import {
+  resolveVerifyTemplateTestScope,
+  summarizeTemplateScopeDecision,
+} from "../../dev/verify/template-test-scope.ts";
 
 test("auto mode uses template-selected targets for template-only changes", async () => {
   const result = await resolveVerifyTemplateTestScope({
@@ -92,6 +95,41 @@ test("never mode bypasses selector path and keeps existing build-system scope", 
   });
   assert.equal(result.selectorMode, "skipped");
   assert.deepEqual(result.targets, ["//workspace/..."]);
+});
+
+test("never mode preserves full build-system scope when build-system tests are forced always", async () => {
+  const result = await resolveVerifyTemplateTestScope({
+    root: process.cwd(),
+    requestedTargets: ["//..."],
+    env: { BNX_TEMPLATE_TEST_SCOPE: "never", BNX_BUILD_SYSTEM_TESTS: "always" },
+    deps: {
+      resolveBuildScope: async () => ({
+        targets: ["//..."],
+        mode: "always",
+        hasBuildSystemChanges: false,
+      }),
+      resolveTemplateSelection: async () => {
+        throw new Error("selector should not be called when never mode preserves forced scope");
+      },
+    },
+  });
+  assert.equal(result.selectorMode, "skipped");
+  assert.equal(result.reason, "selector-disabled");
+  assert.deepEqual(result.targets, ["//..."]);
+});
+
+test("selection summary reports target selector counts rather than expanded test counts", () => {
+  assert.equal(
+    summarizeTemplateScopeDecision({
+      requestedMode: "never",
+      selectorMode: "skipped",
+      targets: ["//..."],
+      diagnostics: null,
+      lintFilters: null,
+      reason: "selector-disabled",
+    }),
+    "requested=never selector=skipped reason=selector-disabled targetSelectors=1",
+  );
 });
 
 test("explicit project target scopes lint/prettier to that importer", async () => {

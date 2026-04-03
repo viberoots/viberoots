@@ -6,6 +6,7 @@ import {
   computeSelectedCppPackageClosure,
   FILTERED_FLAKE_RSYNC_EXCLUDES,
   graphNodesFromJson,
+  selectedCppSnapshotRsyncSources,
   selectedCppSnapshotRelPaths,
 } from "./nix-build-filtered-flake-lib.ts";
 
@@ -38,12 +39,14 @@ async function readSelectedCppSnapshotSources(
   }
   const packagePaths = computeSelectedCppPackageClosure(graphNodesFromJson(rawGraph), target);
   if (packagePaths.length === 0) return null;
-  const rsyncSources: string[] = [];
-  for (const relPath of selectedCppSnapshotRelPaths(packagePaths)) {
+  const relPaths = selectedCppSnapshotRelPaths(packagePaths);
+  const presentRelPaths: string[] = [];
+  for (const relPath of relPaths) {
     const absPath = path.resolve(root, relPath);
     if (!(await pathExists(absPath))) continue;
-    rsyncSources.push(`${root}/./${relPath}`);
+    presentRelPaths.push(relPath);
   }
+  const rsyncSources = selectedCppSnapshotRsyncSources(presentRelPaths);
   if (rsyncSources.length === 0) return null;
   return { packagePaths, rsyncSources };
 }
@@ -118,6 +121,7 @@ async function main(): Promise<void> {
         "snapshot-rsync",
         $({
           stdio: "inherit",
+          cwd: root,
         })`rsync -a --delete --relative ${rsyncExcludes} ${selectedCppSources.rsyncSources} ${snapDir}/`,
       );
     } else {

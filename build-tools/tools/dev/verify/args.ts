@@ -118,7 +118,7 @@ export function parseVerifyArgs(opts?: {
       "verify selector 'project-closure' cannot be combined with explicit Buck targets",
     );
   }
-  if (selector === "default" && (requestedProjects.length > 0 || explainSelection)) {
+  if (selector === "default" && requestedProjects.length > 0) {
     throw new Error(
       "project selectors require '--selector project-closure' or VERIFY_SELECTOR=project-closure",
     );

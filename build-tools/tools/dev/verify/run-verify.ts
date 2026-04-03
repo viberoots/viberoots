@@ -34,6 +34,7 @@ import { prepareVerifySeed, shouldPrepareVerifySeedForRequestedTargets } from ".
 import { isProjectsOnlyVerifyTargets } from "./target-scope.ts";
 import { summarizeTemplateScopeDecision } from "./template-test-scope.ts";
 import { ensureRepoLocalTmpRoot } from "./tmp-root.ts";
+import { resolveVerifyTargetPlan, summarizeVerifyTargetPlan } from "./target-passes.ts";
 import { runVerifyBuckPasses } from "./verify-passes.ts";
 import { computeZxTestNodeModulesOut } from "./zx-node-modules.ts";
 
@@ -48,7 +49,12 @@ export async function runVerify(): Promise<void> {
   const zxInitPath = path.join(root, "build-tools", "tools", "dev", "zx-init.mjs");
   await ensureVerifyPinnedNixpkgs(root);
   if (args.explainSelection) {
-    printVerifySelection(templateScope);
+    const plan = resolveVerifyTargetPlan({
+      root,
+      iso: "v-explain-selection",
+      targets: templateScope.targets,
+    });
+    printVerifySelection(templateScope, summarizeVerifyTargetPlan(plan));
     return;
   }
   await runStartupCheck(root);

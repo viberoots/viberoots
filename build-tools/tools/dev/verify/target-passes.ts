@@ -16,9 +16,33 @@ export type VerifyTargetPass = {
   threadsOverride?: number;
 };
 
+export type VerifyTargetExpansionSummary = {
+  expandedTargetCount: number;
+  isolatedPassCount: number;
+  isolatedTargetCount: number;
+  sharedTargetCount: number;
+  passCount: number;
+};
+
+export type VerifyTargetPlan = {
+  targetLabels: VerifyTargetLabels[];
+  passes: VerifyTargetPass[];
+};
+
 type CqueryTargetInfo = {
   labels?: string[];
 };
+
+function buildCqueryQuery(targets: readonly string[]): string {
+  return targets.length === 1
+    ? targets[0]!
+    : `(${targets.map((target) => `${target}`).join(" + ")})`;
+}
+
+function isPatternVerifyTarget(target: string): boolean {
+  const trimmed = String(target || "").trim();
+  return trimmed === "//..." || (trimmed.startsWith("//") && trimmed.endsWith("/..."));
+}
 
 export function planVerifyTargetPasses(targets: readonly VerifyTargetLabels[]): VerifyTargetPass[] {
   const sharedTargets: string[] = [];
@@ -43,6 +67,21 @@ export function planVerifyTargetPasses(targets: readonly VerifyTargetLabels[]): 
   return passes;
 }
 
+export function summarizeVerifyTargetPlan(plan: VerifyTargetPlan): VerifyTargetExpansionSummary {
+  const isolatedPassCount = plan.passes.filter((pass) => pass.name.startsWith("isolated:")).length;
+  const isolatedTargetCount = plan.passes
+    .filter((pass) => pass.name.startsWith("isolated:"))
+    .reduce((total, pass) => total + pass.targets.length, 0);
+  const sharedTargetCount = plan.passes.find((pass) => pass.name === "shared")?.targets.length ?? 0;
+  return {
+    expandedTargetCount: plan.targetLabels.length,
+    isolatedPassCount,
+    isolatedTargetCount,
+    sharedTargetCount,
+    passCount: plan.passes.length,
+  };
+}
+
 function parseVerifyTargetLabelsJson(stdout: string): Map<string, readonly string[]> {
   const parsed = JSON.parse(stdout) as Record<string, CqueryTargetInfo>;
   const out = new Map<string, readonly string[]>();
@@ -52,16 +91,11 @@ function parseVerifyTargetLabelsJson(stdout: string): Map<string, readonly strin
   return out;
 }
 
-export function loadVerifyTargetLabels(opts: {
+function queryVerifyTargetLabels(opts: {
   root: string;
   iso: string;
-  targets: string[];
-}): VerifyTargetLabels[] {
-  if (opts.targets.length === 0) return [];
-  const query =
-    opts.targets.length === 1
-      ? opts.targets[0]!
-      : `(${opts.targets.map((target) => `${target}`).join(" + ")})`;
+  query: string;
+}): Map<string, readonly string[]> {
   const buck2Path = resolveToolPathSync("buck2");
   const result = spawnSync(
     buck2Path,
@@ -74,7 +108,7 @@ export function loadVerifyTargetLabels(opts: {
       "--json",
       "--output-attribute",
       "labels",
-      query,
+      opts.query,
     ],
     {
       cwd: opts.root,
@@ -94,9 +128,58 @@ export function loadVerifyTargetLabels(opts: {
     const stderr = String(result.stderr || "").trim();
     throw new Error(`verify target label cquery failed (${result.status}): ${stderr}`);
   }
-  const labelsByTarget = parseVerifyTargetLabelsJson(String(result.stdout || "{}"));
-  return opts.targets.map((target) => ({
-    target,
-    labels: labelsByTarget.get(normalizeTargetLabel(target)) ?? [],
-  }));
+  return parseVerifyTargetLabelsJson(String(result.stdout || "{}"));
+}
+
+export function loadVerifyTargetLabels(opts: {
+  root: string;
+  iso: string;
+  targets: string[];
+}): VerifyTargetLabels[] {
+  if (opts.targets.length === 0) return [];
+  const explicitTargets = opts.targets.filter((target) => !isPatternVerifyTarget(target));
+  const patternTargets = opts.targets.filter(isPatternVerifyTarget);
+  const resolved = new Map<string, readonly string[]>();
+
+  if (explicitTargets.length > 0) {
+    const labelsByTarget = queryVerifyTargetLabels({
+      root: opts.root,
+      iso: opts.iso,
+      query: buildCqueryQuery(explicitTargets),
+    });
+    for (const target of explicitTargets) {
+      const normalizedTarget = normalizeTargetLabel(target);
+      resolved.set(normalizedTarget, labelsByTarget.get(normalizedTarget) ?? []);
+    }
+  }
+
+  if (patternTargets.length > 0) {
+    const labelsByTarget = queryVerifyTargetLabels({
+      root: opts.root,
+      iso: opts.iso,
+      query: `kind(test, ${buildCqueryQuery(patternTargets)})`,
+    });
+    const expandedTargets = [...labelsByTarget.keys()].sort((left, right) =>
+      left.localeCompare(right),
+    );
+    for (const target of expandedTargets) {
+      if (!resolved.has(target)) {
+        resolved.set(target, labelsByTarget.get(target) ?? []);
+      }
+    }
+  }
+
+  return [...resolved.entries()].map(([target, labels]) => ({ target, labels }));
+}
+
+export function resolveVerifyTargetPlan(opts: {
+  root: string;
+  iso: string;
+  targets: string[];
+}): VerifyTargetPlan {
+  const targetLabels = loadVerifyTargetLabels(opts);
+  return {
+    targetLabels,
+    passes: planVerifyTargetPasses(targetLabels),
+  };
 }

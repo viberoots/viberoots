@@ -1,4 +1,10 @@
+load("//build-tools/lang:defs_common.bzl", "dedupe_preserve")
 load("//build-tools/tools/buck:zx_test.bzl", "zx_test")
+load(
+    "//build-tools/tools/tests:deployment_conventions.bzl",
+    "deployment_convention_for_script",
+    "validate_deployment_convention",
+)
 load(
     "//build-tools/tools/tests:template_conventions.bzl",
     "template_convention_for_script",
@@ -35,7 +41,11 @@ def auto_zx_tests(root = "build-tools/tools/tests", patterns = ["**/*.test.ts"])
             input_globs = convention.get("template_input_globs", [])
             for g in input_globs:
                 template_inputs.extend(native.glob([g], exclude=["**/node_modules/**", "**/.direnv/**"]))
+        deployment_convention = deployment_convention_for_script(f)
+        if deployment_convention != None:
+            labels = dedupe_preserve(labels + deployment_convention.get("labels", []))
         validate_template_convention(f, labels, template_inputs)
+        validate_deployment_convention(f, labels)
         zx_test(
             name = name,
             script = f,
@@ -44,5 +54,4 @@ def auto_zx_tests(root = "build-tools/tools/tests", patterns = ["**/*.test.ts"])
             labels = labels,
             template_inputs = sorted(template_inputs),
         )
-
 

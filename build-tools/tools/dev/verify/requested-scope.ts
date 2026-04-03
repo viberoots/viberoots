@@ -1,4 +1,5 @@
 import type { VerifyArgs } from "./args.ts";
+import type { VerifyTargetExpansionSummary } from "./target-passes.ts";
 import { normalizeVerifyTargets } from "./args.ts";
 import {
   resolveVerifyTemplateTestScope,
@@ -33,8 +34,16 @@ export async function resolveRequestedVerifyScope(opts: {
   return { args, templateScope };
 }
 
-export function printVerifySelection(decision: VerifyTemplateScopeDecision): void {
+export function printVerifySelection(
+  decision: VerifyTemplateScopeDecision,
+  expanded?: VerifyTargetExpansionSummary,
+): void {
   process.stdout.write(`[verify] selection: ${summarizeTemplateScopeDecision(decision)}\n`);
+  if (expanded) {
+    process.stdout.write(
+      `[verify] expanded selection: concreteTargets=${expanded.expandedTargetCount} passCount=${expanded.passCount} isolatedPasses=${expanded.isolatedPassCount} isolatedTargets=${expanded.isolatedTargetCount} sharedTargets=${expanded.sharedTargetCount}\n`,
+    );
+  }
   if (decision.diagnostics) {
     process.stdout.write(`${JSON.stringify(decision.diagnostics, null, 2)}\n`);
   }

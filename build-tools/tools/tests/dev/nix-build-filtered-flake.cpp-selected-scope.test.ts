@@ -1,10 +1,14 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 import {
   computeSelectedCppPackageClosure,
   graphNodesFromJson,
   selectedCppSnapshotRelPaths,
+  selectedCppSnapshotRsyncSources,
 } from "../../dev/nix-build-filtered-flake-lib.ts";
 
 test("selected cpp filtered-flake snapshots follow the target package closure", () => {
@@ -67,4 +71,61 @@ test("selected cpp filtered-flake snapshots follow the target package closure", 
     !snapshotRelPaths.includes("projects/apps/unrelated"),
     "selected cpp snapshot should not carry unrelated project packages",
   );
+
+  assert.deepEqual(selectedCppSnapshotRsyncSources(snapshotRelPaths).slice(0, 3), [
+    "./.npmrc",
+    "./flake.lock",
+    "./flake.nix",
+  ]);
+});
+
+test("selected cpp snapshot rsync sources keep flake files at the snapshot root", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "cpp-selected-snapshot-root-"));
+  const out = await fsp.mkdtemp(path.join(os.tmpdir(), "cpp-selected-snapshot-out-"));
+  try {
+    for (const rel of [
+      "flake.nix",
+      "flake.lock",
+      ".npmrc",
+      "gomod2nix.toml",
+      "package.json",
+      "pnpm-lock.yaml",
+      "build-tools/tools/dev",
+      "prelude",
+      "third_party/providers",
+      "toolchains",
+      "types",
+      "projects/libs/pleomino-solver-wasm",
+    ]) {
+      const abs = path.join(root, rel);
+      const isFile = path.extname(rel) !== "" || path.basename(rel).startsWith(".");
+      await fsp.mkdir(isFile ? path.dirname(abs) : abs, { recursive: true });
+      if (isFile) {
+        await fsp.writeFile(abs, `${rel}\n`, "utf8");
+      }
+    }
+
+    const sources = selectedCppSnapshotRsyncSources([
+      "flake.nix",
+      "flake.lock",
+      ".npmrc",
+      "package.json",
+      "pnpm-lock.yaml",
+      "build-tools",
+      "prelude",
+      "third_party",
+      "toolchains",
+      "projects/libs/pleomino-solver-wasm",
+    ]);
+    await $({ cwd: root, stdio: "pipe" })`rsync -a --delete --relative ${sources} ${out}/`;
+
+    assert.equal(await fsp.readFile(path.join(out, "flake.nix"), "utf8"), "flake.nix\n");
+    assert.equal(await fsp.readFile(path.join(out, "flake.lock"), "utf8"), "flake.lock\n");
+    await fsp.access(path.join(out, "projects", "libs", "pleomino-solver-wasm"));
+    await fsp.access(path.join(out, "build-tools"));
+    await assert.rejects(fsp.access(path.join(out, "Users")));
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+    await fsp.rm(out, { recursive: true, force: true });
+  }
 });

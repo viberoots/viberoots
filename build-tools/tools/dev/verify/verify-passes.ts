@@ -2,7 +2,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { spawnVerifyBuck2Tests } from "./buck2-test.ts";
 import { startVerifySafetyRails } from "./safety-rails.ts";
-import { loadVerifyTargetLabels, planVerifyTargetPasses } from "./target-passes.ts";
+import { resolveVerifyTargetPlan, summarizeVerifyTargetPlan } from "./target-passes.ts";
 
 async function appendVerifyPassLog(file: string | null, line: string): Promise<void> {
   if (!file) return;
@@ -19,8 +19,12 @@ export async function runVerifyBuckPasses(opts: {
   analysisDir: string;
   onPgid: (pgid: number) => void;
 }): Promise<number> {
-  const passes = planVerifyTargetPasses(
-    loadVerifyTargetLabels({ root: opts.root, iso: opts.iso, targets: opts.targets }),
+  const plan = resolveVerifyTargetPlan({ root: opts.root, iso: opts.iso, targets: opts.targets });
+  const passes = plan.passes;
+  const expanded = summarizeVerifyTargetPlan(plan);
+  await appendVerifyPassLog(
+    opts.logFile,
+    `[verify] expanded targets: concrete=${expanded.expandedTargetCount} pass_count=${expanded.passCount} isolated_passes=${expanded.isolatedPassCount} isolated_targets=${expanded.isolatedTargetCount} shared_targets=${expanded.sharedTargetCount}`,
   );
   if (passes.length !== 1 || passes[0]?.name !== "shared") {
     await appendVerifyPassLog(

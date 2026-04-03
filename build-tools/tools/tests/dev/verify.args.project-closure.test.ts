@@ -26,6 +26,18 @@ test("verify args: project-closure parses repeated flags and explain-selection",
   assert.deepEqual(parsed.targets, ["//..."]);
 });
 
+test("verify args: explain-selection is allowed in default mode", () => {
+  const parsed = parseVerifyArgs({
+    argvTokens: ["--explain-selection"],
+    env: {},
+  });
+
+  assert.equal(parsed.selector, "default");
+  assert.equal(parsed.explainSelection, true);
+  assert.deepEqual(parsed.requestedProjects, []);
+  assert.deepEqual(parsed.targets, ["//..."]);
+});
+
 test("verify args: env aliases apply when CLI selector flags are absent", () => {
   const parsed = parseVerifyArgs({
     argvTokens: [],
