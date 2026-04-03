@@ -2,7 +2,10 @@
 import path from "node:path";
 import { sanitizeName } from "../lib/sanitize.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
-import { normalizeHostLogicalPath } from "./nixos-shared-host-install-contract.ts";
+import {
+  defaultManagedRoot,
+  normalizeHostLogicalPath,
+} from "./nixos-shared-host-install-contract.ts";
 import {
   readNixosSharedHostClientProfile,
   type ClientInput,
@@ -39,7 +42,18 @@ export type NixosSharedHostRemotePlan = {
     defaultMode: "remove";
     retainFlag: "--retain-remote-artifact";
   };
-  hostApplyExpectedLater: true;
+  hostApply: NixosSharedHostRemoteHostApplyPlan;
+  hostApplyExpectedLater: boolean;
+};
+
+export type NixosSharedHostRemoteHostApplyMode = "skip" | "switch" | "dry-run";
+
+export type NixosSharedHostRemoteHostApplyPlan = {
+  supported: true;
+  explicitOptInRequired: true;
+  selectedMode: NixosSharedHostRemoteHostApplyMode;
+  remoteConfigRoot: string;
+  remoteManagedRoot: string;
 };
 
 type RemoteOverrideKey =
@@ -96,6 +110,23 @@ function artifactSourceFor(
   };
 }
 
+function hostApplyPlanFor(input?: {
+  selectedMode?: NixosSharedHostRemoteHostApplyMode;
+  remoteConfigRoot?: string;
+  remoteManagedRoot?: string;
+}): NixosSharedHostRemoteHostApplyPlan {
+  const remoteConfigRoot = normalizeHostLogicalPath(input?.remoteConfigRoot || "/etc/nixos");
+  return {
+    supported: true,
+    explicitOptInRequired: true,
+    selectedMode: input?.selectedMode || "skip",
+    remoteConfigRoot,
+    remoteManagedRoot: normalizeHostLogicalPath(
+      input?.remoteManagedRoot || defaultManagedRoot(remoteConfigRoot),
+    ),
+  };
+}
+
 function applyRemoteOverrides(
   profileName: string,
   manifest: ClientInput,
@@ -138,6 +169,11 @@ export async function createNixosSharedHostRemotePlan(opts: {
   profileRoot: string;
   overrides?: Partial<ClientInput>;
   artifactDir?: string;
+  hostApply?: {
+    selectedMode?: NixosSharedHostRemoteHostApplyMode;
+    remoteConfigRoot?: string;
+    remoteManagedRoot?: string;
+  };
 }): Promise<NixosSharedHostRemotePlan> {
   const profileName = String(opts.profileName || "").trim();
   if (!profileName) throw new Error("missing required --profile");
@@ -160,6 +196,7 @@ export async function createNixosSharedHostRemotePlan(opts: {
       `unsupported reviewed transport mode "${selected.sshMode}" for profile "${profileName}"`,
     );
   }
+  const hostApply = hostApplyPlanFor(opts.hostApply);
   return {
     planMode: true,
     remoteExecutionImplemented: true,
@@ -178,6 +215,7 @@ export async function createNixosSharedHostRemotePlan(opts: {
       defaultMode: "remove",
       retainFlag: "--retain-remote-artifact",
     },
-    hostApplyExpectedLater: true,
+    hostApply,
+    hostApplyExpectedLater: hostApply.selectedMode !== "switch",
   };
 }

@@ -5,6 +5,7 @@ import {
   buildRemoteArtifactStageArgv,
   buildRemoteCleanupScript,
   buildRemoteDeployScript,
+  buildRemoteHostApplyScript,
   buildRemoteRepoPreflightScript,
   buildRemoteSshArgv,
   buildRemoteStagePrepareScript,
@@ -33,6 +34,13 @@ const plan: NixosSharedHostRemotePlan = {
   stagedArtifactCleanup: {
     defaultMode: "remove",
     retainFlag: "--retain-remote-artifact",
+  },
+  hostApply: {
+    supported: true,
+    explicitOptInRequired: true,
+    selectedMode: "skip",
+    remoteConfigRoot: "/etc/nixos",
+    remoteManagedRoot: "/etc/nixos/bucknix/nixos-shared-host",
   },
   hostApplyExpectedLater: true,
 };
@@ -88,4 +96,39 @@ test("remote SSH transport assembles reviewed preflight, staging, deploy, and cl
     buildRemoteCleanupScript(remoteArtifactPath),
   );
   assert.match(cleanup[4] || "", /rm -rf --/);
+});
+
+test("remote SSH transport assembles reviewed host-apply commands for switch and dry-run", () => {
+  const switchPlan: NixosSharedHostRemotePlan = {
+    ...plan,
+    hostApply: {
+      ...plan.hostApply,
+      selectedMode: "switch",
+    },
+    hostApplyExpectedLater: false,
+  };
+  const switchApply = buildRemoteSshArgv(
+    switchPlan.destination,
+    buildRemoteHostApplyScript(switchPlan),
+  );
+  assert.match(switchApply[4] || "", /nixos-shared-host-host-apply\.ts/);
+  assert.match(switchApply[4] || "", /--config-root '\/etc\/nixos'/);
+  assert.match(switchApply[4] || "", /--managed-root '\/etc\/nixos\/bucknix\/nixos-shared-host'/);
+  assert.match(
+    switchApply[4] || "",
+    /--expected-state-path '\/var\/lib\/bucknix\/nixos-shared-host\/platform-state\.json'/,
+  );
+  const dryRunPlan: NixosSharedHostRemotePlan = {
+    ...switchPlan,
+    hostApply: {
+      ...switchPlan.hostApply,
+      selectedMode: "dry-run",
+    },
+    hostApplyExpectedLater: true,
+  };
+  const dryRunApply = buildRemoteSshArgv(
+    dryRunPlan.destination,
+    buildRemoteHostApplyScript(dryRunPlan),
+  );
+  assert.match(dryRunApply[4] || "", /--dry-run/);
 });

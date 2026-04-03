@@ -12,6 +12,10 @@ function commandArgs(args: Array<[string, string]>): string {
   return args.map(([flag, value]) => `--${flag} ${shSingleQuote(value)}`).join(" ");
 }
 
+function commandFlags(flags: string[]): string {
+  return flags.map((flag) => `--${flag}`).join(" ");
+}
+
 export function buildRemoteSshArgv(destination: string, script: string): string[] {
   return ["ssh", destination, "bash", "-lc", script];
 }
@@ -69,5 +73,22 @@ export function buildRemoteDeployScript(opts: {
     "set -euo pipefail",
     `cd ${shSingleQuote(opts.plan.remoteRepoPath)}`,
     `exec direnv exec . build-tools/tools/bin/deploy ${commandArgs(args)}`,
+  ].join("; ");
+}
+
+export function buildRemoteHostApplyScript(plan: NixosSharedHostRemotePlan): string {
+  const args: Array<[string, string]> = [
+    ["config-root", plan.hostApply.remoteConfigRoot],
+    ["managed-root", plan.hostApply.remoteManagedRoot],
+    ["expected-state-path", plan.remoteStatePath],
+    ["expected-runtime-root", plan.remoteRuntimeRoot],
+    ["expected-records-root", plan.remoteRecordsRoot],
+  ];
+  const flags = plan.hostApply.selectedMode === "dry-run" ? ["dry-run"] : [];
+  const suffix = [commandArgs(args), commandFlags(flags)].filter(Boolean).join(" ");
+  return [
+    "set -euo pipefail",
+    `cd ${shSingleQuote(plan.remoteRepoPath)}`,
+    `exec direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-host-apply.ts ${suffix}`,
   ].join("; ");
 }

@@ -36,6 +36,22 @@ cd -- "\${workdir}"
 exec "$@"
 `;
 
+const FAKE_SUDO = `#!/usr/bin/env bash
+set -euo pipefail
+exec "$@"
+`;
+
+const FAKE_NIXOS_REBUILD = `#!/usr/bin/env bash
+set -euo pipefail
+if [[ "\${FAKE_NIXOS_REBUILD_FAIL:-0}" == "1" ]]; then
+  echo "fake nixos-rebuild failure" >&2
+  exit 103
+fi
+if [[ -n "\${FAKE_NIXOS_REBUILD_LOG:-}" ]]; then
+  printf '%s\\n' "$*" >> "\${FAKE_NIXOS_REBUILD_LOG}"
+fi
+`;
+
 const FAKE_RSYNC = `#!/usr/bin/env bash
 set -euo pipefail
 if [[ "\${FAKE_RSYNC_FAIL:-0}" == "1" ]]; then
@@ -72,10 +88,14 @@ export async function installFakeRemoteTransport(
   await fsp.writeFile(path.join(binDir, "ssh"), FAKE_SSH, "utf8");
   await fsp.writeFile(path.join(binDir, "direnv"), FAKE_DIRENV, "utf8");
   await fsp.writeFile(path.join(binDir, "rsync"), FAKE_RSYNC, "utf8");
+  await fsp.writeFile(path.join(binDir, "sudo"), FAKE_SUDO, "utf8");
+  await fsp.writeFile(path.join(binDir, "nixos-rebuild"), FAKE_NIXOS_REBUILD, "utf8");
   await Promise.all([
     fsp.chmod(path.join(binDir, "ssh"), 0o755),
     fsp.chmod(path.join(binDir, "direnv"), 0o755),
     fsp.chmod(path.join(binDir, "rsync"), 0o755),
+    fsp.chmod(path.join(binDir, "sudo"), 0o755),
+    fsp.chmod(path.join(binDir, "nixos-rebuild"), 0o755),
   ]);
   return {
     env: {

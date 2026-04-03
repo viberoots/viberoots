@@ -348,8 +348,11 @@ Current limitation:
 - the client installer records the reviewed remote target contract only
 - `build-tools/tools/bin/deploy --profile <name>` now performs reviewed SSH
   transport and remote artifact staging for the current direct deploy flow
-- it still does not perform remote host apply or `nixos-rebuild switch` on
-  your behalf
+- remote host apply now stays explicit:
+  - pass `--apply-host` to run a reviewed remote host apply after deploy
+  - pass `--apply-host-dry-run` to run reviewed preflight plus
+    `nixos-rebuild dry-activate`
+  - ambient defaults still skip host apply entirely
 
 Client lifecycle commands:
 
@@ -404,7 +407,9 @@ The plan output is deterministic and includes:
 - reviewed remote runtime root
 - reviewed remote records root
 - selected artifact source contract
-- whether host apply is still expected as a later step
+- selected host-apply mode
+- reviewed remote config root and managed root for host apply
+- whether an actual host apply is still expected as a later step
 
 Remote profile precedence rules:
 
@@ -417,8 +422,10 @@ Remote profile precedence rules:
   - `--remote-records-root`
   - `--ssh-mode`
 - local mutation flags such as `--host-root`, `--state`, `--records-root`,
-  `--remove`, and the smoke-connect flags are rejected when `--profile` is
-  selected because that combination is ambiguous
+  and `--remove` are rejected when `--profile` is selected because that
+  combination is ambiguous
+- smoke-connect flags remain available in `--profile` mode for reviewed remote
+  smoke overrides
 
 Transport contract in this interim slice:
 
@@ -426,6 +433,15 @@ Transport contract in this interim slice:
 - unsupported transport values fail closed
 - `--profile` mode stages a local artifact onto the reviewed remote host and
   then runs the existing deploy wrapper from the remote repo checkout
+- host apply is a second explicit reviewed step:
+  - `--apply-host` runs remote preflight and then `nixos-rebuild switch`
+  - `--apply-host-dry-run` runs the same preflight and then
+    `nixos-rebuild dry-activate`
+  - no ambient default performs host apply implicitly
+- host-apply preflight fails closed when:
+  - the server is unmanaged
+  - managed wiring is missing or not inspectable
+  - the reviewed remote state/runtime/records paths are missing
 - staged artifacts land under:
   - `<remoteRuntimeRoot>/.deploy-artifacts/<deployment>/<run-id>`
 - staged artifacts are removed by default after the remote deploy returns
@@ -503,18 +519,19 @@ sudo nixos-rebuild switch
 Current workable pattern:
 
 - Jenkins can now run the reviewed remote wrapper from another machine
-- the current deploy tool mutates local paths and does not have built-in remote
-  host apply
+- Jenkins can opt into reviewed remote host apply with `--apply-host` or
+  preview it with `--apply-host-dry-run`
 - `mini` must already be installed as a managed `nixos-shared-host`
 - `mini` must already have a repo checkout that Jenkins can update or use
-- Jenkins still owns any later host-apply step
+- the host apply remains explicit and opt-in; Jenkins should choose that mode
+  deliberately rather than rely on ambient defaults
 
 Why this shape is required today:
 
 - `build-tools/tools/bin/deploy --profile <name>` now owns the reviewed SSH
   transport and exact-artifact staging path
 - there is not yet a Jenkins-native pipeline wrapper, shared-control-plane
-  submission path, or automatic host apply step
+  submission path, or shared-control-plane admission around host apply
 
 Example shape:
 
@@ -556,8 +573,9 @@ Current workable operator flow:
 3. Optionally render `deploy --profile mini --plan` to confirm the reviewed
    remote repo/state/runtime/records/staging contract before execution.
 4. Run the reviewed remote deploy wrapper from your machine.
-5. If you want the host config applied too, run that as a separate explicit
-   step on `mini`.
+5. If you want the host config applied too, add `--apply-host`.
+6. If you want to validate host apply first without switching, use
+   `--apply-host-dry-run`.
 
 Example:
 
@@ -575,7 +593,8 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
 direnv exec . build-tools/tools/bin/deploy \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
-  --artifact-dir ./dist
+  --artifact-dir ./dist \
+  --apply-host
 ```
 
 If you want to keep the staged remote artifact for inspection, add:
@@ -590,16 +609,16 @@ The remote summary reports:
 - the exact staged remote artifact path
 - whether the stage was removed or retained
 - the remote deploy result JSON, including the remote record path
+- the selected host-apply mode and, when requested, the reviewed host-apply
+  result JSON
 
 This flow still does not do:
 
-- remote `nixos-rebuild switch`
 - shared-control-plane submission or locking
 - remote repo checkout management
 
 Not yet implemented, but required for a finished dev-machine remote flow:
 
-- remote `nixos-rebuild switch` orchestration or a reviewed apply wrapper
 - a shared-control-plane path instead of direct host mutation from the operator
   path
 

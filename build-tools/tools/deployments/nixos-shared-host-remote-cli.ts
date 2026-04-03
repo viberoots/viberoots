@@ -3,9 +3,14 @@ import path from "node:path";
 import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
 import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
+import {
+  defaultManagedRoot,
+  normalizeHostLogicalPath,
+} from "./nixos-shared-host-install-contract.ts";
 import { runNixosSharedHostRemoteDeploy } from "./nixos-shared-host-remote-execution.ts";
 import {
   createNixosSharedHostRemotePlan,
+  type NixosSharedHostRemoteHostApplyMode,
   type NixosSharedHostRemotePlan,
 } from "./nixos-shared-host-remote-target.ts";
 import type { ClientInput } from "./nixos-shared-host-install-dev-machine.ts";
@@ -58,6 +63,32 @@ function collectSmokeConnectOverride() {
   };
 }
 
+function collectHostApplySelection(): {
+  selectedMode: NixosSharedHostRemoteHostApplyMode;
+  remoteConfigRoot: string;
+  remoteManagedRoot: string;
+  hasOverrides: boolean;
+} {
+  const selectedMode = getFlagBool("apply-host-dry-run")
+    ? "dry-run"
+    : getFlagBool("apply-host")
+      ? "switch"
+      : "skip";
+  const hasOverrides = hasFlag("remote-config-root") || hasFlag("remote-managed-root");
+  const remoteConfigRoot = hasFlag("remote-config-root")
+    ? normalizeHostLogicalPath(requireNamedFlagValue("remote-config-root"))
+    : "/etc/nixos";
+  const remoteManagedRoot = hasFlag("remote-managed-root")
+    ? normalizeHostLogicalPath(requireNamedFlagValue("remote-managed-root"))
+    : defaultManagedRoot(remoteConfigRoot);
+  return {
+    selectedMode,
+    remoteConfigRoot,
+    remoteManagedRoot,
+    hasOverrides,
+  };
+}
+
 async function resolveLocalArtifactDir(
   workspaceRoot: string,
   deployment: NixosSharedHostDeployment,
@@ -79,6 +110,7 @@ async function createPlan(
   deployment: NixosSharedHostDeployment,
   profileName: string,
   overrides: RemoteOverrides,
+  hostApply: ReturnType<typeof collectHostApplySelection>,
 ): Promise<NixosSharedHostRemotePlan> {
   return await createNixosSharedHostRemotePlan({
     deployment,
@@ -86,6 +118,7 @@ async function createPlan(
     profileRoot: resolveProfileRoot(workspaceRoot),
     overrides,
     artifactDir: hasFlag("artifact-dir") ? requireNamedFlagValue("artifact-dir") : undefined,
+    hostApply,
   });
 }
 
@@ -99,12 +132,22 @@ export async function maybeRunNixosSharedHostRemoteProfile(opts: {
   const overrides = collectRemoteOverrides();
   const retainRemoteArtifact = getFlagBool("retain-remote-artifact");
   const smokeConnectOverride = collectSmokeConnectOverride();
+  const hostApply = collectHostApplySelection();
   if (!profileName) {
-    if (profileRequested || Object.keys(overrides).length > 0 || retainRemoteArtifact) {
+    if (
+      profileRequested ||
+      Object.keys(overrides).length > 0 ||
+      retainRemoteArtifact ||
+      hostApply.selectedMode !== "skip" ||
+      hostApply.hasOverrides
+    ) {
       throw new Error("remote target selection requires --profile <name>");
     }
     if (planMode) throw new Error("--plan/--dry-run requires --profile <name>");
     return false;
+  }
+  if (hostApply.selectedMode === "skip" && hostApply.hasOverrides) {
+    throw new Error("--remote-config-root/--remote-managed-root require --apply-host");
   }
   const conflicts = collectProfileModeConflicts();
   if (conflicts.length > 0) {
@@ -112,7 +155,13 @@ export async function maybeRunNixosSharedHostRemoteProfile(opts: {
       `--profile cannot be combined with local execution flags: ${conflicts.join(", ")}`,
     );
   }
-  const plan = await createPlan(opts.workspaceRoot, opts.deployment, profileName, overrides);
+  const plan = await createPlan(
+    opts.workspaceRoot,
+    opts.deployment,
+    profileName,
+    overrides,
+    hostApply,
+  );
   if (planMode) {
     console.log(JSON.stringify(plan, null, 2));
     return true;
@@ -130,6 +179,7 @@ export async function maybeRunNixosSharedHostRemoteProfile(opts: {
         localArtifactDir: await resolveLocalArtifactDir(opts.workspaceRoot, opts.deployment),
         retainRemoteArtifact,
         ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
+        hostApply: plan.hostApply,
       }),
       null,
       2,

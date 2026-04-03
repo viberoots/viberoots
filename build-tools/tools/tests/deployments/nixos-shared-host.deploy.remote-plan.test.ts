@@ -54,6 +54,13 @@ test("deploy plan reads the reviewed remote profile deterministically", async ()
         defaultMode: "remove",
         retainFlag: "--retain-remote-artifact",
       },
+      hostApply: {
+        supported: true,
+        explicitOptInRequired: true,
+        selectedMode: "skip",
+        remoteConfigRoot: "/etc/nixos",
+        remoteManagedRoot: "/etc/nixos/bucknix/nixos-shared-host",
+      },
       hostApplyExpectedLater: true,
     });
   });
@@ -81,6 +88,36 @@ test("deploy plan lets explicit remote overrides win over profile metadata", asy
   });
 });
 
+test("deploy plan renders reviewed host-apply selection when remote apply is requested", async () => {
+  await runInTemp("nixos-shared-host-remote-plan-host-apply", async (tmp, $) => {
+    const deploymentJson = await writeDeploymentJson(tmp);
+    const profileRoot = path.join(tmp, "profiles");
+    await installClientProfile($, profileRoot);
+    const result =
+      await $`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --profile mini --profile-root ${profileRoot} --plan --apply-host --remote-config-root /srv/nixos --remote-managed-root /srv/nixos/bucknix/nixos-shared-host`;
+    assert.deepEqual(JSON.parse(String(result.stdout)).hostApply, {
+      supported: true,
+      explicitOptInRequired: true,
+      selectedMode: "switch",
+      remoteConfigRoot: "/srv/nixos",
+      remoteManagedRoot: "/srv/nixos/bucknix/nixos-shared-host",
+    });
+  });
+});
+
+test("deploy plan keeps host apply explicit and dry-runnable", async () => {
+  await runInTemp("nixos-shared-host-remote-plan-host-apply-dry-run", async (tmp, $) => {
+    const deploymentJson = await writeDeploymentJson(tmp);
+    const profileRoot = path.join(tmp, "profiles");
+    await installClientProfile($, profileRoot);
+    const result =
+      await $`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --profile mini --profile-root ${profileRoot} --plan --apply-host-dry-run`;
+    const summary = JSON.parse(String(result.stdout));
+    assert.equal(summary.hostApply.selectedMode, "dry-run");
+    assert.equal(summary.hostApplyExpectedLater, true);
+  });
+});
+
 test("deploy plan rejects profile mode mixed with local mutation flags", async () => {
   await runInTemp("nixos-shared-host-remote-plan-conflict", async (tmp, $) => {
     const deploymentJson = await writeDeploymentJson(tmp);
@@ -91,6 +128,21 @@ test("deploy plan rejects profile mode mixed with local mutation flags", async (
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /--profile cannot be combined with local execution flags/);
     assert.match(String(result.stderr), /--state/);
+  });
+});
+
+test("deploy plan rejects host-apply path overrides unless host apply is selected", async () => {
+  await runInTemp("nixos-shared-host-remote-plan-host-apply-overrides", async (tmp, $) => {
+    const deploymentJson = await writeDeploymentJson(tmp);
+    const profileRoot = path.join(tmp, "profiles");
+    await installClientProfile($, profileRoot);
+    const result =
+      await $`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --profile mini --profile-root ${profileRoot} --plan --remote-config-root /srv/nixos`.nothrow();
+    assert.notEqual(result.exitCode, 0);
+    assert.match(
+      String(result.stderr),
+      /--remote-config-root\/--remote-managed-root require --apply-host/,
+    );
   });
 });
 
