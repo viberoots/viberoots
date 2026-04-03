@@ -23,6 +23,7 @@ import { assertNoProcessRestart, waitForValue, writeAndBumpMtime } from "./lib/w
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
+const SSR_VITE_DEV_READY_TIMEOUT_MS = 120000;
 
 test(
   "Phase-5 PR-5 final goal validation: dependency growth works in one dev session without app-entrypoint edits",
@@ -95,7 +96,17 @@ test(
       devServer.stderr?.on("data", (chunk) => logs.push(String(chunk || "")));
 
       try {
-        await waitForHttpOk(`http://127.0.0.1:${port}/`);
+        try {
+          await waitForHttpOk(`http://127.0.0.1:${port}/`, SSR_VITE_DEV_READY_TIMEOUT_MS);
+        } catch (error) {
+          const joinedLogs = logs.join("").trim();
+          const suffix = joinedLogs ? `\n---- dev logs ----\n${joinedLogs}` : "";
+          throw new Error(
+            `${error instanceof Error ? error.message : String(error)} (exitCode=${String(
+              devServer.exitCode,
+            )}, signal=${String(devServer.signalCode)})${suffix}`,
+          );
+        }
         const pid = devServer.pid;
         assertNoProcessRestart(devServer, pid);
         const tsManifestPath = contracts.tsManifestPath;

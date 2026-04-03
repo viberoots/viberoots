@@ -4,10 +4,11 @@ import path from "node:path";
 import { ensureGraph } from "../buck/glue-run.ts";
 import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
 import { resolveSelectedTargetLabel } from "../dev/target-label-resolver.ts";
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
+import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
 import { readCompositeGraph } from "../lib/graph-view.ts";
 import { findRepoRoot } from "../lib/repo.ts";
 import { extractNixosSharedHostDeployments, type NixosSharedHostDeployment } from "./contract.ts";
+import { createNixosSharedHostRemotePlan } from "./nixos-shared-host-remote-target.ts";
 import { runNixosSharedHostExplicitRemoval } from "./nixos-shared-host-explicit-removal.ts";
 import { runNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy.ts";
 
@@ -58,13 +59,107 @@ async function resolveArtifactDir(
   return path.join(outPath, "dist");
 }
 
+function requireNamedFlagValue(name: string): string {
+  if (!hasFlag(name)) return "";
+  const value = getFlagStr(name, "").trim();
+  if (!value) throw new Error(`--${name} requires a non-empty value`);
+  return value;
+}
+
+function collectRemoteOverrides(): Partial<{
+  destination: string;
+  remoteRepoPath: string;
+  remoteStatePath: string;
+  remoteRuntimeRoot: string;
+  remoteRecordsRoot: string;
+  sshMode: string;
+}> {
+  return {
+    ...(hasFlag("destination") ? { destination: requireNamedFlagValue("destination") } : {}),
+    ...(hasFlag("remote-repo-path")
+      ? { remoteRepoPath: requireNamedFlagValue("remote-repo-path") }
+      : {}),
+    ...(hasFlag("remote-state-path")
+      ? { remoteStatePath: requireNamedFlagValue("remote-state-path") }
+      : {}),
+    ...(hasFlag("remote-runtime-root")
+      ? { remoteRuntimeRoot: requireNamedFlagValue("remote-runtime-root") }
+      : {}),
+    ...(hasFlag("remote-records-root")
+      ? { remoteRecordsRoot: requireNamedFlagValue("remote-records-root") }
+      : {}),
+    ...(hasFlag("ssh-mode") ? { sshMode: requireNamedFlagValue("ssh-mode") } : {}),
+  };
+}
+
+function collectProfileModeConflicts(): string[] {
+  const conflicts = [
+    "host-root",
+    "state",
+    "records-root",
+    "host-config-out",
+    "smoke-connect-host",
+    "smoke-connect-port",
+    "smoke-connect-protocol",
+  ].filter((flag) => hasFlag(flag));
+  if (hasFlag("remove")) conflicts.push("remove");
+  return conflicts.map((flag) => `--${flag}`);
+}
+
+async function maybeRunRemotePlan(
+  workspaceRoot: string,
+  deployment: NixosSharedHostDeployment,
+): Promise<boolean> {
+  const profileRequested = hasFlag("profile") || hasFlag("profile-root");
+  const profileName = hasFlag("profile") ? requireNamedFlagValue("profile") : "";
+  const planMode = getFlagBool("plan") || getFlagBool("dry-run");
+  const remoteOverrides = collectRemoteOverrides();
+  if (!profileName) {
+    if (profileRequested || Object.keys(remoteOverrides).length > 0) {
+      throw new Error("remote target selection requires --profile <name>");
+    }
+    if (planMode) throw new Error("--plan/--dry-run requires --profile <name>");
+    return false;
+  }
+  const conflicts = collectProfileModeConflicts();
+  if (conflicts.length > 0) {
+    throw new Error(
+      `--profile cannot be combined with local execution flags: ${conflicts.join(", ")}`,
+    );
+  }
+  if (!planMode) {
+    throw new Error(
+      "remote profile selection is plan-only in PR-4.6; rerun with --plan or --dry-run",
+    );
+  }
+  const profileRoot = hasFlag("profile-root")
+    ? path.resolve(requireNamedFlagValue("profile-root"))
+    : path.join(workspaceRoot, ".local", "deployments", "nixos-shared-host", "clients");
+  const artifactDir = hasFlag("artifact-dir") ? requireNamedFlagValue("artifact-dir") : undefined;
+  console.log(
+    JSON.stringify(
+      await createNixosSharedHostRemotePlan({
+        deployment,
+        profileName,
+        profileRoot,
+        overrides: remoteOverrides,
+        artifactDir,
+      }),
+      null,
+      2,
+    ),
+  );
+  return true;
+}
+
 async function main() {
   const workspaceRoot = await findRepoRoot(process.cwd());
+  const deployment = await resolveDeployment(workspaceRoot);
+  if (await maybeRunRemotePlan(workspaceRoot, deployment)) return;
   const remove = getFlagBool("remove");
   const hostRoot = path.resolve(
     getFlagStr("host-root", path.join(workspaceRoot, ".local", "deployments", "nixos-shared-host")),
   );
-  const deployment = await resolveDeployment(workspaceRoot);
   const statePath = path.resolve(getFlagStr("state", path.join(hostRoot, "platform-state.json")));
   const recordsRoot = path.resolve(getFlagStr("records-root", path.join(hostRoot, "records")));
   const hostConfigPath = getFlagStr("host-config-out", "").trim();

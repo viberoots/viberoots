@@ -8,6 +8,7 @@ _REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/nixos-shared-host.contract.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.failure-records.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.deploy.remote-plan.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.explicit-removal.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.extraction.from-targets.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.host-module.duplicate-hostname.nix.test.ts": True,

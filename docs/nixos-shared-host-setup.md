@@ -346,7 +346,8 @@ Override with `--output-root` when needed.
 Current limitation:
 
 - the client installer records connection and path metadata only
-- it does not yet make `build-tools/tools/bin/deploy` consume `--profile`
+- `build-tools/tools/bin/deploy` now consumes `--profile` for non-mutating
+  `--plan` / `--dry-run` only
 - it does not yet perform SSH transport, remote artifact copy, or remote
   `nixos-rebuild switch` on your behalf
 
@@ -378,6 +379,54 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
 
 - `--profile <name>` to remove one profile
 - `--all` to remove every installed client profile under `--output-root`
+
+## Reviewing A Remote Deploy Plan
+
+Once you have a client profile, you can ask the deploy tool to render the
+reviewed remote target contract without mutating the host or attempting any
+transport:
+
+```bash
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --plan
+```
+
+`--dry-run` is an alias for `--plan`.
+
+The plan output is deterministic and includes:
+
+- selected deployment id and label
+- selected profile and destination
+- reviewed remote repo path
+- reviewed remote authoritative state path
+- reviewed remote runtime root
+- reviewed remote records root
+- selected artifact source contract
+- whether host apply is still expected as a later step
+
+Remote profile precedence rules:
+
+- the installed profile is the base reviewed remote-target contract
+- explicit remote flags override the matching profile values:
+  - `--destination`
+  - `--remote-repo-path`
+  - `--remote-state-path`
+  - `--remote-runtime-root`
+  - `--remote-records-root`
+  - `--ssh-mode`
+- local mutation flags such as `--host-root`, `--state`, `--records-root`,
+  `--remove`, and the smoke-connect flags are rejected when `--profile` is
+  selected because that combination is ambiguous
+
+Transport contract in this interim slice:
+
+- the only reviewed transport mode is `ssh`
+- unsupported transport values fail closed
+- `--profile` mode is still non-mutating in this PR
+- this is still an interim direct-mutation operator aid, not the later
+  shared-control-plane submission model
 
 ## Managed Manifest Contract
 
@@ -461,7 +510,8 @@ Why this shape is required today:
 - if Jenkins builds artifacts elsewhere, it must still copy them to `mini` and
   then invoke deploy on `mini` with a path that exists on `mini`
 - there is not yet a Jenkins-native wrapper, shared-control-plane submission
-  path, or `deploy --profile mini` remote executor
+  path, or built-in remote executor beyond non-mutating
+  `deploy --profile mini --plan`
 
 If Jenkins can SSH to `mini`, the simplest current pattern is:
 
@@ -516,18 +566,30 @@ Not yet implemented, but required for a finished Jenkins flow:
 
 The fully finished remote flow is not implemented yet.
 
-Today, the client installer helps you record reviewed connection metadata for a
-real `nixos-shared-host`, but that metadata is not yet consumed by the deploy
-tool. In the current implementation, "remote deploy from my dev machine" still
-means "SSH to `mini` and run the deploy on `mini`."
+Today, the client installer records reviewed connection metadata for a real
+`nixos-shared-host`, and the deploy tool consumes that metadata for
+non-mutating `--plan` / `--dry-run` output. Actual remote execution is still
+manual, so "remote deploy from my dev machine" still means "SSH to `mini` and
+run the deploy on `mini`."
+
+Reviewed preflight plan:
+
+```bash
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --plan
+```
 
 Current workable operator flow:
 
 1. Install the server side on `mini`.
 2. Optionally record a local client profile with `client install`.
-3. SSH to `mini`.
-4. Run `build-tools/tools/bin/deploy` from the repo checkout on `mini`.
-5. Run `sudo nixos-rebuild switch` on `mini`.
+3. Optionally render `deploy --profile mini --plan` to confirm the reviewed
+   remote repo/state/runtime/records contract before transport.
+4. SSH to `mini`.
+5. Run `build-tools/tools/bin/deploy` from the repo checkout on `mini`.
+6. Run `sudo nixos-rebuild switch` on `mini`.
 
 Example:
 
@@ -564,8 +626,8 @@ manual copy step today:
 
 Not yet implemented, but required for a finished dev-machine remote flow:
 
-- `build-tools/tools/bin/deploy --profile mini` or equivalent profile-aware
-  command
+- transport execution behind `build-tools/tools/bin/deploy --profile mini`
+  instead of plan-only output
 - built-in SSH execution or another reviewed transport layer
 - remote artifact staging that uses the installed client profile automatically
 - remote `nixos-rebuild switch` orchestration or a reviewed apply wrapper

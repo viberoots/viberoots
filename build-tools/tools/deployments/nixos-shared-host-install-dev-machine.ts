@@ -18,19 +18,24 @@ export type ClientInput = {
   sshMode: string;
 };
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 function parseClientManifest(raw: unknown, source: string): NixosSharedHostClientManifest {
   const parsed = raw as Partial<NixosSharedHostClientManifest>;
   if (
     parsed?.schemaVersion !== NIXOS_SHARED_HOST_CLIENT_SCHEMA_V1 ||
     parsed.tool !== NIXOS_SHARED_HOST_INSTALL_TOOL ||
-    typeof parsed.profileName !== "string" ||
-    typeof parsed.destination !== "string" ||
-    typeof parsed.remoteRepoPath !== "string" ||
-    typeof parsed.remoteStatePath !== "string" ||
-    typeof parsed.remoteRuntimeRoot !== "string" ||
-    typeof parsed.remoteRecordsRoot !== "string" ||
-    typeof parsed.sshMode !== "string" ||
-    !Array.isArray(parsed.localManagedPaths)
+    !isNonEmptyString(parsed.profileName) ||
+    !isNonEmptyString(parsed.destination) ||
+    !isNonEmptyString(parsed.remoteRepoPath) ||
+    !isNonEmptyString(parsed.remoteStatePath) ||
+    !isNonEmptyString(parsed.remoteRuntimeRoot) ||
+    !isNonEmptyString(parsed.remoteRecordsRoot) ||
+    !isNonEmptyString(parsed.sshMode) ||
+    !Array.isArray(parsed.localManagedPaths) ||
+    parsed.localManagedPaths.some((entry) => typeof entry !== "string")
   ) {
     throw new Error(`${source}: invalid nixos-shared-host client manifest`);
   }
@@ -41,7 +46,7 @@ function clientManifestPath(outputRoot: string, profileName: string): string {
   return path.resolve(outputRoot, `${requireValue("profileName", profileName)}.json`);
 }
 
-async function readClientManifest(filePath: string): Promise<NixosSharedHostClientManifest> {
+export async function readClientManifest(filePath: string): Promise<NixosSharedHostClientManifest> {
   return parseClientManifest(JSON.parse(await fsp.readFile(filePath, "utf8")), filePath);
 }
 
@@ -118,6 +123,17 @@ export async function listNixosSharedHostClients(opts: { outputRoot: string }): 
     })),
   );
   return { outputRoot: path.resolve(opts.outputRoot), profiles };
+}
+
+export async function readNixosSharedHostClientProfile(opts: {
+  outputRoot: string;
+  profileName: string;
+}): Promise<{ manifestPath: string; manifest: NixosSharedHostClientManifest }> {
+  const manifestPath = clientManifestPath(opts.outputRoot, opts.profileName);
+  return {
+    manifestPath,
+    manifest: await readClientManifest(manifestPath),
+  };
 }
 
 export async function uninstallNixosSharedHostClient(opts: {
