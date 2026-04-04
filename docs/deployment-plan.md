@@ -1503,6 +1503,110 @@ Implement while the `mini` path is still the narrowest shared provider family.
 
 ---
 
+## PR-7.1: Rollback-candidate hardening + deployment-domain test modularization
+
+### Description
+
+I will close the first contract gap discovered after PR-7 lands: same-deployment rollback must
+fail closed to prior successful normal runs instead of accepting any successful replay-shaped run.
+This follow-up also removes deployment-domain methodology drift by modularizing oversized remote
+execution coverage without reducing the reviewed behavior surface.
+
+### Scope & Changes
+
+- Tighten same-deployment rollback source selection for the implemented `mini` path so rollback
+  candidates must be:
+  - the same deployment id
+  - target-compatible under the existing replay checks
+  - prior successful normal publish runs for the same normal live target
+- Reject rollback candidates sourced from runs classified as:
+  - `retry`
+  - `rollback`
+  - `explicit removal`
+- Keep shared `retry` behavior unchanged for the reviewed same-deployment immutable-reuse slice.
+- Improve fail-closed rollback diagnostics so operators can see whether rejection came from:
+  - non-success final outcome
+  - wrong run classification
+  - deployment or target incompatibility
+- Keep rollback selection derived from durable records and replay snapshots rather than recency or
+  "latest known good" heuristics.
+- Split oversized deployment-owned remote-execution test coverage into smaller reviewed modules or
+  helpers so the deployment test area stays within repo methodology file-size expectations without
+  dropping coverage.
+
+### Tests (in this PR)
+
+- Add tests rejecting rollback sourced from:
+  - a prior successful `retry`
+  - a prior successful `rollback`
+  - an `explicit removal` run
+  - a non-successful run
+- Add regression tests proving same-deployment source-run reuse stays distinct between:
+  - `retry`
+  - `rollback`
+- Keep end-to-end rollback coverage for:
+  - restoring a prior known-good exact artifact
+  - failing closed when the chosen source run is not an eligible rollback candidate
+- Preserve the existing reviewed remote deploy and host-apply coverage while modularizing the test
+  files that currently exceed the methodology size target.
+
+### Docs (in this PR)
+
+- Document that same-deployment rollback candidates are limited to prior successful normal runs for
+  the same deployment.
+- Document explicitly that successful `retry` and `rollback` runs are not valid default rollback
+  sources.
+- Document that this PR is a contract-hardening follow-up to PR-7 rather than a new deploy feature
+  slice.
+
+### Verification Commands
+
+- `buck2 test //...`
+- retry, rollback, and replay command flows introduced in PR-7
+
+### Expected Regression Scope
+
+- `deployment-only`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should stay within reviewed
+  deployment-owned replay-selection logic, deployment-domain tests, and related docs. Under the
+  deployment-only verify policy, default `v` / CI can run the reviewed deployment suite instead of
+  the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- Same-deployment rollback accepts only prior successful normal runs for the same deployment.
+- Successful `retry`, `rollback`, and `explicit removal` runs are rejected as rollback sources with
+  actionable diagnostics.
+- The reviewed deployment-domain remote-execution coverage remains behaviorally intact while the
+  file-size methodology drift in that test area is removed.
+
+### Risks
+
+Tightening rollback eligibility can break informal operator expectations if anyone was implicitly
+treating any successful replay-shaped run as rollback-safe.
+
+### Mitigation
+
+Keep the correction narrow, fail closed with explicit diagnostics, and align tests plus docs to the
+same rollback-candidate rule in the same PR.
+
+### Consequence of Not Implementing
+
+The repo would keep a rollback path that is looser than its reviewed contract, and deployment-owned
+test coverage would continue to drift from the methodology file-size standard.
+
+### Downsides for Implementing
+
+This is primarily a hardening and modularization PR, so it adds review work without expanding the
+operator feature surface.
+
+### Recommendation
+
+Implement immediately after PR-7 so later admission and promotion work builds on a strict rollback
+contract instead of preserving an overly permissive replay precedent.
+
+---
+
 ## PR-8: Branch-backed `lane_policy` + source admission + target-environment run admission
 
 ### Description

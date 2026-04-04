@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
+import path from "node:path";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import {
   emptyNixosSharedHostPlatformState,
@@ -61,5 +62,6 @@ export async function readNixosSharedHostPlatformStateOrEmpty(
 }
 
 export async function writeJsonDocument(filePath: string, value: unknown): Promise<void> {
+  await fsp.mkdir(path.dirname(filePath), { recursive: true });
   await fsp.writeFile(filePath, JSON.stringify(value, null, 2) + "\n", "utf8");
 }

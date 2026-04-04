@@ -97,18 +97,46 @@ Normative-source note:
   - activate by atomically repointing `/srv/static-app/current`
   - keep nginx rooted at `/srv/static-app/live`, which remains a stable link to `current`
   - re-publishing an already-staged artifact identity may reuse the existing release directory
+  - admitted deploys persist the exact static artifact under the local artifact/provenance store before publish starts
+  - the shared control-plane execution snapshot freezes publish input as an exact-artifact reference instead of a workstation-local `artifactDir`
+
+### Replay Snapshot Baseline
+
+- reviewed initial immutable-reuse baseline for `nixos-shared-host-static-webapp`:
+  - each admitted deploy persists a replay snapshot for the run
+  - the replay snapshot records:
+    - exact artifact reference
+    - canonical provider-target identity
+    - deployment metadata fingerprint
+    - platform-state snapshot reference
+    - rendered host-config snapshot reference
+  - reusable artifact provenance stays in the artifact/provenance store, while deployment-run records point at that artifact plus the replay snapshot used for the run
+
+### Immutable-Reuse Operator Flows
+
+- reviewed initial same-deployment immutable-reuse slice for `mini`:
+  - shared `--publish-only` must name an admitted source run with `--source-run-id`
+  - shared `--publish-only` must not accept a fresh local `artifactDir` as an implicit rebuild input
+  - same-deployment `--publish-only` is recorded as `retry`
+  - same-deployment rollback requires both `--publish-only` and `--rollback`
+  - rollback source selection is limited to prior successful normal runs for the same deployment
+  - successful `retry`, `rollback`, and `explicit_removal` runs are not valid rollback sources
+  - if the retained exact artifact is unavailable, retry or rollback fails closed instead of rebuilding
 
 ### Partial Publish Observability
 
 - the initial local record surface preserves:
   - canonical `operation_kind = deploy`
-  - `run_classification = deploy | explicit_removal`
+  - `run_classification = deploy | retry | rollback | explicit_removal`
   - `publish_mode = normal`
   - `lifecycle_state = finished`
   - canonical `final_outcome`
   - deployment id and deployment label
   - canonical provider-target identity as both structured provider-target fields and normalized identity
   - artifact identity for publish runs
+  - artifact provenance and stored exact-artifact references for admitted deploys
+  - parent-run and artifact-lineage fields for retry / rollback reuse
+  - deployment metadata fingerprint and replay snapshot path
   - failed step when a run terminates unsuccessfully after admission into the local workflow
 
 ### Provisioner Support

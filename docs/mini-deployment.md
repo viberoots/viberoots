@@ -420,7 +420,7 @@ Publisher responsibility:
 
 - publish the app artifact into the existing target
 - restart or reload the app service as needed
-- record deploy outcome and published artifact identity
+- record deploy outcome, published artifact identity, and replay-snapshot references for the admitted run
 
 This separation matters because:
 
@@ -458,6 +458,15 @@ Once the target exists, a normal deployment should usually be:
 1. resolve admitted artifact
 2. ensure target still exists and matches declared identity
 3. publish artifact into the existing container
+4. run blocking smoke against the live hostname
+
+Operator reuse flows on the implemented `mini` path:
+
+- `deploy ... --publish-only --source-run-id <run>` replays the retained exact artifact for that run without rebuilding and records the run as `retry`
+- `deploy ... --publish-only --source-run-id <run> --rollback` restores a prior known-good exact artifact and records the run as `rollback`
+- same-deployment rollback only accepts prior successful normal deploy runs; successful `retry`, `rollback`, and `explicit_removal` runs fail closed as rollback sources
+- if the retained exact artifact is missing, the run fails closed instead of rebuilding a lookalike artifact
+
 4. restart or reload app service
 5. run smoke/health validation
 

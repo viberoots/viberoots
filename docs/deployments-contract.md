@@ -36,6 +36,7 @@ design has been explicitly updated first.
 - Same-deployment delayed first publish of an already admitted artifact or admitted run lineage remains `operation_kind = deploy`; same-deployment re-publication of an earlier attempted normal run is `retry`.
 - Rollback source selection must use a prior admitted run for the same deployment.
 - Default rollback candidates are prior successful `publish_mode = normal` runs against the same normal live target.
+- Successful same-deployment `retry`, `rollback`, and `explicit_removal` runs are not default rollback candidates.
 - Default rollback candidates are usable only when any already-applied stateful `release_actions` remain rollback-compatible under their declared data-compatibility posture.
 - Protected/shared immutable-reuse flows must replay the recorded execution snapshot rather than reinterpret current repo state.
 - Protected/shared replay snapshots must record non-secret secret/config contract references or versions, not secret values.

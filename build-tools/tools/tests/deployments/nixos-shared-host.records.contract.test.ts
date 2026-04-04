@@ -13,7 +13,11 @@ test("nixos-shared-host durable records persist canonical provider-target identi
     runClassification: "deploy",
     finalOutcome: "succeeded",
     artifactIdentity: "static-webapp:abc123",
+    artifactStoredArtifactPath: "/tmp/records/artifacts/blobs/static-webapp-abc123",
+    artifactProvenancePath: "/tmp/records/artifacts/provenance/static-webapp-abc123.json",
     artifactLineageId: "static-webapp:abc123",
+    deploymentMetadataFingerprint: "sha256:deadbeef",
+    replaySnapshotPath: "/tmp/records/replay/deploy-123/snapshot.json",
     publicUrl: "https://demoapp.apps.kilty.io/",
     authority: {
       kind: "control-plane-worker",
@@ -24,7 +28,7 @@ test("nixos-shared-host durable records persist canonical provider-target identi
       executionSnapshotPath: "/tmp/control-plane/snapshots/cp-123.json",
     },
   });
-  assert.equal(record.schemaVersion, "deploy-record@2026-04-03");
+  assert.equal(record.schemaVersion, "deploy-record@2026-04-04");
   assert.equal(record.operationKind, "deploy");
   assert.equal(record.publishMode, "normal");
   assert.equal(record.lifecycleState, "finished");
@@ -41,7 +45,34 @@ test("nixos-shared-host durable records persist canonical provider-target identi
     executionSnapshotPath: "/tmp/control-plane/snapshots/cp-123.json",
   });
   assert.equal(record.artifact?.identity, "static-webapp:abc123");
+  assert.equal(
+    record.artifact?.storedArtifactPath,
+    "/tmp/records/artifacts/blobs/static-webapp-abc123",
+  );
+  assert.equal(
+    record.artifact?.provenancePath,
+    "/tmp/records/artifacts/provenance/static-webapp-abc123.json",
+  );
   assert.equal(record.artifactLineageId, "static-webapp:abc123");
+  assert.equal(record.deploymentMetadataFingerprint, "sha256:deadbeef");
+  assert.equal(record.replaySnapshotPath, "/tmp/records/replay/deploy-123/snapshot.json");
   assert.equal(record.publisherType, "nixos-shared-host-static-webapp");
   assert.equal(record.smokeRunnerType, "nixos-shared-host-static-webapp-smoke");
+});
+
+test("nixos-shared-host retry records preserve parent-run and artifact-lineage fields", () => {
+  const record = createNixosSharedHostDeployRecord(nixosSharedHostDeploymentFixture(), {
+    deployRunId: "deploy-456",
+    operationKind: "retry",
+    runClassification: "retry",
+    finalOutcome: "succeeded",
+    parentRunId: "deploy-123",
+    artifactIdentity: "static-webapp:abc123",
+    artifactLineageId: "static-webapp:abc123",
+  });
+  assert.equal(record.operationKind, "retry");
+  assert.equal(record.runClassification, "retry");
+  assert.equal(record.parentRunId, "deploy-123");
+  assert.equal(record.artifactLineageId, "static-webapp:abc123");
+  assert.equal(record.publisherType, "nixos-shared-host-static-webapp");
 });

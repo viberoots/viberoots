@@ -45,6 +45,7 @@ test("shared control plane admits shared_nonprod deploys and executes from the f
             deployment.deploymentId = "tampered";
             deployment.label = "//projects/deployments/tampered:deploy";
             deployment.providerTarget.sharedDevTargetIdentity = "tampered-target";
+            await fsp.rm(artifactDir, { recursive: true, force: true });
           },
         },
       });
@@ -55,6 +56,11 @@ test("shared control plane admits shared_nonprod deploys and executes from the f
       assert.equal(snapshot.deploymentId, "demoapp-dev");
       assert.equal(snapshot.deploymentLabel, "//projects/deployments/demoapp-dev:deploy");
       assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:demoapp");
+      assert.equal(snapshot.action.publishInput.kind, "exact-artifact");
+      assert.equal(
+        snapshot.action.publishInput.artifact.identity,
+        result.record.artifact?.identity,
+      );
       assert.equal(result.record.providerTargetIdentity, "nixos-shared-host:default:demoapp");
       assert.ok(result.record.controlPlane);
       assert.equal(result.record.controlPlane.submissionId, result.submission.submissionId);
@@ -70,7 +76,12 @@ test("shared control plane rejects direct local shared_nonprod mutation outside 
     await assert.rejects(
       runNixosSharedHostStaticDeploy({
         deployment: nixosSharedHostDeploymentFixture(),
-        artifactDir: path.join(tmp, "artifact"),
+        artifact: {
+          kind: "nixos-shared-host-static-webapp",
+          identity: "static-webapp:direct-local-reject",
+          storedArtifactPath: path.join(tmp, "artifact"),
+          provenancePath: path.join(tmp, "artifact.json"),
+        },
         statePath: path.join(tmp, "platform-state.json"),
         hostRoot: path.join(tmp, "host"),
         recordsRoot: path.join(tmp, "records"),

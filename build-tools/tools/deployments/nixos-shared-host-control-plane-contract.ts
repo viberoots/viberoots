@@ -1,12 +1,19 @@
 #!/usr/bin/env zx-wrapper
+import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA =
-  "nixos-shared-host-control-plane-snapshot@1";
+  "nixos-shared-host-control-plane-snapshot@2";
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMISSION_SCHEMA =
   "nixos-shared-host-control-plane-submission@1";
 
-export type NixosSharedHostControlPlaneOperationKind = "deploy" | "explicit_removal";
+export type NixosSharedHostPublishBehavior = "deploy" | "publish-only";
+
+export type NixosSharedHostControlPlaneOperationKind =
+  | "deploy"
+  | "retry"
+  | "rollback"
+  | "explicit_removal";
 
 export type NixosSharedHostSmokeConnectOverride = {
   protocol: "http:" | "https:";
@@ -33,7 +40,19 @@ export type NixosSharedHostControlPlaneSnapshot = {
   lockScope: string;
   deployment: NixosSharedHostDeployment;
   paths: NixosSharedHostControlPlanePaths;
-  action: { kind: "deploy"; artifactDir: string } | { kind: "explicit_removal" };
+  action:
+    | {
+        kind: "deploy";
+        publishBehavior: NixosSharedHostPublishBehavior;
+        publishInput: {
+          kind: "exact-artifact";
+          artifact: NixosSharedHostAdmittedArtifact;
+        };
+        parentRunId?: string;
+        releaseLineageId?: string;
+        artifactLineageId?: string;
+      }
+    | { kind: "explicit_removal" };
   smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;
 };
 

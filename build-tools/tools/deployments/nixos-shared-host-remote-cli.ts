@@ -44,9 +44,15 @@ function collectRemoteOverrides(): RemoteOverrides {
 }
 
 function collectProfileModeConflicts(): string[] {
-  const conflicts = ["host-root", "state", "records-root", "host-config-out"].filter((flag) =>
-    hasFlag(flag),
-  );
+  const conflicts = [
+    "host-root",
+    "state",
+    "records-root",
+    "host-config-out",
+    "publish-only",
+    "rollback",
+    "source-run-id",
+  ].filter((flag) => hasFlag(flag));
   if (hasFlag("remove")) conflicts.push("remove");
   return conflicts.map((flag) => `--${flag}`);
 }

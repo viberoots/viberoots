@@ -9,9 +9,10 @@ import {
   type NixosSharedHostProviderTarget,
 } from "./contract.ts";
 
-export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-03";
+export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-04";
 
-export type NixosSharedHostRunClassification = "deploy" | "explicit_removal";
+export type NixosSharedHostOperationKind = "deploy" | "retry" | "rollback";
+export type NixosSharedHostRunClassification = NixosSharedHostOperationKind | "explicit_removal";
 export type NixosSharedHostFinalOutcome =
   | "succeeded"
   | "provision_failed"
@@ -22,7 +23,7 @@ export type NixosSharedHostFailedStep = "provision" | "publish" | "smoke";
 export type NixosSharedHostDeployRecord = {
   schemaVersion: typeof NIXOS_SHARED_HOST_RECORD_SCHEMA;
   deployRunId: string;
-  operationKind: "deploy";
+  operationKind: NixosSharedHostOperationKind;
   runClassification: NixosSharedHostRunClassification;
   publishMode: "normal";
   lifecycleState: "finished";
@@ -47,11 +48,15 @@ export type NixosSharedHostDeployRecord = {
   artifactLineageId?: string;
   artifact?: {
     identity: string;
+    storedArtifactPath?: string;
+    provenancePath?: string;
   };
   failedStep?: NixosSharedHostFailedStep;
   provisionerType?: string;
   publisherType?: string;
   smokeRunnerType?: "nixos-shared-host-static-webapp-smoke";
+  deploymentMetadataFingerprint?: string;
+  replaySnapshotPath?: string;
   publicUrl?: string;
   healthUrl?: string;
   error?: string;
@@ -59,6 +64,7 @@ export type NixosSharedHostDeployRecord = {
 
 type NixosSharedHostRecordOutcome = {
   deployRunId: string;
+  operationKind?: NixosSharedHostOperationKind;
   runClassification: NixosSharedHostRunClassification;
   finalOutcome: NixosSharedHostFinalOutcome;
   artifactIdentity?: string;
@@ -70,6 +76,10 @@ type NixosSharedHostRecordOutcome = {
   releaseLineageId?: string;
   artifactLineageId?: string;
   authority?: NixosSharedHostControlPlaneWorkerAuthority;
+  artifactStoredArtifactPath?: string;
+  artifactProvenancePath?: string;
+  deploymentMetadataFingerprint?: string;
+  replaySnapshotPath?: string;
 };
 
 export function createNixosSharedHostDeployRunId(prefix = "deploy"): string {
@@ -83,7 +93,7 @@ export function createNixosSharedHostDeployRecord(
   return {
     schemaVersion: NIXOS_SHARED_HOST_RECORD_SCHEMA,
     deployRunId: outcome.deployRunId,
-    operationKind: "deploy",
+    operationKind: outcome.operationKind || "deploy",
     runClassification: outcome.runClassification,
     publishMode: "normal",
     lifecycleState: "finished",
@@ -110,28 +120,62 @@ export function createNixosSharedHostDeployRecord(
     ...(outcome.parentRunId ? { parentRunId: outcome.parentRunId } : {}),
     ...(outcome.releaseLineageId ? { releaseLineageId: outcome.releaseLineageId } : {}),
     ...(outcome.artifactLineageId ? { artifactLineageId: outcome.artifactLineageId } : {}),
-    ...(outcome.artifactIdentity ? { artifact: { identity: outcome.artifactIdentity } } : {}),
+    ...(outcome.artifactIdentity
+      ? {
+          artifact: {
+            identity: outcome.artifactIdentity,
+            ...(outcome.artifactStoredArtifactPath
+              ? { storedArtifactPath: outcome.artifactStoredArtifactPath }
+              : {}),
+            ...(outcome.artifactProvenancePath
+              ? { provenancePath: outcome.artifactProvenancePath }
+              : {}),
+          },
+        }
+      : {}),
     ...(outcome.failedStep ? { failedStep: outcome.failedStep } : {}),
     ...(deployment.provisioner ? { provisionerType: deployment.provisioner.type } : {}),
-    ...(outcome.runClassification === "deploy"
+    ...(outcome.runClassification !== "explicit_removal"
       ? {
           publisherType: deployment.publisher.type,
           smokeRunnerType: "nixos-shared-host-static-webapp-smoke" as const,
         }
       : {}),
+    ...(outcome.deploymentMetadataFingerprint
+      ? { deploymentMetadataFingerprint: outcome.deploymentMetadataFingerprint }
+      : {}),
+    ...(outcome.replaySnapshotPath ? { replaySnapshotPath: outcome.replaySnapshotPath } : {}),
     ...(outcome.publicUrl ? { publicUrl: outcome.publicUrl } : {}),
     ...(outcome.healthUrl ? { healthUrl: outcome.healthUrl } : {}),
     ...(outcome.error ? { error: outcome.error } : {}),
   };
 }
 
+export function deployRecordPathFor(recordsRoot: string, deployRunId: string): string {
+  return path.join(path.resolve(recordsRoot), "runs", `${deployRunId}.json`);
+}
+
 export async function writeNixosSharedHostDeployRecord(
   recordsRoot: string,
   record: NixosSharedHostDeployRecord,
 ): Promise<string> {
-  const runsDir = path.join(recordsRoot, "runs");
-  const recordPath = path.join(runsDir, `${record.deployRunId}.json`);
+  const recordPath = deployRecordPathFor(recordsRoot, record.deployRunId);
+  const runsDir = path.dirname(recordPath);
   await fsp.mkdir(runsDir, { recursive: true });
   await fsp.writeFile(recordPath, JSON.stringify(record, null, 2) + "\n", "utf8");
   return recordPath;
+}
+
+export async function readNixosSharedHostDeployRecord(
+  recordPath: string,
+): Promise<NixosSharedHostDeployRecord> {
+  const record = JSON.parse(await fsp.readFile(recordPath, "utf8")) as NixosSharedHostDeployRecord;
+  if (
+    record.schemaVersion !== NIXOS_SHARED_HOST_RECORD_SCHEMA ||
+    typeof record.deployRunId !== "string" ||
+    typeof record.deploymentLabel !== "string"
+  ) {
+    throw new Error(`invalid nixos-shared-host deploy record: ${recordPath}`);
+  }
+  return record;
 }
