@@ -1,7 +1,12 @@
 # NixOS Shared Host Setup
 
-This guide covers the reviewed install tooling for the current
-`nixos-shared-host` deployment slice.
+This is the canonical install and operator entrypoint for the current
+reviewed `nixos-shared-host` deployment slice.
+
+If you are setting up `mini` as the shared Nix host, start here. Use
+[Mini Shared-Dev Deployment Design](/Users/kiltyj/Code/bucknix-fresh/docs/mini-deployment.md)
+for background and provider design; use this guide for the actual server and
+client installation workflow.
 
 Current implemented scope:
 
@@ -17,8 +22,181 @@ The install workflow is now centered on:
 - dedicated repo-managed drop-in files
 - explicit dry-run, status, and uninstall commands
 
+Use this guide to:
+
+- install the server-side managed assets on `mini`
+- wire the managed anchor into `/etc/nixos/configuration.nix`
+- install a reviewed client profile on a dev machine or Jenkins agent
+- review the remote plan and run the current reviewed remote deploy flow
+
 `mini` remains a good example host, but it is no longer special in the
 contract.
+
+## Recommended Path For `mini`
+
+The default reviewed path is:
+
+- a repo checkout on `mini` at `/srv/common`
+- `server install --install-mode managed-manual-wire` on `mini`
+- a manual import of `/etc/nixos/bucknix/nixos-shared-host/default.nix` into
+  `/etc/nixos/configuration.nix`
+- `sudo nixos-rebuild switch` on `mini`
+- `client install --profile mini --destination mini` on each dev machine or CI
+  worker
+- `deploy --profile mini --plan` before the first remote deploy
+
+Use `managed-dropin` only when you explicitly want the installer to own the
+wiring block in the authoritative config entry file.
+
+## Quick Start For `mini`
+
+### 1. Prepare the server checkout
+
+On `mini`, make sure the current repo checkout exists at the path you want the
+remote profile to use later. The examples below assume:
+
+- remote repo checkout: `/srv/common`
+- authoritative config root: `/etc/nixos`
+- authoritative config entry: `/etc/nixos/configuration.nix`
+
+The `mini` host must be NixOS and its `/etc/nix/nix.conf` must already enable
+`nix-command` and `flakes`. All commands below should run from the chosen repo
+checkout.
+
+### 2. Install the server side on `mini`
+
+```bash
+cd /srv/common
+direnv exec . build-tools/tools/bin/nixos-shared-host-install \
+  server install \
+  --server-root / \
+  --config-root /etc/nixos \
+  --config-entry-path /etc/nixos/configuration.nix \
+  --install-mode managed-manual-wire
+```
+
+This writes the dedicated managed assets and state roots:
+
+- `/etc/nixos/bucknix/nixos-shared-host/install-manifest.json`
+- `/etc/nixos/bucknix/nixos-shared-host/nixos-shared-host-managed.nix`
+- `/etc/nixos/bucknix/nixos-shared-host/default.nix`
+- `/var/lib/bucknix/nixos-shared-host/platform-state.json`
+- `/var/lib/bucknix/nixos-shared-host/runtime`
+- `/var/lib/bucknix/nixos-shared-host/records`
+
+`managed-manual-wire` is the recommended default because it keeps
+`/etc/nixos/configuration.nix` operator-managed while still giving the shared
+host install a manifest-owned lifecycle.
+
+### 3. Wire the managed anchor into the host config
+
+`managed-manual-wire` prints the exact instruction you should add. For the
+default managed root, the anchor path is:
+
+- `/etc/nixos/bucknix/nixos-shared-host/default.nix`
+
+For a plain `/etc/nixos/configuration.nix`, the resulting import normally looks
+like:
+
+```nix
+imports = [
+  ./hardware-configuration.nix
+  /etc/nixos/bucknix/nixos-shared-host/default.nix
+];
+```
+
+If the host uses a flake-style config entry, add the same anchor path to the
+top-level `modules = [ ... ]` list instead. The installer prints the exact
+instruction because it detects which topology the host uses.
+
+Then apply the host config:
+
+```bash
+sudo nixos-rebuild switch
+```
+
+If you want the installer to own this wiring step too, use
+`--install-mode managed-dropin` instead. That mode inserts a dedicated managed
+block into the explicit `--config-entry-path` and removes it again during
+`server uninstall`.
+
+### 4. Verify the server install
+
+```bash
+cd /srv/common
+direnv exec . build-tools/tools/bin/nixos-shared-host-install \
+  server status \
+  --server-root / \
+  --config-root /etc/nixos
+```
+
+Expected steady-state result:
+
+- `managed` is `true`
+- `wiringState` is `wired`
+- the managed paths listed above exist
+
+### 5. Install a client profile on your dev machine or Jenkins worker
+
+From a repo checkout on the machine that will run deploys:
+
+```bash
+direnv exec . build-tools/tools/bin/nixos-shared-host-install \
+  client install \
+  --profile mini \
+  --destination mini \
+  --remote-repo-path /srv/common \
+  --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json \
+  --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime \
+  --remote-records-root /var/lib/bucknix/nixos-shared-host/records \
+  --ssh-mode ssh
+```
+
+This writes the local client manifest under:
+
+- `.local/deployments/nixos-shared-host/clients/mini.json`
+
+Use the same reviewed values on Jenkins; the wrapper later adds only the local
+artifact directory plus SSH credentials.
+
+### 6. Review the first remote plan
+
+```bash
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --plan
+```
+
+Review that the resolved destination, repo path, state path, runtime root, and
+records root all point at the `mini` install you just created.
+
+### 7. Run the current reviewed remote flow
+
+From a dev machine:
+
+```bash
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --artifact-dir ./dist \
+  --apply-host
+```
+
+From Jenkins:
+
+```bash
+direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --artifact-dir "$WORKSPACE/projects/apps/pleomino/dist" \
+  --ssh-identity-file "$JENKINS_SSH_IDENTITY" \
+  --ssh-known-hosts "$JENKINS_KNOWN_HOSTS"
+```
+
+For both paths, `--apply-host` and `--apply-host-dry-run` stay explicit.
+Ambient defaults still skip host apply. The rest of this document is reference
+detail for those same server and client workflows.
 
 ## What The Installer Manages
 
