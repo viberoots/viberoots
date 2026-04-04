@@ -516,39 +516,80 @@ sudo nixos-rebuild switch
 
 ## Deploying Pleomino To `mini` From Jenkins
 
-Current workable pattern:
-
-- Jenkins can now run the reviewed remote wrapper from another machine
-- Jenkins can opt into reviewed remote host apply with `--apply-host` or
-  preview it with `--apply-host-dry-run`
-- `mini` must already be installed as a managed `nixos-shared-host`
-- `mini` must already have a repo checkout that Jenkins can update or use
-- the host apply remains explicit and opt-in; Jenkins should choose that mode
-  deliberately rather than rely on ambient defaults
-
-Why this shape is required today:
-
-- `build-tools/tools/bin/deploy --profile <name>` now owns the reviewed SSH
-  transport and exact-artifact staging path
-- there is not yet a Jenkins-native pipeline wrapper, shared-control-plane
-  submission path, or shared-control-plane admission around host apply
-
-Example shape:
+The reviewed CI entrypoint is now:
 
 ```bash
-direnv exec . build-tools/tools/bin/deploy \
+direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
-  --artifact-dir ./dist
+  --artifact-dir "$WORKSPACE/projects/apps/pleomino/dist" \
+  --ssh-identity-file "$JENKINS_SSH_IDENTITY" \
+  --ssh-known-hosts "$JENKINS_KNOWN_HOSTS"
 ```
 
-Not yet implemented, but required for a finished Jenkins flow:
+Minimum Jenkins contract:
 
-- a reviewed Jenkins pipeline or wrapper that owns the SSH/transport step
-- first-class consumption of client/profile metadata from CI
-- shared-control-plane submission, locking, and admission for shared deploys
-- immutable artifact replay/promotion support beyond the current direct deploy
-  path
+- `--profile`
+  - selects the reviewed remote destination and remote repo/state/runtime/
+    records roots
+- `--artifact-dir`
+  - must point at an already-built local artifact directory
+- `--ssh-identity-file`
+  - required private key file for the reviewed SSH transport
+- `--ssh-known-hosts`
+  - required known-hosts file; the wrapper forces strict host-key checking and
+    batch mode so CI stays non-interactive
+- `--apply-host` or `--apply-host-dry-run`
+  - optional and explicit; host apply is never implicit
+
+Remote checkout expectations:
+
+- `mini` must already be installed as a managed `nixos-shared-host`
+- `mini` must already have a reviewed repo checkout at the path recorded in the
+  selected client profile
+- that remote checkout must include:
+  - `flake.nix`
+  - `build-tools/tools/bin/deploy`
+
+Concrete Pleomino `dev` to `mini` example with explicit host apply:
+
+```bash
+direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --artifact-dir "$WORKSPACE/projects/apps/pleomino/dist" \
+  --ssh-identity-file "$JENKINS_SSH_IDENTITY" \
+  --ssh-known-hosts "$JENKINS_KNOWN_HOSTS" \
+  --apply-host
+```
+
+Plan-only preflight for Jenkins:
+
+```bash
+direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --artifact-dir "$WORKSPACE/projects/apps/pleomino/dist" \
+  --ssh-identity-file "$JENKINS_SSH_IDENTITY" \
+  --ssh-known-hosts "$JENKINS_KNOWN_HOSTS" \
+  --plan
+```
+
+The wrapper always emits JSON on stdout. Success output includes:
+
+- the reviewed Jenkins contract summary
+- the resolved remote plan
+- the remote execution result, including the remote record path
+
+Failure output is also JSON and exits non-zero so Jenkins can parse the error
+without scraping stderr.
+
+This remains an interim direct-mutation route. It still does not do:
+
+- shared-control-plane submission or locking
+- remote repo checkout management
+- Cloudflare or multi-environment promotion
+- immutable artifact replay/promotion beyond this direct path
 
 ## Deploying Pleomino From Your Dev Machine Via The Reviewed Remote Flow
 

@@ -4,15 +4,35 @@ import path from "node:path";
 
 const FAKE_SSH = `#!/usr/bin/env bash
 set -euo pipefail
-destination="\${1:-}"
-shift || true
+destination=""
+while [[ "$#" -gt 0 ]]; do
+  case "\${1:-}" in
+    -o|-i|-F|-J|-p)
+      shift
+      [[ "$#" -gt 0 ]] || break
+      shift
+      ;;
+    -*)
+      shift
+      ;;
+    *)
+      destination="\${1:-}"
+      shift || true
+      break
+      ;;
+  esac
+done
 if [[ "\${FAKE_SSH_FAIL:-0}" == "1" ]]; then
   echo "fake ssh transport failure for \${destination}" >&2
   exit 97
 fi
+if [[ -z "\${destination}" ]]; then
+  echo "fake ssh expects a destination" >&2
+  exit 98
+fi
 if [[ "\${1:-}" != "bash" || "\${2:-}" != "-lc" ]]; then
   echo "fake ssh only supports: ssh <destination> bash -lc <script>" >&2
-  exit 98
+  exit 99
 fi
 script="\${3:-}"
 path_q="$(printf '%q' "\${PATH}")"
@@ -60,7 +80,16 @@ if [[ "\${FAKE_RSYNC_FAIL:-0}" == "1" ]]; then
 fi
 src=""
 dest=""
+skip_next=0
 for arg in "$@"; do
+  if [[ "$skip_next" == "1" ]]; then
+    skip_next=0
+    continue
+  fi
+  if [[ "$arg" == "-e" ]]; then
+    skip_next=1
+    continue
+  fi
   if [[ "$arg" == -* ]]; then
     continue
   fi

@@ -10,6 +10,10 @@ import {
   buildRemoteSshArgv,
   buildRemoteStagePrepareScript,
 } from "../../deployments/nixos-shared-host-remote-shell.ts";
+import {
+  REMOTE_SSH_IDENTITY_FILE_ENV,
+  REMOTE_SSH_KNOWN_HOSTS_FILE_ENV,
+} from "../../deployments/nixos-shared-host-remote-ssh.ts";
 import { createNixosSharedHostRemoteArtifactPath } from "../../deployments/nixos-shared-host-remote-target.ts";
 import type { NixosSharedHostRemotePlan } from "../../deployments/nixos-shared-host-remote-target.ts";
 
@@ -131,4 +135,47 @@ test("remote SSH transport assembles reviewed host-apply commands for switch and
     buildRemoteHostApplyScript(dryRunPlan),
   );
   assert.match(dryRunApply[4] || "", /--dry-run/);
+});
+
+test("remote SSH transport adds reviewed non-interactive auth options when Jenkins auth is present", () => {
+  const previousIdentity = process.env[REMOTE_SSH_IDENTITY_FILE_ENV];
+  const previousKnownHosts = process.env[REMOTE_SSH_KNOWN_HOSTS_FILE_ENV];
+  process.env[REMOTE_SSH_IDENTITY_FILE_ENV] = "/tmp/jenkins-id";
+  process.env[REMOTE_SSH_KNOWN_HOSTS_FILE_ENV] = "/tmp/known-hosts";
+  try {
+    const ssh = buildRemoteSshArgv(plan.destination, "echo ok");
+    assert.deepEqual(ssh.slice(0, 11), [
+      "ssh",
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "IdentitiesOnly=yes",
+      "-o",
+      "StrictHostKeyChecking=yes",
+      "-o",
+      "UserKnownHostsFile=/tmp/known-hosts",
+      "-i",
+      "/tmp/jenkins-id",
+    ]);
+    const stage = buildRemoteArtifactStageArgv(
+      "/tmp/local-artifact",
+      plan.destination,
+      "/tmp/remote",
+    );
+    assert.equal(stage[3], "-e");
+    assert.match(stage[4] || "", /BatchMode=yes/);
+    assert.match(stage[4] || "", /UserKnownHostsFile=\/tmp\/known-hosts/);
+    assert.match(stage[4] || "", /\/tmp\/jenkins-id/);
+  } finally {
+    if (previousIdentity == null) {
+      delete process.env[REMOTE_SSH_IDENTITY_FILE_ENV];
+    } else {
+      process.env[REMOTE_SSH_IDENTITY_FILE_ENV] = previousIdentity;
+    }
+    if (previousKnownHosts == null) {
+      delete process.env[REMOTE_SSH_KNOWN_HOSTS_FILE_ENV];
+    } else {
+      process.env[REMOTE_SSH_KNOWN_HOSTS_FILE_ENV] = previousKnownHosts;
+    }
+  }
 });

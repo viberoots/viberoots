@@ -1,5 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import { shSingleQuote } from "../lib/shell-quote.ts";
+import {
+  buildReviewedRemoteRsyncShell,
+  buildReviewedRemoteSshArgvPrefix,
+} from "./nixos-shared-host-remote-ssh.ts";
 import type { NixosSharedHostRemotePlan } from "./nixos-shared-host-remote-target.ts";
 
 export type NixosSharedHostRemoteSmokeConnectOverride = {
@@ -17,7 +21,7 @@ function commandFlags(flags: string[]): string {
 }
 
 export function buildRemoteSshArgv(destination: string, script: string): string[] {
-  return ["ssh", destination, "bash", "-lc", script];
+  return [...buildReviewedRemoteSshArgvPrefix(), destination, "bash", "-lc", script];
 }
 
 export function buildRemoteArtifactStageArgv(
@@ -27,7 +31,15 @@ export function buildRemoteArtifactStageArgv(
 ): string[] {
   const source = localArtifactDir.endsWith("/") ? localArtifactDir : `${localArtifactDir}/`;
   const remoteTarget = `${destination}:${remoteArtifactPath.endsWith("/") ? remoteArtifactPath : `${remoteArtifactPath}/`}`;
-  return ["rsync", "-az", "--delete", source, remoteTarget];
+  const rsyncShell = buildReviewedRemoteRsyncShell();
+  return [
+    "rsync",
+    "-az",
+    "--delete",
+    ...(rsyncShell ? ["-e", rsyncShell] : []),
+    source,
+    remoteTarget,
+  ];
 }
 
 export function buildRemoteRepoPreflightScript(plan: NixosSharedHostRemotePlan): string {
