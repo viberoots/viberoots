@@ -15,8 +15,16 @@ test("nixos-shared-host durable records persist canonical provider-target identi
     artifactIdentity: "static-webapp:abc123",
     artifactLineageId: "static-webapp:abc123",
     publicUrl: "https://demoapp.apps.kilty.io/",
+    authority: {
+      kind: "control-plane-worker",
+      submissionId: "cp-123",
+      submissionPath: "/tmp/control-plane/submissions/cp-123.json",
+      workerId: "cp-123-worker",
+      lockScope: "nixos-shared-host:shared-dev:demoapp",
+      executionSnapshotPath: "/tmp/control-plane/snapshots/cp-123.json",
+    },
   });
-  assert.equal(record.schemaVersion, "deploy-record@2026-03-25");
+  assert.equal(record.schemaVersion, "deploy-record@2026-04-03");
   assert.equal(record.operationKind, "deploy");
   assert.equal(record.publishMode, "normal");
   assert.equal(record.lifecycleState, "finished");
@@ -24,6 +32,14 @@ test("nixos-shared-host durable records persist canonical provider-target identi
   assert.equal(record.provider, "nixos-shared-host");
   assert.equal(record.providerTargetIdentity, "nixos-shared-host:shared-dev:demoapp");
   assert.deepEqual(record.providerTarget, record.effectiveRunTarget);
+  assert.deepEqual(record.controlPlane, {
+    submissionId: "cp-123",
+    submissionPath: "/tmp/control-plane/submissions/cp-123.json",
+    workerId: "cp-123-worker",
+    admission: "admitted",
+    lockScope: "nixos-shared-host:shared-dev:demoapp",
+    executionSnapshotPath: "/tmp/control-plane/snapshots/cp-123.json",
+  });
   assert.equal(record.artifact?.identity, "static-webapp:abc123");
   assert.equal(record.artifactLineageId, "static-webapp:abc123");
   assert.equal(record.publisherType, "nixos-shared-host-static-webapp");

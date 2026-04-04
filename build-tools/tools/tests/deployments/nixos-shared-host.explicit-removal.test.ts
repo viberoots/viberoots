@@ -38,6 +38,13 @@ test("nixos-shared-host deploy CLI records explicit removal and cleans up the re
       assert.equal(record.runClassification, "explicit_removal");
       assert.equal(record.finalOutcome, "succeeded");
       assert.equal(record.providerTargetIdentity, "nixos-shared-host:default:demoapp");
+      assert.equal(record.controlPlane.submissionId, summary.controlPlane.submissionId);
+      assert.equal(record.controlPlane.lockScope, "nixos-shared-host:default:demoapp");
+      const snapshot = JSON.parse(
+        await fsp.readFile(record.controlPlane.executionSnapshotPath, "utf8"),
+      );
+      assert.equal(snapshot.action.kind, "explicit_removal");
+      assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:demoapp");
       await assert.rejects(fsp.access(path.join(hostRoot, "containers", "demoapp")));
       const state = JSON.parse(await fsp.readFile(statePath, "utf8"));
       assert.deepEqual(state.deployments, []);

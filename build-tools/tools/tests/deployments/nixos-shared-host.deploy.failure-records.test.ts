@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runNixosSharedHostStaticDeploy } from "../../deployments/nixos-shared-host-static-deploy.ts";
+import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
@@ -28,12 +28,15 @@ test("nixos-shared-host deploy records smoke failure when the public health path
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
       await assert.rejects(
-        runNixosSharedHostStaticDeploy({
+        submitNixosSharedHostControlPlaneRun({
+          operationKind: "deploy",
           deployment,
           artifactDir,
-          statePath: path.join(tmp, "platform-state.json"),
-          hostRoot,
-          recordsRoot,
+          paths: {
+            statePath: path.join(tmp, "platform-state.json"),
+            hostRoot,
+            recordsRoot,
+          },
           smokeConnectOverride: {
             protocol: "https:",
             hostname: "127.0.0.1",
@@ -44,6 +47,7 @@ test("nixos-shared-host deploy records smoke failure when the public health path
         (error: any) => {
           assert.equal(error.record.finalOutcome, "smoke_failed_after_publish");
           assert.equal(error.record.failedStep, "smoke");
+          assert.equal(error.record.controlPlane.lockScope, "nixos-shared-host:default:demoapp");
           assert.match(error.record.error, /expected 200/);
           return true;
         },
@@ -53,6 +57,7 @@ test("nixos-shared-host deploy records smoke failure when the public health path
       const record = JSON.parse(await fsp.readFile(path.join(runsDir, recordName), "utf8"));
       assert.equal(record.runClassification, "deploy");
       assert.equal(record.finalOutcome, "smoke_failed_after_publish");
+      assert.equal(record.controlPlane.lockScope, "nixos-shared-host:default:demoapp");
     } finally {
       await server.close();
     }
@@ -69,12 +74,15 @@ test("nixos-shared-host deploy rejects a reachable hostname serving the wrong ar
     const server = await startNixosSharedHostPublicServer({ deployment, fixedRoot });
     try {
       await assert.rejects(
-        runNixosSharedHostStaticDeploy({
+        submitNixosSharedHostControlPlaneRun({
+          operationKind: "deploy",
           deployment,
           artifactDir,
-          statePath: path.join(tmp, "platform-state.json"),
-          hostRoot: path.join(tmp, "host"),
-          recordsRoot: path.join(tmp, "records"),
+          paths: {
+            statePath: path.join(tmp, "platform-state.json"),
+            hostRoot: path.join(tmp, "host"),
+            recordsRoot: path.join(tmp, "records"),
+          },
           smokeConnectOverride: {
             protocol: "https:",
             hostname: "127.0.0.1",
@@ -85,6 +93,7 @@ test("nixos-shared-host deploy rejects a reachable hostname serving the wrong ar
         (error: any) => {
           assert.equal(error.record.finalOutcome, "smoke_failed_after_publish");
           assert.equal(error.record.failedStep, "smoke");
+          assert.equal(error.record.controlPlane.lockScope, "nixos-shared-host:default:demoapp");
           assert.match(error.message, /smoke content mismatch/);
           return true;
         },

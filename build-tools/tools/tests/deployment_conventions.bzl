@@ -5,6 +5,7 @@ _REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-domain.taxonomy-drift.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-verify-scope.boundary.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.control-plane.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.contract.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.jenkins.contract.test.ts": True,

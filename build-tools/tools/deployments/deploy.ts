@@ -4,13 +4,12 @@ import path from "node:path";
 import { nodesFromCqueryJson } from "../buck/exporter/cquery/nodes.ts";
 import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
 import { resolveSelectedTargetLabel } from "../dev/target-label-resolver.ts";
-import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli.ts";
 import { normalizeTargetLabel } from "../lib/labels.ts";
 import { findRepoRoot } from "../lib/repo.ts";
 import { extractNixosSharedHostDeployments, type NixosSharedHostDeployment } from "./contract.ts";
+import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
 import { maybeRunNixosSharedHostRemoteProfile } from "./nixos-shared-host-remote-cli.ts";
-import { runNixosSharedHostExplicitRemoval } from "./nixos-shared-host-explicit-removal.ts";
-import { runNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy.ts";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();
@@ -122,13 +121,6 @@ async function resolveArtifactDir(
   return path.join(outPath, "dist");
 }
 
-function requireNamedFlagValue(name: string): string {
-  if (!hasFlag(name)) return "";
-  const value = getFlagStr(name, "").trim();
-  if (!value) throw new Error(`--${name} requires a non-empty value`);
-  return value;
-}
-
 async function main() {
   const workspaceRoot = await findRepoRoot(process.cwd());
   const deployment = await resolveDeployment(workspaceRoot);
@@ -140,26 +132,28 @@ async function main() {
   const statePath = path.resolve(getFlagStr("state", path.join(hostRoot, "platform-state.json")));
   const recordsRoot = path.resolve(getFlagStr("records-root", path.join(hostRoot, "records")));
   const hostConfigPath = getFlagStr("host-config-out", "").trim();
+  const paths = {
+    statePath,
+    hostRoot,
+    recordsRoot,
+    ...(hostConfigPath ? { hostConfigPath: path.resolve(hostConfigPath) } : {}),
+  };
   const result = remove
-    ? await runNixosSharedHostExplicitRemoval({
+    ? await submitNixosSharedHostControlPlaneRun({
+        operationKind: "explicit_removal",
         deployment,
-        statePath,
-        hostRoot,
-        recordsRoot,
-        ...(hostConfigPath ? { hostConfigPath: path.resolve(hostConfigPath) } : {}),
+        paths,
       })
     : await (async () => {
         const artifactDir = await resolveArtifactDir(workspaceRoot, deployment);
         const smokeConnectHost = getFlagStr("smoke-connect-host", "").trim();
         const smokeConnectPort = Number(getFlagStr("smoke-connect-port", "").trim() || 0);
         const smokeConnectProtocol = getFlagStr("smoke-connect-protocol", "https:").trim();
-        return await runNixosSharedHostStaticDeploy({
+        return await submitNixosSharedHostControlPlaneRun({
+          operationKind: "deploy",
           deployment,
           artifactDir,
-          statePath,
-          hostRoot,
-          recordsRoot,
-          ...(hostConfigPath ? { hostConfigPath: path.resolve(hostConfigPath) } : {}),
+          paths,
           ...(smokeConnectHost && smokeConnectPort > 0
             ? {
                 smokeConnectOverride: {
@@ -182,6 +176,7 @@ async function main() {
         artifactIdentity: result.record.artifact?.identity,
         publicUrl: result.record.publicUrl,
         recordPath: result.recordPath,
+        ...(result.record.controlPlane ? { controlPlane: result.record.controlPlane } : {}),
       },
       null,
       2,

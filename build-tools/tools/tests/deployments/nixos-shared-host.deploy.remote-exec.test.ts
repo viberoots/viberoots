@@ -157,6 +157,12 @@ test("remote deploy stages the artifact, runs deploy remotely, writes remote rec
       assert.equal(summary.remoteRecordsRoot, remoteRecordsRoot);
       const record = JSON.parse(await fsp.readFile(summary.remoteDeployResult.recordPath, "utf8"));
       assert.equal(record.finalOutcome, "succeeded");
+      assert.equal(record.controlPlane.lockScope, "nixos-shared-host:default:pleomino");
+      const snapshot = JSON.parse(
+        await fsp.readFile(record.controlPlane.executionSnapshotPath, "utf8"),
+      );
+      assert.equal(snapshot.deploymentLabel, "//projects/deployments/pleomino-dev:deploy");
+      assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:pleomino");
       const liveIndex = path.join(
         nixosSharedHostContainerRoot(remoteRuntimeRoot, deployment.providerTarget.containerName),
         "srv/static-app/live/index.html",

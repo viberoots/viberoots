@@ -67,6 +67,15 @@ test("jenkins wrapper stages the Pleomino artifact, runs remote deploy, optional
       assert.equal(summary.remoteExecution.remoteDeployResult.finalOutcome, "succeeded");
       assert.equal(summary.remoteExecution.hostApply.selectedMode, "switch");
       assert.equal(summary.remoteExecution.hostApply.result.applied, true);
+      const record = JSON.parse(
+        await fsp.readFile(summary.remoteExecution.remoteDeployResult.recordPath, "utf8"),
+      );
+      assert.equal(record.controlPlane.lockScope, "nixos-shared-host:default:pleomino");
+      const snapshot = JSON.parse(
+        await fsp.readFile(record.controlPlane.executionSnapshotPath, "utf8"),
+      );
+      assert.equal(snapshot.deploymentLabel, "//projects/deployments/pleomino-dev:deploy");
+      assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:pleomino");
       const liveIndex = path.join(
         nixosSharedHostContainerRoot(remoteRuntimeRoot, deployment.providerTarget.containerName),
         "srv/static-app/live/index.html",

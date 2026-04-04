@@ -32,15 +32,27 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
       assert.equal(summary.runClassification, "deploy");
       assert.equal(summary.finalOutcome, "succeeded");
       assert.equal(summary.publicUrl, "https://demoapp.apps.kilty.io/");
+      assert.equal(summary.controlPlane.lockScope, "nixos-shared-host:default:demoapp");
       const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
-      assert.equal(record.schemaVersion, "deploy-record@2026-03-25");
+      assert.equal(record.schemaVersion, "deploy-record@2026-04-03");
       assert.equal(record.deployRunId, summary.deployRunId);
       assert.equal(record.runClassification, "deploy");
       assert.equal(record.lifecycleState, "finished");
       assert.equal(record.provider, "nixos-shared-host");
       assert.equal(record.providerTargetIdentity, "nixos-shared-host:default:demoapp");
+      assert.equal(record.controlPlane.submissionId, summary.controlPlane.submissionId);
+      assert.equal(record.controlPlane.lockScope, "nixos-shared-host:default:demoapp");
+      assert.equal(
+        record.controlPlane.executionSnapshotPath,
+        summary.controlPlane.executionSnapshotPath,
+      );
       assert.equal(record.artifact.identity, summary.artifactIdentity);
       assert.equal(record.finalOutcome, "succeeded");
+      const snapshot = JSON.parse(
+        await fsp.readFile(record.controlPlane.executionSnapshotPath, "utf8"),
+      );
+      assert.equal(snapshot.deploymentLabel, "//projects/deployments/demoapp-dev:deploy");
+      assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:demoapp");
       const rendered = JSON.parse(await fsp.readFile(path.join(tmp, "rendered-host.json"), "utf8"));
       assert.ok(rendered.containers.demoapp);
     } finally {

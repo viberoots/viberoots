@@ -1,4 +1,8 @@
 #!/usr/bin/env zx-wrapper
+import {
+  requireNixosSharedHostControlPlaneAuthority,
+  type NixosSharedHostControlPlaneWorkerAuthority,
+} from "./nixos-shared-host-control-plane-contract.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import {
   readNixosSharedHostPlatformStateOrEmpty,
@@ -20,7 +24,9 @@ export async function runNixosSharedHostExplicitRemoval(opts: {
   hostRoot: string;
   recordsRoot: string;
   hostConfigPath?: string;
+  authority?: NixosSharedHostControlPlaneWorkerAuthority;
 }): Promise<{ record: NixosSharedHostDeployRecord; recordPath: string }> {
+  const authority = requireNixosSharedHostControlPlaneAuthority(opts.deployment, opts.authority);
   const runId = createNixosSharedHostDeployRunId("remove");
   try {
     const current = await readNixosSharedHostPlatformStateOrEmpty(opts.statePath);
@@ -33,6 +39,7 @@ export async function runNixosSharedHostExplicitRemoval(opts: {
       deployRunId: runId,
       runClassification: "explicit_removal",
       finalOutcome: "succeeded",
+      authority,
     });
     return { record, recordPath: await writeNixosSharedHostDeployRecord(opts.recordsRoot, record) };
   } catch (error) {
@@ -43,6 +50,7 @@ export async function runNixosSharedHostExplicitRemoval(opts: {
       finalOutcome: "provision_failed",
       failedStep: "provision",
       error: message,
+      authority,
     });
     const recordPath = await writeNixosSharedHostDeployRecord(opts.recordsRoot, record);
     throw Object.assign(error instanceof Error ? error : new Error(message), {

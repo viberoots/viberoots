@@ -1,4 +1,8 @@
 #!/usr/bin/env zx-wrapper
+import {
+  requireNixosSharedHostControlPlaneAuthority,
+  type NixosSharedHostControlPlaneWorkerAuthority,
+} from "./nixos-shared-host-control-plane-contract.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import {
   readNixosSharedHostPlatformStateOrEmpty,
@@ -36,6 +40,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
   hostRoot: string;
   recordsRoot: string;
   hostConfigPath?: string;
+  authority?: NixosSharedHostControlPlaneWorkerAuthority;
   smokeConnectOverride?: {
     protocol: "http:" | "https:";
     hostname: string;
@@ -43,6 +48,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
     rejectUnauthorized?: boolean;
   };
 }): Promise<{ record: NixosSharedHostDeployRecord; recordPath: string }> {
+  const authority = requireNixosSharedHostControlPlaneAuthority(opts.deployment, opts.authority);
   const runId = createNixosSharedHostDeployRunId();
   try {
     const current = await readNixosSharedHostPlatformStateOrEmpty(opts.statePath);
@@ -79,6 +85,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
       artifactLineageId: published.artifactIdentity,
       publicUrl: smoke.publicUrl,
       healthUrl: smoke.healthUrl,
+      authority,
     });
     return { record, recordPath: await writeNixosSharedHostDeployRecord(opts.recordsRoot, record) };
   } catch (error) {
@@ -104,6 +111,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
       finalOutcome,
       failedStep,
       error: message,
+      authority,
     });
     const recordPath = await writeNixosSharedHostDeployRecord(opts.recordsRoot, record);
     throw Object.assign(error instanceof Error ? error : new Error(message), {

@@ -2,13 +2,14 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import type { NixosSharedHostControlPlaneWorkerAuthority } from "./nixos-shared-host-control-plane-contract.ts";
 import {
   NIXOS_SHARED_HOST_PROVIDER,
   type NixosSharedHostDeployment,
   type NixosSharedHostProviderTarget,
 } from "./contract.ts";
 
-export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-03-25";
+export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-03";
 
 export type NixosSharedHostRunClassification = "deploy" | "explicit_removal";
 export type NixosSharedHostFinalOutcome =
@@ -33,6 +34,14 @@ export type NixosSharedHostDeployRecord = {
   providerTarget: NixosSharedHostProviderTarget;
   effectiveRunTarget: NixosSharedHostProviderTarget;
   providerTargetIdentity: string;
+  controlPlane?: {
+    submissionId: string;
+    submissionPath: string;
+    workerId: string;
+    admission: "admitted";
+    lockScope: string;
+    executionSnapshotPath: string;
+  };
   parentRunId?: string;
   releaseLineageId?: string;
   artifactLineageId?: string;
@@ -60,6 +69,7 @@ type NixosSharedHostRecordOutcome = {
   parentRunId?: string;
   releaseLineageId?: string;
   artifactLineageId?: string;
+  authority?: NixosSharedHostControlPlaneWorkerAuthority;
 };
 
 export function createNixosSharedHostDeployRunId(prefix = "deploy"): string {
@@ -85,6 +95,18 @@ export function createNixosSharedHostDeployRecord(
     providerTarget: deployment.providerTarget,
     effectiveRunTarget: deployment.providerTarget,
     providerTargetIdentity: deployment.providerTarget.sharedDevTargetIdentity,
+    ...(outcome.authority
+      ? {
+          controlPlane: {
+            submissionId: outcome.authority.submissionId,
+            submissionPath: outcome.authority.submissionPath,
+            workerId: outcome.authority.workerId,
+            admission: "admitted" as const,
+            lockScope: outcome.authority.lockScope,
+            executionSnapshotPath: outcome.authority.executionSnapshotPath,
+          },
+        }
+      : {}),
     ...(outcome.parentRunId ? { parentRunId: outcome.parentRunId } : {}),
     ...(outcome.releaseLineageId ? { releaseLineageId: outcome.releaseLineageId } : {}),
     ...(outcome.artifactLineageId ? { artifactLineageId: outcome.artifactLineageId } : {}),

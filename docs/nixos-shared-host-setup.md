@@ -8,6 +8,11 @@ If you are setting up `mini` as the shared Nix host, start here. Use
 for background and provider design; use this guide for the actual server and
 client installation workflow.
 
+If you are handing this work to technicians, give them
+[NixOS Shared Host Technician Checklist](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-technician-checklist.md)
+first. It is the short SOP version of this guide and follows the same reviewed
+default path for `mini`.
+
 Current implemented scope:
 
 - provider family: `nixos-shared-host`
@@ -625,8 +630,10 @@ Transport contract in this interim slice:
 - staged artifacts are removed by default after the remote deploy returns
 - pass `--retain-remote-artifact` to keep the staged remote artifact for
   debugging
-- this is still an interim direct-mutation operator aid, not the later
-  shared-control-plane submission model
+- mutating `shared_nonprod` deploys and explicit removals now submit through the
+  shared control plane instead of mutating host state directly from the caller
+- the control plane freezes one execution snapshot, acquires the canonical
+  provider-target lock, and then invokes the reviewed worker path
 
 ## Managed Manifest Contract
 
@@ -685,6 +692,15 @@ direnv exec . build-tools/tools/bin/deploy \
   --state /var/lib/bucknix/nixos-shared-host/platform-state.json \
   --records-root /var/lib/bucknix/nixos-shared-host/records
 ```
+
+For `shared_nonprod`, that command now submits to the shared control plane. The
+control-plane state lands under:
+
+- `<records-root>/control-plane/submissions/*.json`
+- `<records-root>/control-plane/snapshots/*.json`
+
+The deploy record written under `<records-root>/runs/*.json` also records the
+admitted control-plane submission id, lock scope, and execution-snapshot path.
 
 Then apply server config as usual:
 
@@ -762,9 +778,17 @@ The wrapper always emits JSON on stdout. Success output includes:
 Failure output is also JSON and exits non-zero so Jenkins can parse the error
 without scraping stderr.
 
-This remains an interim direct-mutation route. It still does not do:
+This flow now submits through the shared control plane for the remote
+`shared_nonprod` mutation. Current locking and authority behavior:
 
-- shared-control-plane submission or locking
+- lock scope is the canonical provider-target identity
+  - for Pleomino `dev` on `mini`: `nixos-shared-host:default:pleomino`
+- concurrent submissions on the same target fail closed with a lock conflict
+- the deploy record preserves the control-plane submission and frozen
+  execution-snapshot references
+
+It still does not do:
+
 - remote repo checkout management
 - Cloudflare or multi-environment promotion
 - immutable artifact replay/promotion beyond this direct path
@@ -830,16 +854,12 @@ The remote summary reports:
 - the remote deploy result JSON, including the remote record path
 - the selected host-apply mode and, when requested, the reviewed host-apply
   result JSON
+- the remote deploy record's control-plane references under
+  `<records-root>/control-plane`
 
 This flow still does not do:
 
-- shared-control-plane submission or locking
 - remote repo checkout management
-
-Not yet implemented, but required for a finished dev-machine remote flow:
-
-- a shared-control-plane path instead of direct host mutation from the operator
-  path
 
 ## Upgrade Guidance
 
