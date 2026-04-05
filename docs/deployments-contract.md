@@ -126,6 +126,10 @@ design has been explicitly updated first.
 - Replay-sensitive secret and runtime-config references must resolve exactly to the admitted reference set for the replayed run kind.
 - `retry` and `rollback` must fail closed if recorded admitted secret or runtime-config references have expired, been deleted, been revoked, or cannot be resolved exactly; implementations must not silently substitute newer, rotated, ambient, or `latest` values.
 - `promotion` uses the target deployment's newly admitted target-environment secret and runtime-config references rather than replaying the source deployment's references.
+- Concrete Pleomino example:
+  - `pleomino-dev -> pleomino-staging -> pleomino-prod` reuses one exact static-webapp artifact when the lane stays on `artifact_reuse_mode = "same_artifact"`.
+  - the selected source run contributes the immutable artifact plus recorded source snapshot evidence, while the target deployment still freezes its own admitted execution snapshot and target identity before mutation.
+  - `parent_run_id` points at the immediately promoted source run, `release_lineage_id` stays stable across the whole promoted release line, and `artifact_lineage_id` stays stable only while the exact same artifact is reused.
 - Recorded `release_actions` replay policy must use one closed disposition per replay context: `rerun`, `skip`, or `fail`.
 - Recorded side-effecting `release_actions` that declare `rerun` must also record or reference the duplicate-execution safety contract that made rerun admissible for that context.
 - Protected/shared replay by exact artifact ref is valid only when the artifact ref resolves unambiguously to one admitted source-run snapshot.

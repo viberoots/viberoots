@@ -1,13 +1,18 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
 import path from "node:path";
-import { resolveInitialCloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
+import {
+  resolveInitialCloudflarePagesAdmittedContext,
+  resolvePromotionCloudflarePagesAdmittedContext,
+} from "./cloudflare-pages-admission.ts";
 import {
   CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA,
   CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMISSION_SCHEMA,
+  type CloudflarePagesControlPlaneOperationKind,
   type CloudflarePagesControlPlaneSnapshot,
-  type CloudflarePagesSmokeConnectOverride,
   type CloudflarePagesControlPlaneSubmission,
+  type CloudflarePagesPublishBehavior,
+  type CloudflarePagesSmokeConnectOverride,
 } from "./cloudflare-pages-control-plane-contract.ts";
 import { runCloudflarePagesStaticDeploy } from "./cloudflare-pages-static-deploy.ts";
 import type { CloudflarePagesDeployRecord } from "./cloudflare-pages-records.ts";
@@ -19,12 +24,35 @@ import {
   submissionPathFor,
   writeControlPlaneJson,
 } from "./nixos-shared-host-control-plane-store.ts";
-import { admitStaticWebappArtifact } from "./static-webapp-artifacts.ts";
+import {
+  admitStaticWebappArtifact,
+  type AdmittedStaticWebappArtifact,
+} from "./static-webapp-artifacts.ts";
+
+type PromotionSourceSelection = {
+  record: { deployRunId: string; deploymentId: string };
+  recordPath: string;
+  replaySnapshotPath: string;
+};
+
+type SubmitOpts = {
+  workspaceRoot: string;
+  deployment: CloudflarePagesDeployment;
+  recordsRoot: string;
+  artifactDir?: string;
+  artifact?: AdmittedStaticWebappArtifact;
+  operationKind?: CloudflarePagesControlPlaneOperationKind;
+  publishBehavior?: CloudflarePagesPublishBehavior;
+  parentRunId?: string;
+  releaseLineageId?: string;
+  artifactLineageId?: string;
+  source?: PromotionSourceSelection;
+  smokeConnectOverride?: CloudflarePagesSmokeConnectOverride;
+};
 
 function createSubmissionId(): string {
   return `cp-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
 }
-
 function createWorkerId(submissionId: string): string {
   return `${submissionId}-worker`;
 }
@@ -35,6 +63,69 @@ function admissionReasonFor(
   return deployment.protectionClass === "production_facing"
     ? "production_facing"
     : "shared_nonprod";
+}
+
+async function createSnapshot(
+  opts: SubmitOpts,
+  submissionId: string,
+): Promise<CloudflarePagesControlPlaneSnapshot> {
+  const operationKind = opts.operationKind || "deploy";
+  const publishBehavior = opts.publishBehavior || "deploy";
+  if (operationKind === "promotion" && !opts.source) {
+    throw new Error("cloudflare-pages promotion requires source run evidence");
+  }
+  if (!opts.artifact && !opts.artifactDir) {
+    throw new Error(`cloudflare-pages ${operationKind} submission requires exact artifact input`);
+  }
+  const artifact =
+    opts.artifact ||
+    (await admitStaticWebappArtifact({
+      recordsRoot: opts.recordsRoot,
+      artifactDir: path.resolve(opts.artifactDir || ""),
+    }));
+  const admittedContext = opts.source
+    ? await resolvePromotionCloudflarePagesAdmittedContext({
+        workspaceRoot: opts.workspaceRoot,
+        deployment: opts.deployment,
+        artifactIdentity: artifact.identity,
+        sourceRecord: opts.source.record,
+      })
+    : await resolveInitialCloudflarePagesAdmittedContext({
+        workspaceRoot: opts.workspaceRoot,
+        deployment: opts.deployment,
+        artifactIdentity: artifact.identity,
+      });
+  const lockScope = opts.deployment.providerTarget.providerTargetIdentity;
+  return {
+    schemaVersion: CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA,
+    submissionId,
+    submittedAt: new Date().toISOString(),
+    operationKind,
+    deploymentId: opts.deployment.deploymentId,
+    deploymentLabel: opts.deployment.label,
+    providerTargetIdentity: lockScope,
+    lockScope,
+    deployment: opts.deployment,
+    admittedContext,
+    paths: {
+      workspaceRoot: path.resolve(opts.workspaceRoot),
+      recordsRoot: path.resolve(opts.recordsRoot),
+    },
+    action: {
+      kind: "deploy",
+      publishBehavior,
+      publishInput: {
+        kind: "exact-artifact",
+        artifact,
+      },
+      ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
+      ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
+      ...(opts.artifactLineageId ? { artifactLineageId: opts.artifactLineageId } : {}),
+      ...(opts.source ? { sourceRecordPath: opts.source.recordPath } : {}),
+      ...(opts.source ? { sourceReplaySnapshotPath: opts.source.replaySnapshotPath } : {}),
+    },
+    ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
+  };
 }
 
 async function runWorker(opts: {
@@ -50,7 +141,15 @@ async function runWorker(opts: {
     deployment: snapshot.deployment,
     artifact: snapshot.action.publishInput.artifact,
     recordsRoot: snapshot.paths.recordsRoot,
+    operationKind: snapshot.operationKind,
     admittedContext: snapshot.admittedContext,
+    ...(snapshot.action.parentRunId ? { parentRunId: snapshot.action.parentRunId } : {}),
+    ...(snapshot.action.releaseLineageId
+      ? { releaseLineageId: snapshot.action.releaseLineageId }
+      : {}),
+    ...(snapshot.action.artifactLineageId
+      ? { artifactLineageId: snapshot.action.artifactLineageId }
+      : {}),
     authority: {
       kind: "control-plane-worker",
       submissionId: snapshot.submissionId,
@@ -65,13 +164,7 @@ async function runWorker(opts: {
   });
 }
 
-export async function submitCloudflarePagesControlPlaneDeploy(opts: {
-  workspaceRoot: string;
-  deployment: CloudflarePagesDeployment;
-  artifactDir: string;
-  recordsRoot: string;
-  smokeConnectOverride?: CloudflarePagesSmokeConnectOverride;
-}): Promise<{
+export async function submitCloudflarePagesControlPlaneDeploy(opts: SubmitOpts): Promise<{
   submission: CloudflarePagesControlPlaneSubmission;
   submissionPath: string;
   executionSnapshotPath: string;
@@ -80,57 +173,23 @@ export async function submitCloudflarePagesControlPlaneDeploy(opts: {
   recordPath: string;
 }> {
   const submissionId = createSubmissionId();
-  const submittedAt = new Date().toISOString();
-  const artifact = await admitStaticWebappArtifact({
-    recordsRoot: opts.recordsRoot,
-    artifactDir: path.resolve(opts.artifactDir),
-  });
-  const admittedContext = await resolveInitialCloudflarePagesAdmittedContext({
-    workspaceRoot: opts.workspaceRoot,
-    deployment: opts.deployment,
-    artifactIdentity: artifact.identity,
-  });
-  const lockScope = opts.deployment.providerTarget.providerTargetIdentity;
-  const snapshot: CloudflarePagesControlPlaneSnapshot = {
-    schemaVersion: CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA,
-    submissionId,
-    submittedAt,
-    operationKind: "deploy",
-    deploymentId: opts.deployment.deploymentId,
-    deploymentLabel: opts.deployment.label,
-    providerTargetIdentity: lockScope,
-    lockScope,
-    deployment: opts.deployment,
-    admittedContext,
-    paths: {
-      workspaceRoot: path.resolve(opts.workspaceRoot),
-      recordsRoot: path.resolve(opts.recordsRoot),
-    },
-    action: {
-      kind: "deploy",
-      publishInput: {
-        kind: "exact-artifact",
-        artifact,
-      },
-    },
-    ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
-  };
+  const snapshot = await createSnapshot(opts, submissionId);
   const executionSnapshotPath = executionSnapshotPathFor(opts.recordsRoot, submissionId);
   const submissionPath = submissionPathFor(opts.recordsRoot, submissionId);
   await writeControlPlaneJson(executionSnapshotPath, snapshot);
   let releaseLock: (() => Promise<void>) | undefined;
   try {
-    releaseLock = await acquireControlPlaneLock(opts.recordsRoot, lockScope);
+    releaseLock = await acquireControlPlaneLock(opts.recordsRoot, snapshot.lockScope);
   } catch (error) {
     const rejected: CloudflarePagesControlPlaneSubmission = {
       schemaVersion: CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMISSION_SCHEMA,
       submissionId,
-      submittedAt,
-      operationKind: "deploy",
+      submittedAt: snapshot.submittedAt,
+      operationKind: snapshot.operationKind,
       deploymentId: opts.deployment.deploymentId,
       deploymentLabel: opts.deployment.label,
-      providerTargetIdentity: lockScope,
-      lockScope,
+      providerTargetIdentity: snapshot.lockScope,
+      lockScope: snapshot.lockScope,
       executionSnapshotPath,
       admission: { decision: "rejected", reason: "lock_conflict" },
     };
@@ -140,12 +199,12 @@ export async function submitCloudflarePagesControlPlaneDeploy(opts: {
   let submission: CloudflarePagesControlPlaneSubmission = {
     schemaVersion: CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMISSION_SCHEMA,
     submissionId,
-    submittedAt,
-    operationKind: "deploy",
+    submittedAt: snapshot.submittedAt,
+    operationKind: snapshot.operationKind,
     deploymentId: opts.deployment.deploymentId,
     deploymentLabel: opts.deployment.label,
-    providerTargetIdentity: lockScope,
-    lockScope,
+    providerTargetIdentity: snapshot.lockScope,
+    lockScope: snapshot.lockScope,
     executionSnapshotPath,
     workerId: createWorkerId(submissionId),
     admission: { decision: "admitted", reason: admissionReasonFor(opts.deployment) },
@@ -168,7 +227,7 @@ export async function submitCloudflarePagesControlPlaneDeploy(opts: {
       submission,
       submissionPath,
       executionSnapshotPath,
-      lockScope,
+      lockScope: snapshot.lockScope,
       record: result.record,
       recordPath: result.recordPath,
     };

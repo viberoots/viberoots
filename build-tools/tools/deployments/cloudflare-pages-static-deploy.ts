@@ -10,9 +10,11 @@ import { publishCloudflarePagesStaticWebapp } from "./cloudflare-pages-publisher
 import {
   createCloudflarePagesDeployRecord,
   createCloudflarePagesDeployRunId,
+  type CloudflarePagesOperationKind,
   type CloudflarePagesDeployRecord,
   writeCloudflarePagesDeployRecord,
 } from "./cloudflare-pages-records.ts";
+import { writeCloudflarePagesReplaySnapshot } from "./cloudflare-pages-replay.ts";
 import { smokeCloudflarePagesStaticWebapp } from "./cloudflare-pages-static-smoke.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
@@ -36,8 +38,12 @@ export async function runCloudflarePagesStaticDeploy(opts: {
   deployment: CloudflarePagesDeployment;
   artifact: AdmittedStaticWebappArtifact;
   recordsRoot: string;
+  operationKind?: CloudflarePagesOperationKind;
   authority?: CloudflarePagesControlPlaneWorkerAuthority;
   admittedContext: CloudflarePagesAdmittedContext;
+  parentRunId?: string;
+  releaseLineageId?: string;
+  artifactLineageId?: string;
   smokeConnectOverride?: {
     protocol: "http:" | "https:";
     hostname: string;
@@ -47,8 +53,10 @@ export async function runCloudflarePagesStaticDeploy(opts: {
 }): Promise<{ record: CloudflarePagesDeployRecord; recordPath: string }> {
   const authority = requireCloudflarePagesControlPlaneAuthority(opts.deployment, opts.authority);
   const runId = createCloudflarePagesDeployRunId();
+  const operationKind = opts.operationKind || "deploy";
   const deploymentMetadataFingerprint = deploymentMetadataFingerprintFor(opts.deployment);
   let providerConfigFingerprint: string | undefined;
+  let replaySnapshotPath: string | undefined;
   try {
     const artifactDir = await requireAdmittedStaticWebappArtifactPath(opts.artifact);
     const preparedConfig = await prepareCloudflarePagesWranglerConfig({
@@ -59,6 +67,15 @@ export async function runCloudflarePagesStaticDeploy(opts: {
       throw withFailedStep("publish", error);
     });
     providerConfigFingerprint = preparedConfig.fingerprint;
+    ({ replaySnapshotPath } = await writeCloudflarePagesReplaySnapshot({
+      recordsRoot: opts.recordsRoot,
+      deployRunId: runId,
+      deployment: opts.deployment,
+      artifact: opts.artifact,
+      admittedContext: opts.admittedContext,
+      providerConfigSnapshotPath: preparedConfig.renderedConfigPath,
+      controlPlaneExecutionSnapshotPath: authority.executionSnapshotPath,
+    }));
     const published = await publishCloudflarePagesStaticWebapp({
       workspaceRoot: opts.workspaceRoot,
       deployment: opts.deployment,
@@ -76,14 +93,20 @@ export async function runCloudflarePagesStaticDeploy(opts: {
     });
     const record = createCloudflarePagesDeployRecord(opts.deployment, {
       deployRunId: runId,
+      operationKind,
+      runClassification: operationKind,
       finalOutcome: "succeeded",
+      ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
+      ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
       artifactIdentity: opts.artifact.identity,
       artifactStoredArtifactPath: opts.artifact.storedArtifactPath,
       artifactProvenancePath: opts.artifact.provenancePath,
+      artifactLineageId: opts.artifactLineageId || opts.artifact.identity,
       admittedContext: opts.admittedContext,
       authority,
       deploymentMetadataFingerprint,
       providerConfigFingerprint,
+      ...(replaySnapshotPath ? { replaySnapshotPath } : {}),
       publicUrl: smoke.publicUrl,
       ...(published.providerReleaseId ? { providerReleaseId: published.providerReleaseId } : {}),
     });
@@ -99,15 +122,21 @@ export async function runCloudflarePagesStaticDeploy(opts: {
     const message = error instanceof Error ? error.message : String(error);
     const record = createCloudflarePagesDeployRecord(opts.deployment, {
       deployRunId: runId,
+      operationKind,
+      runClassification: operationKind,
       finalOutcome: failedStep === "smoke" ? "smoke_failed_after_publish" : "publish_failed",
+      ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
+      ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
       artifactIdentity: opts.artifact.identity,
       artifactStoredArtifactPath: opts.artifact.storedArtifactPath,
       artifactProvenancePath: opts.artifact.provenancePath,
+      artifactLineageId: opts.artifactLineageId || opts.artifact.identity,
       admittedContext: opts.admittedContext,
       authority,
       failedStep,
       deploymentMetadataFingerprint,
       ...(providerConfigFingerprint ? { providerConfigFingerprint } : {}),
+      ...(replaySnapshotPath ? { replaySnapshotPath } : {}),
       error: message,
     });
     const recordPath = await writeCloudflarePagesDeployRecord(opts.recordsRoot, record);

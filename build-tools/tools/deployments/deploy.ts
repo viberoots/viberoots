@@ -6,6 +6,7 @@ import { resolveSelectedTargetLabel } from "../dev/target-label-resolver.ts";
 import { getFlagBool, getFlagStr } from "../lib/cli.ts";
 import { findRepoRoot } from "../lib/repo.ts";
 import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-control-plane.ts";
+import { resolveCloudflarePagesPromotionSelection } from "./cloudflare-pages-promotion.ts";
 import { resolveDeploymentFromTarget } from "./deployment-query.ts";
 import { isNixosSharedHostDeployment, type DeploymentTarget } from "./contract.ts";
 import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
@@ -66,10 +67,6 @@ function resolveSmokeConnectOverride() {
   };
 }
 
-function unsupportedCloudflareFlag(name: string): never {
-  throw new Error(`cloudflare-pages deploys do not support --${name} yet`);
-}
-
 async function main() {
   const workspaceRoot = await findRepoRoot(process.cwd());
   const deployment = await resolveDeployment(workspaceRoot);
@@ -80,20 +77,56 @@ async function main() {
   const artifactDirFlag = getFlagStr("artifact-dir", "").trim();
   const smokeConnectOverride = resolveSmokeConnectOverride();
   if (!isNixosSharedHostDeployment(deployment)) {
-    if (remove) unsupportedCloudflareFlag("remove");
-    if (publishOnly) unsupportedCloudflareFlag("publish-only");
-    if (rollback) unsupportedCloudflareFlag("rollback");
-    if (sourceRunId) unsupportedCloudflareFlag("source-run-id");
+    if (remove) throw new Error("cloudflare-pages deploys do not support --remove yet");
+    if (rollback) throw new Error("cloudflare-pages deploys do not support --rollback yet");
+    const recordsRoot = path.resolve(
+      getFlagStr(
+        "records-root",
+        path.join(workspaceRoot, ".local", "deployments", "cloudflare-pages", "records"),
+      ),
+    );
+    if (publishOnly && !sourceRunId) {
+      throw new Error(
+        "cloudflare-pages --publish-only requires --source-run-id to select a promotion source run",
+      );
+    }
+    if (!publishOnly && sourceRunId) {
+      throw new Error("cloudflare-pages --source-run-id requires --publish-only");
+    }
+    if (publishOnly && artifactDirFlag) {
+      throw new Error(
+        "cloudflare-pages --publish-only must not use --artifact-dir; promote the admitted exact artifact with --source-run-id",
+      );
+    }
+    const promotion = publishOnly
+      ? await resolveCloudflarePagesPromotionSelection({
+          workspaceRoot,
+          deployment,
+          recordsRoot,
+          sourceRunId,
+        })
+      : undefined;
     const result = await submitCloudflarePagesControlPlaneDeploy({
       workspaceRoot,
       deployment,
-      artifactDir: await resolveArtifactDir(workspaceRoot, deployment),
-      recordsRoot: path.resolve(
-        getFlagStr(
-          "records-root",
-          path.join(workspaceRoot, ".local", "deployments", "cloudflare-pages", "records"),
-        ),
-      ),
+      recordsRoot,
+      ...(promotion
+        ? {
+            operationKind: promotion.operationKind,
+            artifact: promotion.artifact,
+            publishBehavior: "publish-only" as const,
+            parentRunId: promotion.parentRunId,
+            releaseLineageId: promotion.releaseLineageId,
+            artifactLineageId: promotion.artifactLineageId,
+            source: {
+              record: promotion.sourceRecord,
+              recordPath: promotion.sourceRecordPath,
+              replaySnapshotPath: promotion.sourceReplaySnapshotPath,
+            },
+          }
+        : {
+            artifactDir: await resolveArtifactDir(workspaceRoot, deployment),
+          }),
       ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
     });
     console.log(
@@ -105,6 +138,7 @@ async function main() {
           runClassification: result.record.runClassification,
           finalOutcome: result.record.finalOutcome,
           artifactIdentity: result.record.artifact?.identity,
+          ...(result.record.parentRunId ? { parentRunId: result.record.parentRunId } : {}),
           publicUrl: result.record.publicUrl,
           recordPath: result.recordPath,
           ...(result.record.controlPlane ? { controlPlane: result.record.controlPlane } : {}),

@@ -8,11 +8,14 @@ import { CLOUDFLARE_PAGES_PROVIDER, type CloudflarePagesDeployment } from "./con
 
 export const CLOUDFLARE_PAGES_RECORD_SCHEMA = "deploy-record@2026-04-04";
 
+export type CloudflarePagesOperationKind = "deploy" | "promotion";
+export type CloudflarePagesRunClassification = CloudflarePagesOperationKind;
+
 export type CloudflarePagesDeployRecord = {
   schemaVersion: typeof CLOUDFLARE_PAGES_RECORD_SCHEMA;
   deployRunId: string;
-  operationKind: "deploy";
-  runClassification: "deploy";
+  operationKind: CloudflarePagesOperationKind;
+  runClassification: CloudflarePagesRunClassification;
   publishMode: "normal";
   lifecycleState: "finished";
   terminationReason: null;
@@ -31,6 +34,9 @@ export type CloudflarePagesDeployRecord = {
     lockScope: string;
     executionSnapshotPath: string;
   };
+  parentRunId?: string;
+  releaseLineageId?: string;
+  artifactLineageId?: string;
   artifact?: {
     identity: string;
     storedArtifactPath?: string;
@@ -42,6 +48,7 @@ export type CloudflarePagesDeployRecord = {
   smokeRunnerType: "cloudflare-pages-static-webapp-smoke";
   deploymentMetadataFingerprint?: string;
   providerConfigFingerprint?: string;
+  replaySnapshotPath?: string;
   publicUrl?: string;
   providerReleaseId?: string;
   error?: string;
@@ -49,15 +56,21 @@ export type CloudflarePagesDeployRecord = {
 
 type RecordOutcome = {
   deployRunId: string;
+  operationKind?: CloudflarePagesOperationKind;
+  runClassification?: CloudflarePagesRunClassification;
   finalOutcome: CloudflarePagesDeployRecord["finalOutcome"];
   artifactIdentity: string;
   artifactStoredArtifactPath?: string;
   artifactProvenancePath?: string;
   admittedContext: CloudflarePagesAdmittedContext;
   authority?: CloudflarePagesControlPlaneWorkerAuthority;
+  parentRunId?: string;
+  releaseLineageId?: string;
+  artifactLineageId?: string;
   failedStep?: CloudflarePagesDeployRecord["failedStep"];
   deploymentMetadataFingerprint?: string;
   providerConfigFingerprint?: string;
+  replaySnapshotPath?: string;
   publicUrl?: string;
   providerReleaseId?: string;
   error?: string;
@@ -74,8 +87,8 @@ export function createCloudflarePagesDeployRecord(
   return {
     schemaVersion: CLOUDFLARE_PAGES_RECORD_SCHEMA,
     deployRunId: outcome.deployRunId,
-    operationKind: "deploy",
-    runClassification: "deploy",
+    operationKind: outcome.operationKind || "deploy",
+    runClassification: outcome.runClassification || outcome.operationKind || "deploy",
     publishMode: "normal",
     lifecycleState: "finished",
     terminationReason: null,
@@ -98,6 +111,9 @@ export function createCloudflarePagesDeployRecord(
           },
         }
       : {}),
+    ...(outcome.parentRunId ? { parentRunId: outcome.parentRunId } : {}),
+    ...(outcome.releaseLineageId ? { releaseLineageId: outcome.releaseLineageId } : {}),
+    ...(outcome.artifactLineageId ? { artifactLineageId: outcome.artifactLineageId } : {}),
     artifact: {
       identity: outcome.artifactIdentity,
       ...(outcome.artifactStoredArtifactPath
@@ -115,13 +131,14 @@ export function createCloudflarePagesDeployRecord(
     ...(outcome.providerConfigFingerprint
       ? { providerConfigFingerprint: outcome.providerConfigFingerprint }
       : {}),
+    ...(outcome.replaySnapshotPath ? { replaySnapshotPath: outcome.replaySnapshotPath } : {}),
     ...(outcome.publicUrl ? { publicUrl: outcome.publicUrl } : {}),
     ...(outcome.providerReleaseId ? { providerReleaseId: outcome.providerReleaseId } : {}),
     ...(outcome.error ? { error: outcome.error } : {}),
   };
 }
 
-function deployRecordPathFor(recordsRoot: string, deployRunId: string): string {
+export function deployRecordPathFor(recordsRoot: string, deployRunId: string): string {
   return path.join(path.resolve(recordsRoot), "runs", `${deployRunId}.json`);
 }
 
@@ -133,4 +150,18 @@ export async function writeCloudflarePagesDeployRecord(
   await fsp.mkdir(path.dirname(recordPath), { recursive: true });
   await fsp.writeFile(recordPath, JSON.stringify(record, null, 2) + "\n", "utf8");
   return recordPath;
+}
+
+export async function readCloudflarePagesDeployRecord(
+  recordPath: string,
+): Promise<CloudflarePagesDeployRecord> {
+  const record = JSON.parse(await fsp.readFile(recordPath, "utf8")) as CloudflarePagesDeployRecord;
+  if (
+    record.schemaVersion !== CLOUDFLARE_PAGES_RECORD_SCHEMA ||
+    typeof record.deployRunId !== "string" ||
+    typeof record.deploymentLabel !== "string"
+  ) {
+    throw new Error(`invalid cloudflare-pages deploy record: ${recordPath}`);
+  }
+  return record;
 }

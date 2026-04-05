@@ -4,9 +4,12 @@ import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admissio
 import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
 
 export const CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA =
-  "cloudflare-pages-control-plane-snapshot@1";
+  "cloudflare-pages-control-plane-snapshot@2";
 export const CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMISSION_SCHEMA =
   "cloudflare-pages-control-plane-submission@1";
+
+export type CloudflarePagesPublishBehavior = "deploy" | "publish-only";
+export type CloudflarePagesControlPlaneOperationKind = "deploy" | "promotion";
 
 export type CloudflarePagesSmokeConnectOverride = {
   protocol: "http:" | "https:";
@@ -24,7 +27,7 @@ export type CloudflarePagesControlPlaneSnapshot = {
   schemaVersion: typeof CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA;
   submissionId: string;
   submittedAt: string;
-  operationKind: "deploy";
+  operationKind: CloudflarePagesControlPlaneOperationKind;
   deploymentId: string;
   deploymentLabel: string;
   providerTargetIdentity: string;
@@ -34,10 +37,16 @@ export type CloudflarePagesControlPlaneSnapshot = {
   paths: CloudflarePagesControlPlanePaths;
   action: {
     kind: "deploy";
+    publishBehavior: CloudflarePagesPublishBehavior;
     publishInput: {
       kind: "exact-artifact";
       artifact: AdmittedStaticWebappArtifact;
     };
+    parentRunId?: string;
+    releaseLineageId?: string;
+    artifactLineageId?: string;
+    sourceRecordPath?: string;
+    sourceReplaySnapshotPath?: string;
   };
   smokeConnectOverride?: CloudflarePagesSmokeConnectOverride;
 };
@@ -51,7 +60,7 @@ export type CloudflarePagesControlPlaneSubmission = {
   submissionId: string;
   submittedAt: string;
   completedAt?: string;
-  operationKind: "deploy";
+  operationKind: CloudflarePagesControlPlaneOperationKind;
   deploymentId: string;
   deploymentLabel: string;
   providerTargetIdentity: string;
