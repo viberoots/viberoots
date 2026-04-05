@@ -1,16 +1,22 @@
 # Deployment Verify Scope
 
 This document records the first reviewed deployment-domain test label and the first reviewed
-build-system ownership boundary from PR-4.5.1, the fail-closed path classifier from PR-4.5.2, and
-the deployment-aware verify/CI execution path from PR-4.5.3. The goal is to keep deployment-only
-selection resting on explicit metadata instead of path guesses.
+build-system ownership boundary from PR-4.5.1, the fail-closed path classifier from PR-4.5.2, the
+deployment-aware verify/CI execution path from PR-4.5.3, and the PR-12.1 ownership split that moves
+mutable deployment-domain taxonomy data into the reviewed deployment-owned test area. The goal is
+to keep deployment-only selection resting on explicit metadata instead of path guesses.
 
 ## Reviewed Buck label
 
 - Reviewed deployment-domain test label: `domain:deployment`
 - Initial reviewed deployment test area: `build-tools/tools/tests/deployments/**`
 - Fail-closed rule: every new test under that reviewed area must be classified explicitly in
-  `build-tools/tools/tests/deployment_conventions.bzl`
+  `build-tools/tools/tests/deployments/deployment_domain_taxonomy.bzl`
+
+The shared zx-test loader stays in `build-tools/tools/tests/defs.bzl` and the thin
+`build-tools/tools/tests/deployment_conventions.bzl` shim. The mutable ownership table now lives in
+`build-tools/tools/tests/deployments/deployment_domain_taxonomy.bzl`, so routine deployment test
+additions or renames do not touch the shared loader path.
 
 Inspect the reviewed deployment suite with Buck:
 
@@ -26,12 +32,16 @@ The initial deployment-owned build-system boundary is intentionally narrow:
 - `build-tools/deployments/**`
 - `build-tools/tools/deployments/**`
 - `build-tools/tools/tests/deployments/**`
+- deployment-domain taxonomy data currently lives at
+  `build-tools/tools/tests/deployments/deployment_domain_taxonomy.bzl`
 
 ## Reviewed shared paths
 
 Touches to these reviewed shared paths still stay on the full build-system verify path:
 
 - `build-tools/tools/buck/**`
+- `build-tools/tools/tests/deployment_conventions.bzl`
+- `build-tools/tools/tests/defs.bzl`
 - `build-tools/tools/dev/**`
 - `build-tools/tools/lib/**`
 - `build-tools/lang/**`
@@ -57,6 +67,10 @@ Decision order is conservative:
 3. Any change under `projects/deployments/**` produces `deployment-and-project-impact`.
 4. Remaining reviewed deployment-owned build-system changes produce `deployment-only`.
 5. Everything else stays `no-deployment-impact`.
+
+Because the taxonomy table now lives under `build-tools/tools/tests/deployments/**`, a taxonomy-only
+edit resolves to `deployment-only`, while edits to the shared loader shim still broaden to
+`mixed-build-system`.
 
 The classifier emits stable JSON diagnostics with:
 

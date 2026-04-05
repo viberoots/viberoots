@@ -12,6 +12,7 @@ test("deployment verify scope marks reviewed deployment-owned paths explicitly",
   const deploymentOwned = [
     "build-tools/deployments/defs.bzl",
     "build-tools/tools/deployments/deploy.ts",
+    "build-tools/tools/tests/deployments/deployment_domain_taxonomy.bzl",
     "build-tools/tools/tests/deployments/nixos-shared-host.contract.test.ts",
   ];
   for (const relPath of deploymentOwned) {
@@ -29,6 +30,8 @@ test("deployment verify scope marks reviewed deployment-owned paths explicitly",
 test("deployment verify scope keeps reviewed shared paths out of the deployment domain", () => {
   const sharedPaths = [
     "build-tools/tools/buck/zx_test.bzl",
+    "build-tools/tools/tests/deployment_conventions.bzl",
+    "build-tools/tools/tests/defs.bzl",
     "build-tools/tools/dev/verify/run-verify.ts",
     "build-tools/tools/lib/build-system-test-scope.ts",
     "build-tools/lang/defs_common.bzl",

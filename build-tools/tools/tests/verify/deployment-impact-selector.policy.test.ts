@@ -22,8 +22,23 @@ test("deployment-impact: reviewed deployment-owned build-system paths stay deplo
   assert.equal(result.diagnostics.reason, "deployment-owned-build-system-path-changed");
 });
 
-test("deployment-impact: shared helpers and reviewed root/toolchain paths broaden to mixed mode", () => {
+test("deployment-impact: deployment taxonomy-only edits stay deployment-only", () => {
   const result = resolveDeploymentImpactSelection([
+    "build-tools/tools/tests/deployments/deployment_domain_taxonomy.bzl",
+  ]);
+
+  assert.equal(result.mode, "deployment-only");
+  assert.deepEqual(result.diagnostics.deploymentOwnedPaths, [
+    "build-tools/tools/tests/deployments/deployment_domain_taxonomy.bzl",
+  ]);
+  assert.deepEqual(result.diagnostics.fullBuildSystemTriggerPaths, []);
+  assert.equal(result.diagnostics.reason, "deployment-owned-build-system-path-changed");
+});
+
+test("deployment-impact: shared helpers and reviewed loader/root paths broaden to mixed mode", () => {
+  const result = resolveDeploymentImpactSelection([
+    "build-tools/tools/tests/deployment_conventions.bzl",
+    "build-tools/tools/tests/defs.bzl",
     "toolchains/TARGETS",
     "build-tools/tools/dev/verify/run-verify.ts",
     "third_party/providers/auto_map.bzl",
@@ -33,6 +48,8 @@ test("deployment-impact: shared helpers and reviewed root/toolchain paths broade
   assert.equal(result.mode, "mixed-build-system");
   assert.deepEqual(result.diagnostics.sharedBuildSystemPaths, [
     "build-tools/tools/dev/verify/run-verify.ts",
+    "build-tools/tools/tests/defs.bzl",
+    "build-tools/tools/tests/deployment_conventions.bzl",
     "flake.nix",
     "third_party/providers/auto_map.bzl",
     "toolchains/TARGETS",

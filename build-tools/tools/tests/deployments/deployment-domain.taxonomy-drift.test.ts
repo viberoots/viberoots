@@ -18,6 +18,7 @@ async function copyCurrentBuckClassificationFiles(tmp: string): Promise<void> {
   const relPaths = [
     "build-tools/tools/tests/defs.bzl",
     "build-tools/tools/tests/deployment_conventions.bzl",
+    "build-tools/tools/tests/deployments/deployment_domain_taxonomy.bzl",
   ];
   for (const relPath of relPaths) {
     const src = path.join(repoRoot, relPath);
@@ -89,6 +90,7 @@ test("deployment-domain taxonomy drift fails closed for unclassified deployment 
     })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-domain-taxonomy-drift")} cquery --target-platforms prelude//platforms:default //...`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr || ""), /deployment-domain taxonomy drift/);
+    assert.match(String(result.stderr || ""), /deployment_domain_taxonomy\.bzl/);
     assert.match(String(result.stderr || ""), /unclassified\.deployment-domain\.test\.ts/);
   });
 });

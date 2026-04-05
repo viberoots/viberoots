@@ -21,6 +21,8 @@ export const REVIEWED_SHARED_BUILD_SYSTEM_PATHS = [
   ".buckconfig",
   "BUCK",
   "TARGETS",
+  "build-tools/tools/tests/deployment_conventions.bzl",
+  "build-tools/tools/tests/defs.bzl",
   "flake.lock",
   "flake.nix",
 ] as const;
