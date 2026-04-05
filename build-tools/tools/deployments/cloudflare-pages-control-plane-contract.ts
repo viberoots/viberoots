@@ -32,6 +32,7 @@ export type CloudflarePagesControlPlaneSnapshot = {
   schemaVersion: typeof CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA;
   submissionId: string;
   submittedAt: string;
+  deployBatchId?: string;
   operationKind: CloudflarePagesControlPlaneOperationKind;
   deploymentId: string;
   deploymentLabel: string;

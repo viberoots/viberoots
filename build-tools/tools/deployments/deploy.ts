@@ -5,6 +5,8 @@ import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
 import { resolveSelectedTargetLabel } from "../dev/target-label-resolver.ts";
 import { getFlagBool, getFlagStr } from "../lib/cli.ts";
 import { findRepoRoot } from "../lib/repo.ts";
+import { summarizeDeploymentResult } from "./deployment-execution.ts";
+import { runFromChangesCli } from "./deployment-from-changes-cli.ts";
 import { runCloudflarePagesCli } from "./cloudflare-pages-cli.ts";
 import { resolveDeploymentFromTarget } from "./deployment-query.ts";
 import { isNixosSharedHostDeployment, type DeploymentTarget } from "./contract.ts";
@@ -66,41 +68,16 @@ function resolveSmokeConnectOverride() {
   };
 }
 
-function printResult(result: {
-  record: {
-    deployRunId: string;
-    operationKind: string;
-    runClassification: string;
-    finalOutcome: string;
-    artifact?: { identity: string };
-    parentRunId?: string;
-    publicUrl?: string;
-    controlPlane?: unknown;
-  };
-  recordPath: string;
-}) {
-  console.log(
-    JSON.stringify(
-      {
-        runId: result.record.deployRunId,
-        deployRunId: result.record.deployRunId,
-        operationKind: result.record.operationKind,
-        runClassification: result.record.runClassification,
-        finalOutcome: result.record.finalOutcome,
-        artifactIdentity: result.record.artifact?.identity,
-        ...(result.record.parentRunId ? { parentRunId: result.record.parentRunId } : {}),
-        publicUrl: result.record.publicUrl,
-        recordPath: result.recordPath,
-        ...(result.record.controlPlane ? { controlPlane: result.record.controlPlane } : {}),
-      },
-      null,
-      2,
-    ),
-  );
+function printJson(value: unknown) {
+  console.log(JSON.stringify(value, null, 2));
 }
 
 async function main() {
   const workspaceRoot = await findRepoRoot(process.cwd());
+  if (getFlagBool("from-changes")) {
+    await runFromChangesCli(workspaceRoot);
+    return;
+  }
   const deployment = await resolveDeployment(workspaceRoot);
   const remove = getFlagBool("remove");
   const publishOnly = getFlagBool("publish-only");
@@ -148,7 +125,7 @@ async function main() {
       ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
       cleanupReason,
     });
-    printResult(result);
+    printJson(summarizeDeploymentResult(result));
     return;
   }
   if (preview || previewCleanup) {
@@ -213,7 +190,7 @@ async function main() {
           ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
         });
       })();
-  printResult(result);
+  printJson(summarizeDeploymentResult(result));
 }
 
 main().catch((error) => {

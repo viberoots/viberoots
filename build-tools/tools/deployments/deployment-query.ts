@@ -22,6 +22,7 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "health_path",
   "target_group",
   "provider_target",
+  "prerequisites",
   "stages",
   "stage_branches",
   "allowed_promotion_edges",
@@ -51,6 +52,15 @@ function deploymentIsolationArgs(): string[] {
       "",
   ).trim();
   return isolationDir ? ["--isolation-dir", isolationDir] : [];
+}
+
+const CONFIG_SUFFIX = /\s+\([^)]*\)$/;
+
+function normalizeQueryTarget(target: string): string {
+  const clean = String(target || "")
+    .trim()
+    .replace(CONFIG_SUFFIX, "");
+  return clean.startsWith("root//") ? clean.slice("root".length) : clean;
 }
 
 export async function queryDeploymentNodes(
@@ -89,4 +99,41 @@ export async function resolveDeploymentFromTarget(
   const hit = extracted.deployments.find((deployment) => deployment.label === deploymentTarget);
   if (!hit) throw new Error(`deployment target not found: ${deploymentTarget}`);
   return hit;
+}
+
+export async function listDeploymentTargets(workspaceRoot: string): Promise<string[]> {
+  const { stdout } = await $({
+    cwd: workspaceRoot,
+    stdio: "pipe",
+    env: deploymentBuckEnv(),
+  })`buck2 ${deploymentIsolationArgs()} cquery --target-platforms prelude//platforms:default kind("deployment_target", //projects/deployments/...) --json --output-attribute name`.quiet();
+  const raw = JSON.parse(String(stdout || "{}")) as Record<string, unknown>;
+  return Object.keys(raw)
+    .map((target) => normalizeQueryTarget(target))
+    .filter(Boolean)
+    .sort();
+}
+
+export async function resolveAllDeployments(workspaceRoot: string): Promise<DeploymentTarget[]> {
+  const labels = await listDeploymentTargets(workspaceRoot);
+  if (labels.length === 0) return [];
+  const nodes = await queryDeploymentNodes(workspaceRoot, labels);
+  const extraLabels = Array.from(
+    new Set(
+      nodes.flatMap((node) =>
+        [
+          normalizeTargetLabel(String((node as any).component || "")),
+          normalizeTargetLabel(String((node as any).lane_policy || "")),
+          normalizeTargetLabel(String((node as any).admission_policy || "")),
+        ].filter(Boolean),
+      ),
+    ),
+  ).filter((label) => !labels.includes(label));
+  const allNodes =
+    extraLabels.length > 0
+      ? await queryDeploymentNodes(workspaceRoot, [...labels, ...extraLabels])
+      : nodes;
+  const extracted = extractDeployments(allNodes);
+  if (extracted.errors.length > 0) throw new Error(extracted.errors.join("\n"));
+  return extracted.deployments;
 }

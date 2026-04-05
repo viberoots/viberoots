@@ -230,7 +230,11 @@ Allowed `mode` values:
 
 Validation rule:
 
+- prerequisites must reference distinct deployment ids; duplicates are rejected
+- prerequisites must not self-reference the owning deployment id
 - prerequisites must stay within the same lane; cross-lane prerequisites are rejected
+- prerequisites must form an acyclic graph before orchestration
+- selectors may widen only by declared direct prerequisite edges; transitive execution order comes from topological sorting, not extra inferred metadata
 
 ## 2. Lane Policy Object
 
@@ -701,6 +705,8 @@ Repo validation should reject:
 - preview configuration without isolated-target semantics
 - missing canonical provider-target identity fields
 - invalid prerequisite graphs
+- duplicate prerequisite ids
+- self-referential prerequisites
 - cross-lane prerequisites
 - protected/shared approval-policy shapes that leave retry, promotion, or rollback approval semantics ambiguous
 - protected/shared immutable-artifact selectors that do not resolve unambiguously to one admitted source-run snapshot

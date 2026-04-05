@@ -20,6 +20,7 @@ def _deployment_document(ctx):
         "target_group": ctx.attrs.target_group,
         "provider_target": ctx.attrs.provider_target,
         "preview": ctx.attrs.preview,
+        "prerequisites": ctx.attrs.prerequisites,
     }
 
 def _deployment_target_impl(ctx):
@@ -45,6 +46,7 @@ deployment_target = rule(
         "target_group": attrs.string(default = ""),
         "provider_target": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
         "preview": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
+        "prerequisites": attrs.list(attrs.dict(key = attrs.string(), value = attrs.string()), default = []),
         "labels": attrs.list(attrs.string(), default = []),
     },
 )
@@ -103,6 +105,7 @@ def nixos_shared_host_static_webapp_deployment(
         lane_policy = None,
         environment_stage = "",
         admission_policy = None,
+        prerequisites = [],
         labels = [],
         visibility = ["PUBLIC"]):
     if protection_class != "local_only":
@@ -122,6 +125,7 @@ def nixos_shared_host_static_webapp_deployment(
         container_port = container_port,
         health_path = health_path,
         target_group = target_group,
+        prerequisites = prerequisites,
         labels = labels + [
             "kind:deployment",
             "deployment:nixos-shared-host",
@@ -143,6 +147,7 @@ def cloudflare_pages_static_webapp_deployment(
         lane_policy = None,
         environment_stage = "",
         admission_policy = None,
+        prerequisites = [],
         labels = [],
         visibility = ["PUBLIC"]):
     if protection_class != "local_only":
@@ -164,6 +169,7 @@ def cloudflare_pages_static_webapp_deployment(
             "id": project_id if project_id else project,
         },
         preview = preview or {},
+        prerequisites = prerequisites,
         labels = labels + [
             "kind:deployment",
             "deployment:cloudflare-pages",

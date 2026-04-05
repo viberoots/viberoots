@@ -22,6 +22,7 @@ const ATTRS = [
   "admission_policy",
   "provider_target",
   "preview",
+  "prerequisites",
   "stages",
   "stage_branches",
   "allowed_promotion_edges",
@@ -144,6 +145,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
     assert.equal(deployments[0]?.publisher.config, "wrangler.jsonc");
     assert.equal(deployments[0]?.providerTarget.account, "web-platform-staging");
     assert.equal(deployments[0]?.providerTarget.project, "pleomino-staging-pages");
+    assert.deepEqual(deployments[0]?.prerequisites, []);
     assert.equal(deployments[0]?.preview?.identitySelector, "source_run");
   });
 });

@@ -12,7 +12,9 @@ import {
   createDeploymentExtractionContext,
   deploymentError,
   isStaticWebappNode,
+  pushTokenFieldErrors,
   readLabel,
+  readPrerequisites,
   readPreviewPolicy,
   readString,
   readStringRecord,
@@ -45,6 +47,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
     const publisherConfig = readString(node, "publisher_config");
     const provisioner = readString(node, "provisioner");
     const providerTarget = readStringRecord(node, "provider_target");
+    const prerequisites = readPrerequisites(node, "prerequisites");
     const preview = readPreviewPolicy(node, "preview");
     const account = providerTarget.account || "";
     const project = providerTarget.project || "";
@@ -64,33 +67,20 @@ export function extractCloudflarePagesDeploymentsFromContext(
     }
     if (!componentTarget)
       deploymentErrors.push(deploymentError(label, "missing required component target"));
-    if (!account) {
-      deploymentErrors.push(deploymentError(label, "provider_target.account is required"));
-    } else if (!TARGET_TOKEN_RE.test(account)) {
-      deploymentErrors.push(
-        deploymentError(
-          label,
-          "provider_target.account must be lowercase alphanumeric plus internal hyphens",
-        ),
-      );
-    }
-    if (!project) {
-      deploymentErrors.push(deploymentError(label, "provider_target.project is required"));
-    } else if (!TARGET_TOKEN_RE.test(project)) {
-      deploymentErrors.push(
-        deploymentError(
-          label,
-          "provider_target.project must be lowercase alphanumeric plus internal hyphens",
-        ),
-      );
-    }
-    if (id && !TARGET_TOKEN_RE.test(id)) {
-      deploymentErrors.push(
-        deploymentError(
-          label,
-          "provider_target.id must be lowercase alphanumeric plus internal hyphens",
-        ),
-      );
+    for (const [fieldPath, value, required] of [
+      ["provider_target.account", account, true],
+      ["provider_target.project", project, true],
+      ["provider_target.id", id, false],
+    ] as const) {
+      pushTokenFieldErrors({
+        errors: deploymentErrors,
+        label,
+        fieldPath,
+        value,
+        pattern: TARGET_TOKEN_RE,
+        required,
+        invalidMessage: `${fieldPath} must be lowercase alphanumeric plus internal hyphens`,
+      });
     }
     if (!validProtectionClass(protectionClass)) {
       deploymentErrors.push(
@@ -209,6 +199,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
       environmentStage,
       admissionPolicyRef,
       admissionPolicy: admissionPolicy!,
+      prerequisites,
       component: { kind: STATIC_WEBAPP_COMPONENT, target: componentTarget },
       ...(preview ? { preview } : {}),
       publisher: { type: publisher, config: publisherConfig },

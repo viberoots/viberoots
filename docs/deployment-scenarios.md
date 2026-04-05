@@ -150,12 +150,23 @@ Situation:
 
 - a changed deployment is an explicit direct prerequisite of another deployment
 - the run is mutating and lane-scoped
+- the operator wants one grouped submission for audit
 
 Expected behavior:
 
+- the operator submits `deploy --from-changes --group`
+- impact selection uses explicit `--changed` paths when provided, otherwise the repo's changed-path collector
+- deployment-owned path changes select the owning deployment directly
+- component-project changes select deployments whose component projects fall in the impacted Buck closure
+- broad build-system or unmatched deployment-package changes may widen to all deployments in the safe lane-scoped set
 - impact selection widens deterministically according to declared direct prerequisite metadata
+- selection widens only one direct prerequisite edge during planning; it does not recursively pull an arbitrary transitive tree
+- selection is rejected if the resulting deployments span multiple lanes
 - execution remains serial and topological by default
+- `ordering_only` prerequisites affect order only
+- `health_gated` prerequisites block the dependent deployment if the prerequisite did not already finish `succeeded` earlier in the batch
 - the mutating invocation fans out into ordinary per-deployment runs rather than one multi-deployment run record
+- every run keeps its own `deploy_run_id`, lifecycle, and final outcome even when the CLI also attaches one shared `deploy_batch_id`
 - the selector may over-select for safety but must not under-select
 
 ## 11. Protected/Shared Provision-Only With Immutable Inputs

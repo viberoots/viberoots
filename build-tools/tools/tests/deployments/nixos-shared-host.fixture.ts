@@ -111,6 +111,7 @@ export function nixosSharedHostDeploymentFixture(
     environmentStage: overrides.environmentStage || "dev",
     admissionPolicyRef: overrides.admissionPolicyRef || admissionPolicy.ref,
     admissionPolicy,
+    prerequisites: overrides.prerequisites || [],
     component: {
       kind: STATIC_WEBAPP_COMPONENT,
       target: overrides.component?.target || "//projects/apps/demoapp:app",

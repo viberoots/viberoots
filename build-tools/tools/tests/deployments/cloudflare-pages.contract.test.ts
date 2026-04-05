@@ -40,6 +40,27 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
     staticWebappComponent("//projects/apps/pleomino:app"),
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
+    cloudflarePagesAdmissionPolicyNodeFixture({
+      name: "//build-tools/deployments/policies:pleomino_dev_release",
+      allowed_refs: ["env/pleomino/dev"],
+      required_checks: ["deploy/pleomino-dev"],
+    }),
+    {
+      name: "//projects/deployments/pleomino-dev:deploy",
+      provider: "cloudflare-pages",
+      component: "//projects/apps/pleomino:app",
+      component_kind: "static-webapp",
+      publisher: "wrangler-pages",
+      publisher_config: "wrangler.jsonc",
+      protection_class: "shared_nonprod",
+      lane_policy: "//build-tools/deployments/lanes:pleomino",
+      environment_stage: "dev",
+      admission_policy: "//build-tools/deployments/policies:pleomino_dev_release",
+      provider_target: {
+        account: "web-platform-dev",
+        project: "pleomino-dev-pages",
+      },
+    },
     {
       name: "//projects/deployments/pleomino-staging:deploy",
       provider: "cloudflare-pages",
@@ -59,6 +80,7 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
         smoke_target: "preview_url",
         lock_scope: "shared",
       },
+      prerequisites: [{ deployment_id: "pleomino-dev", mode: "ordering_only" }],
       provider_target: {
         account: "web-platform-staging",
         project: "pleomino-staging-pages",
@@ -68,12 +90,16 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
 
   const { deployments, errors } = extractCloudflarePagesDeployments(nodes);
   assert.deepEqual(errors, []);
-  assert.equal(deployments.length, 1);
-  assert.equal(deployments[0]?.publisher.config, "wrangler.jsonc");
-  assert.equal(deployments[0]?.providerTarget.id, "pleomino-staging-pages");
-  assert.equal(deployments[0]?.preview?.identitySelector, "source_run");
+  assert.equal(deployments.length, 2);
+  assert.deepEqual(deployments[0]?.prerequisites, []);
+  assert.equal(deployments[1]?.publisher.config, "wrangler.jsonc");
+  assert.deepEqual(deployments[1]?.prerequisites, [
+    { deploymentId: "pleomino-dev", mode: "ordering_only" },
+  ]);
+  assert.equal(deployments[1]?.providerTarget.id, "pleomino-staging-pages");
+  assert.equal(deployments[1]?.preview?.identitySelector, "source_run");
   assert.equal(
-    deployments[0]?.providerTarget.providerTargetIdentity,
+    deployments[1]?.providerTarget.providerTargetIdentity,
     "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
   );
 });

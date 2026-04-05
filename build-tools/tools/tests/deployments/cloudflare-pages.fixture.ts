@@ -59,6 +59,7 @@ export function cloudflarePagesDeploymentFixture(
     environmentStage: overrides.environmentStage || "staging",
     admissionPolicyRef: overrides.admissionPolicyRef || admissionPolicy.ref,
     admissionPolicy,
+    prerequisites: overrides.prerequisites || [],
     component: {
       kind: STATIC_WEBAPP_COMPONENT,
       target: overrides.component?.target || "//projects/apps/pleomino:app",

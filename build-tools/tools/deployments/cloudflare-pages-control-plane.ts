@@ -34,6 +34,7 @@ type SubmitOpts = {
   workspaceRoot: string;
   deployment: CloudflarePagesDeployment;
   recordsRoot: string;
+  deployBatchId?: string;
   artifactDir?: string;
   artifact?: AdmittedStaticWebappArtifact;
   operationKind?: CloudflarePagesControlPlaneOperationKind;
@@ -80,6 +81,7 @@ async function createSnapshot(
     schemaVersion: CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA,
     submissionId,
     submittedAt: new Date().toISOString(),
+    ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
     operationKind,
     deploymentId: opts.deployment.deploymentId,
     deploymentLabel: opts.deployment.label,
@@ -135,6 +137,7 @@ async function runWorker(opts: {
     ...(snapshot.action.artifactLineageId
       ? { artifactLineageId: snapshot.action.artifactLineageId }
       : {}),
+    ...(snapshot.deployBatchId ? { deployBatchId: snapshot.deployBatchId } : {}),
     ...(snapshot.action.publishMode ? { publishMode: snapshot.action.publishMode } : {}),
     ...(snapshot.action.effectiveRunTarget
       ? { effectiveRunTarget: snapshot.action.effectiveRunTarget }

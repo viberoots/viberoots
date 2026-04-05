@@ -113,7 +113,11 @@ design has been explicitly updated first.
 - Same-deployment preview publication defaults to `operation_kind = deploy` plus `publish_mode = preview`, not `retry`.
 - Unless `admission_policy` explicitly defines a stricter preview posture, protected/shared preview uses the target deployment's normal branch and required-check requirements, while manual preview approval remains optional by default for already-admitted artifacts or run lineage.
 - Separate preview lock scope is allowed only when the preview meets the stronger independent-execution isolation bar; otherwise preview shares the normal deployment lock even when preview publication itself is in policy.
+- `--from-changes` selection may over-select for safety, but it must not under-select a deployment whose reviewed metadata or component project was impacted.
+- `--from-changes` prerequisite widening is driven only by explicit direct prerequisite edges from authoritative deployment metadata; the selector must not invent transitive or cross-lane fan-out heuristics.
 - Mutating `--from-changes` fans out into ordinary per-deployment runs; it is not one multi-deployment mutating run record.
+- Grouped `--from-changes` submission may stamp a shared batch id for audit, but each deployment still owns its own `deploy_run_id`, lifecycle, final outcome, and record.
+- `health_gated` prerequisites block the dependent deployment when the prerequisite run in that invocation did not already succeed; `ordering_only` prerequisites constrain ordering only.
 - `resume` is a first-class operator action on an existing paused progressive-rollout run, not a new `operation_kind`.
 - `resume` keeps the existing `deploy_run_id`, lineage, and frozen execution snapshot; it must reacquire lock and revalidate the paused run under the recorded rollout-resume policy before continuing.
 - If a paused rollout is not resumable under recorded rollout state, current approval state, or provider capability contract, `resume` must fail closed rather than creating an implicit replacement run.

@@ -49,6 +49,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
   statePath: string;
   hostRoot: string;
   recordsRoot: string;
+  deployBatchId?: string;
   parentRunId?: string;
   releaseLineageId?: string;
   artifactLineageId?: string;
@@ -128,6 +129,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
       operationKind,
       runClassification: operationKind,
       finalOutcome: "succeeded",
+      ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
       ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
       ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
       artifactIdentity: opts.artifact.identity,
@@ -164,6 +166,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
       operationKind,
       runClassification: operationKind,
       finalOutcome,
+      ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
       ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
       ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
       artifactIdentity: opts.artifact.identity,

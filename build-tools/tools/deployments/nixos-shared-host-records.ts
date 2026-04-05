@@ -44,6 +44,7 @@ export type NixosSharedHostDeployRecord = {
     lockScope: string;
     executionSnapshotPath: string;
   };
+  deployBatchId?: string;
   parentRunId?: string;
   releaseLineageId?: string;
   artifactLineageId?: string;
@@ -77,6 +78,7 @@ type NixosSharedHostRecordOutcome = {
   parentRunId?: string;
   releaseLineageId?: string;
   artifactLineageId?: string;
+  deployBatchId?: string;
   authority?: NixosSharedHostControlPlaneWorkerAuthority;
   artifactStoredArtifactPath?: string;
   artifactProvenancePath?: string;
@@ -120,6 +122,7 @@ export function createNixosSharedHostDeployRecord(
           },
         }
       : {}),
+    ...(outcome.deployBatchId ? { deployBatchId: outcome.deployBatchId } : {}),
     ...(outcome.parentRunId ? { parentRunId: outcome.parentRunId } : {}),
     ...(outcome.releaseLineageId ? { releaseLineageId: outcome.releaseLineageId } : {}),
     ...(outcome.artifactLineageId ? { artifactLineageId: outcome.artifactLineageId } : {}),

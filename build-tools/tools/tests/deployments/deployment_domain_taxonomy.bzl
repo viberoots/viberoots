@@ -1,6 +1,9 @@
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-domain.taxonomy-drift.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-from-changes.batch.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-from-changes.selection.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-prerequisites.validation.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-verify-scope.boundary.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.contract.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.deploy.e2e.test.ts": True,

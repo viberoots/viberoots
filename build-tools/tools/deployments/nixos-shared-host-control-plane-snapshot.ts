@@ -34,6 +34,7 @@ export type NixosSharedHostControlPlaneSnapshotOpts = {
   operationKind: NixosSharedHostControlPlaneOperationKind;
   deployment: NixosSharedHostDeployment;
   paths: NixosSharedHostControlPlanePaths;
+  deployBatchId?: string;
   artifactDir?: string;
   artifact?: NixosSharedHostAdmittedArtifact;
   publishBehavior?: NixosSharedHostPublishBehavior;
@@ -117,6 +118,7 @@ export async function createNixosSharedHostControlPlaneSnapshot(
     schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA,
     submissionId,
     submittedAt,
+    ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
     operationKind: opts.operationKind,
     deploymentId: opts.deployment.deploymentId,
     deploymentLabel: opts.deployment.label,

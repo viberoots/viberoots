@@ -14,6 +14,7 @@ import {
   isStaticWebappNode,
   readLabel,
   readNumber,
+  readPrerequisites,
   readPreviewPolicy,
   readString,
   type DeploymentExtractionContext,
@@ -40,6 +41,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
     const containerPort = readNumber(node, "container_port");
     const healthPath = readString(node, "health_path");
     const targetGroup = readString(node, "target_group");
+    const prerequisites = readPrerequisites(node, "prerequisites");
     const protectionClass = readString(node, "protection_class") || SHARED_NONPROD;
     const preview = readPreviewPolicy(node, "preview");
     const publisher = readString(node, "publisher");
@@ -161,6 +163,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
       environmentStage,
       admissionPolicyRef,
       admissionPolicy: admissionPolicy!,
+      prerequisites,
       component: { kind: STATIC_WEBAPP_COMPONENT, target: componentTarget },
       publisher: { type: publisher },
       ...(provisioner ? { provisioner: { type: provisioner } } : {}),

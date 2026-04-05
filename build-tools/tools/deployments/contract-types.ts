@@ -7,6 +7,13 @@ export const NIXOS_SHARED_HOST_PROVIDER = "nixos-shared-host";
 export const CLOUDFLARE_PAGES_PROVIDER = "cloudflare-pages";
 export const STATIC_WEBAPP_COMPONENT = "static-webapp";
 
+export type DeploymentPrerequisiteMode = "ordering_only" | "health_gated";
+
+export type DeploymentPrerequisite = {
+  deploymentId: string;
+  mode: DeploymentPrerequisiteMode;
+};
+
 export type DeploymentPreviewIdentitySelector = "branch" | "commit" | "source_run";
 
 export type DeploymentPreviewPolicy = {
@@ -28,6 +35,7 @@ type DeploymentBase = {
   environmentStage: string;
   admissionPolicyRef: string;
   admissionPolicy: DeploymentAdmissionPolicy;
+  prerequisites: DeploymentPrerequisite[];
   component: {
     kind: typeof STATIC_WEBAPP_COMPONENT;
     target: string;

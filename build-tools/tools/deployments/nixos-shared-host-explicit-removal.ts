@@ -23,6 +23,7 @@ export async function runNixosSharedHostExplicitRemoval(opts: {
   statePath: string;
   hostRoot: string;
   recordsRoot: string;
+  deployBatchId?: string;
   hostConfigPath?: string;
   authority?: NixosSharedHostControlPlaneWorkerAuthority;
 }): Promise<{ record: NixosSharedHostDeployRecord; recordPath: string }> {
@@ -39,6 +40,7 @@ export async function runNixosSharedHostExplicitRemoval(opts: {
       deployRunId: runId,
       runClassification: "explicit_removal",
       finalOutcome: "succeeded",
+      ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
       authority,
     });
     return { record, recordPath: await writeNixosSharedHostDeployRecord(opts.recordsRoot, record) };
@@ -48,6 +50,7 @@ export async function runNixosSharedHostExplicitRemoval(opts: {
       deployRunId: runId,
       runClassification: "explicit_removal",
       finalOutcome: "provision_failed",
+      ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
       failedStep: "provision",
       error: message,
       authority,

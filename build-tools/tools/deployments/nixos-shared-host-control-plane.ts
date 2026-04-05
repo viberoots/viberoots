@@ -37,6 +37,7 @@ type SubmitOpts = {
   operationKind: NixosSharedHostControlPlaneOperationKind;
   deployment: NixosSharedHostDeployment;
   paths: NixosSharedHostControlPlanePaths;
+  deployBatchId?: string;
   artifactDir?: string;
   artifact?: NixosSharedHostAdmittedArtifact;
   publishBehavior?: NixosSharedHostPublishBehavior;
@@ -94,6 +95,7 @@ async function runWorker(opts: {
         ...(snapshot.action.artifactLineageId
           ? { artifactLineageId: snapshot.action.artifactLineageId }
           : {}),
+        ...(snapshot.deployBatchId ? { deployBatchId: snapshot.deployBatchId } : {}),
         ...(snapshot.admittedContext ? { admittedContext: snapshot.admittedContext } : {}),
         ...(snapshot.paths.hostConfigPath ? { hostConfigPath: snapshot.paths.hostConfigPath } : {}),
         ...(snapshot.smokeConnectOverride
@@ -106,6 +108,7 @@ async function runWorker(opts: {
         statePath: snapshot.paths.statePath,
         hostRoot: snapshot.paths.hostRoot,
         recordsRoot: snapshot.paths.recordsRoot,
+        ...(snapshot.deployBatchId ? { deployBatchId: snapshot.deployBatchId } : {}),
         ...(snapshot.paths.hostConfigPath ? { hostConfigPath: snapshot.paths.hostConfigPath } : {}),
         authority,
       });

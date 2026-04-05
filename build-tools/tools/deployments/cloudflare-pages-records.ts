@@ -39,6 +39,7 @@ export type CloudflarePagesDeployRecord = {
     lockScope: string;
     executionSnapshotPath: string;
   };
+  deployBatchId?: string;
   parentRunId?: string;
   releaseLineageId?: string;
   artifactLineageId?: string;
@@ -75,6 +76,7 @@ type RecordOutcome = {
   parentRunId?: string;
   releaseLineageId?: string;
   artifactLineageId?: string;
+  deployBatchId?: string;
   effectiveRunTarget?: CloudflarePagesDeployment["providerTarget"];
   previewIdentitySelector?: CloudflarePagesPreviewIdentitySelector;
   cleanupReason?: CloudflarePagesPreviewCleanupReason;
@@ -122,6 +124,7 @@ export function createCloudflarePagesDeployRecord(
           },
         }
       : {}),
+    ...(outcome.deployBatchId ? { deployBatchId: outcome.deployBatchId } : {}),
     ...(outcome.parentRunId ? { parentRunId: outcome.parentRunId } : {}),
     ...(outcome.releaseLineageId ? { releaseLineageId: outcome.releaseLineageId } : {}),
     ...(outcome.artifactLineageId ? { artifactLineageId: outcome.artifactLineageId } : {}),

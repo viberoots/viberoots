@@ -16,6 +16,7 @@ test("nixos-shared-host durable records persist canonical provider-target identi
     artifactStoredArtifactPath: "/tmp/records/artifacts/blobs/static-webapp-abc123",
     artifactProvenancePath: "/tmp/records/artifacts/provenance/static-webapp-abc123.json",
     artifactLineageId: "static-webapp:abc123",
+    deployBatchId: "batch-123",
     admittedContext: {
       lanePolicyRef: "//build-tools/deployments/lanes:pleomino",
       lanePolicyFingerprint: "sha256:lane-pleomino",
@@ -75,6 +76,7 @@ test("nixos-shared-host durable records persist canonical provider-target identi
     "/tmp/records/artifacts/provenance/static-webapp-abc123.json",
   );
   assert.equal(record.artifactLineageId, "static-webapp:abc123");
+  assert.equal(record.deployBatchId, "batch-123");
   assert.equal(record.admittedContext?.environmentStage, "dev");
   assert.equal(record.deploymentMetadataFingerprint, "sha256:deadbeef");
   assert.equal(record.replaySnapshotPath, "/tmp/records/replay/deploy-123/snapshot.json");

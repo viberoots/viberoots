@@ -24,6 +24,7 @@ test("cloudflare-pages preview records preserve both live and effective preview 
     finalOutcome: "succeeded",
     artifactIdentity: "static-webapp:abc123",
     artifactLineageId: "static-webapp:abc123",
+    deployBatchId: "batch-123",
     admittedContext: {
       lanePolicyRef: deployment.lanePolicyRef,
       lanePolicyFingerprint: deployment.lanePolicy.fingerprint,
@@ -55,6 +56,7 @@ test("cloudflare-pages preview records preserve both live and effective preview 
     record.effectiveRunTarget.providerTargetIdentity,
     effectiveRunTarget.providerTargetIdentity,
   );
+  assert.equal(record.deployBatchId, "batch-123");
   assert.equal(record.previewIdentitySelector?.sourceRunId, "deploy-123");
   assert.equal(record.publishMode, "preview");
 });

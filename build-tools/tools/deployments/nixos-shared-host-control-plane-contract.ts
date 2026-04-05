@@ -35,6 +35,7 @@ export type NixosSharedHostControlPlaneSnapshot = {
   schemaVersion: typeof NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA;
   submissionId: string;
   submittedAt: string;
+  deployBatchId?: string;
   operationKind: NixosSharedHostControlPlaneOperationKind;
   deploymentId: string;
   deploymentLabel: string;

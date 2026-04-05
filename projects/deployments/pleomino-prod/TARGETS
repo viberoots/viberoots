@@ -9,6 +9,12 @@ cloudflare_pages_static_webapp_deployment(
     environment_stage = "prod",
     admission_policy = "//build-tools/deployments/policies:pleomino_prod_release",
     protection_class = "production_facing",
+    prerequisites = [
+        {
+            "deployment_id": "pleomino-staging",
+            "mode": "ordering_only",
+        },
+    ],
     preview = {
         "target_derivation": "provider_managed_source_run",
         "isolation_class": "isolated",

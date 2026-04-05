@@ -2,6 +2,8 @@
 import type { GraphNode } from "../lib/graph.ts";
 import { normalizeTargetLabel } from "../lib/labels.ts";
 import type {
+  DeploymentPrerequisite,
+  DeploymentPrerequisiteMode,
   DeploymentPreviewIdentitySelector,
   DeploymentPreviewPolicy,
 } from "./contract-types.ts";
@@ -62,6 +64,25 @@ export function readPreviewPolicy(
   };
 }
 
+export function readPrerequisites(node: GraphNode, key: string): DeploymentPrerequisite[] {
+  const value = node[key];
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+      const prerequisite = entry as Record<string, unknown>;
+      const deploymentId =
+        typeof prerequisite.deployment_id === "string" ? prerequisite.deployment_id.trim() : "";
+      const mode =
+        typeof prerequisite.mode === "string"
+          ? (prerequisite.mode.trim() as DeploymentPrerequisiteMode)
+          : ("" as DeploymentPrerequisiteMode);
+      if (!deploymentId || !mode) return null;
+      return { deploymentId, mode };
+    })
+    .filter((entry): entry is DeploymentPrerequisite => !!entry);
+}
+
 export function isStaticWebappNode(node: GraphNode | undefined): boolean {
   const labels = new Set(Array.isArray(node?.labels) ? node.labels : []);
   return labels.has("kind:app") && (labels.has("webapp:static") || labels.has("webapp:pwa"));
@@ -69,6 +90,25 @@ export function isStaticWebappNode(node: GraphNode | undefined): boolean {
 
 export function deploymentError(label: string, message: string): string {
   return `${normalizeTargetLabel(label)}: ${message}`;
+}
+
+export function pushTokenFieldErrors(opts: {
+  errors: string[];
+  label: string;
+  fieldPath: string;
+  value: string;
+  pattern: RegExp;
+  required?: boolean;
+  invalidMessage: string;
+}) {
+  if (!opts.value) {
+    if (opts.required !== false) {
+      opts.errors.push(deploymentError(opts.label, `${opts.fieldPath} is required`));
+    }
+    return;
+  }
+  if (opts.pattern.test(opts.value)) return;
+  opts.errors.push(deploymentError(opts.label, opts.invalidMessage));
 }
 
 export function createDeploymentExtractionContext(nodes: GraphNode[]): DeploymentExtractionContext {

@@ -24,6 +24,7 @@ const ATTRS = [
   "container_port",
   "health_path",
   "target_group",
+  "prerequisites",
   "stages",
   "stage_branches",
   "allowed_promotion_edges",
@@ -138,6 +139,7 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
     assert.equal(deployments[0]?.environmentStage, "dev");
     assert.equal(deployments[0]?.runtime.appName, "demoapp");
     assert.equal(deployments[0]?.runtime.containerPort, 3000);
+    assert.deepEqual(deployments[0]?.prerequisites, []);
     assert.equal(deployments[0]?.providerTarget.hostname, "demoapp.apps.kilty.io");
     assert.equal(
       deployments[0]?.providerTarget.sharedDevTargetIdentity,

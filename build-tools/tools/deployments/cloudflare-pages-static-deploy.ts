@@ -40,6 +40,7 @@ export async function runCloudflarePagesStaticDeploy(opts: {
   deployment: CloudflarePagesDeployment;
   artifact: AdmittedStaticWebappArtifact;
   recordsRoot: string;
+  deployBatchId?: string;
   operationKind?: CloudflarePagesOperationKind;
   authority?: CloudflarePagesControlPlaneWorkerAuthority;
   admittedContext: CloudflarePagesAdmittedContext;
@@ -106,6 +107,7 @@ export async function runCloudflarePagesStaticDeploy(opts: {
       runClassification: operationKind,
       publishMode,
       finalOutcome: "succeeded",
+      ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
       ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
       ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
       artifactIdentity: opts.artifact.identity,
@@ -140,6 +142,7 @@ export async function runCloudflarePagesStaticDeploy(opts: {
       runClassification: operationKind,
       publishMode,
       finalOutcome: failedStep === "smoke" ? "smoke_failed_after_publish" : "publish_failed",
+      ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
       ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
       ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
       artifactIdentity: opts.artifact.identity,
