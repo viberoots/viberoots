@@ -8,11 +8,14 @@ import { resolveModuleContractsPaths } from "../../dev/module-contract-paths.ts"
 import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core.ts";
 import { parseWasmModuleManifest } from "../../scaffolding/webapp-module-manifests.ts";
 import { runInTemp } from "../lib/test-helpers";
-import { pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
+import { pickFreePort, stopServer, waitForChildHttpOk } from "./lib/webapp-static-hmr";
 import { removeDefaultWasmFiles, toZeroWasmTargets } from "./lib/zero-wasm";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
+const NEXT_DEV_READY_TIMEOUT_MS = Number(
+  process.env.NEXT_DEV_READY_TIMEOUT_MS || process.env.NEXT_DEV_UPDATE_TIMEOUT_MS || "180000",
+);
 
 test(
   "PR-7 zero-wasm default (ssr-next): install, build, and dev stay healthy without wasm modules",
@@ -53,13 +56,34 @@ test(
       await _$({ cwd: appAbs, stdio: "inherit" })`pnpm --dir ${appAbs} run build:ssr`;
 
       const port = await pickFreePort();
+      const serverStdout: string[] = [];
+      const serverStderr: string[] = [];
       const devServer: ChildProcess = spawn("pnpm", ["run", "dev:ssr"], {
         cwd: appAbs,
         stdio: "pipe",
         env: { ...process.env, PORT: String(port), NODE_OPTIONS: "", NEXT_TELEMETRY_DISABLED: "1" },
       });
+      devServer.stdout?.on("data", (chunk) => {
+        serverStdout.push(String(chunk || ""));
+        if (serverStdout.length > 200) serverStdout.shift();
+      });
+      devServer.stderr?.on("data", (chunk) => {
+        serverStderr.push(String(chunk || ""));
+        if (serverStderr.length > 200) serverStderr.shift();
+      });
       try {
-        await waitForHttpOk(`http://127.0.0.1:${port}/`, 120000);
+        await waitForChildHttpOk(devServer, `http://127.0.0.1:${port}/`, NEXT_DEV_READY_TIMEOUT_MS);
+      } catch (error) {
+        const tailOut = serverStdout.join("").slice(-8000);
+        const tailErr = serverStderr.join("").slice(-8000);
+        throw new Error(
+          [
+            error instanceof Error ? error.message : String(error),
+            "runtime diagnostics:",
+            `next stdout tail:\n${tailOut}`,
+            `next stderr tail:\n${tailErr}`,
+          ].join("\n\n"),
+        );
       } finally {
         await stopServer(devServer);
       }

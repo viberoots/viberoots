@@ -57,6 +57,30 @@ export async function waitForHttpOk(url: string, timeoutMs = 45000): Promise<voi
   throw new Error(`server did not become ready within ${timeoutMs}ms`);
 }
 
+export async function waitForChildHttpOk(
+  child: ChildProcess,
+  url: string,
+  timeoutMs = 45000,
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (child.exitCode != null || child.signalCode != null) {
+      throw new Error(
+        `server exited before readiness check completed (exitCode=${String(
+          child.exitCode,
+        )}, signal=${String(child.signalCode)})`,
+      );
+    }
+    try {
+      const remainingMs = Math.max(250, timeoutMs - (Date.now() - start));
+      const res = await httpGet(url, Math.min(5000, remainingMs));
+      if (res.status === 200) return;
+    } catch {}
+    await sleep(300);
+  }
+  throw new Error(`server did not become ready within ${timeoutMs}ms`);
+}
+
 export async function stopServer(child: ChildProcess): Promise<void> {
   await terminateChildTree(child, 5000);
   try {
