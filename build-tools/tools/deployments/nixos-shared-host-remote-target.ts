@@ -10,6 +10,7 @@ import {
   readNixosSharedHostClientProfile,
   type ClientInput,
 } from "./nixos-shared-host-install-dev-machine.ts";
+import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
 
 export type NixosSharedHostRemoteArtifactSource =
   | {
@@ -177,6 +178,11 @@ export async function createNixosSharedHostRemotePlan(opts: {
 }): Promise<NixosSharedHostRemotePlan> {
   const profileName = String(opts.profileName || "").trim();
   if (!profileName) throw new Error("missing required --profile");
+  if (isMultiComponentNixosSharedHostDeployment(opts.deployment)) {
+    throw new Error(
+      "reviewed nixos-shared-host remote profiles do not support multi-component deployments yet",
+    );
+  }
   const profileRoot = path.resolve(opts.profileRoot);
   let profile;
   try {

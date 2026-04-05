@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import { requiredDeploymentStageBranch } from "./contract.ts";
+import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
 import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
 import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
 
@@ -82,8 +83,8 @@ async function targetEnvironmentAdmission(
     mode: "stage_branch_snapshot",
     targetRef,
     targetRevision,
-    providerTargetIdentity: deployment.providerTarget.sharedDevTargetIdentity,
-    lockScope: deployment.providerTarget.sharedDevTargetIdentity,
+    providerTargetIdentity: nixosSharedHostDeploymentTargetIdentity(deployment),
+    lockScope: nixosSharedHostDeploymentTargetIdentity(deployment),
   };
 }
 

@@ -2,6 +2,8 @@
 import path from "node:path";
 import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
 import { isNixosSharedHostDeployment, type DeploymentTarget } from "./contract.ts";
+import { buildArtifactDirsByComponentId } from "./deployment-component-artifact-dirs.ts";
+import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
 import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-control-plane.ts";
 import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
 
@@ -19,6 +21,11 @@ export type DeploymentExecutionResult = {
     runClassification: string;
     finalOutcome: string;
     artifact?: { identity: string };
+    componentResults?: Array<{
+      componentId: string;
+      providerTargetIdentity: string;
+      finalOutcome: string;
+    }>;
     parentRunId?: string;
     publicUrl?: string;
     controlPlane?: unknown;
@@ -66,11 +73,16 @@ export async function runNormalDeployment(opts: {
     });
   }
   const hostRoot = path.resolve(opts.hostRoot || defaultNixosHostRoot(opts.workspaceRoot));
+  const artifactDirsByComponentId = isMultiComponentNixosSharedHostDeployment(opts.deployment)
+    ? await buildArtifactDirsByComponentId(opts.workspaceRoot, opts.deployment)
+    : undefined;
   return await submitNixosSharedHostControlPlaneRun({
     workspaceRoot: opts.workspaceRoot,
     operationKind: "deploy",
     deployment: opts.deployment,
-    artifactDir: await resolveArtifactDir(opts.workspaceRoot, opts.deployment),
+    ...(artifactDirsByComponentId
+      ? { artifactDirsByComponentId }
+      : { artifactDir: await resolveArtifactDir(opts.workspaceRoot, opts.deployment) }),
     paths: {
       statePath: path.resolve(opts.statePath || path.join(hostRoot, "platform-state.json")),
       hostRoot,
@@ -92,6 +104,7 @@ export function summarizeDeploymentResult(result: DeploymentExecutionResult) {
     artifactIdentity: result.record.artifact?.identity,
     ...(result.record.parentRunId ? { parentRunId: result.record.parentRunId } : {}),
     ...(result.record.deployBatchId ? { deployBatchId: result.record.deployBatchId } : {}),
+    ...(result.record.componentResults ? { componentResults: result.record.componentResults } : {}),
     publicUrl: result.record.publicUrl,
     recordPath: result.recordPath,
     ...(result.record.controlPlane ? { controlPlane: result.record.controlPlane } : {}),

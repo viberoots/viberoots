@@ -9,6 +9,7 @@ import { runStartupCheck } from "../dev-build/startup.ts";
 import { parseVerifyArgs } from "./args.ts";
 import { cleanupOrphanBuckDaemons, cleanupRegisteredTempRepos } from "./buck-orphan-cleanup.ts";
 import { runMergedCoverageReport, setupCoverage } from "./coverage.ts";
+import { runExplainSelection } from "./explain-selection.ts";
 import {
   enforceVerifyDiskGate,
   runVerifyHousekeeping,
@@ -22,7 +23,7 @@ import { activeNixGcProcesses, logVerifyRevision } from "./preflight.ts";
 import { prewarmVerifyOnce } from "./prewarm.ts";
 import { cleanupVerifyLegacyPnpmState } from "./pnpm-state.ts";
 import { resolveRequestedVerifyScope } from "./requested-scope.ts";
-import { printVerifySelection, summarizeVerifyScopeDecision } from "./selection-output.ts";
+import { summarizeVerifyScopeDecision } from "./selection-output.ts";
 import {
   appendVerifyLogLine,
   killBuckIsolation,
@@ -34,7 +35,6 @@ import {
 import { prepareVerifySeed, shouldPrepareVerifySeedForRequestedTargets } from "./seed.ts";
 import { isProjectsOnlyVerifyTargets } from "./target-scope.ts";
 import { ensureRepoLocalTmpRoot } from "./tmp-root.ts";
-import { resolveVerifyTargetPlan, summarizeVerifyTargetPlan } from "./target-passes.ts";
 import { runVerifyBuckPasses } from "./verify-passes.ts";
 import { computeZxTestNodeModulesOut } from "./zx-node-modules.ts";
 
@@ -49,12 +49,7 @@ export async function runVerify(): Promise<void> {
   const zxInitPath = path.join(root, "build-tools", "tools", "dev", "zx-init.mjs");
   await ensureVerifyPinnedNixpkgs(root);
   if (args.explainSelection) {
-    const plan = resolveVerifyTargetPlan({
-      root,
-      iso: "v-explain-selection",
-      targets: selection.targets,
-    });
-    printVerifySelection(selection, summarizeVerifyTargetPlan(plan));
+    await runExplainSelection({ root, selection });
     return;
   }
   await runStartupCheck(root);

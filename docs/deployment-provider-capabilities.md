@@ -66,8 +66,10 @@ Normative-source note:
 - supported component kinds:
   - `static-webapp`
 - multi-component support:
-  - not supported in the initial reviewed slice
-  - deployments must contain exactly one `static-webapp` component
+  - reviewed for `shared_nonprod` only when every component is a `static-webapp`
+  - all components must resolve to one `target_group`
+  - every component must declare a distinct `app_name`
+  - replay-style flows (`publish-only`, retry, rollback, promotion) remain single-component only in the current reviewed slice
 - additional unsupported shapes:
   - explicit subdomain-style overrides
   - provider-family use with non-webapp component targets
@@ -77,7 +79,12 @@ Normative-source note:
 - default rollout mode:
   - provider-family host realization only; publish rollout remains single-target and all-at-once in the initial slice
 - supported rollout modes:
-  - `all_at_once` only for the initial reviewed slice
+  - `all_at_once` for single-component deployments
+  - `ordered_best_effort` for the reviewed multi-component static-webapp slice, with:
+    - explicit `rollout_policy`
+    - `abort = "stop_on_first_failure"`
+    - `smoke = "final_only"`
+    - `steps` listing every component id exactly once
 
 ### Preview Support
 

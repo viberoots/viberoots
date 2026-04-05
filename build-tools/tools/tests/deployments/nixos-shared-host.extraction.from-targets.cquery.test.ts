@@ -14,12 +14,15 @@ const ATTRS = [
   "provider",
   "component",
   "component_kind",
+  "components",
   "publisher",
   "provisioner",
   "protection_class",
   "lane_policy",
   "environment_stage",
   "admission_policy",
+  "rollout_policy",
+  "rollout_steps",
   "app_name",
   "container_port",
   "health_path",
@@ -144,6 +147,125 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
     assert.equal(
       deployments[0]?.providerTarget.sharedDevTargetIdentity,
       "nixos-shared-host:default:demoapp",
+    );
+  });
+});
+
+test("nixos-shared-host multi-component extraction reads rollout policy and component metadata", async () => {
+  await runInTemp("deployment-cquery-multi-component", async (tmp, _$) => {
+    const appTargetsPath = path.join(tmp, "projects", "apps", "demoapp", "TARGETS");
+    const apiTargetsPath = path.join(tmp, "projects", "apps", "demoapi", "TARGETS");
+    const deployTargetsPath = path.join(
+      tmp,
+      "projects",
+      "deployments",
+      "demo-stack-dev",
+      "TARGETS",
+    );
+    const laneTargetsPath = path.join(tmp, "build-tools", "deployments", "lanes", "TARGETS");
+    const policyTargetsPath = path.join(tmp, "build-tools", "deployments", "policies", "TARGETS");
+    await fsp.mkdir(path.dirname(appTargetsPath), { recursive: true });
+    await fsp.mkdir(path.dirname(apiTargetsPath), { recursive: true });
+    await fsp.mkdir(path.dirname(deployTargetsPath), { recursive: true });
+    await fsp.mkdir(path.dirname(laneTargetsPath), { recursive: true });
+    await fsp.mkdir(path.dirname(policyTargetsPath), { recursive: true });
+    for (const [targetPath, name] of [
+      [appTargetsPath, "app"],
+      [apiTargetsPath, "api"],
+    ] as const) {
+      await fsp.writeFile(
+        targetPath,
+        [
+          'load("@prelude//:rules.bzl", "genrule")',
+          "",
+          "genrule(",
+          `    name = "${name}",`,
+          `    out = "${name}.txt",`,
+          `    cmd = "printf ${name} > $OUT",`,
+          '    labels = ["kind:app", "webapp:static"],',
+          '    visibility = ["PUBLIC"],',
+          ")",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+    }
+    await fsp.writeFile(
+      laneTargetsPath,
+      [
+        'load("//build-tools/deployments:defs.bzl", "deployment_lane_policy")',
+        "",
+        "deployment_lane_policy(",
+        '    name = "pleomino",',
+        '    stages = ["dev", "staging", "prod"],',
+        '    stage_branches = {"dev": "env/pleomino/dev", "staging": "env/pleomino/staging", "prod": "env/pleomino/prod"},',
+        '    allowed_promotion_edges = ["dev->staging", "staging->prod"],',
+        '    visibility = ["PUBLIC"],',
+        ")",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await fsp.writeFile(
+      policyTargetsPath,
+      [
+        'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy")',
+        "",
+        "deployment_admission_policy(",
+        '    name = "pleomino_dev_release",',
+        '    allowed_refs = ["env/pleomino/dev"],',
+        '    required_checks = ["deploy/pleomino-dev"],',
+        '    visibility = ["PUBLIC"],',
+        ")",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await fsp.writeFile(
+      deployTargetsPath,
+      [
+        'load("//build-tools/deployments:defs.bzl", "nixos_shared_host_multi_static_webapp_deployment")',
+        "",
+        "nixos_shared_host_multi_static_webapp_deployment(",
+        '    name = "deploy",',
+        '    lane_policy = "//build-tools/deployments/lanes:pleomino",',
+        '    environment_stage = "dev",',
+        '    admission_policy = "//build-tools/deployments/policies:pleomino_dev_release",',
+        "    components = [",
+        '        {"id": "frontend", "target": "//projects/apps/demoapp:app", "app_name": "demoapp", "container_port": 3000},',
+        '        {"id": "api", "target": "//projects/apps/demoapi:api", "app_name": "demoapi", "container_port": 3001},',
+        "    ],",
+        '    rollout_policy = {"mode": "ordered_best_effort", "abort": "stop_on_first_failure", "smoke": "final_only", "steps": ["frontend", "api"]},',
+        ")",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
+    const query =
+      "set(//projects/deployments/demo-stack-dev:deploy //projects/apps/demoapp:app //projects/apps/demoapi:api //build-tools/deployments/lanes:pleomino //build-tools/deployments/policies:pleomino_dev_release)";
+    const cquery = await _$({
+      cwd: tmp,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
+        SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
+      },
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-cquery-multi")} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
+    const merged = JSON.parse(String(cquery.stdout || "")) as Record<string, any>;
+    const { deployments, errors } = extractNixosSharedHostDeployments(nodesFromCqueryJson(merged));
+    assert.deepEqual(errors, []);
+    assert.equal(deployments.length, 1);
+    assert.equal(deployments[0]?.components.length, 2);
+    assert.equal(deployments[0]?.components[0]?.id, "frontend");
+    assert.equal(deployments[0]?.components[1]?.id, "api");
+    assert.equal(deployments[0]?.rolloutPolicy?.mode, "ordered_best_effort");
+    assert.deepEqual(deployments[0]?.rolloutPolicy?.steps, ["frontend", "api"]);
+    assert.equal(
+      deployments[0]?.providerTarget.deploymentTargetIdentity,
+      "nixos-shared-host:default:{demoapi,demoapp}",
     );
   });
 });

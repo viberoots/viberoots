@@ -8,18 +8,20 @@ import {
   targetName,
   type CloudflarePagesDeployment,
 } from "./contract-types.ts";
+import { readPrimaryDeploymentComponent } from "./contract-extract-components.ts";
 import {
-  createDeploymentExtractionContext,
   deploymentError,
   isStaticWebappNode,
+  pushRolloutPolicyFieldErrors,
   pushTokenFieldErrors,
   readLabel,
   readPrerequisites,
   readPreviewPolicy,
+  readRolloutPolicy,
   readString,
   readStringRecord,
   type DeploymentExtractionContext,
-  uniqueErrors,
+  duplicateValueEntries,
 } from "./contract-extract-shared.ts";
 
 const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/;
@@ -37,8 +39,8 @@ export function extractCloudflarePagesDeploymentsFromContext(
   for (const node of context.nodes) {
     if (readString(node, "provider") !== CLOUDFLARE_PAGES_PROVIDER) continue;
     const label = readLabel(node, "name");
-    const componentTarget = readLabel(node, "component");
-    const componentKind = readString(node, "component_kind");
+    const { componentTarget, componentKind, components, primaryComponent } =
+      readPrimaryDeploymentComponent(node);
     const lanePolicyRef = readLabel(node, "lane_policy");
     const admissionPolicyRef = readLabel(node, "admission_policy");
     const environmentStage = readString(node, "environment_stage");
@@ -49,6 +51,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
     const providerTarget = readStringRecord(node, "provider_target");
     const prerequisites = readPrerequisites(node, "prerequisites");
     const preview = readPreviewPolicy(node, "preview");
+    const rolloutPolicy = readRolloutPolicy(node);
     const account = providerTarget.account || "";
     const project = providerTarget.project || "";
     const id = providerTarget.id || project;
@@ -57,16 +60,27 @@ export function extractCloudflarePagesDeploymentsFromContext(
       context.errors.push("deployment target missing canonical label");
       continue;
     }
-    if (componentKind !== STATIC_WEBAPP_COMPONENT) {
+    if ((primaryComponent?.kind || componentKind) !== STATIC_WEBAPP_COMPONENT) {
       deploymentErrors.push(
         deploymentError(
           label,
-          `unsupported cloudflare-pages component_kind "${componentKind || "<empty>"}"`,
+          `unsupported cloudflare-pages component_kind "${primaryComponent?.kind || componentKind || "<empty>"}"`,
         ),
       );
     }
-    if (!componentTarget)
+    if (!primaryComponent?.target)
       deploymentErrors.push(deploymentError(label, "missing required component target"));
+    if (components.length > 1) {
+      deploymentErrors.push(
+        deploymentError(label, "cloudflare-pages does not support multi-component deployments"),
+      );
+    }
+    pushRolloutPolicyFieldErrors({ errors: deploymentErrors, label, rolloutPolicy });
+    if (rolloutPolicy) {
+      deploymentErrors.push(
+        deploymentError(label, "cloudflare-pages does not support explicit rollout_policy"),
+      );
+    }
     for (const [fieldPath, value, required] of [
       ["provider_target.account", account, true],
       ["provider_target.project", project, true],
@@ -136,12 +150,12 @@ export function extractCloudflarePagesDeploymentsFromContext(
         );
       }
     }
-    const componentNode = context.components.get(componentTarget);
-    if (componentTarget && !isStaticWebappNode(componentNode)) {
+    const componentNode = context.components.get(primaryComponent?.target || "");
+    if (primaryComponent?.target && !isStaticWebappNode(componentNode)) {
       deploymentErrors.push(
         deploymentError(
           label,
-          `component target ${componentTarget || "<empty>"} is not a supported static-webapp`,
+          `component target ${primaryComponent.target} is not a supported static-webapp`,
         ),
       );
     }
@@ -200,41 +214,34 @@ export function extractCloudflarePagesDeploymentsFromContext(
       admissionPolicyRef,
       admissionPolicy: admissionPolicy!,
       prerequisites,
+      ...(rolloutPolicy ? { rolloutPolicy } : {}),
       component: { kind: STATIC_WEBAPP_COMPONENT, target: componentTarget },
+      components: [
+        {
+          id: primaryComponent?.id || "default",
+          kind: STATIC_WEBAPP_COMPONENT,
+          target: primaryComponent?.target || componentTarget,
+        },
+      ],
       ...(preview ? { preview } : {}),
       publisher: { type: publisher, config: publisherConfig },
       providerTarget: deriveCloudflarePagesProviderTarget({ account, project, id }),
     });
   }
-  const labelsByTargetIdentity = new Map<string, string[]>();
-  for (const deployment of deployments) {
-    const labels =
-      labelsByTargetIdentity.get(deployment.providerTarget.providerTargetIdentity) || [];
-    labels.push(deployment.label);
-    labelsByTargetIdentity.set(deployment.providerTarget.providerTargetIdentity, labels);
-  }
-  for (const [identity, labels] of labelsByTargetIdentity) {
-    if (labels.length < 2) continue;
-    const sortedLabels = [...labels].sort();
-    for (const label of sortedLabels) {
+  for (const duplicate of duplicateValueEntries(
+    deployments.map((deployment) => ({
+      value: deployment.providerTarget.providerTargetIdentity,
+      label: deployment.label,
+    })),
+  )) {
+    for (const label of duplicate.labels) {
       context.errors.push(
         deploymentError(
           label,
-          `duplicate provider_target identity "${identity}" collides with ${sortedLabels.join(", ")}`,
+          `duplicate provider_target identity "${duplicate.value}" collides with ${duplicate.labels.join(", ")}`,
         ),
       );
     }
   }
   return deployments.sort((a, b) => a.label.localeCompare(b.label));
-}
-
-export function extractCloudflarePagesDeployments(nodes: GraphNode[]): {
-  deployments: CloudflarePagesDeployment[];
-  errors: string[];
-} {
-  const context = createDeploymentExtractionContext(nodes);
-  return {
-    deployments: extractCloudflarePagesDeploymentsFromContext(context),
-    errors: uniqueErrors(context.errors),
-  };
 }

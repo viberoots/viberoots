@@ -12,17 +12,27 @@ function sortDeployments(deployments: NixosSharedHostDeployment[]): NixosSharedH
   return [...deployments].sort((a, b) => a.deploymentId.localeCompare(b.deploymentId));
 }
 
-function duplicateValueErrors(
-  deployments: NixosSharedHostDeployment[],
-  readKey: (deployment: NixosSharedHostDeployment) => string,
+function platformComponents(deployments: NixosSharedHostDeployment[]) {
+  return deployments.flatMap((deployment) =>
+    deployment.components.map((component) => ({
+      label: `${deployment.label}#${component.id}`,
+      hostname: component.providerTarget.hostname || "",
+      sharedDevTargetIdentity: component.providerTarget.sharedDevTargetIdentity || "",
+    })),
+  );
+}
+
+function duplicateValueErrors<T extends { label: string }>(
+  entries: T[],
+  readKey: (entry: T) => string,
   describe: (value: string, labels: string[]) => string,
 ): string[] {
   const labelsByKey = new Map<string, string[]>();
-  for (const deployment of deployments) {
-    const key = readKey(deployment).trim();
+  for (const entry of entries) {
+    const key = readKey(entry).trim();
     if (!key) continue;
     const labels = labelsByKey.get(key) || [];
-    labels.push(deployment.label);
+    labels.push(entry.label);
     labelsByKey.set(key, labels);
   }
   const errors: string[] = [];
@@ -77,16 +87,16 @@ export function validateNixosSharedHostPlatformState(
   );
   errors.push(
     ...duplicateValueErrors(
-      state.deployments,
-      (deployment) => deployment.providerTarget.hostname,
+      platformComponents(state.deployments),
+      (component) => component.hostname,
       (value, labels) =>
         `duplicate hostname "${value}" in nixos-shared-host platform state: ${labels.join(", ")}`,
     ),
   );
   errors.push(
     ...duplicateValueErrors(
-      state.deployments,
-      (deployment) => deployment.providerTarget.sharedDevTargetIdentity,
+      platformComponents(state.deployments),
+      (component) => component.sharedDevTargetIdentity,
       (value, labels) =>
         `duplicate shared-dev target identity "${value}" in nixos-shared-host platform state: ${labels.join(", ")}`,
     ),

@@ -96,8 +96,29 @@ export function nixosSharedHostDeploymentFixture(
   const targetGroup = overrides.runtime?.targetGroup || "default";
   const lanePolicy = overrides.lanePolicy || nixosSharedHostLanePolicyFixture();
   const admissionPolicy = overrides.admissionPolicy || nixosSharedHostAdmissionPolicyFixture();
-  const providerTarget = {
+  const defaultComponentProviderTarget = {
     ...deriveNixosSharedHostProviderTarget({ appName, targetGroup }),
+    ...(overrides.providerTarget || {}),
+  };
+  const components = overrides.components || [
+    {
+      id: "default",
+      kind: STATIC_WEBAPP_COMPONENT,
+      target: overrides.component?.target || "//projects/apps/demoapp:app",
+      runtime: {
+        appName,
+        containerPort: overrides.runtime?.containerPort || 3000,
+        ...(overrides.runtime?.healthPath ? { healthPath: overrides.runtime.healthPath } : {}),
+        ...(overrides.runtime?.targetGroup ? { targetGroup: overrides.runtime.targetGroup } : {}),
+      },
+      providerTarget: defaultComponentProviderTarget,
+    },
+  ];
+  const providerTarget = {
+    ...deriveNixosSharedHostProviderTarget({
+      appNames: components.map((component) => component.runtime.appName),
+      targetGroup: components[0]?.providerTarget.targetGroup || targetGroup,
+    }),
     ...(overrides.providerTarget || {}),
   };
   return {
@@ -112,17 +133,24 @@ export function nixosSharedHostDeploymentFixture(
     admissionPolicyRef: overrides.admissionPolicyRef || admissionPolicy.ref,
     admissionPolicy,
     prerequisites: overrides.prerequisites || [],
+    ...(overrides.rolloutPolicy ? { rolloutPolicy: overrides.rolloutPolicy } : {}),
     component: {
       kind: STATIC_WEBAPP_COMPONENT,
-      target: overrides.component?.target || "//projects/apps/demoapp:app",
+      target: components[0]?.target || overrides.component?.target || "//projects/apps/demoapp:app",
     },
+    components,
     publisher: overrides.publisher || { type: "nixos-shared-host-static-webapp" },
     provisioner: overrides.provisioner || { type: "nixos-shared-host-manifest" },
     runtime: {
-      appName,
-      containerPort: overrides.runtime?.containerPort || 3000,
-      ...(overrides.runtime?.healthPath ? { healthPath: overrides.runtime.healthPath } : {}),
-      ...(overrides.runtime?.targetGroup ? { targetGroup: overrides.runtime.targetGroup } : {}),
+      appName: components[0]?.runtime.appName || appName,
+      containerPort:
+        components[0]?.runtime.containerPort || overrides.runtime?.containerPort || 3000,
+      ...(components[0]?.runtime.healthPath
+        ? { healthPath: components[0].runtime.healthPath }
+        : {}),
+      ...(components[0]?.runtime.targetGroup
+        ? { targetGroup: components[0].runtime.targetGroup }
+        : {}),
     },
     providerTarget,
   };

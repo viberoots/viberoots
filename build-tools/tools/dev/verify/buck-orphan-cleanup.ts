@@ -68,6 +68,7 @@ export function isLikelyEphemeralIsolation(iso: string): boolean {
   const s = String(iso || "").trim();
   if (!s) return false;
   if (/^v-\d+-\d+$/.test(s)) return true;
+  if (/^verify-nested-(?:\d+-)?[a-f0-9]{12}$/.test(s)) return true;
   if (/^debug-[A-Za-z0-9._-]+-\d{9,}$/.test(s)) return true;
   if (/^targeted-[A-Za-z0-9._-]+-\d{9,}$/.test(s)) return true;
   if (/^(parity_|sanitize_|importer_strings_)/.test(s)) return true;

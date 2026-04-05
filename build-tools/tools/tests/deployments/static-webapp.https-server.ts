@@ -127,3 +127,39 @@ export async function startStaticWebappHttpsServer(opts: {
     },
   };
 }
+
+export async function startStaticWebappHttpsMultiServer(opts: {
+  hosts: Record<string, string | (() => string)>;
+  tlsRoot?: string;
+}): Promise<{ port: number; close: () => Promise<void> }> {
+  const hostnames = Object.keys(opts.hosts).sort();
+  if (hostnames.length === 0) throw new Error("multi-host server requires at least one host");
+  const port = await pickFreePort();
+  const tls = await writeTlsMaterial(
+    opts.tlsRoot ||
+      (typeof opts.hosts[hostnames[0]!] === "string"
+        ? (opts.hosts[hostnames[0]!] as string)
+        : process.cwd()),
+    hostnames[0]!,
+  );
+  const server = https.createServer({ cert: tls.cert, key: tls.key }, async (req, res) => {
+    const hostname = (req.headers.host || "").split(":")[0];
+    const root = opts.hosts[hostname];
+    if (!root) {
+      res.writeHead(404).end("unknown host\n");
+      return;
+    }
+    const response = await serveFile(typeof root === "function" ? root() : root, req.url || "/");
+    res.writeHead(response.status, { "content-type": "text/html; charset=utf-8" });
+    res.end(response.body);
+  });
+  await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", () => resolve()));
+  return {
+    port,
+    close: async () => {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    },
+  };
+}

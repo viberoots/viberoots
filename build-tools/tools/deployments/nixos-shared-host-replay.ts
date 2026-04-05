@@ -6,6 +6,7 @@ import { requireNixosSharedHostAdmittedArtifactPath } from "./nixos-shared-host-
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
+import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
 import {
   deployRecordPathFor,
   readNixosSharedHostDeployRecord,
@@ -81,7 +82,7 @@ export async function writeNixosSharedHostReplaySnapshot(opts: {
     createdAt: new Date().toISOString(),
     deploymentId: opts.deployment.deploymentId,
     deploymentLabel: opts.deployment.label,
-    providerTargetIdentity: opts.deployment.providerTarget.sharedDevTargetIdentity,
+    providerTargetIdentity: nixosSharedHostDeploymentTargetIdentity(opts.deployment),
     deploymentMetadataFingerprint,
     artifact: opts.artifact,
     admittedContext: opts.admittedContext,
@@ -163,13 +164,14 @@ function sameDeploymentReplayErrors(
     errors.push(replayMismatch("provider", current.provider, source.provider));
   }
   if (
-    current.providerTarget.sharedDevTargetIdentity !== source.providerTarget.sharedDevTargetIdentity
+    nixosSharedHostDeploymentTargetIdentity(current) !==
+    nixosSharedHostDeploymentTargetIdentity(source)
   ) {
     errors.push(
       replayMismatch(
         "providerTargetIdentity",
-        current.providerTarget.sharedDevTargetIdentity,
-        source.providerTarget.sharedDevTargetIdentity,
+        nixosSharedHostDeploymentTargetIdentity(current),
+        nixosSharedHostDeploymentTargetIdentity(source),
       ),
     );
   }

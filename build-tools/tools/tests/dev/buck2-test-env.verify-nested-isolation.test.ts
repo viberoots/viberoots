@@ -11,6 +11,8 @@ test("verify child env reuses a shared nested buck isolation per pass", () => {
   const isolated = previewVerifyNestedBuckIsolation("v-123", "isolated://foo:bar");
   assert.equal(shared, previewVerifyNestedBuckIsolation("v-123", "shared"));
   assert.notEqual(shared, isolated);
+  assert.match(shared, /^verify-nested-123-/);
+  assert.match(isolated, /^verify-nested-123-/);
 
   const envArgs = buildVerifyTestEnvArgs({
     iso: "v-123",

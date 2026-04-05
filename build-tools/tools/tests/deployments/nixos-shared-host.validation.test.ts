@@ -80,3 +80,65 @@ test("validation rejects unsupported component kinds for nixos-shared-host", () 
   ]);
   assert.ok(errors.some((entry) => entry.includes("unsupported nixos-shared-host component_kind")));
 });
+
+test("validation rejects protected multi-component shared-host deployments without rollout_policy", () => {
+  const { errors } = extractNixosSharedHostDeployments([
+    staticWebappComponent("//projects/apps/demoapp:app"),
+    staticWebappComponent("//projects/apps/demoapi:app"),
+    ...policyNodes(),
+    deploymentNode({
+      components: [
+        {
+          id: "frontend",
+          kind: "static-webapp",
+          target: "//projects/apps/demoapp:app",
+          app_name: "demoapp",
+          container_port: "3000",
+        },
+        {
+          id: "api",
+          kind: "static-webapp",
+          target: "//projects/apps/demoapi:app",
+          app_name: "demoapi",
+          container_port: "3001",
+        },
+      ],
+    }),
+  ]);
+  assert.ok(errors.some((entry) => entry.includes("must set rollout_policy")));
+});
+
+test("validation rejects multi-component shared-host rollout steps that omit a component", () => {
+  const { errors } = extractNixosSharedHostDeployments([
+    staticWebappComponent("//projects/apps/demoapp:app"),
+    staticWebappComponent("//projects/apps/demoapi:app"),
+    ...policyNodes(),
+    deploymentNode({
+      components: [
+        {
+          id: "frontend",
+          kind: "static-webapp",
+          target: "//projects/apps/demoapp:app",
+          app_name: "demoapp",
+          container_port: "3000",
+        },
+        {
+          id: "api",
+          kind: "static-webapp",
+          target: "//projects/apps/demoapi:app",
+          app_name: "demoapi",
+          container_port: "3001",
+        },
+      ],
+      rollout_policy: {
+        mode: "ordered_best_effort",
+        abort: "stop_on_first_failure",
+        smoke: "final_only",
+      },
+      rollout_steps: ["frontend"],
+    }),
+  ]);
+  assert.ok(
+    errors.some((entry) => entry.includes("steps must list every component id exactly once")),
+  );
+});

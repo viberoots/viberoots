@@ -87,5 +87,5 @@ export async function startBuckWatchdog(opts: {
   await $({
     stdio: "ignore",
     cwd: opts.root,
-  })`bash --noprofile --norc -c ${`node --experimental-top-level-await --experimental-strip-types --disable-warning=ExperimentalWarning --import ${opts.zxInitPath} ${watchdog} --parent ${process.pid} --iso ${opts.iso} --patterns v- >/dev/null 2>&1 & disown`}`.nothrow();
+  })`bash --noprofile --norc -c ${`node --experimental-top-level-await --experimental-strip-types --disable-warning=ExperimentalWarning --import ${opts.zxInitPath} ${watchdog} --parent ${process.pid} --iso ${opts.iso} --patterns v-,verify-nested- >/dev/null 2>&1 & disown`}`.nothrow();
 }

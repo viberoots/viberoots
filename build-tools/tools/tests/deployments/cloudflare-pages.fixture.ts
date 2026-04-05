@@ -60,10 +60,18 @@ export function cloudflarePagesDeploymentFixture(
     admissionPolicyRef: overrides.admissionPolicyRef || admissionPolicy.ref,
     admissionPolicy,
     prerequisites: overrides.prerequisites || [],
+    ...(overrides.rolloutPolicy ? { rolloutPolicy: overrides.rolloutPolicy } : {}),
     component: {
       kind: STATIC_WEBAPP_COMPONENT,
       target: overrides.component?.target || "//projects/apps/pleomino:app",
     },
+    components: overrides.components || [
+      {
+        id: "default",
+        kind: STATIC_WEBAPP_COMPONENT,
+        target: overrides.component?.target || "//projects/apps/pleomino:app",
+      },
+    ],
     ...(overrides.preview ? { preview: overrides.preview } : {}),
     publisher: overrides.publisher || { type: "wrangler-pages", config: "wrangler.jsonc" },
     providerTarget,

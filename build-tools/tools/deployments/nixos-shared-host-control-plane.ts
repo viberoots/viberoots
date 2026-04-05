@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import {
   type NixosSharedHostControlPlaneOperationKind,
@@ -25,6 +26,7 @@ import {
   submissionPathFor,
   writeControlPlaneJson,
 } from "./nixos-shared-host-control-plane-store.ts";
+import { nixosSharedHostLockScopes } from "./nixos-shared-host-components.ts";
 import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
 
 type SubmitHooks = {
@@ -39,7 +41,9 @@ type SubmitOpts = {
   paths: NixosSharedHostControlPlanePaths;
   deployBatchId?: string;
   artifactDir?: string;
+  artifactDirsByComponentId?: Record<string, string>;
   artifact?: NixosSharedHostAdmittedArtifact;
+  componentArtifacts?: NixosSharedHostResolvedComponentArtifact[];
   publishBehavior?: NixosSharedHostPublishBehavior;
   parentRunId?: string;
   releaseLineageId?: string;
@@ -84,7 +88,12 @@ async function runWorker(opts: {
             ? snapshot.operationKind
             : "deploy",
         publishBehavior: snapshot.action.publishBehavior,
-        artifact: snapshot.action.publishInput.artifact,
+        ...(snapshot.action.publishInput.kind === "exact-artifact"
+          ? { artifact: snapshot.action.publishInput.artifact }
+          : {
+              componentArtifacts: snapshot.action.publishInput.components,
+              compositeArtifactIdentity: snapshot.action.publishInput.compositeArtifactIdentity,
+            }),
         statePath: snapshot.paths.statePath,
         hostRoot: snapshot.paths.hostRoot,
         recordsRoot: snapshot.paths.recordsRoot,
@@ -114,6 +123,21 @@ async function runWorker(opts: {
       });
 }
 
+async function acquireControlPlaneLocks(recordsRoot: string, lockScopes: string[]) {
+  const releaseLocks: Array<() => Promise<void>> = [];
+  try {
+    for (const lockScope of lockScopes) {
+      releaseLocks.push(await acquireControlPlaneLock(recordsRoot, lockScope));
+    }
+  } catch (error) {
+    for (const release of releaseLocks.reverse()) await release();
+    throw error;
+  }
+  return async () => {
+    for (const release of releaseLocks.reverse()) await release();
+  };
+}
+
 export async function submitNixosSharedHostControlPlaneRun(
   opts: SubmitOpts,
 ): Promise<SubmitResult> {
@@ -125,7 +149,10 @@ export async function submitNixosSharedHostControlPlaneRun(
   await opts.hooks?.afterSnapshotWritten?.(executionSnapshotPath);
   let releaseLock: (() => Promise<void>) | undefined;
   try {
-    releaseLock = await acquireControlPlaneLock(opts.paths.recordsRoot, snapshot.lockScope);
+    releaseLock = await acquireControlPlaneLocks(
+      opts.paths.recordsRoot,
+      nixosSharedHostLockScopes(opts.deployment),
+    );
   } catch (error) {
     const rejected = createNixosSharedHostControlPlaneSubmission(snapshot, executionSnapshotPath, {
       decision: "rejected",

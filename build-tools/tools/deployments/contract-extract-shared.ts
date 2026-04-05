@@ -2,11 +2,18 @@
 import type { GraphNode } from "../lib/graph.ts";
 import { normalizeTargetLabel } from "../lib/labels.ts";
 import type {
+  DeploymentComponent,
   DeploymentPrerequisite,
   DeploymentPrerequisiteMode,
   DeploymentPreviewIdentitySelector,
   DeploymentPreviewPolicy,
 } from "./contract-types.ts";
+import {
+  DEPLOYMENT_ROLLOUT_ABORT_BEHAVIORS,
+  DEPLOYMENT_ROLLOUT_MODES,
+  DEPLOYMENT_ROLLOUT_SMOKE_MODES,
+  type DeploymentRolloutPolicy,
+} from "./deployment-rollout.ts";
 import {
   extractDeploymentAdmissionPolicies,
   extractDeploymentLanePolicies,
@@ -48,6 +55,25 @@ export function readStringRecord(node: GraphNode, key: string): Record<string, s
   );
 }
 
+export function readStringRecordList(node: GraphNode, key: string): Record<string, string>[] {
+  const value = node[key];
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+      return Object.fromEntries(
+        Object.entries(entry as Record<string, unknown>)
+          .filter(
+            ([entryKey, entryValue]) =>
+              typeof entryKey === "string" && typeof entryValue === "string",
+          )
+          .map(([entryKey, entryValue]) => [entryKey.trim(), String(entryValue).trim()])
+          .filter(([entryKey, entryValue]) => entryKey !== "" && entryValue !== ""),
+      );
+    })
+    .filter((entry): entry is Record<string, string> => !!entry);
+}
+
 export function readPreviewPolicy(
   node: GraphNode,
   key: string,
@@ -61,6 +87,37 @@ export function readPreviewPolicy(
     cleanupTtl: preview.cleanup_ttl || "7d",
     smokeTarget: (preview.smoke_target || "normal_url") as "normal_url" | "preview_url",
     lockScope: (preview.lock_scope || "shared") as "shared" | "preview",
+  };
+}
+
+export function readDeploymentComponents(
+  node: GraphNode,
+  fallback?: DeploymentComponent,
+): DeploymentComponent[] {
+  const components = readStringRecordList(node, "components")
+    .map((entry) => ({
+      id: entry.id || "",
+      kind: (entry.kind || "") as DeploymentComponent["kind"],
+      target: normalizeTargetLabel(entry.target || ""),
+    }))
+    .filter((component) => component.id || component.kind || component.target);
+  if (components.length > 0) return components;
+  return fallback ? [fallback] : [];
+}
+
+export function readRolloutPolicy(node: GraphNode): DeploymentRolloutPolicy | undefined {
+  const rollout = readStringRecord(node, "rollout_policy");
+  if (Object.keys(rollout).length === 0) return undefined;
+  const steps = Array.isArray(node.rollout_steps)
+    ? node.rollout_steps.filter(
+        (step): step is string => typeof step === "string" && step.trim() !== "",
+      )
+    : [];
+  return {
+    mode: (rollout.mode || "") as DeploymentRolloutPolicy["mode"],
+    abort: (rollout.abort || "") as DeploymentRolloutPolicy["abort"],
+    smoke: (rollout.smoke || "") as DeploymentRolloutPolicy["smoke"],
+    steps,
   };
 }
 
@@ -90,6 +147,39 @@ export function isStaticWebappNode(node: GraphNode | undefined): boolean {
 
 export function deploymentError(label: string, message: string): string {
   return `${normalizeTargetLabel(label)}: ${message}`;
+}
+
+export function pushRolloutPolicyFieldErrors(opts: {
+  errors: string[];
+  label: string;
+  rolloutPolicy?: DeploymentRolloutPolicy;
+}) {
+  const rolloutPolicy = opts.rolloutPolicy;
+  if (!rolloutPolicy) return;
+  if (!DEPLOYMENT_ROLLOUT_MODES.has(rolloutPolicy.mode)) {
+    opts.errors.push(
+      deploymentError(
+        opts.label,
+        `unsupported rollout_policy.mode "${rolloutPolicy.mode || "<empty>"}"`,
+      ),
+    );
+  }
+  if (!DEPLOYMENT_ROLLOUT_ABORT_BEHAVIORS.has(rolloutPolicy.abort)) {
+    opts.errors.push(
+      deploymentError(
+        opts.label,
+        `unsupported rollout_policy.abort "${rolloutPolicy.abort || "<empty>"}"`,
+      ),
+    );
+  }
+  if (!DEPLOYMENT_ROLLOUT_SMOKE_MODES.has(rolloutPolicy.smoke)) {
+    opts.errors.push(
+      deploymentError(
+        opts.label,
+        `unsupported rollout_policy.smoke "${rolloutPolicy.smoke || "<empty>"}"`,
+      ),
+    );
+  }
 }
 
 export function pushTokenFieldErrors(opts: {
@@ -131,4 +221,18 @@ export function createDeploymentExtractionContext(nodes: GraphNode[]): Deploymen
 
 export function uniqueErrors(errors: string[]): string[] {
   return Array.from(new Set(errors));
+}
+
+export function duplicateValueEntries(
+  values: Array<{ value: string; label: string }>,
+): Array<{ value: string; labels: string[] }> {
+  const labelsByValue = new Map<string, string[]>();
+  for (const entry of values) {
+    const labels = labelsByValue.get(entry.value) || [];
+    labels.push(entry.label);
+    labelsByValue.set(entry.value, labels);
+  }
+  return Array.from(labelsByValue.entries())
+    .filter(([, labels]) => labels.length > 1)
+    .map(([value, labels]) => ({ value, labels: [...labels].sort() }));
 }

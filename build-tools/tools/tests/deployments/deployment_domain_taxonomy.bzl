@@ -21,6 +21,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.failure-records.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.jenkins.contract.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.jenkins.exec.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.multi-component.deploy.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.remote-exec.failures.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.remote-exec.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.remote-host-apply.test.ts": True,

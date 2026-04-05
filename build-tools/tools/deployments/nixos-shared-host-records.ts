@@ -9,6 +9,7 @@ import {
   type NixosSharedHostDeployment,
   type NixosSharedHostProviderTarget,
 } from "./contract.ts";
+import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
 
 export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-04";
 
@@ -20,6 +21,15 @@ export type NixosSharedHostFinalOutcome =
   | "publish_failed"
   | "smoke_failed_after_publish";
 export type NixosSharedHostFailedStep = "provision" | "publish" | "smoke";
+
+export type NixosSharedHostComponentResult = {
+  componentId: string;
+  providerTargetIdentity: string;
+  publicUrl?: string;
+  healthUrl?: string;
+  artifactIdentity?: string;
+  finalOutcome: "succeeded" | "publish_failed" | "smoke_failed_after_publish" | "not_started";
+};
 
 export type NixosSharedHostDeployRecord = {
   schemaVersion: typeof NIXOS_SHARED_HOST_RECORD_SCHEMA;
@@ -53,6 +63,7 @@ export type NixosSharedHostDeployRecord = {
     storedArtifactPath?: string;
     provenancePath?: string;
   };
+  componentResults?: NixosSharedHostComponentResult[];
   admittedContext?: NixosSharedHostAdmittedContext;
   failedStep?: NixosSharedHostFailedStep;
   provisionerType?: string;
@@ -83,6 +94,7 @@ type NixosSharedHostRecordOutcome = {
   artifactStoredArtifactPath?: string;
   artifactProvenancePath?: string;
   admittedContext?: NixosSharedHostAdmittedContext;
+  componentResults?: NixosSharedHostComponentResult[];
   deploymentMetadataFingerprint?: string;
   replaySnapshotPath?: string;
 };
@@ -109,7 +121,7 @@ export function createNixosSharedHostDeployRecord(
     provider: NIXOS_SHARED_HOST_PROVIDER,
     providerTarget: deployment.providerTarget,
     effectiveRunTarget: deployment.providerTarget,
-    providerTargetIdentity: deployment.providerTarget.sharedDevTargetIdentity,
+    providerTargetIdentity: nixosSharedHostDeploymentTargetIdentity(deployment),
     ...(outcome.authority
       ? {
           controlPlane: {
@@ -140,6 +152,7 @@ export function createNixosSharedHostDeployRecord(
         }
       : {}),
     ...(outcome.admittedContext ? { admittedContext: outcome.admittedContext } : {}),
+    ...(outcome.componentResults ? { componentResults: outcome.componentResults } : {}),
     ...(outcome.failedStep ? { failedStep: outcome.failedStep } : {}),
     ...(deployment.provisioner ? { provisionerType: deployment.provisioner.type } : {}),
     ...(outcome.runClassification !== "explicit_removal"

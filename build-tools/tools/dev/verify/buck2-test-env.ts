@@ -12,7 +12,8 @@ type VerifyBuck2TestEnvArgsOptions = {
 function verifyNestedBuckIsolation(iso: string, passName: string): string {
   const seed = `${iso}:${passName}`;
   const hash = crypto.createHash("sha256").update(seed).digest("hex").slice(0, 12);
-  return `verify-nested-${hash}`;
+  const ownerPid = (String(iso || "").match(/^v-(\d+)(?:-|$)/) || [])[1] || "";
+  return ownerPid ? `verify-nested-${ownerPid}-${hash}` : `verify-nested-${hash}`;
 }
 
 function maybeEnvArg(name: string, value: string | undefined): string[] {

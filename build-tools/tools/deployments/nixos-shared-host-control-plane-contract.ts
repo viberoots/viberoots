@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 
@@ -48,10 +49,16 @@ export type NixosSharedHostControlPlaneSnapshot = {
     | {
         kind: "deploy";
         publishBehavior: NixosSharedHostPublishBehavior;
-        publishInput: {
-          kind: "exact-artifact";
-          artifact: NixosSharedHostAdmittedArtifact;
-        };
+        publishInput:
+          | {
+              kind: "exact-artifact";
+              artifact: NixosSharedHostAdmittedArtifact;
+            }
+          | {
+              kind: "component-artifacts";
+              components: NixosSharedHostResolvedComponentArtifact[];
+              compositeArtifactIdentity: string;
+            };
         parentRunId?: string;
         releaseLineageId?: string;
         artifactLineageId?: string;

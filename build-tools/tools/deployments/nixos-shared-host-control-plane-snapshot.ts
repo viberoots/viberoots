@@ -2,6 +2,11 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import {
+  admitNixosSharedHostComponentArtifacts,
+  compositeNixosSharedHostArtifactIdentity,
+  type NixosSharedHostResolvedComponentArtifact,
+} from "./nixos-shared-host-component-artifacts.ts";
+import {
   admitNixosSharedHostStaticArtifact,
   type NixosSharedHostAdmittedArtifact,
 } from "./nixos-shared-host-artifacts.ts";
@@ -19,6 +24,10 @@ import {
   type NixosSharedHostPublishBehavior,
   type NixosSharedHostSmokeConnectOverride,
 } from "./nixos-shared-host-control-plane-contract.ts";
+import {
+  isMultiComponentNixosSharedHostDeployment,
+  nixosSharedHostDeploymentTargetIdentity,
+} from "./nixos-shared-host-components.ts";
 import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
 import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
 
@@ -36,7 +45,9 @@ export type NixosSharedHostControlPlaneSnapshotOpts = {
   paths: NixosSharedHostControlPlanePaths;
   deployBatchId?: string;
   artifactDir?: string;
+  artifactDirsByComponentId?: Record<string, string>;
   artifact?: NixosSharedHostAdmittedArtifact;
+  componentArtifacts?: NixosSharedHostResolvedComponentArtifact[];
   publishBehavior?: NixosSharedHostPublishBehavior;
   parentRunId?: string;
   releaseLineageId?: string;
@@ -67,7 +78,8 @@ export async function createNixosSharedHostControlPlaneSnapshot(
   submissionId: string,
 ): Promise<NixosSharedHostControlPlaneSnapshot> {
   const submittedAt = new Date().toISOString();
-  const lockScope = opts.deployment.providerTarget.sharedDevTargetIdentity;
+  const multiComponent = isMultiComponentNixosSharedHostDeployment(opts.deployment);
+  const lockScope = nixosSharedHostDeploymentTargetIdentity(opts.deployment);
   if (
     (opts.operationKind === "retry" || opts.operationKind === "rollback") &&
     !hasReplaySnapshot(opts.source)
@@ -77,19 +89,59 @@ export async function createNixosSharedHostControlPlaneSnapshot(
   if (opts.operationKind === "promotion" && !opts.source) {
     throw new Error("shared control-plane promotion submission requires source run");
   }
-  if (opts.operationKind !== "explicit_removal" && !opts.artifact && !opts.artifactDir) {
+  if (
+    multiComponent &&
+    opts.operationKind !== "deploy" &&
+    opts.operationKind !== "explicit_removal"
+  ) {
+    throw new Error(
+      "multi-component nixos-shared-host deployments currently support normal deploy and explicit removal only",
+    );
+  }
+  if (multiComponent && (opts.artifact || opts.artifactDir)) {
+    throw new Error(
+      "multi-component nixos-shared-host deployments require per-component exact artifact inputs",
+    );
+  }
+  if (!multiComponent && (opts.componentArtifacts || opts.artifactDirsByComponentId)) {
+    throw new Error(
+      "single-component nixos-shared-host deployments must use a single exact artifact input",
+    );
+  }
+  if (
+    opts.operationKind !== "explicit_removal" &&
+    !opts.artifact &&
+    !opts.artifactDir &&
+    !opts.componentArtifacts &&
+    !opts.artifactDirsByComponentId
+  ) {
     throw new Error(
       `shared control-plane ${opts.operationKind} submission requires exact artifact input`,
     );
   }
   const artifact =
-    opts.operationKind === "explicit_removal"
+    opts.operationKind === "explicit_removal" || multiComponent
       ? undefined
       : opts.artifact ||
         (await admitNixosSharedHostStaticArtifact({
           recordsRoot: opts.paths.recordsRoot,
           artifactDir: path.resolve(opts.artifactDir || ""),
         }));
+  const componentArtifacts =
+    opts.operationKind !== "explicit_removal" && multiComponent
+      ? opts.componentArtifacts ||
+        (await admitNixosSharedHostComponentArtifacts({
+          deployment: opts.deployment,
+          recordsRoot: opts.paths.recordsRoot,
+          artifactDirsByComponentId: opts.artifactDirsByComponentId || {},
+        }))
+      : undefined;
+  const artifactIdentity =
+    opts.operationKind === "explicit_removal"
+      ? undefined
+      : componentArtifacts && componentArtifacts.length > 0
+        ? compositeNixosSharedHostArtifactIdentity(componentArtifacts)
+        : (artifact as NixosSharedHostAdmittedArtifact).identity;
   const admittedContext =
     opts.operationKind === "explicit_removal"
       ? undefined
@@ -97,14 +149,14 @@ export async function createNixosSharedHostControlPlaneSnapshot(
         ? await resolvePromotionNixosSharedHostAdmittedContext({
             workspaceRoot: opts.workspaceRoot,
             deployment: opts.deployment,
-            artifactIdentity: (artifact as NixosSharedHostAdmittedArtifact).identity,
+            artifactIdentity,
             sourceRecord: opts.source!.record,
           })
         : hasReplaySnapshot(opts.source)
           ? await resolveReplayNixosSharedHostAdmittedContext({
               workspaceRoot: opts.workspaceRoot,
               deployment: opts.deployment,
-              artifactIdentity: (artifact as NixosSharedHostAdmittedArtifact).identity,
+              artifactIdentity,
               sourceRecord: opts.source.record,
               sourceReplaySnapshot: opts.source.replaySnapshot,
               rollback: opts.operationKind === "rollback",
@@ -112,7 +164,7 @@ export async function createNixosSharedHostControlPlaneSnapshot(
           : await resolveInitialNixosSharedHostAdmittedContext({
               workspaceRoot: opts.workspaceRoot,
               deployment: opts.deployment,
-              artifactIdentity: (artifact as NixosSharedHostAdmittedArtifact).identity,
+              artifactIdentity,
             });
   return {
     schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA,
@@ -122,7 +174,7 @@ export async function createNixosSharedHostControlPlaneSnapshot(
     operationKind: opts.operationKind,
     deploymentId: opts.deployment.deploymentId,
     deploymentLabel: opts.deployment.label,
-    providerTargetIdentity: opts.deployment.providerTarget.sharedDevTargetIdentity,
+    providerTargetIdentity: nixosSharedHostDeploymentTargetIdentity(opts.deployment),
     lockScope,
     deployment: opts.deployment,
     ...(admittedContext ? { admittedContext } : {}),
@@ -139,10 +191,17 @@ export async function createNixosSharedHostControlPlaneSnapshot(
         ? {
             kind: "deploy",
             publishBehavior: opts.publishBehavior || "deploy",
-            publishInput: {
-              kind: "exact-artifact",
-              artifact: artifact as NixosSharedHostAdmittedArtifact,
-            },
+            publishInput:
+              componentArtifacts && componentArtifacts.length > 0
+                ? {
+                    kind: "component-artifacts",
+                    components: componentArtifacts,
+                    compositeArtifactIdentity: artifactIdentity,
+                  }
+                : {
+                    kind: "exact-artifact",
+                    artifact: artifact as NixosSharedHostAdmittedArtifact,
+                  },
             ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
             ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
             ...(opts.artifactLineageId ? { artifactLineageId: opts.artifactLineageId } : {}),

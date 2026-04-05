@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostDeployment } from "./contract.ts";
+import type { NixosSharedHostDeployment, NixosSharedHostDeploymentComponent } from "./contract.ts";
 import {
   type NixosSharedHostPlatformState,
   validateNixosSharedHostPlatformState,
@@ -34,12 +34,18 @@ export type NixosSharedHostConfig = {
   nginxVirtualHosts: Record<string, NixosSharedHostRoute>;
 };
 
-function backendIdentityFor(deployment: NixosSharedHostDeployment): string {
-  return `${deployment.providerTarget.containerName}:${deployment.runtime.containerPort}`;
+function flattenedDeployments(state: NixosSharedHostPlatformState) {
+  return state.deployments.flatMap((deployment) =>
+    deployment.components.map((component) => ({ deployment, component })),
+  );
 }
 
-function backendAddressFor(deployment: NixosSharedHostDeployment): string {
-  return `http://${deployment.providerTarget.containerName}.nixos-shared-host.internal:${deployment.runtime.containerPort}`;
+function backendIdentityFor(component: NixosSharedHostDeploymentComponent): string {
+  return `${component.providerTarget.containerName}:${component.runtime.containerPort}`;
+}
+
+function backendAddressFor(component: NixosSharedHostDeploymentComponent): string {
+  return `http://${component.providerTarget.containerName}.nixos-shared-host.internal:${component.runtime.containerPort}`;
 }
 
 function duplicateKeyErrors(
@@ -66,9 +72,9 @@ export function renderNixosSharedHostConfig(
   const errors = validateNixosSharedHostPlatformState(state);
   errors.push(
     ...duplicateKeyErrors(
-      state.deployments.map((deployment) => ({
-        label: deployment.label,
-        key: backendIdentityFor(deployment),
+      flattenedDeployments(state).map(({ deployment, component }) => ({
+        label: `${deployment.label}#${component.id}`,
+        key: backendIdentityFor(component),
       })),
       (key, labels) =>
         `duplicate backend identity "${key}" in nixos-shared-host config: ${labels.join(", ")}`,
@@ -79,33 +85,33 @@ export function renderNixosSharedHostConfig(
   }
 
   const containers = Object.fromEntries(
-    state.deployments.map((deployment) => [
-      deployment.providerTarget.containerName,
+    flattenedDeployments(state).map(({ component }) => [
+      component.providerTarget.containerName,
       {
-        containerName: deployment.providerTarget.containerName,
-        targetGroup: deployment.providerTarget.targetGroup,
-        hostname: deployment.providerTarget.hostname,
-        backendIdentity: backendIdentityFor(deployment),
-        backendAddress: backendAddressFor(deployment),
+        containerName: component.providerTarget.containerName,
+        targetGroup: component.providerTarget.targetGroup,
+        hostname: component.providerTarget.hostname,
+        backendIdentity: backendIdentityFor(component),
+        backendAddress: backendAddressFor(component),
         runtime: "static-app-host",
-        containerPort: deployment.runtime.containerPort,
+        containerPort: component.runtime.containerPort,
         publishRoot: "/srv/static-app/current",
         releaseRoot: "/srv/static-app/releases",
         activeReleaseLink: "/srv/static-app/live",
-        ...(deployment.runtime.healthPath ? { healthPath: deployment.runtime.healthPath } : {}),
+        ...(component.runtime.healthPath ? { healthPath: component.runtime.healthPath } : {}),
       },
     ]),
   );
 
   const nginxVirtualHosts = Object.fromEntries(
-    state.deployments.map((deployment) => [
-      deployment.providerTarget.hostname,
+    flattenedDeployments(state).map(({ component }) => [
+      component.providerTarget.hostname,
       {
-        hostname: deployment.providerTarget.hostname,
-        backendIdentity: backendIdentityFor(deployment),
-        backendAddress: backendAddressFor(deployment),
-        targetGroup: deployment.providerTarget.targetGroup,
-        ...(deployment.runtime.healthPath ? { healthPath: deployment.runtime.healthPath } : {}),
+        hostname: component.providerTarget.hostname,
+        backendIdentity: backendIdentityFor(component),
+        backendAddress: backendAddressFor(component),
+        targetGroup: component.providerTarget.targetGroup,
+        ...(component.runtime.healthPath ? { healthPath: component.runtime.healthPath } : {}),
       },
     ]),
   );

@@ -69,8 +69,13 @@ Required keys:
 
 Initial reviewed `nixos-shared-host` component rule:
 
-- exactly one component
-- `kind = "static-webapp"`
+- every component must use `kind = "static-webapp"`
+- single-component deployments may rely on provider-default rollout behavior
+- protected/shared multi-component deployments must:
+  - resolve every component into one `target_group`
+  - declare distinct component ids and distinct `app_name` values
+  - declare `rollout_policy`
+  - use the reviewed `ordered_best_effort` slice, with `steps` listing every component id exactly once
 
 ### `publisher`
 

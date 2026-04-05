@@ -8,7 +8,7 @@ import {
   projectFromTargetLabel,
   toSortedUnique,
 } from "../lib/project-graph.ts";
-import type { DeploymentTarget } from "./contract.ts";
+import { componentTargetsFor, type DeploymentTarget } from "./contract.ts";
 import {
   resolveDirectPrerequisiteDependents,
   sortDeploymentsTopologically,
@@ -113,7 +113,9 @@ function componentImpactedDeploymentIds(
   const impactedProjects = new Set(projectIds);
   return deployments
     .filter((deployment) =>
-      impactedProjects.has(projectFromTargetLabel(deployment.component.target) || ""),
+      componentTargetsFor(deployment).some((target) =>
+        impactedProjects.has(projectFromTargetLabel(target) || ""),
+      ),
     )
     .map((deployment) => deployment.deploymentId)
     .sort();

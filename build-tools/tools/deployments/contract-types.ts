@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import type { DeploymentAdmissionPolicy, DeploymentLanePolicy } from "./deployment-policy.ts";
+import type { DeploymentRolloutPolicy } from "./deployment-rollout.ts";
 import { packagePathFromLabel } from "../lib/labels.ts";
 
 export const NIXOS_SHARED_HOST_PROVIDER = "nixos-shared-host";
@@ -25,6 +26,12 @@ export type DeploymentPreviewPolicy = {
   lockScope: "shared" | "preview";
 };
 
+export type DeploymentComponent = {
+  id: string;
+  kind: typeof STATIC_WEBAPP_COMPONENT;
+  target: string;
+};
+
 type DeploymentBase = {
   deploymentId: string;
   label: string;
@@ -36,20 +43,24 @@ type DeploymentBase = {
   admissionPolicyRef: string;
   admissionPolicy: DeploymentAdmissionPolicy;
   prerequisites: DeploymentPrerequisite[];
+  rolloutPolicy?: DeploymentRolloutPolicy;
   component: {
     kind: typeof STATIC_WEBAPP_COMPONENT;
     target: string;
   };
+  components: DeploymentComponent[];
   preview?: DeploymentPreviewPolicy;
 };
 
 export type NixosSharedHostProviderTarget = {
   host: "nixos-shared-host";
-  appName: string;
   targetGroup: string;
-  hostname: string;
-  containerName: string;
-  sharedDevTargetIdentity: string;
+  appNames: string[];
+  deploymentTargetIdentity: string;
+  appName?: string;
+  hostname?: string;
+  containerName?: string;
+  sharedDevTargetIdentity?: string;
 };
 
 export type CloudflarePagesProviderTarget = {
@@ -62,16 +73,22 @@ export type CloudflarePagesProviderTarget = {
   previewSourceRunId?: string;
 };
 
-export type NixosSharedHostDeployment = DeploymentBase & {
-  provider: typeof NIXOS_SHARED_HOST_PROVIDER;
-  publisher: { type: string };
-  provisioner?: { type: string };
+export type NixosSharedHostDeploymentComponent = DeploymentComponent & {
   runtime: {
     appName: string;
     containerPort: number;
     healthPath?: string;
     targetGroup?: string;
   };
+  providerTarget: NixosSharedHostProviderTarget;
+};
+
+export type NixosSharedHostDeployment = DeploymentBase & {
+  provider: typeof NIXOS_SHARED_HOST_PROVIDER;
+  publisher: { type: string };
+  provisioner?: { type: string };
+  runtime?: NixosSharedHostDeploymentComponent["runtime"];
+  components: NixosSharedHostDeploymentComponent[];
   providerTarget: NixosSharedHostProviderTarget;
 };
 
@@ -117,18 +134,33 @@ export function requiredDeploymentStageBranch(deployment: {
 }
 
 export function deriveNixosSharedHostProviderTarget(input: {
-  appName: string;
+  appName?: string;
+  appNames?: string[];
   targetGroup?: string;
 }): NixosSharedHostProviderTarget {
-  const appName = input.appName.trim();
+  const appNames = Array.from(
+    new Set(
+      (input.appNames || [input.appName || ""]).map((appName) => appName.trim()).filter(Boolean),
+    ),
+  ).sort();
   const targetGroup = normalizeTargetGroup(input.targetGroup || "");
+  const deploymentTargetIdentity =
+    appNames.length === 1
+      ? `${NIXOS_SHARED_HOST_PROVIDER}:${targetGroup}:${appNames[0]}`
+      : `${NIXOS_SHARED_HOST_PROVIDER}:${targetGroup}:{${appNames.join(",")}}`;
   return {
     host: "nixos-shared-host",
-    appName,
     targetGroup,
-    hostname: `${appName}.apps.kilty.io`,
-    containerName: appName,
-    sharedDevTargetIdentity: `${NIXOS_SHARED_HOST_PROVIDER}:${targetGroup}:${appName}`,
+    appNames,
+    deploymentTargetIdentity,
+    ...(appNames.length === 1
+      ? {
+          appName: appNames[0],
+          hostname: `${appNames[0]}.apps.kilty.io`,
+          containerName: appNames[0],
+          sharedDevTargetIdentity: `${NIXOS_SHARED_HOST_PROVIDER}:${targetGroup}:${appNames[0]}`,
+        }
+      : {}),
   };
 }
 
@@ -161,8 +193,16 @@ export function isCloudflarePagesDeployment(
   return deployment.provider === CLOUDFLARE_PAGES_PROVIDER;
 }
 
+export function isMultiComponentDeployment(deployment: DeploymentTarget): boolean {
+  return deployment.components.length > 1;
+}
+
+export function componentTargetsFor(deployment: DeploymentTarget): string[] {
+  return deployment.components.map((component) => component.target);
+}
+
 export function providerTargetIdentityFor(deployment: DeploymentTarget): string {
   return isNixosSharedHostDeployment(deployment)
-    ? deployment.providerTarget.sharedDevTargetIdentity
+    ? deployment.providerTarget.deploymentTargetIdentity
     : deployment.providerTarget.providerTargetIdentity;
 }

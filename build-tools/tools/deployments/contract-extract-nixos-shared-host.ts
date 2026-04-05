@@ -7,18 +7,23 @@ import {
   STATIC_WEBAPP_COMPONENT,
   targetName,
   type NixosSharedHostDeployment,
+  type NixosSharedHostDeploymentComponent,
 } from "./contract-types.ts";
 import {
-  createDeploymentExtractionContext,
+  componentError,
+  pushDuplicateNixosSharedHostAppNameErrors,
+  readRawStaticWebappComponents,
+  rolloutPolicyErrorsForNixosSharedHost,
+} from "./contract-extract-components.ts";
+import {
   deploymentError,
   isStaticWebappNode,
   readLabel,
-  readNumber,
   readPrerequisites,
   readPreviewPolicy,
+  readRolloutPolicy,
   readString,
   type DeploymentExtractionContext,
-  uniqueErrors,
 } from "./contract-extract-shared.ts";
 
 const APP_NAME_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
@@ -32,57 +37,26 @@ export function extractNixosSharedHostDeploymentsFromContext(
   for (const node of context.nodes) {
     if (readString(node, "provider") !== NIXOS_SHARED_HOST_PROVIDER) continue;
     const label = readLabel(node, "name");
-    const componentTarget = readLabel(node, "component");
-    const componentKind = readString(node, "component_kind");
     const lanePolicyRef = readLabel(node, "lane_policy");
     const admissionPolicyRef = readLabel(node, "admission_policy");
     const environmentStage = readString(node, "environment_stage");
-    const appName = readString(node, "app_name");
-    const containerPort = readNumber(node, "container_port");
-    const healthPath = readString(node, "health_path");
-    const targetGroup = readString(node, "target_group");
     const prerequisites = readPrerequisites(node, "prerequisites");
     const protectionClass = readString(node, "protection_class") || SHARED_NONPROD;
     const preview = readPreviewPolicy(node, "preview");
     const publisher = readString(node, "publisher");
     const provisioner = readString(node, "provisioner");
+    const rolloutPolicy = readRolloutPolicy(node);
     const deploymentErrors: string[] = [];
+    const rawComponents = readRawStaticWebappComponents(node);
     if (!label) {
       context.errors.push("deployment target missing canonical label");
       continue;
     }
-    if (componentKind !== STATIC_WEBAPP_COMPONENT) {
+    if (!publisher) deploymentErrors.push(deploymentError(label, "missing required publisher"));
+    if (!provisioner) deploymentErrors.push(deploymentError(label, "missing required provisioner"));
+    if (preview) {
       deploymentErrors.push(
-        deploymentError(
-          label,
-          `unsupported nixos-shared-host component_kind "${componentKind || "<empty>"}"`,
-        ),
-      );
-    }
-    if (!componentTarget)
-      deploymentErrors.push(deploymentError(label, "missing required component target"));
-    if (!appName) deploymentErrors.push(deploymentError(label, "missing required app_name"));
-    if (!Number.isInteger(containerPort) || containerPort < 1 || containerPort > 65535) {
-      deploymentErrors.push(
-        deploymentError(label, "container_port must be an integer between 1 and 65535"),
-      );
-    }
-    if (appName && !APP_NAME_RE.test(appName)) {
-      deploymentErrors.push(
-        deploymentError(
-          label,
-          "app_name must be a lowercase hostname token without dots or subdomain overrides",
-        ),
-      );
-    }
-    if (targetGroup && !TARGET_GROUP_RE.test(targetGroup)) {
-      deploymentErrors.push(
-        deploymentError(label, "target_group must be lowercase alphanumeric plus internal hyphens"),
-      );
-    }
-    if (healthPath && !healthPath.startsWith("/")) {
-      deploymentErrors.push(
-        deploymentError(label, "health_path must start with '/' when provided"),
+        deploymentError(label, "preview is not supported for nixos-shared-host"),
       );
     }
     if (protectionClass !== SHARED_NONPROD) {
@@ -93,22 +67,99 @@ export function extractNixosSharedHostDeploymentsFromContext(
         ),
       );
     }
-    if (!publisher) deploymentErrors.push(deploymentError(label, "missing required publisher"));
-    if (!provisioner) deploymentErrors.push(deploymentError(label, "missing required provisioner"));
-    if (preview) {
-      deploymentErrors.push(
-        deploymentError(label, "preview is not supported for nixos-shared-host"),
-      );
+    const seenIds = new Set<string>();
+    const resolvedComponents: NixosSharedHostDeploymentComponent[] = [];
+    for (const rawComponent of rawComponents) {
+      if (!rawComponent.id) {
+        deploymentErrors.push(deploymentError(label, "components must set id"));
+        continue;
+      }
+      if (seenIds.has(rawComponent.id)) {
+        deploymentErrors.push(componentError(label, rawComponent.id, "duplicate component id"));
+        continue;
+      }
+      seenIds.add(rawComponent.id);
+      if (rawComponent.kind !== STATIC_WEBAPP_COMPONENT) {
+        deploymentErrors.push(
+          componentError(
+            label,
+            rawComponent.id,
+            `unsupported nixos-shared-host component_kind "${rawComponent.kind || "<empty>"}"`,
+          ),
+        );
+      }
+      if (!rawComponent.target) {
+        deploymentErrors.push(
+          componentError(label, rawComponent.id, "missing required component target"),
+        );
+      }
+      if (!rawComponent.appName) {
+        deploymentErrors.push(componentError(label, rawComponent.id, "missing required app_name"));
+      }
+      if (
+        !Number.isInteger(rawComponent.containerPort) ||
+        rawComponent.containerPort < 1 ||
+        rawComponent.containerPort > 65535
+      ) {
+        deploymentErrors.push(
+          componentError(
+            label,
+            rawComponent.id,
+            "container_port must be an integer between 1 and 65535",
+          ),
+        );
+      }
+      if (rawComponent.appName && !APP_NAME_RE.test(rawComponent.appName)) {
+        deploymentErrors.push(
+          componentError(
+            label,
+            rawComponent.id,
+            "app_name must be a lowercase hostname token without dots or subdomain overrides",
+          ),
+        );
+      }
+      if (rawComponent.targetGroup && !TARGET_GROUP_RE.test(rawComponent.targetGroup)) {
+        deploymentErrors.push(
+          componentError(
+            label,
+            rawComponent.id,
+            "target_group must be lowercase alphanumeric plus internal hyphens",
+          ),
+        );
+      }
+      if (rawComponent.healthPath && !rawComponent.healthPath.startsWith("/")) {
+        deploymentErrors.push(
+          componentError(label, rawComponent.id, "health_path must start with '/' when provided"),
+        );
+      }
+      const componentNode = context.components.get(rawComponent.target);
+      if (rawComponent.target && !isStaticWebappNode(componentNode)) {
+        deploymentErrors.push(
+          componentError(
+            label,
+            rawComponent.id,
+            `component target ${rawComponent.target} is not a supported static-webapp`,
+          ),
+        );
+      }
+      resolvedComponents.push({
+        id: rawComponent.id,
+        kind: STATIC_WEBAPP_COMPONENT,
+        target: rawComponent.target,
+        runtime: {
+          appName: rawComponent.appName,
+          containerPort: rawComponent.containerPort,
+          ...(rawComponent.healthPath ? { healthPath: rawComponent.healthPath } : {}),
+          ...(rawComponent.targetGroup ? { targetGroup: rawComponent.targetGroup } : {}),
+        },
+        providerTarget: deriveNixosSharedHostProviderTarget({
+          appName: rawComponent.appName,
+          targetGroup: rawComponent.targetGroup,
+        }),
+      });
     }
-    const componentNode = context.components.get(componentTarget);
-    if (componentTarget && !isStaticWebappNode(componentNode)) {
-      deploymentErrors.push(
-        deploymentError(
-          label,
-          `component target ${componentTarget || "<empty>"} is not a supported static-webapp`,
-        ),
-      );
-    }
+    const lanePolicy = context.lanePolicies.get(lanePolicyRef);
+    const admissionPolicy = context.admissionPolicies.get(admissionPolicyRef);
     if (!lanePolicyRef)
       deploymentErrors.push(deploymentError(label, "missing required lane_policy"));
     if (!environmentStage) {
@@ -117,13 +168,11 @@ export function extractNixosSharedHostDeploymentsFromContext(
     if (!admissionPolicyRef) {
       deploymentErrors.push(deploymentError(label, "missing required admission_policy"));
     }
-    const lanePolicy = context.lanePolicies.get(lanePolicyRef);
     if (lanePolicyRef && !lanePolicy) {
       deploymentErrors.push(
         deploymentError(label, `lane_policy target not found: ${lanePolicyRef}`),
       );
     }
-    const admissionPolicy = context.admissionPolicies.get(admissionPolicyRef);
     if (admissionPolicyRef && !admissionPolicy) {
       deploymentErrors.push(
         deploymentError(label, `admission_policy target not found: ${admissionPolicyRef}`),
@@ -148,6 +197,25 @@ export function extractNixosSharedHostDeploymentsFromContext(
         );
       }
     }
+    const targetGroups = new Set(
+      resolvedComponents.map((component) => component.providerTarget.targetGroup),
+    );
+    if (targetGroups.size > 1) {
+      deploymentErrors.push(
+        deploymentError(
+          label,
+          "multi-component nixos-shared-host deployments must resolve to one target_group",
+        ),
+      );
+    }
+    deploymentErrors.push(
+      ...rolloutPolicyErrorsForNixosSharedHost(
+        label,
+        protectionClass,
+        rawComponents,
+        rolloutPolicy,
+      ),
+    );
     if (deploymentErrors.length > 0) {
       context.errors.push(...deploymentErrors);
       continue;
@@ -164,46 +232,18 @@ export function extractNixosSharedHostDeploymentsFromContext(
       admissionPolicyRef,
       admissionPolicy: admissionPolicy!,
       prerequisites,
-      component: { kind: STATIC_WEBAPP_COMPONENT, target: componentTarget },
+      ...(rolloutPolicy ? { rolloutPolicy } : {}),
+      component: { kind: STATIC_WEBAPP_COMPONENT, target: resolvedComponents[0]!.target },
+      components: resolvedComponents,
       publisher: { type: publisher },
       ...(provisioner ? { provisioner: { type: provisioner } } : {}),
-      runtime: {
-        appName,
-        containerPort,
-        ...(healthPath ? { healthPath } : {}),
-        ...(targetGroup ? { targetGroup } : {}),
-      },
-      providerTarget: deriveNixosSharedHostProviderTarget({ appName, targetGroup }),
+      runtime: resolvedComponents[0]!.runtime,
+      providerTarget: deriveNixosSharedHostProviderTarget({
+        appNames: resolvedComponents.map((component) => component.runtime.appName),
+        targetGroup: resolvedComponents[0]!.providerTarget.targetGroup,
+      }),
     });
   }
-  const labelsByAppName = new Map<string, string[]>();
-  for (const deployment of deployments) {
-    const labels = labelsByAppName.get(deployment.runtime.appName) || [];
-    labels.push(deployment.label);
-    labelsByAppName.set(deployment.runtime.appName, labels);
-  }
-  for (const [appName, labels] of labelsByAppName) {
-    if (labels.length < 2) continue;
-    const sortedLabels = [...labels].sort();
-    for (const label of sortedLabels) {
-      context.errors.push(
-        deploymentError(
-          label,
-          `duplicate app_name "${appName}" collides on ${appName}.apps.kilty.io with ${sortedLabels.join(", ")}`,
-        ),
-      );
-    }
-  }
+  pushDuplicateNixosSharedHostAppNameErrors(context.errors, deployments);
   return deployments.sort((a, b) => a.label.localeCompare(b.label));
-}
-
-export function extractNixosSharedHostDeployments(nodes: GraphNode[]): {
-  deployments: NixosSharedHostDeployment[];
-  errors: string[];
-} {
-  const context = createDeploymentExtractionContext(nodes);
-  return {
-    deployments: extractNixosSharedHostDeploymentsFromContext(context),
-    errors: uniqueErrors(context.errors),
-  };
 }

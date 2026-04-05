@@ -1,4 +1,25 @@
 #!/usr/bin/env zx-wrapper
+import type { GraphNode } from "../lib/graph.ts";
+import { createDeploymentExtractionContext, uniqueErrors } from "./contract-extract-shared.ts";
+import { extractCloudflarePagesDeploymentsFromContext } from "./contract-extract-cloudflare-pages.ts";
+import { extractNixosSharedHostDeploymentsFromContext } from "./contract-extract-nixos-shared-host.ts";
+
+export function extractNixosSharedHostDeployments(nodes: GraphNode[]) {
+  const context = createDeploymentExtractionContext(nodes);
+  return {
+    deployments: extractNixosSharedHostDeploymentsFromContext(context),
+    errors: uniqueErrors(context.errors),
+  };
+}
+
+export function extractCloudflarePagesDeployments(nodes: GraphNode[]) {
+  const context = createDeploymentExtractionContext(nodes);
+  return {
+    deployments: extractCloudflarePagesDeploymentsFromContext(context),
+    errors: uniqueErrors(context.errors),
+  };
+}
+
 export * from "./contract-types.ts";
 export * from "./contract-extract.ts";
 export * from "./contract-extract-cloudflare-pages.ts";

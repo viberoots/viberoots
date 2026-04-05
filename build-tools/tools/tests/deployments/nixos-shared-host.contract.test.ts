@@ -23,7 +23,9 @@ test("deriveNixosSharedHostProviderTarget normalizes hostname, container name, a
   assert.deepEqual(target, {
     host: "nixos-shared-host",
     appName: "demoapp",
+    appNames: ["demoapp"],
     targetGroup: "default",
+    deploymentTargetIdentity: "nixos-shared-host:default:demoapp",
     hostname: "demoapp.apps.kilty.io",
     containerName: "demoapp",
     sharedDevTargetIdentity: "nixos-shared-host:default:demoapp",

@@ -6,10 +6,15 @@ import { resolveSelectedTargetLabel } from "../dev/target-label-resolver.ts";
 import { getFlagBool, getFlagStr } from "../lib/cli.ts";
 import { findRepoRoot } from "../lib/repo.ts";
 import { summarizeDeploymentResult } from "./deployment-execution.ts";
+import {
+  buildArtifactDirsByComponentId,
+  parseComponentArtifactDirs,
+} from "./deployment-component-artifact-dirs.ts";
 import { runFromChangesCli } from "./deployment-from-changes-cli.ts";
 import { runCloudflarePagesCli } from "./cloudflare-pages-cli.ts";
 import { resolveDeploymentFromTarget } from "./deployment-query.ts";
 import { isNixosSharedHostDeployment, type DeploymentTarget } from "./contract.ts";
+import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
 import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
 import { submitNixosSharedHostPublishOnlyRun } from "./nixos-shared-host-publish-only.ts";
 import { maybeRunNixosSharedHostRemoteProfile } from "./nixos-shared-host-remote-cli.ts";
@@ -53,6 +58,16 @@ async function resolveArtifactDir(
   if (artifactDir) return path.resolve(artifactDir);
   const outPath = await buildSelectedOutPath(workspaceRoot, deployment.component.target);
   return path.join(outPath, "dist");
+}
+
+async function resolveComponentArtifactDirs(
+  workspaceRoot: string,
+  deployment: DeploymentTarget,
+): Promise<Record<string, string>> {
+  const flagValue = getFlagStr("component-artifacts", "").trim();
+  return flagValue
+    ? parseComponentArtifactDirs(flagValue)
+    : await buildArtifactDirsByComponentId(workspaceRoot, deployment);
 }
 
 function resolveSmokeConnectOverride() {
@@ -159,6 +174,11 @@ async function main() {
       })
     : await (async () => {
         if (publishOnly) {
+          if (isMultiComponentNixosSharedHostDeployment(deployment)) {
+            throw new Error(
+              "multi-component nixos-shared-host deployments do not support --publish-only yet",
+            );
+          }
           if (!sourceRunId) {
             throw new Error(
               rollback
@@ -180,12 +200,18 @@ async function main() {
             ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
           });
         }
-        const artifactDir = await resolveArtifactDir(workspaceRoot, deployment);
+        const componentArtifactDirs = isMultiComponentNixosSharedHostDeployment(deployment)
+          ? await resolveComponentArtifactDirs(workspaceRoot, deployment)
+          : undefined;
+        const artifactDir = componentArtifactDirs
+          ? undefined
+          : await resolveArtifactDir(workspaceRoot, deployment);
         return await submitNixosSharedHostControlPlaneRun({
           workspaceRoot,
           operationKind: "deploy",
           deployment,
-          artifactDir,
+          ...(artifactDir ? { artifactDir } : {}),
+          ...(componentArtifactDirs ? { artifactDirsByComponentId: componentArtifactDirs } : {}),
           paths,
           ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
         });

@@ -119,3 +119,18 @@ test("validation rejects cloudflare preview metadata that does not use source-ru
   ]);
   assert.ok(errors.some((entry) => entry.includes('identity_selector must be "source_run"')));
 });
+
+test("validation rejects multi-component cloudflare-pages deployments", () => {
+  const { errors } = extractCloudflarePagesDeployments([
+    staticWebappComponent("//projects/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/other:app"),
+    ...policyNodes(),
+    deploymentNode({
+      components: [
+        { id: "primary", kind: "static-webapp", target: "//projects/apps/pleomino:app" },
+        { id: "secondary", kind: "static-webapp", target: "//projects/apps/other:app" },
+      ],
+    }),
+  ]);
+  assert.ok(errors.some((entry) => entry.includes("does not support multi-component")));
+});

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { nodesFromCqueryJson } from "../buck/exporter/cquery/nodes.ts";
 import { normalizeTargetLabel } from "../lib/labels.ts";
-import { extractDeployments, type DeploymentTarget } from "./contract.ts";
+import { componentTargetsFor, extractDeployments, type DeploymentTarget } from "./contract.ts";
 
 const DEPLOYMENT_CQUERY_ATTRS = [
   "name",
@@ -10,6 +10,7 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "provider",
   "component",
   "component_kind",
+  "components",
   "publisher",
   "publisher_config",
   "provisioner",
@@ -17,6 +18,8 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "lane_policy",
   "environment_stage",
   "admission_policy",
+  "rollout_policy",
+  "rollout_steps",
   "app_name",
   "container_port",
   "health_path",
@@ -98,7 +101,23 @@ export async function resolveDeploymentFromTarget(
   if (extracted.errors.length > 0) throw new Error(extracted.errors.join("\n"));
   const hit = extracted.deployments.find((deployment) => deployment.label === deploymentTarget);
   if (!hit) throw new Error(`deployment target not found: ${deploymentTarget}`);
-  return hit;
+  const componentLabels = componentTargetsFor(hit).filter(
+    (label) => label && ![deploymentTarget, ...extraLabels].includes(label),
+  );
+  if (componentLabels.length === 0) return hit;
+  const expanded = extractDeployments(
+    await queryDeploymentNodes(workspaceRoot, [
+      deploymentTarget,
+      ...extraLabels,
+      ...componentLabels,
+    ]),
+  );
+  if (expanded.errors.length > 0) throw new Error(expanded.errors.join("\n"));
+  const expandedHit = expanded.deployments.find(
+    (deployment) => deployment.label === deploymentTarget,
+  );
+  if (!expandedHit) throw new Error(`deployment target not found: ${deploymentTarget}`);
+  return expandedHit;
 }
 
 export async function listDeploymentTargets(workspaceRoot: string): Promise<string[]> {
@@ -135,5 +154,13 @@ export async function resolveAllDeployments(workspaceRoot: string): Promise<Depl
       : nodes;
   const extracted = extractDeployments(allNodes);
   if (extracted.errors.length > 0) throw new Error(extracted.errors.join("\n"));
-  return extracted.deployments;
+  const componentLabels = Array.from(
+    new Set(extracted.deployments.flatMap((deployment) => componentTargetsFor(deployment))),
+  ).filter((label) => label && !labels.includes(label) && !extraLabels.includes(label));
+  if (componentLabels.length === 0) return extracted.deployments;
+  const expanded = extractDeployments(
+    await queryDeploymentNodes(workspaceRoot, [...labels, ...extraLabels, ...componentLabels]),
+  );
+  if (expanded.errors.length > 0) throw new Error(expanded.errors.join("\n"));
+  return expanded.deployments;
 }
