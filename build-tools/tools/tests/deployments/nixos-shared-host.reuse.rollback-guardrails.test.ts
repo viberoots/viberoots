@@ -4,7 +4,10 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import {
+  ensureNixosSharedHostStageBranch,
+  nixosSharedHostDeploymentFixture,
+} from "./nixos-shared-host.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string, marker: string): Promise<void> {
@@ -26,6 +29,7 @@ test("nixos-shared-host rollback fails closed for a successful retry source run"
     const statePath = path.join(tmp, "platform-state.json");
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactDir, "v1");
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {

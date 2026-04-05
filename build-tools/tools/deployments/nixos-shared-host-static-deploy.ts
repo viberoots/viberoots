@@ -3,6 +3,7 @@ import {
   requireNixosSharedHostControlPlaneAuthority,
   type NixosSharedHostControlPlaneWorkerAuthority,
 } from "./nixos-shared-host-control-plane-contract.ts";
+import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 import {
   requireNixosSharedHostAdmittedArtifactPath,
   type NixosSharedHostAdmittedArtifact,
@@ -53,6 +54,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
   artifactLineageId?: string;
   hostConfigPath?: string;
   authority?: NixosSharedHostControlPlaneWorkerAuthority;
+  admittedContext?: NixosSharedHostAdmittedContext;
   smokeConnectOverride?: {
     protocol: "http:" | "https:";
     hostname: string;
@@ -90,6 +92,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
         deployRunId: runId,
         deployment: opts.deployment,
         artifact: opts.artifact,
+        admittedContext: opts.admittedContext!,
         platformState: state,
         hostConfig: rendered,
         controlPlaneExecutionSnapshotPath: authority.executionSnapshotPath,
@@ -131,6 +134,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
       artifactStoredArtifactPath: opts.artifact.storedArtifactPath,
       artifactProvenancePath: opts.artifact.provenancePath,
       artifactLineageId: opts.artifactLineageId || opts.artifact.identity,
+      ...(opts.admittedContext ? { admittedContext: opts.admittedContext } : {}),
       ...(deploymentMetadataFingerprint ? { deploymentMetadataFingerprint } : {}),
       ...(replaySnapshotPath ? { replaySnapshotPath } : {}),
       publicUrl: smoke.publicUrl,
@@ -166,6 +170,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
       artifactStoredArtifactPath: opts.artifact.storedArtifactPath,
       artifactProvenancePath: opts.artifact.provenancePath,
       artifactLineageId: opts.artifactLineageId || opts.artifact.identity,
+      ...(opts.admittedContext ? { admittedContext: opts.admittedContext } : {}),
       failedStep,
       error: message,
       ...(deploymentMetadataFingerprint ? { deploymentMetadataFingerprint } : {}),

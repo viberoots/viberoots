@@ -218,6 +218,40 @@ What should not be required:
 
 For this provider family, those are derived from `appName`.
 
+## Branch-Backed Admission Slice
+
+The first protected/shared lane-policy slice for this provider binds the current shared-dev path to
+an explicit branch-backed lane and two-stage admission flow.
+
+Current reviewed repo-owned policy refs:
+
+- `lane_policy = "//build-tools/deployments/lanes:pleomino"`
+- `environment_stage = "dev"`
+- `admission_policy = "//build-tools/deployments/policies:pleomino_dev_release"`
+
+For the current `mini` shared-dev deployment path, that means:
+
+- source admission resolves the authoritative stage branch for the deployment's lane stage
+  - today that is `env/pleomino/dev` for the concrete `pleomino-dev` deployment
+  - source admission records the admitted source revision and the exact artifact identity selected
+    for that revision
+- target-environment run admission freezes the mutating execution snapshot before lock acquisition
+  - this snapshot records the current lane-policy fingerprint, admission-policy fingerprint,
+    environment stage, target branch head revision, and canonical provider-target identity
+- durable run records and replay snapshots preserve that admitted context so retry and rollback do
+  not silently reinterpret current repo metadata as if it had been part of the original run
+
+Operationally, this keeps the current shared-dev provider narrow while still enforcing the core
+protected/shared model:
+
+- normal deploys use the lane stage branch as the source of truth instead of the operator's ambient
+  checkout
+- `retry` reuses the recorded admitted source snapshot and exact artifact without rebuilding
+- `rollback` still reuses a prior admitted run, but only while that run remains authorized by the
+  current branch-backed lane state
+- replay is rejected when the current deployment no longer resolves to the same authoritative lane
+  policy that admitted the source run
+
 ## Routing And Domains
 
 The domain model is:

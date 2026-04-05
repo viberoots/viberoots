@@ -2,6 +2,7 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 import type { NixosSharedHostControlPlaneWorkerAuthority } from "./nixos-shared-host-control-plane-contract.ts";
 import {
   NIXOS_SHARED_HOST_PROVIDER,
@@ -51,6 +52,7 @@ export type NixosSharedHostDeployRecord = {
     storedArtifactPath?: string;
     provenancePath?: string;
   };
+  admittedContext?: NixosSharedHostAdmittedContext;
   failedStep?: NixosSharedHostFailedStep;
   provisionerType?: string;
   publisherType?: string;
@@ -78,6 +80,7 @@ type NixosSharedHostRecordOutcome = {
   authority?: NixosSharedHostControlPlaneWorkerAuthority;
   artifactStoredArtifactPath?: string;
   artifactProvenancePath?: string;
+  admittedContext?: NixosSharedHostAdmittedContext;
   deploymentMetadataFingerprint?: string;
   replaySnapshotPath?: string;
 };
@@ -133,6 +136,7 @@ export function createNixosSharedHostDeployRecord(
           },
         }
       : {}),
+    ...(outcome.admittedContext ? { admittedContext: outcome.admittedContext } : {}),
     ...(outcome.failedStep ? { failedStep: outcome.failedStep } : {}),
     ...(deployment.provisioner ? { provisionerType: deployment.provisioner.type } : {}),
     ...(outcome.runClassification !== "explicit_removal"

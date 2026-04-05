@@ -1,13 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import * as fs from "node:fs/promises";
 import path from "node:path";
-import { nodesFromCqueryJson } from "../buck/exporter/cquery/nodes.ts";
 import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
 import { resolveSelectedTargetLabel } from "../dev/target-label-resolver.ts";
 import { getFlagBool, getFlagStr } from "../lib/cli.ts";
-import { normalizeTargetLabel } from "../lib/labels.ts";
 import { findRepoRoot } from "../lib/repo.ts";
-import { extractNixosSharedHostDeployments, type NixosSharedHostDeployment } from "./contract.ts";
+import type { NixosSharedHostDeployment } from "./contract.ts";
+import { resolveDeploymentFromTarget } from "./deployment-query.ts";
 import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
 import { maybeRunNixosSharedHostRemoteProfile } from "./nixos-shared-host-remote-cli.ts";
 import { resolveNixosSharedHostReplaySelection } from "./nixos-shared-host-replay.ts";
@@ -16,75 +15,6 @@ function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();
   if (!value) throw new Error(`missing required --${name}`);
   return value;
-}
-
-const DEPLOYMENT_CQUERY_ATTRS = [
-  "name",
-  "rule_type",
-  "provider",
-  "component",
-  "component_kind",
-  "publisher",
-  "provisioner",
-  "protection_class",
-  "app_name",
-  "container_port",
-  "health_path",
-  "target_group",
-  "labels",
-];
-
-function deploymentBuckEnv(): NodeJS.ProcessEnv {
-  return {
-    ...process.env,
-    HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
-    SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
-  };
-}
-
-function deploymentIsolationArgs(): string[] {
-  if (process.env.BUCK_NO_ISOLATION === "1") return [];
-  const isolationDir = String(
-    process.env.BUCK_ISOLATION_DIR ||
-      process.env.BUCK_ISOLATION_DIR_EXPORTER ||
-      process.env.BUCK_NESTED_ISO ||
-      "",
-  ).trim();
-  return isolationDir ? ["--isolation-dir", isolationDir] : [];
-}
-
-async function queryDeploymentNodes(
-  workspaceRoot: string,
-  labels: string[],
-): Promise<ReturnType<typeof nodesFromCqueryJson>> {
-  const normalizedLabels = Array.from(new Set(labels.map((label) => normalizeTargetLabel(label))));
-  const attrFlags = DEPLOYMENT_CQUERY_ATTRS.flatMap((attr) => ["--output-attribute", attr]);
-  const query = `set(${normalizedLabels.join(" ")})`;
-  const { stdout } = await $({
-    cwd: workspaceRoot,
-    stdio: "pipe",
-    env: deploymentBuckEnv(),
-  })`buck2 ${deploymentIsolationArgs()} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
-  return nodesFromCqueryJson(JSON.parse(String(stdout || "{}")) as Record<string, any>);
-}
-
-async function resolveDeploymentFromTarget(
-  workspaceRoot: string,
-  deploymentTarget: string,
-): Promise<NixosSharedHostDeployment> {
-  const deploymentNodes = await queryDeploymentNodes(workspaceRoot, [deploymentTarget]);
-  const deploymentNode = deploymentNodes.find((node) => node.name === deploymentTarget);
-  if (!deploymentNode) throw new Error(`deployment target not found: ${deploymentTarget}`);
-  const componentTarget = normalizeTargetLabel(String((deploymentNode as any).component || ""));
-  const nodes =
-    componentTarget && componentTarget !== deploymentTarget
-      ? await queryDeploymentNodes(workspaceRoot, [deploymentTarget, componentTarget])
-      : deploymentNodes;
-  const extracted = extractNixosSharedHostDeployments(nodes);
-  if (extracted.errors.length > 0) throw new Error(extracted.errors.join("\n"));
-  const hit = extracted.deployments.find((deployment) => deployment.label === deploymentTarget);
-  if (!hit) throw new Error(`deployment target not found: ${deploymentTarget}`);
-  return hit;
 }
 
 async function readDeploymentFromJson(filePath: string): Promise<NixosSharedHostDeployment> {
@@ -164,6 +94,7 @@ async function main() {
   };
   const result = remove
     ? await submitNixosSharedHostControlPlaneRun({
+        workspaceRoot,
         operationKind: "explicit_removal",
         deployment,
         paths,
@@ -190,6 +121,7 @@ async function main() {
             rollback,
           });
           return await submitNixosSharedHostControlPlaneRun({
+            workspaceRoot,
             operationKind: replay.operationKind,
             deployment: replay.deployment,
             artifact: replay.artifact,
@@ -197,12 +129,17 @@ async function main() {
             parentRunId: replay.parentRunId,
             releaseLineageId: replay.releaseLineageId,
             artifactLineageId: replay.artifactLineageId,
+            source: {
+              record: replay.sourceRecord,
+              replaySnapshot: replay.sourceReplaySnapshot,
+            },
             paths,
             ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
           });
         }
         const artifactDir = await resolveArtifactDir(workspaceRoot, deployment);
         return await submitNixosSharedHostControlPlaneRun({
+          workspaceRoot,
           operationKind: "deploy",
           deployment,
           artifactDir,

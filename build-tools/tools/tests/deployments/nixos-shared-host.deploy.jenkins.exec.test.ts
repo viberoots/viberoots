@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
 import { installFakeRemoteTransport } from "./nixos-shared-host.remote-transport.fake.ts";
 import {
   installClientProfile,
@@ -28,6 +29,7 @@ test("jenkins wrapper stages the Pleomino artifact, runs remote deploy, optional
     const remoteStatePath = path.join(tmp, "remote-state", "platform-state.json");
     const rebuildLog = path.join(tmp, "nixos-rebuild.log");
     await installReviewedPleominoTargets(tmp);
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await prepareReviewedRemoteHostPaths({
       remoteStatePath,
       remoteRuntimeRoot,

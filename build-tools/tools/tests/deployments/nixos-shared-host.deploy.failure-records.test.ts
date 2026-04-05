@@ -5,7 +5,10 @@ import path from "node:path";
 import { test } from "node:test";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import {
+  ensureNixosSharedHostStageBranch,
+  nixosSharedHostDeploymentFixture,
+} from "./nixos-shared-host.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string, files: Record<string, string>): Promise<void> {
@@ -17,7 +20,7 @@ async function writeArtifact(root: string, files: Record<string, string>): Promi
 }
 
 test("nixos-shared-host deploy records smoke failure when the public health path fails", async () => {
-  await runInTemp("nixos-shared-host-smoke-failure", async (tmp) => {
+  await runInTemp("nixos-shared-host-smoke-failure", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture({
       runtime: { appName: "demoapp", containerPort: 3000, healthPath: "/healthz" },
     });
@@ -25,10 +28,12 @@ test("nixos-shared-host deploy records smoke failure when the public health path
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactDir, { "index.html": "<html>ok</html>\n" });
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
       await assert.rejects(
         submitNixosSharedHostControlPlaneRun({
+          workspaceRoot: tmp,
           operationKind: "deploy",
           deployment,
           artifactDir,
@@ -65,16 +70,18 @@ test("nixos-shared-host deploy records smoke failure when the public health path
 });
 
 test("nixos-shared-host deploy rejects a reachable hostname serving the wrong artifact contents", async () => {
-  await runInTemp("nixos-shared-host-content-mismatch", async (tmp) => {
+  await runInTemp("nixos-shared-host-content-mismatch", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture();
     const artifactDir = path.join(tmp, "artifact");
     const fixedRoot = path.join(tmp, "wrong-public-root");
     await writeArtifact(artifactDir, { "index.html": "<html>expected</html>\n" });
     await writeArtifact(fixedRoot, { "index.html": "<html>wrong</html>\n" });
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, fixedRoot });
     try {
       await assert.rejects(
         submitNixosSharedHostControlPlaneRun({
+          workspaceRoot: tmp,
           operationKind: "deploy",
           deployment,
           artifactDir,

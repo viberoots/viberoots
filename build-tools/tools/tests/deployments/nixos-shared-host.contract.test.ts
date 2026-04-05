@@ -6,6 +6,10 @@ import {
   deriveNixosSharedHostProviderTarget,
   extractNixosSharedHostDeployments,
 } from "../../deployments/contract.ts";
+import {
+  nixosSharedHostAdmissionPolicyNodeFixture,
+  nixosSharedHostLanePolicyNodeFixture,
+} from "./nixos-shared-host.fixture.ts";
 
 function staticWebappComponent(label: string): GraphNode {
   return {
@@ -29,6 +33,8 @@ test("deriveNixosSharedHostProviderTarget normalizes hostname, container name, a
 test("extractNixosSharedHostDeployments defaults protection_class to shared_nonprod", () => {
   const nodes: GraphNode[] = [
     staticWebappComponent("//projects/apps/demoapp:app"),
+    nixosSharedHostLanePolicyNodeFixture(),
+    nixosSharedHostAdmissionPolicyNodeFixture(),
     {
       name: "//projects/deployments/demoapp-dev:deploy",
       provider: "nixos-shared-host",
@@ -37,6 +43,9 @@ test("extractNixosSharedHostDeployments defaults protection_class to shared_nonp
       publisher: "nixos-shared-host-static-webapp",
       provisioner: "nixos-shared-host-manifest",
       protection_class: "",
+      lane_policy: "//build-tools/deployments/lanes:pleomino",
+      environment_stage: "dev",
+      admission_policy: "//build-tools/deployments/policies:pleomino_dev_release",
       app_name: "demoapp",
       container_port: 3000,
       health_path: "/healthz",
@@ -48,5 +57,7 @@ test("extractNixosSharedHostDeployments defaults protection_class to shared_nonp
   assert.deepEqual(errors, []);
   assert.equal(deployments.length, 1);
   assert.equal(deployments[0]?.protectionClass, "shared_nonprod");
+  assert.equal(deployments[0]?.lanePolicyRef, "//build-tools/deployments/lanes:pleomino");
+  assert.equal(deployments[0]?.environmentStage, "dev");
   assert.equal(deployments[0]?.providerTarget.hostname, "demoapp.apps.kilty.io");
 });

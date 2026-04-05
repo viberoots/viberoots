@@ -3,6 +3,9 @@ load("//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_depl
 nixos_shared_host_static_webapp_deployment(
     name = "deploy",
     component = "//projects/apps/pleomino:app",
+    lane_policy = "//build-tools/deployments/lanes:pleomino",
+    environment_stage = "dev",
+    admission_policy = "//build-tools/deployments/policies:pleomino_dev_release",
     app_name = "pleomino",
     container_port = 3000,
     health_path = "/healthz",

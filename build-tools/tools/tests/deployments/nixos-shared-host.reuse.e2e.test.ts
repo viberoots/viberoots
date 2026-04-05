@@ -5,7 +5,10 @@ import path from "node:path";
 import { test } from "node:test";
 import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import {
+  ensureNixosSharedHostStageBranch,
+  nixosSharedHostDeploymentFixture,
+} from "./nixos-shared-host.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string, marker: string): Promise<void> {
@@ -36,6 +39,7 @@ test("nixos-shared-host publish-only rejects ambiguous replay selectors and impl
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactDir, "v1");
     await writeArtifact(otherArtifactDir, "v2");
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
@@ -78,6 +82,7 @@ test("nixos-shared-host publish-only retry reuses the stored exact artifact from
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactDir, "v1");
     await writeArtifact(wrongRoot, "wrong");
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const wrongServer = await startNixosSharedHostPublicServer({
       deployment,
@@ -133,6 +138,7 @@ test("nixos-shared-host publish-only can republish a retained exact artifact wit
     const statePath = path.join(tmp, "platform-state.json");
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactDir, "v1");
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
@@ -169,6 +175,7 @@ test("nixos-shared-host rollback restores a prior known-good exact artifact", as
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactV1, "v1");
     await writeArtifact(artifactV2, "v2");
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {

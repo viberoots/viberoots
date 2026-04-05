@@ -9,7 +9,10 @@ import {
   resolveNixosSharedHostReplaySource,
 } from "../../deployments/nixos-shared-host-replay.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import {
+  ensureNixosSharedHostStageBranch,
+  nixosSharedHostDeploymentFixture,
+} from "./nixos-shared-host.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string): Promise<void> {
@@ -19,7 +22,7 @@ async function writeArtifact(root: string): Promise<void> {
 }
 
 test("nixos-shared-host replay snapshots preserve exact artifact refs and admitted deployment inputs", async () => {
-  await runInTemp("nixos-shared-host-replay-contract", async (tmp) => {
+  await runInTemp("nixos-shared-host-replay-contract", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture({
       runtime: { appName: "demoapp", containerPort: 3000, healthPath: "/healthz" },
     });
@@ -27,9 +30,11 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactDir);
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
       const result = await submitNixosSharedHostControlPlaneRun({
+        workspaceRoot: tmp,
         operationKind: "deploy",
         deployment,
         artifactDir,
@@ -60,6 +65,11 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
         replay.replaySnapshot.controlPlaneExecutionSnapshotPath,
         result.executionSnapshotPath,
       );
+      assert.equal(replay.replaySnapshot.admittedContext.environmentStage, "dev");
+      assert.equal(
+        replay.replaySnapshot.admittedContext.targetEnvironment.targetRef,
+        "env/pleomino/dev",
+      );
       assert.equal(replay.artifactDir, result.record.artifact?.storedArtifactPath);
       await fsp.access(replay.replaySnapshot.platformStateSnapshotPath);
       await fsp.access(replay.replaySnapshot.hostConfigSnapshotPath);
@@ -70,16 +80,18 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
 });
 
 test("nixos-shared-host replay resolution fails closed when the stored exact artifact is missing", async () => {
-  await runInTemp("nixos-shared-host-replay-missing-artifact", async (tmp) => {
+  await runInTemp("nixos-shared-host-replay-missing-artifact", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture({
       runtime: { appName: "demoapp", containerPort: 3000, healthPath: "/healthz" },
     });
     const artifactDir = path.join(tmp, "artifact");
     const hostRoot = path.join(tmp, "host");
     await writeArtifact(artifactDir);
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
       const result = await submitNixosSharedHostControlPlaneRun({
+        workspaceRoot: tmp,
         operationKind: "deploy",
         deployment,
         artifactDir,

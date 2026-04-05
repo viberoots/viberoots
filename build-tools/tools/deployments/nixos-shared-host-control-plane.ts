@@ -1,13 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import crypto from "node:crypto";
-import path from "node:path";
-import {
-  admitNixosSharedHostStaticArtifact,
-  type NixosSharedHostAdmittedArtifact,
-} from "./nixos-shared-host-artifacts.ts";
+import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import {
-  NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA,
   type NixosSharedHostControlPlaneOperationKind,
   type NixosSharedHostControlPlanePaths,
   type NixosSharedHostPublishBehavior,
@@ -16,6 +10,12 @@ import {
   type NixosSharedHostSmokeConnectOverride,
 } from "./nixos-shared-host-control-plane-contract.ts";
 import { createNixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-submission.ts";
+import {
+  createNixosSharedHostControlPlaneSnapshot,
+  createNixosSharedHostSubmissionId,
+  createNixosSharedHostWorkerId,
+  type NixosSharedHostControlPlaneSourceSelection,
+} from "./nixos-shared-host-control-plane-snapshot.ts";
 import { runNixosSharedHostExplicitRemoval } from "./nixos-shared-host-explicit-removal.ts";
 import { runNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy.ts";
 import {
@@ -33,6 +33,7 @@ type SubmitHooks = {
 };
 
 type SubmitOpts = {
+  workspaceRoot: string;
   operationKind: NixosSharedHostControlPlaneOperationKind;
   deployment: NixosSharedHostDeployment;
   paths: NixosSharedHostControlPlanePaths;
@@ -43,6 +44,7 @@ type SubmitOpts = {
   releaseLineageId?: string;
   artifactLineageId?: string;
   smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;
+  source?: NixosSharedHostControlPlaneSourceSelection;
   hooks?: SubmitHooks;
 };
 
@@ -54,68 +56,6 @@ type SubmitResult = {
   record: NixosSharedHostDeployRecord;
   recordPath: string;
 };
-
-function createSubmissionId(): string {
-  return `cp-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
-}
-function createWorkerId(submissionId: string): string {
-  return `${submissionId}-worker`;
-}
-
-async function createSnapshot(
-  opts: SubmitOpts,
-  submissionId: string,
-): Promise<NixosSharedHostControlPlaneSnapshot> {
-  const submittedAt = new Date().toISOString();
-  const lockScope = opts.deployment.providerTarget.sharedDevTargetIdentity;
-  if (opts.operationKind !== "explicit_removal" && !opts.artifact && !opts.artifactDir) {
-    throw new Error(
-      `shared control-plane ${opts.operationKind} submission requires exact artifact input`,
-    );
-  }
-  const artifact =
-    opts.operationKind === "explicit_removal"
-      ? undefined
-      : opts.artifact ||
-        (await admitNixosSharedHostStaticArtifact({
-          recordsRoot: opts.paths.recordsRoot,
-          artifactDir: path.resolve(opts.artifactDir || ""),
-        }));
-  return {
-    schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA,
-    submissionId,
-    submittedAt,
-    operationKind: opts.operationKind,
-    deploymentId: opts.deployment.deploymentId,
-    deploymentLabel: opts.deployment.label,
-    providerTargetIdentity: opts.deployment.providerTarget.sharedDevTargetIdentity,
-    lockScope,
-    deployment: opts.deployment,
-    paths: {
-      statePath: path.resolve(opts.paths.statePath),
-      hostRoot: path.resolve(opts.paths.hostRoot),
-      recordsRoot: path.resolve(opts.paths.recordsRoot),
-      ...(opts.paths.hostConfigPath
-        ? { hostConfigPath: path.resolve(opts.paths.hostConfigPath) }
-        : {}),
-    },
-    action:
-      opts.operationKind !== "explicit_removal"
-        ? {
-            kind: "deploy",
-            publishBehavior: opts.publishBehavior || "deploy",
-            publishInput: {
-              kind: "exact-artifact",
-              artifact: artifact as NixosSharedHostAdmittedArtifact,
-            },
-            ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
-            ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
-            ...(opts.artifactLineageId ? { artifactLineageId: opts.artifactLineageId } : {}),
-          }
-        : { kind: "explicit_removal" },
-    ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
-  };
-}
 
 async function runWorker(opts: {
   submissionPath: string;
@@ -152,6 +92,7 @@ async function runWorker(opts: {
         ...(snapshot.action.artifactLineageId
           ? { artifactLineageId: snapshot.action.artifactLineageId }
           : {}),
+        ...(snapshot.admittedContext ? { admittedContext: snapshot.admittedContext } : {}),
         ...(snapshot.paths.hostConfigPath ? { hostConfigPath: snapshot.paths.hostConfigPath } : {}),
         ...(snapshot.smokeConnectOverride
           ? { smokeConnectOverride: snapshot.smokeConnectOverride }
@@ -171,8 +112,8 @@ async function runWorker(opts: {
 export async function submitNixosSharedHostControlPlaneRun(
   opts: SubmitOpts,
 ): Promise<SubmitResult> {
-  const submissionId = createSubmissionId();
-  const snapshot = await createSnapshot(opts, submissionId);
+  const submissionId = createNixosSharedHostSubmissionId();
+  const snapshot = await createNixosSharedHostControlPlaneSnapshot(opts, submissionId);
   const executionSnapshotPath = executionSnapshotPathFor(opts.paths.recordsRoot, submissionId);
   const submissionPath = submissionPathFor(opts.paths.recordsRoot, submissionId);
   await writeControlPlaneJson(executionSnapshotPath, snapshot);
@@ -192,7 +133,7 @@ export async function submitNixosSharedHostControlPlaneRun(
       executionSnapshotPath,
     });
   }
-  const workerId = createWorkerId(submissionId);
+  const workerId = createNixosSharedHostWorkerId(submissionId);
   let submission = createNixosSharedHostControlPlaneSubmission(
     snapshot,
     executionSnapshotPath,

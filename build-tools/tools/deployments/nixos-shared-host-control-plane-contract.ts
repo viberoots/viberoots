@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
+import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA =
   "nixos-shared-host-control-plane-snapshot@2";
@@ -39,6 +40,7 @@ export type NixosSharedHostControlPlaneSnapshot = {
   providerTargetIdentity: string;
   lockScope: string;
   deployment: NixosSharedHostDeployment;
+  admittedContext?: NixosSharedHostAdmittedContext;
   paths: NixosSharedHostControlPlanePaths;
   action:
     | {

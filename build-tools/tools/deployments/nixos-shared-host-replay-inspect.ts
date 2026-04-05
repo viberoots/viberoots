@@ -31,6 +31,7 @@ async function main() {
         deploymentLabel: resolved.record.deploymentLabel,
         providerTargetIdentity: resolved.replaySnapshot.providerTargetIdentity,
         deploymentMetadataFingerprint: resolved.replaySnapshot.deploymentMetadataFingerprint,
+        admittedContext: resolved.replaySnapshot.admittedContext,
         replaySnapshotPath: resolved.record.replaySnapshotPath,
         platformStateSnapshotPath: resolved.replaySnapshot.platformStateSnapshotPath,
         hostConfigSnapshotPath: resolved.replaySnapshot.hostConfigSnapshotPath,

@@ -1,10 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
 import { requireNixosSharedHostAdmittedArtifactPath } from "./nixos-shared-host-artifacts.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
+import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 import {
   deployRecordPathFor,
   readNixosSharedHostDeployRecord,
@@ -22,6 +23,7 @@ export type NixosSharedHostReplaySnapshot = {
   providerTargetIdentity: string;
   deploymentMetadataFingerprint: string;
   artifact: NixosSharedHostAdmittedArtifact;
+  admittedContext: NixosSharedHostAdmittedContext;
   deployment: NixosSharedHostDeployment;
   platformStateSnapshotPath: string;
   hostConfigSnapshotPath: string;
@@ -44,22 +46,6 @@ function hostConfigSnapshotPathFor(recordsRoot: string, deployRunId: string): st
   return path.join(replayBundleDir(recordsRoot, deployRunId), "host-config.json");
 }
 
-function canonicalize(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (!value || typeof value !== "object") return value;
-  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
-    a.localeCompare(b),
-  );
-  return Object.fromEntries(entries.map(([key, nested]) => [key, canonicalize(nested)]));
-}
-
-export function deploymentMetadataFingerprintFor(deployment: NixosSharedHostDeployment): string {
-  return `sha256:${crypto
-    .createHash("sha256")
-    .update(JSON.stringify(canonicalize(deployment)))
-    .digest("hex")}`;
-}
-
 async function writeSnapshotDocument(filePath: string, value: unknown): Promise<void> {
   await fsp.mkdir(path.dirname(filePath), { recursive: true });
   await fsp.writeFile(filePath, JSON.stringify(value, null, 2) + "\n", "utf8");
@@ -70,6 +56,7 @@ export async function writeNixosSharedHostReplaySnapshot(opts: {
   deployRunId: string;
   deployment: NixosSharedHostDeployment;
   artifact: NixosSharedHostAdmittedArtifact;
+  admittedContext: NixosSharedHostAdmittedContext;
   platformState: unknown;
   hostConfig: unknown;
   controlPlaneExecutionSnapshotPath?: string;
@@ -97,6 +84,7 @@ export async function writeNixosSharedHostReplaySnapshot(opts: {
     providerTargetIdentity: opts.deployment.providerTarget.sharedDevTargetIdentity,
     deploymentMetadataFingerprint,
     artifact: opts.artifact,
+    admittedContext: opts.admittedContext,
     deployment: opts.deployment,
     platformStateSnapshotPath,
     hostConfigSnapshotPath,
@@ -222,6 +210,8 @@ export async function resolveNixosSharedHostReplaySelection(opts: {
   artifactLineageId: string;
   recordPath: string;
   replaySnapshotPath: string;
+  sourceRecord: NixosSharedHostDeployRecord;
+  sourceReplaySnapshot: NixosSharedHostReplaySnapshot;
 }> {
   const source = await resolveNixosSharedHostReplaySource({
     recordsRoot: opts.recordsRoot,
@@ -239,12 +229,14 @@ ${rollbackErrors.join("\n")}`);
   }
   return {
     operationKind: opts.rollback ? "rollback" : "retry",
-    deployment: source.replaySnapshot.deployment,
+    deployment: opts.deployment,
     artifact: source.replaySnapshot.artifact,
     parentRunId: source.record.deployRunId,
     ...(source.record.releaseLineageId ? { releaseLineageId: source.record.releaseLineageId } : {}),
     artifactLineageId: source.record.artifactLineageId || source.replaySnapshot.artifact.identity,
     recordPath: source.recordPath,
     replaySnapshotPath: requireReplaySnapshotPath(source.record),
+    sourceRecord: source.record,
+    sourceReplaySnapshot: source.replaySnapshot,
   };
 }

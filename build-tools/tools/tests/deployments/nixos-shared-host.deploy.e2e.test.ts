@@ -4,7 +4,10 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import {
+  ensureNixosSharedHostStageBranch,
+  nixosSharedHostDeploymentFixture,
+} from "./nixos-shared-host.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string): Promise<void> {
@@ -22,6 +25,7 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
     const artifactDir = path.join(tmp, "artifact");
     const hostRoot = path.join(tmp, "host");
     await writeArtifact(artifactDir);
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
@@ -47,6 +51,8 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
         record.controlPlane.executionSnapshotPath,
         summary.controlPlane.executionSnapshotPath,
       );
+      assert.equal(record.admittedContext.source.sourceRef, "env/pleomino/dev");
+      assert.equal(record.admittedContext.targetEnvironment.targetRef, "env/pleomino/dev");
       assert.equal(record.artifact.identity, summary.artifactIdentity);
       assert.match(record.artifact.storedArtifactPath, /records\/artifacts\/blobs\//);
       assert.match(record.artifact.provenancePath, /records\/artifacts\/provenance\//);
@@ -60,6 +66,7 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
       assert.equal(snapshot.deploymentLabel, "//projects/deployments/demoapp-dev:deploy");
       assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:demoapp");
       assert.equal(snapshot.action.publishBehavior, "deploy");
+      assert.equal(snapshot.admittedContext.source.sourceRef, "env/pleomino/dev");
       await fsp.rm(artifactDir, { recursive: true, force: true });
       const replayInspect = await $({
         cwd: tmp,
@@ -70,6 +77,13 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
       assert.equal(replay.artifact.identity, summary.artifactIdentity);
       assert.equal(replay.replaySnapshotPath, record.replaySnapshotPath);
       assert.equal(replay.deploymentMetadataFingerprint, record.deploymentMetadataFingerprint);
+      assert.equal(replay.admittedContext.source.sourceRef, "env/pleomino/dev");
+      const admissionInspect = await $({
+        cwd: tmp,
+      })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-admission-inspect.ts --record-path ${summary.recordPath}`;
+      const admission = JSON.parse(String(admissionInspect.stdout));
+      assert.equal(admission.admittedContext.environmentStage, "dev");
+      assert.equal(admission.admittedContext.targetEnvironment.targetRef, "env/pleomino/dev");
       const rendered = JSON.parse(await fsp.readFile(path.join(tmp, "rendered-host.json"), "utf8"));
       assert.ok(rendered.containers.demoapp);
     } finally {

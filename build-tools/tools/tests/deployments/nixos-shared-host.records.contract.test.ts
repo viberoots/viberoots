@@ -16,6 +16,27 @@ test("nixos-shared-host durable records persist canonical provider-target identi
     artifactStoredArtifactPath: "/tmp/records/artifacts/blobs/static-webapp-abc123",
     artifactProvenancePath: "/tmp/records/artifacts/provenance/static-webapp-abc123.json",
     artifactLineageId: "static-webapp:abc123",
+    admittedContext: {
+      lanePolicyRef: "//build-tools/deployments/lanes:pleomino",
+      lanePolicyFingerprint: "sha256:lane-pleomino",
+      admissionPolicyRef: "//build-tools/deployments/policies:pleomino_dev_release",
+      admissionPolicyFingerprint: "sha256:admission-pleomino-dev",
+      environmentStage: "dev",
+      source: {
+        mode: "stage_branch_head",
+        sourceRef: "env/pleomino/dev",
+        sourceRevision: "abc123",
+        artifactIdentity: "static-webapp:abc123",
+        artifactTrustMode: "recorded_exact_artifact",
+      },
+      targetEnvironment: {
+        mode: "stage_branch_snapshot",
+        targetRef: "env/pleomino/dev",
+        targetRevision: "abc123",
+        providerTargetIdentity: "nixos-shared-host:shared-dev:demoapp",
+        lockScope: "nixos-shared-host:shared-dev:demoapp",
+      },
+    },
     deploymentMetadataFingerprint: "sha256:deadbeef",
     replaySnapshotPath: "/tmp/records/replay/deploy-123/snapshot.json",
     publicUrl: "https://demoapp.apps.kilty.io/",
@@ -54,6 +75,7 @@ test("nixos-shared-host durable records persist canonical provider-target identi
     "/tmp/records/artifacts/provenance/static-webapp-abc123.json",
   );
   assert.equal(record.artifactLineageId, "static-webapp:abc123");
+  assert.equal(record.admittedContext?.environmentStage, "dev");
   assert.equal(record.deploymentMetadataFingerprint, "sha256:deadbeef");
   assert.equal(record.replaySnapshotPath, "/tmp/records/replay/deploy-123/snapshot.json");
   assert.equal(record.publisherType, "nixos-shared-host-static-webapp");

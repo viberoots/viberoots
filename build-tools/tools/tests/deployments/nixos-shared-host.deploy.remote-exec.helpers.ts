@@ -2,7 +2,10 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { NixosSharedHostDeployment } from "../../deployments/contract.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import {
+  ensureNixosSharedHostStageBranch,
+  nixosSharedHostDeploymentFixture,
+} from "./nixos-shared-host.fixture.ts";
 import { createNixosSharedHostInstallFixture } from "./nixos-shared-host.install.fixture.ts";
 import { installFakeRemoteTransport } from "./nixos-shared-host.remote-transport.fake.ts";
 
@@ -82,6 +85,9 @@ async function installReviewedPleominoTargets(tmp: string): Promise<void> {
       "nixos_shared_host_static_webapp_deployment(",
       '    name = "deploy",',
       '    component = "//projects/apps/pleomino:app",',
+      '    lane_policy = "//build-tools/deployments/lanes:pleomino",',
+      '    environment_stage = "dev",',
+      '    admission_policy = "//build-tools/deployments/policies:pleomino_dev_release",',
       '    app_name = "pleomino",',
       "    container_port = 3000,",
       '    health_path = "/healthz",',
@@ -127,6 +133,7 @@ export async function prepareRemoteExecFixture(opts: {
   const remoteRecordsRoot = path.join(opts.tmp, "remote-records");
   const remoteStatePath = path.join(opts.tmp, "remote-state", "platform-state.json");
   await installReviewedPleominoTargets(opts.tmp);
+  await ensureNixosSharedHostStageBranch(opts.tmp, opts.$, deployment);
   await prepareReviewedRemoteHostPaths({
     remoteStatePath,
     remoteRuntimeRoot,

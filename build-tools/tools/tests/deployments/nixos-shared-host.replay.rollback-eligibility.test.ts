@@ -6,7 +6,10 @@ import { test } from "node:test";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
 import { resolveNixosSharedHostReplaySelection } from "../../deployments/nixos-shared-host-replay.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import {
+  ensureNixosSharedHostStageBranch,
+  nixosSharedHostDeploymentFixture,
+} from "./nixos-shared-host.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string, marker: string, includeHealthz = true): Promise<void> {
@@ -18,12 +21,7 @@ async function writeArtifact(root: string, marker: string, includeHealthz = true
 }
 
 function smokeConnect(port: number) {
-  return {
-    protocol: "https:" as const,
-    hostname: "127.0.0.1",
-    port,
-    rejectUnauthorized: false,
-  };
+  return { protocol: "https:" as const, hostname: "127.0.0.1", port, rejectUnauthorized: false };
 }
 
 function replayPaths(tmp: string) {
@@ -40,37 +38,49 @@ function replayDeploymentFixture() {
   });
 }
 
-async function resolveSelection(opts: {
+const resolveSelection = (opts: {
   deployment: ReturnType<typeof nixosSharedHostDeploymentFixture>;
   recordsRoot: string;
   sourceRunId: string;
   rollback: boolean;
-}) {
-  return await resolveNixosSharedHostReplaySelection(opts);
-}
+}) => resolveNixosSharedHostReplaySelection(opts);
 
 test("rollback rejects a successful retry source while retry reuse stays available", async () => {
-  await runInTemp("nixos-shared-host-replay-retry-source", async (tmp) => {
+  await runInTemp("nixos-shared-host-replay-retry-source", async (tmp, $) => {
     const deployment = replayDeploymentFixture();
     const artifactDir = path.join(tmp, "artifact");
     const paths = replayPaths(tmp);
     await writeArtifact(artifactDir, "retry-source");
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot: paths.hostRoot });
     try {
       const initial = await submitNixosSharedHostControlPlaneRun({
+        workspaceRoot: tmp,
         operationKind: "deploy",
         deployment,
         artifactDir,
         paths,
         smokeConnectOverride: smokeConnect(server.port),
       });
-      const retry = await submitNixosSharedHostControlPlaneRun({
-        operationKind: "retry",
+      const retrySource = await resolveSelection({
         deployment,
-        artifactDir,
+        recordsRoot: paths.recordsRoot,
+        sourceRunId: initial.record.deployRunId,
+        rollback: false,
+      });
+      const retry = await submitNixosSharedHostControlPlaneRun({
+        workspaceRoot: tmp,
+        operationKind: retrySource.operationKind,
+        deployment: retrySource.deployment,
+        artifact: retrySource.artifact,
         publishBehavior: "publish-only",
-        parentRunId: initial.record.deployRunId,
-        artifactLineageId: initial.record.artifact?.identity,
+        parentRunId: retrySource.parentRunId,
+        artifactLineageId: retrySource.artifactLineageId,
+        ...(retrySource.releaseLineageId ? { releaseLineageId: retrySource.releaseLineageId } : {}),
+        source: {
+          record: retrySource.sourceRecord,
+          replaySnapshot: retrySource.sourceReplaySnapshot,
+        },
         paths,
         smokeConnectOverride: smokeConnect(server.port),
       });
@@ -98,27 +108,43 @@ test("rollback rejects a successful retry source while retry reuse stays availab
 });
 
 test("rollback rejects a successful rollback source while retry reuse stays available", async () => {
-  await runInTemp("nixos-shared-host-replay-rollback-source", async (tmp) => {
+  await runInTemp("nixos-shared-host-replay-rollback-source", async (tmp, $) => {
     const deployment = replayDeploymentFixture();
     const artifactDir = path.join(tmp, "artifact");
     const paths = replayPaths(tmp);
     await writeArtifact(artifactDir, "rollback-source");
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot: paths.hostRoot });
     try {
       const initial = await submitNixosSharedHostControlPlaneRun({
+        workspaceRoot: tmp,
         operationKind: "deploy",
         deployment,
         artifactDir,
         paths,
         smokeConnectOverride: smokeConnect(server.port),
       });
-      const rollback = await submitNixosSharedHostControlPlaneRun({
-        operationKind: "rollback",
+      const rollbackSource = await resolveSelection({
         deployment,
-        artifactDir,
+        recordsRoot: paths.recordsRoot,
+        sourceRunId: initial.record.deployRunId,
+        rollback: true,
+      });
+      const rollback = await submitNixosSharedHostControlPlaneRun({
+        workspaceRoot: tmp,
+        operationKind: rollbackSource.operationKind,
+        deployment: rollbackSource.deployment,
+        artifact: rollbackSource.artifact,
         publishBehavior: "publish-only",
-        parentRunId: initial.record.deployRunId,
-        artifactLineageId: initial.record.artifact?.identity,
+        parentRunId: rollbackSource.parentRunId,
+        artifactLineageId: rollbackSource.artifactLineageId,
+        ...(rollbackSource.releaseLineageId
+          ? { releaseLineageId: rollbackSource.releaseLineageId }
+          : {}),
+        source: {
+          record: rollbackSource.sourceRecord,
+          replaySnapshot: rollbackSource.sourceReplaySnapshot,
+        },
         paths,
         smokeConnectOverride: smokeConnect(server.port),
       });
@@ -145,14 +171,16 @@ test("rollback rejects a successful rollback source while retry reuse stays avai
 });
 
 test("rollback rejects explicit-removal source runs with actionable diagnostics", async () => {
-  await runInTemp("nixos-shared-host-replay-explicit-removal", async (tmp) => {
+  await runInTemp("nixos-shared-host-replay-explicit-removal", async (tmp, $) => {
     const deployment = replayDeploymentFixture();
     const artifactDir = path.join(tmp, "artifact");
     const paths = replayPaths(tmp);
     await writeArtifact(artifactDir, "explicit-removal");
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot: paths.hostRoot });
     try {
       await submitNixosSharedHostControlPlaneRun({
+        workspaceRoot: tmp,
         operationKind: "deploy",
         deployment,
         artifactDir,
@@ -160,6 +188,7 @@ test("rollback rejects explicit-removal source runs with actionable diagnostics"
         smokeConnectOverride: smokeConnect(server.port),
       });
       const removal = await submitNixosSharedHostControlPlaneRun({
+        workspaceRoot: tmp,
         operationKind: "explicit_removal",
         deployment,
         paths,
@@ -180,14 +209,16 @@ test("rollback rejects explicit-removal source runs with actionable diagnostics"
 });
 
 test("rollback rejects non-successful runs while retry reuse stays available", async () => {
-  await runInTemp("nixos-shared-host-replay-failed-source", async (tmp) => {
+  await runInTemp("nixos-shared-host-replay-failed-source", async (tmp, $) => {
     const deployment = replayDeploymentFixture();
     const artifactDir = path.join(tmp, "artifact");
     const paths = replayPaths(tmp);
     await writeArtifact(artifactDir, "failed-source", false);
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot: paths.hostRoot });
     try {
       const failedRunId = await submitNixosSharedHostControlPlaneRun({
+        workspaceRoot: tmp,
         operationKind: "deploy",
         deployment,
         artifactDir,

@@ -4,9 +4,13 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
+import { resolveNixosSharedHostReplaySelection } from "../../deployments/nixos-shared-host-replay.ts";
 import { runNixosSharedHostStaticDeploy } from "../../deployments/nixos-shared-host-static-deploy.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import {
+  ensureNixosSharedHostStageBranch,
+  nixosSharedHostDeploymentFixture,
+} from "./nixos-shared-host.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string): Promise<void> {
@@ -16,16 +20,18 @@ async function writeArtifact(root: string): Promise<void> {
 }
 
 test("shared control plane admits shared_nonprod deploys and executes from the frozen snapshot", async () => {
-  await runInTemp("nixos-shared-host-control-plane-admit", async (tmp) => {
+  await runInTemp("nixos-shared-host-control-plane-admit", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture({
       runtime: { appName: "demoapp", containerPort: 3000, healthPath: "/healthz" },
     });
     const artifactDir = path.join(tmp, "artifact");
     const hostRoot = path.join(tmp, "host");
     await writeArtifact(artifactDir);
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
       const result = await submitNixosSharedHostControlPlaneRun({
+        workspaceRoot: tmp,
         operationKind: "deploy",
         deployment,
         artifactDir,
@@ -57,14 +63,84 @@ test("shared control plane admits shared_nonprod deploys and executes from the f
       assert.equal(snapshot.deploymentLabel, "//projects/deployments/demoapp-dev:deploy");
       assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:demoapp");
       assert.equal(snapshot.action.publishInput.kind, "exact-artifact");
+      assert.equal(snapshot.admittedContext.source.sourceRef, "env/pleomino/dev");
+      assert.equal(snapshot.admittedContext.targetEnvironment.targetRef, "env/pleomino/dev");
       assert.equal(
         snapshot.action.publishInput.artifact.identity,
         result.record.artifact?.identity,
       );
       assert.equal(result.record.providerTargetIdentity, "nixos-shared-host:default:demoapp");
+      assert.equal(result.record.admittedContext.source.mode, "stage_branch_head");
       assert.ok(result.record.controlPlane);
       assert.equal(result.record.controlPlane.submissionId, result.submission.submissionId);
       assert.equal(result.record.controlPlane.executionSnapshotPath, result.executionSnapshotPath);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+test("shared control plane rejects replay when the current lane policy no longer matches the source run", async () => {
+  await runInTemp("nixos-shared-host-control-plane-lane-drift", async (tmp, $) => {
+    const deployment = nixosSharedHostDeploymentFixture();
+    const artifactDir = path.join(tmp, "artifact");
+    const paths = {
+      statePath: path.join(tmp, "platform-state.json"),
+      hostRoot: path.join(tmp, "host"),
+      recordsRoot: path.join(tmp, "records"),
+    };
+    await writeArtifact(artifactDir);
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const server = await startNixosSharedHostPublicServer({ deployment, hostRoot: paths.hostRoot });
+    try {
+      const initial = await submitNixosSharedHostControlPlaneRun({
+        workspaceRoot: tmp,
+        operationKind: "deploy",
+        deployment,
+        artifactDir,
+        paths,
+        smokeConnectOverride: {
+          protocol: "https:",
+          hostname: "127.0.0.1",
+          port: server.port,
+          rejectUnauthorized: false,
+        },
+      });
+      const replay = await resolveNixosSharedHostReplaySelection({
+        deployment,
+        recordsRoot: paths.recordsRoot,
+        sourceRunId: initial.record.deployRunId,
+        rollback: false,
+      });
+      const driftedDeployment = nixosSharedHostDeploymentFixture({
+        lanePolicy: {
+          ...deployment.lanePolicy,
+          fingerprint: "sha256:lane-pleomino-drifted",
+        },
+      });
+      await assert.rejects(
+        submitNixosSharedHostControlPlaneRun({
+          workspaceRoot: tmp,
+          operationKind: replay.operationKind,
+          deployment: driftedDeployment,
+          artifact: replay.artifact,
+          publishBehavior: "publish-only",
+          parentRunId: replay.parentRunId,
+          artifactLineageId: replay.artifactLineageId,
+          source: {
+            record: replay.sourceRecord,
+            replaySnapshot: replay.sourceReplaySnapshot,
+          },
+          paths,
+          smokeConnectOverride: {
+            protocol: "https:",
+            hostname: "127.0.0.1",
+            port: server.port,
+            rejectUnauthorized: false,
+          },
+        }),
+        /source run is outside current lane policy/,
+      );
     } finally {
       await server.close();
     }
@@ -103,6 +179,7 @@ test("shared control plane fails closed on lock conflict for the same canonical 
       lockAcquired = resolve;
     });
     const firstRun = submitNixosSharedHostControlPlaneRun({
+      workspaceRoot: tmp,
       operationKind: "explicit_removal",
       deployment,
       paths: {
@@ -120,6 +197,7 @@ test("shared control plane fails closed on lock conflict for the same canonical 
     await firstHasLock;
     await assert.rejects(
       submitNixosSharedHostControlPlaneRun({
+        workspaceRoot: tmp,
         operationKind: "explicit_removal",
         deployment: nixosSharedHostDeploymentFixture(),
         paths: {

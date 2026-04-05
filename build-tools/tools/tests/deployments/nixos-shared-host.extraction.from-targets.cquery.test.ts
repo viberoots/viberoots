@@ -10,16 +10,29 @@ import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers.ts";
 const ATTRS = [
   "name",
   "rule_type",
+  "buck.type",
   "provider",
   "component",
   "component_kind",
   "publisher",
   "provisioner",
   "protection_class",
+  "lane_policy",
+  "environment_stage",
+  "admission_policy",
   "app_name",
   "container_port",
   "health_path",
   "target_group",
+  "stages",
+  "stage_branches",
+  "allowed_promotion_edges",
+  "artifact_reuse_mode",
+  "allowed_refs",
+  "required_checks",
+  "required_approvals",
+  "retry_branch_policy",
+  "artifact_attestation_mode",
   "labels",
 ];
 
@@ -27,8 +40,12 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
   await runInTemp("deployment-cquery-extraction", async (tmp, _$) => {
     const appTargetsPath = path.join(tmp, "projects", "apps", "demoapp", "TARGETS");
     const deployTargetsPath = path.join(tmp, "projects", "deployments", "demoapp-dev", "TARGETS");
+    const laneTargetsPath = path.join(tmp, "build-tools", "deployments", "lanes", "TARGETS");
+    const policyTargetsPath = path.join(tmp, "build-tools", "deployments", "policies", "TARGETS");
     await fsp.mkdir(path.dirname(appTargetsPath), { recursive: true });
     await fsp.mkdir(path.dirname(deployTargetsPath), { recursive: true });
+    await fsp.mkdir(path.dirname(laneTargetsPath), { recursive: true });
+    await fsp.mkdir(path.dirname(policyTargetsPath), { recursive: true });
     await fsp.writeFile(
       appTargetsPath,
       [
@@ -46,6 +63,37 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
       "utf8",
     );
     await fsp.writeFile(
+      laneTargetsPath,
+      [
+        'load("//build-tools/deployments:defs.bzl", "deployment_lane_policy")',
+        "",
+        "deployment_lane_policy(",
+        '    name = "pleomino",',
+        '    stages = ["dev", "staging", "prod"],',
+        '    stage_branches = {"dev": "env/pleomino/dev", "staging": "env/pleomino/staging", "prod": "env/pleomino/prod"},',
+        '    allowed_promotion_edges = ["dev->staging", "staging->prod"],',
+        '    visibility = ["PUBLIC"],',
+        ")",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await fsp.writeFile(
+      policyTargetsPath,
+      [
+        'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy")',
+        "",
+        "deployment_admission_policy(",
+        '    name = "pleomino_dev_release",',
+        '    allowed_refs = ["env/pleomino/dev"],',
+        '    required_checks = ["deploy/pleomino-dev"],',
+        '    visibility = ["PUBLIC"],',
+        ")",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await fsp.writeFile(
       deployTargetsPath,
       [
         'load("//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
@@ -53,6 +101,9 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
         "nixos_shared_host_static_webapp_deployment(",
         '    name = "deploy",',
         '    component = "//projects/apps/demoapp:app",',
+        '    lane_policy = "//build-tools/deployments/lanes:pleomino",',
+        '    environment_stage = "dev",',
+        '    admission_policy = "//build-tools/deployments/policies:pleomino_dev_release",',
         '    app_name = "demoapp",',
         "    container_port = 3000,",
         ")",
@@ -62,7 +113,8 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
     );
 
     const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
-    const query = "set(//projects/deployments/demoapp-dev:deploy //projects/apps/demoapp:app)";
+    const query =
+      "set(//projects/deployments/demoapp-dev:deploy //projects/apps/demoapp:app //build-tools/deployments/lanes:pleomino //build-tools/deployments/policies:pleomino_dev_release)";
     const cquery = await _$({
       cwd: tmp,
       stdio: "pipe",
@@ -78,6 +130,12 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
     assert.equal(deployments.length, 1);
     assert.equal(deployments[0]?.label, "//projects/deployments/demoapp-dev:deploy");
     assert.equal(deployments[0]?.name, "deploy");
+    assert.equal(deployments[0]?.lanePolicyRef, "//build-tools/deployments/lanes:pleomino");
+    assert.equal(
+      deployments[0]?.admissionPolicyRef,
+      "//build-tools/deployments/policies:pleomino_dev_release",
+    );
+    assert.equal(deployments[0]?.environmentStage, "dev");
     assert.equal(deployments[0]?.runtime.appName, "demoapp");
     assert.equal(deployments[0]?.runtime.containerPort, 3000);
     assert.equal(deployments[0]?.providerTarget.hostname, "demoapp.apps.kilty.io");
