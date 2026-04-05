@@ -2319,15 +2319,21 @@ Implement only after the default same-artifact path is stable and well tested.
 
 I will complete the remaining cross-cutting operator and execution contracts that the design calls
 out explicitly: secret and runtime-config declaration, reviewed built-in release actions, and
-migration or alias exception support for controlled target ownership transitions.
+migration or alias exception support for controlled target ownership transitions. This closeout
+work should preserve sliceability: reviewed built-in behavior may live in shared implementation
+code, but project-specific declarations, policies, and exceptions should remain slice-owned and
+referenced by label rather than being pulled into new centralized registries.
 
 ### Scope & Changes
 
 - Implement secret-requirement and runtime-config-requirement validation and replay preservation.
-- Implement reviewed built-in release-action registry support for protected/shared flows.
+- Implement reviewed built-in release-action support for protected/shared flows without requiring a
+  centralized per-project registry.
 - Implement migration or alias exception objects for controlled live-target ownership transitions.
 - Enforce fail-closed handling when replay invariants no longer match current ownership or policy.
 - Ensure deployment records preserve the required secret-free config and exception references.
+- Keep release-action, migration, and alias-exception declarations slice-owned and label-addressable
+  so unrelated deployments do not couple through shared instance registries.
 
 ### Tests (in this PR)
 
@@ -2364,6 +2370,8 @@ migration or alias exception support for controlled target ownership transitions
 
 - The remaining major cross-cutting design requirements are implemented and tested.
 - Secret, config, release-action, and migration semantics are explicit and fail closed.
+- Project-specific declarations and exceptions remain slice-owned; the solution does not introduce
+  centralized registries that hurt sliceability.
 - The system no longer relies on undocumented assumptions for protected/shared execution.
 
 ### Risks
@@ -2372,7 +2380,9 @@ These are cross-cutting features with broad reach, so late-stage drift is easy.
 
 ### Mitigation
 
-Anchor each feature to explicit validation, replay, and record contracts in the same PR.
+Anchor each feature to explicit validation, replay, and record contracts in the same PR, and prefer
+slice-owned label references over shared instance registries whenever project-specific control data
+is introduced.
 
 ### Consequence of Not Implementing
 
