@@ -3,7 +3,7 @@ import type { CloudflarePagesDeployment } from "./contract.ts";
 import { requiredDeploymentStageBranch } from "./contract.ts";
 
 export type CloudflarePagesSourceAdmission = {
-  mode: "stage_branch_head" | "promotion_source_run";
+  mode: "stage_branch_head" | "source_run_reuse" | "promotion_source_run";
   sourceRef: string;
   sourceRevision: string;
   artifactIdentity: string;
@@ -105,6 +105,38 @@ export async function resolvePromotionCloudflarePagesAdmittedContext(opts: {
       mode: "promotion_source_run",
       sourceRef: target.targetRef,
       sourceRevision: target.targetRevision,
+      artifactIdentity: opts.artifactIdentity,
+      artifactTrustMode: opts.deployment.admissionPolicy.artifactAttestationMode,
+      sourceRunId: opts.sourceRecord.deployRunId,
+      sourceDeploymentId: opts.sourceRecord.deploymentId,
+    },
+    targetEnvironment: target,
+  };
+}
+
+export async function resolveSourceRunCloudflarePagesAdmittedContext(opts: {
+  workspaceRoot: string;
+  deployment: CloudflarePagesDeployment;
+  artifactIdentity: string;
+  sourceRecord: {
+    deployRunId: string;
+    deploymentId: string;
+    admittedContext?: {
+      source?: {
+        sourceRef?: string;
+        sourceRevision?: string;
+      };
+    };
+  };
+}): Promise<CloudflarePagesAdmittedContext> {
+  const target = await targetEnvironmentAdmission(opts.workspaceRoot, opts.deployment);
+  return {
+    ...baseContext(opts.deployment),
+    source: {
+      mode: "source_run_reuse",
+      sourceRef: opts.sourceRecord.admittedContext?.source?.sourceRef || target.targetRef,
+      sourceRevision:
+        opts.sourceRecord.admittedContext?.source?.sourceRevision || target.targetRevision,
       artifactIdentity: opts.artifactIdentity,
       artifactTrustMode: opts.deployment.admissionPolicy.artifactAttestationMode,
       sourceRunId: opts.sourceRecord.deployRunId,

@@ -5,6 +5,7 @@ import { smokeNixosSharedHostStaticWebapp } from "./nixos-shared-host-static-smo
 export async function smokeCloudflarePagesStaticWebapp(opts: {
   deployment: CloudflarePagesDeployment;
   indexPath: string;
+  effectiveRunTarget?: CloudflarePagesDeployment["providerTarget"];
   connectOverride?: {
     protocol: "http:" | "https:";
     hostname: string;
@@ -13,7 +14,8 @@ export async function smokeCloudflarePagesStaticWebapp(opts: {
   };
 }): Promise<{ publicUrl: string }> {
   return await smokeNixosSharedHostStaticWebapp({
-    hostname: new URL(opts.deployment.providerTarget.canonicalUrl).hostname,
+    hostname: new URL((opts.effectiveRunTarget || opts.deployment.providerTarget).canonicalUrl)
+      .hostname,
     indexPath: opts.indexPath,
     connectOverride: opts.connectOverride,
   });

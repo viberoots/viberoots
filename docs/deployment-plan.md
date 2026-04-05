@@ -2006,6 +2006,101 @@ Implement after normal deploy, replay, and promotion semantics are stable.
 
 ---
 
+## PR-12.1: Deployment-domain taxonomy ownership split + verify-scope hardening
+
+### Description
+
+I will remove the first recurring false broadening in the deployment-only verify path by moving the
+mutable deployment-domain taxonomy data out of the shared test-definition surface and into the
+reviewed deployment-owned boundary. The goal is to keep routine deployment test additions or renames
+from kicking default `v` / CI back to the full build-system suite while preserving fail-closed
+classification behavior.
+
+### Scope & Changes
+
+- Move the mutable reviewed deployment-domain ownership table into the reviewed deployment-owned test
+  area under `build-tools/tools/tests/deployments/**`.
+- Keep the shared zx-test loader stable:
+  - `build-tools/tools/tests/defs.bzl` remains shared test infrastructure
+  - root `TARGETS` remains shared test infrastructure
+- Update deployment verify-scope classification so the new deployment-domain taxonomy file is
+  treated as reviewed deployment-owned rather than an unclassified `build-tools/**` path.
+- Keep fail-closed taxonomy behavior unchanged:
+  - unclassified reviewed deployment tests still fail
+  - reviewed non-deployment tests still must not acquire the deployment-domain label
+- Avoid widening deployment ownership to the whole shared test-definition layer just to solve this
+  one mutable taxonomy hotspot.
+
+### Tests (in this PR)
+
+- Add or extend boundary tests proving:
+  - the moved deployment-domain taxonomy file is classified as reviewed deployment-owned
+  - `build-tools/tools/tests/defs.bzl` remains classified as shared
+- Add selector-policy tests proving a taxonomy-only change now resolves to `deployment-only`
+  instead of `mixed-build-system`.
+- Preserve taxonomy-drift tests proving unclassified reviewed deployment tests still fail closed.
+- Preserve cquery label tests proving only reviewed deployment-domain tests acquire
+  `domain:deployment`.
+
+### Docs (in this PR)
+
+- Document the split between:
+  - shared zx-test loader infrastructure
+  - deployment-owned taxonomy data for reviewed deployment-domain tests
+- Document why routine deployment test additions no longer need to broaden default `v` / CI to the
+  full build-system verify scope.
+- Document the fail-closed ownership rule for the moved taxonomy data.
+
+### Verification Commands
+
+- `buck2 test //...`
+- deployment verify-scope inspection and selection-explain commands touched in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR is expected to touch both the reviewed
+  deployment-owned deployment-domain taxonomy data and the shared verify-scope classification logic
+  that decides whether default `v` / CI can narrow safely. This PR should therefore run the full
+  build-system verify scope once, so later deployment-only PRs can keep routine deployment test
+  taxonomy edits inside the reviewed deployment-owned boundary.
+
+### Acceptance Criteria
+
+- Touching only the deployment-domain taxonomy data no longer classifies as `mixed-build-system`.
+- Shared zx-test loader infrastructure remains outside the deployment-owned boundary.
+- Reviewed deployment test classification still fails closed on drift or missing ownership entries.
+- Verify-scope diagnostics clearly explain the new ownership boundary.
+
+### Risks
+
+Misclassifying shared test-definition infrastructure as deployment-owned could let a genuinely
+cross-cutting build-system change bypass the full verify scope.
+
+### Mitigation
+
+Keep the shared loader and root test-definition entrypoints classified as shared, move only the
+mutable deployment-domain taxonomy data, and cover the boundary with explicit classifier and
+selection tests.
+
+### Consequence of Not Implementing
+
+Future deployment PRs that add, rename, or reclassify reviewed deployment tests will keep
+unexpectedly triggering full build-system verify runs, which weakens the practical value of the
+deployment-only verify policy.
+
+### Downsides for Implementing
+
+Adds one more ownership split between shared test-definition infrastructure and deployment-owned
+taxonomy data.
+
+### Recommendation
+
+Implement immediately after PR-12 so later deployment-only PRs can rely on predictable verify-scope
+behavior when they extend reviewed deployment-domain coverage.
+
+---
+
 ## PR-13: `--from-changes` grouped submission + prerequisite graph orchestration
 
 ### Description
@@ -2044,10 +2139,11 @@ turn repo changes into auditable per-deployment runs without inventing a second 
 ### Expected Regression Scope
 
 - `deployment-only`
-- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should live in reviewed deployment-owned
-  change-selection/orchestration code and deployment-domain tests rather than shared build-system
-  selector paths. Under the deployment-only verify policy, default `v` / CI can run the reviewed
-  deployment suite instead of the full non-deployment build-system verify scope.
+- Assuming PR-4.5.1 through PR-4.5.3 and PR-12.1 are complete, this PR should live in reviewed
+  deployment-owned change-selection/orchestration code and deployment-domain tests rather than
+  shared build-system selector paths or shared deployment-taxonomy ownership files. Under the
+  deployment-only verify policy, default `v` / CI can run the reviewed deployment suite instead of
+  the full non-deployment build-system verify scope.
 
 ### Acceptance Criteria
 
@@ -2308,8 +2404,9 @@ are stable.
    control-plane authority, immutable artifacts, replay, and admission.
 6. PR-9 through PR-10: reach the secondary milestone by adding Cloudflare Pages static-webapp deploys
    and a full Pleomino `dev -> staging -> prod` flow.
-7. PR-11 through PR-13: generalize that second milestone across providers, preview, and changed-based
-   orchestration.
+7. PR-11 through PR-13, with PR-12.1 verify-scope hardening immediately after preview: generalize
+   that second milestone across providers, preview, deployment-test ownership cleanup, and
+   changed-based orchestration.
 8. PR-14 through PR-16: close the remaining model gaps for multi-component rollout, rebuild-per-stage,
    and cross-cutting protected/shared semantics.
 

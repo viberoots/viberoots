@@ -203,10 +203,12 @@ Normative-source note:
 
 - preview support:
   - supported only when the deployment explicitly opts in with `preview` metadata
+  - the current built-in operator contract uses `deploy <deployment> --preview --source-run-id <deploy-run-id>`
 - preview isolation model:
   - provider-managed isolated preview target derived deterministically from deployment metadata plus run context
 - preview cleanup default:
   - provider-managed cleanup with a default TTL of `7d`; deployment metadata may override when needed
+  - the current built-in explicit cleanup contract uses `deploy <deployment> --preview-cleanup --source-run-id <deploy-run-id>`
 - preview lock-scope default:
   - preview shares the normal deployment lock by default
   - a separate preview lock scope is allowed only when the preview satisfies the stronger independent-execution isolation bar

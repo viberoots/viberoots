@@ -1,6 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import type { CloudflarePagesDeployment } from "./contract.ts";
 import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
+import type {
+  CloudflarePagesPreviewCleanupReason,
+  CloudflarePagesPreviewIdentitySelector,
+} from "./cloudflare-pages-preview.ts";
 import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
 
 export const CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA =
@@ -8,8 +12,9 @@ export const CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA =
 export const CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMISSION_SCHEMA =
   "cloudflare-pages-control-plane-submission@1";
 
+export type CloudflarePagesPublishMode = "normal" | "preview";
 export type CloudflarePagesPublishBehavior = "deploy" | "publish-only";
-export type CloudflarePagesControlPlaneOperationKind = "deploy" | "promotion";
+export type CloudflarePagesControlPlaneOperationKind = "deploy" | "promotion" | "preview_cleanup";
 
 export type CloudflarePagesSmokeConnectOverride = {
   protocol: "http:" | "https:";
@@ -35,19 +40,37 @@ export type CloudflarePagesControlPlaneSnapshot = {
   deployment: CloudflarePagesDeployment;
   admittedContext: CloudflarePagesAdmittedContext;
   paths: CloudflarePagesControlPlanePaths;
-  action: {
-    kind: "deploy";
-    publishBehavior: CloudflarePagesPublishBehavior;
-    publishInput: {
-      kind: "exact-artifact";
-      artifact: AdmittedStaticWebappArtifact;
-    };
-    parentRunId?: string;
-    releaseLineageId?: string;
-    artifactLineageId?: string;
-    sourceRecordPath?: string;
-    sourceReplaySnapshotPath?: string;
-  };
+  action:
+    | {
+        kind: "deploy";
+        publishBehavior: CloudflarePagesPublishBehavior;
+        publishMode?: CloudflarePagesPublishMode;
+        effectiveRunTarget?: CloudflarePagesDeployment["providerTarget"];
+        previewIdentitySelector?: CloudflarePagesPreviewIdentitySelector;
+        publishInput: {
+          kind: "exact-artifact";
+          artifact: AdmittedStaticWebappArtifact;
+        };
+        parentRunId?: string;
+        releaseLineageId?: string;
+        artifactLineageId?: string;
+        sourceRecordPath?: string;
+        sourceReplaySnapshotPath?: string;
+      }
+    | {
+        kind: "preview_cleanup";
+        publishMode: "preview";
+        effectiveRunTarget: CloudflarePagesDeployment["providerTarget"];
+        previewIdentitySelector: CloudflarePagesPreviewIdentitySelector;
+        cleanupReason: CloudflarePagesPreviewCleanupReason;
+        artifactIdentity: string;
+        artifactLineageId?: string;
+        providerReleaseId?: string;
+        parentRunId?: string;
+        releaseLineageId?: string;
+        sourceRecordPath?: string;
+        sourceReplaySnapshotPath?: string;
+      };
   smokeConnectOverride?: CloudflarePagesSmokeConnectOverride;
 };
 

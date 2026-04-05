@@ -6,9 +6,12 @@ import {
   deriveCloudflarePagesProviderTarget,
   extractCloudflarePagesDeployments,
 } from "../../deployments/contract.ts";
+import { deriveCloudflarePagesPreviewTarget } from "../../deployments/cloudflare-pages-preview.ts";
 import {
   cloudflarePagesAdmissionPolicyNodeFixture,
+  cloudflarePagesDeploymentFixture,
   cloudflarePagesLanePolicyNodeFixture,
+  cloudflarePagesPreviewFixture,
 } from "./cloudflare-pages.fixture.ts";
 
 function staticWebappComponent(label: string): GraphNode {
@@ -48,6 +51,14 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
       lane_policy: "//build-tools/deployments/lanes:pleomino",
       environment_stage: "staging",
       admission_policy: "//build-tools/deployments/policies:pleomino_staging_release",
+      preview: {
+        target_derivation: "provider_managed_source_run",
+        isolation_class: "isolated",
+        identity_selector: "source_run",
+        cleanup_ttl: "7d",
+        smoke_target: "preview_url",
+        lock_scope: "shared",
+      },
       provider_target: {
         account: "web-platform-staging",
         project: "pleomino-staging-pages",
@@ -60,8 +71,27 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
   assert.equal(deployments.length, 1);
   assert.equal(deployments[0]?.publisher.config, "wrangler.jsonc");
   assert.equal(deployments[0]?.providerTarget.id, "pleomino-staging-pages");
+  assert.equal(deployments[0]?.preview?.identitySelector, "source_run");
   assert.equal(
     deployments[0]?.providerTarget.providerTargetIdentity,
     "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+  );
+});
+
+test("deriveCloudflarePagesPreviewTarget preserves the live target while deriving an isolated preview identity", () => {
+  const previewTarget = deriveCloudflarePagesPreviewTarget(
+    cloudflarePagesDeploymentFixture({ preview: cloudflarePagesPreviewFixture() }),
+    "deploy-123",
+  );
+  assert.equal(previewTarget.previewSourceRunId, "deploy-123");
+  assert.match(previewTarget.previewBranch ?? "", /^prv-deploy-123-[0-9a-f]{8}$/);
+  assert.ok((previewTarget.previewBranch?.length ?? 0) <= 31);
+  assert.equal(
+    previewTarget.providerTargetIdentity,
+    `cloudflare-pages:web-platform-staging/pleomino-staging-pages#preview:${previewTarget.previewBranch}`,
+  );
+  assert.equal(
+    previewTarget.canonicalUrl,
+    `https://${previewTarget.previewBranch}.pleomino-staging-pages.pages.dev/`,
   );
 });

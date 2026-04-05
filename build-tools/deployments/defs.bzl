@@ -19,6 +19,7 @@ def _deployment_document(ctx):
         "health_path": ctx.attrs.health_path,
         "target_group": ctx.attrs.target_group,
         "provider_target": ctx.attrs.provider_target,
+        "preview": ctx.attrs.preview,
     }
 
 def _deployment_target_impl(ctx):
@@ -43,6 +44,7 @@ deployment_target = rule(
         "health_path": attrs.string(default = ""),
         "target_group": attrs.string(default = ""),
         "provider_target": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
+        "preview": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
         "labels": attrs.list(attrs.string(), default = []),
     },
 )
@@ -134,6 +136,7 @@ def cloudflare_pages_static_webapp_deployment(
         account,
         project,
         project_id = "",
+        preview = None,
         publisher = "wrangler-pages",
         publisher_config = "wrangler.jsonc",
         protection_class = "shared_nonprod",
@@ -160,6 +163,7 @@ def cloudflare_pages_static_webapp_deployment(
             "project": project,
             "id": project_id if project_id else project,
         },
+        preview = preview or {},
         labels = labels + [
             "kind:deployment",
             "deployment:cloudflare-pages",

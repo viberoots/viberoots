@@ -14,6 +14,7 @@ import {
   isStaticWebappNode,
   readLabel,
   readNumber,
+  readPreviewPolicy,
   readString,
   type DeploymentExtractionContext,
   uniqueErrors,
@@ -40,6 +41,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
     const healthPath = readString(node, "health_path");
     const targetGroup = readString(node, "target_group");
     const protectionClass = readString(node, "protection_class") || SHARED_NONPROD;
+    const preview = readPreviewPolicy(node, "preview");
     const publisher = readString(node, "publisher");
     const provisioner = readString(node, "provisioner");
     const deploymentErrors: string[] = [];
@@ -91,6 +93,11 @@ export function extractNixosSharedHostDeploymentsFromContext(
     }
     if (!publisher) deploymentErrors.push(deploymentError(label, "missing required publisher"));
     if (!provisioner) deploymentErrors.push(deploymentError(label, "missing required provisioner"));
+    if (preview) {
+      deploymentErrors.push(
+        deploymentError(label, "preview is not supported for nixos-shared-host"),
+      );
+    }
     const componentNode = context.components.get(componentTarget);
     if (componentTarget && !isStaticWebappNode(componentNode)) {
       deploymentErrors.push(

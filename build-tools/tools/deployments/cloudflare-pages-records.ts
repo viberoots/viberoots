@@ -4,11 +4,16 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
 import type { CloudflarePagesControlPlaneWorkerAuthority } from "./cloudflare-pages-control-plane-contract.ts";
+import type { CloudflarePagesPublishMode } from "./cloudflare-pages-control-plane-contract.ts";
+import type {
+  CloudflarePagesPreviewCleanupReason,
+  CloudflarePagesPreviewIdentitySelector,
+} from "./cloudflare-pages-preview.ts";
 import { CLOUDFLARE_PAGES_PROVIDER, type CloudflarePagesDeployment } from "./contract.ts";
 
 export const CLOUDFLARE_PAGES_RECORD_SCHEMA = "deploy-record@2026-04-04";
 
-export type CloudflarePagesOperationKind = "deploy" | "promotion";
+export type CloudflarePagesOperationKind = "deploy" | "promotion" | "preview_cleanup";
 export type CloudflarePagesRunClassification = CloudflarePagesOperationKind;
 
 export type CloudflarePagesDeployRecord = {
@@ -16,7 +21,7 @@ export type CloudflarePagesDeployRecord = {
   deployRunId: string;
   operationKind: CloudflarePagesOperationKind;
   runClassification: CloudflarePagesRunClassification;
-  publishMode: "normal";
+  publishMode: CloudflarePagesPublishMode;
   lifecycleState: "finished";
   terminationReason: null;
   finalOutcome: "succeeded" | "publish_failed" | "smoke_failed_after_publish";
@@ -37,15 +42,17 @@ export type CloudflarePagesDeployRecord = {
   parentRunId?: string;
   releaseLineageId?: string;
   artifactLineageId?: string;
+  previewIdentitySelector?: CloudflarePagesPreviewIdentitySelector;
+  cleanupReason?: CloudflarePagesPreviewCleanupReason;
   artifact?: {
     identity: string;
     storedArtifactPath?: string;
     provenancePath?: string;
   };
   admittedContext: CloudflarePagesAdmittedContext;
-  failedStep?: "publish" | "smoke";
-  publisherType: string;
-  smokeRunnerType: "cloudflare-pages-static-webapp-smoke";
+  failedStep?: "publish" | "smoke" | "preview_cleanup";
+  publisherType?: string;
+  smokeRunnerType?: "cloudflare-pages-static-webapp-smoke";
   deploymentMetadataFingerprint?: string;
   providerConfigFingerprint?: string;
   replaySnapshotPath?: string;
@@ -58,8 +65,9 @@ type RecordOutcome = {
   deployRunId: string;
   operationKind?: CloudflarePagesOperationKind;
   runClassification?: CloudflarePagesRunClassification;
+  publishMode?: CloudflarePagesPublishMode;
   finalOutcome: CloudflarePagesDeployRecord["finalOutcome"];
-  artifactIdentity: string;
+  artifactIdentity?: string;
   artifactStoredArtifactPath?: string;
   artifactProvenancePath?: string;
   admittedContext: CloudflarePagesAdmittedContext;
@@ -67,6 +75,9 @@ type RecordOutcome = {
   parentRunId?: string;
   releaseLineageId?: string;
   artifactLineageId?: string;
+  effectiveRunTarget?: CloudflarePagesDeployment["providerTarget"];
+  previewIdentitySelector?: CloudflarePagesPreviewIdentitySelector;
+  cleanupReason?: CloudflarePagesPreviewCleanupReason;
   failedStep?: CloudflarePagesDeployRecord["failedStep"];
   deploymentMetadataFingerprint?: string;
   providerConfigFingerprint?: string;
@@ -89,7 +100,7 @@ export function createCloudflarePagesDeployRecord(
     deployRunId: outcome.deployRunId,
     operationKind: outcome.operationKind || "deploy",
     runClassification: outcome.runClassification || outcome.operationKind || "deploy",
-    publishMode: "normal",
+    publishMode: outcome.publishMode || "normal",
     lifecycleState: "finished",
     terminationReason: null,
     finalOutcome: outcome.finalOutcome,
@@ -97,7 +108,7 @@ export function createCloudflarePagesDeployRecord(
     deploymentLabel: deployment.label,
     provider: CLOUDFLARE_PAGES_PROVIDER,
     providerTarget: deployment.providerTarget,
-    effectiveRunTarget: deployment.providerTarget,
+    effectiveRunTarget: outcome.effectiveRunTarget || deployment.providerTarget,
     providerTargetIdentity: deployment.providerTarget.providerTargetIdentity,
     ...(outcome.authority
       ? {
@@ -114,17 +125,31 @@ export function createCloudflarePagesDeployRecord(
     ...(outcome.parentRunId ? { parentRunId: outcome.parentRunId } : {}),
     ...(outcome.releaseLineageId ? { releaseLineageId: outcome.releaseLineageId } : {}),
     ...(outcome.artifactLineageId ? { artifactLineageId: outcome.artifactLineageId } : {}),
-    artifact: {
-      identity: outcome.artifactIdentity,
-      ...(outcome.artifactStoredArtifactPath
-        ? { storedArtifactPath: outcome.artifactStoredArtifactPath }
-        : {}),
-      ...(outcome.artifactProvenancePath ? { provenancePath: outcome.artifactProvenancePath } : {}),
-    },
+    ...(outcome.previewIdentitySelector
+      ? { previewIdentitySelector: outcome.previewIdentitySelector }
+      : {}),
+    ...(outcome.cleanupReason ? { cleanupReason: outcome.cleanupReason } : {}),
+    ...(outcome.artifactIdentity
+      ? {
+          artifact: {
+            identity: outcome.artifactIdentity,
+            ...(outcome.artifactStoredArtifactPath
+              ? { storedArtifactPath: outcome.artifactStoredArtifactPath }
+              : {}),
+            ...(outcome.artifactProvenancePath
+              ? { provenancePath: outcome.artifactProvenancePath }
+              : {}),
+          },
+        }
+      : {}),
     admittedContext: outcome.admittedContext,
     ...(outcome.failedStep ? { failedStep: outcome.failedStep } : {}),
-    publisherType: deployment.publisher.type,
-    smokeRunnerType: "cloudflare-pages-static-webapp-smoke",
+    ...(outcome.operationKind !== "preview_cleanup"
+      ? {
+          publisherType: deployment.publisher.type,
+          smokeRunnerType: "cloudflare-pages-static-webapp-smoke" as const,
+        }
+      : {}),
     ...(outcome.deploymentMetadataFingerprint
       ? { deploymentMetadataFingerprint: outcome.deploymentMetadataFingerprint }
       : {}),

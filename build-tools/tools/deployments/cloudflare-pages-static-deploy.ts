@@ -4,8 +4,10 @@ import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admissio
 import {
   requireCloudflarePagesControlPlaneAuthority,
   type CloudflarePagesControlPlaneWorkerAuthority,
+  type CloudflarePagesPublishMode,
 } from "./cloudflare-pages-control-plane-contract.ts";
 import { prepareCloudflarePagesWranglerConfig } from "./cloudflare-pages-config.ts";
+import type { CloudflarePagesPreviewIdentitySelector } from "./cloudflare-pages-preview.ts";
 import { publishCloudflarePagesStaticWebapp } from "./cloudflare-pages-publisher.ts";
 import {
   createCloudflarePagesDeployRecord,
@@ -44,6 +46,9 @@ export async function runCloudflarePagesStaticDeploy(opts: {
   parentRunId?: string;
   releaseLineageId?: string;
   artifactLineageId?: string;
+  publishMode?: CloudflarePagesPublishMode;
+  effectiveRunTarget?: CloudflarePagesDeployment["providerTarget"];
+  previewIdentitySelector?: CloudflarePagesPreviewIdentitySelector;
   smokeConnectOverride?: {
     protocol: "http:" | "https:";
     hostname: string;
@@ -54,6 +59,8 @@ export async function runCloudflarePagesStaticDeploy(opts: {
   const authority = requireCloudflarePagesControlPlaneAuthority(opts.deployment, opts.authority);
   const runId = createCloudflarePagesDeployRunId();
   const operationKind = opts.operationKind || "deploy";
+  const publishMode = opts.publishMode || "normal";
+  const effectiveRunTarget = opts.effectiveRunTarget || opts.deployment.providerTarget;
   const deploymentMetadataFingerprint = deploymentMetadataFingerprintFor(opts.deployment);
   let providerConfigFingerprint: string | undefined;
   let replaySnapshotPath: string | undefined;
@@ -81,12 +88,14 @@ export async function runCloudflarePagesStaticDeploy(opts: {
       deployment: opts.deployment,
       artifactDir,
       renderedConfigPath: preparedConfig.renderedConfigPath,
+      effectiveRunTarget,
     }).catch((error) => {
       throw withFailedStep("publish", error);
     });
     const smoke = await smokeCloudflarePagesStaticWebapp({
       deployment: opts.deployment,
       indexPath: path.join(artifactDir, "index.html"),
+      effectiveRunTarget,
       connectOverride: opts.smokeConnectOverride,
     }).catch((error) => {
       throw withFailedStep("smoke", error);
@@ -95,6 +104,7 @@ export async function runCloudflarePagesStaticDeploy(opts: {
       deployRunId: runId,
       operationKind,
       runClassification: operationKind,
+      publishMode,
       finalOutcome: "succeeded",
       ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
       ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
@@ -104,6 +114,10 @@ export async function runCloudflarePagesStaticDeploy(opts: {
       artifactLineageId: opts.artifactLineageId || opts.artifact.identity,
       admittedContext: opts.admittedContext,
       authority,
+      effectiveRunTarget,
+      ...(opts.previewIdentitySelector
+        ? { previewIdentitySelector: opts.previewIdentitySelector }
+        : {}),
       deploymentMetadataFingerprint,
       providerConfigFingerprint,
       ...(replaySnapshotPath ? { replaySnapshotPath } : {}),
@@ -124,6 +138,7 @@ export async function runCloudflarePagesStaticDeploy(opts: {
       deployRunId: runId,
       operationKind,
       runClassification: operationKind,
+      publishMode,
       finalOutcome: failedStep === "smoke" ? "smoke_failed_after_publish" : "publish_failed",
       ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
       ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
@@ -134,6 +149,10 @@ export async function runCloudflarePagesStaticDeploy(opts: {
       admittedContext: opts.admittedContext,
       authority,
       failedStep,
+      effectiveRunTarget,
+      ...(opts.previewIdentitySelector
+        ? { previewIdentitySelector: opts.previewIdentitySelector }
+        : {}),
       deploymentMetadataFingerprint,
       ...(providerConfigFingerprint ? { providerConfigFingerprint } : {}),
       ...(replaySnapshotPath ? { replaySnapshotPath } : {}),

@@ -85,3 +85,37 @@ test("validation rejects unsupported protection_class for cloudflare-pages", () 
     ),
   );
 });
+
+test("validation rejects preview metadata that reuses the normal live target", () => {
+  const { errors } = extractCloudflarePagesDeployments([
+    staticWebappComponent("//projects/apps/pleomino:app"),
+    ...policyNodes(),
+    deploymentNode({
+      preview: {
+        target_derivation: "live_target",
+        isolation_class: "isolated",
+        identity_selector: "source_run",
+        smoke_target: "preview_url",
+        lock_scope: "shared",
+      },
+    }),
+  ]);
+  assert.ok(errors.some((entry) => entry.includes("must not reuse the normal live target")));
+});
+
+test("validation rejects cloudflare preview metadata that does not use source-run identity", () => {
+  const { errors } = extractCloudflarePagesDeployments([
+    staticWebappComponent("//projects/apps/pleomino:app"),
+    ...policyNodes(),
+    deploymentNode({
+      preview: {
+        target_derivation: "provider_managed_source_run",
+        isolation_class: "isolated",
+        identity_selector: "branch",
+        smoke_target: "preview_url",
+        lock_scope: "shared",
+      },
+    }),
+  ]);
+  assert.ok(errors.some((entry) => entry.includes('identity_selector must be "source_run"')));
+});

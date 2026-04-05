@@ -18,6 +18,7 @@ if (args[0] !== "pages" || args[1] !== "deploy") {
 }
 const artifactDir = path.resolve(args[2] || "");
 const projectName = flagValue("--project-name");
+const branch = flagValue("--branch");
 const configPath = path.resolve(flagValue("--config"));
 const publishRoot = process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT || "";
 const logPath = process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_LOG || "";
@@ -31,10 +32,15 @@ if (!publishRoot) {
   console.error("missing BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT");
   process.exit(4);
 }
-const destination = path.join(path.resolve(publishRoot), projectName);
+const destination = branch
+  ? path.join(path.resolve(publishRoot), projectName + "--preview--" + branch)
+  : path.join(path.resolve(publishRoot), projectName);
 fs.mkdirSync(path.dirname(destination), { recursive: true });
 fs.rmSync(destination, { recursive: true, force: true });
 fs.cpSync(artifactDir, destination, { recursive: true, force: true });
+const url = branch
+  ? "https://" + branch + "." + projectName + ".pages.dev/"
+  : "https://" + projectName + ".pages.dev/";
 if (logPath) {
   fs.mkdirSync(path.dirname(path.resolve(logPath)), { recursive: true });
   fs.appendFileSync(
@@ -43,13 +49,24 @@ if (logPath) {
       args,
       artifactDir,
       projectName,
+      branch,
       configPath,
       accountId,
       config,
+      url,
     }) + "\\n",
   );
 }
-console.log(JSON.stringify({ deploymentId: "cloudflare-pages-deployment-01TEST", projectName }));
+console.log(
+  JSON.stringify({
+    deploymentId: branch
+      ? "cloudflare-pages-preview-" + branch
+      : "cloudflare-pages-deployment-01TEST",
+    projectName,
+    branch,
+    url,
+  }),
+);
 `;
 
 export async function installFakeCloudflarePagesWrangler(tmp: string): Promise<{

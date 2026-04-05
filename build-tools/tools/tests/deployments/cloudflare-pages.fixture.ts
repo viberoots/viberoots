@@ -3,6 +3,7 @@ import {
   CLOUDFLARE_PAGES_PROVIDER,
   deriveCloudflarePagesProviderTarget,
   STATIC_WEBAPP_COMPONENT,
+  type DeploymentPreviewPolicy,
   type CloudflarePagesDeployment,
 } from "../../deployments/contract.ts";
 import type { GraphNode } from "../../lib/graph.ts";
@@ -12,6 +13,20 @@ import {
   nixosSharedHostLanePolicyFixture,
   nixosSharedHostLanePolicyNodeFixture,
 } from "./nixos-shared-host.fixture.ts";
+
+export function cloudflarePagesPreviewFixture(
+  overrides: Partial<DeploymentPreviewPolicy> = {},
+): DeploymentPreviewPolicy {
+  return {
+    targetDerivation: "provider_managed_source_run",
+    isolationClass: "isolated",
+    identitySelector: "source_run",
+    cleanupTtl: "7d",
+    smokeTarget: "preview_url",
+    lockScope: "shared",
+    ...overrides,
+  };
+}
 
 export function cloudflarePagesDeploymentFixture(
   overrides: Partial<CloudflarePagesDeployment> = {},
@@ -48,6 +63,7 @@ export function cloudflarePagesDeploymentFixture(
       kind: STATIC_WEBAPP_COMPONENT,
       target: overrides.component?.target || "//projects/apps/pleomino:app",
     },
+    ...(overrides.preview ? { preview: overrides.preview } : {}),
     publisher: overrides.publisher || { type: "wrangler-pages", config: "wrangler.jsonc" },
     providerTarget,
   };

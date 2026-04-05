@@ -127,6 +127,9 @@ function compatibilityErrors(
   if (source.record.finalOutcome !== "succeeded") {
     errors.push(`source run is not successful: ${source.record.finalOutcome}`);
   }
+  if (source.record.publishMode !== "normal") {
+    errors.push(`promotion source must use publish_mode normal, got ${source.record.publishMode}`);
+  }
   if (source.record.deploymentId === deployment.deploymentId) {
     errors.push(`promotion requires a distinct target deployment id: ${deployment.deploymentId}`);
   }

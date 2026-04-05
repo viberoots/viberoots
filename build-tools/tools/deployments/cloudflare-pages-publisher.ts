@@ -36,6 +36,20 @@ function maybeProviderReleaseId(output: string): string | undefined {
   return undefined;
 }
 
+function maybePublicUrl(output: string): string | undefined {
+  const lines = output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  for (const line of lines.reverse()) {
+    try {
+      const parsed = JSON.parse(line) as Record<string, unknown>;
+      if (typeof parsed.url === "string" && parsed.url.trim()) return parsed.url.trim();
+    } catch {}
+  }
+  return undefined;
+}
+
 function commandError(stdout: string, stderr: string): string {
   return [stderr.trim(), stdout.trim()].filter(Boolean)[0] || "wrangler pages deploy failed";
 }
@@ -45,7 +59,9 @@ export async function publishCloudflarePagesStaticWebapp(opts: {
   deployment: CloudflarePagesDeployment;
   artifactDir: string;
   renderedConfigPath: string;
+  effectiveRunTarget?: CloudflarePagesDeployment["providerTarget"];
 }): Promise<CloudflarePagesPublishResult> {
+  const effectiveRunTarget = opts.effectiveRunTarget || opts.deployment.providerTarget;
   const result = await $({
     cwd: packageDirFor(opts.workspaceRoot, opts.deployment),
     stdio: "pipe",
@@ -53,15 +69,16 @@ export async function publishCloudflarePagesStaticWebapp(opts: {
       ...process.env,
       CLOUDFLARE_ACCOUNT_ID: opts.deployment.providerTarget.account,
     },
-  })`${wranglerBin()} pages deploy ${path.resolve(opts.artifactDir)} --project-name ${opts.deployment.providerTarget.project} --config ${path.resolve(opts.renderedConfigPath)}`.nothrow();
+  })`${wranglerBin()} pages deploy ${path.resolve(opts.artifactDir)} --project-name ${opts.deployment.providerTarget.project} ${effectiveRunTarget.previewBranch ? ["--branch", effectiveRunTarget.previewBranch] : []} --config ${path.resolve(opts.renderedConfigPath)}`.nothrow();
   const stdout = String((result as any).stdout || "");
   const stderr = String((result as any).stderr || "");
   if ((result as any).exitCode !== 0) {
     throw new Error(commandError(stdout, stderr));
   }
   const providerReleaseId = maybeProviderReleaseId(`${stdout}\n${stderr}`);
+  const publicUrl = maybePublicUrl(`${stdout}\n${stderr}`) || effectiveRunTarget.canonicalUrl;
   return {
-    publicUrl: opts.deployment.providerTarget.canonicalUrl,
+    publicUrl,
     ...(providerReleaseId ? { providerReleaseId } : {}),
   };
 }

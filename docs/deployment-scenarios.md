@@ -88,8 +88,10 @@ Expected behavior:
 - unless the deployment's `admission_policy` explicitly defines a stricter preview posture, the preview run uses the same target-environment branch and required-check requirements as a normal protected/shared publish for `pleomino-prod`
 - by default, previewing that already-admitted artifact does not require a second manual approval
 - the effective target identity is the isolated preview target
+- the shared/protected preview selector is the admitted source run id, not an ambient branch or commit
 - the preview run may still share the normal deployment lock unless the preview also satisfies the stronger independent-execution isolation requirements for a separate preview lock scope
 - preview cleanup is a first-class audited `preview_cleanup` operation
+- explicit cleanup uses `deploy pleomino-prod --preview-cleanup --source-run-id <admitted-run-id>`
 - preview cleanup acquires the effective lock scope for that preview, whether that is the shared normal lock or a separate isolated preview lock
 - preview cleanup records `publish_mode = preview`, the isolated preview target identity, and a cleanup reason such as TTL expiry or PR close
 

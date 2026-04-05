@@ -7,6 +7,17 @@ export const NIXOS_SHARED_HOST_PROVIDER = "nixos-shared-host";
 export const CLOUDFLARE_PAGES_PROVIDER = "cloudflare-pages";
 export const STATIC_WEBAPP_COMPONENT = "static-webapp";
 
+export type DeploymentPreviewIdentitySelector = "branch" | "commit" | "source_run";
+
+export type DeploymentPreviewPolicy = {
+  targetDerivation: string;
+  isolationClass: string;
+  identitySelector: DeploymentPreviewIdentitySelector;
+  cleanupTtl: string;
+  smokeTarget: "normal_url" | "preview_url";
+  lockScope: "shared" | "preview";
+};
+
 type DeploymentBase = {
   deploymentId: string;
   label: string;
@@ -21,6 +32,7 @@ type DeploymentBase = {
     kind: typeof STATIC_WEBAPP_COMPONENT;
     target: string;
   };
+  preview?: DeploymentPreviewPolicy;
 };
 
 export type NixosSharedHostProviderTarget = {
@@ -38,6 +50,8 @@ export type CloudflarePagesProviderTarget = {
   id: string;
   canonicalUrl: string;
   providerTargetIdentity: string;
+  previewBranch?: string;
+  previewSourceRunId?: string;
 };
 
 export type NixosSharedHostDeployment = DeploymentBase & {

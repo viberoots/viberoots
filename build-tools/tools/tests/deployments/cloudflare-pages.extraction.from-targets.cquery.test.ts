@@ -21,6 +21,7 @@ const ATTRS = [
   "environment_stage",
   "admission_policy",
   "provider_target",
+  "preview",
   "stages",
   "stage_branches",
   "allowed_promotion_edges",
@@ -109,6 +110,14 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
         '    lane_policy = "//build-tools/deployments/lanes:pleomino",',
         '    environment_stage = "staging",',
         '    admission_policy = "//build-tools/deployments/policies:pleomino_staging_release",',
+        "    preview = {",
+        '        "target_derivation": "provider_managed_source_run",',
+        '        "isolation_class": "isolated",',
+        '        "identity_selector": "source_run",',
+        '        "cleanup_ttl": "7d",',
+        '        "smoke_target": "preview_url",',
+        '        "lock_scope": "shared",',
+        "    },",
         ")",
         "",
       ].join("\n"),
@@ -135,5 +144,6 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
     assert.equal(deployments[0]?.publisher.config, "wrangler.jsonc");
     assert.equal(deployments[0]?.providerTarget.account, "web-platform-staging");
     assert.equal(deployments[0]?.providerTarget.project, "pleomino-staging-pages");
+    assert.equal(deployments[0]?.preview?.identitySelector, "source_run");
   });
 });

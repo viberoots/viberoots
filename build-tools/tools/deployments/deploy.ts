@@ -5,8 +5,7 @@ import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
 import { resolveSelectedTargetLabel } from "../dev/target-label-resolver.ts";
 import { getFlagBool, getFlagStr } from "../lib/cli.ts";
 import { findRepoRoot } from "../lib/repo.ts";
-import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-control-plane.ts";
-import { resolveCloudflarePagesPromotionSelection } from "./cloudflare-pages-promotion.ts";
+import { runCloudflarePagesCli } from "./cloudflare-pages-cli.ts";
 import { resolveDeploymentFromTarget } from "./deployment-query.ts";
 import { isNixosSharedHostDeployment, type DeploymentTarget } from "./contract.ts";
 import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
@@ -67,15 +66,62 @@ function resolveSmokeConnectOverride() {
   };
 }
 
+function printResult(result: {
+  record: {
+    deployRunId: string;
+    operationKind: string;
+    runClassification: string;
+    finalOutcome: string;
+    artifact?: { identity: string };
+    parentRunId?: string;
+    publicUrl?: string;
+    controlPlane?: unknown;
+  };
+  recordPath: string;
+}) {
+  console.log(
+    JSON.stringify(
+      {
+        runId: result.record.deployRunId,
+        deployRunId: result.record.deployRunId,
+        operationKind: result.record.operationKind,
+        runClassification: result.record.runClassification,
+        finalOutcome: result.record.finalOutcome,
+        artifactIdentity: result.record.artifact?.identity,
+        ...(result.record.parentRunId ? { parentRunId: result.record.parentRunId } : {}),
+        publicUrl: result.record.publicUrl,
+        recordPath: result.recordPath,
+        ...(result.record.controlPlane ? { controlPlane: result.record.controlPlane } : {}),
+      },
+      null,
+      2,
+    ),
+  );
+}
+
 async function main() {
   const workspaceRoot = await findRepoRoot(process.cwd());
   const deployment = await resolveDeployment(workspaceRoot);
   const remove = getFlagBool("remove");
   const publishOnly = getFlagBool("publish-only");
+  const preview = getFlagBool("preview");
+  const previewCleanup = getFlagBool("preview-cleanup");
   const rollback = getFlagBool("rollback");
+  const cleanupReason = getFlagStr("cleanup-reason", "manual_cleanup").trim();
   const sourceRunId = getFlagStr("source-run-id", "").trim();
   const artifactDirFlag = getFlagStr("artifact-dir", "").trim();
   const smokeConnectOverride = resolveSmokeConnectOverride();
+  if (preview && previewCleanup) {
+    throw new Error("--preview and --preview-cleanup are mutually exclusive");
+  }
+  if (preview && (publishOnly || remove || rollback)) {
+    throw new Error("--preview cannot be combined with --publish-only, --remove, or --rollback");
+  }
+  if (previewCleanup && (publishOnly || remove || rollback)) {
+    throw new Error(
+      "--preview-cleanup cannot be combined with --publish-only, --remove, or --rollback",
+    );
+  }
   if (!isNixosSharedHostDeployment(deployment)) {
     if (remove) throw new Error("cloudflare-pages deploys do not support --remove yet");
     if (rollback) throw new Error("cloudflare-pages deploys do not support --rollback yet");
@@ -85,69 +131,28 @@ async function main() {
         path.join(workspaceRoot, ".local", "deployments", "cloudflare-pages", "records"),
       ),
     );
-    if (publishOnly && !sourceRunId) {
-      throw new Error(
-        "cloudflare-pages --publish-only requires --source-run-id to select a promotion source run",
-      );
-    }
-    if (!publishOnly && sourceRunId) {
-      throw new Error("cloudflare-pages --source-run-id requires --publish-only");
-    }
-    if (publishOnly && artifactDirFlag) {
-      throw new Error(
-        "cloudflare-pages --publish-only must not use --artifact-dir; promote the admitted exact artifact with --source-run-id",
-      );
-    }
-    const promotion = publishOnly
-      ? await resolveCloudflarePagesPromotionSelection({
-          workspaceRoot,
-          deployment,
-          recordsRoot,
-          sourceRunId,
-        })
-      : undefined;
-    const result = await submitCloudflarePagesControlPlaneDeploy({
+    const resolvedArtifactDir =
+      publishOnly || preview || previewCleanup
+        ? undefined
+        : await resolveArtifactDir(workspaceRoot, deployment);
+    const result = await runCloudflarePagesCli({
       workspaceRoot,
       deployment,
+      artifactDirFlag,
+      resolvedArtifactDir,
       recordsRoot,
-      ...(promotion
-        ? {
-            operationKind: promotion.operationKind,
-            artifact: promotion.artifact,
-            publishBehavior: "publish-only" as const,
-            parentRunId: promotion.parentRunId,
-            releaseLineageId: promotion.releaseLineageId,
-            artifactLineageId: promotion.artifactLineageId,
-            source: {
-              record: promotion.sourceRecord,
-              recordPath: promotion.sourceRecordPath,
-              replaySnapshotPath: promotion.sourceReplaySnapshotPath,
-            },
-          }
-        : {
-            artifactDir: await resolveArtifactDir(workspaceRoot, deployment),
-          }),
+      publishOnly,
+      preview,
+      previewCleanup,
+      sourceRunId,
       ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
+      cleanupReason,
     });
-    console.log(
-      JSON.stringify(
-        {
-          runId: result.record.deployRunId,
-          deployRunId: result.record.deployRunId,
-          operationKind: result.record.operationKind,
-          runClassification: result.record.runClassification,
-          finalOutcome: result.record.finalOutcome,
-          artifactIdentity: result.record.artifact?.identity,
-          ...(result.record.parentRunId ? { parentRunId: result.record.parentRunId } : {}),
-          publicUrl: result.record.publicUrl,
-          recordPath: result.recordPath,
-          ...(result.record.controlPlane ? { controlPlane: result.record.controlPlane } : {}),
-        },
-        null,
-        2,
-      ),
-    );
+    printResult(result);
     return;
+  }
+  if (preview || previewCleanup) {
+    throw new Error("nixos-shared-host deploys do not support --preview or --preview-cleanup");
   }
   if (await maybeRunNixosSharedHostRemoteProfile({ workspaceRoot, deployment })) return;
   if (rollback && !publishOnly) throw new Error("--rollback requires --publish-only");
@@ -208,24 +213,7 @@ async function main() {
           ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
         });
       })();
-  console.log(
-    JSON.stringify(
-      {
-        runId: result.record.deployRunId,
-        deployRunId: result.record.deployRunId,
-        operationKind: result.record.operationKind,
-        runClassification: result.record.runClassification,
-        finalOutcome: result.record.finalOutcome,
-        artifactIdentity: result.record.artifact?.identity,
-        ...(result.record.parentRunId ? { parentRunId: result.record.parentRunId } : {}),
-        publicUrl: result.record.publicUrl,
-        recordPath: result.recordPath,
-        ...(result.record.controlPlane ? { controlPlane: result.record.controlPlane } : {}),
-      },
-      null,
-      2,
-    ),
-  );
+  printResult(result);
 }
 
 main().catch((error) => {

@@ -13,6 +13,7 @@ import {
   deploymentError,
   isStaticWebappNode,
   readLabel,
+  readPreviewPolicy,
   readString,
   readStringRecord,
   type DeploymentExtractionContext,
@@ -44,6 +45,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
     const publisherConfig = readString(node, "publisher_config");
     const provisioner = readString(node, "provisioner");
     const providerTarget = readStringRecord(node, "provider_target");
+    const preview = readPreviewPolicy(node, "preview");
     const account = providerTarget.account || "";
     const project = providerTarget.project || "";
     const id = providerTarget.id || project;
@@ -106,9 +108,8 @@ export function extractCloudflarePagesDeploymentsFromContext(
         ),
       );
     }
-    if (!publisherConfig) {
+    if (!publisherConfig)
       deploymentErrors.push(deploymentError(label, "missing required publisher_config"));
-    }
     if (provisioner) {
       deploymentErrors.push(
         deploymentError(
@@ -116,6 +117,34 @@ export function extractCloudflarePagesDeploymentsFromContext(
           "deployment-owned provisioner is not supported for cloudflare-pages",
         ),
       );
+    }
+    if (preview) {
+      if (preview.targetDerivation !== "provider_managed_source_run") {
+        deploymentErrors.push(
+          deploymentError(
+            label,
+            'preview.target_derivation must be "provider_managed_source_run"; preview must not reuse the normal live target',
+          ),
+        );
+      }
+      if (preview.isolationClass !== "isolated") {
+        deploymentErrors.push(deploymentError(label, 'preview.isolation_class must be "isolated"'));
+      }
+      if (preview.identitySelector !== "source_run") {
+        deploymentErrors.push(
+          deploymentError(label, 'cloudflare-pages preview.identity_selector must be "source_run"'),
+        );
+      }
+      if (preview.smokeTarget !== "preview_url") {
+        deploymentErrors.push(
+          deploymentError(label, 'cloudflare-pages preview.smoke_target must be "preview_url"'),
+        );
+      }
+      if (preview.lockScope !== "shared") {
+        deploymentErrors.push(
+          deploymentError(label, 'cloudflare-pages preview.lock_scope must currently be "shared"'),
+        );
+      }
     }
     const componentNode = context.components.get(componentTarget);
     if (componentTarget && !isStaticWebappNode(componentNode)) {
@@ -181,6 +210,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
       admissionPolicyRef,
       admissionPolicy: admissionPolicy!,
       component: { kind: STATIC_WEBAPP_COMPONENT, target: componentTarget },
+      ...(preview ? { preview } : {}),
       publisher: { type: publisher, config: publisherConfig },
       providerTarget: deriveCloudflarePagesProviderTarget({ account, project, id }),
     });

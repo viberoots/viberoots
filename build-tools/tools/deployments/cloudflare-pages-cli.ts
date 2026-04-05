@@ -1,0 +1,113 @@
+#!/usr/bin/env zx-wrapper
+import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-control-plane.ts";
+import {
+  submitCloudflarePagesPreviewCleanup,
+  submitCloudflarePagesPreviewDeploy,
+} from "./cloudflare-pages-preview-control-plane.ts";
+import { normalizeCloudflarePagesPreviewCleanupReason } from "./cloudflare-pages-preview.ts";
+import { resolveCloudflarePagesPromotionSelection } from "./cloudflare-pages-promotion.ts";
+import type { CloudflarePagesDeployment } from "./contract.ts";
+
+export async function runCloudflarePagesCli(opts: {
+  workspaceRoot: string;
+  deployment: CloudflarePagesDeployment;
+  artifactDirFlag: string;
+  resolvedArtifactDir?: string;
+  recordsRoot: string;
+  publishOnly: boolean;
+  preview: boolean;
+  previewCleanup: boolean;
+  sourceRunId: string;
+  smokeConnectOverride?: {
+    protocol: "http:" | "https:";
+    hostname: string;
+    port: number;
+    rejectUnauthorized?: boolean;
+  };
+  cleanupReason: string;
+}) {
+  if (opts.publishOnly) {
+    if (!opts.sourceRunId) {
+      throw new Error(
+        "cloudflare-pages --publish-only requires --source-run-id to select a promotion source run",
+      );
+    }
+    if (opts.artifactDirFlag) {
+      throw new Error(
+        "cloudflare-pages --publish-only must not use --artifact-dir; promote the admitted exact artifact with --source-run-id",
+      );
+    }
+    const promotion = await resolveCloudflarePagesPromotionSelection({
+      workspaceRoot: opts.workspaceRoot,
+      deployment: opts.deployment,
+      recordsRoot: opts.recordsRoot,
+      sourceRunId: opts.sourceRunId,
+    });
+    return await submitCloudflarePagesControlPlaneDeploy({
+      workspaceRoot: opts.workspaceRoot,
+      deployment: opts.deployment,
+      recordsRoot: opts.recordsRoot,
+      operationKind: promotion.operationKind,
+      artifact: promotion.artifact,
+      publishBehavior: "publish-only",
+      parentRunId: promotion.parentRunId,
+      releaseLineageId: promotion.releaseLineageId,
+      artifactLineageId: promotion.artifactLineageId,
+      source: {
+        record: promotion.sourceRecord,
+        recordPath: promotion.sourceRecordPath,
+        replaySnapshotPath: promotion.sourceReplaySnapshotPath,
+      },
+      ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
+    });
+  }
+  if (opts.previewCleanup) {
+    if (!opts.sourceRunId) {
+      throw new Error(
+        "cloudflare-pages --preview-cleanup requires --source-run-id to identify the preview slot",
+      );
+    }
+    return await submitCloudflarePagesPreviewCleanup({
+      workspaceRoot: opts.workspaceRoot,
+      deployment: opts.deployment,
+      recordsRoot: opts.recordsRoot,
+      sourceRunId: opts.sourceRunId,
+      cleanupReason: normalizeCloudflarePagesPreviewCleanupReason(opts.cleanupReason),
+    });
+  }
+  if (opts.preview) {
+    if (!opts.sourceRunId) {
+      throw new Error(
+        "cloudflare-pages --preview requires --source-run-id for protected/shared preview publication",
+      );
+    }
+    if (opts.artifactDirFlag) {
+      throw new Error(
+        "cloudflare-pages --preview must not use --artifact-dir; preview the admitted exact artifact selected by --source-run-id",
+      );
+    }
+    return await submitCloudflarePagesPreviewDeploy({
+      workspaceRoot: opts.workspaceRoot,
+      deployment: opts.deployment,
+      recordsRoot: opts.recordsRoot,
+      sourceRunId: opts.sourceRunId,
+      ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
+    });
+  }
+  if (opts.sourceRunId) {
+    throw new Error(
+      "cloudflare-pages --source-run-id requires exactly one of --publish-only, --preview, or --preview-cleanup",
+    );
+  }
+  return await submitCloudflarePagesControlPlaneDeploy({
+    workspaceRoot: opts.workspaceRoot,
+    deployment: opts.deployment,
+    recordsRoot: opts.recordsRoot,
+    artifactDir:
+      opts.resolvedArtifactDir ??
+      (() => {
+        throw new Error("cloudflare-pages normal deploy requires a resolved artifact directory");
+      })(),
+    ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
+  });
+}

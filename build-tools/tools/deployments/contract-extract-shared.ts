@@ -1,6 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import type { GraphNode } from "../lib/graph.ts";
 import { normalizeTargetLabel } from "../lib/labels.ts";
+import type {
+  DeploymentPreviewIdentitySelector,
+  DeploymentPreviewPolicy,
+} from "./contract-types.ts";
 import {
   extractDeploymentAdmissionPolicies,
   extractDeploymentLanePolicies,
@@ -40,6 +44,22 @@ export function readStringRecord(node: GraphNode, key: string): Record<string, s
       .map(([entryKey, entryValue]) => [entryKey.trim(), String(entryValue).trim()])
       .filter(([entryKey, entryValue]) => entryKey !== "" && entryValue !== ""),
   );
+}
+
+export function readPreviewPolicy(
+  node: GraphNode,
+  key: string,
+): DeploymentPreviewPolicy | undefined {
+  const preview = readStringRecord(node, key);
+  if (Object.keys(preview).length === 0) return undefined;
+  return {
+    targetDerivation: preview.target_derivation || "",
+    isolationClass: preview.isolation_class || "",
+    identitySelector: (preview.identity_selector || "") as DeploymentPreviewIdentitySelector,
+    cleanupTtl: preview.cleanup_ttl || "7d",
+    smokeTarget: (preview.smoke_target || "normal_url") as "normal_url" | "preview_url",
+    lockScope: (preview.lock_scope || "shared") as "shared" | "preview",
+  };
 }
 
 export function isStaticWebappNode(node: GraphNode | undefined): boolean {
