@@ -59,8 +59,10 @@ async function installClientProfile(
 async function installReviewedPleominoTargets(tmp: string): Promise<void> {
   const appTargetsPath = path.join(tmp, "projects", "apps", "pleomino", "TARGETS");
   const deployTargetsPath = path.join(tmp, "projects", "deployments", "pleomino-dev", "TARGETS");
+  const sharedTargetsPath = path.join(tmp, "projects", "deployments", "pleomino-shared", "TARGETS");
   await fsp.mkdir(path.dirname(appTargetsPath), { recursive: true });
   await fsp.mkdir(path.dirname(deployTargetsPath), { recursive: true });
+  await fsp.mkdir(path.dirname(sharedTargetsPath), { recursive: true });
   await fsp.writeFile(
     appTargetsPath,
     [
@@ -78,6 +80,29 @@ async function installReviewedPleominoTargets(tmp: string): Promise<void> {
     "utf8",
   );
   await fsp.writeFile(
+    sharedTargetsPath,
+    [
+      'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_policy")',
+      "",
+      "deployment_lane_policy(",
+      '    name = "lane",',
+      '    stages = ["dev", "staging", "prod"],',
+      '    stage_branches = {"dev": "env/pleomino/dev", "staging": "env/pleomino/staging", "prod": "env/pleomino/prod"},',
+      '    allowed_promotion_edges = ["dev->staging", "staging->prod"],',
+      '    visibility = ["PUBLIC"],',
+      ")",
+      "",
+      "deployment_admission_policy(",
+      '    name = "dev_release",',
+      '    allowed_refs = ["env/pleomino/dev"],',
+      '    required_checks = ["deploy/pleomino-dev"],',
+      '    visibility = ["PUBLIC"],',
+      ")",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await fsp.writeFile(
     deployTargetsPath,
     [
       'load("//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
@@ -85,9 +110,9 @@ async function installReviewedPleominoTargets(tmp: string): Promise<void> {
       "nixos_shared_host_static_webapp_deployment(",
       '    name = "deploy",',
       '    component = "//projects/apps/pleomino:app",',
-      '    lane_policy = "//build-tools/deployments/lanes:pleomino",',
+      '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
       '    environment_stage = "dev",',
-      '    admission_policy = "//build-tools/deployments/policies:pleomino_dev_release",',
+      '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",',
       '    app_name = "pleomino",',
       "    container_port = 3000,",
       '    health_path = "/healthz",',

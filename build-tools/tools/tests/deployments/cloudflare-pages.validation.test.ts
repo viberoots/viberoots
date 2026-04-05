@@ -24,9 +24,9 @@ function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
     publisher: "wrangler-pages",
     publisher_config: "wrangler.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//build-tools/deployments/lanes:pleomino",
+    lane_policy: "//projects/deployments/pleomino-shared:lane",
     environment_stage: "staging",
-    admission_policy: "//build-tools/deployments/policies:pleomino_staging_release",
+    admission_policy: "//projects/deployments/pleomino-shared:staging_release",
     provider_target: {
       account: "web-platform-staging",
       project: "pleomino-staging-pages",

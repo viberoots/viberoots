@@ -10,6 +10,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/cloudflare-pages.extraction.from-targets.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.preview.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.preview.guardrails.test.ts": True,
+    "build-tools/tools/tests/deployments/cloudflare-pages.rebuild-per-stage.promotion.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.promotion.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.promotion.guardrails.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.publisher.config-drift.test.ts": True,

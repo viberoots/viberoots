@@ -41,7 +41,7 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture({
-      name: "//build-tools/deployments/policies:pleomino_dev_release",
+      name: "//projects/deployments/pleomino-shared:dev_release",
       allowed_refs: ["env/pleomino/dev"],
       required_checks: ["deploy/pleomino-dev"],
     }),
@@ -53,9 +53,9 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
       publisher: "wrangler-pages",
       publisher_config: "wrangler.jsonc",
       protection_class: "shared_nonprod",
-      lane_policy: "//build-tools/deployments/lanes:pleomino",
+      lane_policy: "//projects/deployments/pleomino-shared:lane",
       environment_stage: "dev",
-      admission_policy: "//build-tools/deployments/policies:pleomino_dev_release",
+      admission_policy: "//projects/deployments/pleomino-shared:dev_release",
       provider_target: {
         account: "web-platform-dev",
         project: "pleomino-dev-pages",
@@ -69,9 +69,9 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
       publisher: "wrangler-pages",
       publisher_config: "wrangler.jsonc",
       protection_class: "shared_nonprod",
-      lane_policy: "//build-tools/deployments/lanes:pleomino",
+      lane_policy: "//projects/deployments/pleomino-shared:lane",
       environment_stage: "staging",
-      admission_policy: "//build-tools/deployments/policies:pleomino_staging_release",
+      admission_policy: "//projects/deployments/pleomino-shared:staging_release",
       preview: {
         target_derivation: "provider_managed_source_run",
         isolation_class: "isolated",

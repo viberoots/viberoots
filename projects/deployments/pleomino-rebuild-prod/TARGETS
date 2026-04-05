@@ -3,15 +3,15 @@ load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deplo
 cloudflare_pages_static_webapp_deployment(
     name = "deploy",
     component = "//projects/apps/pleomino:app",
-    account = "web-platform-staging",
-    project = "pleomino-staging-pages",
-    lane_policy = "//projects/deployments/pleomino-shared:lane",
-    environment_stage = "staging",
-    admission_policy = "//projects/deployments/pleomino-shared:staging_release",
-    protection_class = "shared_nonprod",
+    account = "web-platform-prod",
+    project = "pleomino-rebuild-prod-pages",
+    lane_policy = "//projects/deployments/pleomino-rebuild-shared:lane",
+    environment_stage = "prod",
+    admission_policy = "//projects/deployments/pleomino-rebuild-shared:prod_release",
+    protection_class = "production_facing",
     prerequisites = [
         {
-            "deployment_id": "pleomino-dev",
+            "deployment_id": "pleomino-rebuild-staging",
             "mode": "ordering_only",
         },
     ],

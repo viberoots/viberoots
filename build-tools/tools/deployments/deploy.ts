@@ -200,6 +200,11 @@ async function main() {
             ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
           });
         }
+        if (sourceRunId) {
+          throw new Error(
+            "nixos-shared-host --source-run-id without --publish-only is not supported; rebuild-per-stage promotion is currently reviewed only for cloudflare-pages targets",
+          );
+        }
         const componentArtifactDirs = isMultiComponentNixosSharedHostDeployment(deployment)
           ? await resolveComponentArtifactDirs(workspaceRoot, deployment)
           : undefined;

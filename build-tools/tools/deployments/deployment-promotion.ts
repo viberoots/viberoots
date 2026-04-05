@@ -44,6 +44,11 @@ export type CrossDeploymentPromotionSelection<TDeployment extends DeploymentTarg
   sourceReplaySnapshot: DeploymentPromotionSourceReplaySnapshot;
 };
 
+export type CrossDeploymentPromotionSourceSelection<TDeployment extends DeploymentTarget> = Omit<
+  CrossDeploymentPromotionSelection<TDeployment>,
+  "artifact" | "artifactLineageId"
+>;
+
 async function pathExists(filePath: string): Promise<boolean> {
   try {
     await fsp.access(filePath);
@@ -146,16 +151,6 @@ function compatibilityErrors(
       `lanePolicyFingerprint mismatch: current=${deployment.lanePolicy.fingerprint} source=${source.replaySnapshot.admittedContext.lanePolicyFingerprint}`,
     );
   }
-  if (deployment.lanePolicy.artifactReuseMode !== "same_artifact") {
-    errors.push(
-      `target lane artifact_reuse_mode must be same_artifact, got ${deployment.lanePolicy.artifactReuseMode}`,
-    );
-  }
-  if (sourceDeployment.lanePolicy.artifactReuseMode !== "same_artifact") {
-    errors.push(
-      `source lane artifact_reuse_mode must be same_artifact, got ${sourceDeployment.lanePolicy.artifactReuseMode}`,
-    );
-  }
   const edge = `${sourceStage(source)}->${deployment.environmentStage}`;
   if (!deployment.lanePolicy.allowedPromotionEdges.includes(edge)) {
     errors.push(`promotion edge is not allowed by the current lane policy: ${edge}`);
@@ -194,14 +189,22 @@ async function eligibilityErrors(
   return errors;
 }
 
-export async function resolveCrossDeploymentPromotionSelection<
+function exactArtifactPromotionErrors(deployment: DeploymentTarget): string[] {
+  return deployment.lanePolicy.artifactReuseMode === "same_artifact"
+    ? []
+    : [
+        `target lane artifact_reuse_mode ${deployment.lanePolicy.artifactReuseMode} requires target-stage rebuild; use a non-publish-only promotion flow`,
+      ];
+}
+
+export async function resolveCrossDeploymentPromotionSourceSelection<
   TDeployment extends DeploymentTarget,
 >(opts: {
   workspaceRoot: string;
   deployment: TDeployment;
   recordsRoot: string;
   sourceRunId: string;
-}): Promise<CrossDeploymentPromotionSelection<TDeployment>> {
+}): Promise<CrossDeploymentPromotionSourceSelection<TDeployment>> {
   const source = await resolveDeploymentPromotionSource(opts);
   const errors = [
     ...compatibilityErrors(opts.deployment, source),
@@ -214,13 +217,33 @@ ${errors.join("\n")}`);
   return {
     operationKind: "promotion",
     deployment: opts.deployment,
-    artifact: source.artifact,
     parentRunId: source.record.deployRunId,
     releaseLineageId: source.record.releaseLineageId || source.record.deployRunId,
-    artifactLineageId: source.record.artifactLineageId || source.replaySnapshot.artifact.identity,
     sourceRecordPath: source.recordPath,
     sourceReplaySnapshotPath: source.replaySnapshotPath,
     sourceRecord: source.record,
     sourceReplaySnapshot: source.replaySnapshot,
+  };
+}
+
+export async function resolveCrossDeploymentPromotionSelection<
+  TDeployment extends DeploymentTarget,
+>(opts: {
+  workspaceRoot: string;
+  deployment: TDeployment;
+  recordsRoot: string;
+  sourceRunId: string;
+}): Promise<CrossDeploymentPromotionSelection<TDeployment>> {
+  const selection = await resolveCrossDeploymentPromotionSourceSelection(opts);
+  const errors = exactArtifactPromotionErrors(selection.deployment);
+  if (errors.length > 0) {
+    throw new Error(`promotion source run is not eligible: ${selection.parentRunId}
+${errors.join("\n")}`);
+  }
+  return {
+    ...selection,
+    artifact: selection.sourceReplaySnapshot.artifact,
+    artifactLineageId:
+      selection.sourceRecord.artifactLineageId || selection.sourceReplaySnapshot.artifact.identity,
   };
 }

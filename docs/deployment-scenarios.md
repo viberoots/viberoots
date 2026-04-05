@@ -192,10 +192,12 @@ Situation:
 Expected behavior:
 
 - the operator must not use `--publish-only` for this promotion, because the target stage requires a newly built admitted artifact
+- the reviewed operator path is `deploy pleomino-rebuild-staging --source-run-id <deploy-run-id> --artifact-dir <target-stage-artifact-dir>`
 - source-run selection identifies the admitted source revision being promoted
 - trusted CI builds a new stage-specific immutable artifact for the target stage
 - the control plane admits that target-stage artifact before publish
 - exact-artifact source-run reuse is rejected for that promotion flow
+- the promotion preserves `release_lineage_id` but does not reuse the earlier stage's `artifact_lineage_id`
 
 ## 13. Production Rollback Approval
 

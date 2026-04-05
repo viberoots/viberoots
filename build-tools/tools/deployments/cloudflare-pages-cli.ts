@@ -5,7 +5,10 @@ import {
   submitCloudflarePagesPreviewDeploy,
 } from "./cloudflare-pages-preview-control-plane.ts";
 import { normalizeCloudflarePagesPreviewCleanupReason } from "./cloudflare-pages-preview.ts";
-import { resolveCloudflarePagesPromotionSelection } from "./cloudflare-pages-promotion.ts";
+import {
+  resolveCloudflarePagesPromotionSelection,
+  submitCloudflarePagesRebuildPerStagePromotion,
+} from "./cloudflare-pages-promotion.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
 
 export async function runCloudflarePagesCli(opts: {
@@ -95,9 +98,20 @@ export async function runCloudflarePagesCli(opts: {
     });
   }
   if (opts.sourceRunId) {
-    throw new Error(
-      "cloudflare-pages --source-run-id requires exactly one of --publish-only, --preview, or --preview-cleanup",
-    );
+    return await submitCloudflarePagesRebuildPerStagePromotion({
+      workspaceRoot: opts.workspaceRoot,
+      deployment: opts.deployment,
+      artifactDir:
+        opts.resolvedArtifactDir ??
+        (() => {
+          throw new Error(
+            "cloudflare-pages rebuild-per-stage promotion requires a resolved artifact directory",
+          );
+        })(),
+      recordsRoot: opts.recordsRoot,
+      sourceRunId: opts.sourceRunId,
+      ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
+    });
   }
   return await submitCloudflarePagesControlPlaneDeploy({
     workspaceRoot: opts.workspaceRoot,

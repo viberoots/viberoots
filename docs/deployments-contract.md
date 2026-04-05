@@ -50,6 +50,7 @@ design has been explicitly updated first.
 - Promotion compatibility for protected/shared runs must evaluate one explicit closed compatibility contract; adapters must not decide promotability from ad hoc heuristics or unreviewed field comparisons.
 - `same_artifact` lanes reuse the same admitted artifact across environments.
 - `rebuild_per_stage` lanes promote the admitted source revision and build a new admitted stage artifact before publish.
+- The reviewed `rebuild_per_stage` operator path is a mutating promotion submission with `--source-run-id` plus a target-stage artifact input, not `--publish-only`.
 - For promotion, `--source-run-id` may select any earlier admitted run that remains eligible under the lane's current promotion policy; it is not limited to the latest candidate, and it is not an override around lane policy.
 - Protected/shared smoke is required and blocking by default unless there is an explicit `smoke.exception`.
 - Multi-component retry remains deployment-atomic by default after partial publish failure; already-proven-live components may be treated as no-op reuse only when the adapter can prove their live published identity still matches the intended resolved artifact identity and no declared rollout or release-action rule requires re-publish.
@@ -135,6 +136,7 @@ design has been explicitly updated first.
   - promotion compatibility is lane-scoped first: the source and target deployments may use different reviewed providers when the lane policy and component contract still match.
   - the selected source run contributes the immutable artifact plus recorded source snapshot evidence, while the target deployment still freezes its own admitted execution snapshot and target identity before mutation.
   - `parent_run_id` points at the immediately promoted source run, `release_lineage_id` stays stable across the whole promoted release line, and `artifact_lineage_id` stays stable only while the exact same artifact is reused.
+  - `pleomino-rebuild-dev -> pleomino-rebuild-staging -> pleomino-rebuild-prod` keeps the same promoted source revision but admits a new stage-specific artifact for each later environment, so `artifact_lineage_id` is not reused across those promotion runs.
 - Recorded `release_actions` replay policy must use one closed disposition per replay context: `rerun`, `skip`, or `fail`.
 - Recorded side-effecting `release_actions` that declare `rerun` must also record or reference the duplicate-execution safety contract that made rerun admissible for that context.
 - Protected/shared replay by exact artifact ref is valid only when the artifact ref resolves unambiguously to one admitted source-run snapshot.

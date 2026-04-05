@@ -45,9 +45,9 @@ test("extractNixosSharedHostDeployments defaults protection_class to shared_nonp
       publisher: "nixos-shared-host-static-webapp",
       provisioner: "nixos-shared-host-manifest",
       protection_class: "",
-      lane_policy: "//build-tools/deployments/lanes:pleomino",
+      lane_policy: "//projects/deployments/pleomino-shared:lane",
       environment_stage: "dev",
-      admission_policy: "//build-tools/deployments/policies:pleomino_dev_release",
+      admission_policy: "//projects/deployments/pleomino-shared:dev_release",
       app_name: "demoapp",
       container_port: 3000,
       health_path: "/healthz",
@@ -59,7 +59,7 @@ test("extractNixosSharedHostDeployments defaults protection_class to shared_nonp
   assert.deepEqual(errors, []);
   assert.equal(deployments.length, 1);
   assert.equal(deployments[0]?.protectionClass, "shared_nonprod");
-  assert.equal(deployments[0]?.lanePolicyRef, "//build-tools/deployments/lanes:pleomino");
+  assert.equal(deployments[0]?.lanePolicyRef, "//projects/deployments/pleomino-shared:lane");
   assert.equal(deployments[0]?.environmentStage, "dev");
   assert.equal(deployments[0]?.providerTarget.hostname, "demoapp.apps.kilty.io");
   assert.deepEqual(deployments[0]?.prerequisites, []);
@@ -71,7 +71,7 @@ test("extractNixosSharedHostDeployments preserves valid prerequisite metadata", 
     nixosSharedHostLanePolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture({
-      name: "//build-tools/deployments/policies:pleomino_staging_release",
+      name: "//projects/deployments/pleomino-shared:staging_release",
       allowed_refs: ["env/pleomino/staging"],
       required_checks: ["deploy/pleomino-staging"],
       artifact_attestation_mode: "recorded_exact_artifact",
@@ -84,9 +84,9 @@ test("extractNixosSharedHostDeployments preserves valid prerequisite metadata", 
       publisher: "nixos-shared-host-static-webapp",
       provisioner: "nixos-shared-host-manifest",
       protection_class: "",
-      lane_policy: "//build-tools/deployments/lanes:pleomino",
+      lane_policy: "//projects/deployments/pleomino-shared:lane",
       environment_stage: "dev",
-      admission_policy: "//build-tools/deployments/policies:pleomino_dev_release",
+      admission_policy: "//projects/deployments/pleomino-shared:dev_release",
       app_name: "demoapp",
       container_port: 3000,
     },
@@ -98,9 +98,9 @@ test("extractNixosSharedHostDeployments preserves valid prerequisite metadata", 
       publisher: "nixos-shared-host-static-webapp",
       provisioner: "nixos-shared-host-manifest",
       protection_class: "",
-      lane_policy: "//build-tools/deployments/lanes:pleomino",
+      lane_policy: "//projects/deployments/pleomino-shared:lane",
       environment_stage: "staging",
-      admission_policy: "//build-tools/deployments/policies:pleomino_staging_release",
+      admission_policy: "//projects/deployments/pleomino-shared:staging_release",
       app_name: "demoapp-staging",
       container_port: 3001,
       prerequisites: [{ deployment_id: "demoapp-dev", mode: "ordering_only" }],

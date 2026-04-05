@@ -5,9 +5,9 @@ cloudflare_pages_static_webapp_deployment(
     component = "//projects/apps/pleomino:app",
     account = "web-platform-prod",
     project = "pleomino-prod-pages",
-    lane_policy = "//build-tools/deployments/lanes:pleomino",
+    lane_policy = "//projects/deployments/pleomino-shared:lane",
     environment_stage = "prod",
-    admission_policy = "//build-tools/deployments/policies:pleomino_prod_release",
+    admission_policy = "//projects/deployments/pleomino-shared:prod_release",
     protection_class = "production_facing",
     prerequisites = [
         {

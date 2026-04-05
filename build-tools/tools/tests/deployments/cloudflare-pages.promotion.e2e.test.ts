@@ -42,8 +42,8 @@ function pleominoDevDeployment() {
 
 function pleominoProdDeployment() {
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
-    ref: "//build-tools/deployments/policies:pleomino_prod_release",
-    name: "pleomino_prod_release",
+    ref: "//projects/deployments/pleomino-shared:prod_release",
+    name: "prod_release",
     allowedRefs: ["env/pleomino/prod"],
     requiredChecks: ["deploy/pleomino-prod"],
     fingerprint: "sha256:admission-pleomino-prod",

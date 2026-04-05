@@ -225,9 +225,9 @@ an explicit branch-backed lane and two-stage admission flow.
 
 Current reviewed repo-owned policy refs:
 
-- `lane_policy = "//build-tools/deployments/lanes:pleomino"`
+- `lane_policy = "//projects/deployments/pleomino-shared:lane"`
 - `environment_stage = "dev"`
-- `admission_policy = "//build-tools/deployments/policies:pleomino_dev_release"`
+- `admission_policy = "//projects/deployments/pleomino-shared:dev_release"`
 
 For the current `mini` shared-dev deployment path, that means:
 

@@ -44,12 +44,16 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
   await runInTemp("deployment-cquery-extraction", async (tmp, _$) => {
     const appTargetsPath = path.join(tmp, "projects", "apps", "demoapp", "TARGETS");
     const deployTargetsPath = path.join(tmp, "projects", "deployments", "demoapp-dev", "TARGETS");
-    const laneTargetsPath = path.join(tmp, "build-tools", "deployments", "lanes", "TARGETS");
-    const policyTargetsPath = path.join(tmp, "build-tools", "deployments", "policies", "TARGETS");
+    const sharedTargetsPath = path.join(
+      tmp,
+      "projects",
+      "deployments",
+      "pleomino-shared",
+      "TARGETS",
+    );
     await fsp.mkdir(path.dirname(appTargetsPath), { recursive: true });
     await fsp.mkdir(path.dirname(deployTargetsPath), { recursive: true });
-    await fsp.mkdir(path.dirname(laneTargetsPath), { recursive: true });
-    await fsp.mkdir(path.dirname(policyTargetsPath), { recursive: true });
+    await fsp.mkdir(path.dirname(sharedTargetsPath), { recursive: true });
     await fsp.writeFile(
       appTargetsPath,
       [
@@ -67,28 +71,20 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
       "utf8",
     );
     await fsp.writeFile(
-      laneTargetsPath,
+      sharedTargetsPath,
       [
-        'load("//build-tools/deployments:defs.bzl", "deployment_lane_policy")',
+        'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_policy")',
         "",
         "deployment_lane_policy(",
-        '    name = "pleomino",',
+        '    name = "lane",',
         '    stages = ["dev", "staging", "prod"],',
         '    stage_branches = {"dev": "env/pleomino/dev", "staging": "env/pleomino/staging", "prod": "env/pleomino/prod"},',
         '    allowed_promotion_edges = ["dev->staging", "staging->prod"],',
         '    visibility = ["PUBLIC"],',
         ")",
         "",
-      ].join("\n"),
-      "utf8",
-    );
-    await fsp.writeFile(
-      policyTargetsPath,
-      [
-        'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy")',
-        "",
         "deployment_admission_policy(",
-        '    name = "pleomino_dev_release",',
+        '    name = "dev_release",',
         '    allowed_refs = ["env/pleomino/dev"],',
         '    required_checks = ["deploy/pleomino-dev"],',
         '    visibility = ["PUBLIC"],',
@@ -105,9 +101,9 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
         "nixos_shared_host_static_webapp_deployment(",
         '    name = "deploy",',
         '    component = "//projects/apps/demoapp:app",',
-        '    lane_policy = "//build-tools/deployments/lanes:pleomino",',
+        '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
         '    environment_stage = "dev",',
-        '    admission_policy = "//build-tools/deployments/policies:pleomino_dev_release",',
+        '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",',
         '    app_name = "demoapp",',
         "    container_port = 3000,",
         ")",
@@ -118,7 +114,7 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
 
     const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
     const query =
-      "set(//projects/deployments/demoapp-dev:deploy //projects/apps/demoapp:app //build-tools/deployments/lanes:pleomino //build-tools/deployments/policies:pleomino_dev_release)";
+      "set(//projects/deployments/demoapp-dev:deploy //projects/apps/demoapp:app //projects/deployments/pleomino-shared:lane //projects/deployments/pleomino-shared:dev_release)";
     const cquery = await _$({
       cwd: tmp,
       stdio: "pipe",
@@ -134,10 +130,10 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
     assert.equal(deployments.length, 1);
     assert.equal(deployments[0]?.label, "//projects/deployments/demoapp-dev:deploy");
     assert.equal(deployments[0]?.name, "deploy");
-    assert.equal(deployments[0]?.lanePolicyRef, "//build-tools/deployments/lanes:pleomino");
+    assert.equal(deployments[0]?.lanePolicyRef, "//projects/deployments/pleomino-shared:lane");
     assert.equal(
       deployments[0]?.admissionPolicyRef,
-      "//build-tools/deployments/policies:pleomino_dev_release",
+      "//projects/deployments/pleomino-shared:dev_release",
     );
     assert.equal(deployments[0]?.environmentStage, "dev");
     assert.equal(deployments[0]?.runtime.appName, "demoapp");
@@ -162,13 +158,17 @@ test("nixos-shared-host multi-component extraction reads rollout policy and comp
       "demo-stack-dev",
       "TARGETS",
     );
-    const laneTargetsPath = path.join(tmp, "build-tools", "deployments", "lanes", "TARGETS");
-    const policyTargetsPath = path.join(tmp, "build-tools", "deployments", "policies", "TARGETS");
+    const sharedTargetsPath = path.join(
+      tmp,
+      "projects",
+      "deployments",
+      "pleomino-shared",
+      "TARGETS",
+    );
     await fsp.mkdir(path.dirname(appTargetsPath), { recursive: true });
     await fsp.mkdir(path.dirname(apiTargetsPath), { recursive: true });
     await fsp.mkdir(path.dirname(deployTargetsPath), { recursive: true });
-    await fsp.mkdir(path.dirname(laneTargetsPath), { recursive: true });
-    await fsp.mkdir(path.dirname(policyTargetsPath), { recursive: true });
+    await fsp.mkdir(path.dirname(sharedTargetsPath), { recursive: true });
     for (const [targetPath, name] of [
       [appTargetsPath, "app"],
       [apiTargetsPath, "api"],
@@ -191,28 +191,20 @@ test("nixos-shared-host multi-component extraction reads rollout policy and comp
       );
     }
     await fsp.writeFile(
-      laneTargetsPath,
+      sharedTargetsPath,
       [
-        'load("//build-tools/deployments:defs.bzl", "deployment_lane_policy")',
+        'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_policy")',
         "",
         "deployment_lane_policy(",
-        '    name = "pleomino",',
+        '    name = "lane",',
         '    stages = ["dev", "staging", "prod"],',
         '    stage_branches = {"dev": "env/pleomino/dev", "staging": "env/pleomino/staging", "prod": "env/pleomino/prod"},',
         '    allowed_promotion_edges = ["dev->staging", "staging->prod"],',
         '    visibility = ["PUBLIC"],',
         ")",
         "",
-      ].join("\n"),
-      "utf8",
-    );
-    await fsp.writeFile(
-      policyTargetsPath,
-      [
-        'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy")',
-        "",
         "deployment_admission_policy(",
-        '    name = "pleomino_dev_release",',
+        '    name = "dev_release",',
         '    allowed_refs = ["env/pleomino/dev"],',
         '    required_checks = ["deploy/pleomino-dev"],',
         '    visibility = ["PUBLIC"],',
@@ -228,9 +220,9 @@ test("nixos-shared-host multi-component extraction reads rollout policy and comp
         "",
         "nixos_shared_host_multi_static_webapp_deployment(",
         '    name = "deploy",',
-        '    lane_policy = "//build-tools/deployments/lanes:pleomino",',
+        '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
         '    environment_stage = "dev",',
-        '    admission_policy = "//build-tools/deployments/policies:pleomino_dev_release",',
+        '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",',
         "    components = [",
         '        {"id": "frontend", "target": "//projects/apps/demoapp:app", "app_name": "demoapp", "container_port": 3000},',
         '        {"id": "api", "target": "//projects/apps/demoapi:api", "app_name": "demoapi", "container_port": 3001},',
@@ -244,7 +236,7 @@ test("nixos-shared-host multi-component extraction reads rollout policy and comp
 
     const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
     const query =
-      "set(//projects/deployments/demo-stack-dev:deploy //projects/apps/demoapp:app //projects/apps/demoapi:api //build-tools/deployments/lanes:pleomino //build-tools/deployments/policies:pleomino_dev_release)";
+      "set(//projects/deployments/demo-stack-dev:deploy //projects/apps/demoapp:app //projects/apps/demoapi:api //projects/deployments/pleomino-shared:lane //projects/deployments/pleomino-shared:dev_release)";
     const cquery = await _$({
       cwd: tmp,
       stdio: "pipe",

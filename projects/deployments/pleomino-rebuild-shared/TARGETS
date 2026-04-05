@@ -1,0 +1,51 @@
+load(
+    "//build-tools/deployments:defs.bzl",
+    "deployment_admission_policy",
+    "deployment_lane_policy",
+)
+
+deployment_lane_policy(
+    name = "lane",
+    stages = ["dev", "staging", "prod"],
+    stage_branches = {
+        "dev": "env/pleomino/dev",
+        "staging": "env/pleomino/staging",
+        "prod": "env/pleomino/prod",
+    },
+    allowed_promotion_edges = [
+        "dev->staging",
+        "staging->prod",
+    ],
+    artifact_reuse_mode = "rebuild_per_stage",
+    visibility = ["PUBLIC"],
+)
+
+deployment_admission_policy(
+    name = "dev_release",
+    allowed_refs = ["env/pleomino/dev"],
+    required_checks = ["deploy/pleomino-dev"],
+    required_approvals = [],
+    retry_branch_policy = "branch_independent",
+    artifact_attestation_mode = "recorded_exact_artifact",
+    visibility = ["PUBLIC"],
+)
+
+deployment_admission_policy(
+    name = "staging_release",
+    allowed_refs = ["env/pleomino/staging"],
+    required_checks = ["deploy/pleomino-staging"],
+    required_approvals = [],
+    retry_branch_policy = "branch_independent",
+    artifact_attestation_mode = "recorded_exact_artifact",
+    visibility = ["PUBLIC"],
+)
+
+deployment_admission_policy(
+    name = "prod_release",
+    allowed_refs = ["env/pleomino/prod"],
+    required_checks = ["deploy/pleomino-prod"],
+    required_approvals = [],
+    retry_branch_policy = "branch_independent",
+    artifact_attestation_mode = "recorded_exact_artifact",
+    visibility = ["PUBLIC"],
+)

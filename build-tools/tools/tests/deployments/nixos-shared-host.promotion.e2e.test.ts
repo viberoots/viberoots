@@ -58,8 +58,8 @@ function cloudflareDevDeployment() {
 
 function nixosStagingDeployment() {
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
-    ref: "//build-tools/deployments/policies:pleomino_staging_release",
-    name: "pleomino_staging_release",
+    ref: "//projects/deployments/pleomino-shared:staging_release",
+    name: "staging_release",
     allowedRefs: ["env/pleomino/staging"],
     requiredChecks: ["deploy/pleomino-staging"],
     fingerprint: "sha256:admission-pleomino-staging",

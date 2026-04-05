@@ -45,12 +45,16 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
       "pleomino-staging",
       "TARGETS",
     );
-    const laneTargetsPath = path.join(tmp, "build-tools", "deployments", "lanes", "TARGETS");
-    const policyTargetsPath = path.join(tmp, "build-tools", "deployments", "policies", "TARGETS");
+    const sharedTargetsPath = path.join(
+      tmp,
+      "projects",
+      "deployments",
+      "pleomino-shared",
+      "TARGETS",
+    );
     await fsp.mkdir(path.dirname(appTargetsPath), { recursive: true });
     await fsp.mkdir(path.dirname(deployTargetsPath), { recursive: true });
-    await fsp.mkdir(path.dirname(laneTargetsPath), { recursive: true });
-    await fsp.mkdir(path.dirname(policyTargetsPath), { recursive: true });
+    await fsp.mkdir(path.dirname(sharedTargetsPath), { recursive: true });
     await fsp.writeFile(
       appTargetsPath,
       [
@@ -68,28 +72,20 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
       "utf8",
     );
     await fsp.writeFile(
-      laneTargetsPath,
+      sharedTargetsPath,
       [
-        'load("//build-tools/deployments:defs.bzl", "deployment_lane_policy")',
+        'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_policy")',
         "",
         "deployment_lane_policy(",
-        '    name = "pleomino",',
+        '    name = "lane",',
         '    stages = ["dev", "staging", "prod"],',
         '    stage_branches = {"dev": "env/pleomino/dev", "staging": "env/pleomino/staging", "prod": "env/pleomino/prod"},',
         '    allowed_promotion_edges = ["dev->staging", "staging->prod"],',
         '    visibility = ["PUBLIC"],',
         ")",
         "",
-      ].join("\n"),
-      "utf8",
-    );
-    await fsp.writeFile(
-      policyTargetsPath,
-      [
-        'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy")',
-        "",
         "deployment_admission_policy(",
-        '    name = "pleomino_staging_release",',
+        '    name = "staging_release",',
         '    allowed_refs = ["env/pleomino/staging"],',
         '    required_checks = ["deploy/pleomino-staging"],',
         '    visibility = ["PUBLIC"],',
@@ -108,9 +104,9 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
         '    component = "//projects/apps/pleomino:app",',
         '    account = "web-platform-staging",',
         '    project = "pleomino-staging-pages",',
-        '    lane_policy = "//build-tools/deployments/lanes:pleomino",',
+        '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
         '    environment_stage = "staging",',
-        '    admission_policy = "//build-tools/deployments/policies:pleomino_staging_release",',
+        '    admission_policy = "//projects/deployments/pleomino-shared:staging_release",',
         "    preview = {",
         '        "target_derivation": "provider_managed_source_run",',
         '        "isolation_class": "isolated",',
@@ -127,7 +123,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
 
     const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
     const query =
-      "set(//projects/deployments/pleomino-staging:deploy //projects/apps/pleomino:app //build-tools/deployments/lanes:pleomino //build-tools/deployments/policies:pleomino_staging_release)";
+      "set(//projects/deployments/pleomino-staging:deploy //projects/apps/pleomino:app //projects/deployments/pleomino-shared:lane //projects/deployments/pleomino-shared:staging_release)";
     const cquery = await _$({
       cwd: tmp,
       stdio: "pipe",
