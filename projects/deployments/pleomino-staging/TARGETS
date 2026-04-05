@@ -1,0 +1,12 @@
+load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")
+
+cloudflare_pages_static_webapp_deployment(
+    name = "deploy",
+    component = "//projects/apps/pleomino:app",
+    account = "web-platform-staging",
+    project = "pleomino-staging-pages",
+    lane_policy = "//build-tools/deployments/lanes:pleomino",
+    environment_stage = "staging",
+    admission_policy = "//build-tools/deployments/policies:pleomino_staging_release",
+    protection_class = "shared_nonprod",
+)

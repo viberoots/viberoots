@@ -80,7 +80,10 @@ export function nixosSharedHostAdmissionPolicyNodeFixture(
 export async function ensureNixosSharedHostStageBranch(
   cwd: string,
   $: any,
-  deployment: NixosSharedHostDeployment,
+  deployment: {
+    lanePolicy: { stageBranches: Record<string, string> };
+    environmentStage: string;
+  },
 ) {
   const branch = deployment.lanePolicy.stageBranches[deployment.environmentStage];
   await $({ cwd, stdio: "pipe" })`git branch -f ${branch} HEAD`;

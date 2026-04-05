@@ -1,28 +1,28 @@
 def _optional_label(attr):
     return "" if attr == None else str(attr.label)
 
+def _deployment_document(ctx):
+    return {
+        "name": ctx.label.name,
+        "provider": ctx.attrs.provider,
+        "component_kind": ctx.attrs.component_kind,
+        "component": str(ctx.attrs.component.label),
+        "publisher": ctx.attrs.publisher,
+        "publisher_config": ctx.attrs.publisher_config,
+        "provisioner": ctx.attrs.provisioner,
+        "protection_class": ctx.attrs.protection_class,
+        "lane_policy": _optional_label(ctx.attrs.lane_policy),
+        "environment_stage": ctx.attrs.environment_stage,
+        "admission_policy": _optional_label(ctx.attrs.admission_policy),
+        "app_name": ctx.attrs.app_name,
+        "container_port": ctx.attrs.container_port,
+        "health_path": ctx.attrs.health_path,
+        "target_group": ctx.attrs.target_group,
+        "provider_target": ctx.attrs.provider_target,
+    }
+
 def _deployment_target_impl(ctx):
-    out = ctx.actions.declare_output(ctx.label.name + ".json")
-    lines = [
-        "{",
-        '  "name": "%s",' % ctx.label.name,
-        '  "provider": "%s",' % ctx.attrs.provider,
-        '  "component_kind": "%s",' % ctx.attrs.component_kind,
-        '  "component": "%s",' % str(ctx.attrs.component.label),
-        '  "publisher": "%s",' % ctx.attrs.publisher,
-        '  "provisioner": "%s",' % ctx.attrs.provisioner,
-        '  "protection_class": "%s",' % ctx.attrs.protection_class,
-        '  "lane_policy": "%s",' % _optional_label(ctx.attrs.lane_policy),
-        '  "environment_stage": "%s",' % ctx.attrs.environment_stage,
-        '  "admission_policy": "%s",' % _optional_label(ctx.attrs.admission_policy),
-        '  "app_name": "%s",' % ctx.attrs.app_name,
-        '  "container_port": %d,' % ctx.attrs.container_port,
-        '  "health_path": "%s",' % ctx.attrs.health_path,
-        '  "target_group": "%s"' % ctx.attrs.target_group,
-        "}",
-        "",
-    ]
-    ctx.actions.write(out, "\n".join(lines))
+    out = ctx.actions.write_json(ctx.label.name + ".json", _deployment_document(ctx))
     return [DefaultInfo(default_output = out)]
 
 deployment_target = rule(
@@ -32,6 +32,7 @@ deployment_target = rule(
         "component": attrs.dep(),
         "component_kind": attrs.string(),
         "publisher": attrs.string(),
+        "publisher_config": attrs.string(default = ""),
         "provisioner": attrs.string(default = ""),
         "protection_class": attrs.string(default = "shared_nonprod"),
         "lane_policy": attrs.option(attrs.dep(), default = None),
@@ -41,6 +42,7 @@ deployment_target = rule(
         "container_port": attrs.int(default = 0),
         "health_path": attrs.string(default = ""),
         "target_group": attrs.string(default = ""),
+        "provider_target": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
         "labels": attrs.list(attrs.string(), default = []),
     },
 )
@@ -78,6 +80,14 @@ deployment_admission_policy = rule(
     },
 )
 
+def _require_shared_policy(lane_policy, environment_stage, admission_policy):
+    if lane_policy == None:
+        fail("protected/shared deployments must set lane_policy")
+    if not environment_stage:
+        fail("protected/shared deployments must set environment_stage")
+    if admission_policy == None:
+        fail("protected/shared deployments must set admission_policy")
+
 def nixos_shared_host_static_webapp_deployment(
         name,
         component,
@@ -94,12 +104,7 @@ def nixos_shared_host_static_webapp_deployment(
         labels = [],
         visibility = ["PUBLIC"]):
     if protection_class != "local_only":
-        if lane_policy == None:
-            fail("protected/shared deployments must set lane_policy")
-        if not environment_stage:
-            fail("protected/shared deployments must set environment_stage")
-        if admission_policy == None:
-            fail("protected/shared deployments must set admission_policy")
+        _require_shared_policy(lane_policy, environment_stage, admission_policy)
     deployment_target(
         name = name,
         provider = "nixos-shared-host",
@@ -118,6 +123,46 @@ def nixos_shared_host_static_webapp_deployment(
         labels = labels + [
             "kind:deployment",
             "deployment:nixos-shared-host",
+            "deployment-component:static-webapp",
+        ],
+        visibility = visibility,
+    )
+
+def cloudflare_pages_static_webapp_deployment(
+        name,
+        component,
+        account,
+        project,
+        project_id = "",
+        publisher = "wrangler-pages",
+        publisher_config = "wrangler.jsonc",
+        protection_class = "shared_nonprod",
+        lane_policy = None,
+        environment_stage = "",
+        admission_policy = None,
+        labels = [],
+        visibility = ["PUBLIC"]):
+    if protection_class != "local_only":
+        _require_shared_policy(lane_policy, environment_stage, admission_policy)
+    deployment_target(
+        name = name,
+        provider = "cloudflare-pages",
+        component = component,
+        component_kind = "static-webapp",
+        publisher = publisher,
+        publisher_config = publisher_config,
+        protection_class = protection_class,
+        lane_policy = lane_policy,
+        environment_stage = environment_stage,
+        admission_policy = admission_policy,
+        provider_target = {
+            "account": account,
+            "project": project,
+            "id": project_id if project_id else project,
+        },
+        labels = labels + [
+            "kind:deployment",
+            "deployment:cloudflare-pages",
             "deployment-component:static-webapp",
         ],
         visibility = visibility,

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { nodesFromCqueryJson } from "../buck/exporter/cquery/nodes.ts";
 import { normalizeTargetLabel } from "../lib/labels.ts";
-import { extractNixosSharedHostDeployments, type NixosSharedHostDeployment } from "./contract.ts";
+import { extractDeployments, type DeploymentTarget } from "./contract.ts";
 
 const DEPLOYMENT_CQUERY_ATTRS = [
   "name",
@@ -11,6 +11,7 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "component",
   "component_kind",
   "publisher",
+  "publisher_config",
   "provisioner",
   "protection_class",
   "lane_policy",
@@ -20,6 +21,7 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "container_port",
   "health_path",
   "target_group",
+  "provider_target",
   "stages",
   "stage_branches",
   "allowed_promotion_edges",
@@ -69,7 +71,7 @@ export async function queryDeploymentNodes(
 export async function resolveDeploymentFromTarget(
   workspaceRoot: string,
   deploymentTarget: string,
-): Promise<NixosSharedHostDeployment> {
+): Promise<DeploymentTarget> {
   const initialNodes = await queryDeploymentNodes(workspaceRoot, [deploymentTarget]);
   const deploymentNode = initialNodes.find((node) => node.name === deploymentTarget);
   if (!deploymentNode) throw new Error(`deployment target not found: ${deploymentTarget}`);
@@ -82,7 +84,7 @@ export async function resolveDeploymentFromTarget(
     extraLabels.length > 0
       ? await queryDeploymentNodes(workspaceRoot, [deploymentTarget, ...extraLabels])
       : initialNodes;
-  const extracted = extractNixosSharedHostDeployments(nodes);
+  const extracted = extractDeployments(nodes);
   if (extracted.errors.length > 0) throw new Error(extracted.errors.join("\n"));
   const hit = extracted.deployments.find((deployment) => deployment.label === deploymentTarget);
   if (!hit) throw new Error(`deployment target not found: ${deploymentTarget}`);

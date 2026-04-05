@@ -219,8 +219,22 @@ Normative-source note:
 
 - default smoke model:
   - built-in HTTP smoke against the configured canonical URL
+  - for the reviewed static-webapp slice, the canonical normal URL is `https://${project}.pages.dev/`
+  - the initial built-in smoke run validates that canonical root URL after publish and blocks success on mismatch or non-200
 - preview override:
   - may use preview URL only when explicitly configured
+
+### Built-In Publisher Contract
+
+- built-in publisher type:
+  - `wrangler-pages`
+- exact publish input:
+  - one admitted immutable `static-webapp` artifact directory
+- checked-in provider config:
+  - `wrangler.jsonc` remains provider-native Wrangler configuration only
+  - deployment metadata injects or validates the authoritative Pages project name instead of allowing config drift to silently retarget publish
+- account selection:
+  - protected/shared execution must derive the Cloudflare account scope from authoritative deployment metadata rather than ambient local CLI defaults
 
 ### Retry / Idempotency
 
@@ -252,6 +266,12 @@ Normative-source note:
 
 - in policy for protected/shared single-component static-webapp deployments
 - protected/shared execution must stay inside vetted built-in publisher, preview, and smoke-runner code
+
+### Initial Pleomino Topology
+
+- `pleomino-dev` stays on `nixos-shared-host` as the shared-dev path
+- `pleomino-staging` uses `cloudflare-pages` with protection class `shared_nonprod`
+- `pleomino-prod` uses `cloudflare-pages` with protection class `production_facing`
 
 ## Adding Another Provider
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
-import type { NixosSharedHostDeployment } from "./contract.ts";
+import type { DeploymentTarget } from "./contract.ts";
 
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);
@@ -12,9 +12,13 @@ function canonicalize(value: unknown): unknown {
   );
 }
 
-export function deploymentMetadataFingerprintFor(deployment: NixosSharedHostDeployment): string {
+export function fingerprintValue(value: unknown): string {
   return `sha256:${crypto
     .createHash("sha256")
-    .update(JSON.stringify(canonicalize(deployment)))
+    .update(JSON.stringify(canonicalize(value)))
     .digest("hex")}`;
+}
+
+export function deploymentMetadataFingerprintFor(deployment: DeploymentTarget): string {
+  return fingerprintValue(deployment);
 }

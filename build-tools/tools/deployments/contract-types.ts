@@ -4,22 +4,13 @@ import type { DeploymentAdmissionPolicy, DeploymentLanePolicy } from "./deployme
 import { packagePathFromLabel } from "../lib/labels.ts";
 
 export const NIXOS_SHARED_HOST_PROVIDER = "nixos-shared-host";
+export const CLOUDFLARE_PAGES_PROVIDER = "cloudflare-pages";
 export const STATIC_WEBAPP_COMPONENT = "static-webapp";
 
-export type NixosSharedHostProviderTarget = {
-  host: "nixos-shared-host";
-  appName: string;
-  targetGroup: string;
-  hostname: string;
-  containerName: string;
-  sharedDevTargetIdentity: string;
-};
-
-export type NixosSharedHostDeployment = {
+type DeploymentBase = {
   deploymentId: string;
   label: string;
   name: string;
-  provider: typeof NIXOS_SHARED_HOST_PROVIDER;
   protectionClass: string;
   lanePolicyRef: string;
   lanePolicy: DeploymentLanePolicy;
@@ -30,6 +21,27 @@ export type NixosSharedHostDeployment = {
     kind: typeof STATIC_WEBAPP_COMPONENT;
     target: string;
   };
+};
+
+export type NixosSharedHostProviderTarget = {
+  host: "nixos-shared-host";
+  appName: string;
+  targetGroup: string;
+  hostname: string;
+  containerName: string;
+  sharedDevTargetIdentity: string;
+};
+
+export type CloudflarePagesProviderTarget = {
+  account: string;
+  project: string;
+  id: string;
+  canonicalUrl: string;
+  providerTargetIdentity: string;
+};
+
+export type NixosSharedHostDeployment = DeploymentBase & {
+  provider: typeof NIXOS_SHARED_HOST_PROVIDER;
   publisher: { type: string };
   provisioner?: { type: string };
   runtime: {
@@ -40,6 +52,17 @@ export type NixosSharedHostDeployment = {
   };
   providerTarget: NixosSharedHostProviderTarget;
 };
+
+export type CloudflarePagesDeployment = DeploymentBase & {
+  provider: typeof CLOUDFLARE_PAGES_PROVIDER;
+  publisher: {
+    type: string;
+    config: string;
+  };
+  providerTarget: CloudflarePagesProviderTarget;
+};
+
+export type DeploymentTarget = NixosSharedHostDeployment | CloudflarePagesDeployment;
 
 function packageBaseName(label: string): string {
   return path.posix.basename(packagePathFromLabel(label));
@@ -58,6 +81,19 @@ export function deploymentIdFromLabel(label: string): string {
   return packageBaseName(label);
 }
 
+export function requiredDeploymentStageBranch(deployment: {
+  lanePolicy: DeploymentLanePolicy;
+  environmentStage: string;
+}): string {
+  const stageBranch = deployment.lanePolicy.stageBranches[deployment.environmentStage];
+  if (!stageBranch) {
+    throw new Error(
+      `lane policy ${deployment.lanePolicy.ref} does not define stage branch for ${deployment.environmentStage}`,
+    );
+  }
+  return stageBranch;
+}
+
 export function deriveNixosSharedHostProviderTarget(input: {
   appName: string;
   targetGroup?: string;
@@ -72,4 +108,39 @@ export function deriveNixosSharedHostProviderTarget(input: {
     containerName: appName,
     sharedDevTargetIdentity: `${NIXOS_SHARED_HOST_PROVIDER}:${targetGroup}:${appName}`,
   };
+}
+
+export function deriveCloudflarePagesProviderTarget(input: {
+  account: string;
+  project: string;
+  id?: string;
+}): CloudflarePagesProviderTarget {
+  const account = input.account.trim();
+  const project = input.project.trim();
+  const id = (input.id || project).trim() || project;
+  return {
+    account,
+    project,
+    id,
+    canonicalUrl: `https://${project}.pages.dev/`,
+    providerTargetIdentity: `${CLOUDFLARE_PAGES_PROVIDER}:${account}/${project}`,
+  };
+}
+
+export function isNixosSharedHostDeployment(
+  deployment: DeploymentTarget,
+): deployment is NixosSharedHostDeployment {
+  return deployment.provider === NIXOS_SHARED_HOST_PROVIDER;
+}
+
+export function isCloudflarePagesDeployment(
+  deployment: DeploymentTarget,
+): deployment is CloudflarePagesDeployment {
+  return deployment.provider === CLOUDFLARE_PAGES_PROVIDER;
+}
+
+export function providerTargetIdentityFor(deployment: DeploymentTarget): string {
+  return isNixosSharedHostDeployment(deployment)
+    ? deployment.providerTarget.sharedDevTargetIdentity
+    : deployment.providerTarget.providerTargetIdentity;
 }

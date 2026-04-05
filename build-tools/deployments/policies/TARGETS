@@ -9,3 +9,23 @@ deployment_admission_policy(
     artifact_attestation_mode = "recorded_exact_artifact",
     visibility = ["PUBLIC"],
 )
+
+deployment_admission_policy(
+    name = "pleomino_staging_release",
+    allowed_refs = ["env/pleomino/staging"],
+    required_checks = ["deploy/pleomino-staging"],
+    required_approvals = [],
+    retry_branch_policy = "branch_independent",
+    artifact_attestation_mode = "recorded_exact_artifact",
+    visibility = ["PUBLIC"],
+)
+
+deployment_admission_policy(
+    name = "pleomino_prod_release",
+    allowed_refs = ["env/pleomino/prod"],
+    required_checks = ["deploy/pleomino-prod"],
+    required_approvals = [],
+    retry_branch_policy = "branch_independent",
+    artifact_attestation_mode = "recorded_exact_artifact",
+    visibility = ["PUBLIC"],
+)
