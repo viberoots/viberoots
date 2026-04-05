@@ -43,6 +43,7 @@ _REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/nixos-shared-host.platform-state.scoped-omit-preserves.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.platform-state.scoped-update.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.publish.missing-target.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.promotion.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.publisher.contract.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.replay.rollback-eligibility.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.remote-transport.fake.ts": False,

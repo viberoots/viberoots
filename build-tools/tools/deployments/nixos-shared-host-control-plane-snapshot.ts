@@ -8,6 +8,7 @@ import {
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import {
   resolveInitialNixosSharedHostAdmittedContext,
+  resolvePromotionNixosSharedHostAdmittedContext,
   resolveReplayNixosSharedHostAdmittedContext,
 } from "./nixos-shared-host-admission.ts";
 import {
@@ -22,8 +23,10 @@ import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts
 import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
 
 export type NixosSharedHostControlPlaneSourceSelection = {
-  record: NixosSharedHostDeployRecord;
-  replaySnapshot: NixosSharedHostReplaySnapshot;
+  record: NixosSharedHostDeployRecord | { deployRunId: string; deploymentId: string };
+  recordPath?: string;
+  replaySnapshotPath?: string;
+  replaySnapshot?: NixosSharedHostReplaySnapshot;
 };
 
 export type NixosSharedHostControlPlaneSnapshotOpts = {
@@ -49,14 +52,29 @@ export function createNixosSharedHostWorkerId(submissionId: string): string {
   return `${submissionId}-worker`;
 }
 
+function hasReplaySnapshot(
+  source?: NixosSharedHostControlPlaneSourceSelection,
+): source is NixosSharedHostControlPlaneSourceSelection & {
+  record: NixosSharedHostDeployRecord;
+  replaySnapshot: NixosSharedHostReplaySnapshot;
+} {
+  return !!source?.replaySnapshot;
+}
+
 export async function createNixosSharedHostControlPlaneSnapshot(
   opts: NixosSharedHostControlPlaneSnapshotOpts,
   submissionId: string,
 ): Promise<NixosSharedHostControlPlaneSnapshot> {
   const submittedAt = new Date().toISOString();
   const lockScope = opts.deployment.providerTarget.sharedDevTargetIdentity;
-  if ((opts.operationKind === "retry" || opts.operationKind === "rollback") && !opts.source) {
+  if (
+    (opts.operationKind === "retry" || opts.operationKind === "rollback") &&
+    !hasReplaySnapshot(opts.source)
+  ) {
     throw new Error(`shared control-plane ${opts.operationKind} submission requires source run`);
+  }
+  if (opts.operationKind === "promotion" && !opts.source) {
+    throw new Error("shared control-plane promotion submission requires source run");
   }
   if (opts.operationKind !== "explicit_removal" && !opts.artifact && !opts.artifactDir) {
     throw new Error(
@@ -74,20 +92,27 @@ export async function createNixosSharedHostControlPlaneSnapshot(
   const admittedContext =
     opts.operationKind === "explicit_removal"
       ? undefined
-      : opts.source
-        ? await resolveReplayNixosSharedHostAdmittedContext({
+      : opts.operationKind === "promotion"
+        ? await resolvePromotionNixosSharedHostAdmittedContext({
             workspaceRoot: opts.workspaceRoot,
             deployment: opts.deployment,
             artifactIdentity: (artifact as NixosSharedHostAdmittedArtifact).identity,
-            sourceRecord: opts.source.record,
-            sourceReplaySnapshot: opts.source.replaySnapshot,
-            rollback: opts.operationKind === "rollback",
+            sourceRecord: opts.source!.record,
           })
-        : await resolveInitialNixosSharedHostAdmittedContext({
-            workspaceRoot: opts.workspaceRoot,
-            deployment: opts.deployment,
-            artifactIdentity: (artifact as NixosSharedHostAdmittedArtifact).identity,
-          });
+        : hasReplaySnapshot(opts.source)
+          ? await resolveReplayNixosSharedHostAdmittedContext({
+              workspaceRoot: opts.workspaceRoot,
+              deployment: opts.deployment,
+              artifactIdentity: (artifact as NixosSharedHostAdmittedArtifact).identity,
+              sourceRecord: opts.source.record,
+              sourceReplaySnapshot: opts.source.replaySnapshot,
+              rollback: opts.operationKind === "rollback",
+            })
+          : await resolveInitialNixosSharedHostAdmittedContext({
+              workspaceRoot: opts.workspaceRoot,
+              deployment: opts.deployment,
+              artifactIdentity: (artifact as NixosSharedHostAdmittedArtifact).identity,
+            });
   return {
     schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA,
     submissionId,
@@ -119,6 +144,10 @@ export async function createNixosSharedHostControlPlaneSnapshot(
             ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
             ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
             ...(opts.artifactLineageId ? { artifactLineageId: opts.artifactLineageId } : {}),
+            ...(opts.source?.recordPath ? { sourceRecordPath: opts.source.recordPath } : {}),
+            ...(opts.source?.replaySnapshotPath
+              ? { sourceReplaySnapshotPath: opts.source.replaySnapshotPath }
+              : {}),
           }
         : { kind: "explicit_removal" },
     ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),

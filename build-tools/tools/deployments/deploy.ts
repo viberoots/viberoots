@@ -10,8 +10,8 @@ import { resolveCloudflarePagesPromotionSelection } from "./cloudflare-pages-pro
 import { resolveDeploymentFromTarget } from "./deployment-query.ts";
 import { isNixosSharedHostDeployment, type DeploymentTarget } from "./contract.ts";
 import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
+import { submitNixosSharedHostPublishOnlyRun } from "./nixos-shared-host-publish-only.ts";
 import { maybeRunNixosSharedHostRemoteProfile } from "./nixos-shared-host-remote-cli.ts";
-import { resolveNixosSharedHostReplaySelection } from "./nixos-shared-host-replay.ts";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();
@@ -189,26 +189,12 @@ async function main() {
               "shared --publish-only must not use --artifact-dir; replay the admitted exact artifact with --source-run-id",
             );
           }
-          const replay = await resolveNixosSharedHostReplaySelection({
+          return await submitNixosSharedHostPublishOnlyRun({
+            workspaceRoot,
             deployment,
-            recordsRoot,
+            paths,
             sourceRunId,
             rollback,
-          });
-          return await submitNixosSharedHostControlPlaneRun({
-            workspaceRoot,
-            operationKind: replay.operationKind,
-            deployment: replay.deployment,
-            artifact: replay.artifact,
-            publishBehavior: "publish-only",
-            parentRunId: replay.parentRunId,
-            releaseLineageId: replay.releaseLineageId,
-            artifactLineageId: replay.artifactLineageId,
-            source: {
-              record: replay.sourceRecord,
-              replaySnapshot: replay.sourceReplaySnapshot,
-            },
-            paths,
             ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
           });
         }

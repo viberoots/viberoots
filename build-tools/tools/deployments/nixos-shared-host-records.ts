@@ -12,7 +12,7 @@ import {
 
 export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-04";
 
-export type NixosSharedHostOperationKind = "deploy" | "retry" | "rollback";
+export type NixosSharedHostOperationKind = "deploy" | "promotion" | "retry" | "rollback";
 export type NixosSharedHostRunClassification = NixosSharedHostOperationKind | "explicit_removal";
 export type NixosSharedHostFinalOutcome =
   | "succeeded"

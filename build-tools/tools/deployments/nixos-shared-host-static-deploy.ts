@@ -29,7 +29,7 @@ import {
 import { publishNixosSharedHostStaticWebapp } from "./nixos-shared-host-static-publisher.ts";
 import { smokeNixosSharedHostStaticWebapp } from "./nixos-shared-host-static-smoke.ts";
 
-type StaticOperationKind = "deploy" | "retry" | "rollback";
+type StaticOperationKind = "deploy" | "promotion" | "retry" | "rollback";
 type StaticPublishBehavior = "deploy" | "publish-only";
 type DeployFailureStep = "provision" | "publish" | "smoke";
 

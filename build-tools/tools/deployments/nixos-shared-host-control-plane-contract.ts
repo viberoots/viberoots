@@ -12,6 +12,7 @@ export type NixosSharedHostPublishBehavior = "deploy" | "publish-only";
 
 export type NixosSharedHostControlPlaneOperationKind =
   | "deploy"
+  | "promotion"
   | "retry"
   | "rollback"
   | "explicit_removal";
@@ -53,6 +54,8 @@ export type NixosSharedHostControlPlaneSnapshot = {
         parentRunId?: string;
         releaseLineageId?: string;
         artifactLineageId?: string;
+        sourceRecordPath?: string;
+        sourceReplaySnapshotPath?: string;
       }
     | { kind: "explicit_removal" };
   smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;

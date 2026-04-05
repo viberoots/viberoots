@@ -5,12 +5,13 @@ import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts
 import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
 
 export type NixosSharedHostSourceAdmission = {
-  mode: "stage_branch_head" | "source_run_reuse";
+  mode: "stage_branch_head" | "source_run_reuse" | "promotion_source_run";
   sourceRef: string;
   sourceRevision: string;
   artifactIdentity: string;
   artifactTrustMode: "recorded_exact_artifact";
   sourceRunId?: string;
+  sourceDeploymentId?: string;
 };
 
 export type NixosSharedHostTargetEnvironmentAdmission = {
@@ -168,6 +169,28 @@ source revision ${source.source.sourceRevision} is not reachable from ${target.t
       mode: "source_run_reuse",
       artifactIdentity: opts.artifactIdentity,
       sourceRunId: opts.sourceRecord.deployRunId,
+    },
+    targetEnvironment: target,
+  };
+}
+
+export async function resolvePromotionNixosSharedHostAdmittedContext(opts: {
+  workspaceRoot: string;
+  deployment: NixosSharedHostDeployment;
+  artifactIdentity: string;
+  sourceRecord: { deployRunId: string; deploymentId: string };
+}): Promise<NixosSharedHostAdmittedContext> {
+  const target = await targetEnvironmentAdmission(opts.workspaceRoot, opts.deployment);
+  return {
+    ...baseContext(opts.deployment),
+    source: {
+      mode: "promotion_source_run",
+      sourceRef: target.targetRef,
+      sourceRevision: target.targetRevision,
+      artifactIdentity: opts.artifactIdentity,
+      artifactTrustMode: opts.deployment.admissionPolicy.artifactAttestationMode,
+      sourceRunId: opts.sourceRecord.deployRunId,
+      sourceDeploymentId: opts.sourceRecord.deploymentId,
     },
     targetEnvironment: target,
   };

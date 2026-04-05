@@ -61,6 +61,7 @@ Situation:
 
 - `pleomino-staging` and `pleomino-prod` resolve to the same authoritative compatible `lane_policy`
 - the lane uses `artifact_reuse_mode = "same_artifact"`
+- the source and target deployments may use different reviewed providers as long as the lane and component compatibility contract still matches
 - the selected staging run is an earlier admitted candidate that is still eligible under the lane's current promotion policy
 
 Expected behavior:
@@ -70,6 +71,7 @@ Expected behavior:
 - the control plane validates lane compatibility and promotability
 - the source artifact identity is reused
 - the target deployment uses its own admitted target-environment snapshot and approvals
+- `parent_run_id`, `release_lineage_id`, and `artifact_lineage_id` make the promoted lineage explicit across deployment ids even when the provider changes
 
 ## 5. Protected/Shared Preview
 

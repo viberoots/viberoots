@@ -128,6 +128,7 @@ design has been explicitly updated first.
 - `promotion` uses the target deployment's newly admitted target-environment secret and runtime-config references rather than replaying the source deployment's references.
 - Concrete Pleomino example:
   - `pleomino-dev -> pleomino-staging -> pleomino-prod` reuses one exact static-webapp artifact when the lane stays on `artifact_reuse_mode = "same_artifact"`.
+  - promotion compatibility is lane-scoped first: the source and target deployments may use different reviewed providers when the lane policy and component contract still match.
   - the selected source run contributes the immutable artifact plus recorded source snapshot evidence, while the target deployment still freezes its own admitted execution snapshot and target identity before mutation.
   - `parent_run_id` points at the immediately promoted source run, `release_lineage_id` stays stable across the whole promoted release line, and `artifact_lineage_id` stays stable only while the exact same artifact is reused.
 - Recorded `release_actions` replay policy must use one closed disposition per replay context: `rerun`, `skip`, or `fail`.

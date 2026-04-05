@@ -98,3 +98,21 @@ test("nixos-shared-host retry records preserve parent-run and artifact-lineage f
   assert.equal(record.artifactLineageId, "static-webapp:abc123");
   assert.equal(record.publisherType, "nixos-shared-host-static-webapp");
 });
+
+test("nixos-shared-host promotion records preserve release and artifact lineage", () => {
+  const record = createNixosSharedHostDeployRecord(nixosSharedHostDeploymentFixture(), {
+    deployRunId: "deploy-789",
+    operationKind: "promotion",
+    runClassification: "promotion",
+    finalOutcome: "succeeded",
+    parentRunId: "deploy-456",
+    releaseLineageId: "release-123",
+    artifactIdentity: "static-webapp:def456",
+    artifactLineageId: "static-webapp:def456",
+  });
+  assert.equal(record.operationKind, "promotion");
+  assert.equal(record.runClassification, "promotion");
+  assert.equal(record.parentRunId, "deploy-456");
+  assert.equal(record.releaseLineageId, "release-123");
+  assert.equal(record.artifactLineageId, "static-webapp:def456");
+});

@@ -77,7 +77,9 @@ async function runWorker(opts: {
     ? await runNixosSharedHostStaticDeploy({
         deployment: snapshot.deployment,
         operationKind:
-          snapshot.operationKind === "retry" || snapshot.operationKind === "rollback"
+          snapshot.operationKind === "retry" ||
+          snapshot.operationKind === "rollback" ||
+          snapshot.operationKind === "promotion"
             ? snapshot.operationKind
             : "deploy",
         publishBehavior: snapshot.action.publishBehavior,
