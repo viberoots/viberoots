@@ -106,6 +106,9 @@ async function runWorker(opts: {
           : {}),
         ...(snapshot.deployBatchId ? { deployBatchId: snapshot.deployBatchId } : {}),
         ...(snapshot.admittedContext ? { admittedContext: snapshot.admittedContext } : {}),
+        ...(snapshot.recordedReleaseActions
+          ? { releaseActions: snapshot.recordedReleaseActions }
+          : {}),
         ...(snapshot.paths.hostConfigPath ? { hostConfigPath: snapshot.paths.hostConfigPath } : {}),
         ...(snapshot.smokeConnectOverride
           ? { smokeConnectOverride: snapshot.smokeConnectOverride }

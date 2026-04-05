@@ -56,6 +56,8 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
       lane_policy: "//projects/deployments/pleomino-shared:lane",
       environment_stage: "dev",
       admission_policy: "//projects/deployments/pleomino-shared:dev_release",
+      secret_requirements: [],
+      runtime_config_requirements: [],
       provider_target: {
         account: "web-platform-dev",
         project: "pleomino-dev-pages",
@@ -72,6 +74,8 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
       lane_policy: "//projects/deployments/pleomino-shared:lane",
       environment_stage: "staging",
       admission_policy: "//projects/deployments/pleomino-shared:staging_release",
+      secret_requirements: [],
+      runtime_config_requirements: [],
       preview: {
         target_derivation: "provider_managed_source_run",
         isolation_class: "isolated",

@@ -11,6 +11,12 @@ import type { NixosSharedHostConfig } from "./nixos-shared-host.ts";
 import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
 import type { NixosSharedHostComponentResult } from "./nixos-shared-host-records.ts";
 
+type PublishedComponent = {
+  component: NixosSharedHostDeploymentComponent;
+  artifactIdentity: string;
+  indexPath: string;
+};
+
 function baseComponentResult(
   component: NixosSharedHostDeploymentComponent,
   artifactIdentity: string,
@@ -28,9 +34,7 @@ function componentContainer(
   component: NixosSharedHostDeploymentComponent,
 ) {
   const containerName = component.providerTarget.containerName;
-  if (!containerName) {
-    throw new Error(`component "${component.id}" is missing containerName`);
-  }
+  if (!containerName) throw new Error(`component "${component.id}" is missing containerName`);
   const container = rendered.containers[containerName];
   if (!container) {
     throw new Error(
@@ -40,34 +44,20 @@ function componentContainer(
   return container;
 }
 
-export async function publishNixosSharedHostDeploymentComponents(opts: {
+export async function publishNixosSharedHostArtifacts(opts: {
   deployment: NixosSharedHostDeployment;
   rendered: NixosSharedHostConfig;
   hostRoot: string;
   componentArtifacts: NixosSharedHostResolvedComponentArtifact[];
-  smokeConnectOverride?: {
-    protocol: "http:" | "https:";
-    hostname: string;
-    port: number;
-    rejectUnauthorized?: boolean;
-  };
-}): Promise<{
-  componentResults: NixosSharedHostComponentResult[];
-  publicUrl?: string;
-  healthUrl?: string;
-}> {
+}): Promise<PublishedComponent[]> {
   const artifactById = new Map(
     opts.componentArtifacts.map((componentArtifact) => [
       componentArtifact.componentId,
       componentArtifact.artifact,
     ]),
   );
+  const published: PublishedComponent[] = [];
   const orderedComponents = orderedNixosSharedHostComponents(opts.deployment);
-  const published: Array<{
-    component: NixosSharedHostDeploymentComponent;
-    artifactIdentity: string;
-    indexPath: string;
-  }> = [];
   for (const component of orderedComponents) {
     const artifact = artifactById.get(component.id);
     if (!artifact) throw new Error(`missing exact artifact for component "${component.id}"`);
@@ -109,10 +99,27 @@ export async function publishNixosSharedHostDeploymentComponents(opts: {
       });
     }
   }
+  return published;
+}
+
+export async function smokeNixosSharedHostPublishedComponents(opts: {
+  deployment: NixosSharedHostDeployment;
+  published: PublishedComponent[];
+  smokeConnectOverride?: {
+    protocol: "http:" | "https:";
+    hostname: string;
+    port: number;
+    rejectUnauthorized?: boolean;
+  };
+}): Promise<{
+  componentResults: NixosSharedHostComponentResult[];
+  publicUrl?: string;
+  healthUrl?: string;
+}> {
   const primaryComponent = primaryNixosSharedHostComponent(opts.deployment);
-  const singleComponent = orderedComponents.length === 1;
+  const singleComponent = opts.published.length === 1;
   const componentResults: NixosSharedHostComponentResult[] = [];
-  for (const { component, artifactIdentity, indexPath } of published) {
+  for (const { component, artifactIdentity, indexPath } of opts.published) {
     try {
       const smoke = await smokeNixosSharedHostStaticWebapp({
         hostname: component.providerTarget.hostname || "",
@@ -141,7 +148,7 @@ export async function publishNixosSharedHostDeploymentComponents(opts: {
         ...baseComponentResult(component, artifactIdentity),
         finalOutcome: "smoke_failed_after_publish",
       });
-      for (const remaining of published.slice(componentResults.length)) {
+      for (const remaining of opts.published.slice(componentResults.length)) {
         componentResults.push(baseComponentResult(remaining.component, remaining.artifactIdentity));
       }
       throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
@@ -158,4 +165,24 @@ export async function publishNixosSharedHostDeploymentComponents(opts: {
     ...(primaryResult?.publicUrl ? { publicUrl: primaryResult.publicUrl } : {}),
     ...(primaryResult?.healthUrl ? { healthUrl: primaryResult.healthUrl } : {}),
   };
+}
+
+export async function publishNixosSharedHostDeploymentComponents(opts: {
+  deployment: NixosSharedHostDeployment;
+  rendered: NixosSharedHostConfig;
+  hostRoot: string;
+  componentArtifacts: NixosSharedHostResolvedComponentArtifact[];
+  smokeConnectOverride?: {
+    protocol: "http:" | "https:";
+    hostname: string;
+    port: number;
+    rejectUnauthorized?: boolean;
+  };
+}) {
+  const published = await publishNixosSharedHostArtifacts(opts);
+  return await smokeNixosSharedHostPublishedComponents({
+    deployment: opts.deployment,
+    published,
+    ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
+  });
 }

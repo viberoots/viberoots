@@ -1,5 +1,4 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../lib/graph.ts";
 import {
   deploymentIdFromLabel,
   deriveNixosSharedHostProviderTarget,
@@ -7,27 +6,33 @@ import {
   STATIC_WEBAPP_COMPONENT,
   targetName,
   type NixosSharedHostDeployment,
-  type NixosSharedHostDeploymentComponent,
 } from "./contract-types.ts";
 import {
-  componentError,
   pushDuplicateNixosSharedHostAppNameErrors,
   readRawStaticWebappComponents,
   rolloutPolicyErrorsForNixosSharedHost,
 } from "./contract-extract-components.ts";
 import {
   deploymentError,
-  isStaticWebappNode,
   readLabel,
+  readLabelList,
   readPrerequisites,
   readPreviewPolicy,
   readRolloutPolicy,
   readString,
   type DeploymentExtractionContext,
 } from "./contract-extract-shared.ts";
+import {
+  resolveDeploymentMetadataRefs,
+  validateExplicitDeploymentRequirements,
+} from "./deployment-extract-metadata.ts";
+import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
+import { readDeploymentRequirements } from "./deployment-requirements.ts";
+import {
+  pushNixosSharedHostReleaseActionErrors,
+  resolveNixosSharedHostComponents,
+} from "./nixos-shared-host-extract-helpers.ts";
 
-const APP_NAME_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
-const TARGET_GROUP_RE = APP_NAME_RE;
 const SHARED_NONPROD = "shared_nonprod";
 
 export function extractNixosSharedHostDeploymentsFromContext(
@@ -46,6 +51,13 @@ export function extractNixosSharedHostDeploymentsFromContext(
     const publisher = readString(node, "publisher");
     const provisioner = readString(node, "provisioner");
     const rolloutPolicy = readRolloutPolicy(node);
+    const secretRequirements = readDeploymentRequirements(node, "secret_requirements");
+    const runtimeConfigRequirements = readDeploymentRequirements(
+      node,
+      "runtime_config_requirements",
+    );
+    const releaseActionRefs = readLabelList(node, "release_actions");
+    const targetExceptionRefs = readLabelList(node, "target_exceptions");
     const deploymentErrors: string[] = [];
     const rawComponents = readRawStaticWebappComponents(node);
     if (!label) {
@@ -67,136 +79,55 @@ export function extractNixosSharedHostDeploymentsFromContext(
         ),
       );
     }
-    const seenIds = new Set<string>();
-    const resolvedComponents: NixosSharedHostDeploymentComponent[] = [];
-    for (const rawComponent of rawComponents) {
-      if (!rawComponent.id) {
-        deploymentErrors.push(deploymentError(label, "components must set id"));
-        continue;
-      }
-      if (seenIds.has(rawComponent.id)) {
-        deploymentErrors.push(componentError(label, rawComponent.id, "duplicate component id"));
-        continue;
-      }
-      seenIds.add(rawComponent.id);
-      if (rawComponent.kind !== STATIC_WEBAPP_COMPONENT) {
-        deploymentErrors.push(
-          componentError(
-            label,
-            rawComponent.id,
-            `unsupported nixos-shared-host component_kind "${rawComponent.kind || "<empty>"}"`,
-          ),
-        );
-      }
-      if (!rawComponent.target) {
-        deploymentErrors.push(
-          componentError(label, rawComponent.id, "missing required component target"),
-        );
-      }
-      if (!rawComponent.appName) {
-        deploymentErrors.push(componentError(label, rawComponent.id, "missing required app_name"));
-      }
-      if (
-        !Number.isInteger(rawComponent.containerPort) ||
-        rawComponent.containerPort < 1 ||
-        rawComponent.containerPort > 65535
-      ) {
-        deploymentErrors.push(
-          componentError(
-            label,
-            rawComponent.id,
-            "container_port must be an integer between 1 and 65535",
-          ),
-        );
-      }
-      if (rawComponent.appName && !APP_NAME_RE.test(rawComponent.appName)) {
-        deploymentErrors.push(
-          componentError(
-            label,
-            rawComponent.id,
-            "app_name must be a lowercase hostname token without dots or subdomain overrides",
-          ),
-        );
-      }
-      if (rawComponent.targetGroup && !TARGET_GROUP_RE.test(rawComponent.targetGroup)) {
-        deploymentErrors.push(
-          componentError(
-            label,
-            rawComponent.id,
-            "target_group must be lowercase alphanumeric plus internal hyphens",
-          ),
-        );
-      }
-      if (rawComponent.healthPath && !rawComponent.healthPath.startsWith("/")) {
-        deploymentErrors.push(
-          componentError(label, rawComponent.id, "health_path must start with '/' when provided"),
-        );
-      }
-      const componentNode = context.components.get(rawComponent.target);
-      if (rawComponent.target && !isStaticWebappNode(componentNode)) {
-        deploymentErrors.push(
-          componentError(
-            label,
-            rawComponent.id,
-            `component target ${rawComponent.target} is not a supported static-webapp`,
-          ),
-        );
-      }
-      resolvedComponents.push({
-        id: rawComponent.id,
-        kind: STATIC_WEBAPP_COMPONENT,
-        target: rawComponent.target,
-        runtime: {
-          appName: rawComponent.appName,
-          containerPort: rawComponent.containerPort,
-          ...(rawComponent.healthPath ? { healthPath: rawComponent.healthPath } : {}),
-          ...(rawComponent.targetGroup ? { targetGroup: rawComponent.targetGroup } : {}),
-        },
-        providerTarget: deriveNixosSharedHostProviderTarget({
-          appName: rawComponent.appName,
-          targetGroup: rawComponent.targetGroup,
-        }),
-      });
-    }
-    const lanePolicy = context.lanePolicies.get(lanePolicyRef);
-    const admissionPolicy = context.admissionPolicies.get(admissionPolicyRef);
-    if (!lanePolicyRef)
-      deploymentErrors.push(deploymentError(label, "missing required lane_policy"));
-    if (!environmentStage) {
-      deploymentErrors.push(deploymentError(label, "missing required environment_stage"));
-    }
-    if (!admissionPolicyRef) {
-      deploymentErrors.push(deploymentError(label, "missing required admission_policy"));
-    }
-    if (lanePolicyRef && !lanePolicy) {
-      deploymentErrors.push(
-        deploymentError(label, `lane_policy target not found: ${lanePolicyRef}`),
-      );
-    }
-    if (admissionPolicyRef && !admissionPolicy) {
-      deploymentErrors.push(
-        deploymentError(label, `admission_policy target not found: ${admissionPolicyRef}`),
-      );
-    }
-    if (lanePolicy) {
-      if (!lanePolicy.stages.includes(environmentStage)) {
-        deploymentErrors.push(
-          deploymentError(
-            label,
-            `environment_stage "${environmentStage}" is not defined by lane_policy ${lanePolicyRef}`,
-          ),
-        );
-      }
-      const stageBranch = lanePolicy.stageBranches[environmentStage];
-      if (admissionPolicy && stageBranch && !admissionPolicy.allowedRefs.includes(stageBranch)) {
-        deploymentErrors.push(
-          deploymentError(
-            label,
-            `admission_policy ${admissionPolicyRef} must allow stage branch ${stageBranch}`,
-          ),
-        );
-      }
-    }
+    validateExplicitDeploymentRequirements({
+      node,
+      label,
+      fieldPath: "secret_requirements",
+      requirements: secretRequirements,
+      errors: deploymentErrors,
+    });
+    validateExplicitDeploymentRequirements({
+      node,
+      label,
+      fieldPath: "runtime_config_requirements",
+      requirements: runtimeConfigRequirements,
+      errors: deploymentErrors,
+    });
+    const resolvedComponents = resolveNixosSharedHostComponents({
+      context,
+      label,
+      rawComponents,
+      errors: deploymentErrors,
+    });
+    const releaseActions = resolveDeploymentMetadataRefs({
+      refs: releaseActionRefs,
+      label,
+      kind: "release_action",
+      values: context.releaseActions,
+      errors: deploymentErrors,
+    });
+    pushNixosSharedHostReleaseActionErrors({
+      label,
+      releaseActions,
+      secretRequirements,
+      runtimeConfigRequirements,
+      errors: deploymentErrors,
+    });
+    const targetExceptions = resolveDeploymentMetadataRefs({
+      refs: targetExceptionRefs,
+      label,
+      kind: "target_exception",
+      values: context.targetExceptions,
+      errors: deploymentErrors,
+    });
+    const { lanePolicy, admissionPolicy } = resolveSharedDeploymentPolicies({
+      context,
+      label,
+      lanePolicyRef,
+      admissionPolicyRef,
+      environmentStage,
+      errors: deploymentErrors,
+    });
     const targetGroups = new Set(
       resolvedComponents.map((component) => component.providerTarget.targetGroup),
     );
@@ -232,6 +163,10 @@ export function extractNixosSharedHostDeploymentsFromContext(
       admissionPolicyRef,
       admissionPolicy: admissionPolicy!,
       prerequisites,
+      secretRequirements,
+      runtimeConfigRequirements,
+      releaseActions,
+      targetExceptions,
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
       component: { kind: STATIC_WEBAPP_COMPONENT, target: resolvedComponents[0]!.target },
       components: resolvedComponents,

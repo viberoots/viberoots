@@ -2,12 +2,19 @@
 import type { GraphNode } from "../lib/graph.ts";
 import { normalizeTargetLabel } from "../lib/labels.ts";
 import type {
-  DeploymentComponent,
   DeploymentPrerequisite,
   DeploymentPrerequisiteMode,
   DeploymentPreviewIdentitySelector,
   DeploymentPreviewPolicy,
 } from "./contract-types.ts";
+import {
+  extractDeploymentReleaseActions,
+  type DeploymentReleaseAction,
+} from "./deployment-release-actions.ts";
+import {
+  extractDeploymentTargetExceptions,
+  type DeploymentTargetException,
+} from "./deployment-target-exceptions.ts";
 import {
   DEPLOYMENT_ROLLOUT_ABORT_BEHAVIORS,
   DEPLOYMENT_ROLLOUT_MODES,
@@ -26,6 +33,8 @@ export type DeploymentExtractionContext = {
   components: Map<string, GraphNode>;
   lanePolicies: Map<string, DeploymentLanePolicy>;
   admissionPolicies: Map<string, DeploymentAdmissionPolicy>;
+  releaseActions: Map<string, DeploymentReleaseAction>;
+  targetExceptions: Map<string, DeploymentTargetException>;
   errors: string[];
 };
 
@@ -35,11 +44,6 @@ export function readString(node: GraphNode, key: string): string {
 
 export function readLabel(node: GraphNode, key: string): string {
   return normalizeTargetLabel(readString(node, key));
-}
-
-export function readNumber(node: GraphNode, key: string): number {
-  const value = node[key];
-  return typeof value === "number" ? value : Number(value || 0);
 }
 
 export function readStringRecord(node: GraphNode, key: string): Record<string, string> {
@@ -74,6 +78,22 @@ export function readStringRecordList(node: GraphNode, key: string): Record<strin
     .filter((entry): entry is Record<string, string> => !!entry);
 }
 
+export function readLabelList(node: GraphNode, key: string): string[] {
+  const value = node[key];
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) =>
+      typeof entry === "string"
+        ? normalizeTargetLabel(entry)
+        : entry &&
+            typeof entry === "object" &&
+            typeof (entry as { label?: unknown }).label === "string"
+          ? normalizeTargetLabel(String((entry as { label: string }).label))
+          : "",
+    )
+    .filter(Boolean);
+}
+
 export function readPreviewPolicy(
   node: GraphNode,
   key: string,
@@ -88,21 +108,6 @@ export function readPreviewPolicy(
     smokeTarget: (preview.smoke_target || "normal_url") as "normal_url" | "preview_url",
     lockScope: (preview.lock_scope || "shared") as "shared" | "preview",
   };
-}
-
-export function readDeploymentComponents(
-  node: GraphNode,
-  fallback?: DeploymentComponent,
-): DeploymentComponent[] {
-  const components = readStringRecordList(node, "components")
-    .map((entry) => ({
-      id: entry.id || "",
-      kind: (entry.kind || "") as DeploymentComponent["kind"],
-      target: normalizeTargetLabel(entry.target || ""),
-    }))
-    .filter((component) => component.id || component.kind || component.target);
-  if (components.length > 0) return components;
-  return fallback ? [fallback] : [];
 }
 
 export function readRolloutPolicy(node: GraphNode): DeploymentRolloutPolicy | undefined {
@@ -205,6 +210,10 @@ export function createDeploymentExtractionContext(nodes: GraphNode[]): Deploymen
   const { policies: lanePolicies, errors: laneErrors } = extractDeploymentLanePolicies(nodes);
   const { policies: admissionPolicies, errors: admissionErrors } =
     extractDeploymentAdmissionPolicies(nodes);
+  const { actions: releaseActions, errors: releaseActionErrors } =
+    extractDeploymentReleaseActions(nodes);
+  const { exceptions: targetExceptions, errors: targetExceptionErrors } =
+    extractDeploymentTargetExceptions(nodes);
   const components = new Map<string, GraphNode>();
   for (const node of nodes) {
     const label = normalizeTargetLabel(String(node.name || ""));
@@ -215,7 +224,9 @@ export function createDeploymentExtractionContext(nodes: GraphNode[]): Deploymen
     components,
     lanePolicies,
     admissionPolicies,
-    errors: [...laneErrors, ...admissionErrors],
+    releaseActions,
+    targetExceptions,
+    errors: [...laneErrors, ...admissionErrors, ...releaseActionErrors, ...targetExceptionErrors],
   };
 }
 

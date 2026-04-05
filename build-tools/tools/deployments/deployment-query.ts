@@ -26,6 +26,10 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "target_group",
   "provider_target",
   "prerequisites",
+  "secret_requirements",
+  "runtime_config_requirements",
+  "release_actions",
+  "target_exceptions",
   "stages",
   "stage_branches",
   "allowed_promotion_edges",
@@ -66,6 +70,22 @@ function normalizeQueryTarget(target: string): string {
   return clean.startsWith("root//") ? clean.slice("root".length) : clean;
 }
 
+function queryLabelList(node: Record<string, unknown>, key: string): string[] {
+  const value = node[key];
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) =>
+      typeof entry === "string"
+        ? normalizeTargetLabel(entry)
+        : entry &&
+            typeof entry === "object" &&
+            typeof (entry as { label?: unknown }).label === "string"
+          ? normalizeTargetLabel(String((entry as { label: string }).label))
+          : "",
+    )
+    .filter(Boolean);
+}
+
 export async function queryDeploymentNodes(
   workspaceRoot: string,
   labels: string[],
@@ -92,6 +112,8 @@ export async function resolveDeploymentFromTarget(
     normalizeTargetLabel(String((deploymentNode as any).component || "")),
     normalizeTargetLabel(String((deploymentNode as any).lane_policy || "")),
     normalizeTargetLabel(String((deploymentNode as any).admission_policy || "")),
+    ...queryLabelList(deploymentNode as Record<string, unknown>, "release_actions"),
+    ...queryLabelList(deploymentNode as Record<string, unknown>, "target_exceptions"),
   ].filter((label) => label && label !== deploymentTarget);
   const nodes =
     extraLabels.length > 0
@@ -144,6 +166,8 @@ export async function resolveAllDeployments(workspaceRoot: string): Promise<Depl
           normalizeTargetLabel(String((node as any).component || "")),
           normalizeTargetLabel(String((node as any).lane_policy || "")),
           normalizeTargetLabel(String((node as any).admission_policy || "")),
+          ...queryLabelList(node as Record<string, unknown>, "release_actions"),
+          ...queryLabelList(node as Record<string, unknown>, "target_exceptions"),
         ].filter(Boolean),
       ),
     ),

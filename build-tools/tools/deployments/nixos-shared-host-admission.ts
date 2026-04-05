@@ -1,6 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import { requiredDeploymentStageBranch } from "./contract.ts";
+import {
+  requirementSummary,
+  sameRequirementSet,
+  type DeploymentRequirement,
+} from "./deployment-requirements.ts";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
 import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
 import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
@@ -29,6 +34,13 @@ export type NixosSharedHostAdmittedContext = {
   admissionPolicyRef: string;
   admissionPolicyFingerprint: string;
   environmentStage: string;
+  secretRequirements: DeploymentRequirement[];
+  runtimeConfigRequirements: DeploymentRequirement[];
+  referenceResolutionPolicy: {
+    secrets: "exact_contract_ids";
+    runtimeConfig: "exact_contract_ids";
+  };
+  targetExceptionRefs: string[];
   source: NixosSharedHostSourceAdmission;
   targetEnvironment: NixosSharedHostTargetEnvironmentAdmission;
 };
@@ -50,6 +62,13 @@ function baseContext(deployment: NixosSharedHostDeployment) {
     admissionPolicyRef: deployment.admissionPolicyRef,
     admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
     environmentStage: deployment.environmentStage,
+    secretRequirements: deployment.secretRequirements,
+    runtimeConfigRequirements: deployment.runtimeConfigRequirements,
+    referenceResolutionPolicy: {
+      secrets: "exact_contract_ids" as const,
+      runtimeConfig: "exact_contract_ids" as const,
+    },
+    targetExceptionRefs: deployment.targetExceptions.map((exception) => exception.ref).sort(),
   };
 }
 
@@ -139,6 +158,26 @@ export async function resolveReplayNixosSharedHostAdmittedContext(opts: {
   if (source.environmentStage !== opts.deployment.environmentStage) {
     errors.push(
       replayMismatch("environmentStage", opts.deployment.environmentStage, source.environmentStage),
+    );
+  }
+  if (!sameRequirementSet(source.secretRequirements, opts.deployment.secretRequirements)) {
+    errors.push(
+      replayMismatch(
+        "secretRequirements",
+        requirementSummary(opts.deployment.secretRequirements),
+        requirementSummary(source.secretRequirements),
+      ),
+    );
+  }
+  if (
+    !sameRequirementSet(source.runtimeConfigRequirements, opts.deployment.runtimeConfigRequirements)
+  ) {
+    errors.push(
+      replayMismatch(
+        "runtimeConfigRequirements",
+        requirementSummary(opts.deployment.runtimeConfigRequirements),
+        requirementSummary(source.runtimeConfigRequirements),
+      ),
     );
   }
   if (errors.length > 0) {

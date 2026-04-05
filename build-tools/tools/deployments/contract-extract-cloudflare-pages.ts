@@ -1,5 +1,4 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../lib/graph.ts";
 import {
   CLOUDFLARE_PAGES_PROVIDER,
   deriveCloudflarePagesProviderTarget,
@@ -11,18 +10,29 @@ import {
 import { readPrimaryDeploymentComponent } from "./contract-extract-components.ts";
 import {
   deploymentError,
+  duplicateValueEntries,
   isStaticWebappNode,
   pushRolloutPolicyFieldErrors,
   pushTokenFieldErrors,
   readLabel,
+  readLabelList,
   readPrerequisites,
   readPreviewPolicy,
   readRolloutPolicy,
   readString,
   readStringRecord,
   type DeploymentExtractionContext,
-  duplicateValueEntries,
 } from "./contract-extract-shared.ts";
+import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
+import {
+  resolveDeploymentMetadataRefs,
+  validateExplicitDeploymentRequirements,
+} from "./deployment-extract-metadata.ts";
+import { readDeploymentRequirements } from "./deployment-requirements.ts";
+import {
+  allowsCloudflareAliasCollision,
+  pushCloudflarePreviewErrors,
+} from "./cloudflare-pages-extract-helpers.ts";
 
 const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/;
 const SHARED_NONPROD = "shared_nonprod";
@@ -50,6 +60,13 @@ export function extractCloudflarePagesDeploymentsFromContext(
     const provisioner = readString(node, "provisioner");
     const providerTarget = readStringRecord(node, "provider_target");
     const prerequisites = readPrerequisites(node, "prerequisites");
+    const secretRequirements = readDeploymentRequirements(node, "secret_requirements");
+    const runtimeConfigRequirements = readDeploymentRequirements(
+      node,
+      "runtime_config_requirements",
+    );
+    const releaseActionRefs = readLabelList(node, "release_actions");
+    const targetExceptionRefs = readLabelList(node, "target_exceptions");
     const preview = readPreviewPolicy(node, "preview");
     const rolloutPolicy = readRolloutPolicy(node);
     const account = providerTarget.account || "";
@@ -68,8 +85,9 @@ export function extractCloudflarePagesDeploymentsFromContext(
         ),
       );
     }
-    if (!primaryComponent?.target)
+    if (!primaryComponent?.target) {
       deploymentErrors.push(deploymentError(label, "missing required component target"));
+    }
     if (components.length > 1) {
       deploymentErrors.push(
         deploymentError(label, "cloudflare-pages does not support multi-component deployments"),
@@ -112,8 +130,23 @@ export function extractCloudflarePagesDeploymentsFromContext(
         ),
       );
     }
-    if (!publisherConfig)
+    if (!publisherConfig) {
       deploymentErrors.push(deploymentError(label, "missing required publisher_config"));
+    }
+    validateExplicitDeploymentRequirements({
+      node,
+      label,
+      fieldPath: "secret_requirements",
+      requirements: secretRequirements,
+      errors: deploymentErrors,
+    });
+    validateExplicitDeploymentRequirements({
+      node,
+      label,
+      fieldPath: "runtime_config_requirements",
+      requirements: runtimeConfigRequirements,
+      errors: deploymentErrors,
+    });
     if (provisioner) {
       deploymentErrors.push(
         deploymentError(
@@ -122,34 +155,15 @@ export function extractCloudflarePagesDeploymentsFromContext(
         ),
       );
     }
-    if (preview) {
-      if (preview.targetDerivation !== "provider_managed_source_run") {
-        deploymentErrors.push(
-          deploymentError(
-            label,
-            'preview.target_derivation must be "provider_managed_source_run"; preview must not reuse the normal live target',
-          ),
-        );
-      }
-      if (preview.isolationClass !== "isolated") {
-        deploymentErrors.push(deploymentError(label, 'preview.isolation_class must be "isolated"'));
-      }
-      if (preview.identitySelector !== "source_run") {
-        deploymentErrors.push(
-          deploymentError(label, 'cloudflare-pages preview.identity_selector must be "source_run"'),
-        );
-      }
-      if (preview.smokeTarget !== "preview_url") {
-        deploymentErrors.push(
-          deploymentError(label, 'cloudflare-pages preview.smoke_target must be "preview_url"'),
-        );
-      }
-      if (preview.lockScope !== "shared") {
-        deploymentErrors.push(
-          deploymentError(label, 'cloudflare-pages preview.lock_scope must currently be "shared"'),
-        );
-      }
+    if (releaseActionRefs.length > 0) {
+      deploymentErrors.push(
+        deploymentError(
+          label,
+          "cloudflare-pages does not support protected/shared release_actions",
+        ),
+      );
     }
+    pushCloudflarePreviewErrors(label, preview, deploymentErrors);
     const componentNode = context.components.get(primaryComponent?.target || "");
     if (primaryComponent?.target && !isStaticWebappNode(componentNode)) {
       deploymentErrors.push(
@@ -159,45 +173,28 @@ export function extractCloudflarePagesDeploymentsFromContext(
         ),
       );
     }
-    if (!lanePolicyRef)
-      deploymentErrors.push(deploymentError(label, "missing required lane_policy"));
-    if (!environmentStage) {
-      deploymentErrors.push(deploymentError(label, "missing required environment_stage"));
-    }
-    if (!admissionPolicyRef) {
-      deploymentErrors.push(deploymentError(label, "missing required admission_policy"));
-    }
-    const lanePolicy = context.lanePolicies.get(lanePolicyRef);
-    if (lanePolicyRef && !lanePolicy) {
-      deploymentErrors.push(
-        deploymentError(label, `lane_policy target not found: ${lanePolicyRef}`),
-      );
-    }
-    const admissionPolicy = context.admissionPolicies.get(admissionPolicyRef);
-    if (admissionPolicyRef && !admissionPolicy) {
-      deploymentErrors.push(
-        deploymentError(label, `admission_policy target not found: ${admissionPolicyRef}`),
-      );
-    }
-    if (lanePolicy) {
-      if (!lanePolicy.stages.includes(environmentStage)) {
-        deploymentErrors.push(
-          deploymentError(
-            label,
-            `environment_stage "${environmentStage}" is not defined by lane_policy ${lanePolicyRef}`,
-          ),
-        );
-      }
-      const stageBranch = lanePolicy.stageBranches[environmentStage];
-      if (admissionPolicy && stageBranch && !admissionPolicy.allowedRefs.includes(stageBranch)) {
-        deploymentErrors.push(
-          deploymentError(
-            label,
-            `admission_policy ${admissionPolicyRef} must allow stage branch ${stageBranch}`,
-          ),
-        );
-      }
-    }
+    const releaseActions = resolveDeploymentMetadataRefs({
+      refs: releaseActionRefs,
+      label,
+      kind: "release_action",
+      values: context.releaseActions,
+      errors: deploymentErrors,
+    });
+    const targetExceptions = resolveDeploymentMetadataRefs({
+      refs: targetExceptionRefs,
+      label,
+      kind: "target_exception",
+      values: context.targetExceptions,
+      errors: deploymentErrors,
+    });
+    const { lanePolicy, admissionPolicy } = resolveSharedDeploymentPolicies({
+      context,
+      label,
+      lanePolicyRef,
+      admissionPolicyRef,
+      environmentStage,
+      errors: deploymentErrors,
+    });
     if (deploymentErrors.length > 0) {
       context.errors.push(...deploymentErrors);
       continue;
@@ -214,6 +211,10 @@ export function extractCloudflarePagesDeploymentsFromContext(
       admissionPolicyRef,
       admissionPolicy: admissionPolicy!,
       prerequisites,
+      secretRequirements,
+      runtimeConfigRequirements,
+      releaseActions,
+      targetExceptions,
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
       component: { kind: STATIC_WEBAPP_COMPONENT, target: componentTarget },
       components: [
@@ -234,6 +235,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
       label: deployment.label,
     })),
   )) {
+    if (allowsCloudflareAliasCollision(deployments, duplicate.value)) continue;
     for (const label of duplicate.labels) {
       context.errors.push(
         deploymentError(

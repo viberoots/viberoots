@@ -2,6 +2,9 @@
 import path from "node:path";
 import type { DeploymentAdmissionPolicy, DeploymentLanePolicy } from "./deployment-policy.ts";
 import type { DeploymentRolloutPolicy } from "./deployment-rollout.ts";
+import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
+import type { DeploymentRequirement } from "./deployment-requirements.ts";
+import type { DeploymentTargetException } from "./deployment-target-exceptions.ts";
 import { packagePathFromLabel } from "../lib/labels.ts";
 
 export const NIXOS_SHARED_HOST_PROVIDER = "nixos-shared-host";
@@ -43,6 +46,10 @@ type DeploymentBase = {
   admissionPolicyRef: string;
   admissionPolicy: DeploymentAdmissionPolicy;
   prerequisites: DeploymentPrerequisite[];
+  secretRequirements: DeploymentRequirement[];
+  runtimeConfigRequirements: DeploymentRequirement[];
+  releaseActions: DeploymentReleaseAction[];
+  targetExceptions: DeploymentTargetException[];
   rolloutPolicy?: DeploymentRolloutPolicy;
   component: {
     kind: typeof STATIC_WEBAPP_COMPONENT;

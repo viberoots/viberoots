@@ -9,6 +9,8 @@ cloudflare_pages_static_webapp_deployment(
     environment_stage = "prod",
     admission_policy = "//projects/deployments/pleomino-rebuild-shared:prod_release",
     protection_class = "production_facing",
+    secret_requirements = [],
+    runtime_config_requirements = [],
     prerequisites = [
         {
             "deployment_id": "pleomino-rebuild-staging",

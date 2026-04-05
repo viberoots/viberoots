@@ -1,87 +1,18 @@
-def _optional_label(attr):
-    return "" if attr == None else str(attr.label)
-def _deployment_document(ctx):
-    return {
-        "name": ctx.label.name,
-        "provider": ctx.attrs.provider,
-        "component_kind": ctx.attrs.component_kind,
-        "component": str(ctx.attrs.component.label),
-        "components": ctx.attrs.components,
-        "publisher": ctx.attrs.publisher,
-        "publisher_config": ctx.attrs.publisher_config,
-        "provisioner": ctx.attrs.provisioner,
-        "protection_class": ctx.attrs.protection_class,
-        "lane_policy": _optional_label(ctx.attrs.lane_policy),
-        "environment_stage": ctx.attrs.environment_stage,
-        "admission_policy": _optional_label(ctx.attrs.admission_policy),
-        "rollout_policy": ctx.attrs.rollout_policy,
-        "rollout_steps": ctx.attrs.rollout_steps,
-        "app_name": ctx.attrs.app_name,
-        "container_port": ctx.attrs.container_port,
-        "health_path": ctx.attrs.health_path,
-        "target_group": ctx.attrs.target_group,
-        "provider_target": ctx.attrs.provider_target,
-        "preview": ctx.attrs.preview,
-        "prerequisites": ctx.attrs.prerequisites,
-    }
-def _deployment_target_impl(ctx):
-    out = ctx.actions.write_json(ctx.label.name + ".json", _deployment_document(ctx))
-    return [DefaultInfo(default_output = out)]
-deployment_target = rule(
-    impl = _deployment_target_impl,
-    attrs = {
-        "provider": attrs.string(),
-        "component": attrs.dep(),
-        "component_kind": attrs.string(),
-        "publisher": attrs.string(),
-        "publisher_config": attrs.string(default = ""),
-        "provisioner": attrs.string(default = ""),
-        "protection_class": attrs.string(default = "shared_nonprod"),
-        "lane_policy": attrs.option(attrs.dep(), default = None),
-        "environment_stage": attrs.string(default = ""),
-        "admission_policy": attrs.option(attrs.dep(), default = None),
-        "components": attrs.list(attrs.dict(key = attrs.string(), value = attrs.string()), default = []),
-        "rollout_policy": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
-        "rollout_steps": attrs.list(attrs.string(), default = []),
-        "app_name": attrs.string(default = ""),
-        "container_port": attrs.int(default = 0),
-        "health_path": attrs.string(default = ""),
-        "target_group": attrs.string(default = ""),
-        "provider_target": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
-        "preview": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
-        "prerequisites": attrs.list(attrs.dict(key = attrs.string(), value = attrs.string()), default = []),
-        "labels": attrs.list(attrs.string(), default = []),
-    },
+load(
+    "//build-tools/deployments:metadata_rules.bzl",
+    _deployment_admission_policy = "deployment_admission_policy",
+    _deployment_lane_policy = "deployment_lane_policy",
+    _deployment_release_action = "deployment_release_action",
+    _deployment_target = "deployment_target",
+    _deployment_target_exception = "deployment_target_exception",
 )
-def _deployment_lane_policy_impl(ctx):
-    out = ctx.actions.declare_output(ctx.label.name + ".json")
-    ctx.actions.write(out, "{}\n")
-    return [DefaultInfo(default_output = out)]
-deployment_lane_policy = rule(
-    impl = _deployment_lane_policy_impl,
-    attrs = {
-        "stages": attrs.list(attrs.string()),
-        "stage_branches": attrs.dict(key = attrs.string(), value = attrs.string()),
-        "allowed_promotion_edges": attrs.list(attrs.string(), default = []),
-        "artifact_reuse_mode": attrs.string(default = "same_artifact"),
-        "labels": attrs.list(attrs.string(), default = []),
-    },
-)
-def _deployment_admission_policy_impl(ctx):
-    out = ctx.actions.declare_output(ctx.label.name + ".json")
-    ctx.actions.write(out, "{}\n")
-    return [DefaultInfo(default_output = out)]
-deployment_admission_policy = rule(
-    impl = _deployment_admission_policy_impl,
-    attrs = {
-        "allowed_refs": attrs.list(attrs.string()),
-        "required_checks": attrs.list(attrs.string(), default = []),
-        "required_approvals": attrs.list(attrs.string(), default = []),
-        "retry_branch_policy": attrs.string(default = "branch_independent"),
-        "artifact_attestation_mode": attrs.string(default = "recorded_exact_artifact"),
-        "labels": attrs.list(attrs.string(), default = []),
-    },
-)
+
+deployment_admission_policy = _deployment_admission_policy
+deployment_lane_policy = _deployment_lane_policy
+deployment_release_action = _deployment_release_action
+deployment_target = _deployment_target
+deployment_target_exception = _deployment_target_exception
+
 def _require_shared_policy(lane_policy, environment_stage, admission_policy):
     if lane_policy == None:
         fail("protected/shared deployments must set lane_policy")
@@ -103,6 +34,10 @@ def nixos_shared_host_static_webapp_deployment(
         environment_stage = "",
         admission_policy = None,
         prerequisites = [],
+        secret_requirements = [],
+        runtime_config_requirements = [],
+        release_actions = [],
+        target_exceptions = [],
         labels = [],
         visibility = ["PUBLIC"]):
     if protection_class != "local_only":
@@ -132,6 +67,10 @@ def nixos_shared_host_static_webapp_deployment(
         health_path = health_path,
         target_group = target_group,
         prerequisites = prerequisites,
+        secret_requirements = secret_requirements,
+        runtime_config_requirements = runtime_config_requirements,
+        release_actions = release_actions,
+        target_exceptions = target_exceptions,
         labels = labels + [
             "kind:deployment",
             "deployment:nixos-shared-host",
@@ -151,6 +90,10 @@ def nixos_shared_host_multi_static_webapp_deployment(
         environment_stage = "",
         admission_policy = None,
         prerequisites = [],
+        secret_requirements = [],
+        runtime_config_requirements = [],
+        release_actions = [],
+        target_exceptions = [],
         labels = [],
         visibility = ["PUBLIC"]):
     if protection_class != "local_only":
@@ -188,6 +131,10 @@ def nixos_shared_host_multi_static_webapp_deployment(
         rollout_steps = rollout_steps,
         target_group = target_group,
         prerequisites = prerequisites,
+        secret_requirements = secret_requirements,
+        runtime_config_requirements = runtime_config_requirements,
+        release_actions = release_actions,
+        target_exceptions = target_exceptions,
         labels = labels + [
             "kind:deployment",
             "deployment:nixos-shared-host",
@@ -210,6 +157,10 @@ def cloudflare_pages_static_webapp_deployment(
         environment_stage = "",
         admission_policy = None,
         prerequisites = [],
+        secret_requirements = [],
+        runtime_config_requirements = [],
+        release_actions = [],
+        target_exceptions = [],
         labels = [],
         visibility = ["PUBLIC"]):
     if protection_class != "local_only":
@@ -237,6 +188,10 @@ def cloudflare_pages_static_webapp_deployment(
         },
         preview = preview or {},
         prerequisites = prerequisites,
+        secret_requirements = secret_requirements,
+        runtime_config_requirements = runtime_config_requirements,
+        release_actions = release_actions,
+        target_exceptions = target_exceptions,
         labels = labels + [
             "kind:deployment",
             "deployment:cloudflare-pages",

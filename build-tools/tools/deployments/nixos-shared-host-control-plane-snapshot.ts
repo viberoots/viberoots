@@ -177,6 +177,9 @@ export async function createNixosSharedHostControlPlaneSnapshot(
     providerTargetIdentity: nixosSharedHostDeploymentTargetIdentity(opts.deployment),
     lockScope,
     deployment: opts.deployment,
+    ...(hasReplaySnapshot(opts.source)
+      ? { recordedReleaseActions: opts.source.replaySnapshot.deployment.releaseActions }
+      : {}),
     ...(admittedContext ? { admittedContext } : {}),
     paths: {
       statePath: path.resolve(opts.paths.statePath),

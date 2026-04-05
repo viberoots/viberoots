@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { CloudflarePagesDeployment } from "./contract.ts";
 import { requiredDeploymentStageBranch } from "./contract.ts";
+import type { DeploymentRequirement } from "./deployment-requirements.ts";
 
 export type CloudflarePagesSourceAdmission = {
   mode: "stage_branch_head" | "source_run_reuse" | "promotion_source_run";
@@ -26,6 +27,13 @@ export type CloudflarePagesAdmittedContext = {
   admissionPolicyRef: string;
   admissionPolicyFingerprint: string;
   environmentStage: string;
+  secretRequirements: DeploymentRequirement[];
+  runtimeConfigRequirements: DeploymentRequirement[];
+  referenceResolutionPolicy: {
+    secrets: "exact_contract_ids";
+    runtimeConfig: "exact_contract_ids";
+  };
+  targetExceptionRefs: string[];
   source: CloudflarePagesSourceAdmission;
   targetEnvironment: CloudflarePagesTargetEnvironmentAdmission;
 };
@@ -47,6 +55,13 @@ function baseContext(deployment: CloudflarePagesDeployment) {
     admissionPolicyRef: deployment.admissionPolicyRef,
     admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
     environmentStage: deployment.environmentStage,
+    secretRequirements: deployment.secretRequirements,
+    runtimeConfigRequirements: deployment.runtimeConfigRequirements,
+    referenceResolutionPolicy: {
+      secrets: "exact_contract_ids" as const,
+      runtimeConfig: "exact_contract_ids" as const,
+    },
+    targetExceptionRefs: deployment.targetExceptions.map((exception) => exception.ref).sort(),
   };
 }
 

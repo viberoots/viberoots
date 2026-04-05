@@ -27,6 +27,8 @@ function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
     lane_policy: "//projects/deployments/pleomino-shared:lane",
     environment_stage: "staging",
     admission_policy: "//projects/deployments/pleomino-shared:staging_release",
+    secret_requirements: [],
+    runtime_config_requirements: [],
     provider_target: {
       account: "web-platform-staging",
       project: "pleomino-staging-pages",

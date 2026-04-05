@@ -8,6 +8,11 @@ import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admissi
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
 import {
+  liveRollbackCompatibilityErrors,
+  rollbackSourceEligibilityErrors,
+  sameDeploymentReplayErrors,
+} from "./nixos-shared-host-replay-guardrails.ts";
+import {
   deployRecordPathFor,
   readNixosSharedHostDeployRecord,
   type NixosSharedHostDeployRecord,
@@ -61,12 +66,7 @@ export async function writeNixosSharedHostReplaySnapshot(opts: {
   platformState: unknown;
   hostConfig: unknown;
   controlPlaneExecutionSnapshotPath?: string;
-}): Promise<{
-  replaySnapshotPath: string;
-  deploymentMetadataFingerprint: string;
-  platformStateSnapshotPath: string;
-  hostConfigSnapshotPath: string;
-}> {
+}) {
   const replaySnapshotPath = replaySnapshotPathFor(opts.recordsRoot, opts.deployRunId);
   const platformStateSnapshotPath = platformStateSnapshotPathFor(
     opts.recordsRoot,
@@ -125,12 +125,7 @@ export async function resolveNixosSharedHostReplaySource(opts: {
   recordPath?: string;
   recordsRoot?: string;
   deployRunId?: string;
-}): Promise<{
-  record: NixosSharedHostDeployRecord;
-  recordPath: string;
-  replaySnapshot: NixosSharedHostReplaySnapshot;
-  artifactDir: string;
-}> {
+}) {
   if (!opts.recordPath && (!opts.recordsRoot || !opts.deployRunId)) {
     throw new Error(
       "resolve replay source requires --record-path or --records-root plus --deploy-run-id",
@@ -145,76 +140,12 @@ export async function resolveNixosSharedHostReplaySource(opts: {
   return { record, recordPath, replaySnapshot, artifactDir };
 }
 
-function replayMismatch(field: string, expected: string, actual: string): string {
-  return `${field} mismatch: current=${expected} source=${actual}`;
-}
-
-function sameDeploymentReplayErrors(
-  current: NixosSharedHostDeployment,
-  source: NixosSharedHostDeployment,
-): string[] {
-  const errors: string[] = [];
-  if (current.deploymentId !== source.deploymentId) {
-    errors.push(replayMismatch("deploymentId", current.deploymentId, source.deploymentId));
-  }
-  if (current.label !== source.label) {
-    errors.push(replayMismatch("deploymentLabel", current.label, source.label));
-  }
-  if (current.provider !== source.provider) {
-    errors.push(replayMismatch("provider", current.provider, source.provider));
-  }
-  if (
-    nixosSharedHostDeploymentTargetIdentity(current) !==
-    nixosSharedHostDeploymentTargetIdentity(source)
-  ) {
-    errors.push(
-      replayMismatch(
-        "providerTargetIdentity",
-        nixosSharedHostDeploymentTargetIdentity(current),
-        nixosSharedHostDeploymentTargetIdentity(source),
-      ),
-    );
-  }
-  if (current.publisher.type !== source.publisher.type) {
-    errors.push(replayMismatch("publisherType", current.publisher.type, source.publisher.type));
-  }
-  if (current.component.kind !== source.component.kind) {
-    errors.push(replayMismatch("componentKind", current.component.kind, source.component.kind));
-  }
-  return errors;
-}
-
-function rollbackEligibilityErrors(record: NixosSharedHostDeployRecord): string[] {
-  const errors: string[] = [];
-  if (record.finalOutcome !== "succeeded") {
-    errors.push(`non-success final outcome: ${record.finalOutcome}`);
-  }
-  if (record.runClassification !== "deploy") {
-    errors.push(`wrong run classification: ${record.runClassification}`);
-  }
-  if (record.publishMode !== "normal") {
-    errors.push(`wrong publish mode: ${record.publishMode}`);
-  }
-  return errors;
-}
-
 export async function resolveNixosSharedHostReplaySelection(opts: {
   deployment: NixosSharedHostDeployment;
   recordsRoot: string;
   sourceRunId: string;
   rollback: boolean;
-}): Promise<{
-  operationKind: "retry" | "rollback";
-  deployment: NixosSharedHostDeployment;
-  artifact: NixosSharedHostAdmittedArtifact;
-  parentRunId: string;
-  releaseLineageId?: string;
-  artifactLineageId: string;
-  recordPath: string;
-  replaySnapshotPath: string;
-  sourceRecord: NixosSharedHostDeployRecord;
-  sourceReplaySnapshot: NixosSharedHostReplaySnapshot;
-}> {
+}) {
   const source = await resolveNixosSharedHostReplaySource({
     recordsRoot: opts.recordsRoot,
     deployRunId: opts.sourceRunId,
@@ -224,10 +155,21 @@ export async function resolveNixosSharedHostReplaySelection(opts: {
     throw new Error(`shared replay source is not compatible with the current deployment:
 ${errors.join("\n")}`);
   }
-  const rollbackErrors = opts.rollback ? rollbackEligibilityErrors(source.record) : [];
+  const rollbackErrors = opts.rollback ? rollbackSourceEligibilityErrors(source.record) : [];
   if (rollbackErrors.length > 0) {
     throw new Error(`rollback source run is not eligible: ${source.record.deployRunId}
 ${rollbackErrors.join("\n")}`);
+  }
+  const liveCompatibilityErrors = opts.rollback
+    ? await liveRollbackCompatibilityErrors({
+        recordsRoot: opts.recordsRoot,
+        deploymentId: opts.deployment.deploymentId,
+        sourceRunId: source.record.deployRunId,
+      })
+    : [];
+  if (liveCompatibilityErrors.length > 0) {
+    throw new Error(`rollback source run is blocked by current release-action posture:
+${liveCompatibilityErrors.join("\n")}`);
   }
   return {
     operationKind: opts.rollback ? "rollback" : "retry",

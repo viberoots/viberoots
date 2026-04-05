@@ -27,6 +27,8 @@ function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
     lane_policy: "//projects/deployments/pleomino-shared:lane",
     environment_stage: "dev",
     admission_policy: "//projects/deployments/pleomino-shared:dev_release",
+    secret_requirements: [],
+    runtime_config_requirements: [],
     app_name: "demoapp",
     container_port: 3000,
     health_path: "/healthz",

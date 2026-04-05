@@ -2,6 +2,7 @@
 import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
 import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
+import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA =
@@ -43,6 +44,7 @@ export type NixosSharedHostControlPlaneSnapshot = {
   providerTargetIdentity: string;
   lockScope: string;
   deployment: NixosSharedHostDeployment;
+  recordedReleaseActions?: DeploymentReleaseAction[];
   admittedContext?: NixosSharedHostAdmittedContext;
   paths: NixosSharedHostControlPlanePaths;
   action:

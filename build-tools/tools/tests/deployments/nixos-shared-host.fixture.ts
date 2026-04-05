@@ -133,6 +133,10 @@ export function nixosSharedHostDeploymentFixture(
     admissionPolicyRef: overrides.admissionPolicyRef || admissionPolicy.ref,
     admissionPolicy,
     prerequisites: overrides.prerequisites || [],
+    secretRequirements: overrides.secretRequirements || [],
+    runtimeConfigRequirements: overrides.runtimeConfigRequirements || [],
+    releaseActions: overrides.releaseActions || [],
+    targetExceptions: overrides.targetExceptions || [],
     ...(overrides.rolloutPolicy ? { rolloutPolicy: overrides.rolloutPolicy } : {}),
     component: {
       kind: STATIC_WEBAPP_COMPONENT,

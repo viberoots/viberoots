@@ -18,9 +18,16 @@ export type NixosSharedHostRunClassification = NixosSharedHostOperationKind | "e
 export type NixosSharedHostFinalOutcome =
   | "succeeded"
   | "provision_failed"
+  | "release_action_failed"
   | "publish_failed"
   | "smoke_failed_after_publish";
-export type NixosSharedHostFailedStep = "provision" | "publish" | "smoke";
+export type NixosSharedHostFailedStep =
+  | "provision"
+  | "publish"
+  | "smoke"
+  | "release_actions.pre_publish"
+  | "release_actions.post_publish_pre_smoke"
+  | "release_actions.post_smoke";
 
 export type NixosSharedHostComponentResult = {
   componentId: string;
