@@ -26,7 +26,7 @@ Companion docs:
 - [Deployment Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md)
 - [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
 - [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md)
-- [Deployment Implementation Plan](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-implementation-plan.md)
+- [Deployment Implementation Plan](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-plan.md)
 
 The implementation-plan document is operational planning only. It may describe rollout order or work
 breakdown, but the design, contract, schema, and provider-capabilities documents remain authoritative
@@ -6298,7 +6298,7 @@ Hand off the design together with these companion documents:
 - [Deployment Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md)
 - [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
 - [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md)
-- [Deployment Implementation Plan](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-implementation-plan.md)
+- [Deployment Implementation Plan](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-plan.md)
 
 Use them as follows:
 

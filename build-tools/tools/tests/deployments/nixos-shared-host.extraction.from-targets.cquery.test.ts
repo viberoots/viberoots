@@ -3,46 +3,14 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { nodesFromCqueryJson } from "../../buck/exporter/cquery/nodes.ts";
 import { extractNixosSharedHostDeployments } from "../../deployments/contract.ts";
-import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers.ts";
-
-const ATTRS = [
-  "name",
-  "rule_type",
-  "buck.type",
-  "provider",
-  "component",
-  "component_kind",
-  "components",
-  "publisher",
-  "provisioner",
-  "protection_class",
-  "lane_policy",
-  "environment_stage",
-  "admission_policy",
-  "rollout_policy",
-  "rollout_steps",
-  "app_name",
-  "container_port",
-  "health_path",
-  "target_group",
-  "prerequisites",
-  "secret_requirements",
-  "runtime_config_requirements",
-  "release_actions",
-  "target_exceptions",
-  "stages",
-  "stage_branches",
-  "allowed_promotion_edges",
-  "artifact_reuse_mode",
-  "allowed_refs",
-  "required_checks",
-  "required_approvals",
-  "retry_branch_policy",
-  "artifact_attestation_mode",
-  "labels",
-];
+import {
+  ensureParentDir,
+  runDeploymentCquery,
+  writeSharedLaneTargets,
+  writeStaticWebappTarget,
+} from "./nixos-shared-host.extraction.from-targets.helpers.ts";
+import { runInTemp } from "../lib/test-helpers.ts";
 
 test("nixos-shared-host deployment extraction reads canonical metadata from TARGETS via cquery", async () => {
   await runInTemp("deployment-cquery-extraction", async (tmp, _$) => {
@@ -55,48 +23,9 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
       "pleomino-shared",
       "TARGETS",
     );
-    await fsp.mkdir(path.dirname(appTargetsPath), { recursive: true });
-    await fsp.mkdir(path.dirname(deployTargetsPath), { recursive: true });
-    await fsp.mkdir(path.dirname(sharedTargetsPath), { recursive: true });
-    await fsp.writeFile(
-      appTargetsPath,
-      [
-        'load("@prelude//:rules.bzl", "genrule")',
-        "",
-        "genrule(",
-        '    name = "app",',
-        '    out = "app.txt",',
-        '    cmd = "printf demo > $OUT",',
-        '    labels = ["kind:app", "webapp:static"],',
-        '    visibility = ["PUBLIC"],',
-        ")",
-        "",
-      ].join("\n"),
-      "utf8",
-    );
-    await fsp.writeFile(
-      sharedTargetsPath,
-      [
-        'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_policy")',
-        "",
-        "deployment_lane_policy(",
-        '    name = "lane",',
-        '    stages = ["dev", "staging", "prod"],',
-        '    stage_branches = {"dev": "env/pleomino/dev", "staging": "env/pleomino/staging", "prod": "env/pleomino/prod"},',
-        '    allowed_promotion_edges = ["dev->staging", "staging->prod"],',
-        '    visibility = ["PUBLIC"],',
-        ")",
-        "",
-        "deployment_admission_policy(",
-        '    name = "dev_release",',
-        '    allowed_refs = ["env/pleomino/dev"],',
-        '    required_checks = ["deploy/pleomino-dev"],',
-        '    visibility = ["PUBLIC"],',
-        ")",
-        "",
-      ].join("\n"),
-      "utf8",
-    );
+    await writeStaticWebappTarget(appTargetsPath, "app");
+    await writeSharedLaneTargets(sharedTargetsPath);
+    await ensureParentDir(deployTargetsPath);
     await fsp.writeFile(
       deployTargetsPath,
       [
@@ -118,20 +47,13 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
       "utf8",
     );
 
-    const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
-    const query =
-      "set(//projects/deployments/demoapp-dev:deploy //projects/apps/demoapp:app //projects/deployments/pleomino-shared:lane //projects/deployments/pleomino-shared:dev_release)";
-    const cquery = await _$({
-      cwd: tmp,
-      stdio: "pipe",
-      env: {
-        ...process.env,
-        HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
-        SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
-      },
-    })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-cquery")} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
-    const merged = JSON.parse(String(cquery.stdout || "")) as Record<string, any>;
-    const { deployments, errors } = extractNixosSharedHostDeployments(nodesFromCqueryJson(merged));
+    const nodes = await runDeploymentCquery(tmp, _$, "deployment-cquery", [
+      "//projects/deployments/demoapp-dev:deploy",
+      "//projects/apps/demoapp:app",
+      "//projects/deployments/pleomino-shared:lane",
+      "//projects/deployments/pleomino-shared:dev_release",
+    ]);
+    const { deployments, errors } = extractNixosSharedHostDeployments(nodes);
     assert.deepEqual(errors, []);
     assert.equal(deployments.length, 1);
     assert.equal(deployments[0]?.label, "//projects/deployments/demoapp-dev:deploy");
@@ -171,54 +93,14 @@ test("nixos-shared-host multi-component extraction reads rollout policy and comp
       "pleomino-shared",
       "TARGETS",
     );
-    await fsp.mkdir(path.dirname(appTargetsPath), { recursive: true });
-    await fsp.mkdir(path.dirname(apiTargetsPath), { recursive: true });
-    await fsp.mkdir(path.dirname(deployTargetsPath), { recursive: true });
-    await fsp.mkdir(path.dirname(sharedTargetsPath), { recursive: true });
     for (const [targetPath, name] of [
       [appTargetsPath, "app"],
       [apiTargetsPath, "api"],
     ] as const) {
-      await fsp.writeFile(
-        targetPath,
-        [
-          'load("@prelude//:rules.bzl", "genrule")',
-          "",
-          "genrule(",
-          `    name = "${name}",`,
-          `    out = "${name}.txt",`,
-          `    cmd = "printf ${name} > $OUT",`,
-          '    labels = ["kind:app", "webapp:static"],',
-          '    visibility = ["PUBLIC"],',
-          ")",
-          "",
-        ].join("\n"),
-        "utf8",
-      );
+      await writeStaticWebappTarget(targetPath, name);
     }
-    await fsp.writeFile(
-      sharedTargetsPath,
-      [
-        'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_policy")',
-        "",
-        "deployment_lane_policy(",
-        '    name = "lane",',
-        '    stages = ["dev", "staging", "prod"],',
-        '    stage_branches = {"dev": "env/pleomino/dev", "staging": "env/pleomino/staging", "prod": "env/pleomino/prod"},',
-        '    allowed_promotion_edges = ["dev->staging", "staging->prod"],',
-        '    visibility = ["PUBLIC"],',
-        ")",
-        "",
-        "deployment_admission_policy(",
-        '    name = "dev_release",',
-        '    allowed_refs = ["env/pleomino/dev"],',
-        '    required_checks = ["deploy/pleomino-dev"],',
-        '    visibility = ["PUBLIC"],',
-        ")",
-        "",
-      ].join("\n"),
-      "utf8",
-    );
+    await writeSharedLaneTargets(sharedTargetsPath);
+    await ensureParentDir(deployTargetsPath);
     await fsp.writeFile(
       deployTargetsPath,
       [
@@ -242,20 +124,14 @@ test("nixos-shared-host multi-component extraction reads rollout policy and comp
       "utf8",
     );
 
-    const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
-    const query =
-      "set(//projects/deployments/demo-stack-dev:deploy //projects/apps/demoapp:app //projects/apps/demoapi:api //projects/deployments/pleomino-shared:lane //projects/deployments/pleomino-shared:dev_release)";
-    const cquery = await _$({
-      cwd: tmp,
-      stdio: "pipe",
-      env: {
-        ...process.env,
-        HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
-        SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
-      },
-    })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-cquery-multi")} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
-    const merged = JSON.parse(String(cquery.stdout || "")) as Record<string, any>;
-    const { deployments, errors } = extractNixosSharedHostDeployments(nodesFromCqueryJson(merged));
+    const nodes = await runDeploymentCquery(tmp, _$, "deployment-cquery-multi", [
+      "//projects/deployments/demo-stack-dev:deploy",
+      "//projects/apps/demoapp:app",
+      "//projects/apps/demoapi:api",
+      "//projects/deployments/pleomino-shared:lane",
+      "//projects/deployments/pleomino-shared:dev_release",
+    ]);
+    const { deployments, errors } = extractNixosSharedHostDeployments(nodes);
     assert.deepEqual(errors, []);
     assert.equal(deployments.length, 1);
     assert.equal(deployments[0]?.components.length, 2);

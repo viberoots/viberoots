@@ -186,4 +186,4 @@ Before approving a deployment-system change, confirm:
 - [Deployment Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md)
 - [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
 - [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md)
-- [Deployment Implementation Plan](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-implementation-plan.md)
+- [Deployment Implementation Plan](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-plan.md)

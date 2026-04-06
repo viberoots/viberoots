@@ -307,4 +307,4 @@ Expected behavior:
 - [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
 - [Deployment Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md)
 - [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
-- [Deployment Implementation Plan](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-implementation-plan.md)
+- [Deployment Implementation Plan](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-plan.md)

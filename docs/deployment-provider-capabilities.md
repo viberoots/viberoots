@@ -307,4 +307,4 @@ Change-control rule:
 - [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
 - [Deployment Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md)
 - [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md)
-- [Deployment Implementation Plan](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-implementation-plan.md)
+- [Deployment Implementation Plan](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-plan.md)
