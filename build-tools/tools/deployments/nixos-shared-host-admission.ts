@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import { requiredDeploymentStageBranch } from "./contract.ts";
+import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence.ts";
 import {
   requirementSummary,
   sameRequirementSet,
@@ -41,6 +42,7 @@ export type NixosSharedHostAdmittedContext = {
     runtimeConfig: "exact_contract_ids";
   };
   targetExceptionRefs: string[];
+  policyEvaluation?: DeploymentAdmissionPolicyEvaluation;
   source: NixosSharedHostSourceAdmission;
   targetEnvironment: NixosSharedHostTargetEnvironmentAdmission;
 };

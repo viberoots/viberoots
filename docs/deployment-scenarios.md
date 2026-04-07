@@ -164,7 +164,8 @@ Expected behavior:
 - selection is rejected if the resulting deployments span multiple lanes
 - execution remains serial and topological by default
 - `ordering_only` prerequisites affect order only
-- `health_gated` prerequisites block the dependent deployment if the prerequisite did not already finish `succeeded` earlier in the batch
+- `ordering_only` still requires one prior successful admitted prerequisite run before the dependent deployment may mutate
+- `health_gated` prerequisites require that same ordering proof plus fresh admission-time health evidence against the prerequisite's declared smoke or built-in release-health contract
 - the mutating invocation fans out into ordinary per-deployment runs rather than one multi-deployment run record
 - every run keeps its own `deploy_run_id`, lifecycle, and final outcome even when the CLI also attaches one shared `deploy_batch_id`
 - the selector may over-select for safety but must not under-select

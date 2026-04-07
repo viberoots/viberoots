@@ -10,6 +10,7 @@ import {
   submitCloudflarePagesRebuildPerStagePromotion,
 } from "./cloudflare-pages-promotion.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 
 export async function runCloudflarePagesCli(opts: {
   workspaceRoot: string;
@@ -21,6 +22,7 @@ export async function runCloudflarePagesCli(opts: {
   preview: boolean;
   previewCleanup: boolean;
   sourceRunId: string;
+  admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: {
     protocol: "http:" | "https:";
     hostname: string;
@@ -61,6 +63,7 @@ export async function runCloudflarePagesCli(opts: {
         recordPath: promotion.sourceRecordPath,
         replaySnapshotPath: promotion.sourceReplaySnapshotPath,
       },
+      ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
       ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
     });
   }
@@ -94,6 +97,7 @@ export async function runCloudflarePagesCli(opts: {
       deployment: opts.deployment,
       recordsRoot: opts.recordsRoot,
       sourceRunId: opts.sourceRunId,
+      ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
       ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
     });
   }
@@ -110,6 +114,7 @@ export async function runCloudflarePagesCli(opts: {
         })(),
       recordsRoot: opts.recordsRoot,
       sourceRunId: opts.sourceRunId,
+      ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
       ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
     });
   }
@@ -122,6 +127,7 @@ export async function runCloudflarePagesCli(opts: {
       (() => {
         throw new Error("cloudflare-pages normal deploy requires a resolved artifact directory");
       })(),
+    ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
     ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
   });
 }

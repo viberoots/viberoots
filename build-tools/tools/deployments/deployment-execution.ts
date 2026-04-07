@@ -2,6 +2,7 @@
 import path from "node:path";
 import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
 import { isNixosSharedHostDeployment, type DeploymentTarget } from "./contract.ts";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import { buildArtifactDirsByComponentId } from "./deployment-component-artifact-dirs.ts";
 import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
 import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-control-plane.ts";
@@ -59,6 +60,7 @@ export async function runNormalDeployment(opts: {
   hostConfigPath?: string;
   smokeConnectOverride?: DeploymentSmokeConnectOverride;
   deployBatchId?: string;
+  admissionEvidence?: DeploymentAdmissionEvidence;
 }): Promise<DeploymentExecutionResult> {
   if (!isNixosSharedHostDeployment(opts.deployment)) {
     return await submitCloudflarePagesControlPlaneDeploy({
@@ -68,6 +70,7 @@ export async function runNormalDeployment(opts: {
         opts.sharedRecordsRoot || defaultCloudflareRecordsRoot(opts.workspaceRoot),
       ),
       artifactDir: await resolveArtifactDir(opts.workspaceRoot, opts.deployment),
+      ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
       ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
       ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
     });
@@ -89,6 +92,7 @@ export async function runNormalDeployment(opts: {
       recordsRoot: path.resolve(opts.sharedRecordsRoot || path.join(hostRoot, "records")),
       ...(opts.hostConfigPath ? { hostConfigPath: path.resolve(opts.hostConfigPath) } : {}),
     },
+    ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
     ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
     ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
   });

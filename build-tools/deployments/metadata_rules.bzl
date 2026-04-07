@@ -91,6 +91,7 @@ deployment_admission_policy = rule(
         "required_checks": attrs.list(attrs.string(), default = []),
         "required_approvals": attrs.list(attrs.string(), default = []),
         "retry_branch_policy": attrs.string(default = "branch_independent"),
+        "retry_approval_reuse": attrs.string(default = "fresh_only"),
         "artifact_attestation_mode": attrs.string(default = "recorded_exact_artifact"),
         "labels": attrs.list(attrs.string(), default = []),
     },

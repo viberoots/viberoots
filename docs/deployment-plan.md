@@ -1276,13 +1276,15 @@ control-plane work are still pending.
 
 I will establish the shared-control-plane authority boundary for `shared_nonprod` deployments and
 move the `mini` shared-dev flow under that authority. This PR focuses on admission, locking, and
-reviewed execution boundaries rather than advanced artifact replay.
+reviewed execution boundaries rather than advanced artifact replay or later lock-resilience
+refinements.
 
 ### Scope & Changes
 
 - Introduce the first shared control-plane API and worker skeleton for mutating shared deployments.
 - Require `nixos-shared-host` `shared_nonprod` mutation to execute through the shared control plane.
-- Implement lock acquisition on canonical provider-target identity for `nixos-shared-host`.
+- Implement the first shared lock primitive for `nixos-shared-host` on canonical provider-target
+  identity so concurrent mutation on the same target is rejected.
 - Implement the first admission flow for shared-dev `deploy` and `explicit removal`.
 - Freeze an execution snapshot with the deployment metadata and provider-target identity needed for
   the implemented flows.
@@ -1295,6 +1297,8 @@ reviewed execution boundaries rather than advanced artifact replay.
   - allowed `shared_nonprod` submission
   - rejected direct local mutation path
   - lock conflict on the same `mini` target
+- Add locking tests proving shared runs acquire the canonical provider-target lock before mutation
+  and reject concurrent mutation on the same target.
 - Add execution-snapshot tests proving required metadata is frozen before mutation.
 - Extend the `mini` end-to-end flow to assert control-plane submission, locking, and recorded
   execution-snapshot references.
@@ -1302,7 +1306,7 @@ reviewed execution boundaries rather than advanced artifact replay.
 ### Docs (in this PR)
 
 - Document the first shared-control-plane path for `mini` shared-dev deployments.
-- Document locking behavior and conflict expectations.
+- Document the initial canonical provider-target locking behavior for shared mutation.
 - Document the shared-environment authority rule for `nixos-shared-host`.
 
 ### Verification Commands
@@ -1322,7 +1326,8 @@ reviewed execution boundaries rather than advanced artifact replay.
 ### Acceptance Criteria
 
 - `mini` shared-dev deploys run through a reviewed shared control-plane path.
-- The system acquires canonical provider-target locks before mutation.
+- The system acquires canonical provider-target locks before mutation and rejects concurrent
+  mutation on the same target.
 - Shared-environment authority rules are enforced and covered by tests.
 
 ### Risks
@@ -1939,12 +1944,14 @@ solid first.
 ### Description
 
 I will implement preview as a publish mode with explicit isolated target identity and first-class
-cleanup semantics, consistent with the main design.
+audited cleanup semantics, consistent with the main design.
 
 ### Scope & Changes
 
 - Implement preview publish mode with explicit isolated preview target identity.
 - Reject preview paths that try to reuse the normal mutable live target.
+- Reject preview paths that rely on operator-invented ad hoc target identity instead of policy-
+  defined derivation.
 - Implement audited preview cleanup as a first-class control-plane operation.
 - Preserve both normal declared provider-target identity and effective preview target identity in
   deployment records.
@@ -1954,15 +1961,14 @@ cleanup semantics, consistent with the main design.
 
 - Add tests rejecting:
   - preview that reuses the normal live target
-  - preview cleanup without explicit preview identity
-  - shared/protected preview replay paths that omit required source-run identity
+- Add tests rejecting preview cleanup that targets an unknown or non-preview target identity.
 - Add end-to-end preview publish and cleanup tests for one supported provider family.
 - Add record tests for effective preview target identity preservation.
 
 ### Docs (in this PR)
 
 - Document preview as a publish mode, not a deployment identity.
-- Document preview cleanup semantics and required identity selection.
+- Document preview cleanup semantics for the initial audited cleanup path.
 - Document provider support boundaries for preview behavior.
 
 ### Verification Commands
@@ -1980,7 +1986,7 @@ cleanup semantics, consistent with the main design.
 
 ### Acceptance Criteria
 
-- Preview uses explicit isolated target identity.
+- Preview uses explicit isolated target identity and never reuses the live target.
 - Cleanup is audited, explicit, and covered by tests.
 - Preview behavior remains provider-capability-gated and fail-closed.
 
@@ -2113,6 +2119,8 @@ turn repo changes into auditable per-deployment runs without inventing a second 
 - Implement per-deployment run selection from repo changes.
 - Add optional batch grouping while preserving per-deployment run identity.
 - Implement explicit prerequisite graph evaluation from authoritative deployment metadata.
+- Keep prerequisite evaluation direct-edge-only rather than silently introducing transitive
+  prerequisite semantics.
 - Ensure orchestration still emits independent deployment records even when one CLI invocation
   triggers several runs.
 
@@ -2400,6 +2408,2956 @@ are stable.
 
 ---
 
+## PR-17: Required-check enforcement + approval-evidence binding for protected/shared admission
+
+### Description
+
+I will close the gap between extracted admission metadata and the actual protected/shared mutating
+gate. This PR makes required checks, human approvals, approval reuse rules, prerequisite-mode
+evaluation, promotion-compatibility validation, protected/shared execution-boundary enforcement,
+and immutable approval-evidence binding first-class admission behavior instead of parsed-but-
+advisory metadata.
+
+### Scope & Changes
+
+- Enforce `required_checks` for protected/shared `deploy`, `promotion`, `rollback`, and preview
+  flows against the admitted revision or admitted reusable artifact lineage, as appropriate to the
+  operation kind.
+- Enforce `required_approvals` as blocking protected/shared admission inputs rather than
+  documentation-only metadata.
+- Enforce the protected/shared extension boundary at admission time:
+  - normal protected/shared mutation may execute only vetted built-in adapter, provisioner,
+    smoke-runner, and reviewed built-in `release_action` code in the shared control plane
+  - deployment-local `deploy.ts`, deployment-local provisioner entrypoints, deployment-local smoke
+    entrypoints, and other package-local executable hooks are rejected for the normal
+    protected/shared path
+  - deployment-local executable hooks remain available only for `local_only` and explicitly
+    isolated preview/local targets unless a later reviewed sandboxed exception path is introduced
+- Implement the reviewed prerequisite-mode contract for direct prerequisite edges at admission,
+  including:
+  - `ordering_only`
+  - `health_gated`
+  - unknown or ad hoc prerequisite modes rejected fail closed
+  - `ordering_only` preserving dependency ordering without inventing implicit health or rollout
+    coupling
+  - `health_gated` requiring a fresh admission-time health verdict unless explicitly documented
+    provider-specific evidence is accepted as equivalent
+- Implement the explicit promotion-compatibility validation gate before protected/shared promotion
+  mutates the target environment:
+  - for `artifact_reuse_mode = "same_artifact"`, validate the reviewed default lane-compatibility
+    inputs:
+    - component ids
+    - component kinds
+    - publisher type
+    - rollout semantics
+    - resolved-kind contract and artifact-identity semantics
+  - require same-artifact lanes to prove the reused artifact remains environment-neutral across the
+    lane
+  - treat the following differences as reviewed allowed defaults that do not break promotion
+    compatibility on their own:
+    - `environment_stage`
+    - `admission_policy`
+    - normal provider-target identity
+    - secrets and secret references
+    - smoke endpoints, preview URLs, or equivalent health targets
+    - provider-native non-identity settings intentionally derived from environment-specific target
+      identity
+  - require provisioner behavior to be accounted for explicitly in the lane's reviewed default
+    compatibility set or an explicit reviewed compatibility contract before promotion is allowed
+  - fail closed on any other compatibility-affecting difference unless it is modeled as an explicit
+    reviewed compatibility exception
+  - for `artifact_reuse_mode = "rebuild_per_stage"`, reject exact-artifact promotion semantics and
+    verify:
+    - the selected source run identifies an admitted source revision that is still promotable under
+      the current lane policy
+    - target-stage build inputs and build-time substitutions remain within the reviewed lane
+      compatibility contract before the target-stage artifact is built
+  - keep the compatibility gate extensible so later provider-family PRs can add explicit
+    provider-specific compatibility inputs such as SSR runtime contract or mobile signing/track
+    semantics without bypassing the same reviewed gate
+- Introduce approval-evidence capture and binding to the immutable admission payload, including:
+  - admitted `deploy_run_id`
+  - frozen execution snapshot
+  - canonical target identity
+  - selected artifact identity or source-run selector
+  - reviewed provisioner plan/diff artifact when infra-affecting mutation is in scope
+- Implement operation-kind-aware approval rules:
+  - `deploy` uses fresh target-environment approval under the current admission policy
+  - `promotion` always requires target-environment approval
+  - `rollback` requires fresh `production_facing` approval by default unless policy explicitly says
+    otherwise
+  - `retry` may reuse approval only when the admission policy explicitly allows same-lineage reuse
+    and the bound approval remains valid
+  - preview inherits the reviewed branch/check posture for the target deployment unless the
+    admission policy explicitly defines a stricter preview posture
+- Fail closed when approval evidence is stale, revoked, self-approved out of policy, or no longer
+  matches the current immutable admission payload.
+- Persist approval and required-check evaluation facts in deployment records and replay snapshots
+  without storing secret-bearing payloads.
+- Keep the admission and approval engine transport-agnostic so later submit/status/run-action
+  surfaces can reuse the same reviewed semantics.
+
+### Tests (in this PR)
+
+- Add admission tests proving required checks block mutation when:
+  - the admitted revision has not satisfied the target deployment's reviewed check set
+  - a reusable artifact or source-run selector lacks the required earlier-environment evidence
+- Add admission tests rejecting:
+  - protected/shared deployment shapes that require deployment-local executable hooks
+  - unknown prerequisite modes
+  - `health_gated` prerequisites without a fresh admission-time health verdict or reviewed
+    equivalent provider evidence
+  - promotion where component ids, component kinds, publisher type, rollout semantics, or
+    resolved-kind compatibility inputs do not match the lane contract
+  - same-artifact promotion when the artifact is not environment-neutral across the lane
+  - promotion where provisioner behavior is outside the lane's reviewed compatibility contract
+  - rebuild-per-stage promotion when exact-artifact semantics are requested
+  - rebuild-per-stage promotion when target-stage build inputs or build-time substitutions fall
+    outside the reviewed lane compatibility contract
+- Add admission tests proving:
+  - `ordering_only` prerequisites enforce dependency ordering without requiring health evidence
+  - reviewed allowed environment-specific differences do not fail promotion compatibility by
+    default
+- Add approval tests covering:
+  - missing approval
+  - stale or revoked approval
+  - self-approval rejected when out of policy
+  - retry approval reuse allowed only when explicitly declared
+  - promotion and `production_facing` rollback requiring fresh target-environment approval
+- Add tests proving approval evidence fails closed when the frozen execution snapshot, target
+  identity, or selected artifact/source-run input changes after approval.
+- Extend record and replay tests to assert approval/check evidence references are preserved in a
+  secret-safe form.
+
+### Docs (in this PR)
+
+- Document that `admission_policy` required checks and approvals are authoritative blocking inputs,
+  not advisory metadata.
+- Document the protected/shared execution boundary and the explicit rejection of package-local
+  executable hooks in the normal shared-control-plane path.
+- Document the reviewed `ordering_only` / `health_gated` prerequisite-mode contract for direct
+  prerequisite edges.
+- Document the explicit promotion-compatibility validation gate, reviewed default compatibility
+  inputs, allowed environment-specific differences, and provisioner-compatibility requirements.
+- Document approval-evidence binding, approval reuse, and preview approval posture by operation
+  kind.
+- Document the protected/shared record and replay requirements for approval/check facts.
+- Update any provider-capability wording that still describes these fields as lighter-weight than
+  the implemented protected/shared contract.
+
+### Verification Commands
+
+- `buck2 test //...`
+- approval/admission inspection and verification commands introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR is expected to touch shared
+  deployment/control-plane code, record/replay contracts, and the reviewed build-system metadata
+  surface that defines admission-policy behavior. Under the deployment-only verify policy, default
+  `v` / CI must still run the full build-system verify scope.
+
+### Acceptance Criteria
+
+- Required checks and required approvals actually block protected/shared mutation.
+- Protected/shared normal-path admission rejects package-local executable hooks and evaluates the
+  reviewed prerequisite-mode contract explicitly.
+- Promotion mutates only when the reviewed compatibility gate passes for the lane's declared
+  `artifact_reuse_mode`.
+- Approval evidence binds to one immutable admission payload and fails closed on drift.
+- Records and replay snapshots preserve enough secret-safe evidence to explain why a run was
+  admissible.
+- Tests and docs in this PR describe the same admission and approval behavior.
+
+### Risks
+
+Approval and check enforcement cut across multiple run kinds, so it is easy to accidentally make
+one path stricter or looser than the others.
+
+### Mitigation
+
+Centralize policy evaluation, bind approvals to the frozen admission payload, and test every
+reviewed operation kind in the same PR.
+
+### Consequence of Not Implementing
+
+Protected/shared deployments would continue to treat required checks and approvals as parsed
+metadata rather than authoritative mutating-policy gates.
+
+### Downsides for Implementing
+
+Adds policy-state and evidence-management complexity to the control plane before any new provider
+feature is visible to operators.
+
+### Recommendation
+
+Implement immediately after the current cross-cutting closeout work so later control-plane and
+provider slices build on real protected/shared admission semantics rather than placeholders.
+
+---
+
+## PR-18: Versioned deploy/control-plane payload contracts + exact RBAC + idempotency
+
+### Description
+
+I will replace the current in-process control-plane skeleton with reviewed contract surfaces that
+match the final deployment design: versioned Buck-extraction and control-plane payloads,
+machine-readable rejection codes, idempotent submission, first-class lifecycle states beyond
+`finished`, and one explicit protected/shared RBAC model shared by CLI and future UI/API clients.
+
+### Scope & Changes
+
+- Introduce one reviewed versioned payload boundary across:
+  - Buck metadata extraction
+  - the repo-level `deploy` CLI
+  - the shared control-plane API
+- Introduce versioned reviewed payloads for:
+  - extracted deployment metadata
+  - submit request/response contracts
+  - status/read-model contracts
+  - run-action request/response contracts
+  - admitted execution-snapshot payloads
+  - replay-selector payloads
+- Require explicit schema versions and fail-closed reader behavior for those reviewed payloads so
+  extraction, CLI submission, and control-plane execution cannot silently reinterpret older data.
+- Preserve enough normalized operator intent in the reviewed payloads that separate clients do not
+  need undocumented adapter-local conventions to recover preview identity, source-run selection, or
+  replay intent.
+- Add submit-layer idempotency keys or stable submission ids plus dedupe and
+  idempotency-conflict handling for protected/shared mutation requests.
+- Expand the control-plane lifecycle model to include:
+  - `pending_approval`
+  - `queued`
+  - `waiting_for_lock`
+  - `running`
+  - `cancelling`
+  - `finished`
+  - `cancelled`
+- Add machine-readable closed rejection/action-result codes for the reviewed control-plane
+  contracts, including cases such as:
+  - `lock_conflict`
+  - `approval_required`
+  - `approval_no_longer_valid`
+  - `idempotency_conflict`
+  - `unauthorized`
+  - `not_resumable`
+  - `no_longer_admitted`
+- Implement the first-class status/read path used by the repo-level CLI and tests instead of making
+  clients infer state from ad hoc files or string parsing.
+- Implement first-class run actions for:
+  - `cancel` with deterministic reconciliation semantics
+  - `resume` with reviewed fail-closed rejection when the targeted run/provider is not actually
+    resumable under current rollout and approval policy
+- Implement the minimum protected/shared RBAC model and stable action vocabulary using the design's
+  explicit distinct roles:
+  - `submitter`
+  - `approver`
+  - `operator`
+  - `break_glass`
+- Implement the minimum default protected/shared RBAC scopes:
+  - `submitter` granted per deployment id by default
+  - `approver` granted per deployment id by default
+  - `operator` granted per canonical provider-target identity or reviewed lane scope by default
+  - `break_glass` granted per canonical provider-target identity or reviewed lane scope by default
+- Keep any separately documented broader administrative powers outside this minimum role model so
+  the reviewed contract does not collapse `submitter`, `approver`, `operator`, and `break_glass`
+  into one ambient privileged actor.
+- Preserve secret-safe audit surfaces and stable principal ids in records and operator-visible
+  status outputs.
+
+### Tests (in this PR)
+
+- Add contract tests for extracted-metadata, submit, status, run-action, execution-snapshot, and
+  replay-selector payload shapes plus machine-readable closed result codes.
+- Add versioning tests proving each reviewed payload:
+  - carries an explicit schema version
+  - fails closed on unknown or unsupported versions
+  - does not silently reinterpret older payloads under newer code assumptions
+- Add idempotency tests proving:
+  - repeated submit with the same normalized payload resolves to the same accepted or rejected
+    result
+  - repeated submit with the same idempotency key but different payload fails closed
+  - repeated run-action submission follows the same rules
+- Add lifecycle tests covering:
+  - `pending_approval -> queued -> waiting_for_lock -> running -> finished`
+  - clean pre-mutation cancellation to `cancelled`
+  - in-flight cancellation to `cancelling` plus reconciled terminal state
+- Add authz tests rejecting unauthorized submit, status, cancel, preview-cleanup, approval, and
+  resume requests.
+- Add RBAC tests proving:
+  - `submitter`, `approver`, `operator`, and `break_glass` remain distinct reviewed roles
+  - `submitter` and `approver` default to deployment-id scope
+  - `operator` and `break_glass` default to canonical provider-target identity or reviewed lane
+    scope, not repo-wide scope
+  - destructive operations such as preview cleanup and target-transition actions require `operator`
+    or stronger authority
+- Add tests proving non-resumable current provider slices reject `resume` through the reviewed
+  run-action contract rather than through ad hoc CLI errors.
+
+### Docs (in this PR)
+
+- Document the reviewed extracted-metadata, submit, status, run-action, execution-snapshot, and
+  replay-selector payload contracts plus their stable rejection codes.
+- Document lifecycle-state and termination-reason vocabulary for operator-facing tools.
+- Document the exact minimum protected/shared RBAC role and scope model and shared action
+  vocabulary.
+- Document cancellation and resume semantics, including the current fail-closed behavior for
+  non-resumable runs.
+
+### Verification Commands
+
+- `buck2 test //...`
+- submit/status/run-action command flows introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR is expected to span reviewed Buck
+  extraction payloads, repo-level CLI/control-plane contracts, lifecycle handling, authz, and
+  deployment-domain test infrastructure. Under the deployment-only verify policy, default `v` / CI
+  must still run the full build-system verify scope.
+
+### Acceptance Criteria
+
+- Protected/shared clients use stable reviewed versioned payloads from Buck extraction through the
+  control-plane request and status surfaces.
+- Submit and run-action paths are idempotent at the control-plane request layer.
+- Lifecycle states beyond `finished` are real, observable, and test-covered.
+- Cancel works through the reviewed run-action path, and resume has an explicit fail-closed
+  contract even when the current provider/run is not resumable.
+- CLI and later control-plane clients can rely on one exact reviewed RBAC role/scope model and one
+  machine-readable response model.
+
+### Risks
+
+Contract and lifecycle work can sprawl if every convenience request turns into a new special-case
+response shape.
+
+### Mitigation
+
+Keep the contract vocabulary closed, version the payloads explicitly, and reject unsupported actions
+through the same reviewed response surface rather than inventing side channels.
+
+### Consequence of Not Implementing
+
+The deployment system would still lack the final model's reviewed control-plane API, lifecycle,
+idempotency, and authorization guarantees even if individual provider flows continue to work.
+
+### Downsides for Implementing
+
+Adds operator-surface and state-model complexity that is highly visible and must remain stable.
+
+### Recommendation
+
+Implement after PR-17 so the stable control-plane contracts sit on top of real admission and
+approval semantics.
+
+---
+
+## PR-19: Deployment-atomic multi-component replay + `nixos-shared-host` immutable-reuse closeout
+
+### Description
+
+I will close the current reviewed-slice limitation that leaves multi-component
+`nixos-shared-host` deploys effectively write-only. This PR records the per-component publish state
+needed for deterministic replay and adds deployment-atomic multi-component publish-only, retry,
+rollback, and promotion for the reviewed ordered-best-effort static-webapp slice.
+
+### Scope & Changes
+
+- Persist structured per-component artifact, publish, smoke, and live-identity state in deployment
+  records and replay snapshots.
+- Support multi-component `nixos-shared-host`:
+  - `--publish-only`
+  - `retry`
+  - `rollback`
+  - compatible same-artifact `promotion`
+    using recorded per-component state rather than single-component assumptions.
+- Keep retry and rollback deployment-atomic by default after partial publish failure.
+- Allow already-proven-live component no-op reuse only when the adapter can prove:
+  - the currently live published identity exactly matches the intended recorded artifact identity
+  - no rollout or `release_action` rule requires re-publish
+- Fail closed on:
+  - missing per-component replay state
+  - ambiguous live identity
+  - partial-state mismatch
+  - component-level drift that breaks deployment-atomic replay safety
+- Update the `nixos-shared-host` provider capability and related docs so multi-component immutable
+  reuse support and the reviewed built-in `release_actions` posture are documented accurately rather
+  than left in the earlier initial-slice wording.
+
+### Tests (in this PR)
+
+- Add end-to-end tests for multi-component:
+  - publish-only replay
+  - retry
+  - rollback
+  - cross-deployment promotion
+- Add tests proving deployment-atomic behavior after partial publish failure.
+- Add tests allowing no-op component reuse only when the live identity matches the intended exact
+  artifact and rejecting reuse on any ambiguity.
+- Add tests rejecting replay when per-component record or replay state is missing or drifted.
+- Add tests covering multi-component replay interaction with the reviewed built-in `release_actions`
+  contract.
+
+### Docs (in this PR)
+
+- Document deployment-atomic multi-component replay, retry, rollback, and promotion semantics for
+  the reviewed `nixos-shared-host` slice.
+- Document the per-component record and replay data model.
+- Update provider-capability docs so the reviewed multi-component immutable-reuse and built-in
+  `release_actions` support are aligned with the implementation.
+
+### Verification Commands
+
+- `buck2 test //...`
+- multi-component replay and promotion command flows introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-and-project-impact`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should stay in reviewed deployment-owned
+  replay/runtime logic while also adding or updating concrete multi-component deployment fixtures or
+  declarations used to exercise the new behavior. Under the deployment-only verify policy, default
+  `v` / CI can run the reviewed union of deployment coverage and project-impact coverage instead of
+  the full build-system verify scope.
+
+### Acceptance Criteria
+
+- Reviewed multi-component `nixos-shared-host` deployments can be replayed and recovered without
+  guessing from current host state.
+- Deployment records preserve enough per-component state to make replay, rollback, and promotion
+  deterministic.
+- The reviewed provider-capability and operator docs match the runtime behavior for multi-component
+  immutable reuse and built-in `release_actions`.
+
+### Risks
+
+Partial multi-component success can tempt the implementation into ad hoc component-by-component
+recovery rules that silently weaken deployment-atomic semantics.
+
+### Mitigation
+
+Record explicit per-component state, keep the deployment atomic by default, and require exact proof
+before any component-level no-op reuse is permitted.
+
+### Consequence of Not Implementing
+
+The repo would keep a multi-component deployment slice that can publish but cannot fully satisfy
+the final design's replay, rollback, and promotion expectations.
+
+### Downsides for Implementing
+
+Adds structured replay state and more complex negative-path testing for one provider family.
+
+### Recommendation
+
+Implement after the control-plane contract work is stable so multi-component immutable-reuse can
+build on the final protected/shared lifecycle and authz surfaces.
+
+---
+
+## PR-20: Cloudflare Pages rollback + explicit retire/migrate-target workflow closeout
+
+### Description
+
+I will close the remaining operator-surface gap for the reviewed Cloudflare Pages path and add the
+first explicit target-retirement / target-migration workflow required by the design. This PR adds
+same-deployment Cloudflare rollback on exact admitted artifacts and a separate audited workflow for
+retiring or transitioning live target ownership instead of overloading normal deploy/remove
+semantics.
+
+### Scope & Changes
+
+- Implement same-deployment Cloudflare Pages rollback using exact artifact reuse plus current
+  target-environment admission.
+- Apply operation-kind-aware approval rules to Cloudflare rollback, especially fresh
+  `production_facing` approval by default unless policy explicitly relaxes it.
+- Preserve parent-run, release-lineage, artifact-lineage, provider release identity, and
+  normal-versus-preview target distinctions in Cloudflare rollback records.
+- Introduce the first reviewed retire/migrate-target workflow for controlled live-target ownership
+  transitions:
+  - retire one deployment's normal live target
+  - migrate target ownership under a reviewed alias/migration exception window
+  - require the migration or alias exception object to preserve at least:
+    - affected deployment id or deployment ids
+    - old normal target identity and new normal target identity when applicable
+    - enforced shared lock scope for the exception window
+    - approval authority and review ticket or equivalent justification
+    - effective start time and expiry or explicit completion condition
+    - reconciliation owner
+  - require admission and replay validation to consult that exception object when target binding
+    has changed
+  - fail closed when the exception has expired or been superseded
+  - record requesting identity, executing identity, approvals, old target identity, new target
+    identity when applicable, and resulting ownership state
+- Keep retire/migrate-target separate from normal `deploy`; do not treat generic `--remove` as the
+  public abstraction for providers that are not authoritative platform-state hosts.
+- Update CLI guidance and provider-capability docs so the reviewed rollback and target-transition
+  surfaces are explicit and do not rely on earlier placeholder wording.
+
+### Tests (in this PR)
+
+- Add end-to-end Cloudflare Pages rollback tests for:
+  - restoring a prior known-good exact artifact
+  - rejecting rollback when the source run is ineligible
+  - requiring fresh `production_facing` approval where policy says so
+- Add tests rejecting Cloudflare rollback when:
+  - the exact artifact is unavailable
+  - the selected source run refers to preview rather than the normal live target
+  - current lane/admission state no longer authorizes rollback
+- Add retire/migrate-target tests covering:
+  - successful reviewed target retirement
+  - controlled ownership transition under an active exception window
+  - the exception's declared shared lock scope preserved and enforced for the transition window
+  - expired or missing exception rejected
+  - superseded exception rejected
+  - authorization and approval failures
+  - resulting records and audit payloads preserving old/new target identity correctly
+
+### Docs (in this PR)
+
+- Document Cloudflare Pages rollback semantics and approval requirements.
+- Document the reviewed retire/migrate-target workflow and how it differs from normal deploy or
+  provider-local cleanup.
+- Document the migration or alias exception object's required fields and enforced shared lock-scope
+  expectations.
+- Update provider-capability and operator docs so reviewed provider-specific rollback and
+  target-transition behavior is explicit.
+
+### Verification Commands
+
+- `buck2 test //...`
+- Cloudflare rollback and retire/migrate-target command flows introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR is expected to combine provider/control-
+  plane runtime changes with the shared metadata and exception surfaces needed to model reviewed
+  target transitions. Under the deployment-only verify policy, default `v` / CI must still run the
+  full build-system verify scope.
+
+### Acceptance Criteria
+
+- The reviewed Cloudflare Pages path supports same-deployment rollback using exact admitted
+  artifacts and current target-environment admission.
+- Retire/migrate-target is a first-class audited workflow rather than an implicit side effect of
+  `deploy`.
+- Reviewed target transitions depend on an explicit migration or alias exception object whose lock
+  scope and lifetime are enforced.
+- Operators no longer need ad hoc or overloaded `--remove` semantics to retire or transition live
+  targets.
+- Tests and docs in this PR describe the same provider/operator surface.
+
+### Risks
+
+Rollback and target-transition work both touch high-risk destructive paths, so hidden ambiguity is
+dangerous.
+
+### Mitigation
+
+Keep artifact identity, approval, target-identity transition, and audit recording explicit and
+fail closed on any mismatch.
+
+### Consequence of Not Implementing
+
+The repo would still lack the final-model reviewed rollback surface for one of its main higher-
+environment providers and would not have the explicit retire/migrate-target workflow the design
+calls for.
+
+### Downsides for Implementing
+
+Adds another provider-specific recovery path plus a new high-risk operator workflow that must be
+documented very carefully.
+
+### Recommendation
+
+Implement last as the final protected/shared operator-surface closeout after admission, control-
+plane, and multi-component replay behavior are stable.
+
+---
+
+## PR-21: Reviewed provisioner plan/diff gate + higher-bar exception contract for infra-affecting mutation
+
+### Description
+
+I will close the remaining gap for protected/shared infra-affecting mutation by making the reviewed
+provisioner plan/diff artifact a first-class pre-mutation requirement rather than an implied future
+hook. This PR ensures the control plane generates, fingerprints, validates, and records the exact
+reviewed plan/diff from the frozen execution snapshot before routine mutation begins, makes normal
+deploy/provision-only flows fail closed on destructive replace/delete intent, and defines the
+explicit higher-bar exception posture for providers that cannot produce one. This PR also closes
+the destructive-intent boundary for built-in release-time actions so destructive data or
+infrastructure mutation cannot hide inside an ordinary routine deploy.
+
+### Scope & Changes
+
+- Generate the reviewed provisioner plan/diff artifact for protected/shared infra-affecting runs
+  from the frozen execution snapshot before any mutating step begins.
+- Fingerprint and bind that plan/diff artifact to the immutable admitted run snapshot so later
+  approval, lock-time revalidation, and replay checks all refer to the same reviewed artifact.
+- Classify reviewed plan/diff output into non-destructive routine mutation versus destructive
+  replace/delete behavior that can remove owned live resources.
+- Fail closed when:
+  - a required plan/diff artifact is missing
+  - regenerated plan/diff output no longer matches the reviewed artifact materially
+  - mutation is attempted after plan/diff drift without fresh approval
+  - a normal `deploy` or `--provision-only` flow detects destructive replace/delete intent
+- Add one explicit provider/provisioner capability contract for infra-affecting mutation:
+  - reviewed plan/diff required and supported
+  - reviewed higher-bar exception path allowed when no meaningful plan/diff can be produced
+  - routine mutation disallowed when neither contract is reviewed
+- Add one explicit destructive infra-mutation posture for providers that can remove or replace
+  owned live resources:
+  - normal deploy/provision-only remains non-destructive by default
+  - destructive replace/delete behavior requires a separate reviewed operator path or explicit
+    break-glass intent surface rather than piggybacking on routine deploy
+  - the destructive path must bind to the same reviewed plan/diff artifact, stronger approval, and
+    explicit operator intent/audit recording
+- Apply the same non-destructive-by-default contract to built-in `release_actions` that can perform
+  destructive data or infrastructure mutation:
+  - ordinary protected/shared deploy/retry/promotion/rollback paths fail closed when a declared
+    action type is classified as destructive and no separately reviewed workflow/intent surface is
+    in use
+  - destructive built-in action execution must bind to explicit operator intent, stronger approval,
+    and the same reviewed audit boundary rather than silently inheriting routine deploy authority
+- Expose operator-facing plan/diff review references through the reviewed control-plane submit or
+  status surfaces instead of leaving review to provider-local conventions.
+- Persist secret-safe plan/diff references, fingerprints, and approval-binding facts in
+  authoritative records and replay snapshots.
+- Align provider-capability metadata, admission behavior, and worker execution order around one
+  reviewed pre-mutation plan/diff gate.
+
+### Tests (in this PR)
+
+- Add worker-flow tests proving infra-affecting runs generate the reviewed plan/diff before the
+  first mutating provider step.
+- Add admission and revalidation tests rejecting mutation when:
+  - required plan/diff output is unavailable
+  - the artifact fingerprint drifts after approval
+  - the provider/provisioner has no reviewed plan/diff or higher-bar exception contract
+- Add destructive-plan tests proving:
+  - normal `deploy` and `--provision-only` fail closed on reviewed delete/replace intent
+  - destructive infra mutation is accepted only through the separate reviewed destructive path or
+    explicit break-glass intent surface
+  - destructive-path approval and audit evidence bind to the same reviewed plan/diff artifact
+- Add destructive-action tests proving:
+  - destructive built-in `release_actions` are rejected on routine protected/shared paths
+  - destructive built-in actions are accepted only through the reviewed destructive-intent
+    workflow/intent surface
+  - destructive-action execution preserves the stronger approval and audit facts required for later
+    review
+- Add approval-binding tests proving infra-affecting approval evidence fails closed when the
+  reviewed plan/diff artifact changes materially.
+- Add provider-capability tests covering:
+  - providers that require a reviewed plan/diff
+  - providers that use an explicitly reviewed higher-bar exception posture
+  - providers rejected because neither posture is declared
+- Extend record and replay tests to assert plan/diff references remain retrievable in a secret-safe
+  form.
+
+### Docs (in this PR)
+
+- Document the protected/shared worker responsibility to generate and bind reviewed provisioner
+  plan/diff output before mutation.
+- Document the reviewed non-destructive-by-default provisioner contract and the separate
+  destructive-intent workflow for replace/delete behavior.
+- Document that destructive built-in `release_actions` follow the same non-destructive defaulting
+  philosophy and require the same reviewed destructive-intent workflow rather than routine deploy
+  authority.
+- Document the higher-bar exception posture for infra-affecting providers that cannot produce a
+  meaningful plan/diff artifact.
+- Update provider-capability docs so reviewed plan/diff expectations are explicit per provider or
+  provisioner family.
+- Document the operator-visible plan/diff review surface and the fail-closed behavior on drift.
+
+### Verification Commands
+
+- `buck2 test //...`
+- infra-affecting provisioner plan/diff command flows introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to touch shared deployment/control-plane behavior, provider-capability
+  metadata, and the reviewed metadata or contract surface used to describe infra-affecting
+  provisioners. Under the deployment-only verify policy, default `v` / CI must still run the full
+  build-system verify scope.
+
+### Acceptance Criteria
+
+- Protected/shared infra-affecting mutation cannot proceed routinely without the reviewed plan/diff
+  or an explicitly reviewed higher-bar exception posture.
+- Normal `deploy` and `--provision-only` remain non-destructive by default; destructive
+  replace/delete behavior requires a distinct reviewed operator path or explicit break-glass
+  posture.
+- Destructive built-in `release_actions` also require the reviewed destructive-intent workflow and
+  cannot be smuggled through the routine deploy path.
+- Approval evidence and lock-time revalidation bind to the same reviewed plan/diff artifact.
+- Provider-capability docs, tests, and runtime behavior agree on which provisioners require a
+  plan/diff and which are exception-only.
+- The control plane records enough secret-safe plan/diff evidence to justify later audit and
+  replay decisions.
+
+### Risks
+
+Plan/diff handling is easy to weaken accidentally by recomputing from newer inputs or by letting
+provider-specific edge cases bypass the same gate.
+
+### Mitigation
+
+Generate the artifact only from the frozen execution snapshot, fingerprint it explicitly, and make
+unsupported provider behavior fail closed unless a reviewed higher-bar exception path exists.
+
+### Consequence of Not Implementing
+
+Protected/shared infra-affecting mutation would still lack the design's required reviewed
+pre-mutation plan/diff gate.
+
+### Downsides for Implementing
+
+Adds more pre-mutation coordination and provider-capability detail for infra-affecting runs.
+
+### Recommendation
+
+Implement first among the remaining closeout PRs so retention, recovery, and observability all
+instrument the final reviewed plan/diff contract rather than a placeholder.
+
+---
+
+## PR-22: Artifact/replay retention + authoritative backend resilience and restore posture
+
+### Description
+
+I will make the operator-facing durability promises in the deployment design real instead of
+implicit. This PR covers minimum artifact and replay-bundle retention for supported immutable-reuse
+flows, authoritative record and evidence retention, and the reviewed backup, restore-test, failover,
+and recovery-objective posture for the protected/shared control plane itself.
+
+### Scope & Changes
+
+- Implement minimum retention enforcement for protected/shared:
+  - admitted immutable artifacts
+  - immutable dependency closures when required for exact reuse
+  - replay bundles and frozen execution snapshots
+  - authoritative deployment records
+  - approval evidence
+  - migration or alias exception records
+  - break-glass emergency evidence
+- Add retention-aware garbage-collection and deletion safeguards so supported retry, promotion, and
+  rollback paths remain usable for the reviewed minimum window.
+- Surface explicit operator-facing failure results when:
+  - a required artifact has expired or been removed
+  - a replay bundle is incomplete
+  - a supported reuse path can no longer be satisfied because retention guarantees were violated
+- Implement the first reviewed backup and restore-test posture for the authoritative backend and any
+  required artifact or evidence stores, including:
+  - scheduled durable backups
+  - restore-test automation or equivalent reviewed restore validation
+  - explicit restore-test cadence by protection class
+  - failover or recovery-readiness checks for the production control-plane topology
+- Publish one reviewed resilience-objective matrix for the deployment authority itself and align the
+  companion docs and runtime policy constants to that same matrix, eliminating current drift between
+  design and contract documents.
+- Persist backup and restore-test results in reviewed operator-visible state so later observability
+  and alerts can consume them directly.
+
+### Tests (in this PR)
+
+- Add retention tests proving supported protected/shared reuse flows retain the exact artifact and
+  replay bundle for the reviewed minimum window.
+- Add garbage-collection tests rejecting deletion or early expiry of artifacts, replay bundles, or
+  evidence still required for an in-policy retry, rollback, or promotion path.
+- Add tests proving replay and rollback fail explicitly with operator-meaningful errors when a
+  required retained artifact or replay bundle is unavailable.
+- Add backup and restore tests that recover a scratch authoritative backend from backup and verify
+  records, evidence references, and required replay metadata are restored correctly.
+- Add policy tests for protection-class-specific retention, RPO or RTO, and restore-test cadence
+  configuration.
+
+### Docs (in this PR)
+
+- Document the operator-facing retention contract for artifacts, replay bundles, and authoritative
+  records.
+- Document the authoritative control-plane backup, restore-test, and resilience posture, including
+  the reviewed objective matrix implemented in this PR.
+- Align [deployments-design.md](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md),
+  [deployments-contract.md](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md), and
+  related capability or operator docs to the same reviewed retention and resilience commitments.
+- Document the explicit failure behavior when an artifact or replay bundle is missing despite a
+  supported reuse request.
+
+### Verification Commands
+
+- `buck2 test //...`
+- backup, restore-test, and retention inspection flows introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to touch deployment/control-plane storage behavior, artifact and evidence
+  retention policy, and the reviewed deployment definitions or configuration that back the
+  authoritative control-plane topology. Under the deployment-only verify policy, default `v` / CI
+  must still run the full build-system verify scope.
+
+### Acceptance Criteria
+
+- Supported protected/shared immutable-reuse paths remain practically usable for at least the
+  reviewed minimum retention windows.
+- The system fails explicitly rather than guessing when a required retained artifact or replay
+  bundle is unavailable.
+- The authoritative control plane has reviewed backup, restore-test, and resilience objectives with
+  tested restore behavior.
+- Companion docs and implemented policy constants agree on one reviewed resilience and retention
+  matrix.
+
+### Risks
+
+Retention and resilience work can drift into vague policy prose if the implementation does not
+make the operator-facing guarantees testable.
+
+### Mitigation
+
+Turn the guarantees into explicit policy constants, retention guards, restore tests, and operator-
+visible status so the promises are mechanically checkable.
+
+### Consequence of Not Implementing
+
+The repo would still lack the design's required durability guarantees for artifact reuse and would
+still rely on undocumented or unverified recovery posture for the deployment authority itself.
+
+### Downsides for Implementing
+
+Adds storage-lifecycle complexity, backup or restore automation, and more cross-document alignment
+work.
+
+### Recommendation
+
+Implement next so later recovery and observability work can rely on real retention guarantees and a
+reviewed resilience baseline.
+
+---
+
+## PR-23: In-doubt-run recovery + control-plane-outage break-glass reconciliation
+
+### Description
+
+I will close the two remaining recovery-path gaps in the design: the normal protected/shared
+in-doubt run after provider-side mutation may have started, and the incident-bounded break-glass
+path when the normal control plane itself is unavailable. This PR makes both paths explicit,
+fail-closed, auditable, and reconciled back into authoritative records.
+
+### Scope & Changes
+
+- Implement reviewed in-doubt-run detection for protected/shared mutation, including cases such as:
+  - worker restart after provider-side mutation begins
+  - provider request timeout with uncertain remote acceptance
+  - lock lease loss or fencing loss during mutation
+  - process death before final record persistence
+- Add an authoritative recovery state machine that:
+  - reloads the frozen execution snapshot
+  - reacquires current lock or fencing authority before continuing
+  - reconciles provider state before any duplicate side effects
+  - resumes only when duplicate-execution safety is proven
+  - otherwise terminates fail closed with explicit operator follow-up requirements
+- Reuse the same reconciliation path for post-mutation cancellation so `cancelling` runs do not
+  guess about provider state.
+- Persist material recovery facts in authoritative records, including:
+  - whether recovery occurred
+  - which step was in doubt
+  - whether provider-state reconciliation succeeded
+  - whether execution resumed or terminated after reconciliation
+- Implement the explicit control-plane-outage break-glass workflow, including:
+  - incident-bounded authorization scope and separate credentials or execution path
+  - explicit concurrency protection such as target freeze, fencing, or equivalent reviewed
+    protection when the normal online lock service is unavailable
+  - exact admitted-artifact reuse preference when a retained admitted artifact is available
+  - local or deferred emergency evidence capture
+  - mandatory post-incident ingestion or reconciliation of that evidence into authoritative records
+- Keep break-glass separate from normal operator convenience paths and require explicit incident
+  justification.
+
+### Tests (in this PR)
+
+- Add recovery tests covering:
+  - provider mutation timeout with ambiguous remote acceptance
+  - worker restart during publish, smoke, or side-effecting `release_actions`
+  - lock or fencing loss after mutation start
+  - recovery success after provider-state reconciliation proves remote mutation completed
+  - fail-closed termination when reconciliation cannot prove whether mutation happened
+- Add cancellation tests proving post-mutation cancel flows use reconciliation before choosing a
+  terminal record.
+- Add break-glass tests covering:
+  - required incident reference and emergency authorization
+  - concurrency protection against simultaneous normal-path mutation
+  - emergency evidence capture and later authoritative ingestion
+  - rejection of convenience-path or under-specified break-glass attempts
+- Add record tests proving recovery and break-glass facts are preserved in the final authoritative
+  record shape.
+
+### Docs (in this PR)
+
+- Document the reviewed in-doubt-run recovery contract and its fail-closed continuation rules.
+- Document the protected/shared record fields and operator expectations for recovered runs.
+- Document the control-plane-outage break-glass procedure, required evidence, and mandatory
+  post-incident reconciliation.
+- Document how cancellation after mutation start reuses the same provider-state reconciliation
+  contract.
+
+### Verification Commands
+
+- `buck2 test //...`
+- recovery, cancellation-reconciliation, and break-glass flows introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-owned control-plane runtime, records, authz, and
+  deployment-domain test infrastructure. Under the deployment-only verify policy, default `v` / CI
+  can run the reviewed deployment suite instead of the full non-deployment build-system verify
+  scope.
+
+### Acceptance Criteria
+
+- Protected/shared in-doubt runs no longer rely on blind retry or operator memory.
+- Recovery always re-establishes authoritative ownership and reconciles provider state before
+  continuing mutation.
+- Break-glass is an explicit incident-only path with required evidence and mandatory authoritative
+  reconciliation afterward.
+- Records and tests preserve enough structured facts to explain recovered and emergency execution
+  clearly.
+
+### Risks
+
+Recovery logic touches the hardest failure paths in the system, where silent duplication or silent
+data loss would be especially dangerous.
+
+### Mitigation
+
+Keep the recovery state machine explicit, require current authority before continuing, and fail
+closed whenever reconciliation cannot prove safety.
+
+### Consequence of Not Implementing
+
+Protected/shared execution would still lack the design's reviewed recovery path for ambiguous
+provider mutation and the required emergency reconciliation path for control-plane outages.
+
+### Downsides for Implementing
+
+Adds complex negative-path behavior, more state transitions, and an emergency workflow that must be
+carefully fenced.
+
+### Recommendation
+
+Implement after resilience and retention are in place so recovery and break-glass can rely on the
+reviewed storage, evidence, and retention posture introduced there.
+
+---
+
+## PR-24: Control-plane observability + secret-safe logging and redaction closeout
+
+### Description
+
+I will make the final protected/shared operational contract visible and safe to operate. This PR
+adds the required audit events, metrics, alerts, dashboards, and operator-facing views for the
+reviewed control-plane lifecycle, while also enforcing the design's fail-closed redaction boundary
+for logs, provider output, plan/diff artifacts, replay snapshots, and other operator-visible
+payloads.
+
+### Scope & Changes
+
+- Emit structured audit or lifecycle events for the required protected/shared categories,
+  including:
+  - submission and admission decisions
+  - approval grant, reuse, expiry, and revocation
+  - lock acquisition, timeout, and release
+  - mutation-step start and finish
+  - progressive-rollout phase changes when supported
+  - cancellation, supersedence, and no-longer-admitted exits
+  - preview cleanup
+  - in-doubt detection and recovery outcomes
+  - break-glass invocation and reconciliation
+- Expose the required operational metrics and operator-visible views for:
+  - queue depth and queue wait time
+  - lock contention and stale-lock or fencing anomalies
+  - lifecycle-step durations and retry counts
+  - failures by `final_outcome` and `failed_step`
+  - age of oldest queued and running runs
+  - backup, restore-test, and failover posture
+  - in-doubt and recovered-run outcomes
+- Add the reviewed alert set for saturation, repeated target failure, stale-lock anomalies,
+  failed or overdue backup or restore-test posture, excessive break-glass use, and control-plane
+  degradation that threatens the published resilience objectives.
+- Introduce one reviewed redaction-classification and enforcement boundary for operator-visible
+  payloads:
+  - safe to display directly
+  - redact before persistence or display
+  - reference-only with stable pointer or fingerprint
+- Ensure provider stdout or stderr, plan/diff output, smoke failure context, replay snapshots,
+  approval evidence, and exception payloads all pass through the same reviewed redaction boundary
+  before durable persistence or operator display.
+- Store only redacted summaries, structured codes, bounded safe excerpts, or fingerprints when raw
+  payload secret safety cannot be proven.
+- Make redaction explicit in operator-facing status or debug surfaces so omitted fields are
+  understood as intentional safety behavior.
+
+### Tests (in this PR)
+
+- Add event-emission tests for the required lifecycle, approval, recovery, preview-cleanup, and
+  break-glass categories.
+- Add metrics and alert tests proving the required counters, timers, gauges, and thresholded alert
+  conditions are populated for representative success and failure paths.
+- Add operator-view tests proving queue, lock, failure, backup or restore, and recovery posture can
+  be inspected through the reviewed dashboards or equivalent views introduced in this PR.
+- Add redaction tests proving secret-bearing provider output, config content, credentials, and
+  uncertain payloads are never persisted or displayed raw in protected/shared observability or
+  record surfaces.
+- Add tests proving plan/diff artifacts, approval evidence, and replay snapshots follow the same
+  fail-closed redaction contract.
+
+### Docs (in this PR)
+
+- Document the minimum required control-plane audit events, metrics, alerts, and dashboards for
+  protected/shared mutation.
+- Document the secret-safe logging and redaction contract for logs, events, plan/diff artifacts,
+  provider output, replay snapshots, and operator-visible summaries.
+- Document how redaction is surfaced to operators so omitted values are understood correctly.
+- Update companion operator docs to describe the reviewed observability and troubleshooting posture
+  after the earlier resilience and recovery PRs land.
+
+### Verification Commands
+
+- `buck2 test //...`
+- observability, audit-event, and redaction verification flows introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-owned control-plane runtime, observability integration,
+  record shaping, and deployment-domain test infrastructure. Under the deployment-only verify
+  policy, default `v` / CI can run the reviewed deployment suite instead of the full non-deployment
+  build-system verify scope.
+
+### Acceptance Criteria
+
+- The protected/shared control plane exposes the required audit events, metrics, alerts, and
+  operator-facing views to operate the published resilience and rollout posture.
+- Observability surfaces cover recovery and break-glass behavior, not only steady-state deploy
+  success.
+- Protected/shared logs, audit streams, dashboards, and record-adjacent payloads are secret-safe by
+  construction.
+- Documentation, dashboards or views, and tests describe the same reviewed observability contract.
+
+### Risks
+
+Observability work can accidentally become a grab bag of ad hoc logs and unsafe payload capture.
+
+### Mitigation
+
+Use one reviewed event and metric vocabulary, centralize redaction enforcement, and fail closed
+when payload secret safety cannot be established.
+
+### Consequence of Not Implementing
+
+The repo would still fall short of the design's required operational visibility and secret-safe
+observability posture for protected/shared mutation.
+
+### Downsides for Implementing
+
+Adds telemetry, dashboards, alerts, and redaction plumbing across most protected/shared execution
+paths.
+
+### Recommendation
+
+Implement after PR-23 so observability instruments the stabilized protected/shared control-plane
+core before the final progressive-rollout and bootstrap closeout work lands.
+
+---
+
+## PR-25: Progressive-rollout state model + resume/abort/supersedence + record persistence
+
+### Description
+
+I will close the remaining execution-model gap for deployments whose reviewed rollout behavior is
+more complex than a single publish plus smoke pass. This PR adds the explicit progressive-rollout
+state machine, gate evaluation contract, first-class `resume` and `abort` behavior, supersedence
+rules, and authoritative record persistence required by the design, while keeping unsupported
+progressive modes fail-closed unless a reviewed provider capability entry explicitly allows them.
+
+### Scope & Changes
+
+- Implement the progressive-rollout metadata and execution contract for reviewed provider slices,
+  including:
+  - explicit rollout phases or steps in execution order
+  - per-phase advance gates
+  - explicit abort rules
+  - explicit smoke mode placement
+- Add the reviewed progressive phase-state vocabulary:
+  - `pending`
+  - `running`
+  - `paused`
+  - `succeeded`
+  - `failed`
+  - `aborted`
+- Implement first-class progressive-run actions on the existing `deploy_run_id`:
+  - `resume`
+  - `abort`
+    with lock reacquisition, paused-state validation, and fail-closed rejection when deterministic
+    continuation is not provable.
+- Implement explicit supersedence rules for progressive runs so newer runs cannot silently replace
+  a running rollout mid-phase unless a reviewed stronger provider rule says so.
+- Add the minimum reviewed gate-type vocabulary and evaluation contract needed for the first slice,
+  while failing closed on gate types or rollout modes that lack a reviewed provider capability
+  contract.
+- Preserve per-phase gate evidence, decisions, publish state, and resumability facts in
+  authoritative deployment records and replay snapshots.
+- Keep rollback from partial progressive state fail-closed by default unless the reviewed provider
+  capability and rollout policy explicitly define safe reversal semantics.
+- Update provider-capability docs and runtime gating so progressive rollout support is explicit per
+  provider family and rollout mode rather than inferred from operator habit.
+
+### Tests (in this PR)
+
+- Add validation tests for progressive-rollout metadata, including rejection of:
+  - unsupported rollout modes for the provider family
+  - unsupported gate types
+  - missing phase order, gate, or abort declarations
+- Add execution tests covering:
+  - `pending -> running -> succeeded` phase progression
+  - `paused` on a non-passing gate whose terminal effect is pause
+  - `failed` and `aborted` outcomes according to the declared gate or abort rule
+- Add run-action tests proving:
+  - `resume` keeps the same `deploy_run_id`, rollout history, and frozen execution snapshot
+  - `resume` fails closed when lock ownership, paused state, or deterministic continuation cannot
+    be proven
+  - `abort` follows the declared rollout-mode policy rather than improvising provider behavior
+- Add supersedence tests proving running progressive rollouts are not silently replaced by newer
+  runs mid-phase.
+- Add record and replay tests asserting per-phase state, gate evidence references, resumability,
+  and partial publish facts are preserved deterministically.
+
+### Docs (in this PR)
+
+- Document the progressive-rollout state machine, gate vocabulary, resume or abort semantics, and
+  supersedence rules.
+- Document the first reviewed provider or rollout-mode slice and the fail-closed behavior for
+  unsupported progressive modes.
+- Document the required record fields for paused, resumed, failed, and aborted rollouts.
+- Update operator docs so progressive rollout becomes an explicit first-class workflow rather than
+  an implied future extension of simple publish.
+
+### Verification Commands
+
+- `buck2 test //...`
+- progressive-rollout submit, resume, abort, and status flows introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-owned control-plane runtime, provider-capability handling,
+  records, and deployment-domain tests. Under the deployment-only verify policy, default `v` / CI
+  can run the reviewed deployment suite instead of the full non-deployment build-system verify
+  scope.
+
+### Acceptance Criteria
+
+- Progressive rollout is a real reviewed execution model with explicit phase states, gates,
+  resumability, and abort behavior.
+- `resume` and `abort` operate on an existing run rather than inventing ad hoc replacement flows.
+- Unsupported progressive modes fail closed unless a reviewed provider capability entry says
+  otherwise.
+- Records and tests preserve enough structured phase history to make later audit, replay, and
+  operator decisions deterministic.
+
+### Risks
+
+Progressive rollout can easily devolve into provider-specific improvisation if the phase model,
+gate vocabulary, and supersedence rules are not kept explicit.
+
+### Mitigation
+
+Keep the state machine closed, require reviewed provider capability declarations, and fail closed on
+any rollout mode or gate type whose deterministic continuation semantics are not proven.
+
+### Consequence of Not Implementing
+
+The design would still lack its required progressive-rollout state handling, resume or abort
+policy, and authoritative record persistence.
+
+### Downsides for Implementing
+
+Adds a more complex execution model with more lifecycle states, operator actions, and negative-path
+testing.
+
+### Recommendation
+
+Implement after the core observability work so the progressive-run state model can plug into the
+stabilized event, metric, and record vocabulary instead of forcing another cross-cutting redesign.
+
+---
+
+## PR-26: Reviewed bootstrap/self-hosting bring-up + deployment-authority recovery path
+
+### Description
+
+I will add the final design-level execution path that is still missing: the reviewed limited
+bootstrap mode for bringing up or recovering the deployment authority itself. This PR makes
+self-hosting and disaster-recovery bootstrap explicit, bounded, auditable, and separate from the
+normal protected/shared deployment path so the system does not gain a second long-lived mutating
+authority by accident.
+
+### Scope & Changes
+
+- Introduce one reviewed bootstrap executor path or deployment family dedicated to
+  deployment-system-owned infrastructure only.
+- Limit bootstrap scope to creating or recovering the minimum dependencies needed for normal
+  control-plane operation, such as:
+  - control-plane service runtime
+  - authoritative backend and lock service
+  - artifact or provenance storage
+  - secrets or runtime-config integration wiring for the deployment authority itself
+  - control-plane ingress, DNS, certificates, or endpoint wiring
+  - initial credentials needed for the normal control plane to take ownership
+- Implement one explicit bootstrap identity and authorization path distinct from ordinary submit,
+  approve, operate, and break-glass roles.
+- Require explicit proof of target identity, artifact identity, and ownership of the
+  deployment-system resources being mutated, failing closed when that proof is absent.
+- Prefer exact immutable admitted artifacts for bootstrap or recovery when available rather than
+  silently rebuilding.
+- Reconcile or ingest authoritative bootstrap records as soon as the normal control plane is
+  available again.
+- Keep bootstrap clearly separate from normal protected/shared deploy:
+  - no silent fallback from normal deploy into bootstrap
+  - no arbitrary application deployment through bootstrap
+  - no package-local hooks or other unreviewed mutation paths with bootstrap authority
+- Update the reviewed self-hosting repository shape and operator guidance so steady-state control-
+  plane updates return to the normal deployment path after bootstrap succeeds.
+
+### Tests (in this PR)
+
+- Add tests for reviewed bootstrap authorization and scope rejection, including failure when:
+  - the target is not deployment-system-owned infrastructure
+  - the caller uses ordinary deploy authority instead of bootstrap authority
+  - artifact identity, target identity, or ownership proof cannot be established
+- Add first-install bootstrap tests for bringing up the minimum deployment-authority dependencies
+  from a reviewed bootstrap target.
+- Add offline recovery bootstrap tests proving the path can restore or recreate the minimum control-
+  plane dependencies and then hand authority back to the normal control plane.
+- Add reconciliation tests proving deferred bootstrap evidence is ingested into authoritative
+  records once the normal control plane is available again.
+- Add tests rejecting continued routine updates through bootstrap after the normal control plane is
+  healthy.
+
+### Docs (in this PR)
+
+- Document the reviewed bootstrap model, allowed scope, and explicit separation from normal deploy
+  and from break-glass.
+- Document the operator workflow for first install, trusted CI bootstrap, and offline recovery
+  bootstrap.
+- Document the minimum bootstrap constraints and the requirement to reconcile authoritative records
+  after bootstrap.
+- Update self-hosting or control-plane topology docs so bootstrap becomes an explicit, bounded part
+  of the implemented deployment system rather than an implied future procedure.
+
+### Verification Commands
+
+- `buck2 test //...`
+- bootstrap and deployment-authority recovery flows introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to touch deployment/control-plane runtime, deployment-system topology or
+  infrastructure declarations, and the reviewed metadata or command surface used for bootstrap
+  execution. Under the deployment-only verify policy, default `v` / CI must still run the full
+  build-system verify scope.
+
+### Acceptance Criteria
+
+- The repo has one explicit reviewed bootstrap path for creating or recovering the deployment
+  authority itself.
+- Bootstrap is bounded to deployment-system-owned infrastructure and cannot become a second routine
+  deployment system for ordinary applications.
+- Bootstrap prefers exact immutable artifacts, fails closed on identity or ownership ambiguity, and
+  reconciles authoritative records once the normal control plane resumes.
+- Tests and docs in this PR describe the same self-hosting and recovery posture.
+
+### Risks
+
+Bootstrap is inherently high-risk because it exists exactly when the normal authority is missing or
+being created.
+
+### Mitigation
+
+Keep the bootstrap scope intentionally tiny, require separate authority and explicit identity proof,
+and force routine updates back through the normal control plane immediately after bootstrap.
+
+### Consequence of Not Implementing
+
+The design would still lack its reviewed path for self-hosting bring-up and for recovering the
+deployment authority itself without pretending the half-available control plane is already the
+normal mutating authority.
+
+### Downsides for Implementing
+
+Adds a special-case executor path and recovery workflow that must remain carefully bounded forever.
+
+### Recommendation
+
+Implement late, after the normal control-plane contracts are stable, so bootstrap can build on the
+fully stabilized resilience posture, records, and observability introduced by the earlier PRs.
+
+---
+
+## PR-27: Repo-level `deploy` front-door and preview-policy closeout for `--validate-only`, `--provision-only`, and `--list`
+
+### Description
+
+I will close the remaining public CLI contract gaps so the repo has one reviewed deploy front door
+that actually matches the design's documented operator surface. This PR adds the missing
+non-mutating and provision-only entry points, their mutual-exclusion rules, and the reviewed
+provisioner-input contract for runs that mutate infrastructure without publishing a new artifact,
+while also closing the remaining repo-level preview-policy and preview-identity contract gaps.
+
+### Scope & Changes
+
+- Implement `deploy <id> --validate-only` as a reviewed validation-only path that:
+  - validates deployment metadata, provider capability rules, referenced Buck targets, and required
+    provider-native config presence
+  - does not build, resolve, provision, publish, run `release_actions`, or mutate any external
+    state
+- Implement `deploy --list` as the canonical non-mutating deployment discovery entry point with one
+  stable reviewed output contract suitable for scripting and operator discovery.
+- Implement `deploy <id> --provision-only` for both `local_only` and protected/shared flows,
+  preserving the reviewed rule that provision-only:
+  - still validates
+  - does not publish
+  - does not run publish-phase `release_actions`
+  - binds to one admitted source revision and one frozen execution snapshot for protected/shared
+    mutation
+- Implement the explicit local-only mutating fallback posture on the repo-level `deploy` path:
+  - `local_only` mutation may use a local filesystem lock plus a local structured deployment record
+  - that local fallback is non-authoritative and must never be used as the locking or record system
+    for shared environments
+- Require exact immutable selectors for local-only immutable-reuse flows:
+  - `local_only --provision-only` with `immutable_resolved_inputs` requires an explicit immutable
+    selector such as `--artifact-ref` or an equivalent exact local record reference
+  - `local_only --publish-only` requires one explicit immutable artifact selector or equivalent
+    exact local record reference
+  - local-only immutable-reuse flows must not implicitly reuse "whatever was built most recently"
+    or other ambient local state
+- Preserve and normalize the canonical preview-selector contract on the repo-level `deploy` entry
+  point:
+  - preview-safe local or isolated-preview flows accept exactly one explicit selector such as
+    `--preview-branch` or `--preview-commit`
+  - protected/shared preview publish and preview cleanup use `--source-run-id` as the canonical
+    admitted selector
+  - all preview identity inputs normalize to one structured reviewed preview-identity field before
+    downstream submission
+  - ambient git state, current branch, or provider-default inference is rejected as a mutating
+    preview selector
+- Require preview support to come only from:
+  - an explicit deployment preview-policy block
+  - or a documented reviewed provider-capability default preview policy that the deployment has
+    opted into
+- Implement authoritative effective preview-policy resolution, including provider-wide built-in
+  defaults for cleanup TTL or equivalent cleanup trigger, smoke behavior, and preview lock-scope
+  separation, with validation treating the resolved preview policy as required once preview is in
+  use.
+- Implement deterministic preview identity derivation rules so one reviewed preview derivation key
+  maps to one active preview slot and drives:
+  - isolated preview target identity
+  - preview URL derivation
+  - cleanup ownership
+- Require preview cleanup selectors to identify the preview by the same derivation key or admitted
+  source-run identity that created it.
+- Make preview cleanup safe to repeat idempotently when the targeted preview is already gone.
+- Preserve preview cleanup reason, requesting identity, and effective preview target identity in the
+  cleanup record shape.
+- Preserve preview-cleanup provenance in the cleanup record shape by recording either:
+  - the preview's originating source revision
+  - or a stable lineage/reference to the preview-producing run when that is the more meaningful
+    audit key
+- Add the reviewed provisioner input-class contract:
+  - `metadata_only`
+  - `immutable_resolved_inputs`
+- Require an explicit admitted source selector such as `--source-run-id <deploy-run-id>` whenever a
+  protected/shared provisioner uses `immutable_resolved_inputs`.
+- Preserve explicit operator-visible run classification, lifecycle, and record semantics for
+  provision-only runs rather than treating them as malformed publish runs.
+- Enforce the documented mutual-exclusion and flag-compatibility rules for:
+  - `--validate-only`
+  - `--provision-only`
+  - `--publish-only`
+  - `--preview`
+  - `--preview-cleanup`
+- Keep the canonical public operator surface on the repo-level `deploy` entry point rather than
+  inventing package-local alternatives for these remaining modes.
+
+### Tests (in this PR)
+
+- Add CLI contract tests for `--validate-only`, `--provision-only`, and `--list`.
+- Add tests proving `--validate-only` does not build or mutate.
+- Add local-only fallback tests proving:
+  - local-only mutating runs use the reviewed local lock and structured local record path
+  - shared environments reject any attempt to use the local-only fallback path
+- Add local-only exact-selector tests proving:
+  - `local_only --provision-only` with `immutable_resolved_inputs` rejects ambient or "latest"
+    local state and requires an exact immutable selector
+  - `local_only --publish-only` rejects implicit latest-local-build reuse and requires an exact
+    immutable artifact selector
+- Add preview-selector CLI tests proving:
+  - preview-safe local or isolated-preview flows require exactly one of `--preview-branch` or
+    `--preview-commit`
+  - protected/shared preview and preview cleanup require the reviewed admitted selector surface
+  - ambiguous or ambient preview identity is rejected before submission
+- Add preview-policy tests rejecting:
+  - preview without an explicit or provider-default resolved preview policy
+  - provider-default preview policy values that are required but not resolved or validated
+  - shared/protected preview replay paths that omit required source-run identity
+- Add cleanup-identity tests proving preview cleanup:
+  - rejects a different derivation key or admitted selector than the preview used at creation time
+  - is safe to repeat idempotently when the preview is already absent
+- Add cleanup-record tests proving preview cleanup preserves cleanup reason, requesting identity,
+  and effective preview target identity.
+- Add preview-cleanup provenance tests proving cleanup records preserve the originating source
+  revision or the stable preview-producing-run reference used for audit.
+- Add tests proving `--provision-only`:
+  - skips publish and publish-phase `release_actions`
+  - binds one admitted source revision and frozen execution snapshot for protected/shared runs
+  - loads no artifact by default for `metadata_only`
+  - requires an explicit admitted source selector for `immutable_resolved_inputs`
+- Add mutual-exclusion tests rejecting incompatible flag combinations.
+- Add record and status tests proving provision-only runs preserve the reviewed lifecycle and
+  operator-visible classification.
+
+### Docs (in this PR)
+
+- Document `--validate-only`, `--provision-only`, and `--list` as part of the stable repo-level
+  deploy contract.
+- Document the explicit non-authoritative local-only fallback posture and its boundary against
+  shared-environment mutation.
+- Document the exact-selector contract for local-only immutable-reuse flows.
+- Document the canonical preview-selector surface and normalization rules on the repo-level `deploy`
+  CLI.
+- Document authoritative preview-policy resolution, including provider-capability defaults, and the
+  reviewed preview-identity derivation contract.
+- Document preview cleanup identity selection and idempotent repeat behavior on the repo-level CLI.
+- Document the cleanup-record shape for preview cleanup, including the required originating-source
+  or preview-producing-run provenance field.
+- Document the reviewed provisioner input-class model and selector requirements.
+- Document mutual-exclusion rules and operator-facing behavior for the remaining front-door modes.
+- Update operator docs so these entry points are explicit and no longer implied future surface.
+
+### Verification Commands
+
+- `buck2 test //...`
+- `deploy --list`
+- `deploy <deployment-id> --validate-only`
+- `deploy <deployment-id> --provision-only`
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-owned CLI/front-door code, control-plane request shaping,
+  records, and deployment-domain tests. Under the deployment-only verify policy, default `v` / CI
+  can run the reviewed deployment suite instead of the full non-deployment build-system verify
+  scope.
+
+### Acceptance Criteria
+
+- The repo-level `deploy` CLI now exposes the full reviewed front-door command surface required by
+  the design for `--validate-only`, `--provision-only`, and `--list`.
+- Local-only mutating flows have one explicit reviewed non-authoritative lock/record posture, and
+  shared environments cannot silently fall back to it.
+- Local-only immutable-reuse flows require exact immutable selectors and cannot silently reuse
+  ambient or most-recent local build state.
+- Preview support, selector inputs, and preview identity derivation are normalized and fail closed
+  according to one explicit reviewed public CLI contract.
+- Preview cleanup remains identity-safe, repeat-safe, and preserves the reviewed cleanup record
+  fields.
+- Preview-cleanup records preserve the originating source revision or stable preview-producing-run
+  reference required for later audit.
+- Provision-only runs have explicit reviewed semantics instead of being a missing or partial
+  special case.
+- Flag interactions fail closed and match the documented operator contract.
+- Tests and docs in this PR describe the same front-door behavior.
+
+### Risks
+
+CLI closeout work can accidentally couple operator intent parsing, provisioning semantics, and
+control-plane internals into one hard-to-evolve blob.
+
+### Mitigation
+
+Keep the front-door contract explicit, versioned where shared payloads cross boundaries, and
+separate operator-intent normalization from the downstream execution logic.
+
+### Consequence of Not Implementing
+
+The design would still overstate the reviewed repo-level `deploy` surface compared with what the
+implementation actually exposes.
+
+### Downsides for Implementing
+
+Adds more operator-facing contract surface that must stay stable and well-tested.
+
+### Recommendation
+
+Implement before the remaining provider-breadth PRs so all later provider slices can rely on the
+fully reviewed public command surface.
+
+---
+
+## PR-28: Shared lock authority, queue timeout + default supersedence + stale-run revalidation closeout
+
+### Description
+
+I will close the remaining shared-environment execution-policy gap around lock authority, waiting,
+supersedence, and staleness. This PR makes the reviewed shared lock authority model, default queue
+timeout, narrow auto-supersedence rules, post-lock revalidation behavior, and terminal-state
+recording for stale runs explicit and test-covered rather than left as implied control-plane
+behavior.
+
+### Scope & Changes
+
+- Elevate the initial shared lock into the reviewed lease/fencing-aware lock contract for shared
+  mutation:
+  - explicit lease expiry
+  - stale-holder protection such as fencing tokens or equivalent reviewed authority proof
+  - fail-closed behavior when the current mutating worker no longer holds valid lock authority
+- Implement the reviewed default shared-environment queue behavior:
+  - bounded wait by default when the effective lock scope is already held
+  - default queue timeout of `30 minutes` unless a stricter reviewed policy is documented for the
+    target class
+- Implement reviewed effective lock-scope derivation rules for shared environments:
+  - default lock scope derived from provider plus normalized canonical provider-target identity
+  - explicit lock-scope override allowed only as a reviewed escape hatch
+  - overrides must validate as at least as strict as the provider-target-derived default and fail
+    closed when they would permit unsafe parallel mutation
+- Require preview cleanup to acquire the same effective lock scope that governed the preview being
+  destroyed:
+  - the isolated preview lock when the preview has one
+  - the shared normal deployment lock when policy says the preview shares that scope
+- Implement narrow default supersedence rules for queued runs:
+  - a later admitted normal `deploy` for the same `deployment_id`, same `publish_mode`, and same
+    effective `lock_scope` supersedes older queued normal deploy runs by default
+  - supersedence is not inferred across different deployment ids, publish modes, or lock scopes
+  - preview supersedence is allowed only for the same isolated preview identity or reviewed preview
+    slot policy
+  - `retry`, `rollback`, `preview_cleanup`, and `--provision-only` are not auto-superseded by
+    default
+- Revalidate current invariants after lock acquisition before any mutating step begins, including:
+  - current admission state
+  - target ownership
+  - lock or fencing currency
+  - any `health_gated` prerequisite still satisfying its declared health requirement using a fresh
+    revalidation-time health verdict unless the reviewed prerequisite contract explicitly allows
+    equivalent provider evidence
+  - supersedence or stale-run status
+- Record explicit terminal behavior for queued or stale runs, including:
+  - `termination_reason = lock_timeout`
+  - superseded exits
+  - no-longer-admitted exits after revalidation
+- Keep any optional fail-fast or incident-response queue behavior behind an explicit reviewed policy
+  surface rather than an implicit default.
+
+### Tests (in this PR)
+
+- Add locking tests proving:
+  - the shared lock uses lease-based authority rather than indefinite ownership
+  - stale holders cannot continue mutating after lease or fencing authority is lost
+  - a replacement holder cannot be raced by an older stale worker still trying to mutate
+- Add queue-behavior tests proving shared runs wait with the reviewed bounded timeout by default.
+- Add lock-scope tests covering:
+  - default lock-scope derivation from canonical provider-target identity
+  - reviewed explicit overrides accepted only when they are at least as strict as the default
+  - invalid or unsafe overrides rejected fail closed
+  - preview cleanup reuses the same effective lock scope as the preview being destroyed
+- Add supersedence tests covering:
+  - later normal deploy superseding older queued normal deploys for the same deployment and lock
+    scope
+  - no inferred supersedence across different deployment ids, publish modes, or lock scopes
+  - preview supersedence allowed only for the same isolated preview identity or slot policy
+  - `retry`, `rollback`, `preview_cleanup`, and `--provision-only` not auto-superseded by default
+- Add post-lock revalidation tests proving stale or no-longer-admitted runs exit without mutation.
+- Add revalidation tests proving `health_gated` prerequisites require a fresh revalidation-time
+  health verdict by default and reject stale or undocumented substitute evidence.
+- Add record and status tests proving timeout, supersedence, and stale-run exits preserve the
+  reviewed lifecycle and termination reasons.
+
+### Docs (in this PR)
+
+- Document locking behavior, lease-expiry semantics, and stale-holder/fencing expectations for the
+  final shared lock contract.
+- Document the default shared queue timeout and waiting semantics.
+- Document default effective lock-scope derivation and the reviewed lock-scope override escape
+  hatch.
+- Document preview cleanup effective-lock-scope reuse.
+- Document the narrow default supersedence policy and the run kinds excluded from auto-supersedence.
+- Document post-lock revalidation, including health-gated prerequisite rechecks, and operator-
+  visible stale-run outcomes.
+- Update control-plane operator docs so queue and stale-run behavior is explicit rather than
+  adapter-local convention.
+
+### Verification Commands
+
+- `buck2 test //...`
+- shared queue and status inspection flows introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-owned control-plane runtime, lifecycle handling, and
+  deployment-domain tests. Under the deployment-only verify policy, default `v` / CI can run the
+  reviewed deployment suite instead of the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- Shared lock authority, waiting behavior, queue timeout, supersedence, and stale-run exits match
+  the reviewed design contract.
+- Effective lock-scope derivation and explicit override validation are reviewed, explicit, and
+  test-covered.
+- Stale holders cannot continue mutating after lease or fencing authority is lost, and preview
+  cleanup reuses the correct effective lock scope.
+- Health-gated prerequisites are revalidated explicitly before mutation rather than trusted from
+  earlier queue-entry time.
+- Normal deploy supersedence is explicit and narrow by default.
+- Non-normal run kinds such as `retry`, `rollback`, `preview_cleanup`, and `--provision-only`
+  retain explicit non-superseded behavior unless a reviewed policy says otherwise.
+- Tests and docs in this PR describe the same queue and stale-run semantics.
+
+### Risks
+
+Queue and supersedence policy is easy to get subtly wrong in ways that only show up under
+concurrency and partial failure.
+
+### Mitigation
+
+Keep the default rules closed and explicit, preserve operator-visible termination reasons, and
+cover the negative paths with concurrency-focused tests.
+
+### Consequence of Not Implementing
+
+The shared control plane would still be missing the design's explicit queue timeout, supersedence,
+and stale-run policy guarantees.
+
+### Downsides for Implementing
+
+Adds more lifecycle branches and concurrency-heavy test cases.
+
+### Recommendation
+
+Implement immediately after the front-door CLI closeout so the remaining provider slices build on
+the final shared waiting and revalidation policy.
+
+---
+
+## PR-29: Canonical non-static component-kind and resolve-contract foundation
+
+### Description
+
+I will expand the deployment foundation beyond the initial static-webapp-only slice so the remaining
+provider families can land on one reviewed canonical resolved-component contract instead of
+reintroducing provider-specific ad hoc shapes. This PR adds the missing component kinds and
+provider-neutral resolved-artifact shapes required for SSR, mobile, service, and third-party
+service deployments, while also closing the provider-capability schema gap around default rollout
+behavior and protected/shared built-in `release_actions` support declarations.
+
+### Scope & Changes
+
+- Extend authoritative deployment metadata, extraction, and validation for:
+  - `ssr-webapp`
+  - `mobile-app`
+  - `service`
+  - `third-party-service`
+- Implement the canonical provider-neutral resolved-component contract for those kinds, including:
+  - required resolved fields
+  - strong immutable artifact identity expectations
+  - any required runtime-contract references for the kind
+- Extend record and provenance schemas so the new kinds preserve the reviewed resolved-artifact,
+  provider-config, and runtime-contract provenance needed for replay and audit.
+- Add provider-capability validation hooks so built-in providers must declare support for the new
+  kinds before they are considered valid for publication.
+- Extend the authoritative provider-capability schema so each reviewed provider can declare:
+  - one explicit default rollout mode
+  - whether omission of `rollout_policy` is in policy for each reviewed deployment shape
+  - whether protected/shared built-in `release_actions` are supported
+  - which reviewed built-in action types are allowed or required to be rejected for that provider
+    family
+- Implement rollout-policy omission validation so:
+  - when `rollout_policy` is absent, the provider capability entry's explicit default rollout mode
+    applies only for shapes where omission is reviewed and in policy
+  - protected/shared multi-component or advanced-rollout shapes fail closed when explicit
+    `rollout_policy` is required
+  - provider capability entries cannot rely on undocumented implicit rollout defaults
+- Backfill the reviewed provider-capability entries for already-implemented providers so their
+  default rollout behavior and protected/shared built-in `release_actions` posture are explicit
+  instead of implied by runtime convention.
+- Extend default smoke-class and release-health classification so the new kinds inherit one reviewed
+  baseline instead of provider-local convention.
+- Add representative deployment fixtures or sample packages for the new kinds so later provider
+  slices exercise reviewed concrete shapes rather than only abstract tests.
+
+### Tests (in this PR)
+
+- Add schema and extraction tests for the new component kinds.
+- Add resolve-contract tests proving each new kind emits the reviewed provider-neutral fields and
+  immutable artifact identity shape.
+- Add validation tests rejecting provider/component combinations that lack reviewed capability
+  support.
+- Add provider-capability tests proving:
+  - explicit default rollout mode is required
+  - `rollout_policy` omission is accepted only for shapes where the provider capability says it is
+    in policy
+  - protected/shared shapes that require explicit rollout metadata fail closed when it is omitted
+  - protected/shared built-in `release_actions` support and allowed/rejected action-type
+    declarations are explicit
+- Add record and provenance tests asserting the new kinds preserve the required artifact,
+  provider-config, and runtime-contract references.
+- Add smoke-class defaulting tests for `ssr-webapp`, `mobile-app`, `service`, and
+  `third-party-service`.
+
+### Docs (in this PR)
+
+- Document the canonical resolved-component registry for the new kinds.
+- Update schema, provider-capability, and scenarios docs so the new kinds are part of the reviewed
+  implementation contract rather than design-only vocabulary.
+- Document the reviewed provider-capability default-rollout contract and the omission-is-in-policy
+  rule for `rollout_policy`.
+- Document the provider-capability declaration surface for protected/shared built-in
+  `release_actions`, including allowed/rejected built-in action types.
+- Document artifact identity expectations and record/provenance requirements for the new kinds.
+- Document the default smoke or release-health classification for each new kind.
+
+### Verification Commands
+
+- `buck2 test //...`
+- resolve and metadata inspection flows introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to touch shared build-system metadata extraction, canonical resolve/record
+  contracts, provider-capability validation, and concrete deployment fixtures for the new kinds.
+  Under the deployment-only verify policy, default `v` / CI must still run the full build-system
+  verify scope.
+
+### Acceptance Criteria
+
+- The repo has reviewed authoritative metadata and resolved-artifact contracts for `ssr-webapp`,
+  `mobile-app`, `service`, and `third-party-service`.
+- Provider capability entries now expose explicit default rollout behavior and protected/shared
+  built-in `release_actions` posture instead of relying on undocumented defaults.
+- Providers must declare support explicitly before accepting those kinds.
+- Records and provenance preserve the information needed to replay and audit the new kinds.
+- Tests and docs in this PR describe the same kind-level contract.
+
+### Risks
+
+If kind semantics drift between extraction, resolve, providers, and records, later provider slices
+will recreate the same ambiguity this plan has been trying to remove.
+
+### Mitigation
+
+Land the kind registry, resolve shapes, and provenance contract together before widening provider
+support.
+
+### Consequence of Not Implementing
+
+The later provider-family PRs would either stall or reintroduce provider-specific artifact contracts
+that contradict the design.
+
+### Downsides for Implementing
+
+Adds foundational schema and contract breadth before the corresponding provider adapters are all
+visible end to end.
+
+### Recommendation
+
+Implement before the remaining provider-family PRs so they all build on one reviewed non-static
+kind foundation.
+
+---
+
+## PR-30: `s3-static` provider family + `aws-s3-sync` static-webapp slice
+
+### Description
+
+I will add the reviewed `s3-static` provider family so the design's static-site model is not
+limited to Cloudflare Pages and shared-host publishing. This PR covers repo-owned bucket or CDN
+setup, exact-artifact publish, authoritative target identity, and static smoke behavior for S3-like
+static hosting.
+
+### Scope & Changes
+
+- Add the authoritative provider-capability entry for `s3-static`.
+- Implement the first reviewed `s3-static` provider slice for exactly one `static-webapp`
+  component.
+- Add canonical `provider_target` identity and lock-scope rules for S3-style static hosting, such
+  as bucket plus account or distribution identity.
+- Implement the built-in static publisher contract for `aws-s3-sync` or equivalent reviewed
+  immutable-artifact upload behavior.
+- Implement reviewed provisioner support for `terraform-stack` and `cdktf-stack` where the repo
+  owns bucket, CDN, DNS, or related environment setup.
+- Add provider-config validation so deployment metadata remains authoritative for target identity
+  and repo-owned setup rather than letting provider-local config silently retarget publish.
+- Define the reviewed preview, rollout, smoke, and retry posture for the initial `s3-static`
+  capability entry, failing closed on unsupported shapes.
+
+### Tests (in this PR)
+
+- Add provider-capability tests for `s3-static`.
+- Add validation tests rejecting unsupported component kinds, rollout modes, or preview shapes for
+  the reviewed initial slice.
+- Add end-to-end tests for:
+  - exact-artifact static publish
+  - repo-owned provision plus publish flow
+  - canonical target-identity and lock-key derivation
+  - static HTTP smoke against the reviewed canonical URL
+- Add tests rejecting provider-config drift and ambiguous target identity.
+- Add retry/idempotency tests for clearly safe retry versus fail-closed ambiguous publish outcomes.
+
+### Docs (in this PR)
+
+- Document the `s3-static` provider capability entry and operator-facing limitations.
+- Document the repo-owned provision plus publish workflow for static sites on S3-style hosting.
+- Document target-identity, smoke, and retry behavior for the reviewed initial slice.
+- Update scenarios docs so S3 static hosting is no longer an abstract example only.
+
+### Verification Commands
+
+- `buck2 test //...`
+- `deploy <deployment-id>` flows introduced for the `s3-static` slice
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to combine provider runtime work, provider-capability metadata, and concrete
+  deployment fixtures or provider-config inputs for the new static-hosting slice. Under the
+  deployment-only verify policy, default `v` / CI must still run the full build-system verify
+  scope.
+
+### Acceptance Criteria
+
+- The repo has one reviewed built-in `s3-static` provider family for `static-webapp` deployments.
+- Exact-artifact publish, target identity, provisioner support, and smoke behavior are explicit and
+  test-covered.
+- Provider-config drift and unsupported shapes fail closed.
+- Docs and tests in this PR describe the same provider slice.
+
+### Risks
+
+Static hosting on S3-style infrastructure is easy to trivialize into "just sync files," which hides
+target identity, CDN, and setup drift problems.
+
+### Mitigation
+
+Keep target identity authoritative in deployment metadata, validate provider-config drift, and make
+repo-owned provisioning and smoke behavior part of the same reviewed slice.
+
+### Consequence of Not Implementing
+
+The design would still claim broader static-hosting fit than the implementation actually provides.
+
+### Downsides for Implementing
+
+Adds another provider family with its own target-identity, retry, and provisioning nuances.
+
+### Recommendation
+
+Implement after the non-static kind foundation so the remaining provider-family breadth begins with
+the simplest additional provider slice.
+
+---
+
+## PR-31: `kubernetes` provider family + `helm-release` service and shared-platform slices
+
+### Description
+
+I will add the reviewed `kubernetes` provider family so the deployment model covers service-style
+workloads, sidecars, and shared platform deployments rather than only static-webapp hosting. This
+PR lands the built-in `helm-release` path, reviewed service and third-party-service component
+support, and the first real shared-platform deployment slice such as a shared observability stack.
+
+### Scope & Changes
+
+- Add the authoritative provider-capability entry for `kubernetes`.
+- Implement the first reviewed `kubernetes` provider slice with:
+  - `service`
+  - `third-party-service`
+    component kinds
+- Add the built-in publisher contract for `helm-release` or the equivalent reviewed Kubernetes
+  release path.
+- Add reviewed provisioner support for `terraform-stack` and `cdktf-stack` for namespace, ingress,
+  storage, service-account, or related cluster-side setup.
+- Support the first reviewed deployment shapes for this provider family:
+  - single service release
+  - service plus sidecar or companion component in one deployment
+  - shared platform deployment such as a shared observability stack
+- Define the reviewed rollout, smoke, retry, release-action, and partial-publish posture for the
+  initial Kubernetes slice, including any explicitly supported progressive mode that the provider
+  can read back safely.
+- Preserve provider-target identity, namespace or release identity, and per-component publish state
+  in authoritative records and replay snapshots.
+
+### Tests (in this PR)
+
+- Add provider-capability tests for `kubernetes`.
+- Add validation tests rejecting unsupported mixes, rollout modes, or target shapes for the
+  reviewed slice.
+- Add end-to-end tests for:
+  - single service publish
+  - service plus sidecar rollout
+  - shared platform deployment publish
+  - repo-owned provision plus publish flow
+- Add tests covering release-action execution and replay behavior for the reviewed Kubernetes slice.
+- Add tests proving canonical target identity, smoke, and partial publish state are preserved in
+  records and replay snapshots.
+
+### Docs (in this PR)
+
+- Document the `kubernetes` provider capability entry and supported component shapes.
+- Document the built-in `helm-release` contract and the reviewed provisioner options.
+- Document how service deployments, sidecars, and shared platform deployments fit the deployment
+  model in implementation rather than only in examples.
+- Update third-party infrastructure and shared-platform docs so the Kubernetes-backed path is
+  explicit and operator-ready.
+
+### Verification Commands
+
+- `buck2 test //...`
+- Kubernetes service and shared-platform deploy flows introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to touch provider runtime, provider-capability metadata, non-static component
+  support, release-action integration, and concrete deployment fixtures for Kubernetes-backed
+  systems. Under the deployment-only verify policy, default `v` / CI must still run the full
+  build-system verify scope.
+
+### Acceptance Criteria
+
+- The repo has one reviewed built-in `kubernetes` provider family for service-style and
+  shared-platform deployments.
+- `service` and `third-party-service` deployments are no longer abstract-only kinds.
+- Shared platform deployments such as observability stacks are explicitly supported and
+  test-covered.
+- Docs and tests in this PR describe the same Kubernetes-backed provider slice.
+
+### Risks
+
+Service and platform deployments can blur provisioning, publishing, side effects, and ownership in
+ways that tempt adapter-specific shortcuts.
+
+### Mitigation
+
+Keep provider-target identity, publisher contract, provisioner contract, and release-action posture
+explicit in the capability entry and record model from the first slice.
+
+### Consequence of Not Implementing
+
+The design would still lack its reviewed service-style and shared-platform provider-family support.
+
+### Downsides for Implementing
+
+Adds a complex provider family with non-trivial setup, release, and observability expectations.
+
+### Recommendation
+
+Implement after `s3-static` so the plan widens from simpler static hosting into the larger service
+and shared-platform provider family.
+
+---
+
+## PR-32: `nixos-shared-host` `ssr-webapp` slice + reviewed SSR runtime contract
+
+### Description
+
+I will close the SSR fit gap by extending the existing reviewed host-based provider family to
+support `ssr-webapp` as a first-class kind with an explicit runtime contract. This PR makes SSR a
+real deployment shape instead of an abstract kind name, while keeping the same immutable-artifact,
+target-identity, and replay guarantees used elsewhere in the design.
+
+### Scope & Changes
+
+- Extend the authoritative `nixos-shared-host` capability entry to support reviewed `ssr-webapp`
+  deployments.
+- Define the reviewed SSR runtime contract for the initial host-based slice, including:
+  - immutable SSR application artifact identity
+  - runtime expectations needed by the built-in publisher
+  - environment-neutral build expectations for promotion-safe lanes
+  - runtime-config and secret injection boundaries
+- Extend the lane-compatibility contract for promotion-safe SSR lanes so runtime contract,
+  publisher type, and required serving-topology assumptions are explicit compatibility inputs.
+- Implement host realization and publish support for the SSR slice on managed `nixos-shared-host`
+  targets.
+- Add built-in smoke or release-health behavior appropriate for the SSR serving contract instead of
+  inferring behavior from app structure ad hoc.
+- Extend records and replay snapshots so SSR runs preserve the runtime-contract and provider-config
+  provenance needed for exact replay and audit.
+- Define the reviewed rollout, preview, retry, rollback, and promotion posture for the initial SSR
+  slice, failing closed where the host-based path does not yet safely support a behavior.
+
+### Tests (in this PR)
+
+- Add provider-capability tests for `nixos-shared-host` `ssr-webapp` support.
+- Add validation tests rejecting unsupported SSR shapes or rollout modes for the reviewed slice.
+- Add validation tests rejecting SSR lane promotion when runtime contract, publisher type, or
+  serving-topology assumptions fall outside the reviewed compatibility contract.
+- Add end-to-end host realization and publish tests for an SSR deployment on a managed host.
+- Add HTTP or release-health smoke tests for the SSR runtime contract.
+- Add record and replay tests proving SSR runtime-contract and provider-config provenance are
+  preserved for later immutable-reuse flows.
+
+### Docs (in this PR)
+
+- Document the reviewed `ssr-webapp` runtime contract for the host-based provider slice.
+- Document the SSR-specific lane-compatibility inputs required for promotion-safe lanes.
+- Update provider-capability and schema docs so SSR support is explicit and no longer only design
+  fit guidance.
+- Document smoke, replay, and rollout behavior for the initial SSR slice.
+- Update operator docs and scenarios so non-static SSR web apps become an implemented path.
+
+### Verification Commands
+
+- `buck2 test //...`
+- host-based SSR deploy flows introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to combine new component-kind support, provider runtime changes, host
+  realization changes, and concrete SSR deployment fixtures. Under the deployment-only verify
+  policy, default `v` / CI must still run the full build-system verify scope.
+
+### Acceptance Criteria
+
+- `ssr-webapp` is a reviewed implemented deployment shape, not just an abstract schema term.
+- The reviewed host-based provider slice documents and enforces one explicit SSR runtime contract.
+- Promotion-safe SSR lanes have explicit reviewed compatibility inputs instead of relying on
+  implicit similarity.
+- SSR runs preserve the provenance and replay information required by the design.
+- Docs and tests in this PR describe the same SSR deployment slice.
+
+### Risks
+
+SSR support can easily collapse into a vague "service-like" bucket that loses the web-app-specific
+runtime and smoke contract the design is trying to preserve.
+
+### Mitigation
+
+Keep `ssr-webapp` explicit, document the runtime contract tightly, and fail closed where the host
+path cannot yet prove a behavior safely.
+
+### Consequence of Not Implementing
+
+The design would still overstate SSR support relative to the actual reviewed implementation.
+
+### Downsides for Implementing
+
+Adds a new runtime-bearing deployment shape on top of an existing provider family.
+
+### Recommendation
+
+Implement after the Kubernetes service slice so SSR lands on the broader non-static kind foundation
+without being collapsed into the generic service path.
+
+---
+
+## PR-33: `app-store-connect` `mobile-app` slice + staged release-health contract
+
+### Description
+
+I will add the first reviewed mobile-store provider family so the design's `mobile-app` model is no
+longer theoretical. This PR covers App Store Connect style release publishing, exact-artifact
+promotion through branch-backed lanes, staged rollout or release-health evaluation, and the
+reviewed record shape for store-distributed releases.
+
+### Scope & Changes
+
+- Add the authoritative provider-capability entry for `app-store-connect`.
+- Implement the first reviewed `mobile-app` publisher slice for signed immutable iOS release
+  artifacts.
+- Add canonical `provider_target` identity and lane/promotion semantics for App Store Connect style
+  tracks or channels.
+- Extend the lane-compatibility contract for promotion-safe mobile lanes so store track or channel
+  progression, staged-rollout policy, signing model, and publisher type are explicit compatibility
+  inputs.
+- Implement the built-in publisher contract for upload, processing validation, staged rollout, and
+  release-track advancement using admitted immutable artifacts rather than ad hoc local release
+  scripts.
+- Define the reviewed smoke or release-health contract for mobile-store releases, such as upload
+  validation, processing status, installability, staged rollout health, or equivalent provider
+  evidence.
+- Preserve store submission ids, track state, rollout state, and release-health evidence in
+  authoritative records and replay snapshots.
+- Define the reviewed preview, retry, rollback, promotion, and progressive rollout posture for the
+  initial App Store Connect slice, failing closed where a store behavior cannot be made
+  deterministic.
+
+### Tests (in this PR)
+
+- Add provider-capability tests for `app-store-connect`.
+- Add validation tests rejecting unsupported mobile shapes or rollout modes for the reviewed slice.
+- Add validation tests rejecting mobile-lane promotion when track/channel, staged-rollout policy,
+  signing model, or publisher type fall outside the reviewed compatibility contract.
+- Add end-to-end tests for:
+  - signed artifact upload and submission
+  - exact-artifact promotion across reviewed mobile lanes
+  - staged rollout or release-health validation
+- Add tests proving store-specific release-health evidence is preserved in records and status views.
+- Add replay and rollback tests for the reviewed mobile-store reuse flows that are in policy.
+
+### Docs (in this PR)
+
+- Document the `app-store-connect` provider capability entry and built-in publisher contract.
+- Document branch-backed mobile lane behavior, track identity, staged release-health semantics, and
+  the mobile-specific promotion-compatibility inputs.
+- Document the reviewed mobile record, replay, and operator workflow for this provider family.
+- Update the mobile-store fit section so App Store Connect is an implemented provider slice.
+
+### Verification Commands
+
+- `buck2 test //...`
+- App Store Connect mobile release flows introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to touch non-static component-kind support, provider runtime, provider-
+  capability metadata, mobile deployment fixtures, and record or replay behavior. Under the
+  deployment-only verify policy, default `v` / CI must still run the full build-system verify
+  scope.
+
+### Acceptance Criteria
+
+- The repo has one reviewed built-in mobile-store provider family for signed iOS releases.
+- Mobile branch-backed promotion, store processing, and staged release-health are explicit and
+  test-covered.
+- Promotion-safe mobile lanes have explicit reviewed compatibility inputs rather than implied store
+  similarity.
+- Records preserve enough provider-specific release state to support audit and reuse decisions.
+- Docs and tests in this PR describe the same mobile-store slice.
+
+### Risks
+
+Mobile-store release systems have asynchronous provider behavior that can tempt the implementation
+into polling and state handling that is hard to reason about.
+
+### Mitigation
+
+Keep provider-target identity, release-health evidence, staged state, and reuse rules explicit in
+the capability entry and authoritative records from the first slice.
+
+### Consequence of Not Implementing
+
+The design would still overstate mobile-store support relative to the actual implementation.
+
+### Downsides for Implementing
+
+Adds another high-latency provider family with asynchronous release state and store-specific
+semantics.
+
+### Recommendation
+
+Implement after the SSR slice so the non-static kind foundation is exercised across both web and
+mobile release models before the final mobile-store family lands.
+
+---
+
+## PR-34: `google-play` `mobile-app` slice + staged rollout and release-track progression
+
+### Description
+
+I will complete the mobile-store provider-family coverage by adding the reviewed Google Play slice.
+This PR covers Android signed-artifact upload, staged rollout or track progression, exact-artifact
+promotion through branch-backed lanes, and the authoritative record model for Google Play style
+release state.
+
+### Scope & Changes
+
+- Add the authoritative provider-capability entry for `google-play`.
+- Implement the reviewed `mobile-app` publisher slice for signed immutable Android release
+  artifacts.
+- Add canonical `provider_target` identity and track or channel semantics for Google Play releases.
+- Extend the lane-compatibility contract for reviewed Google Play promotion-safe lanes so track or
+  channel progression, staged-rollout policy, signing model, and publisher type are explicit
+  compatibility inputs.
+- Implement the built-in publisher contract for upload, processing, staged rollout, and track
+  progression using admitted immutable artifacts.
+- Define the reviewed smoke or release-health contract for Google Play style releases, such as
+  processing success, staged rollout health, installability, and reviewed track-state evidence.
+- Preserve Google Play submission ids, track state, rollout state, and release-health evidence in
+  authoritative records and replay snapshots.
+- Define the reviewed retry, rollback, promotion, and progressive rollout posture for this mobile
+  provider family, failing closed where deterministic continuation cannot be proven.
+
+### Tests (in this PR)
+
+- Add provider-capability tests for `google-play`.
+- Add validation tests rejecting unsupported Android/mobile shapes or rollout modes for the reviewed
+  slice.
+- Add validation tests rejecting Android/mobile lane promotion when track/channel, staged-rollout
+  policy, signing model, or publisher type fall outside the reviewed compatibility contract.
+- Add end-to-end tests for:
+  - signed Android artifact upload and release creation
+  - exact-artifact promotion across reviewed mobile lanes
+  - staged rollout or track progression with release-health validation
+- Add tests proving provider-specific release state is preserved in authoritative records and status
+  outputs.
+- Add replay and rollback tests for the reviewed Google Play reuse flows that are in policy.
+
+### Docs (in this PR)
+
+- Document the `google-play` provider capability entry and built-in publisher contract.
+- Document Android branch-backed lane behavior, track identity, staged rollout, and release-health
+  semantics, and the Android-specific promotion-compatibility inputs.
+- Document the reviewed operator workflow and record expectations for this provider family.
+- Update the mobile-store fit section so Google Play is an implemented provider slice alongside App
+  Store Connect.
+
+### Verification Commands
+
+- `buck2 test //...`
+- Google Play mobile release flows introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to touch mobile provider runtime, provider-capability metadata, mobile
+  deployment fixtures, and record or replay behavior. Under the deployment-only verify policy,
+  default `v` / CI must still run the full build-system verify scope.
+
+### Acceptance Criteria
+
+- The repo has reviewed built-in mobile-store support for signed Android releases.
+- Track progression, staged rollout, and release-health behavior are explicit and test-covered.
+- Promotion-safe Android/mobile lanes have explicit reviewed compatibility inputs rather than
+  implied store similarity.
+- Records preserve enough Google Play release state to support audit and reuse decisions.
+- Docs and tests in this PR describe the same Android/mobile-store slice.
+
+### Risks
+
+Google Play release behavior adds another asynchronous provider family with store-specific rollout
+state and error surfaces.
+
+### Mitigation
+
+Keep the provider-target, rollout state, health evidence, and authoritative record contract explicit
+and fail closed when provider behavior cannot be interpreted deterministically.
+
+### Consequence of Not Implementing
+
+The design would still lack full reviewed mobile-store provider-family coverage even if iOS support
+exists.
+
+### Downsides for Implementing
+
+Adds a second store-specific provider family with its own release semantics and test surface.
+
+### Recommendation
+
+Implement late so the final mobile-store provider can reuse the same non-static, progressive, and
+recording foundations already exercised by the earlier provider-family PRs.
+
+---
+
+## PR-35: Admission attestation, SBOM, and supply-chain policy enforcement closeout
+
+### Description
+
+I will close the remaining admission-policy trust gap by making artifact attestation and
+supply-chain policy first-class protected/shared admission behavior instead of leaving those fields
+as schema-only design intent. This PR adds the reviewed attestation-verification contract, trusted
+builder and signer identity policy, SBOM requirements, and supply-chain admission gates that must
+pass before protected/shared mutation is admitted.
+
+### Scope & Changes
+
+- Extend authoritative `admission_policy` support so protected/shared policy objects can define:
+  - trusted builder identity or identity set
+  - accepted provenance or predicate format
+  - artifact-identity binding back to source revision plus build inputs
+  - verifier behavior for expired, revoked, or no-longer-trusted attestation material
+  - artifact-signature requirements where policy demands them
+  - SBOM or equivalent dependency-inventory requirements where policy demands them
+  - vulnerability, license, or other supply-chain gates and whether they apply at build admission,
+    publish admission, or both
+- Implement reviewed attestation and signature verification for protected/shared publishing runs.
+- Implement reviewed SBOM-presence and minimum-format validation where the admission policy
+  requires it.
+- Implement supply-chain gate evaluation as part of mutating admission, failing closed when:
+  - attestation material is missing
+  - builder or signer identity is untrusted
+  - provenance does not bind to the admitted source revision and artifact identity
+  - required SBOM material is missing or invalid
+  - required vulnerability, license, or equivalent policy gates do not pass
+- Preserve attestation, SBOM, and supply-chain evaluation facts in secret-safe records and replay
+  snapshots so later audit and replay decisions remain explainable.
+- Keep these checks transport-agnostic and reusable across deploy, promotion, rollback, preview,
+  and any other protected/shared publish path that consumes an admitted artifact.
+
+### Tests (in this PR)
+
+- Add admission-policy schema and validation tests for the attestation and supply-chain fields.
+- Add admission tests rejecting protected/shared mutation when:
+  - attestation material is missing
+  - builder or signer identity is untrusted
+  - provenance does not bind the artifact to the admitted source revision and build inputs
+  - attestation is expired, revoked, or otherwise no longer trusted
+  - required SBOM material is missing or invalid
+  - required vulnerability or license gates fail
+- Add tests covering policy timing semantics where supply-chain gates apply at build admission,
+  publish admission, or both.
+- Extend record and replay tests to assert attestation and supply-chain evaluation facts are
+  preserved in a secret-safe form.
+
+### Docs (in this PR)
+
+- Document the protected/shared `admission_policy` attestation, signature, SBOM, and supply-chain
+  contract.
+- Document how trusted builder or signer identity, provenance format, and artifact/source binding
+  are evaluated.
+- Document the fail-closed behavior for missing or untrusted attestation material and failed
+  supply-chain gates.
+- Update contract and operator docs so these protected/shared admission requirements are explicit in
+  implementation rather than design-only policy text.
+
+### Verification Commands
+
+- `buck2 test //...`
+- admission, attestation, and supply-chain verification flows introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to touch admission-policy metadata, shared control-plane admission behavior,
+  record or replay contracts, and deployment-domain tests. Under the deployment-only verify policy,
+  default `v` / CI must still run the full build-system verify scope.
+
+### Acceptance Criteria
+
+- Protected/shared mutation enforces the reviewed attestation, signature, SBOM, and supply-chain
+  gates defined by `admission_policy`.
+- Missing, drifted, expired, revoked, or untrusted attestation material fails closed.
+- Records and replay snapshots preserve enough secret-safe evidence to explain attestation and
+  supply-chain admission decisions.
+- Tests and docs in this PR describe the same protected/shared admission trust contract.
+
+### Risks
+
+Supply-chain policy can become a half-implemented checkbox feature if verification, policy timing,
+and evidence persistence do not stay aligned.
+
+### Mitigation
+
+Bind the checks to the same admitted artifact identity and source snapshot used for mutation, and
+test both positive and fail-closed paths in the same PR.
+
+### Consequence of Not Implementing
+
+The design would still overstate the protected/shared admission contract by naming attestation,
+SBOM, and supply-chain gates that the implementation does not actually enforce.
+
+### Downsides for Implementing
+
+Adds more admission-policy breadth, verification logic, and evidence handling to protected/shared
+publishing.
+
+### Recommendation
+
+Implement after the provider-family breadth is in place so the final admission trust contract can
+be enforced consistently across every reviewed protected/shared publish path.
+
+---
+
+## PR-36: Protected/shared `smoke.exception` policy + explicit smoke-outcome closeout
+
+### Description
+
+I will close the final smoke-policy gap by making protected/shared smoke exceptions explicit,
+validated, and enforced through authoritative deployment metadata instead of leaving them as design
+guidance. This PR adds the `smoke.exception` object contract, validates its required review fields,
+and preserves the reviewed distinction between "publish succeeded" and "smoke failed" in
+operator-visible results and records.
+
+### Scope & Changes
+
+- Implement authoritative deployment-metadata support for protected/shared `smoke.exception`.
+- Enforce the minimum `smoke.exception` contract, including:
+  - `owner`
+  - `reason`
+  - `scope`
+  - one review-boundary field: `review_by` or `expires_at`
+  - optional explicit downgrade mode when smoke is reduced rather than omitted
+- Fail closed when protected/shared smoke is omitted or downgraded without a valid
+  `smoke.exception`.
+- Ensure validators and admission logic read `smoke.exception` only from authoritative deployment
+  metadata, not provider config files or deployment-local executable hooks.
+- Preserve the canonical outcome distinction where:
+  - publish may succeed
+  - smoke may fail
+  - the overall deployment result records that as a distinct operator-visible outcome rather than a
+    generic undifferentiated failure
+- Support reviewed preview smoke relaxation only when the deployment or provider slice explicitly
+  documents that lighter preview smoke posture.
+- Keep local-only behavior intentionally looser where the design allows it, without weakening the
+  protected/shared contract.
+
+### Tests (in this PR)
+
+- Add metadata-validation tests for `smoke.exception`, including rejection of:
+  - missing required fields
+  - missing review boundary
+  - protected/shared smoke omission without an exception object
+  - exception definitions that appear only in provider config or executable hooks
+- Add admission and execution tests proving protected/shared smoke remains blocking by default
+  unless a valid reviewed `smoke.exception` is present.
+- Add tests proving preview may use a lighter smoke policy only when that difference is explicitly
+  documented by deployment metadata or provider capability policy.
+- Add record and status tests proving "publish succeeded, smoke failed" is preserved as a distinct
+  operator-visible result shape.
+- Add tests for exception expiry or review-boundary failure where the exception is no longer valid.
+
+### Docs (in this PR)
+
+- Document the protected/shared `smoke.exception` contract and required fields.
+- Document when smoke may be downgraded or omitted, and when it must remain blocking.
+- Document the operator-visible distinction between publish success and overall smoke failure.
+- Update smoke-policy and operator docs so the exception path is explicit and reviewed rather than
+  implied by omission.
+
+### Verification Commands
+
+- `buck2 test //...`
+- smoke-policy and result-inspection flows introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to touch deployment metadata validation, smoke-policy handling, records or
+  status surfaces, and deployment-domain tests. Under the deployment-only verify policy, default
+  `v` / CI must still run the full build-system verify scope.
+
+### Acceptance Criteria
+
+- Protected/shared smoke remains blocking by default unless a valid reviewed `smoke.exception` is
+  present in authoritative deployment metadata.
+- Invalid, expired, or missing exceptions fail closed.
+- Publish-success and smoke-failure outcomes remain distinguishable in records and operator-facing
+  status.
+- Tests and docs in this PR describe the same smoke-exception and smoke-outcome contract.
+
+### Risks
+
+Smoke-policy exceptions are easy to weaken through silent omission or by letting provider-local
+config bypass authoritative deployment metadata.
+
+### Mitigation
+
+Make the exception object explicit, validate it at the deployment-metadata layer, and preserve the
+outcome distinction in canonical records so operators can see exactly what happened.
+
+### Consequence of Not Implementing
+
+The design would still overstate the protected/shared smoke contract by requiring explicit reviewed
+exceptions that the implementation does not actually validate or enforce.
+
+### Downsides for Implementing
+
+Adds another protected/shared policy object and more result-shape cases to records and status
+surfaces.
+
+### Recommendation
+
+Implement late so the repo-level deployment model, admission trust contract, and protected/shared
+smoke posture are explicit before the remaining execution, governance, and compatibility closeout
+work lands.
+
+---
+
+## PR-37: `secretspec`/Vault backend + protected/shared credential-lifecycle closeout
+
+### Description
+
+I will close the remaining secret-runtime gap by making `secretspec` and the initial Vault-backed
+protected/shared credential model real instead of leaving them as design-level intent. This PR
+adds the reviewed secret-contract resolution path, backend boundary, least-privilege credential
+posture, renewal/reacquire rules, and fail-closed execution behavior for expiring or revoked
+credentials during protected/shared mutation.
+
+### Scope & Changes
+
+- Implement `secretspec` as the authoritative repo-level secret-contract interface for deployment
+  runtime inputs.
+- Implement Vault as the initial production backend behind that interface for protected/shared
+  flows, while keeping the contract backend-switchable so deployment metadata semantics do not
+  depend on Vault-specific details.
+- Resolve admitted secret-contract references and non-secret secret-version or selector identities
+  through the shared control plane without leaking secret material into Buck metadata, checked-in
+  files, records, or replay snapshots.
+- Define and enforce the protected/shared runtime-credential posture, including:
+  - least-privilege provider credentials per lifecycle step and target scope
+  - preference for short-lived or renewable credentials where the provider supports them
+  - explicit renewal or reacquire behavior when a run may outlive one credential lease
+  - fail-closed behavior when a required credential expires, is revoked, or cannot be renewed
+- Keep break-glass credentials segregated from routine mutation credentials and usable only through
+  the explicitly audited emergency path.
+- Preserve the admitted non-secret secret-contract references needed for deterministic retry,
+  rollback, and replay without turning secret backends into a second source of truth for deployment
+  metadata.
+
+### Tests (in this PR)
+
+- Add secret-contract tests covering:
+  - `secretspec` resolution through the reviewed backend boundary
+  - missing required secret contracts
+  - backend-agnostic contract semantics despite Vault as the initial backend
+- Add protected/shared execution tests proving:
+  - least-privilege credentials are selected per lifecycle step
+  - renewable credentials are renewed or reacquired without widening scope
+  - expired, revoked, or non-renewable required credentials fail closed with the affected step
+    recorded
+- Add tests rejecting secret leakage into Buck metadata, provider-config snapshots, records, replay
+  snapshots, logs, or operator-visible status surfaces.
+- Add break-glass tests proving emergency credentials remain segregated from the normal execution
+  path.
+
+### Docs (in this PR)
+
+- Document `secretspec` as the authoritative secret-contract layer and Vault as the initial
+  production backend behind it.
+- Document protected/shared credential posture, renewal or reacquire rules, and fail-closed
+  behavior on expiry or revocation.
+- Document secret-contract replay semantics and the boundary between secret references versus secret
+  values.
+- Update operator docs so the normal path and break-glass credential models are explicit and
+  distinct.
+
+### Verification Commands
+
+- `buck2 test //...`
+- secret-contract and credential-lifecycle inspection flows introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to touch deployment metadata contracts, shared control-plane runtime input
+  resolution, secret backend integration, records or replay handling, and deployment-domain tests.
+  Under the deployment-only verify policy, default `v` / CI must still run the full build-system
+  verify scope.
+
+### Acceptance Criteria
+
+- Protected/shared mutation uses `secretspec` as the reviewed secret-contract interface and Vault
+  as the initial production backend behind it.
+- Secret values never cross into Buck metadata, checked-in files, durable records, replay
+  snapshots, or unredacted operator-visible surfaces.
+- Credential renewal or reacquire behavior is explicit, least-privilege, and fail-closed.
+- Tests and docs in this PR describe the same secret-contract and credential-lifecycle model.
+
+### Risks
+
+Secret-contract and credential-lifecycle work can sprawl across many execution paths and become
+hard to reason about if the backend boundary and runtime authority are not kept explicit.
+
+### Mitigation
+
+Keep `secretspec` as the stable repo contract, keep Vault behind that boundary, and test
+credential-selection, renewal, expiry, and redaction behavior in the same PR.
+
+### Consequence of Not Implementing
+
+The design would still overstate the protected/shared secret and credential model by naming a
+repo-level contract, initial backend, and renewal posture that the implementation does not actually
+provide.
+
+### Downsides for Implementing
+
+Adds secret-backend integration and more execution-path complexity to the shared control plane.
+
+### Recommendation
+
+Implement first in this final tail so later retry, smoke, and provenance closeout work can rely on
+one explicit secret and credential model.
+
+---
+
+## PR-38: Cross-cutting publish-safety, retry, and smoke timeout-budget closeout
+
+### Description
+
+I will close the remaining lifecycle-execution policy gap by implementing the design's explicit
+publish-safety, automatic-retry, and timeout-budget contract instead of leaving those behaviors to
+provider-local convention. This PR adds the reviewed cross-cutting rules for when a publish may
+no-op, when unchanged components may be skipped, when publish or smoke may retry, which steps must
+not auto-retry, how backoff and timeout budgets are applied, and how operators see those decisions
+in records and status.
+
+### Scope & Changes
+
+- Implement the reviewed step-specific automatic-retry policy:
+  - `validate`, `build`, and `resolve` do not auto-retry
+  - `provision` does not auto-retry by default
+  - `publish` may auto-retry only for clearly transient failures when the adapter can prove the
+    earlier attempt did not take effect or prove the retry is idempotent for that provider
+  - `smoke` may auto-retry only for transient readiness or network failures
+- Implement the reviewed cross-cutting publish-safety contract:
+  - publishers consume explicit resolved artifact inputs and never rediscover artifacts from mutable
+    local working state
+  - when a provider exposes enough identity to compare the current live release with the resolved
+    artifact identity, an exact identity match is treated as a no-op by default rather than forcing
+    a redundant re-publish
+  - when one component in a multi-component deployment is unchanged, it may be skipped only when
+    the adapter can prove live identity match and rollout, provider, and `release_action` policy do
+    not require republish
+  - when the adapter cannot prove live identity match safely, it may republish conservatively but
+    must not claim the component was proven unchanged
+- Implement the reviewed publish retry ceiling of up to `2` retries with backoff and fail closed
+  behavior when duplicate-execution safety cannot be proven.
+- Implement the reviewed smoke timeout-budget model and standardized default smoke classes:
+  - `static-webapp`: `5 minutes` total budget including retries
+  - `ssr-webapp`: `10 minutes` total budget including retries
+  - `mobile-app`: adapter-defined release-health validation rather than URL smoke by default
+  - `service` and `third-party-service`: `10 minutes` total budget including retries
+- Implement explicit timeout or budget override support only through deployment metadata or explicit
+  built-in adapter policy, never through undocumented per-environment convention.
+- Preserve retry attempt counts, budget exhaustion, and retry-decision facts in records and
+  operator-visible status so automatic retry reduces false negatives without hiding the final
+  outcome.
+- Keep provider adapters responsible for the provider-specific proof of safe retry while enforcing
+  one shared control-plane policy vocabulary and one reviewed operator contract.
+
+### Tests (in this PR)
+
+- Add lifecycle-policy tests proving:
+  - `validate`, `build`, and `resolve` never auto-retry
+  - `provision` does not auto-retry by default
+  - `publish` retries only on reviewed safe transient cases
+  - ambiguous or non-idempotent publish results fail closed without blind retry
+- Add publish-safety tests proving:
+  - exact live-identity match results in a no-op only when the provider can prove it
+  - unchanged components may be skipped only when rollout and `release_action` posture permit it
+  - ambiguous live identity does not get reported as proven unchanged
+- Add smoke-policy tests proving:
+  - default smoke timeout budgets derive from component kind or explicit smoke runner class
+  - smoke retries stay within the total timeout budget
+  - retries do not hide final smoke failure
+  - undeclared timeout overrides are rejected
+- Add record and status tests proving retry counts, retry reasons, and timeout-budget exhaustion are
+  preserved in operator-visible outputs.
+- Extend provider-slice tests where needed so built-in adapters prove their reviewed retry posture
+  through the shared policy contract.
+
+### Docs (in this PR)
+
+- Document the cross-cutting automatic-retry policy by lifecycle step.
+- Document the cross-cutting publish-safety and no-op/unchanged-component rules.
+- Document the standardized smoke timeout-budget defaults and override rules.
+- Document the operator-visible meaning of no-op publish decisions, automatic retry, backoff,
+  budget exhaustion, and final smoke failure after retries.
+- Update provider-capability and operator docs so retry posture is explicit rather than inferred.
+
+### Verification Commands
+
+- `buck2 test //...`
+- lifecycle retry and smoke-budget inspection flows introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to touch shared control-plane lifecycle logic, smoke-policy handling,
+  provider-adapter retry hooks, record or status surfaces, and deployment-domain tests. Under the
+  deployment-only verify policy, default `v` / CI must still run the full build-system verify
+  scope.
+
+### Acceptance Criteria
+
+- Publishers follow one reviewed no-op/unchanged-component publish-safety contract instead of
+  provider-local convention.
+- Automatic retry behavior matches the reviewed step-by-step contract instead of adapter-local
+  convention.
+- Smoke timeout budgets are explicit, standardized, and test-covered across the implemented
+  component kinds.
+- Operators can see when no-op/skip decisions or retries occurred, why they were permitted, and why
+  a run still failed.
+- Tests and docs in this PR describe the same retry and timeout-budget behavior.
+
+### Risks
+
+Retry logic is dangerous when the shared policy says one thing and an adapter quietly does another.
+
+### Mitigation
+
+Centralize the shared retry policy, require provider slices to prove safe retry explicitly, and
+persist retry decisions in records so they remain auditable.
+
+### Consequence of Not Implementing
+
+The design would still overstate the reviewed execution policy by describing explicit retry ceilings
+and timeout budgets that the implementation does not actually enforce.
+
+### Downsides for Implementing
+
+Adds more lifecycle-policy machinery and more negative-path testing across multiple provider slices.
+
+### Recommendation
+
+Implement after the secret and credential closeout so retry and timeout handling land on one stable
+execution-input model.
+
+---
+
+## PR-39: Environment-branch governance + lane-protection validation closeout
+
+### Description
+
+I will close the remaining branch-governance gap by turning the design's protected environment
+branch assumptions into one reviewed, testable contract instead of leaving them as prose-only repo
+policy. This PR adds the lane-governance model, branch-protection expectations, and verification
+surface that prove protected/shared lane branches are actually safe sources of promotion authority.
+
+### Scope & Changes
+
+- Define the reviewed lane-governance contract for protected/shared lanes, including:
+  - environment branch naming and stage mapping
+  - fast-forward-only advancement rules
+  - disallowed direct pushes to later environment branches except reviewed emergency procedures
+  - required checks that must pass before branch advancement
+  - reviewed automation identities or equivalent normal-path branch-advance authority
+- Require protected/shared lane policies to reference or resolve one authoritative governance object
+  rather than relying on undocumented SCM defaults.
+- Implement validation or verification commands that compare the declared governance contract with
+  actual server-side branch protection or equivalent SCM policy for supported repo backends, failing
+  closed on drift or missing required protection.
+- Preserve governance verification facts in operator-visible inspection output so deployment
+  admission is not silently trusting unverified lane governance assumptions.
+- Keep emergency branch-mutation exceptions explicit and tied to the same reviewed break-glass
+  posture used elsewhere in the deployment design.
+
+### Tests (in this PR)
+
+- Add lane-governance schema and validation tests for the new branch-protection contract.
+- Add verification tests rejecting:
+  - missing required protected branches
+  - missing fast-forward-only enforcement
+  - missing required checks
+  - direct-push-permitted later-environment branches outside the emergency path
+  - drift between declared governance policy and the actual SCM protection state
+- Add admission-path tests proving protected/shared lane validation fails closed when the reviewed
+  governance contract cannot be satisfied or verified.
+- Add operator-surface tests proving governance verification results are visible through the reviewed
+  inspection path.
+
+### Docs (in this PR)
+
+- Document the reviewed lane-governance and environment-branch protection contract.
+- Document how direct pushes, fast-forward promotion, required checks, and automation-driven branch
+  advancement are enforced or verified.
+- Document emergency exceptions for branch mutation and how they relate to the break-glass path.
+- Update operator docs so branch-governance verification is part of the normal protected/shared
+  deployment posture.
+
+### Verification Commands
+
+- `buck2 test //...`
+- lane-governance and branch-protection verification flows introduced in this PR
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to touch protected/shared lane-policy metadata, admission validation,
+  external-policy verification code, and deployment-domain tests. Under the deployment-only verify
+  policy, default `v` / CI must still run the full build-system verify scope.
+
+### Acceptance Criteria
+
+- Protected/shared lane branches have one explicit reviewed governance contract instead of prose-only
+  assumptions.
+- Missing or drifted branch protection fails closed for the protected/shared path.
+- Operators can inspect whether branch-governance requirements are actually satisfied.
+- Tests and docs in this PR describe the same lane-governance contract.
+
+### Risks
+
+SCM governance is partly external to the repo, so it is easy to accidentally document guarantees
+that the runtime never checks.
+
+### Mitigation
+
+Turn the policy into explicit governance metadata plus verification commands and fail closed when
+required protection cannot be proven.
+
+### Consequence of Not Implementing
+
+The design would still rely on unverified branch-governance assumptions for promotion authority and
+required-check enforcement.
+
+### Downsides for Implementing
+
+Adds cross-system verification work at the boundary between repo policy and external SCM controls.
+
+### Recommendation
+
+Implement after the execution-policy closeout so the final promotion-authority contract is
+mechanically checkable instead of remaining prose-only.
+
+---
+
+## PR-40: Record/replay schema-version + runner-identity provenance closeout
+
+### Description
+
+I will close the final compatibility and provenance gap in the deployment record model. This PR
+makes versioned records and replay snapshots explicit, preserves the implementation identities of
+the built-in runners that materially influenced execution, makes recorded `release_actions`
+replay-plan semantics authoritative during replay, completes the remaining explicit
+`release_actions` metadata contract, and completes the remaining minimum record and replay
+compatibility guarantees that the design expects operators and future tooling to rely on.
+
+### Scope & Changes
+
+- Require explicit `schema_version` fields on durable deployment records and replay snapshots.
+- Implement reviewed reader behavior for record or replay compatibility:
+  - handle supported versions explicitly
+  - migrate when a reviewed migration path exists
+  - otherwise fail closed with a clear incompatibility error
+- Preserve stable implementation identities for the built-in:
+  - publisher runner
+  - provisioner runner
+  - smoke runner
+  - `release_actions` runner when it materially influenced execution
+- Preserve the recorded `release_actions` plan snapshot needed for replay-safe immutable reuse,
+  including where applicable:
+  - stable built-in action type
+  - phase placement
+  - `run_condition`
+  - abort behavior
+  - whether later lifecycle steps may proceed on failure
+  - declared artifact or runtime inputs consumed by the action
+  - replay-context dispositions such as `rerun`, `skip`, or `fail`
+  - duplicate-execution-safety posture
+  - rollback data-compatibility posture
+- Implement the remaining explicit validated action-contract vocabulary for protected/shared
+  built-in `release_actions`, including:
+  - closed `run_condition` values such as `success_only`, `failure_only`, and `always`
+  - explicit phase-placement validation
+  - explicit abort/failure-propagation semantics
+  - fail-closed rejection of incomplete or ad hoc action metadata
+- Complete the remaining minimum record or replay provenance fields that earlier PRs introduced only
+  slice-by-slice, including where applicable:
+  - canonical principal-shape audit fields
+  - preview-cleanup context
+  - `failed_step`
+  - rollout resumability state
+  - latest accepted run-action summary
+  - stable policy-content fingerprints or snapshot references
+- Require replay paths such as retry, rollback, promotion, and same-deployment `--publish-only` to
+  obey the recorded `release_actions` plan snapshot rather than reinterpreting current metadata:
+  - recorded `rerun` actions may run again only for the replay context they declared
+  - recorded `skip` actions must not be re-run
+  - recorded `fail` actions must terminate the replay clearly rather than improvising
+  - missing or incompatible recorded action-plan snapshots fail closed
+- Fail closed when replay compatibility cannot be proven for the stored schema version or stored
+  runner identities.
+- Align deployment-record, replay-snapshot, and operator-status surfaces around one reviewed
+  compatibility and provenance vocabulary rather than ad hoc per-slice persistence details.
+
+### Tests (in this PR)
+
+- Add schema-version tests proving records and replay snapshots:
+  - store explicit versions
+  - reject unknown unsupported versions
+  - migrate only through reviewed explicit compatibility paths
+- Add provenance tests proving runner implementation identities are preserved and compared during
+  replay compatibility checks.
+- Add action-contract validation tests proving built-in `release_actions` must declare:
+  - stable built-in type
+  - phase placement
+  - `run_condition`
+  - abort behavior
+  - later-lifecycle failure-propagation posture
+  - declared artifact/runtime inputs when required by the action type
+- Add tests rejecting unknown `run_condition` values, incomplete action metadata, or ad hoc
+  non-reviewed action-contract fields.
+- Add record-contract tests covering the remaining minimum required and conditionally required
+  fields introduced in this PR.
+- Add replay-plan tests proving recorded `release_actions` dispositions are preserved and enforced
+  for `rerun`, `skip`, and `fail` during supported replay contexts.
+- Add replay tests proving runs fail closed when runner compatibility or snapshot compatibility
+  cannot be established.
+
+### Docs (in this PR)
+
+- Document the reviewed record and replay versioning contract.
+- Document the operator-visible meaning of runner implementation identity and replay compatibility
+  failure.
+- Document the complete built-in `release_actions` contract, including per-action metadata fields,
+  closed `run_condition` vocabulary, abort behavior, and failure-propagation semantics.
+- Document the recorded `release_actions` replay-plan snapshot contract and the fail-closed replay
+  behavior when the stored action plan does not authorize rerun.
+- Document the remaining minimum record and provenance fields now required by the full deployment
+  model.
+- Align schema, contract, and operator docs so record/replay compatibility is explicit and stable.
+
+### Verification Commands
+
+- `buck2 test //...`
+- record-schema and replay-compatibility inspection flows introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-owned persistence, replay, compatibility handling, and
+  deployment-domain test infrastructure. Under the deployment-only verify policy, default `v` / CI
+  can run the reviewed deployment suite instead of the full non-deployment build-system verify
+  scope.
+
+### Acceptance Criteria
+
+- Records and replay snapshots carry explicit schema versions and fail closed when compatibility
+  cannot be proven.
+- Built-in runner implementation identities are preserved wherever they materially influence replay
+  safety.
+- Built-in `release_actions` use one explicit reviewed metadata contract rather than ad hoc action
+  fields or implicit runtime behavior.
+- Replay obeys the recorded `release_actions` plan snapshot rather than silently re-running or
+  skipping actions from current metadata.
+- The remaining minimum record and provenance requirements from the design are explicit and
+  test-covered.
+- Tests and docs in this PR describe the same compatibility and provenance contract.
+
+### Risks
+
+Late record-model closeout can accidentally create backwards-compatibility promises that are vague
+or impossible to verify in replay.
+
+### Mitigation
+
+Keep the compatibility contract explicit, version every persisted boundary, and fail closed whenever
+execution provenance is no longer trustworthy.
+
+### Consequence of Not Implementing
+
+The design would still overstate the durability and replay-safety contract by requiring explicit
+schema and runner-identity compatibility that the implementation does not actually preserve.
+
+### Downsides for Implementing
+
+Adds more persistence-contract strictness and compatibility testing to the record model.
+
+### Recommendation
+
+Implement last so every earlier slice can converge on one final versioned record and replay
+contract.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -2411,14 +5369,36 @@ are stable.
 4. PR-4.6 through PR-4.9: add the interim direct remote-execution path so Pleomino can deploy to
    `mini` from a dev machine and Jenkins before the shared control plane exists.
 5. PR-5 through PR-8: turn that first provider slice into a real shared deployment system with
-   control-plane authority, immutable artifacts, replay, and admission.
+   control-plane authority, initial shared locking, immutable artifacts, replay, and admission.
 6. PR-9 through PR-10: reach the secondary milestone by adding Cloudflare Pages static-webapp deploys
    and a full Pleomino `dev -> staging -> prod` flow.
 7. PR-11 through PR-13, with PR-12.1 verify-scope hardening immediately after preview: generalize
    that second milestone across providers, preview, deployment-test ownership cleanup, and
    changed-based orchestration.
-8. PR-14 through PR-16: close the remaining model gaps for multi-component rollout, rebuild-per-stage,
-   and cross-cutting protected/shared semantics.
+8. PR-14 through PR-16: close the remaining model gaps for multi-component rollout,
+   rebuild-per-stage, and cross-cutting protected/shared semantics.
+9. PR-17 through PR-20: harden protected/shared admission, prerequisite-mode and
+   promotion-compatibility validation, and control-plane contracts, then close the remaining
+   replay, rollback, target-transition, and execution-boundary gaps needed for the full reviewed
+   operator model.
+10. PR-21 through PR-24: finish the infra-affecting plan/diff gate, destructive-intent workflow,
+    and the core protected/shared operational closeout for retention, resilience, recovery,
+    break-glass, observability, and redaction.
+11. PR-25 through PR-26: finish progressive rollout and the reviewed bootstrap/self-hosting core
+    so the full protected/shared execution model is in place.
+12. PR-27 through PR-29: close the remaining front-door CLI contract, exact local immutable-
+    selector and preview-policy boundary, shared locking plus queue/effective-lock-scope policy,
+    and the non-static component-kind plus provider-capability rollout/default-action foundation.
+13. PR-30 through PR-34: add the remaining provider-family breadth across S3 static hosting,
+    Kubernetes service/shared-platform deployments, SSR hosting, and both mobile-store release
+    families.
+14. PR-35 through PR-36: close the remaining protected/shared policy contracts for admission
+    attestation/supply-chain enforcement and explicit smoke exceptions.
+15. PR-37 through PR-38: close the remaining protected/shared execution contracts for secrets,
+    credential lifecycle, publish safety, automatic retry, and smoke timeout budgets.
+16. PR-39 through PR-40: close lane-governance verification plus the final record/replay,
+    compatibility, provenance, and explicit `release_actions` contract so the full deployment
+    design is implemented end to end.
 
 ## Companion Docs
 

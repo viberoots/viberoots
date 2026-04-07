@@ -9,6 +9,8 @@ import {
   createCloudflarePagesSubmissionId,
   withCloudflarePagesControlPlaneRun,
 } from "./cloudflare-pages-control-plane-shared.ts";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import {
   deriveCloudflarePagesPreviewTarget,
   cloudflarePagesPreviewIdentitySelector,
@@ -22,6 +24,7 @@ export async function submitCloudflarePagesPreviewDeploy(opts: {
   deployment: CloudflarePagesDeployment;
   recordsRoot: string;
   sourceRunId: string;
+  admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: CloudflarePagesSmokeConnectOverride;
 }) {
   const effectiveRunTarget = deriveCloudflarePagesPreviewTarget(opts.deployment, opts.sourceRunId);
@@ -36,6 +39,16 @@ export async function submitCloudflarePagesPreviewDeploy(opts: {
     deployment: opts.deployment,
     artifactIdentity: source.artifact.identity,
     sourceRecord: source.sourceRecord,
+  });
+  admittedContext.policyEvaluation = await evaluateDeploymentAdmission({
+    workspaceRoot: opts.workspaceRoot,
+    recordsRoot: opts.recordsRoot,
+    deployment: opts.deployment,
+    operationKind: "preview",
+    admittedContext,
+    sourceRecord: source.sourceRecord,
+    artifactLineageId: source.artifactLineageId,
+    evidence: opts.admissionEvidence,
   });
   const snapshot: CloudflarePagesControlPlaneSnapshot = {
     schemaVersion: CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA,

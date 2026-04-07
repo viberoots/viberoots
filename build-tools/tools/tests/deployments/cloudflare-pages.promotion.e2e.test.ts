@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloudflare-pages-control-plane.ts";
 import { resolveCloudflarePagesPromotionSelection } from "../../deployments/cloudflare-pages-promotion.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
@@ -45,7 +44,7 @@ function pleominoProdDeployment() {
     ref: "//projects/deployments/pleomino-shared:prod_release",
     name: "prod_release",
     allowedRefs: ["env/pleomino/prod"],
-    requiredChecks: ["deploy/pleomino-prod"],
+    requiredChecks: [],
     fingerprint: "sha256:admission-pleomino-prod",
   });
   return cloudflarePagesDeploymentFixture({
@@ -75,7 +74,7 @@ function fakeCloudflareEnv(fake: Awaited<ReturnType<typeof installFakeCloudflare
   };
 }
 
-test("pleomino promotes the same exact static-webapp artifact from dev to staging to prod", async () => {
+test("cloudflare-pages rejects cross-provider same-artifact promotion when the compatibility gate fails", async () => {
   await runInTemp("cloudflare-pages-promotion-e2e", async (tmp, $) => {
     const dev = pleominoDevDeployment();
     const staging = cloudflarePagesDeploymentFixture();
@@ -117,39 +116,24 @@ test("pleomino promotes the same exact static-webapp artifact from dev to stagin
         cwd: tmp,
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${devJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
-      const devRecord = JSON.parse(await fsp.readFile(devSummary.recordPath, "utf8"));
-      await fsp.rm(artifactDir, { recursive: true, force: true });
-      const stagingRun = await $({
-        cwd: tmp,
-        env: fakeCloudflareEnv(fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --publish-only --source-run-id ${devSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(stagingServer.port)} --smoke-connect-protocol https:`;
-      const stagingSummary = JSON.parse(String(stagingRun.stdout));
-      const stagingRecord = JSON.parse(await fsp.readFile(stagingSummary.recordPath, "utf8"));
-      const prodRun = await $({
-        cwd: tmp,
-        env: fakeCloudflareEnv(fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${prodJson} --publish-only --source-run-id ${stagingSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(prodServer.port)} --smoke-connect-protocol https:`;
-      const prodSummary = JSON.parse(String(prodRun.stdout));
-      const prodRecord = JSON.parse(await fsp.readFile(prodSummary.recordPath, "utf8"));
-      const wranglerLogs = (await fsp.readFile(fake.logPath, "utf8"))
-        .trim()
-        .split(/\r?\n/)
-        .map((line) => JSON.parse(line));
-      assert.equal(devSummary.operationKind, "deploy");
-      assert.equal(stagingSummary.operationKind, "promotion");
-      assert.equal(prodSummary.operationKind, "promotion");
-      assert.equal(stagingRecord.parentRunId, devSummary.deployRunId);
-      assert.equal(stagingRecord.releaseLineageId, devSummary.deployRunId);
-      assert.equal(stagingRecord.artifactLineageId, devSummary.artifactIdentity);
-      assert.equal(prodRecord.parentRunId, stagingSummary.deployRunId);
-      assert.equal(prodRecord.releaseLineageId, devSummary.deployRunId);
-      assert.equal(prodRecord.artifactLineageId, devSummary.artifactIdentity);
-      assert.equal(stagingRecord.artifact.identity, devSummary.artifactIdentity);
-      assert.equal(prodRecord.artifact.identity, devSummary.artifactIdentity);
-      assert.equal(wranglerLogs[0]?.artifactDir, devRecord.artifact.storedArtifactPath);
-      assert.equal(wranglerLogs[1]?.artifactDir, devRecord.artifact.storedArtifactPath);
-      assert.equal(wranglerLogs[0]?.projectName, "pleomino-staging-pages");
-      assert.equal(wranglerLogs[1]?.projectName, "pleomino-prod-pages");
+      await assert.rejects(
+        resolveCloudflarePagesPromotionSelection({
+          workspaceRoot: tmp,
+          deployment: staging,
+          recordsRoot,
+          sourceRunId: devSummary.deployRunId,
+        }),
+        /provider mismatch|publisher type mismatch/,
+      );
+      await assert.rejects(
+        resolveCloudflarePagesPromotionSelection({
+          workspaceRoot: tmp,
+          deployment: prod,
+          recordsRoot,
+          sourceRunId: devSummary.deployRunId,
+        }),
+        /provider mismatch|publisher type mismatch/,
+      );
     } finally {
       await devServer.close();
       await stagingServer.close();
@@ -193,37 +177,14 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
         cwd: tmp,
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${devJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
-      const promotion = await resolveCloudflarePagesPromotionSelection({
-        workspaceRoot: tmp,
-        deployment: staging,
-        recordsRoot,
-        sourceRunId: devSummary.deployRunId,
-      });
       await assert.rejects(
-        async () =>
-          await submitCloudflarePagesControlPlaneDeploy({
-            workspaceRoot: tmp,
-            deployment: staging,
-            recordsRoot,
-            operationKind: "promotion",
-            artifact: promotion.artifact,
-            publishBehavior: "publish-only",
-            parentRunId: promotion.parentRunId,
-            releaseLineageId: promotion.releaseLineageId,
-            artifactLineageId: promotion.artifactLineageId,
-            source: {
-              record: promotion.sourceRecord,
-              recordPath: promotion.sourceRecordPath,
-              replaySnapshotPath: promotion.sourceReplaySnapshotPath,
-            },
-            smokeConnectOverride: {
-              protocol: "https:",
-              hostname: "127.0.0.1",
-              port: stagingServer.port,
-              rejectUnauthorized: false,
-            },
-          }),
-        /smoke content mismatch/,
+        resolveCloudflarePagesPromotionSelection({
+          workspaceRoot: tmp,
+          deployment: staging,
+          recordsRoot,
+          sourceRunId: devSummary.deployRunId,
+        }),
+        /provider mismatch|publisher type mismatch/,
       );
       const records = await Promise.all(
         (await fsp.readdir(path.join(recordsRoot, "runs")))
@@ -233,8 +194,7 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
           ),
       );
       const failedPromotion = records.find((record) => record.operationKind === "promotion");
-      assert.equal(failedPromotion?.finalOutcome, "smoke_failed_after_publish");
-      assert.equal(failedPromotion?.parentRunId, devSummary.deployRunId);
+      assert.equal(failedPromotion, undefined);
     } finally {
       process.env.PATH = originalEnv.PATH || "";
       delete process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT;

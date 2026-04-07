@@ -8,6 +8,7 @@ export const DEPLOYMENT_ADMISSION_POLICY_RULE = "deployment_admission_policy";
 
 export type ArtifactReuseMode = "same_artifact" | "rebuild_per_stage";
 export type RetryBranchPolicy = "branch_independent" | "branch_coupled";
+export type RetryApprovalReuse = "fresh_only" | "same_lineage";
 export type ArtifactAttestationMode = "recorded_exact_artifact";
 
 export type DeploymentLanePolicy = {
@@ -27,6 +28,7 @@ export type DeploymentAdmissionPolicy = {
   requiredChecks: string[];
   requiredApprovals: string[];
   retryBranchPolicy: RetryBranchPolicy;
+  retryApprovalReuse: RetryApprovalReuse;
   artifactAttestationMode: ArtifactAttestationMode;
   fingerprint: string;
 };
@@ -157,6 +159,8 @@ export function extractDeploymentAdmissionPolicies(nodes: GraphNode[]): {
     const requiredApprovals = readStringArray(node, "required_approvals");
     const retryBranchPolicy = (readString(node, "retry_branch_policy") ||
       "branch_independent") as RetryBranchPolicy;
+    const retryApprovalReuse = (readString(node, "retry_approval_reuse") ||
+      "fresh_only") as RetryApprovalReuse;
     const artifactAttestationMode = (readString(node, "artifact_attestation_mode") ||
       "recorded_exact_artifact") as ArtifactAttestationMode;
     if (!ref) {
@@ -170,6 +174,9 @@ export function extractDeploymentAdmissionPolicies(nodes: GraphNode[]): {
     if (retryBranchPolicy !== "branch_independent" && retryBranchPolicy !== "branch_coupled") {
       errors.push(policyError(ref, `unsupported retry_branch_policy "${retryBranchPolicy}"`));
     }
+    if (retryApprovalReuse !== "fresh_only" && retryApprovalReuse !== "same_lineage") {
+      errors.push(policyError(ref, `unsupported retry_approval_reuse "${retryApprovalReuse}"`));
+    }
     if (artifactAttestationMode !== "recorded_exact_artifact") {
       errors.push(
         policyError(ref, `unsupported artifact_attestation_mode "${artifactAttestationMode}"`),
@@ -182,6 +189,7 @@ export function extractDeploymentAdmissionPolicies(nodes: GraphNode[]): {
       requiredChecks,
       requiredApprovals,
       retryBranchPolicy,
+      retryApprovalReuse,
       artifactAttestationMode,
     });
     policies.set(ref, {
@@ -191,6 +199,7 @@ export function extractDeploymentAdmissionPolicies(nodes: GraphNode[]): {
       requiredChecks,
       requiredApprovals,
       retryBranchPolicy,
+      retryApprovalReuse,
       artifactAttestationMode,
       fingerprint,
     });

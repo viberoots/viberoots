@@ -1,8 +1,11 @@
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-domain.taxonomy-drift.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-admission.policy.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-admission.prerequisites.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-from-changes.batch.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-from-changes.selection.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-promotion-compatibility.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-prerequisites.validation.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-target-exceptions.validation.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-verify-scope.boundary.test.ts": True,

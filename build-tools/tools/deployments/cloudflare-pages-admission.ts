@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { CloudflarePagesDeployment } from "./contract.ts";
 import { requiredDeploymentStageBranch } from "./contract.ts";
+import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence.ts";
 import type { DeploymentRequirement } from "./deployment-requirements.ts";
 
 export type CloudflarePagesSourceAdmission = {
@@ -34,6 +35,7 @@ export type CloudflarePagesAdmittedContext = {
     runtimeConfig: "exact_contract_ids";
   };
   targetExceptionRefs: string[];
+  policyEvaluation?: DeploymentAdmissionPolicyEvaluation;
   source: CloudflarePagesSourceAdmission;
   targetEnvironment: CloudflarePagesTargetEnvironmentAdmission;
 };

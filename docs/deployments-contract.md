@@ -55,6 +55,7 @@ design has been explicitly updated first.
 - Protected/shared smoke is required and blocking by default unless there is an explicit `smoke.exception`.
 - Multi-component retry remains deployment-atomic by default after partial publish failure; already-proven-live components may be treated as no-op reuse only when the adapter can prove their live published identity still matches the intended resolved artifact identity and no declared rollout or release-action rule requires re-publish.
 - Protected/shared package-local executable hooks are out of policy for normal mutation paths.
+- Protected/shared required checks and required approvals are authoritative blocking admission inputs, not advisory metadata.
 - Protected/shared approvals are target-environment run-admission facts, not reusable artifact facts.
 - Protected/shared approval evidence must bind to one immutable admission payload, including the admitted `deploy_run_id`, frozen execution snapshot, canonical target identity, selected artifact identity or admitted source-run selector when publishing, and reviewed provisioner plan/diff artifact when infra-affecting mutation is in scope.
 - If any bound approval input changes materially after approval, mutation must fail closed or require fresh approval.
@@ -118,7 +119,8 @@ design has been explicitly updated first.
 - `--from-changes` prerequisite widening is driven only by explicit direct prerequisite edges from authoritative deployment metadata; the selector must not invent transitive or cross-lane fan-out heuristics.
 - Mutating `--from-changes` fans out into ordinary per-deployment runs; it is not one multi-deployment mutating run record.
 - Grouped `--from-changes` submission may stamp a shared batch id for audit, but each deployment still owns its own `deploy_run_id`, lifecycle, final outcome, and record.
-- `health_gated` prerequisites block the dependent deployment when the prerequisite run in that invocation did not already succeed; `ordering_only` prerequisites constrain ordering only.
+- `ordering_only` prerequisites require one prior successful admitted prerequisite run and constrain ordering only.
+- `health_gated` prerequisites require the same ordering proof plus fresh admission-time health evidence against the prerequisite's declared smoke or built-in release-health contract.
 - `resume` is a first-class operator action on an existing paused progressive-rollout run, not a new `operation_kind`.
 - `resume` keeps the existing `deploy_run_id`, lineage, and frozen execution snapshot; it must reacquire lock and revalidate the paused run under the recorded rollout-resume policy before continuing.
 - If a paused rollout is not resumable under recorded rollout state, current approval state, or provider capability contract, `resume` must fail closed rather than creating an implicit replacement run.
@@ -133,7 +135,7 @@ design has been explicitly updated first.
 - `promotion` uses the target deployment's newly admitted target-environment secret and runtime-config references rather than replaying the source deployment's references.
 - Concrete Pleomino example:
   - `pleomino-dev -> pleomino-staging -> pleomino-prod` reuses one exact static-webapp artifact when the lane stays on `artifact_reuse_mode = "same_artifact"`.
-  - promotion compatibility is lane-scoped first: the source and target deployments may use different reviewed providers when the lane policy and component contract still match.
+  - promotion compatibility is lane-scoped first, but it still requires the reviewed current compatibility gate for provider family, publisher type, component ids and kinds, rollout semantics, and provisioner behavior.
   - the selected source run contributes the immutable artifact plus recorded source snapshot evidence, while the target deployment still freezes its own admitted execution snapshot and target identity before mutation.
   - `parent_run_id` points at the immediately promoted source run, `release_lineage_id` stays stable across the whole promoted release line, and `artifact_lineage_id` stays stable only while the exact same artifact is reused.
   - `pleomino-rebuild-dev -> pleomino-rebuild-staging -> pleomino-rebuild-prod` keeps the same promoted source revision but admits a new stage-specific artifact for each later environment, so `artifact_lineage_id` is not reused across those promotion runs.

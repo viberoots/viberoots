@@ -7,6 +7,7 @@ import {
 } from "./deployment-promotion.ts";
 import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-control-plane.ts";
 import type { CloudflarePagesSmokeConnectOverride } from "./cloudflare-pages-control-plane-contract.ts";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 
 export async function resolveCloudflarePagesPromotionSelection(opts: {
   workspaceRoot: string;
@@ -23,6 +24,7 @@ export async function submitCloudflarePagesRebuildPerStagePromotion(opts: {
   artifactDir: string;
   recordsRoot: string;
   sourceRunId: string;
+  admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: CloudflarePagesSmokeConnectOverride;
 }) {
   if (opts.deployment.lanePolicy.artifactReuseMode !== "rebuild_per_stage") {
@@ -44,6 +46,7 @@ export async function submitCloudflarePagesRebuildPerStagePromotion(opts: {
       recordPath: promotion.sourceRecordPath,
       replaySnapshotPath: promotion.sourceReplaySnapshotPath,
     },
+    ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
     ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
   });
 }

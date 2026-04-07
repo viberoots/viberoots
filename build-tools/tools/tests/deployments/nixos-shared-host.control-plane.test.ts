@@ -66,11 +66,19 @@ test("shared control plane admits shared_nonprod deploys and executes from the f
       assert.equal(snapshot.admittedContext.source.sourceRef, "env/pleomino/dev");
       assert.equal(snapshot.admittedContext.targetEnvironment.targetRef, "env/pleomino/dev");
       assert.equal(
+        snapshot.admittedContext.policyEvaluation.binding.targetIdentity,
+        result.lockScope,
+      );
+      assert.equal(
         snapshot.action.publishInput.artifact.identity,
         result.record.artifact?.identity,
       );
       assert.equal(result.record.providerTargetIdentity, "nixos-shared-host:default:demoapp");
       assert.equal(result.record.admittedContext.source.mode, "stage_branch_head");
+      assert.equal(
+        result.record.admittedContext.policyEvaluation.binding.targetIdentity,
+        result.lockScope,
+      );
       assert.ok(result.record.controlPlane);
       assert.equal(result.record.controlPlane.submissionId, result.submission.submissionId);
       assert.equal(result.record.controlPlane.executionSnapshotPath, result.executionSnapshotPath);

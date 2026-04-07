@@ -41,6 +41,7 @@ export function nixosSharedHostAdmissionPolicyFixture(
     requiredChecks: overrides.requiredChecks || ["deploy/pleomino-dev"],
     requiredApprovals: overrides.requiredApprovals || [],
     retryBranchPolicy: overrides.retryBranchPolicy || "branch_independent",
+    retryApprovalReuse: overrides.retryApprovalReuse || "fresh_only",
     artifactAttestationMode: overrides.artifactAttestationMode || "recorded_exact_artifact",
     fingerprint: overrides.fingerprint || "sha256:admission-pleomino-dev",
   };
@@ -72,6 +73,7 @@ export function nixosSharedHostAdmissionPolicyNodeFixture(
     required_checks: policy.requiredChecks,
     required_approvals: policy.requiredApprovals,
     retry_branch_policy: policy.retryBranchPolicy,
+    retry_approval_reuse: policy.retryApprovalReuse,
     artifact_attestation_mode: policy.artifactAttestationMode,
     ...overrides,
   };
@@ -95,7 +97,8 @@ export function nixosSharedHostDeploymentFixture(
   const appName = overrides.runtime?.appName || "demoapp";
   const targetGroup = overrides.runtime?.targetGroup || "default";
   const lanePolicy = overrides.lanePolicy || nixosSharedHostLanePolicyFixture();
-  const admissionPolicy = overrides.admissionPolicy || nixosSharedHostAdmissionPolicyFixture();
+  const admissionPolicy =
+    overrides.admissionPolicy || nixosSharedHostAdmissionPolicyFixture({ requiredChecks: [] });
   const defaultComponentProviderTarget = {
     ...deriveNixosSharedHostProviderTarget({ appName, targetGroup }),
     ...(overrides.providerTarget || {}),

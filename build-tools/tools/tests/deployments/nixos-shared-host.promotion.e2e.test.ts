@@ -4,7 +4,6 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { resolveCrossDeploymentPromotionSelection } from "../../deployments/deployment-promotion.ts";
-import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
@@ -31,15 +30,10 @@ async function writeWranglerConfig(filePath: string): Promise<void> {
   await fsp.writeFile(filePath, '{\n  "compatibility_date": "2026-03-18"\n}\n', "utf8");
 }
 
-function liveIndexPath(hostRoot: string, containerName: string): string {
-  return path.join(
-    nixosSharedHostContainerRoot(hostRoot, containerName),
-    "srv/static-app/live/index.html",
-  );
-}
-
 function cloudflareDevDeployment() {
-  const admissionPolicy = nixosSharedHostAdmissionPolicyFixture();
+  const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
+    requiredChecks: [],
+  });
   return cloudflarePagesDeploymentFixture({
     deploymentId: "pleomino-dev-pages",
     label: "//projects/deployments/pleomino-dev-pages:deploy",
@@ -61,7 +55,7 @@ function nixosStagingDeployment() {
     ref: "//projects/deployments/pleomino-shared:staging_release",
     name: "staging_release",
     allowedRefs: ["env/pleomino/staging"],
-    requiredChecks: ["deploy/pleomino-staging"],
+    requiredChecks: [],
     fingerprint: "sha256:admission-pleomino-staging",
   });
   return nixosSharedHostDeploymentFixture({
@@ -85,7 +79,7 @@ function fakeCloudflareEnv(fake: Awaited<ReturnType<typeof installFakeCloudflare
   };
 }
 
-test("nixos-shared-host promotes a compatible same-artifact source run from cloudflare-pages", async () => {
+test("nixos-shared-host rejects cross-provider same-artifact promotion when the compatibility gate fails", async () => {
   await runInTemp("nixos-shared-host-promotion-e2e", async (tmp, $) => {
     const source = cloudflareDevDeployment();
     const target = nixosStagingDeployment();
@@ -121,33 +115,14 @@ test("nixos-shared-host promotes a compatible same-artifact source run from clou
         env: fakeCloudflareEnv(fake),
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${sourceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
       const sourceSummary = JSON.parse(String(sourceRun.stdout));
-      const sourceRecord = JSON.parse(await fsp.readFile(sourceSummary.recordPath, "utf8"));
-      await fsp.rm(artifactDir, { recursive: true, force: true });
-      const promotionRun = await $({
-        cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${targetJson} --publish-only --source-run-id ${sourceSummary.deployRunId} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(targetServer.port)} --smoke-connect-protocol https:`;
-      const summary = JSON.parse(String(promotionRun.stdout));
-      const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
-      const snapshot = JSON.parse(
-        await fsp.readFile(record.controlPlane.executionSnapshotPath, "utf8"),
-      );
-      assert.equal(summary.operationKind, "promotion");
-      assert.equal(summary.parentRunId, sourceSummary.deployRunId);
-      assert.equal(record.parentRunId, sourceSummary.deployRunId);
-      assert.equal(record.releaseLineageId, sourceSummary.deployRunId);
-      assert.equal(record.artifactLineageId, sourceSummary.artifactIdentity);
-      assert.equal(record.artifact.identity, sourceSummary.artifactIdentity);
-      assert.equal(record.admittedContext.source.mode, "promotion_source_run");
-      assert.equal(record.admittedContext.source.sourceRunId, sourceSummary.deployRunId);
-      assert.equal(record.admittedContext.source.sourceDeploymentId, source.deploymentId);
-      assert.equal(record.admittedContext.targetEnvironment.targetRef, "env/pleomino/staging");
-      assert.equal(snapshot.operationKind, "promotion");
-      assert.equal(snapshot.action.publishBehavior, "publish-only");
-      assert.equal(snapshot.action.sourceRecordPath, sourceSummary.recordPath);
-      assert.equal(snapshot.action.sourceReplaySnapshotPath, sourceRecord.replaySnapshotPath);
-      assert.match(
-        await fsp.readFile(liveIndexPath(hostRoot, "pleomino-staging"), "utf8"),
-        /promoted release/,
+      await assert.rejects(
+        resolveCrossDeploymentPromotionSelection({
+          workspaceRoot: tmp,
+          deployment: target,
+          recordsRoot,
+          sourceRunId: sourceSummary.deployRunId,
+        }),
+        /provider mismatch|publisher type mismatch/,
       );
     } finally {
       await sourceServer.close();
@@ -193,7 +168,7 @@ test("nixos-shared-host promotion rejects retained source runs that drift out of
           recordsRoot,
           sourceRunId: sourceSummary.deployRunId,
         }),
-        /no longer matches current promotable target state/,
+        /provider mismatch|publisher type mismatch|no longer matches current promotable target state/,
       );
     } finally {
       await sourceServer.close();

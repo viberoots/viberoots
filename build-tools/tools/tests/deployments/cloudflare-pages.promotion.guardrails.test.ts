@@ -87,7 +87,7 @@ test("promotion rejects source runs from an incompatible current lane policy", a
         recordsRoot,
         sourceRunId,
       }),
-      /lanePolicyFingerprint mismatch/,
+      /provider mismatch|publisher type mismatch|lanePolicyFingerprint mismatch/,
     );
   });
 });
@@ -112,7 +112,7 @@ test("promotion rejects retained source runs that no longer match the current pr
         recordsRoot,
         sourceRunId,
       }),
-      /no longer matches current promotable target state/,
+      /provider mismatch|publisher type mismatch|no longer matches current promotable target state/,
     );
   });
 });

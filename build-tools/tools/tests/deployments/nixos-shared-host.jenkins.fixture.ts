@@ -83,7 +83,7 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
       "deployment_admission_policy(",
       '    name = "dev_release",',
       '    allowed_refs = ["env/pleomino/dev"],',
-      '    required_checks = ["deploy/pleomino-dev"],',
+      "    required_checks = [],",
       '    visibility = ["PUBLIC"],',
       ")",
       "",

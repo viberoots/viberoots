@@ -168,6 +168,7 @@ Normative-source note:
 
 - `protection_class` defaults to `shared_nonprod`
 - the initial reviewed slice supports shared-dev metadata extraction, authoritative platform-state reconciliation, and deterministic host realization for static webapps on a NixOS host
+- protected/shared execution must stay inside the vetted built-in publisher, provisioner, smoke-runner, and reviewed built-in `release_actions` registry; package-local executable hooks are rejected on the normal control-plane path
 
 ## Capability Entry: `cloudflare-pages`
 
@@ -275,6 +276,7 @@ Normative-source note:
 
 - in policy for protected/shared single-component static-webapp deployments
 - protected/shared execution must stay inside vetted built-in publisher, preview, and smoke-runner code
+- package-local executable hooks, deployment-owned provisioners, and unreviewed `release_actions` remain out of policy for the normal shared-control-plane path
 
 ### Initial Pleomino Topology
 

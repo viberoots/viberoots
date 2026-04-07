@@ -10,6 +10,7 @@ import {
   buildArtifactDirsByComponentId,
   parseComponentArtifactDirs,
 } from "./deployment-component-artifact-dirs.ts";
+import { resolveDeploymentAdmissionEvidence } from "./deployment-admission-cli.ts";
 import { runFromChangesCli } from "./deployment-from-changes-cli.ts";
 import { runCloudflarePagesCli } from "./cloudflare-pages-cli.ts";
 import { resolveDeploymentFromTarget } from "./deployment-query.ts";
@@ -102,6 +103,7 @@ async function main() {
   const cleanupReason = getFlagStr("cleanup-reason", "manual_cleanup").trim();
   const sourceRunId = getFlagStr("source-run-id", "").trim();
   const artifactDirFlag = getFlagStr("artifact-dir", "").trim();
+  const admissionEvidence = await resolveDeploymentAdmissionEvidence();
   const smokeConnectOverride = resolveSmokeConnectOverride();
   if (preview && previewCleanup) {
     throw new Error("--preview and --preview-cleanup are mutually exclusive");
@@ -137,6 +139,7 @@ async function main() {
       preview,
       previewCleanup,
       sourceRunId,
+      ...(admissionEvidence ? { admissionEvidence } : {}),
       ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
       cleanupReason,
     });
@@ -171,6 +174,7 @@ async function main() {
         operationKind: "explicit_removal",
         deployment,
         paths,
+        ...(admissionEvidence ? { admissionEvidence } : {}),
       })
     : await (async () => {
         if (publishOnly) {
@@ -197,6 +201,7 @@ async function main() {
             paths,
             sourceRunId,
             rollback,
+            ...(admissionEvidence ? { admissionEvidence } : {}),
             ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
           });
         }
@@ -218,6 +223,7 @@ async function main() {
           ...(artifactDir ? { artifactDir } : {}),
           ...(componentArtifactDirs ? { artifactDirsByComponentId: componentArtifactDirs } : {}),
           paths,
+          ...(admissionEvidence ? { admissionEvidence } : {}),
           ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
         });
       })();

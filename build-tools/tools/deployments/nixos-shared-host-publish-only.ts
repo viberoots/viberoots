@@ -10,6 +10,7 @@ import {
 } from "./nixos-shared-host-control-plane-contract.ts";
 import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
 import { resolveNixosSharedHostReplaySelection } from "./nixos-shared-host-replay.ts";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 
 export async function submitNixosSharedHostPublishOnlyRun(opts: {
   workspaceRoot: string;
@@ -17,6 +18,7 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: {
   paths: NixosSharedHostControlPlanePaths;
   sourceRunId: string;
   rollback: boolean;
+  admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;
 }) {
   if (opts.rollback) {
@@ -42,6 +44,7 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: {
         replaySnapshotPath: replay.replaySnapshotPath,
       },
       paths: opts.paths,
+      ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
       ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
     });
   }
@@ -73,6 +76,7 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: {
         replaySnapshotPath: replay.replaySnapshotPath,
       },
       paths: opts.paths,
+      ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
       ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
     });
   }
@@ -97,6 +101,7 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: {
       replaySnapshotPath: promotion.sourceReplaySnapshotPath,
     },
     paths: opts.paths,
+    ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
     ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
   });
 }

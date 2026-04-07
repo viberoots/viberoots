@@ -2,6 +2,8 @@
 import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
 import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import {
   type NixosSharedHostControlPlaneOperationKind,
   type NixosSharedHostControlPlanePaths,
@@ -50,6 +52,7 @@ type SubmitOpts = {
   artifactLineageId?: string;
   smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;
   source?: NixosSharedHostControlPlaneSourceSelection;
+  admissionEvidence?: DeploymentAdmissionEvidence;
   hooks?: SubmitHooks;
 };
 
@@ -146,6 +149,21 @@ export async function submitNixosSharedHostControlPlaneRun(
 ): Promise<SubmitResult> {
   const submissionId = createNixosSharedHostSubmissionId();
   const snapshot = await createNixosSharedHostControlPlaneSnapshot(opts, submissionId);
+  if (snapshot.admittedContext) {
+    snapshot.admittedContext = {
+      ...snapshot.admittedContext,
+      policyEvaluation: await evaluateDeploymentAdmission({
+        workspaceRoot: opts.workspaceRoot,
+        recordsRoot: opts.paths.recordsRoot,
+        deployment: opts.deployment,
+        operationKind: snapshot.operationKind,
+        admittedContext: snapshot.admittedContext,
+        sourceRecord: opts.source?.record as any,
+        artifactLineageId: opts.artifactLineageId,
+        evidence: opts.admissionEvidence,
+      }),
+    };
+  }
   const executionSnapshotPath = executionSnapshotPathFor(opts.paths.recordsRoot, submissionId);
   const submissionPath = submissionPathFor(opts.paths.recordsRoot, submissionId);
   await writeControlPlaneJson(executionSnapshotPath, snapshot);

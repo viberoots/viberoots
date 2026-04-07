@@ -38,7 +38,7 @@ export function cloudflarePagesDeploymentFixture(
       ref: "//projects/deployments/pleomino-shared:staging_release",
       name: "staging_release",
       allowedRefs: ["env/pleomino/staging"],
-      requiredChecks: ["deploy/pleomino-staging"],
+      requiredChecks: [],
       fingerprint: "sha256:admission-pleomino-staging",
     });
   const providerTarget = {

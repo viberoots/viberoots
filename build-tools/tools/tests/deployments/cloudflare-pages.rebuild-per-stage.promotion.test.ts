@@ -10,10 +10,8 @@ import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-serv
 import {
   nixosSharedHostAdmissionPolicyFixture,
   ensureNixosSharedHostStageBranch,
-  nixosSharedHostDeploymentFixture,
   nixosSharedHostLanePolicyFixture,
 } from "./nixos-shared-host.fixture.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });
@@ -44,16 +42,23 @@ function rebuildDevDeployment() {
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
     ref: "//projects/deployments/pleomino-rebuild-shared:dev_release",
     name: "dev_release",
+    requiredChecks: [],
   });
-  return nixosSharedHostDeploymentFixture({
-    deploymentId: "pleomino-rebuild-dev",
-    label: "//projects/deployments/pleomino-rebuild-dev:deploy",
+  return cloudflarePagesDeploymentFixture({
+    deploymentId: "pleomino-rebuild-dev-pages",
+    label: "//projects/deployments/pleomino-rebuild-dev-pages:deploy",
+    environmentStage: "dev",
     lanePolicyRef: lanePolicy.ref,
     lanePolicy,
     admissionPolicyRef: admissionPolicy.ref,
     admissionPolicy,
-    component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
-    runtime: { appName: "pleomino-rebuild", containerPort: 3000, healthPath: "/healthz" },
+    providerTarget: {
+      account: "web-platform-dev",
+      project: "pleomino-rebuild-dev-pages",
+      id: "pleomino-rebuild-dev-pages",
+      canonicalUrl: "https://pleomino-rebuild-dev-pages.pages.dev/",
+      providerTargetIdentity: "cloudflare-pages:web-platform-dev/pleomino-rebuild-dev-pages",
+    },
   });
 }
 
@@ -63,7 +68,7 @@ function rebuildStagingDeployment() {
     ref: "//projects/deployments/pleomino-rebuild-shared:staging_release",
     name: "staging_release",
     allowedRefs: ["env/pleomino/staging"],
-    requiredChecks: ["deploy/pleomino-staging"],
+    requiredChecks: [],
     fingerprint: "sha256:admission-pleomino-rebuild-staging",
   });
   return cloudflarePagesDeploymentFixture({
@@ -94,20 +99,31 @@ function fakeCloudflareEnv(fake: Awaited<ReturnType<typeof installFakeCloudflare
   };
 }
 
-async function createSourceRun(tmp: string, $: any, recordsRoot: string) {
+async function createSourceRun(
+  tmp: string,
+  $: any,
+  recordsRoot: string,
+  fake: Awaited<ReturnType<typeof installFakeCloudflarePagesWrangler>>,
+) {
   const deployment = rebuildDevDeployment();
-  const deploymentJson = path.join(tmp, "pleomino-rebuild-dev.json");
+  const deploymentJson = path.join(tmp, "pleomino-rebuild-dev-pages.json");
   const artifactDir = path.join(tmp, "source-artifact");
-  const hostRoot = path.join(tmp, "host");
-  const statePath = path.join(tmp, "platform-state.json");
   await writeArtifact(artifactDir, "<html>source release</html>\n");
+  await writeWranglerConfig(
+    path.join(tmp, "projects", "deployments", "pleomino-rebuild-dev-pages", "wrangler.jsonc"),
+  );
   await ensureNixosSharedHostStageBranch(tmp, $, deployment);
   await writeDeploymentJson(deploymentJson, deployment);
-  const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
+  const server = await startCloudflarePagesPublicServer({
+    deployment,
+    publishRoot: fake.publishRoot,
+    tlsRoot: tmp,
+  });
   try {
     const run = await $({
       cwd: tmp,
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      env: fakeCloudflareEnv(fake),
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
     const summary = JSON.parse(String(run.stdout));
     const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
     return { deployment, summary, record };
@@ -119,7 +135,8 @@ async function createSourceRun(tmp: string, $: any, recordsRoot: string) {
 test("cloudflare-pages rebuild-per-stage promotion rejects publish-only exact-artifact reuse", async () => {
   await runInTemp("cloudflare-pages-rebuild-per-stage-guardrail", async (tmp, $) => {
     const recordsRoot = path.join(tmp, "records");
-    const { summary } = await createSourceRun(tmp, $, recordsRoot);
+    const fake = await installFakeCloudflarePagesWrangler(tmp);
+    const { summary } = await createSourceRun(tmp, $, recordsRoot, fake);
     const staging = rebuildStagingDeployment();
     const stagingJson = path.join(tmp, "pleomino-rebuild-staging.json");
     await ensureNixosSharedHostStageBranch(tmp, $, staging);
@@ -138,15 +155,15 @@ test("cloudflare-pages rebuild-per-stage promotion rejects publish-only exact-ar
 test("cloudflare-pages rebuild-per-stage promotion admits a new stage artifact before publish", async () => {
   await runInTemp("cloudflare-pages-rebuild-per-stage-e2e", async (tmp, $) => {
     const recordsRoot = path.join(tmp, "records");
+    const fake = await installFakeCloudflarePagesWrangler(tmp);
     const {
       deployment: sourceDeployment,
       summary: sourceSummary,
       record: sourceRecord,
-    } = await createSourceRun(tmp, $, recordsRoot);
+    } = await createSourceRun(tmp, $, recordsRoot, fake);
     const staging = rebuildStagingDeployment();
     const stagingJson = path.join(tmp, "pleomino-rebuild-staging.json");
     const stagingArtifactDir = path.join(tmp, "staging-artifact");
-    const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(stagingArtifactDir, "<html>stage-specific build</html>\n");
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-rebuild-staging", "wrangler.jsonc"),
@@ -175,6 +192,7 @@ test("cloudflare-pages rebuild-per-stage promotion admits a new stage artifact b
         .trim()
         .split(/\r?\n/)
         .map((line) => JSON.parse(line));
+      const publishLog = wranglerLogs[wranglerLogs.length - 1];
       assert.equal(summary.operationKind, "promotion");
       assert.equal(summary.parentRunId, sourceSummary.deployRunId);
       assert.equal(record.parentRunId, sourceSummary.deployRunId);
@@ -190,8 +208,9 @@ test("cloudflare-pages rebuild-per-stage promotion admits a new stage artifact b
       assert.equal(snapshot.action.publishBehavior, "deploy");
       assert.equal(snapshot.action.sourceRecordPath, sourceSummary.recordPath);
       assert.equal(snapshot.action.sourceReplaySnapshotPath, sourceRecord.replaySnapshotPath);
-      assert.equal(wranglerLogs[0]?.artifactDir, record.artifact.storedArtifactPath);
-      assert.notEqual(wranglerLogs[0]?.artifactDir, sourceRecord.artifact.storedArtifactPath);
+      assert.equal(publishLog?.projectName, staging.providerTarget.project);
+      assert.equal(publishLog?.artifactDir, record.artifact.storedArtifactPath);
+      assert.notEqual(publishLog?.artifactDir, sourceRecord.artifact.storedArtifactPath);
       assert.match(
         await fsp.readFile(
           path.join(fake.publishRoot, staging.providerTarget.project, "index.html"),

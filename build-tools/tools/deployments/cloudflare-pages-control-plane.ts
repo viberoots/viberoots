@@ -18,6 +18,9 @@ import {
 import { runCloudflarePagesStaticDeploy } from "./cloudflare-pages-static-deploy.ts";
 import type { CloudflarePagesDeployRecord } from "./cloudflare-pages-records.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
+import type { DeploymentRunRecordLike } from "./deployment-admission-records.ts";
 import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
 import {
   admitStaticWebappArtifact,
@@ -25,7 +28,7 @@ import {
 } from "./static-webapp-artifacts.ts";
 
 type PromotionSourceSelection = {
-  record: { deployRunId: string; deploymentId: string };
+  record: DeploymentRunRecordLike;
   recordPath: string;
   replaySnapshotPath: string;
 };
@@ -43,6 +46,7 @@ type SubmitOpts = {
   releaseLineageId?: string;
   artifactLineageId?: string;
   source?: PromotionSourceSelection;
+  admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: CloudflarePagesSmokeConnectOverride;
 };
 
@@ -183,6 +187,19 @@ export async function submitCloudflarePagesControlPlaneDeploy(opts: SubmitOpts):
 }> {
   const submissionId = createCloudflarePagesSubmissionId();
   const snapshot = await createSnapshot(opts, submissionId);
+  snapshot.admittedContext = {
+    ...snapshot.admittedContext,
+    policyEvaluation: await evaluateDeploymentAdmission({
+      workspaceRoot: opts.workspaceRoot,
+      recordsRoot: opts.recordsRoot,
+      deployment: opts.deployment,
+      operationKind: snapshot.operationKind,
+      admittedContext: snapshot.admittedContext,
+      sourceRecord: opts.source?.record,
+      artifactLineageId: opts.artifactLineageId,
+      evidence: opts.admissionEvidence,
+    }),
+  };
   return await withCloudflarePagesControlPlaneRun(
     opts.deployment,
     opts.recordsRoot,

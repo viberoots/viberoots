@@ -38,6 +38,7 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "required_checks",
   "required_approvals",
   "retry_branch_policy",
+  "retry_approval_reuse",
   "artifact_attestation_mode",
   "labels",
 ];

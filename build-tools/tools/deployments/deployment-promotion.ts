@@ -13,6 +13,11 @@ import {
   resolveNixosSharedHostReplaySource,
   type NixosSharedHostReplaySnapshot,
 } from "./nixos-shared-host-replay.ts";
+import {
+  exactArtifactPromotionErrors,
+  promotionCompatibilityErrors,
+  sourcePromotionRevision,
+} from "./deployment-promotion-compatibility.ts";
 import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
 
 export type DeploymentPromotionSourceRecord =
@@ -66,14 +71,6 @@ async function gitStdout(workspaceRoot: string, args: string[]): Promise<string>
   return String((out as any).stdout || "").trim();
 }
 
-function sourceStage(source: DeploymentPromotionSource): string {
-  return source.replaySnapshot.deployment.environmentStage;
-}
-
-function sourceRevision(source: DeploymentPromotionSource): string {
-  return source.replaySnapshot.admittedContext.source.sourceRevision;
-}
-
 function defaultRecordsRoots(workspaceRoot: string, recordsRoot: string): string[] {
   return Array.from(
     new Set([
@@ -123,51 +120,6 @@ export async function resolveDeploymentPromotionSource(opts: {
   throw new Error(`promotion source run not found: ${opts.sourceRunId}`);
 }
 
-function compatibilityErrors(
-  deployment: DeploymentTarget,
-  source: DeploymentPromotionSource,
-): string[] {
-  const sourceDeployment = source.replaySnapshot.deployment;
-  const errors: string[] = [];
-  if (source.record.finalOutcome !== "succeeded") {
-    errors.push(`source run is not successful: ${source.record.finalOutcome}`);
-  }
-  if (source.record.publishMode !== "normal") {
-    errors.push(`promotion source must use publish_mode normal, got ${source.record.publishMode}`);
-  }
-  if (source.record.deploymentId === deployment.deploymentId) {
-    errors.push(`promotion requires a distinct target deployment id: ${deployment.deploymentId}`);
-  }
-  if (sourceDeployment.lanePolicyRef !== deployment.lanePolicyRef) {
-    errors.push(
-      `lanePolicyRef mismatch: current=${deployment.lanePolicyRef} source=${sourceDeployment.lanePolicyRef}`,
-    );
-  }
-  if (
-    source.replaySnapshot.admittedContext.lanePolicyFingerprint !==
-    deployment.lanePolicy.fingerprint
-  ) {
-    errors.push(
-      `lanePolicyFingerprint mismatch: current=${deployment.lanePolicy.fingerprint} source=${source.replaySnapshot.admittedContext.lanePolicyFingerprint}`,
-    );
-  }
-  const edge = `${sourceStage(source)}->${deployment.environmentStage}`;
-  if (!deployment.lanePolicy.allowedPromotionEdges.includes(edge)) {
-    errors.push(`promotion edge is not allowed by the current lane policy: ${edge}`);
-  }
-  if (sourceDeployment.component.kind !== deployment.component.kind) {
-    errors.push(
-      `component kind mismatch: current=${deployment.component.kind} source=${sourceDeployment.component.kind}`,
-    );
-  }
-  if (sourceDeployment.component.target !== deployment.component.target) {
-    errors.push(
-      `component target mismatch: current=${deployment.component.target} source=${sourceDeployment.component.target}`,
-    );
-  }
-  return errors;
-}
-
 async function eligibilityErrors(
   workspaceRoot: string,
   deployment: DeploymentTarget,
@@ -181,20 +133,12 @@ async function eligibilityErrors(
     );
   }
   const targetRevision = await gitStdout(workspaceRoot, ["rev-parse", targetRef]);
-  if (targetRevision !== sourceRevision(source)) {
+  if (targetRevision !== sourcePromotionRevision(source)) {
     errors.push(
       `source run no longer matches current promotable target state: ${source.record.deployRunId}`,
     );
   }
   return errors;
-}
-
-function exactArtifactPromotionErrors(deployment: DeploymentTarget): string[] {
-  return deployment.lanePolicy.artifactReuseMode === "same_artifact"
-    ? []
-    : [
-        `target lane artifact_reuse_mode ${deployment.lanePolicy.artifactReuseMode} requires target-stage rebuild; use a non-publish-only promotion flow`,
-      ];
 }
 
 export async function resolveCrossDeploymentPromotionSourceSelection<
@@ -207,7 +151,7 @@ export async function resolveCrossDeploymentPromotionSourceSelection<
 }): Promise<CrossDeploymentPromotionSourceSelection<TDeployment>> {
   const source = await resolveDeploymentPromotionSource(opts);
   const errors = [
-    ...compatibilityErrors(opts.deployment, source),
+    ...promotionCompatibilityErrors(opts.deployment, source),
     ...(await eligibilityErrors(opts.workspaceRoot, opts.deployment, source)),
   ];
   if (errors.length > 0) {
