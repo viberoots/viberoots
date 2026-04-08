@@ -1,12 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
 import { requireNixosSharedHostAdmittedArtifactPath } from "./nixos-shared-host-artifacts.ts";
+import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
-import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
-import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
 import {
   liveRollbackCompatibilityErrors,
   rollbackSourceEligibilityErrors,
@@ -17,98 +13,21 @@ import {
   readNixosSharedHostDeployRecord,
   type NixosSharedHostDeployRecord,
 } from "./nixos-shared-host-records.ts";
+import {
+  nixosSharedHostReplayArtifactIdentity,
+  readNixosSharedHostReplaySnapshot,
+  type NixosSharedHostReplaySnapshot,
+} from "./nixos-shared-host-replay-snapshot.ts";
 
-export const NIXOS_SHARED_HOST_REPLAY_SNAPSHOT_SCHEMA = "nixos-shared-host-replay-snapshot@1";
-
-export type NixosSharedHostReplaySnapshot = {
-  schemaVersion: typeof NIXOS_SHARED_HOST_REPLAY_SNAPSHOT_SCHEMA;
-  deployRunId: string;
-  createdAt: string;
-  deploymentId: string;
-  deploymentLabel: string;
-  providerTargetIdentity: string;
-  deploymentMetadataFingerprint: string;
-  artifact: NixosSharedHostAdmittedArtifact;
-  admittedContext: NixosSharedHostAdmittedContext;
-  deployment: NixosSharedHostDeployment;
-  platformStateSnapshotPath: string;
-  hostConfigSnapshotPath: string;
-  controlPlaneExecutionSnapshotPath?: string;
-};
-
-function replayBundleDir(recordsRoot: string, deployRunId: string): string {
-  return path.join(path.resolve(recordsRoot), "replay", deployRunId);
-}
-
-export function replaySnapshotPathFor(recordsRoot: string, deployRunId: string): string {
-  return path.join(replayBundleDir(recordsRoot, deployRunId), "snapshot.json");
-}
-
-function platformStateSnapshotPathFor(recordsRoot: string, deployRunId: string): string {
-  return path.join(replayBundleDir(recordsRoot, deployRunId), "platform-state.json");
-}
-
-function hostConfigSnapshotPathFor(recordsRoot: string, deployRunId: string): string {
-  return path.join(replayBundleDir(recordsRoot, deployRunId), "host-config.json");
-}
-
-async function writeSnapshotDocument(filePath: string, value: unknown): Promise<void> {
-  await fsp.mkdir(path.dirname(filePath), { recursive: true });
-  await fsp.writeFile(filePath, JSON.stringify(value, null, 2) + "\n", "utf8");
-}
-
-export async function writeNixosSharedHostReplaySnapshot(opts: {
-  recordsRoot: string;
-  deployRunId: string;
-  deployment: NixosSharedHostDeployment;
-  artifact: NixosSharedHostAdmittedArtifact;
-  admittedContext: NixosSharedHostAdmittedContext;
-  platformState: unknown;
-  hostConfig: unknown;
-  controlPlaneExecutionSnapshotPath?: string;
-}) {
-  const replaySnapshotPath = replaySnapshotPathFor(opts.recordsRoot, opts.deployRunId);
-  const platformStateSnapshotPath = platformStateSnapshotPathFor(
-    opts.recordsRoot,
-    opts.deployRunId,
-  );
-  const hostConfigSnapshotPath = hostConfigSnapshotPathFor(opts.recordsRoot, opts.deployRunId);
-  await writeSnapshotDocument(platformStateSnapshotPath, opts.platformState);
-  await writeSnapshotDocument(hostConfigSnapshotPath, opts.hostConfig);
-  const deploymentMetadataFingerprint = deploymentMetadataFingerprintFor(opts.deployment);
-  const snapshot: NixosSharedHostReplaySnapshot = {
-    schemaVersion: NIXOS_SHARED_HOST_REPLAY_SNAPSHOT_SCHEMA,
-    deployRunId: opts.deployRunId,
-    createdAt: new Date().toISOString(),
-    deploymentId: opts.deployment.deploymentId,
-    deploymentLabel: opts.deployment.label,
-    providerTargetIdentity: nixosSharedHostDeploymentTargetIdentity(opts.deployment),
-    deploymentMetadataFingerprint,
-    artifact: opts.artifact,
-    admittedContext: opts.admittedContext,
-    deployment: opts.deployment,
-    platformStateSnapshotPath,
-    hostConfigSnapshotPath,
-    ...(opts.controlPlaneExecutionSnapshotPath
-      ? { controlPlaneExecutionSnapshotPath: opts.controlPlaneExecutionSnapshotPath }
-      : {}),
-  };
-  await writeSnapshotDocument(replaySnapshotPath, snapshot);
-  return {
-    replaySnapshotPath,
-    deploymentMetadataFingerprint,
-    platformStateSnapshotPath,
-    hostConfigSnapshotPath,
-  };
-}
-
-export async function readNixosSharedHostReplaySnapshot(
-  replaySnapshotPath: string,
-): Promise<NixosSharedHostReplaySnapshot> {
-  return JSON.parse(
-    await fsp.readFile(replaySnapshotPath, "utf8"),
-  ) as NixosSharedHostReplaySnapshot;
-}
+export {
+  NIXOS_SHARED_HOST_REPLAY_SNAPSHOT_SCHEMA,
+  nixosSharedHostReplayArtifactIdentity,
+  readNixosSharedHostReplaySnapshot,
+  replaySnapshotPathFor,
+  writeNixosSharedHostReplayComponentResults,
+  writeNixosSharedHostReplaySnapshot,
+  type NixosSharedHostReplaySnapshot,
+} from "./nixos-shared-host-replay-snapshot.ts";
 
 function requireReplaySnapshotPath(record: NixosSharedHostDeployRecord): string {
   if (typeof record.replaySnapshotPath === "string" && record.replaySnapshotPath.trim()) {
@@ -136,8 +55,68 @@ export async function resolveNixosSharedHostReplaySource(opts: {
     : deployRecordPathFor(String(opts.recordsRoot || ""), String(opts.deployRunId || ""));
   const record = await readNixosSharedHostDeployRecord(recordPath);
   const replaySnapshot = await readNixosSharedHostReplaySnapshot(requireReplaySnapshotPath(record));
-  const artifactDir = await requireNixosSharedHostAdmittedArtifactPath(replaySnapshot.artifact);
+  if (replaySnapshot.publishInput.kind === "component-artifacts") {
+    const componentArtifactDirs = Object.fromEntries(
+      await Promise.all(
+        replaySnapshot.publishInput.components.map(async ({ componentId, artifact }) => [
+          componentId,
+          await requireNixosSharedHostAdmittedArtifactPath(artifact),
+        ]),
+      ),
+    );
+    return { record, recordPath, replaySnapshot, componentArtifactDirs };
+  }
+  const artifactDir = await requireNixosSharedHostAdmittedArtifactPath(
+    replaySnapshot.publishInput.artifact,
+  );
   return { record, recordPath, replaySnapshot, artifactDir };
+}
+
+function componentIds(values: Array<{ componentId: string }>): string {
+  return values
+    .map((value) => value.componentId)
+    .sort()
+    .join(",");
+}
+
+export function requireNixosSharedHostReplayComponentState(
+  deployment: NixosSharedHostDeployment,
+  replaySnapshot: NixosSharedHostReplaySnapshot,
+): {
+  componentArtifacts: typeof replaySnapshot.publishInput.components;
+  componentResults: NixosSharedHostComponentResult[];
+} {
+  if (replaySnapshot.publishInput.kind !== "component-artifacts") {
+    throw new Error("multi-component replay requires recorded per-component exact artifact inputs");
+  }
+  if (!replaySnapshot.componentResults?.length) {
+    throw new Error("multi-component replay is missing recorded per-component replay state");
+  }
+  const expectedComponentIds = deployment.components
+    .map((component) => component.id)
+    .sort()
+    .join(",");
+  if (componentIds(replaySnapshot.publishInput.components) !== expectedComponentIds) {
+    throw new Error("multi-component replay artifact state does not match deployment components");
+  }
+  if (componentIds(replaySnapshot.componentResults) !== expectedComponentIds) {
+    throw new Error("multi-component replay result state does not match deployment components");
+  }
+  const artifactIdentityByComponentId = new Map(
+    replaySnapshot.publishInput.components.map(({ componentId, artifact }) => [
+      componentId,
+      artifact.identity,
+    ]),
+  );
+  for (const result of replaySnapshot.componentResults) {
+    if (artifactIdentityByComponentId.get(result.componentId) !== result.artifactIdentity) {
+      throw new Error(`multi-component replay state drifted for component "${result.componentId}"`);
+    }
+  }
+  return {
+    componentArtifacts: replaySnapshot.publishInput.components,
+    componentResults: replaySnapshot.componentResults,
+  };
 }
 
 export async function resolveNixosSharedHostReplaySelection(opts: {
@@ -171,16 +150,28 @@ ${rollbackErrors.join("\n")}`);
     throw new Error(`rollback source run is blocked by current release-action posture:
 ${liveCompatibilityErrors.join("\n")}`);
   }
+  const replaySource =
+    source.replaySnapshot.publishInput.kind === "component-artifacts"
+      ? requireNixosSharedHostReplayComponentState(opts.deployment, source.replaySnapshot)
+      : undefined;
   return {
     operationKind: opts.rollback ? "rollback" : "retry",
     deployment: opts.deployment,
-    artifact: source.replaySnapshot.artifact,
+    ...(source.replaySnapshot.publishInput.kind === "exact-artifact"
+      ? { artifact: source.replaySnapshot.publishInput.artifact }
+      : {
+          componentArtifacts: replaySource!.componentArtifacts,
+          compositeArtifactIdentity: source.replaySnapshot.publishInput.compositeArtifactIdentity,
+        }),
     parentRunId: source.record.deployRunId,
     ...(source.record.releaseLineageId ? { releaseLineageId: source.record.releaseLineageId } : {}),
-    artifactLineageId: source.record.artifactLineageId || source.replaySnapshot.artifact.identity,
+    artifactLineageId:
+      source.record.artifactLineageId ||
+      nixosSharedHostReplayArtifactIdentity(source.replaySnapshot),
     recordPath: source.recordPath,
     replaySnapshotPath: requireReplaySnapshotPath(source.record),
     sourceRecord: source.record,
     sourceReplaySnapshot: source.replaySnapshot,
+    ...(replaySource ? { sourceComponentResults: replaySource.componentResults } : {}),
   };
 }

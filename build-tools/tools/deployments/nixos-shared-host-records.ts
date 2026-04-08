@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
+import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
 import type { NixosSharedHostControlPlaneWorkerAuthority } from "./nixos-shared-host-control-plane-contract.ts";
 import {
   NIXOS_SHARED_HOST_PROVIDER,
@@ -11,7 +12,7 @@ import {
 } from "./contract.ts";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
 
-export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-04";
+export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-08";
 
 export type NixosSharedHostOperationKind = "deploy" | "promotion" | "retry" | "rollback";
 export type NixosSharedHostRunClassification = NixosSharedHostOperationKind | "explicit_removal";
@@ -28,15 +29,6 @@ export type NixosSharedHostFailedStep =
   | "release_actions.pre_publish"
   | "release_actions.post_publish_pre_smoke"
   | "release_actions.post_smoke";
-
-export type NixosSharedHostComponentResult = {
-  componentId: string;
-  providerTargetIdentity: string;
-  publicUrl?: string;
-  healthUrl?: string;
-  artifactIdentity?: string;
-  finalOutcome: "succeeded" | "publish_failed" | "smoke_failed_after_publish" | "not_started";
-};
 
 export type NixosSharedHostDeployRecord = {
   schemaVersion: typeof NIXOS_SHARED_HOST_RECORD_SCHEMA;

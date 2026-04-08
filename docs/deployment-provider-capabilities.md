@@ -69,7 +69,7 @@ Normative-source note:
   - reviewed for `shared_nonprod` only when every component is a `static-webapp`
   - all components must resolve to one `target_group`
   - every component must declare a distinct `app_name`
-  - replay-style flows (`publish-only`, retry, rollback, promotion) remain single-component only in the current reviewed slice
+  - replay-style flows (`publish-only`, retry, rollback, promotion) are reviewed for the ordered-best-effort static-webapp slice when the replay source preserves per-component exact artifact and publish state
 - additional unsupported shapes:
   - explicit subdomain-style overrides
   - provider-family use with non-webapp component targets
@@ -77,7 +77,7 @@ Normative-source note:
 ### Rollout Support
 
 - default rollout mode:
-  - provider-family host realization only; publish rollout remains single-target and all-at-once in the initial slice
+  - `all_at_once` for single-component deployments
 - supported rollout modes:
   - `all_at_once` for single-component deployments
   - `ordered_best_effort` for the reviewed multi-component static-webapp slice, with:
@@ -106,22 +106,26 @@ Normative-source note:
   - re-publishing an already-staged artifact identity may reuse the existing release directory
   - admitted deploys persist the exact static artifact under the local artifact/provenance store before publish starts
   - the shared control-plane execution snapshot freezes publish input as an exact-artifact reference instead of a workstation-local `artifactDir`
+  - multi-component replay may skip a previously published component only when the host can prove the live immutable artifact identity already matches the recorded exact artifact identity; otherwise it must republish conservatively
 
 ### Replay Snapshot Baseline
 
-- reviewed initial immutable-reuse baseline for `nixos-shared-host-static-webapp`:
+- reviewed immutable-reuse baseline for `nixos-shared-host-static-webapp`:
   - each admitted deploy persists a replay snapshot for the run
   - the replay snapshot records:
-    - exact artifact reference
+    - the exact publish input:
+      - one exact artifact reference for single-component runs
+      - per-component exact artifact references plus one composite artifact identity for multi-component runs
     - canonical provider-target identity
     - deployment metadata fingerprint
     - platform-state snapshot reference
     - rendered host-config snapshot reference
+    - per-component artifact, publish, smoke, and live-identity state once the run reaches publish
   - reusable artifact provenance stays in the artifact/provenance store, while deployment-run records point at that artifact plus the replay snapshot used for the run
 
 ### Immutable-Reuse Operator Flows
 
-- reviewed initial same-deployment immutable-reuse slice for `mini`:
+- reviewed immutable-reuse slice for `shared_nonprod` `nixos-shared-host` static-webapp deployments:
   - shared `--publish-only` must name an admitted source run with `--source-run-id`
   - shared `--publish-only` must not accept a fresh local `artifactDir` as an implicit rebuild input
   - same-deployment `--publish-only` is recorded as `retry`
@@ -129,6 +133,8 @@ Normative-source note:
   - rollback source selection is limited to prior successful normal runs for the same deployment
   - successful `retry`, `rollback`, and `explicit_removal` runs are not valid rollback sources
   - if the retained exact artifact is unavailable, retry or rollback fails closed instead of rebuilding
+  - multi-component retry, rollback, and same-artifact promotion reuse recorded per-component exact artifact inputs rather than re-resolving local build state
+  - multi-component retry remains deployment-atomic by default after a partial publish failure; already-live components may be treated as no-op reuse only with exact live-identity proof
 
 ### Partial Publish Observability
 
@@ -145,6 +151,10 @@ Normative-source note:
   - parent-run and artifact-lineage fields for retry / rollback reuse
   - deployment metadata fingerprint and replay snapshot path
   - failed step when a run terminates unsuccessfully after admission into the local workflow
+  - for multi-component runs:
+    - per-component exact artifact references
+    - per-component publish outcome, smoke outcome, and live-identity proof
+    - per-component no-op reuse evidence when replay safely skips a publish
 
 ### Provisioner Support
 
@@ -162,7 +172,13 @@ Normative-source note:
 
 ### Built-In `release_actions` Support
 
-- not supported in the initial reviewed `nixos-shared-host` slice
+- protected/shared built-in `release_actions`:
+  - supported only for the reviewed built-in types:
+    - `cache_warmup`
+    - `schema_migration`
+    - `post_publish_verification`
+  - replay follows the recorded per-action replay policy for `retry`, `rollback`, and `promotion`
+  - package-local executable hooks remain out of policy
 
 ### Protected/Shared Eligibility
 

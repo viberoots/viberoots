@@ -10,6 +10,7 @@ import {
 } from "./cloudflare-pages-replay.ts";
 import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
 import {
+  nixosSharedHostReplayArtifactIdentity,
   resolveNixosSharedHostReplaySource,
   type NixosSharedHostReplaySnapshot,
 } from "./nixos-shared-host-replay.ts";
@@ -33,7 +34,8 @@ export type DeploymentPromotionSource = {
   recordPath: string;
   replaySnapshot: DeploymentPromotionSourceReplaySnapshot;
   replaySnapshotPath: string;
-  artifact: AdmittedStaticWebappArtifact;
+  artifact?: AdmittedStaticWebappArtifact;
+  artifactIdentity: string;
 };
 
 export type CrossDeploymentPromotionSelection<TDeployment extends DeploymentTarget> = {
@@ -92,7 +94,10 @@ async function resolvePromotionSourceByPath(
       recordPath: source.recordPath,
       replaySnapshot: source.replaySnapshot,
       replaySnapshotPath: source.record.replaySnapshotPath || "",
-      artifact: source.replaySnapshot.artifact,
+      ...(source.replaySnapshot.publishInput.kind === "exact-artifact"
+        ? { artifact: source.replaySnapshot.publishInput.artifact }
+        : {}),
+      artifactIdentity: nixosSharedHostReplayArtifactIdentity(source.replaySnapshot),
     };
   }
   if (raw.provider === "cloudflare-pages") {
@@ -102,6 +107,7 @@ async function resolvePromotionSourceByPath(
       recordPath: source.recordPath,
       replaySnapshot: source.replaySnapshot,
       replaySnapshotPath: source.record.replaySnapshotPath || "",
+      artifactIdentity: source.replaySnapshot.artifact.identity,
       artifact: source.replaySnapshot.artifact,
     };
   }
@@ -186,8 +192,21 @@ ${errors.join("\n")}`);
   }
   return {
     ...selection,
-    artifact: selection.sourceReplaySnapshot.artifact,
+    artifact: (() => {
+      if (!selection.sourceRecord.provider) return selection.sourceReplaySnapshot.artifact;
+      if (selection.sourceRecord.provider !== "nixos-shared-host") {
+        return selection.sourceReplaySnapshot.artifact;
+      }
+      const source = selection.sourceReplaySnapshot as NixosSharedHostReplaySnapshot;
+      if (source.publishInput.kind === "exact-artifact") return source.publishInput.artifact;
+      throw new Error(
+        "multi-component same-artifact promotion requires per-component publish-only handling",
+      );
+    })(),
     artifactLineageId:
-      selection.sourceRecord.artifactLineageId || selection.sourceReplaySnapshot.artifact.identity,
+      selection.sourceRecord.artifactLineageId ||
+      ("artifactIdentity" in selection.sourceReplaySnapshot
+        ? (selection.sourceReplaySnapshot as NixosSharedHostReplaySnapshot).artifactIdentity
+        : selection.sourceReplaySnapshot.artifact.identity),
   };
 }

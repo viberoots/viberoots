@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
 import path from "node:path";
+import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
 import {
   admitNixosSharedHostComponentArtifacts,
   compositeNixosSharedHostArtifactIdentity,
@@ -28,8 +29,13 @@ import {
   isMultiComponentNixosSharedHostDeployment,
   nixosSharedHostDeploymentTargetIdentity,
 } from "./nixos-shared-host-components.ts";
+import {
+  nixosSharedHostPublishInputArtifactIdentity,
+  type NixosSharedHostPublishInput,
+} from "./nixos-shared-host-publish-input.ts";
 import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
 import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
+import { normalizeSingleComponentArtifactInput } from "./nixos-shared-host-single-component-artifact-input.ts";
 
 export type NixosSharedHostControlPlaneSourceSelection = {
   record: NixosSharedHostDeployRecord | { deployRunId: string; deploymentId: string };
@@ -37,6 +43,29 @@ export type NixosSharedHostControlPlaneSourceSelection = {
   replaySnapshotPath?: string;
   replaySnapshot?: NixosSharedHostReplaySnapshot;
 };
+
+function recordedComponentResults(
+  source?: NixosSharedHostControlPlaneSourceSelection,
+): NixosSharedHostComponentResult[] | undefined {
+  return source?.replaySnapshot?.componentResults;
+}
+
+function publishInputFor(opts: {
+  artifact?: NixosSharedHostAdmittedArtifact;
+  componentArtifacts?: NixosSharedHostResolvedComponentArtifact[];
+}): NixosSharedHostPublishInput {
+  if (opts.componentArtifacts?.length) {
+    return {
+      kind: "component-artifacts",
+      components: opts.componentArtifacts,
+      compositeArtifactIdentity: compositeNixosSharedHostArtifactIdentity(opts.componentArtifacts),
+    };
+  }
+  return {
+    kind: "exact-artifact",
+    artifact: opts.artifact as NixosSharedHostAdmittedArtifact,
+  };
+}
 
 export type NixosSharedHostControlPlaneSnapshotOpts = {
   workspaceRoot: string;
@@ -89,25 +118,22 @@ export async function createNixosSharedHostControlPlaneSnapshot(
   if (opts.operationKind === "promotion" && !opts.source) {
     throw new Error("shared control-plane promotion submission requires source run");
   }
-  if (
-    multiComponent &&
-    opts.operationKind !== "deploy" &&
-    opts.operationKind !== "explicit_removal"
-  ) {
-    throw new Error(
-      "multi-component nixos-shared-host deployments currently support normal deploy and explicit removal only",
-    );
-  }
   if (multiComponent && (opts.artifact || opts.artifactDir)) {
     throw new Error(
       "multi-component nixos-shared-host deployments require per-component exact artifact inputs",
     );
   }
-  if (!multiComponent && (opts.componentArtifacts || opts.artifactDirsByComponentId)) {
-    throw new Error(
-      "single-component nixos-shared-host deployments must use a single exact artifact input",
-    );
-  }
+  const singleComponentArtifacts =
+    !multiComponent && opts.operationKind !== "explicit_removal"
+      ? opts.componentArtifacts ||
+        (opts.artifactDirsByComponentId
+          ? await admitNixosSharedHostComponentArtifacts({
+              deployment: opts.deployment,
+              recordsRoot: opts.paths.recordsRoot,
+              artifactDirsByComponentId: opts.artifactDirsByComponentId,
+            })
+          : undefined)
+      : undefined;
   if (
     opts.operationKind !== "explicit_removal" &&
     !opts.artifact &&
@@ -122,7 +148,11 @@ export async function createNixosSharedHostControlPlaneSnapshot(
   const artifact =
     opts.operationKind === "explicit_removal" || multiComponent
       ? undefined
-      : opts.artifact ||
+      : normalizeSingleComponentArtifactInput({
+          deployment: opts.deployment,
+          artifact: opts.artifact,
+          componentArtifacts: singleComponentArtifacts,
+        }) ||
         (await admitNixosSharedHostStaticArtifact({
           recordsRoot: opts.paths.recordsRoot,
           artifactDir: path.resolve(opts.artifactDir || ""),
@@ -136,12 +166,17 @@ export async function createNixosSharedHostControlPlaneSnapshot(
           artifactDirsByComponentId: opts.artifactDirsByComponentId || {},
         }))
       : undefined;
-  const artifactIdentity =
+  const publishInput =
     opts.operationKind === "explicit_removal"
       ? undefined
-      : componentArtifacts && componentArtifacts.length > 0
-        ? compositeNixosSharedHostArtifactIdentity(componentArtifacts)
-        : (artifact as NixosSharedHostAdmittedArtifact).identity;
+      : publishInputFor({
+          artifact,
+          componentArtifacts,
+        });
+  const artifactIdentity =
+    opts.operationKind === "explicit_removal" || !publishInput
+      ? undefined
+      : nixosSharedHostPublishInputArtifactIdentity(publishInput);
   const admittedContext =
     opts.operationKind === "explicit_removal"
       ? undefined
@@ -194,23 +229,16 @@ export async function createNixosSharedHostControlPlaneSnapshot(
         ? {
             kind: "deploy",
             publishBehavior: opts.publishBehavior || "deploy",
-            publishInput:
-              componentArtifacts && componentArtifacts.length > 0
-                ? {
-                    kind: "component-artifacts",
-                    components: componentArtifacts,
-                    compositeArtifactIdentity: artifactIdentity,
-                  }
-                : {
-                    kind: "exact-artifact",
-                    artifact: artifact as NixosSharedHostAdmittedArtifact,
-                  },
+            publishInput: publishInput as NixosSharedHostPublishInput,
             ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
             ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
             ...(opts.artifactLineageId ? { artifactLineageId: opts.artifactLineageId } : {}),
             ...(opts.source?.recordPath ? { sourceRecordPath: opts.source.recordPath } : {}),
             ...(opts.source?.replaySnapshotPath
               ? { sourceReplaySnapshotPath: opts.source.replaySnapshotPath }
+              : {}),
+            ...(recordedComponentResults(opts.source)
+              ? { recordedComponentResults: recordedComponentResults(opts.source) }
               : {}),
           }
         : { kind: "explicit_removal" },

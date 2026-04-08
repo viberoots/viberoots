@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
-import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
+import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
+import type { NixosSharedHostPublishInput } from "./nixos-shared-host-publish-input.ts";
 import type {
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneLifecycleState,
@@ -14,7 +14,7 @@ import type {
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA =
-  "nixos-shared-host-control-plane-snapshot@2";
+  "nixos-shared-host-control-plane-snapshot@3";
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMISSION_SCHEMA =
   "nixos-shared-host-control-plane-submission@2";
 
@@ -59,21 +59,13 @@ export type NixosSharedHostControlPlaneSnapshot = {
     | {
         kind: "deploy";
         publishBehavior: NixosSharedHostPublishBehavior;
-        publishInput:
-          | {
-              kind: "exact-artifact";
-              artifact: NixosSharedHostAdmittedArtifact;
-            }
-          | {
-              kind: "component-artifacts";
-              components: NixosSharedHostResolvedComponentArtifact[];
-              compositeArtifactIdentity: string;
-            };
+        publishInput: NixosSharedHostPublishInput;
         parentRunId?: string;
         releaseLineageId?: string;
         artifactLineageId?: string;
         sourceRecordPath?: string;
         sourceReplaySnapshotPath?: string;
+        recordedComponentResults?: NixosSharedHostComponentResult[];
       }
     | { kind: "explicit_removal" };
   smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;

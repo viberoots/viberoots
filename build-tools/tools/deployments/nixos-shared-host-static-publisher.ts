@@ -17,6 +17,8 @@ export type NixosSharedHostStaticPublishResult = {
   indexPath: string;
 };
 
+export type NixosSharedHostStaticLivePublishState = NixosSharedHostStaticPublishResult;
+
 async function ensureMaterializedTarget(containerRoot: string, layout: PublishRootLayout) {
   const releaseRoot = path.join(containerRoot, layout.releaseRoot.replace(/^\//, ""));
   const publishRoot = path.join(containerRoot, layout.publishRoot.replace(/^\//, ""));
@@ -37,6 +39,22 @@ async function activateRelease(currentLink: string, releasePath: string): Promis
   await fsp.rename(nextLink, currentLink);
 }
 
+async function materializeReleasePath(opts: {
+  artifactDir: string;
+  artifactIdentity: string;
+  releasePath: string;
+}): Promise<void> {
+  try {
+    if ((await artifactIdentityForStaticWebappDir(opts.releasePath)) === opts.artifactIdentity) {
+      return;
+    }
+  } catch {}
+  const stagePath = `${opts.releasePath}.stage-${process.pid}-${Date.now()}`;
+  await copyTree(opts.artifactDir, stagePath, { cloneMode: "try", force: true });
+  await fsp.rm(opts.releasePath, { recursive: true, force: true });
+  await fsp.rename(stagePath, opts.releasePath);
+}
+
 export async function publishNixosSharedHostStaticWebapp(opts: {
   artifactDir: string;
   artifactIdentity?: string;
@@ -50,19 +68,45 @@ export async function publishNixosSharedHostStaticWebapp(opts: {
     opts.artifactIdentity || (await artifactIdentityForStaticWebappDir(artifactDir));
   const releaseRoot = path.join(containerRoot, opts.layout.releaseRoot.replace(/^\//, ""));
   const releasePath = path.join(releaseRoot, artifactIdentity.replace(":", "__"));
-  try {
-    await fsp.access(releasePath);
-  } catch {
-    const stagePath = path.join(releaseRoot, `.stage-${process.pid}-${Date.now()}`);
-    await copyTree(artifactDir, stagePath, { cloneMode: "try", force: true });
-    await fsp.rename(stagePath, releasePath);
-  }
+  await materializeReleasePath({ artifactDir, artifactIdentity, releasePath });
   const currentLink = path.join(containerRoot, opts.layout.publishRoot.replace(/^\//, ""));
   await activateRelease(currentLink, releasePath);
   const indexPath = path.join(releasePath, "index.html");
   await fsp.access(indexPath);
   return {
     artifactIdentity,
+    releasePath,
+    activatedPath: currentLink,
+    indexPath,
+  };
+}
+
+export async function resolveNixosSharedHostStaticWebappLiveState(opts: {
+  containerRoot: string;
+  layout: PublishRootLayout;
+}): Promise<NixosSharedHostStaticLivePublishState | undefined> {
+  const containerRoot = path.resolve(opts.containerRoot);
+  try {
+    await ensureMaterializedTarget(containerRoot, opts.layout);
+  } catch {
+    return undefined;
+  }
+  const currentLink = path.join(containerRoot, opts.layout.publishRoot.replace(/^\//, ""));
+  let releasePath: string;
+  try {
+    releasePath = await fsp.realpath(currentLink);
+  } catch {
+    return undefined;
+  }
+  if (path.basename(releasePath) === ".empty") return undefined;
+  const indexPath = path.join(releasePath, "index.html");
+  try {
+    await fsp.access(indexPath);
+  } catch {
+    return undefined;
+  }
+  return {
+    artifactIdentity: await artifactIdentityForStaticWebappDir(releasePath),
     releasePath,
     activatedPath: currentLink,
     indexPath,

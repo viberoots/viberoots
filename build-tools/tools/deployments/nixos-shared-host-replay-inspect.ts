@@ -1,7 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import { getFlagStr, hasFlag } from "../lib/cli.ts";
-import { resolveNixosSharedHostReplaySource } from "./nixos-shared-host-replay.ts";
+import {
+  nixosSharedHostReplayArtifactIdentity,
+  resolveNixosSharedHostReplaySource,
+} from "./nixos-shared-host-replay.ts";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();
@@ -35,11 +38,18 @@ async function main() {
         replaySnapshotPath: resolved.record.replaySnapshotPath,
         platformStateSnapshotPath: resolved.replaySnapshot.platformStateSnapshotPath,
         hostConfigSnapshotPath: resolved.replaySnapshot.hostConfigSnapshotPath,
-        artifact: {
-          identity: resolved.replaySnapshot.artifact.identity,
-          storedArtifactPath: resolved.artifactDir,
-          provenancePath: resolved.replaySnapshot.artifact.provenancePath,
-        },
+        artifactIdentity: nixosSharedHostReplayArtifactIdentity(resolved.replaySnapshot),
+        publishInput: resolved.replaySnapshot.publishInput,
+        componentResults: resolved.replaySnapshot.componentResults,
+        ...(resolved.replaySnapshot.publishInput.kind === "exact-artifact"
+          ? {
+              artifact: {
+                identity: resolved.replaySnapshot.publishInput.artifact.identity,
+                storedArtifactPath: resolved.artifactDir,
+                provenancePath: resolved.replaySnapshot.publishInput.artifact.provenancePath,
+              },
+            }
+          : {}),
       },
       null,
       2,

@@ -56,7 +56,12 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
         replay.replaySnapshot.providerTargetIdentity,
         result.record.providerTargetIdentity,
       );
-      assert.equal(replay.replaySnapshot.artifact.identity, result.record.artifact?.identity);
+      assert.equal(replay.replaySnapshot.publishInput.kind, "component-artifacts");
+      assert.equal(replay.replaySnapshot.publishInput.components.length, 1);
+      assert.equal(
+        replay.replaySnapshot.publishInput.components[0]?.artifact.identity,
+        result.record.artifact?.identity,
+      );
       assert.equal(
         replay.replaySnapshot.deploymentMetadataFingerprint,
         result.record.deploymentMetadataFingerprint,
@@ -70,7 +75,10 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
         replay.replaySnapshot.admittedContext.targetEnvironment.targetRef,
         "env/pleomino/dev",
       );
-      assert.equal(replay.artifactDir, result.record.artifact?.storedArtifactPath);
+      assert.equal(
+        Object.values(replay.componentArtifactDirs)[0],
+        result.record.artifact?.storedArtifactPath,
+      );
       await fsp.access(replay.replaySnapshot.platformStateSnapshotPath);
       await fsp.access(replay.replaySnapshot.hostConfigSnapshotPath);
     } finally {
@@ -108,7 +116,10 @@ test("nixos-shared-host replay resolution fails closed when the stored exact art
         },
       });
       const replay = await resolveNixosSharedHostReplaySource({ recordPath: result.recordPath });
-      await fsp.rm(replay.artifactDir, { recursive: true, force: true });
+      await fsp.rm(Object.values(replay.componentArtifactDirs)[0]!, {
+        recursive: true,
+        force: true,
+      });
       await assert.rejects(
         resolveNixosSharedHostReplaySource({ recordPath: result.recordPath }),
         /recorded exact artifact is unavailable/,

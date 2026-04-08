@@ -41,6 +41,7 @@ design has been explicitly updated first.
 - Protected/shared immutable-reuse flows must replay the recorded execution snapshot rather than reinterpret current repo state.
 - Protected/shared replay snapshots must record non-secret secret/config contract references or versions, not secret values.
 - Protected/shared replay snapshots must preserve immutable provider-config content or an immutable provider-config reference, not only a bare fingerprint.
+- Supported multi-component replay snapshots and deployment records must preserve per-component exact artifact references plus per-component publish, smoke, and live-identity state.
 - Protected/shared replay snapshots and deployment records must preserve the implementation identity of the built-in publisher, provisioner, smoke runner, and any built-in `release_actions` runner that materially influenced execution.
 - Side-effecting built-in `release_actions` may allow `rerun` in a replay context only when their reviewed type contract also defines duplicate-execution safety for that context; otherwise replay must fail closed or skip according to the recorded policy.
 - Protected/shared deployment metadata must declare both secret and non-secret runtime-config requirements explicitly, with `{}` as the reviewable empty value for each contract surface.

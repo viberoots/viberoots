@@ -179,11 +179,6 @@ async function main() {
       })
     : await (async () => {
         if (publishOnly) {
-          if (isMultiComponentNixosSharedHostDeployment(deployment)) {
-            throw new Error(
-              "multi-component nixos-shared-host deployments do not support --publish-only yet",
-            );
-          }
           if (!sourceRunId) {
             throw new Error(
               rollback

@@ -50,7 +50,7 @@ test("nixos-shared-host durable records persist canonical provider-target identi
       executionSnapshotPath: "/tmp/control-plane/snapshots/cp-123.json",
     },
   });
-  assert.equal(record.schemaVersion, "deploy-record@2026-04-04");
+  assert.equal(record.schemaVersion, "deploy-record@2026-04-08");
   assert.equal(record.operationKind, "deploy");
   assert.equal(record.publishMode, "normal");
   assert.equal(record.lifecycleState, "finished");

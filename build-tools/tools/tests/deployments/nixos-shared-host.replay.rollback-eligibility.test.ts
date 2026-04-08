@@ -41,7 +41,10 @@ test("rollback rejects a successful retry source while retry reuse stays availab
         workspaceRoot: tmp,
         operationKind: retrySource.operationKind,
         deployment: retrySource.deployment,
-        artifact: retrySource.artifact,
+        ...(retrySource.artifact ? { artifact: retrySource.artifact } : {}),
+        ...(retrySource.componentArtifacts
+          ? { componentArtifacts: retrySource.componentArtifacts }
+          : {}),
         publishBehavior: "publish-only",
         parentRunId: retrySource.parentRunId,
         artifactLineageId: retrySource.artifactLineageId,
@@ -106,7 +109,10 @@ test("rollback rejects a successful rollback source while retry reuse stays avai
         workspaceRoot: tmp,
         operationKind: rollbackSource.operationKind,
         deployment: rollbackSource.deployment,
-        artifact: rollbackSource.artifact,
+        ...(rollbackSource.artifact ? { artifact: rollbackSource.artifact } : {}),
+        ...(rollbackSource.componentArtifacts
+          ? { componentArtifacts: rollbackSource.componentArtifacts }
+          : {}),
         publishBehavior: "publish-only",
         parentRunId: rollbackSource.parentRunId,
         artifactLineageId: rollbackSource.artifactLineageId,

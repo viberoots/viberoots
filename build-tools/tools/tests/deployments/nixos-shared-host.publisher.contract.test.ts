@@ -49,3 +49,28 @@ test("nixos-shared-host publisher stages immutable releases and atomically activ
     assert.match(await fsp.readFile(path.join(live, "index.html"), "utf8"), /v2/);
   });
 });
+
+test("nixos-shared-host publisher re-materializes drifted releases before activation", async () => {
+  await runInTemp("nixos-shared-host-publisher-drift", async (tmp) => {
+    const deployment = nixosSharedHostDeploymentFixture();
+    const rendered = renderNixosSharedHostConfig(createNixosSharedHostPlatformState([deployment]));
+    const hostRoot = path.join(tmp, "host");
+    const artifactDir = path.join(tmp, "artifact");
+    await materializeNixosSharedHostRuntime(hostRoot, rendered);
+    await writeArtifact(artifactDir, "v1");
+    const container = rendered.containers[deployment.providerTarget.containerName];
+    const containerRoot = nixosSharedHostContainerRoot(hostRoot, container.containerName);
+    const published = await publishNixosSharedHostStaticWebapp({
+      artifactDir,
+      containerRoot,
+      layout: container,
+    });
+    await fsp.writeFile(path.join(published.releasePath, "index.html"), "<html>drift</html>\n");
+    await publishNixosSharedHostStaticWebapp({
+      artifactDir,
+      containerRoot,
+      layout: container,
+    });
+    assert.match(await fsp.readFile(path.join(published.releasePath, "index.html"), "utf8"), /v1/);
+  });
+});

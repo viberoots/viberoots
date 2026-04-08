@@ -51,6 +51,9 @@ export async function runNixosSharedHostControlPlaneWorker(opts: {
         ...(snapshot.action.artifactLineageId
           ? { artifactLineageId: snapshot.action.artifactLineageId }
           : {}),
+        ...(snapshot.action.recordedComponentResults
+          ? { sourceComponentResults: snapshot.action.recordedComponentResults }
+          : {}),
         ...(snapshot.deployBatchId ? { deployBatchId: snapshot.deployBatchId } : {}),
         ...(snapshot.admittedContext ? { admittedContext: snapshot.admittedContext } : {}),
         ...(snapshot.recordedReleaseActions

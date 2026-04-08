@@ -39,7 +39,7 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
       assert.equal(summary.publicUrl, "https://demoapp.apps.kilty.io/");
       assert.equal(summary.controlPlane.lockScope, "nixos-shared-host:default:demoapp");
       const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
-      assert.equal(record.schemaVersion, "deploy-record@2026-04-04");
+      assert.equal(record.schemaVersion, "deploy-record@2026-04-08");
       assert.equal(record.deployRunId, summary.deployRunId);
       assert.equal(record.runClassification, "deploy");
       assert.equal(record.lifecycleState, "finished");
@@ -74,7 +74,8 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
       const replay = JSON.parse(String(replayInspect.stdout));
       assert.equal(replay.deployRunId, summary.deployRunId);
       assert.equal(replay.providerTargetIdentity, "nixos-shared-host:default:demoapp");
-      assert.equal(replay.artifact.identity, summary.artifactIdentity);
+      assert.equal(replay.publishInput.kind, "component-artifacts");
+      assert.equal(replay.publishInput.components[0].artifact.identity, summary.artifactIdentity);
       assert.equal(replay.replaySnapshotPath, record.replaySnapshotPath);
       assert.equal(replay.deploymentMetadataFingerprint, record.deploymentMetadataFingerprint);
       assert.equal(replay.admittedContext.source.sourceRef, "env/pleomino/dev");

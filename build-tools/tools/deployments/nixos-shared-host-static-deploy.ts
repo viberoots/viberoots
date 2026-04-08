@@ -9,6 +9,7 @@ import {
   requireNixosSharedHostAdmittedArtifactPath,
   type NixosSharedHostAdmittedArtifact,
 } from "./nixos-shared-host-artifacts.ts";
+import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import { primaryNixosSharedHostComponent } from "./nixos-shared-host-components.ts";
@@ -33,7 +34,11 @@ import {
   type NixosSharedHostDeployRecord,
   writeNixosSharedHostDeployRecord,
 } from "./nixos-shared-host-records.ts";
-import { writeNixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
+import { artifactOutcomeFields } from "./nixos-shared-host-static-deploy-records.ts";
+import {
+  writeNixosSharedHostReplayComponentResults,
+  writeNixosSharedHostReplaySnapshot,
+} from "./nixos-shared-host-replay.ts";
 import { materializeNixosSharedHostRuntime } from "./nixos-shared-host-runtime.ts";
 import { renderNixosSharedHostConfig } from "./nixos-shared-host.ts";
 
@@ -57,6 +62,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
   hostConfigPath?: string;
   authority?: NixosSharedHostControlPlaneWorkerAuthority;
   admittedContext?: NixosSharedHostAdmittedContext;
+  sourceComponentResults?: NixosSharedHostComponentResult[];
   releaseActions?: DeploymentReleaseAction[];
   smokeConnectOverride?: {
     protocol: "http:" | "https:";
@@ -97,13 +103,17 @@ export async function runNixosSharedHostStaticDeploy(opts: {
         new Error(`publish-only requires an existing realized target: ${authority.lockScope}`),
       );
     }
-    if (opts.artifact) {
+    if (opts.artifact || componentArtifacts.length > 0) {
       ({ deploymentMetadataFingerprint, replaySnapshotPath } =
         await writeNixosSharedHostReplaySnapshot({
           recordsRoot: opts.recordsRoot,
           deployRunId: runId,
           deployment: opts.deployment,
-          artifact: opts.artifact,
+          ...(opts.artifact ? { artifact: opts.artifact } : {}),
+          ...(componentArtifacts.length > 0 ? { componentArtifacts } : {}),
+          ...(opts.compositeArtifactIdentity
+            ? { compositeArtifactIdentity: opts.compositeArtifactIdentity }
+            : {}),
           admittedContext: opts.admittedContext!,
           platformState: state,
           hostConfig: rendered,
@@ -134,6 +144,13 @@ export async function runNixosSharedHostStaticDeploy(opts: {
       rendered,
       hostRoot: opts.hostRoot,
       componentArtifacts,
+      ...(opts.sourceComponentResults
+        ? { sourceComponentResults: opts.sourceComponentResults }
+        : {}),
+      allowLiveComponentReuse:
+        publishBehavior === "publish-only" &&
+        componentArtifacts.length > 1 &&
+        releaseActions.length === 0,
     }).catch((error) => {
       throw withFailedStep((error as any)?.failedStep || "publish", error);
     });
@@ -167,6 +184,9 @@ export async function runNixosSharedHostStaticDeploy(opts: {
     }).catch((error) => {
       throw withFailedStep("release_actions.post_smoke", error);
     });
+    if (replaySnapshotPath && smoke.componentResults.length > 0) {
+      await writeNixosSharedHostReplayComponentResults(replaySnapshotPath, smoke.componentResults);
+    }
     const record = createNixosSharedHostDeployRecord(opts.deployment, {
       deployRunId: runId,
       operationKind,
@@ -175,14 +195,11 @@ export async function runNixosSharedHostStaticDeploy(opts: {
       ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
       ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
       ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
-      ...(topLevelArtifactIdentity ? { artifactIdentity: topLevelArtifactIdentity } : {}),
-      ...(opts.artifact?.storedArtifactPath
-        ? { artifactStoredArtifactPath: opts.artifact.storedArtifactPath }
-        : {}),
-      ...(opts.artifact?.provenancePath
-        ? { artifactProvenancePath: opts.artifact.provenancePath }
-        : {}),
-      artifactLineageId: opts.artifactLineageId || topLevelArtifactIdentity,
+      ...artifactOutcomeFields({
+        artifactIdentity: topLevelArtifactIdentity,
+        artifact: opts.artifact,
+        artifactLineageId: opts.artifactLineageId,
+      }),
       ...(opts.admittedContext ? { admittedContext: opts.admittedContext } : {}),
       componentResults: smoke.componentResults,
       ...(deploymentMetadataFingerprint ? { deploymentMetadataFingerprint } : {}),
@@ -195,6 +212,12 @@ export async function runNixosSharedHostStaticDeploy(opts: {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const failedStep = failedStepFromError(error);
+    const componentResults = (error as any)?.componentResults as
+      | NixosSharedHostComponentResult[]
+      | undefined;
+    if (replaySnapshotPath && componentResults?.length) {
+      await writeNixosSharedHostReplayComponentResults(replaySnapshotPath, componentResults);
+    }
     const record = createNixosSharedHostDeployRecord(opts.deployment, {
       deployRunId: runId,
       operationKind,
@@ -203,26 +226,13 @@ export async function runNixosSharedHostStaticDeploy(opts: {
       ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
       ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
       ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
-      ...(opts.compositeArtifactIdentity
-        ? { artifactIdentity: opts.compositeArtifactIdentity }
-        : {}),
-      ...(opts.artifact?.identity ? { artifactIdentity: opts.artifact.identity } : {}),
-      ...(opts.artifact?.storedArtifactPath
-        ? { artifactStoredArtifactPath: opts.artifact.storedArtifactPath }
-        : {}),
-      ...(opts.artifact?.provenancePath
-        ? { artifactProvenancePath: opts.artifact.provenancePath }
-        : {}),
-      ...(opts.artifactLineageId || opts.compositeArtifactIdentity || opts.artifact?.identity
-        ? {
-            artifactLineageId:
-              opts.artifactLineageId || opts.compositeArtifactIdentity || opts.artifact?.identity,
-          }
-        : {}),
+      ...artifactOutcomeFields({
+        artifactIdentity: opts.compositeArtifactIdentity || opts.artifact?.identity,
+        artifact: opts.artifact,
+        artifactLineageId: opts.artifactLineageId,
+      }),
       ...(opts.admittedContext ? { admittedContext: opts.admittedContext } : {}),
-      ...((error as any)?.componentResults
-        ? { componentResults: (error as any).componentResults }
-        : {}),
+      ...(componentResults ? { componentResults } : {}),
       failedStep,
       error: message,
       ...(deploymentMetadataFingerprint ? { deploymentMetadataFingerprint } : {}),

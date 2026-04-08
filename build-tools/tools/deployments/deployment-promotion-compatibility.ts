@@ -8,7 +8,8 @@ type PromotionSourceLike = {
     deploymentId: string;
   };
   replaySnapshot: {
-    artifact: { identity: string };
+    artifactIdentity?: string;
+    artifact?: { identity: string };
     admittedContext: {
       lanePolicyFingerprint: string;
       source: { sourceRevision: string };
@@ -44,6 +45,10 @@ function componentTargets(deployment: DeploymentTarget): string {
 
 function sourceStage(source: PromotionSourceLike): string {
   return source.replaySnapshot.deployment.environmentStage;
+}
+
+function sourceArtifactIdentity(source: PromotionSourceLike): string {
+  return source.replaySnapshot.artifactIdentity || source.replaySnapshot.artifact?.identity || "";
 }
 
 export function sourcePromotionRevision(source: PromotionSourceLike): string {
@@ -123,7 +128,7 @@ export function promotionCompatibilityErrors(
   }
   if (
     deployment.lanePolicy.artifactReuseMode === "same_artifact" &&
-    source.replaySnapshot.artifact.identity.trim() === ""
+    sourceArtifactIdentity(source).trim() === ""
   ) {
     errors.push("same_artifact promotion requires a reusable exact artifact identity");
   }
