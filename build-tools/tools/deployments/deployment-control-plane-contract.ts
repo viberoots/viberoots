@@ -52,7 +52,8 @@ export type DeploymentControlPlaneRole = "submitter" | "approver" | "operator" |
 export type DeploymentControlPlaneScope =
   | { kind: "deployment_id"; value: string }
   | { kind: "provider_target_identity"; value: string }
-  | { kind: "lane_policy"; value: string };
+  | { kind: "lane_policy"; value: string }
+  | { kind: "break_glass_incident"; value: string };
 
 export type DeploymentControlPlaneGrant = {
   role: DeploymentControlPlaneRole;
@@ -142,6 +143,7 @@ export type DeploymentControlPlaneResponseBase = {
     submittedAt: string;
     dedupe: DeploymentControlPlaneRequestDedupe;
     lifecycleState: DeploymentControlPlaneLifecycleState;
+    requestedBy?: DeploymentPrincipal;
     rejectionCode?: DeploymentControlPlaneRunActionRejectionCode;
   };
 };

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import {
   requireNixosSharedHostControlPlaneAuthority,
-  type NixosSharedHostControlPlaneWorkerAuthority,
+  type NixosSharedHostMutationAuthority,
 } from "./nixos-shared-host-control-plane-contract.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import {
@@ -25,7 +25,7 @@ export async function runNixosSharedHostExplicitRemoval(opts: {
   recordsRoot: string;
   deployBatchId?: string;
   hostConfigPath?: string;
-  authority?: NixosSharedHostControlPlaneWorkerAuthority;
+  authority?: NixosSharedHostMutationAuthority;
   provisionerPlan?: import("./nixos-shared-host-provisioner-plan.ts").NixosSharedHostProvisionerPlanRef;
 }): Promise<{ record: NixosSharedHostDeployRecord; recordPath: string }> {
   const authority = requireNixosSharedHostControlPlaneAuthority(opts.deployment, opts.authority);

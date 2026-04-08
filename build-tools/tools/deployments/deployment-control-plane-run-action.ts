@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { randomUUID } from "node:crypto";
+import { defaultRequestedBy, type DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 import {
   DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA,
   type DeploymentControlPlaneAuthorizationDecision,
@@ -42,6 +43,37 @@ type SubmissionRecord = {
   };
   requestedBy?: { principalId: string; displayName?: string };
   authorization?: DeploymentControlPlaneAuthorizationDecision;
+  execution?: {
+    currentStep:
+      | "provision"
+      | "publish"
+      | "smoke"
+      | "release_actions.pre_publish"
+      | "release_actions.post_publish_pre_smoke"
+      | "release_actions.post_smoke";
+    mutationStartedAt?: string;
+  };
+  cancellationRequested?: {
+    requestedAt: string;
+    requestedBy: DeploymentPrincipal;
+  };
+  cancellationSummary?: {
+    requestedAt: string;
+    requestedBy: DeploymentPrincipal;
+    activeStep:
+      | "provision"
+      | "publish"
+      | "smoke"
+      | "release_actions.pre_publish"
+      | "release_actions.post_publish_pre_smoke"
+      | "release_actions.post_smoke";
+    mutationMayHaveStarted: boolean;
+    enteredReconciliation: boolean;
+    terminalizationPath:
+      | "cancelled_without_mutation"
+      | "finished_after_reconciliation"
+      | "failed_after_reconciliation";
+  };
   latestAction?: {
     actionId: string;
     action: "cancel" | "resume";
@@ -59,6 +91,7 @@ type SubmissionRecord = {
       | "cancelling"
       | "finished"
       | "cancelled";
+    requestedBy?: DeploymentPrincipal;
     rejectionCode?:
       | "lock_conflict"
       | "approval_required"
@@ -97,9 +130,11 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
   submissionPath: string;
   action: DeploymentControlPlaneRunAction;
   idempotencyKey?: string;
+  requestedBy?: DeploymentPrincipal;
 }) {
   const submission = await readControlPlaneJson<SubmissionRecord>(opts.submissionPath);
   const submittedAt = new Date().toISOString();
+  const requestedBy = opts.requestedBy || defaultRequestedBy();
   const requestFingerprint = fingerprintControlPlanePayload({
     submissionId: submission.submissionId,
     action: opts.action,
@@ -136,8 +171,29 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
         ...(opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : {}),
       },
       lifecycleState: next.lifecycleState,
+      requestedBy,
       ...(next.rejectionCode ? { rejectionCode: next.rejectionCode } : {}),
     },
+    ...(next.lifecycleState === "cancelling"
+      ? {
+          cancellationRequested: {
+            requestedAt: submittedAt,
+            requestedBy,
+          },
+        }
+      : {}),
+    ...(next.lifecycleState === "cancelled"
+      ? {
+          cancellationSummary: {
+            requestedAt: submittedAt,
+            requestedBy,
+            activeStep: submission.execution?.currentStep || "publish",
+            mutationMayHaveStarted: !!submission.execution?.mutationStartedAt,
+            enteredReconciliation: false,
+            terminalizationPath: "cancelled_without_mutation" as const,
+          },
+        }
+      : {}),
   };
   await writeControlPlaneJson(opts.submissionPath, updated);
   const status = await readDeploymentControlPlaneStatus({

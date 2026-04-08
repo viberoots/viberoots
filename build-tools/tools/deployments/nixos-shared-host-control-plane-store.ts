@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { sanitizeName } from "../lib/sanitize.ts";
+import { assertNoBreakGlassFreeze } from "./nixos-shared-host-break-glass-freeze.ts";
 
 type LockOwner = { pid: number; createdAt: string; lockScope: string };
 
@@ -83,6 +84,7 @@ export async function acquireControlPlaneLock(
   recordsRoot: string,
   lockScope: string,
 ): Promise<() => Promise<void>> {
+  await assertNoBreakGlassFreeze(recordsRoot, lockScope);
   const lockDir = lockDirFor(recordsRoot, lockScope);
   await fsp.mkdir(path.dirname(lockDir), { recursive: true });
   const tryAcquire = async (): Promise<boolean> => {

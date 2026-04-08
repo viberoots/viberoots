@@ -23,6 +23,10 @@ export function createNixosSharedHostControlPlaneSubmission(
     rejectionCode?: NixosSharedHostControlPlaneSubmission["rejectionCode"];
     pendingReasonCode?: NixosSharedHostControlPlaneSubmission["pendingReasonCode"];
     latestAction?: NixosSharedHostControlPlaneSubmission["latestAction"];
+    execution?: NixosSharedHostControlPlaneSubmission["execution"];
+    cancellationRequested?: NixosSharedHostControlPlaneSubmission["cancellationRequested"];
+    cancellationSummary?: NixosSharedHostControlPlaneSubmission["cancellationSummary"];
+    recovery?: NixosSharedHostControlPlaneSubmission["recovery"];
   },
 ): NixosSharedHostControlPlaneSubmission {
   return {
@@ -48,6 +52,10 @@ export function createNixosSharedHostControlPlaneSubmission(
     ...(opts.rejectionCode ? { rejectionCode: opts.rejectionCode } : {}),
     ...(opts.pendingReasonCode ? { pendingReasonCode: opts.pendingReasonCode } : {}),
     ...(opts.latestAction ? { latestAction: opts.latestAction } : {}),
+    ...(opts.execution ? { execution: opts.execution } : {}),
+    ...(opts.cancellationRequested ? { cancellationRequested: opts.cancellationRequested } : {}),
+    ...(opts.cancellationSummary ? { cancellationSummary: opts.cancellationSummary } : {}),
+    ...(opts.recovery ? { recovery: opts.recovery } : {}),
     admission: opts.admission,
   };
 }

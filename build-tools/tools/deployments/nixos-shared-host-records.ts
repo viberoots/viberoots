@@ -4,13 +4,14 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
-import type { NixosSharedHostControlPlaneWorkerAuthority } from "./nixos-shared-host-control-plane-contract.ts";
+import type { NixosSharedHostMutationAuthority } from "./nixos-shared-host-control-plane-contract.ts";
 import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
 import {
   NIXOS_SHARED_HOST_PROVIDER,
   type NixosSharedHostDeployment,
   type NixosSharedHostProviderTarget,
 } from "./contract.ts";
+import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
 
 export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-08";
@@ -54,6 +55,18 @@ export type NixosSharedHostDeployRecord = {
     lockScope: string;
     executionSnapshotPath: string;
   };
+  breakGlass?: {
+    incidentRef: string;
+    freezeId: string;
+    freezePath: string;
+    evidencePath: string;
+    requestedBy: DeploymentPrincipal;
+    approvedBy?: DeploymentPrincipal;
+    executedBy: DeploymentPrincipal;
+    justification: string;
+    bypassReason: string;
+    selection: { kind: "exact_artifact"; artifactIdentity: string };
+  };
   deployBatchId?: string;
   parentRunId?: string;
   releaseLineageId?: string;
@@ -91,7 +104,7 @@ type NixosSharedHostRecordOutcome = {
   releaseLineageId?: string;
   artifactLineageId?: string;
   deployBatchId?: string;
-  authority?: NixosSharedHostControlPlaneWorkerAuthority;
+  authority?: NixosSharedHostMutationAuthority;
   artifactStoredArtifactPath?: string;
   artifactProvenancePath?: string;
   admittedContext?: NixosSharedHostAdmittedContext;
@@ -124,7 +137,7 @@ export function createNixosSharedHostDeployRecord(
     providerTarget: deployment.providerTarget,
     effectiveRunTarget: deployment.providerTarget,
     providerTargetIdentity: nixosSharedHostDeploymentTargetIdentity(deployment),
-    ...(outcome.authority
+    ...(outcome.authority?.kind === "control-plane-worker"
       ? {
           controlPlane: {
             submissionId: outcome.authority.submissionId,
@@ -133,6 +146,22 @@ export function createNixosSharedHostDeployRecord(
             admission: "admitted" as const,
             lockScope: outcome.authority.lockScope,
             executionSnapshotPath: outcome.authority.executionSnapshotPath,
+          },
+        }
+      : {}),
+    ...(outcome.authority?.kind === "break-glass-worker"
+      ? {
+          breakGlass: {
+            incidentRef: outcome.authority.incidentRef,
+            freezeId: outcome.authority.freezeId,
+            freezePath: outcome.authority.freezePath,
+            evidencePath: outcome.authority.evidencePath,
+            requestedBy: outcome.authority.requestedBy,
+            ...(outcome.authority.approvedBy ? { approvedBy: outcome.authority.approvedBy } : {}),
+            executedBy: outcome.authority.executedBy,
+            justification: outcome.authority.justification,
+            bypassReason: outcome.authority.bypassReason,
+            selection: outcome.authority.selection,
           },
         }
       : {}),

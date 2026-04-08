@@ -2,7 +2,7 @@
 import {
   requireNixosSharedHostControlPlaneAuthority,
   type NixosSharedHostSmokeConnectOverride,
-  type NixosSharedHostControlPlaneWorkerAuthority,
+  type NixosSharedHostMutationAuthority,
 } from "./nixos-shared-host-control-plane-contract.ts";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
@@ -62,7 +62,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
   releaseLineageId?: string;
   artifactLineageId?: string;
   hostConfigPath?: string;
-  authority?: NixosSharedHostControlPlaneWorkerAuthority;
+  authority?: NixosSharedHostMutationAuthority;
   admittedContext?: NixosSharedHostAdmittedContext;
   sourceComponentResults?: NixosSharedHostComponentResult[];
   releaseActions?: DeploymentReleaseAction[];

@@ -109,7 +109,57 @@ export type NixosSharedHostControlPlaneSubmission = {
     submittedAt: string;
     dedupe: DeploymentControlPlaneRequestDedupe;
     lifecycleState: DeploymentControlPlaneLifecycleState;
+    requestedBy?: DeploymentPrincipal;
     rejectionCode?: DeploymentControlPlaneSubmitRejectionCode | "not_resumable";
+  };
+  execution?: {
+    currentStep:
+      | "provision"
+      | "publish"
+      | "smoke"
+      | "release_actions.pre_publish"
+      | "release_actions.post_publish_pre_smoke"
+      | "release_actions.post_smoke";
+    mutationStartedAt?: string;
+  };
+  cancellationRequested?: {
+    requestedAt: string;
+    requestedBy: DeploymentPrincipal;
+  };
+  cancellationSummary?: {
+    requestedAt: string;
+    requestedBy: DeploymentPrincipal;
+    activeStep:
+      | "provision"
+      | "publish"
+      | "smoke"
+      | "release_actions.pre_publish"
+      | "release_actions.post_publish_pre_smoke"
+      | "release_actions.post_smoke";
+    mutationMayHaveStarted: boolean;
+    enteredReconciliation: boolean;
+    terminalizationPath:
+      | "cancelled_without_mutation"
+      | "finished_after_reconciliation"
+      | "failed_after_reconciliation";
+  };
+  recovery?: {
+    occurred: true;
+    inDoubtStep:
+      | "provision"
+      | "publish"
+      | "smoke"
+      | "release_actions.pre_publish"
+      | "release_actions.post_publish_pre_smoke"
+      | "release_actions.post_smoke";
+    providerReconciliation: "mutation_completed" | "mutation_not_observed" | "inconclusive";
+    decision:
+      | "resumed_execution"
+      | "converged_to_final_record"
+      | "terminated_for_operator_follow_up";
+    recoveredAt: string;
+    authorityReacquired: boolean;
+    recoveredBy?: DeploymentPrincipal;
   };
   admission: NixosSharedHostControlPlaneAdmission;
 };
@@ -123,16 +173,35 @@ export type NixosSharedHostControlPlaneWorkerAuthority = {
   executionSnapshotPath: string;
 };
 
+export type NixosSharedHostBreakGlassAuthority = {
+  kind: "break-glass-worker";
+  incidentRef: string;
+  freezeId: string;
+  freezePath: string;
+  evidencePath: string;
+  requestedBy: DeploymentPrincipal;
+  approvedBy?: DeploymentPrincipal;
+  executedBy: DeploymentPrincipal;
+  justification: string;
+  bypassReason: string;
+  selection: { kind: "exact_artifact"; artifactIdentity: string };
+};
+
+export type NixosSharedHostMutationAuthority =
+  | NixosSharedHostControlPlaneWorkerAuthority
+  | NixosSharedHostBreakGlassAuthority;
+
 export function requireNixosSharedHostControlPlaneAuthority(
   deployment: NixosSharedHostDeployment,
-  authority?: NixosSharedHostControlPlaneWorkerAuthority,
-): NixosSharedHostControlPlaneWorkerAuthority {
+  authority?: NixosSharedHostMutationAuthority,
+): NixosSharedHostMutationAuthority {
   if (deployment.protectionClass !== "shared_nonprod") {
     throw new Error(
       `unsupported protection_class "${deployment.protectionClass}" for nixos-shared-host mutation`,
     );
   }
-  if (authority?.kind === "control-plane-worker") return authority;
+  if (authority?.kind === "control-plane-worker" || authority?.kind === "break-glass-worker")
+    return authority;
   throw new Error(
     `nixos-shared-host ${deployment.protectionClass} mutation must execute through the shared control plane`,
   );

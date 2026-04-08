@@ -1,0 +1,40 @@
+#!/usr/bin/env zx-wrapper
+import type {
+  NixosSharedHostControlPlaneSnapshot,
+  NixosSharedHostControlPlaneSubmission,
+} from "./nixos-shared-host-control-plane-contract.ts";
+import type {
+  DeploymentControlPlaneAuthorizationDecision,
+  DeploymentControlPlaneRequestDedupe,
+} from "./deployment-control-plane-contract.ts";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+import { createNixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-submission.ts";
+
+export function createAdmissionFailureSubmission(opts: {
+  error: unknown;
+  snapshot: NixosSharedHostControlPlaneSnapshot;
+  executionSnapshotPath: string;
+  dedupe: DeploymentControlPlaneRequestDedupe;
+  requestedBy?: NixosSharedHostControlPlaneSubmission["requestedBy"];
+  authorization?: DeploymentControlPlaneAuthorizationDecision;
+}) {
+  if (!(opts.error instanceof DeploymentAdmissionError)) return undefined;
+  const pending =
+    opts.error.code === "approval_required" || opts.error.code === "approval_no_longer_valid";
+  return createNixosSharedHostControlPlaneSubmission(opts.snapshot, opts.executionSnapshotPath, {
+    admission: pending
+      ? { decision: "pending_approval", reason: opts.error.code }
+      : { decision: "rejected", reason: opts.error.code },
+    lifecycleState: pending ? "pending_approval" : "finished",
+    dedupe: opts.dedupe,
+    requestedBy: opts.requestedBy,
+    authorization: opts.authorization,
+    ...(pending ? { pendingReasonCode: opts.error.code } : { rejectionCode: opts.error.code }),
+    ...(pending
+      ? {}
+      : {
+          completedAt: new Date().toISOString(),
+          terminationReason: "no_longer_admitted" as const,
+        }),
+  });
+}

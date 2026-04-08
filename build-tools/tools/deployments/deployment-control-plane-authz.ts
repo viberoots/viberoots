@@ -113,6 +113,26 @@ export function authorizeControlPlaneRunAction(opts: {
   );
 }
 
+export function authorizeControlPlaneBreakGlass(opts: {
+  deployment: DeploymentTarget;
+  incidentRef: string;
+  authorization: DeploymentControlPlaneAuthorization;
+}): DeploymentControlPlaneAuthorizationDecision {
+  const grant = opts.authorization.grants.find(
+    (entry) => entry.role === "break_glass" && entry.scope.kind === "break_glass_incident",
+  );
+  if (!grant || grant.scope.value !== opts.incidentRef) {
+    throw new DeploymentUnauthorizedError(
+      `principal ${opts.authorization.requestedBy.principalId} is not authorized for break-glass incident ${opts.incidentRef} on ${opts.deployment.deploymentId}`,
+    );
+  }
+  return {
+    principal: opts.authorization.requestedBy,
+    role: grant.role,
+    scope: grant.scope,
+  };
+}
+
 export function grantsFor(
   requestedBy: DeploymentControlPlaneAuthorization["requestedBy"],
   grants: DeploymentControlPlaneGrant[],
