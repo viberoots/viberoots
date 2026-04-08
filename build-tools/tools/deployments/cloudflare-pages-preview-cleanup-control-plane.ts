@@ -171,5 +171,11 @@ export async function submitCloudflarePagesPreviewCleanup(opts: {
         });
       }
     },
+    {
+      dedupe: {
+        mode: "created",
+        requestFingerprint: `direct:${snapshot.submissionId}`,
+      },
+    },
   );
 }

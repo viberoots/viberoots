@@ -98,5 +98,11 @@ export async function submitCloudflarePagesPreviewDeploy(opts: {
         previewIdentitySelector: cloudflarePagesPreviewIdentitySelector(opts.sourceRunId),
         ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
       }),
+    {
+      dedupe: {
+        mode: "created",
+        requestFingerprint: `direct:${submissionId}`,
+      },
+    },
   );
 }

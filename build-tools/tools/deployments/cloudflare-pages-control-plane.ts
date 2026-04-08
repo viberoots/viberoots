@@ -1,42 +1,48 @@
 #!/usr/bin/env zx-wrapper
-import path from "node:path";
-import {
-  resolveInitialCloudflarePagesAdmittedContext,
-  resolvePromotionCloudflarePagesAdmittedContext,
-} from "./cloudflare-pages-admission.ts";
-import {
-  CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA,
-  type CloudflarePagesControlPlaneOperationKind,
-  type CloudflarePagesControlPlaneSnapshot,
-  type CloudflarePagesPublishBehavior,
-  type CloudflarePagesSmokeConnectOverride,
+import type {
+  CloudflarePagesControlPlaneOperationKind,
+  CloudflarePagesControlPlaneSnapshot,
+  CloudflarePagesPublishBehavior,
+  CloudflarePagesSmokeConnectOverride,
 } from "./cloudflare-pages-control-plane-contract.ts";
 import {
   createCloudflarePagesSubmissionId,
   withCloudflarePagesControlPlaneRun,
 } from "./cloudflare-pages-control-plane-shared.ts";
+import {
+  createCloudflarePagesControlPlaneSnapshot,
+  type CloudflarePagesPromotionSourceSelection,
+} from "./cloudflare-pages-control-plane-snapshot.ts";
 import { runCloudflarePagesStaticDeploy } from "./cloudflare-pages-static-deploy.ts";
 import type { CloudflarePagesDeployRecord } from "./cloudflare-pages-records.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import type { DeploymentRunRecordLike } from "./deployment-admission-records.ts";
-import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+import type {
+  DeploymentControlPlaneAuthorizationDecision,
+  DeploymentControlPlaneRequestDedupe,
+} from "./deployment-control-plane-contract.ts";
 import {
-  admitStaticWebappArtifact,
-  type AdmittedStaticWebappArtifact,
-} from "./static-webapp-artifacts.ts";
-
-type PromotionSourceSelection = {
-  record: DeploymentRunRecordLike;
-  recordPath: string;
-  replaySnapshotPath: string;
-};
+  executionSnapshotPathFor,
+  readControlPlaneJson,
+  submissionPathFor,
+  writeControlPlaneJson,
+} from "./nixos-shared-host-control-plane-store.ts";
+import { type AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
 
 type SubmitOpts = {
   workspaceRoot: string;
   deployment: CloudflarePagesDeployment;
   recordsRoot: string;
+  submissionId?: string;
+  dedupe?: DeploymentControlPlaneRequestDedupe;
+  requestedBy?: {
+    principalId: string;
+    displayName?: string;
+  };
+  authorization?: DeploymentControlPlaneAuthorizationDecision;
   deployBatchId?: string;
   artifactDir?: string;
   artifact?: AdmittedStaticWebappArtifact;
@@ -45,72 +51,19 @@ type SubmitOpts = {
   parentRunId?: string;
   releaseLineageId?: string;
   artifactLineageId?: string;
-  source?: PromotionSourceSelection;
+  source?: CloudflarePagesPromotionSourceSelection;
   admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: CloudflarePagesSmokeConnectOverride;
+  hooks?: {
+    afterSnapshotWritten?: (snapshotPath: string) => Promise<void> | void;
+    onLockAcquired?: () => Promise<void> | void;
+  };
 };
 
-async function createSnapshot(
-  opts: SubmitOpts,
-  submissionId: string,
-): Promise<CloudflarePagesControlPlaneSnapshot> {
-  const operationKind = opts.operationKind || "deploy";
-  const publishBehavior = opts.publishBehavior || "deploy";
-  if (operationKind === "promotion" && !opts.source) {
-    throw new Error("cloudflare-pages promotion requires source run evidence");
-  }
-  if (!opts.artifact && !opts.artifactDir) {
-    throw new Error(`cloudflare-pages ${operationKind} submission requires exact artifact input`);
-  }
-  const artifact =
-    opts.artifact ||
-    (await admitStaticWebappArtifact({
-      recordsRoot: opts.recordsRoot,
-      artifactDir: path.resolve(opts.artifactDir || ""),
-    }));
-  const admittedContext = opts.source
-    ? await resolvePromotionCloudflarePagesAdmittedContext({
-        workspaceRoot: opts.workspaceRoot,
-        deployment: opts.deployment,
-        artifactIdentity: artifact.identity,
-        sourceRecord: opts.source.record,
-      })
-    : await resolveInitialCloudflarePagesAdmittedContext({
-        workspaceRoot: opts.workspaceRoot,
-        deployment: opts.deployment,
-        artifactIdentity: artifact.identity,
-      });
-  const lockScope = opts.deployment.providerTarget.providerTargetIdentity;
+function directDedupe(submissionId: string): DeploymentControlPlaneRequestDedupe {
   return {
-    schemaVersion: CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA,
-    submissionId,
-    submittedAt: new Date().toISOString(),
-    ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
-    operationKind,
-    deploymentId: opts.deployment.deploymentId,
-    deploymentLabel: opts.deployment.label,
-    providerTargetIdentity: lockScope,
-    lockScope,
-    deployment: opts.deployment,
-    admittedContext,
-    paths: {
-      workspaceRoot: path.resolve(opts.workspaceRoot),
-      recordsRoot: path.resolve(opts.recordsRoot),
-    },
-    action: {
-      kind: "deploy",
-      publishBehavior,
-      publishInput: {
-        kind: "exact-artifact",
-        artifact,
-      },
-      ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
-      ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
-      ...(opts.artifactLineageId ? { artifactLineageId: opts.artifactLineageId } : {}),
-      ...(opts.source ? { sourceRecordPath: opts.source.recordPath } : {}),
-      ...(opts.source ? { sourceReplaySnapshotPath: opts.source.replaySnapshotPath } : {}),
-    },
-    ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
+    mode: "created",
+    requestFingerprint: `direct:${submissionId}`,
   };
 }
 
@@ -185,21 +138,69 @@ export async function submitCloudflarePagesControlPlaneDeploy(opts: SubmitOpts):
   record: CloudflarePagesDeployRecord;
   recordPath: string;
 }> {
-  const submissionId = createCloudflarePagesSubmissionId();
-  const snapshot = await createSnapshot(opts, submissionId);
-  snapshot.admittedContext = {
-    ...snapshot.admittedContext,
-    policyEvaluation: await evaluateDeploymentAdmission({
-      workspaceRoot: opts.workspaceRoot,
-      recordsRoot: opts.recordsRoot,
-      deployment: opts.deployment,
-      operationKind: snapshot.operationKind,
-      admittedContext: snapshot.admittedContext,
-      sourceRecord: opts.source?.record,
-      artifactLineageId: opts.artifactLineageId,
-      evidence: opts.admissionEvidence,
-    }),
-  };
+  const submissionId = opts.submissionId || createCloudflarePagesSubmissionId();
+  const dedupe = opts.dedupe || directDedupe(submissionId);
+  const snapshot = await createCloudflarePagesControlPlaneSnapshot(opts, submissionId);
+  try {
+    snapshot.admittedContext = {
+      ...snapshot.admittedContext,
+      policyEvaluation: await evaluateDeploymentAdmission({
+        workspaceRoot: opts.workspaceRoot,
+        recordsRoot: opts.recordsRoot,
+        deployment: opts.deployment,
+        operationKind: snapshot.operationKind,
+        admittedContext: snapshot.admittedContext,
+        sourceRecord: opts.source?.record,
+        artifactLineageId: opts.artifactLineageId,
+        evidence: opts.admissionEvidence,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof DeploymentAdmissionError) {
+      const executionSnapshotPath = executionSnapshotPathFor(opts.recordsRoot, submissionId);
+      const submissionPath = submissionPathFor(opts.recordsRoot, submissionId);
+      const submission = {
+        schemaVersion: "cloudflare-pages-control-plane-submission@2" as const,
+        submissionId,
+        submittedAt: snapshot.submittedAt,
+        operationKind: snapshot.operationKind,
+        deploymentId: opts.deployment.deploymentId,
+        deploymentLabel: opts.deployment.label,
+        providerTargetIdentity: snapshot.providerTargetIdentity,
+        lockScope: snapshot.lockScope,
+        executionSnapshotPath,
+        lifecycleState:
+          error.code === "approval_required" || error.code === "approval_no_longer_valid"
+            ? ("pending_approval" as const)
+            : ("finished" as const),
+        terminationReason:
+          error.code === "approval_required" || error.code === "approval_no_longer_valid"
+            ? null
+            : ("no_longer_admitted" as const),
+        dedupe,
+        ...(opts.requestedBy ? { requestedBy: opts.requestedBy } : {}),
+        ...(opts.authorization ? { authorization: opts.authorization } : {}),
+        ...(error.code === "approval_required" || error.code === "approval_no_longer_valid"
+          ? {
+              pendingReasonCode: error.code,
+              admission: { decision: "pending_approval" as const, reason: error.code },
+            }
+          : {
+              completedAt: new Date().toISOString(),
+              rejectionCode: error.code,
+              admission: { decision: "rejected" as const, reason: error.code },
+            }),
+      };
+      await writeControlPlaneJson(executionSnapshotPath, snapshot);
+      await writeControlPlaneJson(submissionPath, submission);
+      throw Object.assign(error, {
+        submission,
+        submissionPath,
+        executionSnapshotPath,
+      });
+    }
+    throw error;
+  }
   return await withCloudflarePagesControlPlaneRun(
     opts.deployment,
     opts.recordsRoot,
@@ -210,5 +211,11 @@ export async function submitCloudflarePagesControlPlaneDeploy(opts: SubmitOpts):
         submissionPath: authority.submissionPath,
         workerId: authority.workerId,
       }),
+    {
+      dedupe,
+      requestedBy: opts.requestedBy,
+      authorization: opts.authorization,
+    },
+    opts.hooks,
   );
 }

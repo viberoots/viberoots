@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentTarget } from "./contract.ts";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
 import {
   requireBuiltInExecutionBoundary,
   requiredApprovalFacts,
@@ -67,7 +68,8 @@ function requiredCheckFacts(opts: {
     const hit =
       current.find((check) => check.name === name) || carried.find((check) => check.name === name);
     if (!hit) {
-      throw new Error(
+      throw new DeploymentAdmissionError(
+        "no_longer_admitted",
         `protected/shared admission requires check ${name} for subject(s) ${Array.from(subjects).join(", ")}`,
       );
     }
@@ -89,13 +91,15 @@ async function prerequisiteFacts(opts: {
       deploymentId: prerequisite.deploymentId,
     });
     if (!hit) {
-      throw new Error(
+      throw new DeploymentAdmissionError(
+        "no_longer_admitted",
         `prerequisite deployment has no successful admitted run: ${prerequisite.deploymentId}`,
       );
     }
     if (prerequisite.mode === "health_gated") {
       if (!hit.record.publicUrl && !hit.record.healthUrl) {
-        throw new Error(
+        throw new DeploymentAdmissionError(
+          "no_longer_admitted",
           `health_gated prerequisite is underspecified: ${prerequisite.deploymentId}`,
         );
       }
@@ -103,7 +107,8 @@ async function prerequisiteFacts(opts: {
         (entry) => entry.deploymentId === prerequisite.deploymentId && entry.status === "healthy",
       );
       if (!health) {
-        throw new Error(
+        throw new DeploymentAdmissionError(
+          "no_longer_admitted",
           `health_gated prerequisite lacks fresh health evidence: ${prerequisite.deploymentId}`,
         );
       }

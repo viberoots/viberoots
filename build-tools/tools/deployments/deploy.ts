@@ -19,6 +19,7 @@ import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-c
 import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
 import { submitNixosSharedHostPublishOnlyRun } from "./nixos-shared-host-publish-only.ts";
 import { maybeRunNixosSharedHostRemoteProfile } from "./nixos-shared-host-remote-cli.ts";
+import { DEPLOYMENT_EXTRACTED_METADATA_SCHEMA } from "./deployment-control-plane-contract.ts";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();
@@ -29,7 +30,7 @@ function requireFlag(name: string): string {
 async function readDeploymentFromJson(filePath: string): Promise<DeploymentTarget> {
   const parsed = JSON.parse(await fs.readFile(filePath, "utf8"));
   if (
-    parsed?.version === 1 &&
+    parsed?.schemaVersion === DEPLOYMENT_EXTRACTED_METADATA_SCHEMA &&
     Array.isArray(parsed?.deployments) &&
     parsed.deployments.length === 1
   ) {

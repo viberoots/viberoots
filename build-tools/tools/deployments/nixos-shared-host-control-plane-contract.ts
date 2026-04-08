@@ -4,11 +4,19 @@ import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-ho
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
+import type {
+  DeploymentControlPlaneAuthorizationDecision,
+  DeploymentControlPlaneLifecycleState,
+  DeploymentControlPlaneRequestDedupe,
+  DeploymentControlPlaneSubmitRejectionCode,
+  DeploymentControlPlaneTerminationReason,
+} from "./deployment-control-plane-contract.ts";
+import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA =
   "nixos-shared-host-control-plane-snapshot@2";
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMISSION_SCHEMA =
-  "nixos-shared-host-control-plane-submission@1";
+  "nixos-shared-host-control-plane-submission@2";
 
 export type NixosSharedHostPublishBehavior = "deploy" | "publish-only";
 
@@ -73,7 +81,11 @@ export type NixosSharedHostControlPlaneSnapshot = {
 
 export type NixosSharedHostControlPlaneAdmission =
   | { decision: "admitted"; reason: "shared_nonprod" }
-  | { decision: "rejected"; reason: "lock_conflict" };
+  | {
+      decision: "pending_approval";
+      reason: "approval_required" | "approval_no_longer_valid";
+    }
+  | { decision: "rejected"; reason: DeploymentControlPlaneSubmitRejectionCode };
 
 export type NixosSharedHostControlPlaneSubmission = {
   schemaVersion: typeof NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMISSION_SCHEMA;
@@ -86,9 +98,25 @@ export type NixosSharedHostControlPlaneSubmission = {
   providerTargetIdentity: string;
   lockScope: string;
   executionSnapshotPath: string;
+  lifecycleState: DeploymentControlPlaneLifecycleState;
+  terminationReason: DeploymentControlPlaneTerminationReason;
+  dedupe: DeploymentControlPlaneRequestDedupe;
   workerId?: string;
+  deployRunId?: string;
   resultRecordPath?: string;
   finalOutcome?: string;
+  requestedBy?: DeploymentPrincipal;
+  authorization?: DeploymentControlPlaneAuthorizationDecision;
+  rejectionCode?: DeploymentControlPlaneSubmitRejectionCode;
+  pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
+  latestAction?: {
+    actionId: string;
+    action: "cancel" | "resume";
+    submittedAt: string;
+    dedupe: DeploymentControlPlaneRequestDedupe;
+    lifecycleState: DeploymentControlPlaneLifecycleState;
+    rejectionCode?: DeploymentControlPlaneSubmitRejectionCode | "not_resumable";
+  };
   admission: NixosSharedHostControlPlaneAdmission;
 };
 

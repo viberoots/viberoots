@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentTarget } from "./contract.ts";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
 import {
   NIXOS_SHARED_HOST_RELEASE_ACTION_TYPES,
   releaseActionRefs,
@@ -64,19 +65,22 @@ function currentApprovalFacts(opts: {
 export function requireBuiltInExecutionBoundary(deployment: DeploymentTarget) {
   if (deployment.provider === "cloudflare-pages") {
     if (deployment.publisher.type !== "wrangler-pages") {
-      throw new Error(
+      throw new DeploymentAdmissionError(
+        "no_longer_admitted",
         `protected/shared admission rejects non-built-in cloudflare-pages publisher ${deployment.publisher.type}`,
       );
     }
     if (deployment.releaseActions.length > 0) {
-      throw new Error(
+      throw new DeploymentAdmissionError(
+        "no_longer_admitted",
         `protected/shared admission rejects cloudflare-pages deployment-local release_actions: ${releaseActionRefs(deployment.releaseActions).join(", ")}`,
       );
     }
     return;
   }
   if (deployment.publisher.type !== "nixos-shared-host-static-webapp") {
-    throw new Error(
+    throw new DeploymentAdmissionError(
+      "no_longer_admitted",
       `protected/shared admission rejects non-built-in nixos-shared-host publisher ${deployment.publisher.type}`,
     );
   }
@@ -84,13 +88,15 @@ export function requireBuiltInExecutionBoundary(deployment: DeploymentTarget) {
     deployment.provisioner?.type &&
     deployment.provisioner.type !== "nixos-shared-host-manifest"
   ) {
-    throw new Error(
+    throw new DeploymentAdmissionError(
+      "no_longer_admitted",
       `protected/shared admission rejects non-built-in nixos-shared-host provisioner ${deployment.provisioner.type}`,
     );
   }
   for (const action of deployment.releaseActions) {
     if (!NIXOS_SHARED_HOST_RELEASE_ACTION_TYPES.has(action.type)) {
-      throw new Error(
+      throw new DeploymentAdmissionError(
+        "no_longer_admitted",
         `protected/shared admission rejects non-built-in release_action ${action.ref}`,
       );
     }
@@ -106,6 +112,13 @@ export function requiredApprovalFacts(opts: {
   binding: { payloadFingerprint: string; targetIdentity: string };
 }): DeploymentAdmissionApprovalFact[] {
   if (opts.operationKind === "preview") return [];
+  const providedApprovals = opts.evidence?.approvals || [];
+  const sawProvidedApproval = providedApprovals.some(
+    (approval) =>
+      approval.name &&
+      approval.deploymentId === opts.deployment.deploymentId &&
+      approval.targetIdentity === opts.binding.targetIdentity,
+  );
   const fresh = currentApprovalFacts({
     evidence: opts.evidence,
     deploymentId: opts.deployment.deploymentId,
@@ -128,7 +141,8 @@ export function requiredApprovalFacts(opts: {
       matchingApproval(name, fresh, opts.requestedBy) ||
       matchingApproval(name, reused, opts.requestedBy);
     if (!approval) {
-      throw new Error(
+      throw new DeploymentAdmissionError(
+        sawProvidedApproval ? "approval_no_longer_valid" : "approval_required",
         `protected/shared admission requires approval ${name} for ${opts.deployment.deploymentId}`,
       );
     }

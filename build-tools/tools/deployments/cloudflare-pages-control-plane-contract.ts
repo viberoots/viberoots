@@ -6,11 +6,19 @@ import type {
   CloudflarePagesPreviewIdentitySelector,
 } from "./cloudflare-pages-preview.ts";
 import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
+import type {
+  DeploymentControlPlaneAuthorizationDecision,
+  DeploymentControlPlaneLifecycleState,
+  DeploymentControlPlaneRequestDedupe,
+  DeploymentControlPlaneSubmitRejectionCode,
+  DeploymentControlPlaneTerminationReason,
+} from "./deployment-control-plane-contract.ts";
+import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 
 export const CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA =
   "cloudflare-pages-control-plane-snapshot@2";
 export const CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMISSION_SCHEMA =
-  "cloudflare-pages-control-plane-submission@1";
+  "cloudflare-pages-control-plane-submission@2";
 
 export type CloudflarePagesPublishMode = "normal" | "preview";
 export type CloudflarePagesPublishBehavior = "deploy" | "publish-only";
@@ -77,7 +85,11 @@ export type CloudflarePagesControlPlaneSnapshot = {
 
 export type CloudflarePagesControlPlaneAdmission =
   | { decision: "admitted"; reason: "shared_nonprod" | "production_facing" }
-  | { decision: "rejected"; reason: "lock_conflict" };
+  | {
+      decision: "pending_approval";
+      reason: "approval_required" | "approval_no_longer_valid";
+    }
+  | { decision: "rejected"; reason: DeploymentControlPlaneSubmitRejectionCode };
 
 export type CloudflarePagesControlPlaneSubmission = {
   schemaVersion: typeof CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMISSION_SCHEMA;
@@ -90,9 +102,25 @@ export type CloudflarePagesControlPlaneSubmission = {
   providerTargetIdentity: string;
   lockScope: string;
   executionSnapshotPath: string;
+  lifecycleState: DeploymentControlPlaneLifecycleState;
+  terminationReason: DeploymentControlPlaneTerminationReason;
+  dedupe: DeploymentControlPlaneRequestDedupe;
   workerId?: string;
+  deployRunId?: string;
   resultRecordPath?: string;
   finalOutcome?: string;
+  requestedBy?: DeploymentPrincipal;
+  authorization?: DeploymentControlPlaneAuthorizationDecision;
+  rejectionCode?: DeploymentControlPlaneSubmitRejectionCode;
+  pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
+  latestAction?: {
+    actionId: string;
+    action: "cancel" | "resume";
+    submittedAt: string;
+    dedupe: DeploymentControlPlaneRequestDedupe;
+    lifecycleState: DeploymentControlPlaneLifecycleState;
+    rejectionCode?: DeploymentControlPlaneSubmitRejectionCode | "not_resumable";
+  };
   admission: CloudflarePagesControlPlaneAdmission;
 };
 

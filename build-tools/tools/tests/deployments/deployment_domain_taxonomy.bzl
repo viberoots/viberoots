@@ -3,6 +3,8 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-domain.taxonomy-drift.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admission.policy.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admission.prerequisites.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-control-plane.authz-idempotency.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-control-plane.pending-approval.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-from-changes.batch.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-from-changes.selection.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-promotion-compatibility.test.ts": True,

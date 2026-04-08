@@ -2,6 +2,7 @@
 import { getFlagStr } from "../lib/cli.ts";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
 import { readCompositeGraph } from "../lib/graph-view.ts";
+import { DEPLOYMENT_EXTRACTED_METADATA_SCHEMA } from "./deployment-control-plane-contract.ts";
 import { extractDeployments } from "./contract.ts";
 
 async function main() {
@@ -12,7 +13,9 @@ async function main() {
     for (const error of errors) console.error(error);
     process.exit(1);
   }
-  console.log(JSON.stringify({ version: 1, deployments }, null, 2));
+  console.log(
+    JSON.stringify({ schemaVersion: DEPLOYMENT_EXTRACTED_METADATA_SCHEMA, deployments }, null, 2),
+  );
 }
 
 main().catch((error) => {
