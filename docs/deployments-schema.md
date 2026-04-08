@@ -104,6 +104,8 @@ Minimum plan/diff contract when provisioner-managed infra mutation is reviewable
 
 - whether the plan surface is provider-native or provider-neutral
 - whether routine mutation requires a reviewed pre-mutation plan artifact
+- how the reviewed plan or diff is fingerprinted and bound to approval or revalidation evidence
+- where operators retrieve the reviewed artifact later in a secret-safe form
 - how destructive or replacement actions are surfaced distinctly from create or in-place update
 - if no meaningful plan or diff can be produced, the reviewed higher-bar approval posture required for that path
 
@@ -178,6 +180,11 @@ Minimum data-compatibility contract:
 - one closed posture from:
   - `backward_compatible`
   - `forward_only`
+
+Protected/shared routine-path rule:
+
+- destructive built-in `release_actions` must fail closed on the ordinary deploy or provision-only
+  path unless a separately reviewed destructive-intent workflow is in use
   - `reversible`
   - `manual_recovery_required`
 - if the action type is not `backward_compatible` or `reversible`, protected/shared rollback admission must not assume that re-publishing an earlier artifact is safe

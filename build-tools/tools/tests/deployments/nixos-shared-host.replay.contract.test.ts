@@ -70,6 +70,14 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
         replay.replaySnapshot.controlPlaneExecutionSnapshotPath,
         result.executionSnapshotPath,
       );
+      assert.equal(
+        replay.replaySnapshot.provisionerPlan?.artifactPath,
+        result.record.provisionerPlan?.artifactPath,
+      );
+      assert.equal(
+        replay.replaySnapshot.provisionerPlan?.fingerprint,
+        result.record.provisionerPlan?.fingerprint,
+      );
       assert.equal(replay.replaySnapshot.admittedContext.environmentStage, "dev");
       assert.equal(
         replay.replaySnapshot.admittedContext.targetEnvironment.targetRef,
@@ -81,6 +89,7 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
       );
       await fsp.access(replay.replaySnapshot.platformStateSnapshotPath);
       await fsp.access(replay.replaySnapshot.hostConfigSnapshotPath);
+      await fsp.access(replay.replaySnapshot.provisionerPlan!.artifactPath);
     } finally {
       await server.close();
     }

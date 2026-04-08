@@ -188,3 +188,83 @@ test("retry may reuse approval only when policy explicitly allows same-lineage r
     /requires approval human\/retry/,
   );
 });
+
+test("approval binding fails closed when the reviewed provisioner plan fingerprint drifts", async () => {
+  const deployment = nixosSharedHostDeploymentFixture({
+    admissionPolicy: {
+      ...nixosSharedHostDeploymentFixture().admissionPolicy,
+      requiredApprovals: ["human/dev"],
+    },
+  });
+  const admittedContext = admittedContextFixture(deployment);
+  const reviewed = deploymentAdmissionEvidenceFixture({
+    deployment,
+    operationKind: "deploy",
+    sourceRevision: admittedContext.source.sourceRevision,
+    artifactIdentity: admittedContext.source.artifactIdentity,
+    requiredApprovals: ["human/dev"],
+    provisionerPlanFingerprint: "sha256:reviewed-plan",
+  });
+  await assert.rejects(
+    evaluateDeploymentAdmission({
+      workspaceRoot: process.cwd(),
+      recordsRoot: path.join(
+        process.cwd(),
+        ".local",
+        "deployments",
+        "nixos-shared-host",
+        "records",
+      ),
+      deployment,
+      operationKind: "deploy",
+      admittedContext,
+      evidence: {
+        ...reviewed,
+        provisionerPlanFingerprint: "sha256:drifted-plan",
+      },
+    }),
+    /requires approval human\/dev/,
+  );
+});
+
+test("protected/shared routine admission rejects destructive built-in release actions", async () => {
+  const deployment = nixosSharedHostDeploymentFixture({
+    releaseActions: [
+      {
+        ref: "//projects/deployments/demoapp-shared:db_migration",
+        type: "schema_migration",
+        phase: "pre_publish",
+        runCondition: "success_only",
+        abortBehavior: "fail_run",
+        dataCompatibility: "forward_only",
+        replayPolicy: {
+          deploy_publish_slice: "skip",
+          retry: "rerun",
+          rollback: "fail",
+          promotion: "skip",
+        },
+        duplicateSafety: { retry: "control_plane_deduplicated" },
+        operationKeys: { retry: "db-migration:${deploy_run_id}" },
+        requiredSecretRequirementNames: [],
+        requiredRuntimeConfigRequirementNames: [],
+      },
+    ],
+  });
+  await assert.rejects(
+    evaluateDeploymentAdmission({
+      workspaceRoot: process.cwd(),
+      recordsRoot: path.join(
+        process.cwd(),
+        ".local",
+        "deployments",
+        "nixos-shared-host",
+        "records",
+      ),
+      deployment,
+      operationKind: "deploy",
+      admittedContext: admittedContextFixture(deployment),
+      evidence: { requestedBy: { principalId: "user:submitter" } },
+    }),
+    /rejects destructive built-in release_actions/,
+  );
+});

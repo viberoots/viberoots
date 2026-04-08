@@ -4,7 +4,6 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
-import { resolveNixosSharedHostReplaySelection } from "../../deployments/nixos-shared-host-replay.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import {
   ensureNixosSharedHostStageBranch,
@@ -14,7 +13,6 @@ import {
   deploymentReleaseActionFixture,
   deploymentRequirementFixture,
 } from "./deployment-metadata.fixture.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });
@@ -22,12 +20,9 @@ async function writeArtifact(root: string, html: string): Promise<void> {
   await fsp.writeFile(path.join(root, "healthz"), "ok\n", "utf8");
 }
 
-test("rollback rejects older source runs when the current live run applied a forward-only release action", async () => {
-  await runInTemp("nixos-shared-host-release-actions-rollback", async (tmp, $) => {
-    const baseDeployment = nixosSharedHostDeploymentFixture({
-      runtime: { appName: "demoapp", containerPort: 3000, healthPath: "/healthz" },
-    });
-    const guardedDeployment = nixosSharedHostDeploymentFixture({
+test("routine deploy rejects destructive schema-migration release actions", async () => {
+  await runInTemp("nixos-shared-host-release-actions-routine-reject", async (tmp, $) => {
+    const deployment = nixosSharedHostDeploymentFixture({
       runtime: { appName: "demoapp", containerPort: 3000, healthPath: "/healthz" },
       secretRequirements: [
         deploymentRequirementFixture({
@@ -53,60 +48,22 @@ test("rollback rejects older source runs when the current live run applied a for
         }),
       ],
     });
-    const hostRoot = path.join(tmp, "host");
-    const recordsRoot = path.join(tmp, "records");
-    const firstArtifact = path.join(tmp, "artifact-v1");
-    const secondArtifact = path.join(tmp, "artifact-v2");
-    await writeArtifact(firstArtifact, "<html>v1</html>");
-    await writeArtifact(secondArtifact, "<html>v2</html>");
-    await ensureNixosSharedHostStageBranch(tmp, $, baseDeployment);
-    const server = await startNixosSharedHostPublicServer({ deployment: baseDeployment, hostRoot });
-    try {
-      const firstRun = await submitNixosSharedHostControlPlaneRun({
+    const artifactDir = path.join(tmp, "artifact-v2");
+    await writeArtifact(artifactDir, "<html>v2</html>");
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await assert.rejects(
+      submitNixosSharedHostControlPlaneRun({
         workspaceRoot: tmp,
         operationKind: "deploy",
-        deployment: baseDeployment,
-        artifactDir: firstArtifact,
+        deployment,
+        artifactDir,
         paths: {
           statePath: path.join(tmp, "platform-state.json"),
-          hostRoot,
-          recordsRoot,
+          hostRoot: path.join(tmp, "host"),
+          recordsRoot: path.join(tmp, "records"),
         },
-        smokeConnectOverride: {
-          protocol: "https:",
-          hostname: "127.0.0.1",
-          port: server.port,
-          rejectUnauthorized: false,
-        },
-      });
-      await submitNixosSharedHostControlPlaneRun({
-        workspaceRoot: tmp,
-        operationKind: "deploy",
-        deployment: guardedDeployment,
-        artifactDir: secondArtifact,
-        paths: {
-          statePath: path.join(tmp, "platform-state.json"),
-          hostRoot,
-          recordsRoot,
-        },
-        smokeConnectOverride: {
-          protocol: "https:",
-          hostname: "127.0.0.1",
-          port: server.port,
-          rejectUnauthorized: false,
-        },
-      });
-      await assert.rejects(
-        resolveNixosSharedHostReplaySelection({
-          deployment: guardedDeployment,
-          recordsRoot,
-          sourceRunId: firstRun.record.deployRunId,
-          rollback: true,
-        }),
-        /blocked by current release-action posture/,
-      );
-    } finally {
-      await server.close();
-    }
+      }),
+      /rejects destructive built-in release_actions/,
+    );
   });
 });

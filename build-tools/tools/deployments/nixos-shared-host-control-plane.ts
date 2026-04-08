@@ -2,7 +2,6 @@
 import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
 import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
 import { directControlPlaneDedupe } from "./deployment-control-plane-idempotency.ts";
@@ -25,6 +24,8 @@ import {
   createNixosSharedHostWorkerId,
   type NixosSharedHostControlPlaneSourceSelection,
 } from "./nixos-shared-host-control-plane-snapshot.ts";
+import { evaluateNixosSharedHostControlPlaneAdmission } from "./nixos-shared-host-control-plane-admission.ts";
+import { writeNixosSharedHostProvisionerPlan } from "./nixos-shared-host-provisioner-plan.ts";
 import {
   acquireNixosSharedHostControlPlaneLocks,
   runNixosSharedHostControlPlaneWorker,
@@ -81,25 +82,22 @@ export async function submitNixosSharedHostControlPlaneRun(
   const submissionId = opts.submissionId || createNixosSharedHostSubmissionId();
   const dedupe = opts.dedupe || directControlPlaneDedupe(submissionId);
   const snapshot = await createNixosSharedHostControlPlaneSnapshot(opts, submissionId);
+  snapshot.provisionerPlan = await writeNixosSharedHostProvisionerPlan({ snapshot });
   const executionSnapshotPath = executionSnapshotPathFor(opts.paths.recordsRoot, submissionId);
   const submissionPath = submissionPathFor(opts.paths.recordsRoot, submissionId);
   await writeControlPlaneJson(executionSnapshotPath, snapshot);
   await opts.hooks?.afterSnapshotWritten?.(executionSnapshotPath);
   try {
+    await evaluateNixosSharedHostControlPlaneAdmission({
+      workspaceRoot: opts.workspaceRoot,
+      recordsRoot: opts.paths.recordsRoot,
+      deployment: opts.deployment,
+      snapshot,
+      source: opts.source,
+      artifactLineageId: opts.artifactLineageId,
+      admissionEvidence: opts.admissionEvidence,
+    });
     if (snapshot.admittedContext) {
-      snapshot.admittedContext = {
-        ...snapshot.admittedContext,
-        policyEvaluation: await evaluateDeploymentAdmission({
-          workspaceRoot: opts.workspaceRoot,
-          recordsRoot: opts.paths.recordsRoot,
-          deployment: opts.deployment,
-          operationKind: snapshot.operationKind,
-          admittedContext: snapshot.admittedContext,
-          sourceRecord: opts.source?.record as any,
-          artifactLineageId: opts.artifactLineageId,
-          evidence: opts.admissionEvidence,
-        }),
-      };
       await writeControlPlaneJson(executionSnapshotPath, snapshot);
     }
   } catch (error) {

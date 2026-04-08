@@ -5,6 +5,7 @@ import path from "node:path";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
 import type { NixosSharedHostControlPlaneWorkerAuthority } from "./nixos-shared-host-control-plane-contract.ts";
+import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
 import {
   NIXOS_SHARED_HOST_PROVIDER,
   type NixosSharedHostDeployment,
@@ -68,6 +69,7 @@ export type NixosSharedHostDeployRecord = {
   provisionerType?: string;
   publisherType?: string;
   smokeRunnerType?: "nixos-shared-host-static-webapp-smoke";
+  provisionerPlan?: NixosSharedHostProvisionerPlanRef;
   deploymentMetadataFingerprint?: string;
   replaySnapshotPath?: string;
   publicUrl?: string;
@@ -94,6 +96,7 @@ type NixosSharedHostRecordOutcome = {
   artifactProvenancePath?: string;
   admittedContext?: NixosSharedHostAdmittedContext;
   componentResults?: NixosSharedHostComponentResult[];
+  provisionerPlan?: NixosSharedHostProvisionerPlanRef;
   deploymentMetadataFingerprint?: string;
   replaySnapshotPath?: string;
 };
@@ -160,6 +163,7 @@ export function createNixosSharedHostDeployRecord(
           smokeRunnerType: "nixos-shared-host-static-webapp-smoke" as const,
         }
       : {}),
+    ...(outcome.provisionerPlan ? { provisionerPlan: outcome.provisionerPlan } : {}),
     ...(outcome.deploymentMetadataFingerprint
       ? { deploymentMetadataFingerprint: outcome.deploymentMetadataFingerprint }
       : {}),

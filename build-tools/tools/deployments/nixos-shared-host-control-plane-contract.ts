@@ -4,6 +4,7 @@ import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 import type { NixosSharedHostPublishInput } from "./nixos-shared-host-publish-input.ts";
+import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
 import type {
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneLifecycleState,
@@ -53,6 +54,7 @@ export type NixosSharedHostControlPlaneSnapshot = {
   lockScope: string;
   deployment: NixosSharedHostDeployment;
   recordedReleaseActions?: DeploymentReleaseAction[];
+  provisionerPlan?: NixosSharedHostProvisionerPlanRef;
   admittedContext?: NixosSharedHostAdmittedContext;
   paths: NixosSharedHostControlPlanePaths;
   action:

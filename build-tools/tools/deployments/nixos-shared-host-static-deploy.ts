@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import {
   requireNixosSharedHostControlPlaneAuthority,
+  type NixosSharedHostSmokeConnectOverride,
   type NixosSharedHostControlPlaneWorkerAuthority,
 } from "./nixos-shared-host-control-plane-contract.ts";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
@@ -34,11 +35,12 @@ import {
   type NixosSharedHostDeployRecord,
   writeNixosSharedHostDeployRecord,
 } from "./nixos-shared-host-records.ts";
-import { artifactOutcomeFields } from "./nixos-shared-host-static-deploy-records.ts";
+import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
 import {
-  writeNixosSharedHostReplayComponentResults,
-  writeNixosSharedHostReplaySnapshot,
-} from "./nixos-shared-host-replay.ts";
+  captureStaticDeployReplaySnapshot,
+  staticDeployRecordFields,
+} from "./nixos-shared-host-static-deploy-records.ts";
+import { writeNixosSharedHostReplayComponentResults } from "./nixos-shared-host-replay.ts";
 import { materializeNixosSharedHostRuntime } from "./nixos-shared-host-runtime.ts";
 import { renderNixosSharedHostConfig } from "./nixos-shared-host.ts";
 
@@ -64,12 +66,8 @@ export async function runNixosSharedHostStaticDeploy(opts: {
   admittedContext?: NixosSharedHostAdmittedContext;
   sourceComponentResults?: NixosSharedHostComponentResult[];
   releaseActions?: DeploymentReleaseAction[];
-  smokeConnectOverride?: {
-    protocol: "http:" | "https:";
-    hostname: string;
-    port: number;
-    rejectUnauthorized?: boolean;
-  };
+  provisionerPlan?: NixosSharedHostProvisionerPlanRef;
+  smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;
 }): Promise<{ record: NixosSharedHostDeployRecord; recordPath: string }> {
   const authority = requireNixosSharedHostControlPlaneAuthority(opts.deployment, opts.authority);
   const runId = createNixosSharedHostDeployRunId();
@@ -103,23 +101,20 @@ export async function runNixosSharedHostStaticDeploy(opts: {
         new Error(`publish-only requires an existing realized target: ${authority.lockScope}`),
       );
     }
-    if (opts.artifact || componentArtifacts.length > 0) {
-      ({ deploymentMetadataFingerprint, replaySnapshotPath } =
-        await writeNixosSharedHostReplaySnapshot({
-          recordsRoot: opts.recordsRoot,
-          deployRunId: runId,
-          deployment: opts.deployment,
-          ...(opts.artifact ? { artifact: opts.artifact } : {}),
-          ...(componentArtifacts.length > 0 ? { componentArtifacts } : {}),
-          ...(opts.compositeArtifactIdentity
-            ? { compositeArtifactIdentity: opts.compositeArtifactIdentity }
-            : {}),
-          admittedContext: opts.admittedContext!,
-          platformState: state,
-          hostConfig: rendered,
-          controlPlaneExecutionSnapshotPath: authority.executionSnapshotPath,
-        }));
-    }
+    ({ deploymentMetadataFingerprint, replaySnapshotPath } =
+      await captureStaticDeployReplaySnapshot({
+        recordsRoot: opts.recordsRoot,
+        deployRunId: runId,
+        deployment: opts.deployment,
+        artifact: opts.artifact,
+        componentArtifacts,
+        compositeArtifactIdentity: opts.compositeArtifactIdentity,
+        admittedContext: opts.admittedContext!,
+        platformState: state,
+        hostConfig: rendered,
+        provisionerPlan: opts.provisionerPlan,
+        controlPlaneExecutionSnapshotPath: authority.executionSnapshotPath,
+      }));
     if (publishBehavior === "deploy") {
       await materializeNixosSharedHostRuntime(opts.hostRoot, rendered).catch((error) => {
         throw withFailedStep("provision", error);
@@ -184,31 +179,34 @@ export async function runNixosSharedHostStaticDeploy(opts: {
     }).catch((error) => {
       throw withFailedStep("release_actions.post_smoke", error);
     });
-    if (replaySnapshotPath && smoke.componentResults.length > 0) {
+    if (replaySnapshotPath && smoke.componentResults.length > 0)
       await writeNixosSharedHostReplayComponentResults(replaySnapshotPath, smoke.componentResults);
-    }
     const record = createNixosSharedHostDeployRecord(opts.deployment, {
       deployRunId: runId,
       operationKind,
       runClassification: operationKind,
       finalOutcome: "succeeded",
-      ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
-      ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
-      ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
-      ...artifactOutcomeFields({
+      ...staticDeployRecordFields({
+        deployBatchId: opts.deployBatchId,
+        parentRunId: opts.parentRunId,
+        releaseLineageId: opts.releaseLineageId,
         artifactIdentity: topLevelArtifactIdentity,
         artifact: opts.artifact,
         artifactLineageId: opts.artifactLineageId,
+        admittedContext: opts.admittedContext,
+        provisionerPlan: opts.provisionerPlan,
+        deploymentMetadataFingerprint,
+        replaySnapshotPath,
       }),
-      ...(opts.admittedContext ? { admittedContext: opts.admittedContext } : {}),
       componentResults: smoke.componentResults,
-      ...(deploymentMetadataFingerprint ? { deploymentMetadataFingerprint } : {}),
-      ...(replaySnapshotPath ? { replaySnapshotPath } : {}),
       publicUrl: smoke.publicUrl,
       healthUrl: smoke.healthUrl,
       authority,
     });
-    return { record, recordPath: await writeNixosSharedHostDeployRecord(opts.recordsRoot, record) };
+    return {
+      record,
+      recordPath: await writeNixosSharedHostDeployRecord(opts.recordsRoot, record),
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const failedStep = failedStepFromError(error);
@@ -223,20 +221,21 @@ export async function runNixosSharedHostStaticDeploy(opts: {
       operationKind,
       runClassification: operationKind,
       finalOutcome: finalOutcomeForFailedStep(failedStep),
-      ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
-      ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
-      ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
-      ...artifactOutcomeFields({
+      ...staticDeployRecordFields({
+        deployBatchId: opts.deployBatchId,
+        parentRunId: opts.parentRunId,
+        releaseLineageId: opts.releaseLineageId,
         artifactIdentity: opts.compositeArtifactIdentity || opts.artifact?.identity,
         artifact: opts.artifact,
         artifactLineageId: opts.artifactLineageId,
+        admittedContext: opts.admittedContext,
+        provisionerPlan: opts.provisionerPlan,
+        deploymentMetadataFingerprint,
+        replaySnapshotPath,
       }),
-      ...(opts.admittedContext ? { admittedContext: opts.admittedContext } : {}),
       ...(componentResults ? { componentResults } : {}),
       failedStep,
       error: message,
-      ...(deploymentMetadataFingerprint ? { deploymentMetadataFingerprint } : {}),
-      ...(replaySnapshotPath ? { replaySnapshotPath } : {}),
       authority,
     });
     const recordPath = await writeNixosSharedHostDeployRecord(opts.recordsRoot, record);

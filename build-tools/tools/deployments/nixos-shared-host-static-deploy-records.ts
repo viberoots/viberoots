@@ -1,5 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
+import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
+import type { NixosSharedHostDeployment } from "./contract.ts";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
+import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
+import { writeNixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
 
 export function artifactOutcomeFields(opts: {
   artifactIdentity?: string;
@@ -18,4 +23,61 @@ export function artifactOutcomeFields(opts: {
       ? { artifactLineageId: opts.artifactLineageId || opts.artifactIdentity }
       : {}),
   };
+}
+
+export function staticDeployRecordFields(opts: {
+  deployBatchId?: string;
+  parentRunId?: string;
+  releaseLineageId?: string;
+  artifactIdentity?: string;
+  artifact?: NixosSharedHostAdmittedArtifact;
+  artifactLineageId?: string;
+  admittedContext?: NixosSharedHostAdmittedContext;
+  provisionerPlan?: NixosSharedHostProvisionerPlanRef;
+  deploymentMetadataFingerprint?: string;
+  replaySnapshotPath?: string;
+}) {
+  return {
+    ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
+    ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
+    ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
+    ...artifactOutcomeFields(opts),
+    ...(opts.admittedContext ? { admittedContext: opts.admittedContext } : {}),
+    ...(opts.provisionerPlan ? { provisionerPlan: opts.provisionerPlan } : {}),
+    ...(opts.deploymentMetadataFingerprint
+      ? { deploymentMetadataFingerprint: opts.deploymentMetadataFingerprint }
+      : {}),
+    ...(opts.replaySnapshotPath ? { replaySnapshotPath: opts.replaySnapshotPath } : {}),
+  };
+}
+
+export async function captureStaticDeployReplaySnapshot(opts: {
+  recordsRoot: string;
+  deployRunId: string;
+  deployment: NixosSharedHostDeployment;
+  artifact?: NixosSharedHostAdmittedArtifact;
+  componentArtifacts: NixosSharedHostResolvedComponentArtifact[];
+  compositeArtifactIdentity?: string;
+  admittedContext: NixosSharedHostAdmittedContext;
+  platformState: unknown;
+  hostConfig: unknown;
+  provisionerPlan?: NixosSharedHostProvisionerPlanRef;
+  controlPlaneExecutionSnapshotPath: string;
+}) {
+  if (!opts.artifact && opts.componentArtifacts.length === 0) return {};
+  return await writeNixosSharedHostReplaySnapshot({
+    recordsRoot: opts.recordsRoot,
+    deployRunId: opts.deployRunId,
+    deployment: opts.deployment,
+    ...(opts.artifact ? { artifact: opts.artifact } : {}),
+    ...(opts.componentArtifacts.length > 0 ? { componentArtifacts: opts.componentArtifacts } : {}),
+    ...(opts.compositeArtifactIdentity
+      ? { compositeArtifactIdentity: opts.compositeArtifactIdentity }
+      : {}),
+    admittedContext: opts.admittedContext,
+    platformState: opts.platformState,
+    hostConfig: opts.hostConfig,
+    ...(opts.provisionerPlan ? { provisionerPlan: opts.provisionerPlan } : {}),
+    controlPlaneExecutionSnapshotPath: opts.controlPlaneExecutionSnapshotPath,
+  });
 }

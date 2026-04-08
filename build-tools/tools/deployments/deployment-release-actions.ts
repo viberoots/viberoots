@@ -37,6 +37,7 @@ export const NIXOS_SHARED_HOST_RELEASE_ACTION_TYPES = new Set([
   "schema_migration",
   "post_publish_verification",
 ]);
+const DESTRUCTIVE_RELEASE_ACTION_TYPES = new Set(["schema_migration"]);
 
 export type DeploymentReleaseActionReplayContext =
   (typeof DEPLOYMENT_RELEASE_ACTION_REPLAY_CONTEXTS)[number];
@@ -197,4 +198,10 @@ export function extractDeploymentReleaseActions(nodes: GraphNode[]): {
 
 export function releaseActionRefs(actions: DeploymentReleaseAction[]): string[] {
   return actions.map((action) => action.ref).sort((a, b) => a.localeCompare(b));
+}
+
+export function destructiveReleaseActions(
+  actions: DeploymentReleaseAction[],
+): DeploymentReleaseAction[] {
+  return actions.filter((action) => DESTRUCTIVE_RELEASE_ACTION_TYPES.has(action.type));
 }

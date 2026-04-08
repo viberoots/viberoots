@@ -26,6 +26,7 @@ export async function runNixosSharedHostExplicitRemoval(opts: {
   deployBatchId?: string;
   hostConfigPath?: string;
   authority?: NixosSharedHostControlPlaneWorkerAuthority;
+  provisionerPlan?: import("./nixos-shared-host-provisioner-plan.ts").NixosSharedHostProvisionerPlanRef;
 }): Promise<{ record: NixosSharedHostDeployRecord; recordPath: string }> {
   const authority = requireNixosSharedHostControlPlaneAuthority(opts.deployment, opts.authority);
   const runId = createNixosSharedHostDeployRunId("remove");
@@ -41,6 +42,7 @@ export async function runNixosSharedHostExplicitRemoval(opts: {
       runClassification: "explicit_removal",
       finalOutcome: "succeeded",
       ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
+      ...(opts.provisionerPlan ? { provisionerPlan: opts.provisionerPlan } : {}),
       authority,
     });
     return { record, recordPath: await writeNixosSharedHostDeployRecord(opts.recordsRoot, record) };
@@ -51,6 +53,7 @@ export async function runNixosSharedHostExplicitRemoval(opts: {
       runClassification: "explicit_removal",
       finalOutcome: "provision_failed",
       ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
+      ...(opts.provisionerPlan ? { provisionerPlan: opts.provisionerPlan } : {}),
       failedStep: "provision",
       error: message,
       authority,

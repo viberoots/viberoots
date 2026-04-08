@@ -3,6 +3,7 @@ import type { DeploymentTarget } from "./contract.ts";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
 import {
   NIXOS_SHARED_HOST_RELEASE_ACTION_TYPES,
+  destructiveReleaseActions,
   releaseActionRefs,
 } from "./deployment-release-actions.ts";
 import type {
@@ -100,6 +101,13 @@ export function requireBuiltInExecutionBoundary(deployment: DeploymentTarget) {
         `protected/shared admission rejects non-built-in release_action ${action.ref}`,
       );
     }
+  }
+  const destructiveActions = destructiveReleaseActions(deployment.releaseActions);
+  if (destructiveActions.length > 0) {
+    throw new DeploymentAdmissionError(
+      "no_longer_admitted",
+      `protected/shared routine deploy rejects destructive built-in release_actions: ${releaseActionRefs(destructiveActions).join(", ")}`,
+    );
   }
 }
 

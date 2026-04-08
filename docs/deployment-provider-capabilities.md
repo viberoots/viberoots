@@ -161,6 +161,13 @@ Normative-source note:
 - reviewed built-in provisioner reference for the initial slice:
   - `nixos-shared-host-manifest`
 - meaning:
+  - shared control-plane `deploy` and `explicit_removal` runs generate one reviewed provisioner
+    plan artifact from the frozen execution snapshot before the first mutating provider step
+  - the plan artifact fingerprint is bound into protected/shared admission evidence so approval and
+    later revalidation fail closed on plan drift
+  - routine `deploy` remains non-destructive by default; if the reviewed plan would delete or
+    replace an owned live target identity, the routine path is rejected and operators must use the
+    separate destructive workflow instead of piggybacking on ordinary deploy authority
   - reviewed deploy/control-plane workflows maintain one authoritative cumulative platform-state artifact for the selected `nixos-shared-host` target
   - scoped apply may create or update only the named deployment entries in that platform state
   - authoritative full reconcile may replace the full platform state
@@ -175,8 +182,10 @@ Normative-source note:
 - protected/shared built-in `release_actions`:
   - supported only for the reviewed built-in types:
     - `cache_warmup`
-    - `schema_migration`
     - `post_publish_verification`
+  - `schema_migration` remains a reviewed built-in action type, but it is destructive and therefore
+    rejected on the ordinary protected/shared deploy path until a separate destructive-intent
+    workflow is used
   - replay follows the recorded per-action replay policy for `retry`, `rollback`, and `promotion`
   - package-local executable hooks remain out of policy
 

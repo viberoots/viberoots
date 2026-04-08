@@ -49,6 +49,12 @@ test("nixos-shared-host durable records persist canonical provider-target identi
       lockScope: "nixos-shared-host:shared-dev:demoapp",
       executionSnapshotPath: "/tmp/control-plane/snapshots/cp-123.json",
     },
+    provisionerPlan: {
+      artifactPath: "/tmp/control-plane/provisioner-plans/cp-123.json",
+      fingerprint: "sha256:plan-123",
+      mutationClass: "non_destructive",
+      destructiveReasons: [],
+    },
   });
   assert.equal(record.schemaVersion, "deploy-record@2026-04-08");
   assert.equal(record.operationKind, "deploy");
@@ -82,6 +88,11 @@ test("nixos-shared-host durable records persist canonical provider-target identi
   assert.equal(record.replaySnapshotPath, "/tmp/records/replay/deploy-123/snapshot.json");
   assert.equal(record.publisherType, "nixos-shared-host-static-webapp");
   assert.equal(record.smokeRunnerType, "nixos-shared-host-static-webapp-smoke");
+  assert.equal(
+    record.provisionerPlan?.artifactPath,
+    "/tmp/control-plane/provisioner-plans/cp-123.json",
+  );
+  assert.equal(record.provisionerPlan?.fingerprint, "sha256:plan-123");
 });
 
 test("nixos-shared-host retry records preserve parent-run and artifact-lineage fields", () => {

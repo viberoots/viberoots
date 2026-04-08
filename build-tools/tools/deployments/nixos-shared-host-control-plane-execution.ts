@@ -59,6 +59,7 @@ export async function runNixosSharedHostControlPlaneWorker(opts: {
         ...(snapshot.recordedReleaseActions
           ? { releaseActions: snapshot.recordedReleaseActions }
           : {}),
+        ...(snapshot.provisionerPlan ? { provisionerPlan: snapshot.provisionerPlan } : {}),
         ...(snapshot.paths.hostConfigPath ? { hostConfigPath: snapshot.paths.hostConfigPath } : {}),
         ...(snapshot.smokeConnectOverride
           ? { smokeConnectOverride: snapshot.smokeConnectOverride }
@@ -71,6 +72,7 @@ export async function runNixosSharedHostControlPlaneWorker(opts: {
         hostRoot: snapshot.paths.hostRoot,
         recordsRoot: snapshot.paths.recordsRoot,
         ...(snapshot.deployBatchId ? { deployBatchId: snapshot.deployBatchId } : {}),
+        ...(snapshot.provisionerPlan ? { provisionerPlan: snapshot.provisionerPlan } : {}),
         ...(snapshot.paths.hostConfigPath ? { hostConfigPath: snapshot.paths.hostConfigPath } : {}),
         authority,
       });

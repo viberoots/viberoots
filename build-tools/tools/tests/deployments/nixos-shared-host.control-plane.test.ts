@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
+import { createNixosSharedHostPlatformState } from "../../deployments/nixos-shared-host-platform.ts";
 import { resolveNixosSharedHostReplaySelection } from "../../deployments/nixos-shared-host-replay.ts";
 import { runNixosSharedHostStaticDeploy } from "../../deployments/nixos-shared-host-static-deploy.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
@@ -63,6 +64,12 @@ test("shared control plane admits shared_nonprod deploys and executes from the f
       assert.equal(snapshot.deploymentLabel, "//projects/deployments/demoapp-dev:deploy");
       assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:demoapp");
       assert.equal(snapshot.action.publishInput.kind, "exact-artifact");
+      assert.equal(snapshot.provisionerPlan?.mutationClass, "non_destructive");
+      assert.ok(snapshot.provisionerPlan?.artifactPath);
+      assert.equal(
+        snapshot.admittedContext.policyEvaluation.binding.provisionerPlanFingerprint,
+        snapshot.provisionerPlan?.fingerprint,
+      );
       assert.equal(snapshot.admittedContext.source.sourceRef, "env/pleomino/dev");
       assert.equal(snapshot.admittedContext.targetEnvironment.targetRef, "env/pleomino/dev");
       assert.equal(
@@ -76,6 +83,10 @@ test("shared control plane admits shared_nonprod deploys and executes from the f
       assert.equal(result.record.providerTargetIdentity, "nixos-shared-host:default:demoapp");
       assert.equal(result.record.admittedContext.source.mode, "stage_branch_head");
       assert.equal(
+        result.record.provisionerPlan?.fingerprint,
+        snapshot.provisionerPlan?.fingerprint,
+      );
+      assert.equal(
         result.record.admittedContext.policyEvaluation.binding.targetIdentity,
         result.lockScope,
       );
@@ -85,6 +96,45 @@ test("shared control plane admits shared_nonprod deploys and executes from the f
     } finally {
       await server.close();
     }
+  });
+});
+
+test("shared control plane rejects routine deploys whose provisioner plan would replace a live target identity", async () => {
+  await runInTemp("nixos-shared-host-control-plane-destructive-plan", async (tmp, $) => {
+    const existing = nixosSharedHostDeploymentFixture({
+      runtime: { appName: "oldapp", containerPort: 3000, healthPath: "/healthz" },
+    });
+    const deployment = nixosSharedHostDeploymentFixture({
+      runtime: { appName: "demoapp", containerPort: 3000, healthPath: "/healthz" },
+    });
+    const artifactDir = path.join(tmp, "artifact");
+    const statePath = path.join(tmp, "platform-state.json");
+    await writeArtifact(artifactDir);
+    await fsp.writeFile(
+      statePath,
+      JSON.stringify(createNixosSharedHostPlatformState([existing]), null, 2) + "\n",
+      "utf8",
+    );
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await assert.rejects(
+      submitNixosSharedHostControlPlaneRun({
+        workspaceRoot: tmp,
+        operationKind: "deploy",
+        deployment,
+        artifactDir,
+        paths: {
+          statePath,
+          hostRoot: path.join(tmp, "host"),
+          recordsRoot: path.join(tmp, "records"),
+        },
+      }),
+      (error: any) => {
+        assert.equal(error.submission.admission.decision, "rejected");
+        assert.equal(error.submission.rejectionCode, "no_longer_admitted");
+        assert.match(error.message, /destructive provisioner plan/);
+        return true;
+      },
+    );
   });
 });
 

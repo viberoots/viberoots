@@ -11,6 +11,7 @@ import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
+import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
 import {
   nixosSharedHostPublishInputArtifactIdentity,
   type NixosSharedHostPublishInput,
@@ -32,6 +33,7 @@ export type NixosSharedHostReplaySnapshot = {
   componentResults?: NixosSharedHostComponentResult[];
   admittedContext: NixosSharedHostAdmittedContext;
   deployment: NixosSharedHostDeployment;
+  provisionerPlan?: NixosSharedHostProvisionerPlanRef;
   platformStateSnapshotPath: string;
   hostConfigSnapshotPath: string;
   controlPlaneExecutionSnapshotPath?: string;
@@ -102,6 +104,7 @@ export async function writeNixosSharedHostReplaySnapshot(opts: {
   admittedContext: NixosSharedHostAdmittedContext;
   platformState: unknown;
   hostConfig: unknown;
+  provisionerPlan?: NixosSharedHostProvisionerPlanRef;
   controlPlaneExecutionSnapshotPath?: string;
 }) {
   const replaySnapshotPath = replaySnapshotPathFor(opts.recordsRoot, opts.deployRunId);
@@ -127,6 +130,7 @@ export async function writeNixosSharedHostReplaySnapshot(opts: {
     publishInput,
     admittedContext: opts.admittedContext,
     deployment: opts.deployment,
+    ...(opts.provisionerPlan ? { provisionerPlan: opts.provisionerPlan } : {}),
     platformStateSnapshotPath,
     hostConfigSnapshotPath,
     ...(opts.controlPlaneExecutionSnapshotPath
