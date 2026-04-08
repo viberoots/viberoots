@@ -3,6 +3,7 @@ import path from "node:path";
 import { requireNixosSharedHostAdmittedArtifactPath } from "./nixos-shared-host-artifacts.ts";
 import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
+import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention.ts";
 import {
   liveRollbackCompatibilityErrors,
   rollbackSourceEligibilityErrors,
@@ -54,7 +55,26 @@ export async function resolveNixosSharedHostReplaySource(opts: {
     ? path.resolve(opts.recordPath)
     : deployRecordPathFor(String(opts.recordsRoot || ""), String(opts.deployRunId || ""));
   const record = await readNixosSharedHostDeployRecord(recordPath);
-  const replaySnapshot = await readNixosSharedHostReplaySnapshot(requireReplaySnapshotPath(record));
+  const replaySnapshotPath = requireReplaySnapshotPath(record);
+  const replaySnapshot = await readNixosSharedHostReplaySnapshot(replaySnapshotPath);
+  await assertProtectedSharedReplayUsable({
+    protectionClass: "shared_nonprod",
+    deployRunId: record.deployRunId,
+    recordPath,
+    replaySnapshotPath,
+    replayCreatedAt: replaySnapshot.createdAt,
+    artifacts:
+      replaySnapshot.publishInput.kind === "component-artifacts"
+        ? replaySnapshot.publishInput.components.map(({ artifact }) => artifact)
+        : [replaySnapshot.publishInput.artifact],
+    replayBundlePaths: [
+      replaySnapshot.platformStateSnapshotPath,
+      replaySnapshot.hostConfigSnapshotPath,
+      replaySnapshot.controlPlaneExecutionSnapshotPath || "",
+      replaySnapshot.provisionerPlan?.artifactPath || "",
+    ],
+    evidence: replaySnapshot.admittedContext.policyEvaluation,
+  });
   if (replaySnapshot.publishInput.kind === "component-artifacts") {
     const componentArtifactDirs = Object.fromEntries(
       await Promise.all(

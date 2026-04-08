@@ -4349,7 +4349,7 @@ Artifact retention policy:
 - for protected/shared `promotion` reuse flows, the system should replay only the source-run artifact and compatibility evidence from the reused run, while using the target deployment's own admitted execution snapshot for target-environment mutation
 - those flows should fail explicitly if the recorded snapshot is missing or if required current invariants no longer match that recorded snapshot
 - minimum operator-facing retention defaults should be:
-  - `production_facing`: 90 days
+  - `production_facing`: 180 days
   - `shared_nonprod`: 30 days
 - minimum operator-facing audit-retention defaults should be:
   - `production_facing`: 1 year for authoritative deployment records, approval evidence, migration or alias exception records, and break-glass emergency evidence
@@ -4364,8 +4364,8 @@ Control-plane resilience policy:
 - the authoritative deployment backend must support durable backups and regularly tested restore procedures
 - the production control-plane topology must avoid one unrecoverable single storage or API instance as the sole practical path for routine protected/shared mutation
 - target control-plane recovery objectives must be:
-  - `production_facing`: `RPO <= 5 minutes`, `RTO <= 30 minutes`
-  - `shared_nonprod`: `RPO <= 15 minutes`, `RTO <= 4 hours`
+  - `production_facing`: `RPO <= 15 minutes`, `RTO <= 1 hour`, minimum restore-test cadence `monthly`
+  - `shared_nonprod`: `RPO <= 4 hours`, `RTO <= 8 hours`, minimum restore-test cadence `quarterly`
 - those objectives are operator-facing policy commitments for the deployment authority itself; implementation topology may evolve as long as it continues to satisfy them
 - failover and restore posture may evolve by implementation, but the operator-facing resilience commitments must remain explicit and reviewable
 

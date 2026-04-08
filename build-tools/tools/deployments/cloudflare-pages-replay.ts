@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
+import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
 import { requireAdmittedStaticWebappArtifactPath } from "./static-webapp-artifacts.ts";
@@ -112,7 +113,23 @@ export async function resolveCloudflarePagesReplaySource(opts: {
     ? path.resolve(opts.recordPath)
     : deployRecordPathFor(String(opts.recordsRoot || ""), String(opts.deployRunId || ""));
   const record = await readCloudflarePagesDeployRecord(recordPath);
-  const replaySnapshot = await readCloudflarePagesReplaySnapshot(requireReplaySnapshotPath(record));
+  const replaySnapshotPath = requireReplaySnapshotPath(record);
+  const replaySnapshot = await readCloudflarePagesReplaySnapshot(replaySnapshotPath);
+  await assertProtectedSharedReplayUsable({
+    protectionClass: replaySnapshot.deployment.protectionClass as
+      | "shared_nonprod"
+      | "production_facing",
+    deployRunId: record.deployRunId,
+    recordPath,
+    replaySnapshotPath,
+    replayCreatedAt: replaySnapshot.createdAt,
+    artifacts: [replaySnapshot.artifact],
+    replayBundlePaths: [
+      replaySnapshot.providerConfigSnapshotPath,
+      replaySnapshot.controlPlaneExecutionSnapshotPath || "",
+    ],
+    evidence: replaySnapshot.admittedContext.policyEvaluation,
+  });
   const artifactDir = await requireAdmittedStaticWebappArtifactPath(replaySnapshot.artifact);
   return { record, recordPath, replaySnapshot, artifactDir };
 }
