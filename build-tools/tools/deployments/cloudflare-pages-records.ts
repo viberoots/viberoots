@@ -10,6 +10,7 @@ import type {
   CloudflarePagesPreviewIdentitySelector,
 } from "./cloudflare-pages-preview.ts";
 import { CLOUDFLARE_PAGES_PROVIDER, type CloudflarePagesDeployment } from "./contract.ts";
+import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
 
 export const CLOUDFLARE_PAGES_RECORD_SCHEMA = "deploy-record@2026-04-04";
 
@@ -60,6 +61,7 @@ export type CloudflarePagesDeployRecord = {
   publicUrl?: string;
   providerReleaseId?: string;
   error?: string;
+  errorFingerprint?: string;
 };
 
 type RecordOutcome = {
@@ -97,6 +99,7 @@ export function createCloudflarePagesDeployRecord(
   deployment: CloudflarePagesDeployment,
   outcome: RecordOutcome,
 ): CloudflarePagesDeployRecord {
+  const operatorError = operatorErrorFields(outcome.error);
   return {
     schemaVersion: CLOUDFLARE_PAGES_RECORD_SCHEMA,
     deployRunId: outcome.deployRunId,
@@ -162,7 +165,7 @@ export function createCloudflarePagesDeployRecord(
     ...(outcome.replaySnapshotPath ? { replaySnapshotPath: outcome.replaySnapshotPath } : {}),
     ...(outcome.publicUrl ? { publicUrl: outcome.publicUrl } : {}),
     ...(outcome.providerReleaseId ? { providerReleaseId: outcome.providerReleaseId } : {}),
-    ...(outcome.error ? { error: outcome.error } : {}),
+    ...operatorError,
   };
 }
 

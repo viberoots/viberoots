@@ -12,6 +12,7 @@ import {
   type NixosSharedHostProviderTarget,
 } from "./contract.ts";
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
+import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
 
 export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-08";
@@ -88,6 +89,7 @@ export type NixosSharedHostDeployRecord = {
   publicUrl?: string;
   healthUrl?: string;
   error?: string;
+  errorFingerprint?: string;
 };
 
 type NixosSharedHostRecordOutcome = {
@@ -122,6 +124,7 @@ export function createNixosSharedHostDeployRecord(
   deployment: NixosSharedHostDeployment,
   outcome: NixosSharedHostRecordOutcome,
 ): NixosSharedHostDeployRecord {
+  const operatorError = operatorErrorFields(outcome.error);
   return {
     schemaVersion: NIXOS_SHARED_HOST_RECORD_SCHEMA,
     deployRunId: outcome.deployRunId,
@@ -199,7 +202,7 @@ export function createNixosSharedHostDeployRecord(
     ...(outcome.replaySnapshotPath ? { replaySnapshotPath: outcome.replaySnapshotPath } : {}),
     ...(outcome.publicUrl ? { publicUrl: outcome.publicUrl } : {}),
     ...(outcome.healthUrl ? { healthUrl: outcome.healthUrl } : {}),
-    ...(outcome.error ? { error: outcome.error } : {}),
+    ...operatorError,
   };
 }
 
