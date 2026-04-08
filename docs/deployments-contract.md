@@ -31,6 +31,7 @@ design has been explicitly updated first.
 - For protected/shared mutation, `--provision-only` must still bind to one admitted source revision and frozen execution snapshot, even when no artifact is required.
 - For `shared_nonprod` and `production_facing`, immutable-reuse publish paths must resolve to one authoritative admitted source run and its frozen execution snapshot.
 - Protected/shared rollback requires an explicit `--source-run-id` selecting the prior admitted run to reuse.
+- For `cloudflare-pages`, same-deployment rollback additionally requires `--publish-only` plus `--rollback`, and the selected source run must be a successful normal live-target run for the same deployment.
 - Protected/shared preview publish and preview cleanup require an explicit `--source-run-id` selecting the admitted run lineage the preview is derived from.
 - Same-deployment source-run reuse with `publish_mode = normal` is classified by operator intent: delayed first publish remains `deploy`, re-publication is `retry`, and explicit restoration uses `--rollback`.
 - Same-deployment delayed first publish of an already admitted artifact or admitted run lineage remains `operation_kind = deploy`; same-deployment re-publication of an earlier attempted normal run is `retry`.
@@ -69,6 +70,7 @@ design has been explicitly updated first.
 - `retry` is branch-independent replay of an earlier admitted run for the same deployment by default; later branch movement does not invalidate it unless the admission policy explicitly sets `retry_branch_policy = branch_coupled`.
 - Supported protected/shared artifact-reuse paths must retain retrievable immutable artifacts for at least the documented minimum retention window.
 - Protected/shared authoritative deployment records, approval evidence, migration or alias exception records, and break-glass emergency evidence must remain retained for at least the documented minimum audit-retention window.
+- `retire-target` and `migrate-target` are separate operator workflows, not aliases for normal `deploy` or provider-local `--remove`.
 - Protected/shared infra-affecting provisioner runs must surface a reviewed plan or diff artifact before routine mutation, unless an explicitly reviewed higher-bar exception path says otherwise.
 - The authoritative protected/shared control plane must have explicit reviewed backup, restore-test, and recovery objectives; break-glass is an emergency exception path, not the normal resilience model for routine outages.
 - Minimum reviewed control-plane resilience objectives are:
@@ -100,6 +102,7 @@ design has been explicitly updated first.
 - `operation_kind` uses the canonical set: `deploy`, `retry`, `promotion`, `rollback`, `preview_cleanup`.
 - `publish_mode` is a separate field from `operation_kind`.
 - `preview_cleanup` is a destructive housekeeping run against preview resources; it should preserve preview context in records rather than being treated as a normal publish.
+- Retire/migrate-target records must preserve old target identity, new target identity when applicable, the reviewed exception object, and the resulting ownership state.
 - Final outcome is a separate field from both operation kind and lifecycle state.
 - `pending_approval` is a first-class lifecycle state for accepted protected/shared runs awaiting required human approval.
 - `termination_reason` uses the canonical set `cancelled`, `superseded`, `no_longer_admitted`, `lock_timeout`, or `null` when a canonical terminal outcome exists.

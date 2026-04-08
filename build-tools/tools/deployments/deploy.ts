@@ -11,10 +11,12 @@ import {
   parseComponentArtifactDirs,
 } from "./deployment-component-artifact-dirs.ts";
 import { resolveDeploymentAdmissionEvidence } from "./deployment-admission-cli.ts";
+import { resolveSmokeConnectOverride } from "./deployment-cli-smoke.ts";
 import { runFromChangesCli } from "./deployment-from-changes-cli.ts";
 import { runCloudflarePagesCli } from "./cloudflare-pages-cli.ts";
 import { resolveDeploymentFromTarget } from "./deployment-query.ts";
 import { isNixosSharedHostDeployment, type DeploymentTarget } from "./contract.ts";
+import { submitCloudflarePagesTargetTransition } from "./cloudflare-pages-target-transition.ts";
 import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
 import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
 import { submitNixosSharedHostPublishOnlyRun } from "./nixos-shared-host-publish-only.ts";
@@ -72,19 +74,6 @@ async function resolveComponentArtifactDirs(
     : await buildArtifactDirsByComponentId(workspaceRoot, deployment);
 }
 
-function resolveSmokeConnectOverride() {
-  const smokeConnectHost = getFlagStr("smoke-connect-host", "").trim();
-  const smokeConnectPort = Number(getFlagStr("smoke-connect-port", "").trim() || 0);
-  const smokeConnectProtocol = getFlagStr("smoke-connect-protocol", "https:").trim();
-  if (!smokeConnectHost || smokeConnectPort <= 0) return undefined;
-  return {
-    protocol: smokeConnectProtocol === "http:" ? ("http:" as const) : ("https:" as const),
-    hostname: smokeConnectHost,
-    port: smokeConnectPort,
-    rejectUnauthorized: false,
-  };
-}
-
 function printJson(value: unknown) {
   console.log(JSON.stringify(value, null, 2));
 }
@@ -101,6 +90,9 @@ async function main() {
   const preview = getFlagBool("preview");
   const previewCleanup = getFlagBool("preview-cleanup");
   const rollback = getFlagBool("rollback");
+  const retireTarget = getFlagBool("retire-target");
+  const migrateTarget = getFlagBool("migrate-target");
+  const targetExceptionRef = getFlagStr("target-exception-ref", "").trim();
   const cleanupReason = getFlagStr("cleanup-reason", "manual_cleanup").trim();
   const sourceRunId = getFlagStr("source-run-id", "").trim();
   const artifactDirFlag = getFlagStr("artifact-dir", "").trim();
@@ -109,23 +101,51 @@ async function main() {
   if (preview && previewCleanup) {
     throw new Error("--preview and --preview-cleanup are mutually exclusive");
   }
+  if (retireTarget && migrateTarget) {
+    throw new Error("--retire-target and --migrate-target are mutually exclusive");
+  }
   if (preview && (publishOnly || remove || rollback)) {
     throw new Error("--preview cannot be combined with --publish-only, --remove, or --rollback");
   }
-  if (previewCleanup && (publishOnly || remove || rollback)) {
+  if (previewCleanup && (publishOnly || remove || rollback))
     throw new Error(
       "--preview-cleanup cannot be combined with --publish-only, --remove, or --rollback",
     );
-  }
+  if ((retireTarget || migrateTarget) && (publishOnly || remove || preview || previewCleanup))
+    throw new Error(
+      "--retire-target/--migrate-target cannot be combined with deploy, publish-only, remove, or preview flags",
+    );
   if (!isNixosSharedHostDeployment(deployment)) {
     if (remove) throw new Error("cloudflare-pages deploys do not support --remove yet");
-    if (rollback) throw new Error("cloudflare-pages deploys do not support --rollback yet");
+    if (rollback && !publishOnly)
+      throw new Error("cloudflare-pages rollback requires --publish-only");
     const recordsRoot = path.resolve(
       getFlagStr(
         "records-root",
         path.join(workspaceRoot, ".local", "deployments", "cloudflare-pages", "records"),
       ),
     );
+    if (retireTarget || migrateTarget) {
+      if (!targetExceptionRef)
+        throw new Error("--retire-target/--migrate-target requires --target-exception-ref");
+      const result = await submitCloudflarePagesTargetTransition({
+        deployment,
+        recordsRoot,
+        operationKind: retireTarget ? "retire_target" : "migrate_target",
+        targetExceptionRef,
+        ...(admissionEvidence ? { admissionEvidence } : {}),
+      });
+      printJson({
+        runId: result.record.deployRunId,
+        deployRunId: result.record.deployRunId,
+        operationKind: result.record.operationKind,
+        runClassification: result.record.runClassification,
+        finalOutcome: result.record.finalOutcome,
+        recordPath: result.recordPath,
+        controlPlane: result.record.controlPlane,
+      });
+      return;
+    }
     const resolvedArtifactDir =
       publishOnly || preview || previewCleanup
         ? undefined
@@ -137,6 +157,7 @@ async function main() {
       resolvedArtifactDir,
       recordsRoot,
       publishOnly,
+      rollback,
       preview,
       previewCleanup,
       sourceRunId,
@@ -147,16 +168,14 @@ async function main() {
     printJson(summarizeDeploymentResult(result));
     return;
   }
-  if (preview || previewCleanup) {
+  if (preview || previewCleanup)
     throw new Error("nixos-shared-host deploys do not support --preview or --preview-cleanup");
-  }
   if (await maybeRunNixosSharedHostRemoteProfile({ workspaceRoot, deployment })) return;
   if (rollback && !publishOnly) throw new Error("--rollback requires --publish-only");
-  if (remove && (publishOnly || rollback || sourceRunId)) {
+  if (remove && (publishOnly || rollback || sourceRunId))
     throw new Error(
       "--remove cannot be combined with --publish-only, --rollback, or --source-run-id",
     );
-  }
   const hostRoot = path.resolve(
     getFlagStr("host-root", path.join(workspaceRoot, ".local", "deployments", "nixos-shared-host")),
   );
@@ -179,18 +198,16 @@ async function main() {
       })
     : await (async () => {
         if (publishOnly) {
-          if (!sourceRunId) {
+          if (!sourceRunId)
             throw new Error(
               rollback
                 ? "shared rollback requires --source-run-id"
                 : "shared --publish-only requires --source-run-id to select an admitted run",
             );
-          }
-          if (artifactDirFlag) {
+          if (artifactDirFlag)
             throw new Error(
               "shared --publish-only must not use --artifact-dir; replay the admitted exact artifact with --source-run-id",
             );
-          }
           return await submitNixosSharedHostPublishOnlyRun({
             workspaceRoot,
             deployment,
@@ -201,11 +218,10 @@ async function main() {
             ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
           });
         }
-        if (sourceRunId) {
+        if (sourceRunId)
           throw new Error(
             "nixos-shared-host --source-run-id without --publish-only is not supported; rebuild-per-stage promotion is currently reviewed only for cloudflare-pages targets",
           );
-        }
         const componentArtifactDirs = isMultiComponentNixosSharedHostDeployment(deployment)
           ? await resolveComponentArtifactDirs(workspaceRoot, deployment)
           : undefined;

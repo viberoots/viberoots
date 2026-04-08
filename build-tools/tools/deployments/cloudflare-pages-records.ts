@@ -13,7 +13,7 @@ import { CLOUDFLARE_PAGES_PROVIDER, type CloudflarePagesDeployment } from "./con
 
 export const CLOUDFLARE_PAGES_RECORD_SCHEMA = "deploy-record@2026-04-04";
 
-export type CloudflarePagesOperationKind = "deploy" | "promotion" | "preview_cleanup";
+export type CloudflarePagesOperationKind = "deploy" | "promotion" | "rollback" | "preview_cleanup";
 export type CloudflarePagesRunClassification = CloudflarePagesOperationKind;
 
 export type CloudflarePagesDeployRecord = {

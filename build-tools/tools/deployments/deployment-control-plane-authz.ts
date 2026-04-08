@@ -67,7 +67,10 @@ function authorize(
 }
 
 function requiredSubmitRoles(operationKind: string): DeploymentControlPlaneRole[] {
-  return operationKind === "explicit_removal" || operationKind === "preview_cleanup"
+  return operationKind === "explicit_removal" ||
+    operationKind === "preview_cleanup" ||
+    operationKind === "retire_target" ||
+    operationKind === "migrate_target"
     ? ["operator", "break_glass"]
     : ["submitter", "break_glass"];
 }

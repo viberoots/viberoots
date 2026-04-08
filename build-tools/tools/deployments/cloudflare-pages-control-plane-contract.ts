@@ -22,7 +22,11 @@ export const CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMISSION_SCHEMA =
 
 export type CloudflarePagesPublishMode = "normal" | "preview";
 export type CloudflarePagesPublishBehavior = "deploy" | "publish-only";
-export type CloudflarePagesControlPlaneOperationKind = "deploy" | "promotion" | "preview_cleanup";
+export type CloudflarePagesControlPlaneOperationKind =
+  | "deploy"
+  | "promotion"
+  | "rollback"
+  | "preview_cleanup";
 
 export type CloudflarePagesSmokeConnectOverride = {
   protocol: "http:" | "https:";

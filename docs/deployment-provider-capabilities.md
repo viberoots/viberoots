@@ -266,6 +266,19 @@ Normative-source note:
 
 - publish retry may be allowed only for clearly transient network/provider failures
 - if the provider cannot prove idempotent retry semantics after an ambiguous result, the adapter must reconcile remote state before retrying
+- same-deployment rollback is supported only as exact-artifact reuse through `deploy <deployment> --publish-only --rollback --source-run-id <deploy-run-id>`
+- rollback source selection is limited to prior successful normal live-target runs for the same deployment
+- rollback fails closed when the retained exact artifact is unavailable or when the selected source run refers to preview rather than the normal live target
+
+### Target Transition Support
+
+- reviewed retire/migrate-target support:
+  - supported only through the separate operator workflows `deploy <deployment> --retire-target --target-exception-ref <label>` and `deploy <deployment> --migrate-target --target-exception-ref <label>`
+- reviewed exception requirements:
+  - the selected target exception must be active, must carry the reviewed shared lock scope, and must not be superseded
+  - migration exceptions must define `new_provider_target_identity`
+- audit guarantees:
+  - records preserve old target identity, new target identity when applicable, the selected exception object, and the resulting ownership state
 
 ### Partial Publish Observability
 

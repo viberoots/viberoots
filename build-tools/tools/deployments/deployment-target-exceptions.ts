@@ -72,6 +72,11 @@ export function extractDeploymentTargetExceptions(nodes: GraphNode[]): {
         exceptionError(ref, `unsupported exception_kind "${exception.exceptionKind || "<empty>"}"`),
       );
     }
+    if (exception.exceptionKind === "migration" && !exception.newProviderTargetIdentity) {
+      errors.push(
+        exceptionError(ref, "migration target exception must define new_provider_target_identity"),
+      );
+    }
     if (exception.affectedDeploymentIds.length === 0) {
       errors.push(exceptionError(ref, "target exception must define affected_deployments"));
     }

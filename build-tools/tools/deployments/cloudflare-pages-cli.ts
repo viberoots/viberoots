@@ -9,6 +9,7 @@ import {
   resolveCloudflarePagesPromotionSelection,
   submitCloudflarePagesRebuildPerStagePromotion,
 } from "./cloudflare-pages-promotion.ts";
+import { submitCloudflarePagesRollback } from "./cloudflare-pages-rollback.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 
@@ -19,6 +20,7 @@ export async function runCloudflarePagesCli(opts: {
   resolvedArtifactDir?: string;
   recordsRoot: string;
   publishOnly: boolean;
+  rollback: boolean;
   preview: boolean;
   previewCleanup: boolean;
   sourceRunId: string;
@@ -34,13 +36,27 @@ export async function runCloudflarePagesCli(opts: {
   if (opts.publishOnly) {
     if (!opts.sourceRunId) {
       throw new Error(
-        "cloudflare-pages --publish-only requires --source-run-id to select a promotion source run",
+        opts.rollback
+          ? "cloudflare-pages rollback requires --source-run-id"
+          : "cloudflare-pages --publish-only requires --source-run-id to select a promotion source run",
       );
     }
     if (opts.artifactDirFlag) {
       throw new Error(
-        "cloudflare-pages --publish-only must not use --artifact-dir; promote the admitted exact artifact with --source-run-id",
+        opts.rollback
+          ? "cloudflare-pages --publish-only --rollback must not use --artifact-dir; replay the admitted exact artifact with --source-run-id"
+          : "cloudflare-pages --publish-only must not use --artifact-dir; promote the admitted exact artifact with --source-run-id",
       );
+    }
+    if (opts.rollback) {
+      return await submitCloudflarePagesRollback({
+        workspaceRoot: opts.workspaceRoot,
+        deployment: opts.deployment,
+        recordsRoot: opts.recordsRoot,
+        sourceRunId: opts.sourceRunId,
+        ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
+        ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
+      });
     }
     const promotion = await resolveCloudflarePagesPromotionSelection({
       workspaceRoot: opts.workspaceRoot,
