@@ -5,7 +5,24 @@ import path from "node:path";
 import { sanitizeName } from "../lib/sanitize.ts";
 import { assertNoBreakGlassFreeze } from "./nixos-shared-host-break-glass-freeze.ts";
 
-type LockOwner = { pid: number; createdAt: string; lockScope: string };
+type LockOwner = {
+  pid: number;
+  createdAt: string;
+  updatedAt: string;
+  leaseExpiresAt: string;
+  lockScope: string;
+  holderId: string;
+  fencingToken: string;
+};
+
+export type ControlPlaneLockAbortReason = "cancelled" | "superseded" | "no_longer_admitted";
+
+export type AcquiredControlPlaneLock = {
+  lockScope: string;
+  fencingToken: string;
+  release: () => Promise<void>;
+  assertCurrentAuthority: () => Promise<void>;
+};
 
 function controlPlaneRoot(recordsRoot: string): string {
   return path.join(path.resolve(recordsRoot), "control-plane");
@@ -62,6 +79,37 @@ function lockDirFor(recordsRoot: string, lockScope: string): string {
   return path.join(controlPlaneRoot(recordsRoot), "locks", `${sanitizeName(lockScope)}.lock`);
 }
 
+function ownerPathFor(lockDir: string): string {
+  return path.join(lockDir, "owner.json");
+}
+
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw || !raw.trim()) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function lockLeaseMs(): number {
+  return envInt("BNX_DEPLOY_LOCK_LEASE_MS", 30_000);
+}
+
+function lockHeartbeatMs(): number {
+  return envInt("BNX_DEPLOY_LOCK_HEARTBEAT_MS", 5_000);
+}
+
+function lockPollMs(): number {
+  return envInt("BNX_DEPLOY_LOCK_POLL_MS", 1_000);
+}
+
+function lockWaitTimeoutMs(): number {
+  return envInt("BNX_DEPLOY_LOCK_WAIT_TIMEOUT_MS", 30 * 60_000);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function pidAlive(pid: number): boolean {
   if (!Number.isInteger(pid) || pid < 1) return false;
   try {
@@ -74,44 +122,120 @@ function pidAlive(pid: number): boolean {
 
 async function readLockOwner(lockDir: string): Promise<LockOwner | null> {
   try {
-    return await readControlPlaneJson<LockOwner>(path.join(lockDir, "owner.json"));
+    return await readControlPlaneJson<LockOwner>(ownerPathFor(lockDir));
   } catch {
     return null;
   }
 }
 
+function leaseExpired(owner: LockOwner, now = Date.now()): boolean {
+  const expiresAt = Date.parse(owner.leaseExpiresAt);
+  return !Number.isFinite(expiresAt) || expiresAt <= now;
+}
+
+function sameOwner(owner: LockOwner | null, holderId: string, fencingToken: string): boolean {
+  return !!owner && owner.holderId === holderId && owner.fencingToken === fencingToken;
+}
+
+function lockError(code: string, message: string): Error {
+  return Object.assign(new Error(message), { code });
+}
+
 export async function acquireControlPlaneLock(
   recordsRoot: string,
   lockScope: string,
-): Promise<() => Promise<void>> {
+  opts?: {
+    waitTimeoutMs?: number;
+    shouldAbort?: () => Promise<ControlPlaneLockAbortReason | null>;
+  },
+): Promise<AcquiredControlPlaneLock> {
   await assertNoBreakGlassFreeze(recordsRoot, lockScope);
   const lockDir = lockDirFor(recordsRoot, lockScope);
   await fsp.mkdir(path.dirname(lockDir), { recursive: true });
+  const holderId = `holder-${process.pid}-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+  const fencingToken = `fence-${Date.now()}-${crypto.randomBytes(8).toString("hex")}`;
+  const writeOwner = async () => {
+    const now = new Date();
+    await writeControlPlaneJson(ownerPathFor(lockDir), {
+      pid: process.pid,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      leaseExpiresAt: new Date(now.getTime() + lockLeaseMs()).toISOString(),
+      lockScope,
+      holderId,
+      fencingToken,
+    } satisfies LockOwner);
+  };
   const tryAcquire = async (): Promise<boolean> => {
     try {
       await fsp.mkdir(lockDir);
+      await writeOwner();
       return true;
     } catch {
       return false;
     }
   };
-  if (!(await tryAcquire())) {
+  const deadline = Date.now() + (opts?.waitTimeoutMs ?? lockWaitTimeoutMs());
+  while (!(await tryAcquire())) {
     const owner = await readLockOwner(lockDir);
-    if (!owner || !pidAlive(owner.pid)) {
+    if (!owner || !pidAlive(owner.pid) || leaseExpired(owner)) {
       await fsp.rm(lockDir, { recursive: true, force: true });
-      if (!(await tryAcquire())) {
-        throw new Error(`shared control-plane lock conflict for ${lockScope}`);
-      }
-    } else {
-      throw new Error(`shared control-plane lock conflict for ${lockScope}`);
+      continue;
     }
+    const abortReason = await opts?.shouldAbort?.();
+    if (abortReason) {
+      throw lockError(
+        abortReason,
+        `shared control-plane wait ended because the run was ${abortReason.replaceAll("_", " ")}`,
+      );
+    }
+    if (Date.now() >= deadline) {
+      throw lockError("lock_timeout", `shared control-plane lock timeout for ${lockScope}`);
+    }
+    await sleep(lockPollMs());
   }
-  await writeControlPlaneJson(path.join(lockDir, "owner.json"), {
-    pid: process.pid,
-    createdAt: new Date().toISOString(),
+  let released = false;
+  const heartbeat = setInterval(
+    async () => {
+      try {
+        const owner = await readLockOwner(lockDir);
+        if (!sameOwner(owner, holderId, fencingToken) || leaseExpired(owner)) {
+          clearInterval(heartbeat);
+          return;
+        }
+        const now = new Date();
+        await writeControlPlaneJson(ownerPathFor(lockDir), {
+          ...owner,
+          updatedAt: now.toISOString(),
+          leaseExpiresAt: new Date(now.getTime() + lockLeaseMs()).toISOString(),
+        } satisfies LockOwner);
+      } catch {
+        clearInterval(heartbeat);
+      }
+    },
+    Math.max(250, lockHeartbeatMs()),
+  );
+  heartbeat.unref?.();
+  return {
     lockScope,
-  } satisfies LockOwner);
-  return async () => {
-    await fsp.rm(lockDir, { recursive: true, force: true });
+    fencingToken,
+    assertCurrentAuthority: async () => {
+      const owner = await readLockOwner(lockDir);
+      if (!sameOwner(owner, holderId, fencingToken) || leaseExpired(owner)) {
+        throw lockError(
+          "lock_authority_lost",
+          `shared control-plane lock authority lost for ${lockScope}`,
+        );
+      }
+    },
+    release: async () => {
+      if (released) return;
+      released = true;
+      clearInterval(heartbeat);
+      const owner = await readLockOwner(lockDir);
+      if (sameOwner(owner, holderId, fencingToken)) {
+        await fsp.rm(lockDir, { recursive: true, force: true });
+      }
+    },
   };
 }

@@ -134,6 +134,7 @@ export type CloudflarePagesControlPlaneWorkerAuthority = {
   submissionPath: string;
   workerId: string;
   lockScope: string;
+  fencingToken?: string;
   executionSnapshotPath: string;
 };
 

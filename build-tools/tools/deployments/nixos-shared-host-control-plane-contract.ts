@@ -175,6 +175,7 @@ export type NixosSharedHostControlPlaneWorkerAuthority = {
   submissionPath: string;
   workerId: string;
   lockScope: string;
+  fencingToken?: string;
   executionSnapshotPath: string;
 };
 

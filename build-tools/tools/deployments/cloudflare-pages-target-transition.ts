@@ -198,6 +198,7 @@ export async function submitCloudflarePagesTargetTransition(opts: {
         submissionPath,
         executionSnapshotPath,
         lockScope: exception.sharedLockScope,
+        fencingToken: releaseLock.fencingToken,
         workerId,
       },
     };
@@ -230,6 +231,6 @@ export async function submitCloudflarePagesTargetTransition(opts: {
       recordPath,
     };
   } finally {
-    await releaseLock();
+    await releaseLock.release();
   }
 }

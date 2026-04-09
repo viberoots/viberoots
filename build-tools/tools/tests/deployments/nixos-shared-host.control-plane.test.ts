@@ -20,6 +20,19 @@ async function writeArtifact(root: string): Promise<void> {
   await fsp.writeFile(path.join(root, "healthz"), "ok\n", "utf8");
 }
 
+async function withLockEnv<T>(overrides: Record<string, string>, fn: () => Promise<T>): Promise<T> {
+  const previous = Object.fromEntries(Object.keys(overrides).map((key) => [key, process.env[key]]));
+  Object.assign(process.env, overrides);
+  try {
+    return await fn();
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
 test("shared control plane admits shared_nonprod deploys and executes from the frozen snapshot", async () => {
   await runInTemp("nixos-shared-host-control-plane-admit", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture({
@@ -226,56 +239,65 @@ test("shared control plane rejects direct local shared_nonprod mutation outside 
   });
 });
 
-test("shared control plane fails closed on lock conflict for the same canonical mini target", async () => {
-  await runInTemp("nixos-shared-host-control-plane-lock-conflict", async (tmp) => {
-    const deployment = nixosSharedHostDeploymentFixture();
-    let releaseLock!: () => void;
-    const holdLock = new Promise<void>((resolve) => {
-      releaseLock = resolve;
-    });
-    let lockAcquired!: () => void;
-    const firstHasLock = new Promise<void>((resolve) => {
-      lockAcquired = resolve;
-    });
-    const firstRun = submitNixosSharedHostControlPlaneRun({
-      workspaceRoot: tmp,
-      operationKind: "explicit_removal",
-      deployment,
-      paths: {
-        statePath: path.join(tmp, "platform-state.json"),
-        hostRoot: path.join(tmp, "host"),
-        recordsRoot: path.join(tmp, "records"),
-      },
-      hooks: {
-        onLockAcquired: async () => {
-          lockAcquired();
-          await holdLock;
-        },
-      },
-    });
-    await firstHasLock;
-    await assert.rejects(
-      submitNixosSharedHostControlPlaneRun({
-        workspaceRoot: tmp,
-        operationKind: "explicit_removal",
-        deployment: nixosSharedHostDeploymentFixture(),
-        paths: {
-          statePath: path.join(tmp, "platform-state.json"),
-          hostRoot: path.join(tmp, "host"),
-          recordsRoot: path.join(tmp, "records"),
-        },
-      }),
-      (error: any) => {
-        assert.equal(error.submission.admission.decision, "rejected");
-        assert.equal(error.submission.admission.reason, "lock_conflict");
-        assert.equal(error.submission.lockScope, "nixos-shared-host:default:demoapp");
-        assert.match(error.message, /lock conflict/);
-        return true;
-      },
-    );
-    releaseLock();
-    const firstResult = await firstRun;
-    assert.equal(firstResult.submission.admission.decision, "admitted");
-    assert.equal(firstResult.lockScope, "nixos-shared-host:default:demoapp");
-  });
+test("shared control plane times out queued runs when another holder keeps the shared lock", async () => {
+  await withLockEnv(
+    {
+      BNX_DEPLOY_LOCK_WAIT_TIMEOUT_MS: "200",
+      BNX_DEPLOY_LOCK_POLL_MS: "25",
+    },
+    async () => {
+      await runInTemp("nixos-shared-host-control-plane-lock-conflict", async (tmp) => {
+        const deployment = nixosSharedHostDeploymentFixture();
+        let releaseLock!: () => void;
+        const holdLock = new Promise<void>((resolve) => {
+          releaseLock = resolve;
+        });
+        let lockAcquired!: () => void;
+        const firstHasLock = new Promise<void>((resolve) => {
+          lockAcquired = resolve;
+        });
+        const firstRun = submitNixosSharedHostControlPlaneRun({
+          workspaceRoot: tmp,
+          operationKind: "explicit_removal",
+          deployment,
+          paths: {
+            statePath: path.join(tmp, "platform-state.json"),
+            hostRoot: path.join(tmp, "host"),
+            recordsRoot: path.join(tmp, "records"),
+          },
+          hooks: {
+            onLockAcquired: async () => {
+              lockAcquired();
+              await holdLock;
+            },
+          },
+        });
+        await firstHasLock;
+        await assert.rejects(
+          submitNixosSharedHostControlPlaneRun({
+            workspaceRoot: tmp,
+            operationKind: "explicit_removal",
+            deployment: nixosSharedHostDeploymentFixture(),
+            paths: {
+              statePath: path.join(tmp, "platform-state.json"),
+              hostRoot: path.join(tmp, "host"),
+              recordsRoot: path.join(tmp, "records"),
+            },
+          }),
+          (error: any) => {
+            assert.equal(error.submission.admission.decision, "admitted");
+            assert.equal(error.submission.terminationReason, "lock_timeout");
+            assert.equal(error.submission.lifecycleState, "finished");
+            assert.equal(error.submission.lockScope, "nixos-shared-host:default:demoapp");
+            assert.match(error.message, /lock timeout/);
+            return true;
+          },
+        );
+        releaseLock();
+        const firstResult = await firstRun;
+        assert.equal(firstResult.submission.admission.decision, "admitted");
+        assert.equal(firstResult.lockScope, "nixos-shared-host:default:demoapp");
+      });
+    },
+  );
 });

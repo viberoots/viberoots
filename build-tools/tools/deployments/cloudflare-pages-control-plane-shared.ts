@@ -6,12 +6,21 @@ import type {
   DeploymentControlPlaneRequestDedupe,
 } from "./deployment-control-plane-contract.ts";
 import {
-  CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMISSION_SCHEMA,
   type CloudflarePagesControlPlaneSnapshot,
   type CloudflarePagesControlPlaneSubmission,
 } from "./cloudflare-pages-control-plane-contract.ts";
+import {
+  createCloudflarePagesAdmittedTerminalSubmission,
+  createCloudflarePagesControlPlaneSubmission,
+  createCloudflarePagesLockConflictSubmission,
+} from "./cloudflare-pages-control-plane-submission.ts";
 import type { CloudflarePagesDeployRecord } from "./cloudflare-pages-records.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
+import {
+  lockWaitAbortReasonForSubmission,
+  queueSubmissionForLock,
+} from "./deployment-control-plane-queue.ts";
+import { revalidateControlPlaneAdmission } from "./deployment-control-plane-revalidation.ts";
 import {
   acquireControlPlaneLock,
   executionSnapshotPathFor,
@@ -22,69 +31,6 @@ import {
 
 export function createCloudflarePagesSubmissionId(): string {
   return `cp-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
-}
-
-function createWorkerId(submissionId: string): string {
-  return `${submissionId}-worker`;
-}
-
-function admissionReasonFor(
-  deployment: CloudflarePagesDeployment,
-): "shared_nonprod" | "production_facing" {
-  return deployment.protectionClass === "production_facing"
-    ? "production_facing"
-    : "shared_nonprod";
-}
-
-type RunHooks = {
-  afterSnapshotWritten?: (snapshotPath: string) => Promise<void> | void;
-  onLockAcquired?: () => Promise<void> | void;
-};
-
-function createSubmission(
-  deployment: CloudflarePagesDeployment,
-  snapshot: CloudflarePagesControlPlaneSnapshot,
-  executionSnapshotPath: string,
-  opts: {
-    admission: CloudflarePagesControlPlaneSubmission["admission"];
-    lifecycleState: CloudflarePagesControlPlaneSubmission["lifecycleState"];
-    dedupe: DeploymentControlPlaneRequestDedupe;
-    workerId?: string;
-    completedAt?: string;
-    terminationReason?: CloudflarePagesControlPlaneSubmission["terminationReason"];
-    deployRunId?: string;
-    resultRecordPath?: string;
-    finalOutcome?: string;
-    requestedBy?: DeploymentPrincipal;
-    authorization?: DeploymentControlPlaneAuthorizationDecision;
-    rejectionCode?: CloudflarePagesControlPlaneSubmission["rejectionCode"];
-    pendingReasonCode?: CloudflarePagesControlPlaneSubmission["pendingReasonCode"];
-  },
-): CloudflarePagesControlPlaneSubmission {
-  return {
-    schemaVersion: CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMISSION_SCHEMA,
-    submissionId: snapshot.submissionId,
-    submittedAt: snapshot.submittedAt,
-    operationKind: snapshot.operationKind,
-    deploymentId: deployment.deploymentId,
-    deploymentLabel: deployment.label,
-    providerTargetIdentity: snapshot.providerTargetIdentity,
-    lockScope: snapshot.lockScope,
-    executionSnapshotPath,
-    lifecycleState: opts.lifecycleState,
-    terminationReason: opts.terminationReason ?? null,
-    dedupe: opts.dedupe,
-    ...(opts.workerId ? { workerId: opts.workerId } : {}),
-    ...(opts.completedAt ? { completedAt: opts.completedAt } : {}),
-    ...(opts.deployRunId ? { deployRunId: opts.deployRunId } : {}),
-    ...(opts.resultRecordPath ? { resultRecordPath: opts.resultRecordPath } : {}),
-    ...(opts.finalOutcome ? { finalOutcome: opts.finalOutcome } : {}),
-    ...(opts.requestedBy ? { requestedBy: opts.requestedBy } : {}),
-    ...(opts.authorization ? { authorization: opts.authorization } : {}),
-    ...(opts.rejectionCode ? { rejectionCode: opts.rejectionCode } : {}),
-    ...(opts.pendingReasonCode ? { pendingReasonCode: opts.pendingReasonCode } : {}),
-    admission: opts.admission,
-  };
 }
 
 export async function withCloudflarePagesControlPlaneRun(
@@ -104,35 +50,95 @@ export async function withCloudflarePagesControlPlaneRun(
     requestedBy?: DeploymentPrincipal;
     authorization?: DeploymentControlPlaneAuthorizationDecision;
   },
-  hooks?: RunHooks,
+  hooks?: {
+    afterSnapshotWritten?: (snapshotPath: string) => Promise<void> | void;
+    onLockAcquired?: () => Promise<void> | void;
+  },
 ) {
+  const admissionReason =
+    deployment.protectionClass === "production_facing" ? "production_facing" : "shared_nonprod";
+  const workerId = `${snapshot.submissionId}-worker`;
   const executionSnapshotPath = executionSnapshotPathFor(recordsRoot, snapshot.submissionId);
   const submissionPath = submissionPathFor(recordsRoot, snapshot.submissionId);
   await writeControlPlaneJson(executionSnapshotPath, snapshot);
   await hooks?.afterSnapshotWritten?.(executionSnapshotPath);
-  let submission = createSubmission(deployment, snapshot, executionSnapshotPath, {
-    admission: { decision: "admitted", reason: admissionReasonFor(deployment) },
-    lifecycleState: "queued",
-    dedupe: meta.dedupe,
-    requestedBy: meta.requestedBy,
-    authorization: meta.authorization,
-  });
-  await writeControlPlaneJson(submissionPath, submission);
-  submission = { ...submission, lifecycleState: "waiting_for_lock" };
-  await writeControlPlaneJson(submissionPath, submission);
-  let releaseLock: (() => Promise<void>) | undefined;
-  try {
-    releaseLock = await acquireControlPlaneLock(recordsRoot, snapshot.lockScope);
-  } catch (error) {
-    const rejected = createSubmission(deployment, snapshot, executionSnapshotPath, {
-      admission: { decision: "rejected", reason: "lock_conflict" },
-      lifecycleState: "finished",
-      completedAt: new Date().toISOString(),
+  let submission = createCloudflarePagesControlPlaneSubmission(
+    deployment,
+    snapshot,
+    executionSnapshotPath,
+    {
+      admission: { decision: "admitted", reason: admissionReason },
+      lifecycleState: "queued",
       dedupe: meta.dedupe,
       requestedBy: meta.requestedBy,
       authorization: meta.authorization,
-      rejectionCode: "lock_conflict",
+    },
+  );
+  submission = await queueSubmissionForLock({
+    recordsRoot,
+    submissionPath,
+    snapshot,
+    submission,
+  });
+  let lock: Awaited<ReturnType<typeof acquireControlPlaneLock>> | undefined;
+  try {
+    lock = await acquireControlPlaneLock(recordsRoot, snapshot.lockScope, {
+      shouldAbort: async () => await lockWaitAbortReasonForSubmission(submissionPath),
     });
+  } catch (error) {
+    if (
+      (error as any)?.code === "cancelled" ||
+      (error as any)?.code === "superseded" ||
+      (error as any)?.code === "no_longer_admitted"
+    ) {
+      const terminationReason = (error as any).code;
+      const ended = createCloudflarePagesAdmittedTerminalSubmission(
+        deployment,
+        snapshot,
+        executionSnapshotPath,
+        {
+          terminationReason,
+          dedupe: meta.dedupe,
+          requestedBy: meta.requestedBy,
+          authorization: meta.authorization,
+        },
+      );
+      await writeControlPlaneJson(submissionPath, ended);
+      throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
+        submission: ended,
+        submissionPath,
+        executionSnapshotPath,
+      });
+    }
+    if ((error as any)?.code === "lock_timeout") {
+      const timedOut = createCloudflarePagesAdmittedTerminalSubmission(
+        deployment,
+        snapshot,
+        executionSnapshotPath,
+        {
+          terminationReason: "lock_timeout",
+          dedupe: meta.dedupe,
+          requestedBy: meta.requestedBy,
+          authorization: meta.authorization,
+        },
+      );
+      await writeControlPlaneJson(submissionPath, timedOut);
+      throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
+        submission: timedOut,
+        submissionPath,
+        executionSnapshotPath,
+      });
+    }
+    const rejected = createCloudflarePagesLockConflictSubmission(
+      deployment,
+      snapshot,
+      executionSnapshotPath,
+      {
+        dedupe: meta.dedupe,
+        requestedBy: meta.requestedBy,
+        authorization: meta.authorization,
+      },
+    );
     await writeControlPlaneJson(submissionPath, rejected);
     throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
       submission: rejected,
@@ -142,7 +148,7 @@ export async function withCloudflarePagesControlPlaneRun(
   }
   submission = {
     ...submission,
-    workerId: createWorkerId(snapshot.submissionId),
+    workerId,
     lifecycleState: "running",
   };
   await writeControlPlaneJson(submissionPath, submission);
@@ -167,12 +173,36 @@ export async function withCloudflarePagesControlPlaneRun(
         executionSnapshotPath,
       });
     }
+    if (snapshot.admittedContext) {
+      await revalidateControlPlaneAdmission({
+        workspaceRoot: snapshot.paths.workspaceRoot,
+        deployment,
+        admittedContext: snapshot.admittedContext,
+      }).catch(async (error) => {
+        if (error instanceof Error && (error as any).code === "no_longer_admitted") {
+          const noLongerAdmitted = {
+            ...latestSubmission,
+            lifecycleState: "finished" as const,
+            terminationReason: "no_longer_admitted" as const,
+            completedAt: new Date().toISOString(),
+          };
+          await writeControlPlaneJson(submissionPath, noLongerAdmitted);
+          throw Object.assign(error, {
+            submission: noLongerAdmitted,
+            submissionPath,
+            executionSnapshotPath,
+          });
+        }
+        throw error;
+      });
+    }
     const result = await execute({
       kind: "control-plane-worker",
       submissionId: snapshot.submissionId,
       submissionPath,
-      workerId: submission.workerId || createWorkerId(snapshot.submissionId),
+      workerId: submission.workerId || workerId,
       lockScope: snapshot.lockScope,
+      ...(lock?.fencingToken ? { fencingToken: lock.fencingToken } : {}),
       executionSnapshotPath,
     });
     submission = {
@@ -193,6 +223,11 @@ export async function withCloudflarePagesControlPlaneRun(
       recordPath: result.recordPath,
     };
   } catch (error) {
+    if ((error as any)?.submission) {
+      throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
+        submission: (error as any).submission,
+      });
+    }
     submission = {
       ...submission,
       completedAt: new Date().toISOString(),
@@ -208,6 +243,6 @@ export async function withCloudflarePagesControlPlaneRun(
     await writeControlPlaneJson(submissionPath, submission);
     throw Object.assign(error instanceof Error ? error : new Error(String(error)), { submission });
   } finally {
-    await releaseLock?.();
+    await lock?.release();
   }
 }

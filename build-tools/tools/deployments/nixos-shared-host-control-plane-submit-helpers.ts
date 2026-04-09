@@ -4,6 +4,7 @@ import path from "node:path";
 import type { NixosSharedHostGateEvaluator } from "./nixos-shared-host-progressive-execution.ts";
 import { progressiveRolloutIsActive } from "./nixos-shared-host-progressive-rollout.ts";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+import { revalidateControlPlaneAdmission } from "./deployment-control-plane-revalidation.ts";
 import type {
   NixosSharedHostControlPlaneSnapshot,
   NixosSharedHostControlPlaneSubmission,
@@ -13,6 +14,7 @@ import {
   acquireNixosSharedHostControlPlaneLocks,
   runNixosSharedHostControlPlaneWorker,
 } from "./nixos-shared-host-control-plane-execution.ts";
+import { lockWaitAbortReasonForSubmission } from "./deployment-control-plane-queue.ts";
 import {
   readControlPlaneJson,
   writeControlPlaneJson,
@@ -56,6 +58,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
   submissionPath: string;
   executionSnapshotPath: string;
   snapshot: NixosSharedHostControlPlaneSnapshot;
+  workspaceRoot: string;
   deployRunId: string;
   recordsRoot: string;
   operationKind: string;
@@ -63,12 +66,25 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
   onLockAcquired?: () => Promise<void> | void;
   gateEvaluator?: NixosSharedHostGateEvaluator;
 }) {
-  let releaseLock: (() => Promise<void>) | undefined;
+  let lock: Awaited<ReturnType<typeof acquireNixosSharedHostControlPlaneLocks>> | undefined;
   try {
-    releaseLock = await acquireNixosSharedHostControlPlaneLocks(opts.recordsRoot, opts.deployment);
+    lock = await acquireNixosSharedHostControlPlaneLocks(opts.recordsRoot, opts.deployment, {
+      shouldAbort: async () => await lockWaitAbortReasonForSubmission(opts.submissionPath),
+    });
   } catch (error) {
     throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
-      lockRejected: true,
+      lockRejected: (error as any)?.code !== "lock_timeout",
+      lockTimeout: (error as any)?.code === "lock_timeout",
+      waitAborted:
+        (error as any)?.code === "cancelled" ||
+        (error as any)?.code === "superseded" ||
+        (error as any)?.code === "no_longer_admitted",
+      waitAbortReason:
+        (error as any)?.code === "cancelled" ||
+        (error as any)?.code === "superseded" ||
+        (error as any)?.code === "no_longer_admitted"
+          ? (error as any).code
+          : undefined,
     });
   }
   const workerId = createNixosSharedHostWorkerId(opts.snapshot.submissionId);
@@ -94,6 +110,27 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
         submission: cancelled,
       });
     }
+    try {
+      if (opts.snapshot.admittedContext) {
+        await revalidateControlPlaneAdmission({
+          workspaceRoot: opts.workspaceRoot,
+          deployment: opts.snapshot.deployment,
+          admittedContext: opts.snapshot.admittedContext,
+        });
+      }
+    } catch (error) {
+      if (error instanceof DeploymentAdmissionError && error.code === "no_longer_admitted") {
+        const noLongerAdmitted = {
+          ...latestSubmission,
+          lifecycleState: "finished" as const,
+          terminationReason: "no_longer_admitted" as const,
+          completedAt: new Date().toISOString(),
+        };
+        await writeControlPlaneJson(opts.submissionPath, noLongerAdmitted);
+        throw Object.assign(error, { submission: noLongerAdmitted });
+      }
+      throw error;
+    }
     submission = {
       ...latestSubmission,
       workerId,
@@ -111,6 +148,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
       submissionPath: opts.submissionPath,
       executionSnapshotPath: opts.executionSnapshotPath,
       workerId,
+      ...(lock?.fencingToken ? { fencingToken: lock.fencingToken } : {}),
       deployRunId: opts.deployRunId,
       progressiveRollout: submission.progressiveRollout || opts.snapshot.progressiveRollout,
       ...(opts.gateEvaluator ? { gateEvaluator: opts.gateEvaluator } : {}),
@@ -152,6 +190,6 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
     }
     throw error;
   } finally {
-    await releaseLock?.();
+    await lock?.release();
   }
 }

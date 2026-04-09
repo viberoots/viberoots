@@ -14,6 +14,7 @@ export async function runNixosSharedHostControlPlaneWorker(opts: {
   submissionPath: string;
   executionSnapshotPath: string;
   workerId: string;
+  fencingToken?: string;
   deployRunId?: string;
   progressiveRollout?: NixosSharedHostControlPlaneSnapshot["progressiveRollout"];
   gateEvaluator?: NixosSharedHostGateEvaluator;
@@ -27,6 +28,7 @@ export async function runNixosSharedHostControlPlaneWorker(opts: {
     submissionPath: opts.submissionPath,
     workerId: opts.workerId,
     lockScope: snapshot.lockScope,
+    ...(opts.fencingToken ? { fencingToken: opts.fencingToken } : {}),
     executionSnapshotPath: opts.executionSnapshotPath,
   };
   return snapshot.action.kind === "deploy"
@@ -91,17 +93,28 @@ export async function runNixosSharedHostControlPlaneWorker(opts: {
 export async function acquireNixosSharedHostControlPlaneLocks(
   recordsRoot: string,
   deployment: Parameters<typeof nixosSharedHostLockScopes>[0],
+  opts?: {
+    shouldAbort?: Parameters<typeof acquireControlPlaneLock>[2]["shouldAbort"];
+  },
 ) {
   const releaseLocks: Array<() => Promise<void>> = [];
+  const fencingTokens: string[] = [];
   try {
     for (const lockScope of nixosSharedHostLockScopes(deployment)) {
-      releaseLocks.push(await acquireControlPlaneLock(recordsRoot, lockScope));
+      const lock = await acquireControlPlaneLock(recordsRoot, lockScope, {
+        ...(opts?.shouldAbort ? { shouldAbort: opts.shouldAbort } : {}),
+      });
+      releaseLocks.push(lock.release);
+      fencingTokens.push(lock.fencingToken);
     }
   } catch (error) {
     for (const release of releaseLocks.reverse()) await release();
     throw error;
   }
-  return async () => {
-    for (const release of releaseLocks.reverse()) await release();
+  return {
+    fencingToken: fencingTokens[0],
+    release: async () => {
+      for (const release of releaseLocks.reverse()) await release();
+    },
   };
 }

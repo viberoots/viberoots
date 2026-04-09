@@ -69,12 +69,9 @@ export async function resumePausedProgressiveRun(opts: {
 }) {
   const snapshot = await readControlPlaneJson<any>(opts.submission.executionSnapshotPath);
   const workerId = createNixosSharedHostWorkerId(opts.submission.submissionId);
-  let releaseLock: (() => Promise<void>) | undefined;
+  let lock: Awaited<ReturnType<typeof acquireNixosSharedHostControlPlaneLocks>> | undefined;
   try {
-    releaseLock = await acquireNixosSharedHostControlPlaneLocks(
-      opts.recordsRoot,
-      snapshot.deployment,
-    );
+    lock = await acquireNixosSharedHostControlPlaneLocks(opts.recordsRoot, snapshot.deployment);
     await writeControlPlaneJson(opts.submissionPath, {
       ...opts.updated,
       workerId,
@@ -109,6 +106,6 @@ export async function resumePausedProgressiveRun(opts: {
     }
     throw error;
   } finally {
-    await releaseLock?.();
+    await lock?.release();
   }
 }
