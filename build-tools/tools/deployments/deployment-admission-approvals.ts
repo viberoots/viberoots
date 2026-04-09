@@ -76,6 +76,30 @@ export function requireBuiltInExecutionBoundary(deployment: DeploymentTarget) {
     }
     return;
   }
+  if (deployment.provider === "s3-static") {
+    if (deployment.publisher.type !== "aws-s3-sync") {
+      throw new DeploymentAdmissionError(
+        "no_longer_admitted",
+        `protected/shared admission rejects non-built-in s3-static publisher ${deployment.publisher.type}`,
+      );
+    }
+    if (
+      deployment.provisioner?.type &&
+      !["terraform-stack", "cdktf-stack"].includes(deployment.provisioner.type)
+    ) {
+      throw new DeploymentAdmissionError(
+        "no_longer_admitted",
+        `protected/shared admission rejects non-built-in s3-static provisioner ${deployment.provisioner.type}`,
+      );
+    }
+    if (deployment.releaseActions.length > 0) {
+      throw new DeploymentAdmissionError(
+        "no_longer_admitted",
+        `protected/shared admission rejects s3-static deployment-local release_actions: ${releaseActionRefs(deployment.releaseActions).join(", ")}`,
+      );
+    }
+    return;
+  }
   if (deployment.publisher.type !== "nixos-shared-host-static-webapp") {
     throw new DeploymentAdmissionError(
       "no_longer_admitted",

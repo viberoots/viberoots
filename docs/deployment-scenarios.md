@@ -39,6 +39,27 @@ Expected behavior:
 - provisioning does not run
 - smoke still runs unless explicit policy says otherwise
 
+## 2.1. Repo-Owned `s3-static` Provision + Publish
+
+Situation:
+
+- deployment: `pleomino-staging-s3`
+- protection class: `shared_nonprod`
+- provider: `s3-static`
+- publisher: `aws-s3-sync`
+- provisioner: `terraform-stack` or `cdktf-stack`
+
+Expected behavior:
+
+- the operator submits `deploy pleomino-staging-s3`
+- the control plane admits one exact static artifact for the reviewed stage branch
+- the deploy path materializes one reviewed non-destructive provisioner plan artifact for the
+  bucket/CDN identity owned by deployment metadata
+- checked-in provider config may add local publish flags, but it must not retarget `bucket`,
+  `region`, or reviewed `distribution`
+- publish runs through the built-in `aws-s3-sync` path against the authoritative bucket identity
+- built-in smoke validates the canonical distribution or bucket website URL after publish
+
 ## 3. Same-Deployment Rollback
 
 Situation:

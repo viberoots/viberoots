@@ -10,6 +10,7 @@ import { packagePathFromLabel } from "../lib/labels.ts";
 
 export const NIXOS_SHARED_HOST_PROVIDER = "nixos-shared-host";
 export const CLOUDFLARE_PAGES_PROVIDER = "cloudflare-pages";
+export const S3_STATIC_PROVIDER = "s3-static";
 export const STATIC_WEBAPP_COMPONENT = "static-webapp";
 
 export type DeploymentPrerequisiteMode = "ordering_only" | "health_gated";
@@ -89,6 +90,15 @@ export type CloudflarePagesProviderTarget = {
   previewSourceRunId?: string;
 };
 
+export type S3StaticProviderTarget = {
+  account: string;
+  bucket: string;
+  region: string;
+  distribution?: string;
+  canonicalUrl: string;
+  providerTargetIdentity: string;
+};
+
 export type NixosSharedHostDeploymentComponent = DeploymentComponent & {
   kind: typeof STATIC_WEBAPP_COMPONENT;
   runtime: {
@@ -118,7 +128,20 @@ export type CloudflarePagesDeployment = DeploymentBase & {
   providerTarget: CloudflarePagesProviderTarget;
 };
 
-export type DeploymentTarget = NixosSharedHostDeployment | CloudflarePagesDeployment;
+export type S3StaticDeployment = DeploymentBase & {
+  provider: typeof S3_STATIC_PROVIDER;
+  publisher: {
+    type: string;
+    config: string;
+  };
+  provisioner?: { type: string };
+  providerTarget: S3StaticProviderTarget;
+};
+
+export type DeploymentTarget =
+  | NixosSharedHostDeployment
+  | CloudflarePagesDeployment
+  | S3StaticDeployment;
 
 function packageBaseName(label: string): string {
   return path.posix.basename(packagePathFromLabel(label));
@@ -198,28 +221,26 @@ export function deriveCloudflarePagesProviderTarget(input: {
   };
 }
 
-export function isNixosSharedHostDeployment(
-  deployment: DeploymentTarget,
-): deployment is NixosSharedHostDeployment {
-  return deployment.provider === NIXOS_SHARED_HOST_PROVIDER;
-}
-
-export function isCloudflarePagesDeployment(
-  deployment: DeploymentTarget,
-): deployment is CloudflarePagesDeployment {
-  return deployment.provider === CLOUDFLARE_PAGES_PROVIDER;
-}
-
-export function isMultiComponentDeployment(deployment: DeploymentTarget): boolean {
-  return deployment.components.length > 1;
-}
-
-export function componentTargetsFor(deployment: DeploymentTarget): string[] {
-  return deployment.components.map((component) => component.target);
-}
-
-export function providerTargetIdentityFor(deployment: DeploymentTarget): string {
-  return isNixosSharedHostDeployment(deployment)
-    ? deployment.providerTarget.deploymentTargetIdentity
-    : deployment.providerTarget.providerTargetIdentity;
+export function deriveS3StaticProviderTarget(input: {
+  account: string;
+  bucket: string;
+  region: string;
+  distribution?: string;
+}): S3StaticProviderTarget {
+  const account = input.account.trim();
+  const bucket = input.bucket.trim();
+  const region = input.region.trim();
+  const distribution = String(input.distribution || "").trim();
+  return {
+    account,
+    bucket,
+    region,
+    ...(distribution ? { distribution } : {}),
+    canonicalUrl: distribution
+      ? `https://${distribution}/`
+      : `https://${bucket}.s3-website.${region}.amazonaws.com/`,
+    providerTargetIdentity: distribution
+      ? `${S3_STATIC_PROVIDER}:${account}/${bucket}#distribution:${distribution}`
+      : `${S3_STATIC_PROVIDER}:${account}/${bucket}`,
+  };
 }

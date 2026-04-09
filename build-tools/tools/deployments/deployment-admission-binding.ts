@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
 import type { DeploymentTarget } from "./contract.ts";
+import { providerTargetIdentityFor } from "./contract.ts";
 import type { DeploymentAdmissionBinding } from "./deployment-admission-evidence.ts";
 
 export type DeploymentAdmissionOperationKind =
@@ -37,10 +38,7 @@ function fingerprintFor(value: unknown): string {
 }
 
 export function createDeploymentAdmissionBinding(opts: BindingOpts): DeploymentAdmissionBinding {
-  const targetIdentity =
-    opts.deployment.provider === "cloudflare-pages"
-      ? opts.deployment.providerTarget.providerTargetIdentity
-      : opts.deployment.providerTarget.deploymentTargetIdentity;
+  const targetIdentity = providerTargetIdentityFor(opts.deployment);
   const payloadFingerprint = fingerprintFor({
     deploymentId: opts.deployment.deploymentId,
     lanePolicyFingerprint: opts.deployment.lanePolicy.fingerprint,

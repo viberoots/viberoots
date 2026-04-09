@@ -60,6 +60,22 @@ const PROVIDER_CAPABILITIES: Record<string, DeploymentProviderCapability> = {
       routineAllowedTypes: [],
     },
   },
+  "s3-static": {
+    provider: "s3-static",
+    supportedComponentKinds: [STATIC_WEBAPP_COMPONENT_KIND],
+    multiComponentKinds: [],
+    supportedRolloutModes: ["all_at_once"],
+    defaultRolloutMode: "all_at_once",
+    rolloutPolicyOmissionInPolicy: {
+      singleComponent: true,
+      multiComponent: false,
+    },
+    releaseActions: {
+      supportsProtectedShared: false,
+      declaredTypes: [],
+      routineAllowedTypes: [],
+    },
+  },
 };
 
 export const REVIEWED_NON_STATIC_COMPONENT_KINDS: DeploymentComponentKind[] = [

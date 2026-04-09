@@ -1,12 +1,17 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
-import { isNixosSharedHostDeployment, type DeploymentTarget } from "./contract.ts";
+import {
+  isNixosSharedHostDeployment,
+  isS3StaticDeployment,
+  type DeploymentTarget,
+} from "./contract.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import { buildArtifactDirsByComponentId } from "./deployment-component-artifact-dirs.ts";
 import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
 import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-control-plane.ts";
 import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
+import { submitS3StaticDeploy } from "./s3-static-deploy.ts";
 
 export type DeploymentSmokeConnectOverride = {
   protocol: "http:" | "https:";
@@ -43,6 +48,10 @@ function defaultCloudflareRecordsRoot(workspaceRoot: string): string {
   return path.join(workspaceRoot, ".local", "deployments", "cloudflare-pages", "records");
 }
 
+function defaultS3StaticRecordsRoot(workspaceRoot: string): string {
+  return path.join(workspaceRoot, ".local", "deployments", "s3-static", "records");
+}
+
 async function resolveArtifactDir(
   workspaceRoot: string,
   deployment: Pick<DeploymentTarget, "component">,
@@ -62,6 +71,18 @@ export async function runNormalDeployment(opts: {
   deployBatchId?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
 }): Promise<DeploymentExecutionResult> {
+  if (isS3StaticDeployment(opts.deployment)) {
+    return await submitS3StaticDeploy({
+      workspaceRoot: opts.workspaceRoot,
+      deployment: opts.deployment,
+      recordsRoot: path.resolve(
+        opts.sharedRecordsRoot || defaultS3StaticRecordsRoot(opts.workspaceRoot),
+      ),
+      artifactDir: await resolveArtifactDir(opts.workspaceRoot, opts.deployment),
+      ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
+      ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
+    });
+  }
   if (!isNixosSharedHostDeployment(opts.deployment)) {
     return await submitCloudflarePagesControlPlaneDeploy({
       workspaceRoot: opts.workspaceRoot,

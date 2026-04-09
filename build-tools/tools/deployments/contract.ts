@@ -3,6 +3,7 @@ import type { GraphNode } from "../lib/graph.ts";
 import { createDeploymentExtractionContext, uniqueErrors } from "./contract-extract-shared.ts";
 import { extractCloudflarePagesDeploymentsFromContext } from "./contract-extract-cloudflare-pages.ts";
 import { extractNixosSharedHostDeploymentsFromContext } from "./contract-extract-nixos-shared-host.ts";
+import { extractS3StaticDeploymentsFromContext } from "./contract-extract-s3-static.ts";
 
 export function extractNixosSharedHostDeployments(nodes: GraphNode[]) {
   const context = createDeploymentExtractionContext(nodes);
@@ -20,7 +21,17 @@ export function extractCloudflarePagesDeployments(nodes: GraphNode[]) {
   };
 }
 
+export function extractS3StaticDeployments(nodes: GraphNode[]) {
+  const context = createDeploymentExtractionContext(nodes);
+  return {
+    deployments: extractS3StaticDeploymentsFromContext(context),
+    errors: uniqueErrors(context.errors),
+  };
+}
+
 export * from "./contract-types.ts";
 export * from "./contract-extract.ts";
 export * from "./contract-extract-cloudflare-pages.ts";
 export * from "./contract-extract-nixos-shared-host.ts";
+export * from "./contract-extract-s3-static.ts";
+export * from "./deployment-targets.ts";

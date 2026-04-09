@@ -6,6 +6,7 @@ load(
     _deployment_target = "deployment_target",
     _deployment_target_exception = "deployment_target_exception",
 )
+load("//build-tools/deployments:s3_defs.bzl", _s3_static_webapp_deployment = "s3_static_webapp_deployment")
 
 deployment_admission_policy = _deployment_admission_policy
 deployment_lane_policy = _deployment_lane_policy
@@ -202,4 +203,11 @@ def cloudflare_pages_static_webapp_deployment(
             "deployment-component:static-webapp",
         ],
         visibility = visibility,
+    )
+
+def s3_static_webapp_deployment(**kwargs):
+    _s3_static_webapp_deployment(
+        deployment_target = deployment_target,
+        require_shared_policy = _require_shared_policy,
+        **kwargs
     )

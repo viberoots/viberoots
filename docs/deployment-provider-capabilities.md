@@ -335,6 +335,94 @@ Normative-source note:
 - `pleomino-staging` uses `cloudflare-pages` with protection class `shared_nonprod`
 - `pleomino-prod` uses `cloudflare-pages` with protection class `production_facing`
 
+## Capability Entry: `s3-static`
+
+### Identity
+
+- `provider`: `s3-static`
+- canonical target identity fields:
+  - `account`
+  - `bucket`
+  - optional `distribution`
+- canonical lock-key shape:
+  - `s3-static:<account>/<bucket>`
+  - when a reviewed CDN hostname is part of the live target contract, the normalized identity appends `#distribution:<distribution>`
+
+### Component Support
+
+- supported component kinds:
+  - `static-webapp`
+- multi-component support:
+  - not supported in the reviewed initial slice
+- additional unsupported shapes:
+  - preview/ephemeral targets
+  - non-static component kinds
+
+### Rollout Support
+
+- default rollout mode:
+  - `all_at_once`
+- rollout-policy omission posture:
+  - omission is reviewed only for the single-component static-webapp slice
+- supported rollout modes:
+  - `all_at_once`
+
+### Preview Support
+
+- preview support:
+  - not reviewed in the initial `s3-static` slice
+
+### Smoke / Release Health
+
+- default smoke model:
+  - built-in HTTP smoke against the reviewed canonical URL after publish
+  - when `distribution` is declared, the canonical URL is `https://${distribution}/`
+  - otherwise the canonical URL is the bucket website endpoint `https://${bucket}.s3-website.${region}.amazonaws.com/`
+
+### Built-In Publisher Contract
+
+- built-in publisher type:
+  - `aws-s3-sync`
+- exact publish input:
+  - one admitted immutable `static-webapp` artifact directory
+- checked-in provider config:
+  - `aws-s3-sync.jsonc` remains provider-local publish configuration only
+  - deployment metadata remains authoritative for `bucket`, `region`, and optional `distribution`; config drift must fail closed before publish
+
+### Retry / Idempotency
+
+- exact-artifact retry is reviewed only when the prior attempt is clearly safe to rerun
+- ambiguous provider outcomes must fail closed rather than silently retrying
+- the initial slice does not define promotion, preview, or rollback workflows
+
+### Partial Publish Observability
+
+- the adapter records:
+  - canonical provider-target identity
+  - exact artifact identity
+  - provider config fingerprint
+  - provider release id when the publisher exposes one
+
+### Provisioner Support
+
+- reviewed built-in provisioners for the initial slice:
+  - `terraform-stack`
+  - `cdktf-stack`
+- meaning:
+  - the normal deploy path may materialize one reviewed non-destructive plan artifact for bucket/CDN/DNS ownership before publish
+  - the plan artifact fingerprint is available for protected/shared admission binding and operator review
+- `--provision-only` is not reviewed in the initial slice; provisioning is coupled to the first built-in deploy workflow
+
+### Built-In `release_actions` Support
+
+- protected/shared built-in `release_actions`:
+  - not supported in the reviewed initial `s3-static` capability entry
+
+### Protected/Shared Eligibility
+
+- in policy for protected/shared single-component static-webapp deployments
+- protected/shared execution must stay inside vetted built-in publisher, provisioner, and smoke-runner code
+
 ## Adding Another Provider
 
 Before adding a new built-in provider for protected/shared use:

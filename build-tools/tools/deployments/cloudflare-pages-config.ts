@@ -5,7 +5,7 @@ import { packagePathFromLabel } from "../lib/labels.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
 import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint.ts";
 
-function stripJsonComments(raw: string): string {
+export function stripJsonComments(raw: string): string {
   let out = "";
   let inString = false;
   let inLineComment = false;
@@ -59,7 +59,7 @@ function stripJsonComments(raw: string): string {
   return out;
 }
 
-function parseJsoncObject(raw: string, sourcePath: string): Record<string, unknown> {
+export function parseJsoncObject(raw: string, sourcePath: string): Record<string, unknown> {
   try {
     const parsed = JSON.parse(stripJsonComments(raw)) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {

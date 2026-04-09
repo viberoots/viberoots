@@ -8,14 +8,13 @@ import {
   printDeployJson,
   validateDeploymentForCli,
 } from "./deploy-front-door.ts";
-import {
-  runCloudflareDeployFrontDoor,
-  runNixosSharedHostDeployFrontDoor,
-} from "./deploy-provider-front-door.ts";
+import { runCloudflareDeployFrontDoor } from "./cloudflare-pages-front-door.ts";
 import { resolveSmokeConnectOverride } from "./deployment-cli-smoke.ts";
 import { runFromChangesCli } from "./deployment-from-changes-cli.ts";
-import { isNixosSharedHostDeployment } from "./contract.ts";
+import { isNixosSharedHostDeployment, isS3StaticDeployment } from "./contract.ts";
 import { maybeRunNixosSharedHostRemoteProfile } from "./nixos-shared-host-remote-cli.ts";
+import { runNixosSharedHostDeployFrontDoor } from "./deploy-provider-front-door.ts";
+import { runS3StaticDeployFrontDoor } from "./s3-static-front-door.ts";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();
@@ -96,6 +95,20 @@ async function main() {
     throw new Error(
       "--retire-target/--migrate-target cannot be combined with deploy, publish-only, remove, or preview flags",
     );
+  if (isS3StaticDeployment(deployment)) {
+    await runS3StaticDeployFrontDoor({
+      workspaceRoot,
+      deployment,
+      publishOnly,
+      provisionOnly,
+      rollback,
+      sourceRunId,
+      artifactDirFlag,
+      ...(admissionEvidence ? { admissionEvidence } : {}),
+      ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
+    });
+    return;
+  }
   if (!isNixosSharedHostDeployment(deployment)) {
     await runCloudflareDeployFrontDoor({
       workspaceRoot,

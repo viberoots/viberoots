@@ -8,6 +8,7 @@ import {
 } from "./contract-extract-shared.ts";
 import { extractCloudflarePagesDeploymentsFromContext } from "./contract-extract-cloudflare-pages.ts";
 import { extractNixosSharedHostDeploymentsFromContext } from "./contract-extract-nixos-shared-host.ts";
+import { extractS3StaticDeploymentsFromContext } from "./contract-extract-s3-static.ts";
 
 const DEPLOYMENT_PREREQUISITE_MODES = new Set<DeploymentPrerequisiteMode>([
   "ordering_only",
@@ -96,6 +97,7 @@ export function extractDeployments(nodes: GraphNode[]): {
   const deployments = [
     ...extractNixosSharedHostDeploymentsFromContext(context),
     ...extractCloudflarePagesDeploymentsFromContext(context),
+    ...extractS3StaticDeploymentsFromContext(context),
   ].sort((a, b) => a.label.localeCompare(b.label));
   context.errors.push(...validateDeploymentPrerequisites(deployments));
   return {

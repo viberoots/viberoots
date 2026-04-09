@@ -27,6 +27,7 @@ export function defaultDeploymentRecordRoots(workspaceRoot: string, recordsRoot:
       path.resolve(recordsRoot),
       path.join(workspaceRoot, ".local", "deployments", "nixos-shared-host", "records"),
       path.join(workspaceRoot, ".local", "deployments", "cloudflare-pages", "records"),
+      path.join(workspaceRoot, ".local", "deployments", "s3-static", "records"),
     ]),
   );
 }

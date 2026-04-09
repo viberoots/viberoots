@@ -51,6 +51,10 @@ function sourceArtifactIdentity(source: PromotionSourceLike): string {
   return source.replaySnapshot.artifactIdentity || source.replaySnapshot.artifact?.identity || "";
 }
 
+function provisionerTypeFor(deployment: DeploymentTarget): string {
+  return "provisioner" in deployment ? deployment.provisioner?.type || "" : "";
+}
+
 export function sourcePromotionRevision(source: PromotionSourceLike): string {
   return source.replaySnapshot.admittedContext.source.sourceRevision;
 }
@@ -115,12 +119,8 @@ export function promotionCompatibilityErrors(
   if (rolloutSignature(sourceDeployment) !== rolloutSignature(deployment)) {
     errors.push("rollout semantics mismatch between source and target deployment");
   }
-  const sourceProvisioner =
-    sourceDeployment.provider === "nixos-shared-host"
-      ? sourceDeployment.provisioner?.type || ""
-      : "";
-  const targetProvisioner =
-    deployment.provider === "nixos-shared-host" ? deployment.provisioner?.type || "" : "";
+  const sourceProvisioner = provisionerTypeFor(sourceDeployment);
+  const targetProvisioner = provisionerTypeFor(deployment);
   if (sourceProvisioner !== targetProvisioner) {
     errors.push(
       `provisioner mismatch: current=${targetProvisioner || "<none>"} source=${sourceProvisioner || "<none>"}`,

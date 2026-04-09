@@ -7,6 +7,7 @@ import { findRepoRoot } from "../../lib/repo.ts";
 import { listDeploymentsForCli } from "../../deployments/deploy-front-door.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import { s3StaticDeploymentFixture } from "./s3-static.fixture.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 
 async function writeDeploymentJson(filePath: string, deployment: unknown) {
@@ -57,6 +58,21 @@ test("deploy front door rejects cloudflare-pages --provision-only", async () => 
           stdio: "pipe",
         })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --provision-only`,
       /does not support --provision-only/,
+    );
+  });
+});
+
+test("deploy front door rejects s3-static --provision-only", async () => {
+  await runInTemp("deploy-s3-static-provision-only-guard", async (tmp, $) => {
+    const deploymentJson = path.join(tmp, "deployment.json");
+    await writeDeploymentJson(deploymentJson, s3StaticDeploymentFixture());
+    await assert.rejects(
+      async () =>
+        await $({
+          cwd: tmp,
+          stdio: "pipe",
+        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --provision-only`,
+      /provisions as part of deploy/,
     );
   });
 });
