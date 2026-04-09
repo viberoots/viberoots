@@ -144,11 +144,12 @@ export async function resolveDeploymentFromTarget(
 }
 
 export async function listDeploymentTargets(workspaceRoot: string): Promise<string[]> {
+  const query = 'kind("deployment_target", //projects/deployments/...)';
   const { stdout } = await $({
     cwd: workspaceRoot,
     stdio: "pipe",
     env: deploymentBuckEnv(),
-  })`buck2 ${deploymentIsolationArgs()} cquery --target-platforms prelude//platforms:default kind("deployment_target", //projects/deployments/...) --json --output-attribute name`.quiet();
+  })`buck2 ${deploymentIsolationArgs()} cquery --target-platforms prelude//platforms:default ${query} --json --output-attribute name`.quiet();
   const raw = JSON.parse(String(stdout || "{}")) as Record<string, unknown>;
   return Object.keys(raw)
     .map((target) => normalizeQueryTarget(target))

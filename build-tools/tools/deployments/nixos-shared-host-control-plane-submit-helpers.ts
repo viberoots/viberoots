@@ -99,7 +99,10 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
       workerId,
       lifecycleState: "running",
       execution: {
-        currentStep: opts.operationKind === "explicit_removal" ? "provision" : "publish",
+        currentStep:
+          opts.operationKind === "explicit_removal" || opts.operationKind === "provision_only"
+            ? "provision"
+            : "publish",
         mutationStartedAt: new Date().toISOString(),
       },
     };

@@ -35,17 +35,20 @@ export async function runNixosSharedHostControlPlaneWorker(opts: {
         operationKind:
           snapshot.operationKind === "retry" ||
           snapshot.operationKind === "rollback" ||
-          snapshot.operationKind === "promotion"
+          snapshot.operationKind === "promotion" ||
+          snapshot.operationKind === "provision_only"
             ? snapshot.operationKind
             : "deploy",
         ...(opts.deployRunId ? { deployRunId: opts.deployRunId } : {}),
         publishBehavior: snapshot.action.publishBehavior,
-        ...(snapshot.action.publishInput.kind === "exact-artifact"
-          ? { artifact: snapshot.action.publishInput.artifact }
-          : {
-              componentArtifacts: snapshot.action.publishInput.components,
-              compositeArtifactIdentity: snapshot.action.publishInput.compositeArtifactIdentity,
-            }),
+        ...(snapshot.action.publishInput
+          ? snapshot.action.publishInput.kind === "exact-artifact"
+            ? { artifact: snapshot.action.publishInput.artifact }
+            : {
+                componentArtifacts: snapshot.action.publishInput.components,
+                compositeArtifactIdentity: snapshot.action.publishInput.compositeArtifactIdentity,
+              }
+          : {}),
         statePath: snapshot.paths.statePath,
         hostRoot: snapshot.paths.hostRoot,
         recordsRoot: snapshot.paths.recordsRoot,

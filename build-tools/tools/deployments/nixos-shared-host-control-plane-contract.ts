@@ -20,12 +20,13 @@ export const NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA =
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMISSION_SCHEMA =
   "nixos-shared-host-control-plane-submission@3";
 
-export type NixosSharedHostPublishBehavior = "deploy" | "publish-only";
+export type NixosSharedHostPublishBehavior = "deploy" | "publish-only" | "provision-only";
 export type NixosSharedHostBootstrapMode = "first_install" | "offline_recovery";
 
 export type NixosSharedHostControlPlaneOperationKind =
   | "deploy"
   | "promotion"
+  | "provision_only"
   | "retry"
   | "rollback"
   | "explicit_removal";
@@ -64,7 +65,7 @@ export type NixosSharedHostControlPlaneSnapshot = {
     | {
         kind: "deploy";
         publishBehavior: NixosSharedHostPublishBehavior;
-        publishInput: NixosSharedHostPublishInput;
+        publishInput?: NixosSharedHostPublishInput;
         parentRunId?: string;
         releaseLineageId?: string;
         artifactLineageId?: string;

@@ -19,7 +19,12 @@ import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-com
 
 export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-08";
 
-export type NixosSharedHostOperationKind = "deploy" | "promotion" | "retry" | "rollback";
+export type NixosSharedHostOperationKind =
+  | "deploy"
+  | "promotion"
+  | "provision_only"
+  | "retry"
+  | "rollback";
 export type NixosSharedHostRunClassification = NixosSharedHostOperationKind | "explicit_removal";
 export type NixosSharedHostFinalOutcome =
   | "succeeded"
@@ -184,7 +189,8 @@ export function createNixosSharedHostDeployRecord(
     ...(outcome.componentResults ? { componentResults: outcome.componentResults } : {}),
     ...(outcome.failedStep ? { failedStep: outcome.failedStep } : {}),
     ...(deployment.provisioner ? { provisionerType: deployment.provisioner.type } : {}),
-    ...(outcome.runClassification !== "explicit_removal"
+    ...(outcome.runClassification !== "explicit_removal" &&
+    outcome.runClassification !== "provision_only"
       ? {
           publisherType: deployment.publisher.type,
           smokeRunnerType: "nixos-shared-host-static-webapp-smoke" as const,

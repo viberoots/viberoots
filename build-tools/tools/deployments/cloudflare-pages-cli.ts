@@ -32,7 +32,13 @@ export async function runCloudflarePagesCli(opts: {
     rejectUnauthorized?: boolean;
   };
   cleanupReason: string;
+  provisionOnly: boolean;
 }) {
+  if (opts.provisionOnly) {
+    throw new Error(
+      "cloudflare-pages does not support --provision-only on the repo-level deploy front door",
+    );
+  }
   if (opts.publishOnly) {
     if (!opts.sourceRunId) {
       throw new Error(

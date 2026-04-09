@@ -125,7 +125,10 @@ function plannedStateFor(
 export async function writeNixosSharedHostProvisionerPlan(opts: {
   snapshot: NixosSharedHostControlPlaneSnapshot;
 }): Promise<NixosSharedHostProvisionerPlanRef | undefined> {
-  if (opts.snapshot.action.kind === "deploy" && opts.snapshot.action.publishBehavior !== "deploy") {
+  if (
+    opts.snapshot.action.kind === "deploy" &&
+    opts.snapshot.action.publishBehavior === "publish-only"
+  ) {
     return undefined;
   }
   const current = await readNixosSharedHostPlatformStateOrEmpty(opts.snapshot.paths.statePath);

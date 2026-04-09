@@ -101,6 +101,8 @@ design has been explicitly updated first.
 ## Operator Semantics
 
 - `operation_kind` uses the canonical set: `deploy`, `retry`, `promotion`, `rollback`, `preview_cleanup`.
+- `--list` is the canonical non-mutating repo-level deployment discovery entry point and must keep one stable machine-readable output shape.
+- `--validate-only` is the canonical non-mutating repo-level deployment validation entry point and must not build, publish, or mutate external state.
 - `publish_mode` is a separate field from `operation_kind`.
 - `preview_cleanup` is a destructive housekeeping run against preview resources; it should preserve preview context in records rather than being treated as a normal publish.
 - Retire/migrate-target records must preserve old target identity, new target identity when applicable, the reviewed exception object, and the resulting ownership state.

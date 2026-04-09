@@ -15,7 +15,7 @@ export type NixosSharedHostSourceAdmission = {
   mode: "stage_branch_head" | "source_run_reuse" | "promotion_source_run";
   sourceRef: string;
   sourceRevision: string;
-  artifactIdentity: string;
+  artifactIdentity?: string;
   artifactTrustMode: "recorded_exact_artifact";
   sourceRunId?: string;
   sourceDeploymentId?: string;
@@ -116,7 +116,7 @@ function replayMismatch(field: string, current: string, source: string): string 
 export async function resolveInitialNixosSharedHostAdmittedContext(opts: {
   workspaceRoot: string;
   deployment: NixosSharedHostDeployment;
-  artifactIdentity: string;
+  artifactIdentity?: string;
 }): Promise<NixosSharedHostAdmittedContext> {
   const target = await targetEnvironmentAdmission(opts.workspaceRoot, opts.deployment);
   return {
@@ -135,7 +135,7 @@ export async function resolveInitialNixosSharedHostAdmittedContext(opts: {
 export async function resolveReplayNixosSharedHostAdmittedContext(opts: {
   workspaceRoot: string;
   deployment: NixosSharedHostDeployment;
-  artifactIdentity: string;
+  artifactIdentity?: string;
   sourceRecord: NixosSharedHostDeployRecord;
   sourceReplaySnapshot: NixosSharedHostReplaySnapshot;
   rollback: boolean;
@@ -219,7 +219,7 @@ source revision ${source.source.sourceRevision} is not reachable from ${target.t
 export async function resolvePromotionNixosSharedHostAdmittedContext(opts: {
   workspaceRoot: string;
   deployment: NixosSharedHostDeployment;
-  artifactIdentity: string;
+  artifactIdentity?: string;
   sourceRecord: { deployRunId: string; deploymentId: string };
 }): Promise<NixosSharedHostAdmittedContext> {
   const target = await targetEnvironmentAdmission(opts.workspaceRoot, opts.deployment);
