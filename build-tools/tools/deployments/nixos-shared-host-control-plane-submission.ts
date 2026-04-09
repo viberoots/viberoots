@@ -18,6 +18,7 @@ export function createNixosSharedHostControlPlaneSubmission(
     deployRunId?: string;
     resultRecordPath?: string;
     finalOutcome?: string;
+    progressiveRollout?: NixosSharedHostControlPlaneSubmission["progressiveRollout"];
     requestedBy?: NixosSharedHostControlPlaneSubmission["requestedBy"];
     authorization?: NixosSharedHostControlPlaneSubmission["authorization"];
     rejectionCode?: NixosSharedHostControlPlaneSubmission["rejectionCode"];
@@ -47,6 +48,7 @@ export function createNixosSharedHostControlPlaneSubmission(
     ...(opts.deployRunId ? { deployRunId: opts.deployRunId } : {}),
     ...(opts.resultRecordPath ? { resultRecordPath: opts.resultRecordPath } : {}),
     ...(opts.finalOutcome ? { finalOutcome: opts.finalOutcome } : {}),
+    ...(opts.progressiveRollout ? { progressiveRollout: opts.progressiveRollout } : {}),
     ...(opts.requestedBy ? { requestedBy: opts.requestedBy } : {}),
     ...(opts.authorization ? { authorization: opts.authorization } : {}),
     ...(opts.rejectionCode ? { rejectionCode: opts.rejectionCode } : {}),

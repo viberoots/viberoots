@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
+import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
 import type { DeploymentTarget } from "./contract.ts";
 
 export const DEPLOYMENT_EXTRACTED_METADATA_SCHEMA = "deployment-extracted-metadata@1";
@@ -20,6 +21,7 @@ export type DeploymentControlPlaneLifecycleState =
   | "queued"
   | "waiting_for_lock"
   | "running"
+  | "paused"
   | "cancelling"
   | "finished"
   | "cancelled";
@@ -37,7 +39,8 @@ export type DeploymentControlPlaneSubmitRejectionCode =
   | "approval_no_longer_valid"
   | "idempotency_conflict"
   | "unauthorized"
-  | "no_longer_admitted";
+  | "no_longer_admitted"
+  | "supersedence_blocked";
 
 export type DeploymentControlPlaneRunActionRejectionCode =
   | "approval_required"
@@ -45,7 +48,8 @@ export type DeploymentControlPlaneRunActionRejectionCode =
   | "idempotency_conflict"
   | "unauthorized"
   | "not_resumable"
-  | "no_longer_admitted";
+  | "no_longer_admitted"
+  | "not_paused";
 
 export type DeploymentControlPlaneRole = "submitter" | "approver" | "operator" | "break_glass";
 
@@ -102,7 +106,7 @@ export type DeploymentControlPlaneSubmitRequest = {
   authorization?: DeploymentControlPlaneAuthorization;
 };
 
-export type DeploymentControlPlaneRunAction = "cancel" | "resume";
+export type DeploymentControlPlaneRunAction = "cancel" | "resume" | "abort";
 
 export type DeploymentControlPlaneRunActionRequest = {
   schemaVersion: typeof DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA;
@@ -130,6 +134,7 @@ export type DeploymentControlPlaneResponseBase = {
   deployRunId?: string;
   resultRecordPath?: string;
   finalOutcome?: string;
+  progressiveRollout?: NixosSharedHostProgressiveRollout;
   dedupe: DeploymentControlPlaneRequestDedupe;
   requestedBy?: DeploymentPrincipal;
   authorization?: DeploymentControlPlaneAuthorizationDecision;

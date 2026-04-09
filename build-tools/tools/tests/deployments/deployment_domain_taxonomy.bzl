@@ -7,6 +7,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-control-plane.break-glass.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.observability.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.pending-approval.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-control-plane.progressive-rollout.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.redaction.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.recovery.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.restore.test.ts": True,

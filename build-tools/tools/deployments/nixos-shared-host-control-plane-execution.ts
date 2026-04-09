@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-control-plane-contract.ts";
 import { runNixosSharedHostExplicitRemoval } from "./nixos-shared-host-explicit-removal.ts";
+import type { NixosSharedHostGateEvaluator } from "./nixos-shared-host-progressive-execution.ts";
 import { runNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy.ts";
 import {
   acquireControlPlaneLock,
@@ -13,6 +14,9 @@ export async function runNixosSharedHostControlPlaneWorker(opts: {
   submissionPath: string;
   executionSnapshotPath: string;
   workerId: string;
+  deployRunId?: string;
+  progressiveRollout?: NixosSharedHostControlPlaneSnapshot["progressiveRollout"];
+  gateEvaluator?: NixosSharedHostGateEvaluator;
 }): Promise<{ record: NixosSharedHostDeployRecord; recordPath: string }> {
   const snapshot = await readControlPlaneJson<NixosSharedHostControlPlaneSnapshot>(
     opts.executionSnapshotPath,
@@ -34,6 +38,7 @@ export async function runNixosSharedHostControlPlaneWorker(opts: {
           snapshot.operationKind === "promotion"
             ? snapshot.operationKind
             : "deploy",
+        ...(opts.deployRunId ? { deployRunId: opts.deployRunId } : {}),
         publishBehavior: snapshot.action.publishBehavior,
         ...(snapshot.action.publishInput.kind === "exact-artifact"
           ? { artifact: snapshot.action.publishInput.artifact }
@@ -59,11 +64,13 @@ export async function runNixosSharedHostControlPlaneWorker(opts: {
         ...(snapshot.recordedReleaseActions
           ? { releaseActions: snapshot.recordedReleaseActions }
           : {}),
+        ...(opts.progressiveRollout ? { progressiveRollout: opts.progressiveRollout } : {}),
         ...(snapshot.provisionerPlan ? { provisionerPlan: snapshot.provisionerPlan } : {}),
         ...(snapshot.paths.hostConfigPath ? { hostConfigPath: snapshot.paths.hostConfigPath } : {}),
         ...(snapshot.smokeConnectOverride
           ? { smokeConnectOverride: snapshot.smokeConnectOverride }
           : {}),
+        ...(opts.gateEvaluator ? { gateEvaluator: opts.gateEvaluator } : {}),
         authority,
       })
     : await runNixosSharedHostExplicitRemoval({

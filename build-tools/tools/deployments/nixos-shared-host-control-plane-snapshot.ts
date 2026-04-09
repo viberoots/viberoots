@@ -35,6 +35,7 @@ import {
 } from "./nixos-shared-host-publish-input.ts";
 import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
 import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
+import { createNixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
 import { normalizeSingleComponentArtifactInput } from "./nixos-shared-host-single-component-artifact-input.ts";
 
 export type NixosSharedHostControlPlaneSourceSelection = {
@@ -201,6 +202,7 @@ export async function createNixosSharedHostControlPlaneSnapshot(
               deployment: opts.deployment,
               artifactIdentity,
             });
+  const progressiveRollout = createNixosSharedHostProgressiveRollout(opts.deployment);
   return {
     schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA,
     submissionId,
@@ -212,6 +214,7 @@ export async function createNixosSharedHostControlPlaneSnapshot(
     providerTargetIdentity: nixosSharedHostDeploymentTargetIdentity(opts.deployment),
     lockScope,
     deployment: opts.deployment,
+    ...(progressiveRollout ? { progressiveRollout } : {}),
     ...(hasReplaySnapshot(opts.source)
       ? { recordedReleaseActions: opts.source.replaySnapshot.deployment.releaseActions }
       : {}),

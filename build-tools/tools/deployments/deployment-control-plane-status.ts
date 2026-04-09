@@ -29,6 +29,7 @@ function toStatusBase(submission: SubmissionLike): DeploymentControlPlaneRespons
     ...(submission.deployRunId ? { deployRunId: submission.deployRunId } : {}),
     ...(submission.resultRecordPath ? { resultRecordPath: submission.resultRecordPath } : {}),
     ...(submission.finalOutcome ? { finalOutcome: submission.finalOutcome } : {}),
+    ...(submission.progressiveRollout ? { progressiveRollout: submission.progressiveRollout } : {}),
     dedupe: submission.dedupe,
     ...(submission.requestedBy ? { requestedBy: submission.requestedBy } : {}),
     ...(submission.authorization ? { authorization: submission.authorization } : {}),

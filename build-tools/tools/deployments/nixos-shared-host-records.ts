@@ -5,6 +5,7 @@ import path from "node:path";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
 import type { NixosSharedHostMutationAuthority } from "./nixos-shared-host-control-plane-contract.ts";
+import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
 import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
 import {
   NIXOS_SHARED_HOST_PROVIDER,
@@ -21,6 +22,7 @@ export type NixosSharedHostOperationKind = "deploy" | "promotion" | "retry" | "r
 export type NixosSharedHostRunClassification = NixosSharedHostOperationKind | "explicit_removal";
 export type NixosSharedHostFinalOutcome =
   | "succeeded"
+  | "aborted"
   | "provision_failed"
   | "release_action_failed"
   | "publish_failed"
@@ -42,6 +44,7 @@ export type NixosSharedHostDeployRecord = {
   lifecycleState: "finished";
   terminationReason: null;
   finalOutcome: NixosSharedHostFinalOutcome;
+  progressiveRollout?: NixosSharedHostProgressiveRollout;
   deploymentId: string;
   deploymentLabel: string;
   provider: typeof NIXOS_SHARED_HOST_PROVIDER;
@@ -97,6 +100,7 @@ type NixosSharedHostRecordOutcome = {
   operationKind?: NixosSharedHostOperationKind;
   runClassification: NixosSharedHostRunClassification;
   finalOutcome: NixosSharedHostFinalOutcome;
+  progressiveRollout?: NixosSharedHostProgressiveRollout;
   artifactIdentity?: string;
   failedStep?: NixosSharedHostFailedStep;
   publicUrl?: string;
@@ -134,6 +138,7 @@ export function createNixosSharedHostDeployRecord(
     lifecycleState: "finished",
     terminationReason: null,
     finalOutcome: outcome.finalOutcome,
+    ...(outcome.progressiveRollout ? { progressiveRollout: outcome.progressiveRollout } : {}),
     deploymentId: deployment.deploymentId,
     deploymentLabel: deployment.label,
     provider: NIXOS_SHARED_HOST_PROVIDER,

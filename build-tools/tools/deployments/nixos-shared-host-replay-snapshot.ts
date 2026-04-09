@@ -11,6 +11,7 @@ import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
+import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
 import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
 import {
   nixosSharedHostPublishInputArtifactIdentity,
@@ -31,6 +32,7 @@ export type NixosSharedHostReplaySnapshot = {
   artifact?: NixosSharedHostAdmittedArtifact;
   publishInput: NixosSharedHostPublishInput;
   componentResults?: NixosSharedHostComponentResult[];
+  progressiveRollout?: NixosSharedHostProgressiveRollout;
   admittedContext: NixosSharedHostAdmittedContext;
   deployment: NixosSharedHostDeployment;
   provisionerPlan?: NixosSharedHostProvisionerPlanRef;
@@ -106,6 +108,7 @@ export async function writeNixosSharedHostReplaySnapshot(opts: {
   hostConfig: unknown;
   provisionerPlan?: NixosSharedHostProvisionerPlanRef;
   controlPlaneExecutionSnapshotPath?: string;
+  progressiveRollout?: NixosSharedHostProgressiveRollout;
 }) {
   const replaySnapshotPath = replaySnapshotPathFor(opts.recordsRoot, opts.deployRunId);
   const platformStateSnapshotPath = platformStateSnapshotPathFor(
@@ -128,6 +131,7 @@ export async function writeNixosSharedHostReplaySnapshot(opts: {
     artifactIdentity: nixosSharedHostPublishInputArtifactIdentity(publishInput),
     ...(publishInput.kind === "exact-artifact" ? { artifact: publishInput.artifact } : {}),
     publishInput,
+    ...(opts.progressiveRollout ? { progressiveRollout: opts.progressiveRollout } : {}),
     admittedContext: opts.admittedContext,
     deployment: opts.deployment,
     ...(opts.provisionerPlan ? { provisionerPlan: opts.provisionerPlan } : {}),
@@ -149,11 +153,13 @@ export async function writeNixosSharedHostReplaySnapshot(opts: {
 export async function writeNixosSharedHostReplayComponentResults(
   replaySnapshotPath: string,
   componentResults: NixosSharedHostComponentResult[],
+  progressiveRollout?: NixosSharedHostProgressiveRollout,
 ): Promise<void> {
   const snapshot = await readNixosSharedHostReplaySnapshot(replaySnapshotPath);
   await writeSnapshotDocument(replaySnapshotPath, {
     ...snapshot,
     componentResults,
+    ...(progressiveRollout ? { progressiveRollout } : {}),
   } satisfies NixosSharedHostReplaySnapshot);
 }
 

@@ -22,7 +22,7 @@ test("recovery converges to the existing authoritative record and preserves canc
     const submissionPath = path.join(recordsRoot, "control-plane", "submissions", "cp-1.json");
     const deployment = nixosSharedHostDeploymentFixture();
     await writeSubmission(submissionPath, {
-      schemaVersion: "nixos-shared-host-control-plane-submission@2",
+      schemaVersion: "nixos-shared-host-control-plane-submission@3",
       submissionId: "cp-1",
       submittedAt: "2026-04-08T10:00:00.000Z",
       operationKind: "deploy",
@@ -80,7 +80,7 @@ test("recovery fails closed when reconciliation cannot prove whether mutation ha
     const submissionPath = path.join(recordsRoot, "control-plane", "submissions", "cp-2.json");
     const deployment = nixosSharedHostDeploymentFixture();
     await writeSubmission(submissionPath, {
-      schemaVersion: "nixos-shared-host-control-plane-submission@2",
+      schemaVersion: "nixos-shared-host-control-plane-submission@3",
       submissionId: "cp-2",
       submittedAt: "2026-04-08T10:00:00.000Z",
       operationKind: "deploy",

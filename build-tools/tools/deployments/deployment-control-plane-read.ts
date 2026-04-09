@@ -22,6 +22,7 @@ type SubmissionRecord = {
     | "queued"
     | "waiting_for_lock"
     | "running"
+    | "paused"
     | "cancelling"
     | "finished"
     | "cancelled";
@@ -49,7 +50,7 @@ type SubmissionRecord = {
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
   latestAction?: {
     actionId: string;
-    action: "cancel" | "resume";
+    action: "cancel" | "resume" | "abort";
     submittedAt: string;
     dedupe: {
       mode: "created" | "reused";
@@ -61,6 +62,7 @@ type SubmissionRecord = {
       | "queued"
       | "waiting_for_lock"
       | "running"
+      | "paused"
       | "cancelling"
       | "finished"
       | "cancelled";
@@ -71,7 +73,8 @@ type SubmissionRecord = {
       | "idempotency_conflict"
       | "unauthorized"
       | "no_longer_admitted"
-      | "not_resumable";
+      | "not_resumable"
+      | "not_paused";
   };
 };
 
@@ -86,6 +89,28 @@ async function submissionPathFromRecord(recordPath: string): Promise<string> {
   return path.resolve(submissionPath);
 }
 
+async function submissionPathFromDeployRunId(
+  recordsRoot: string,
+  deployRunId: string,
+): Promise<string> {
+  const runsPath = path.join(path.resolve(recordsRoot), "runs", `${deployRunId}.json`);
+  try {
+    return await submissionPathFromRecord(runsPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") throw error;
+  }
+  const submissionsRoot = path.join(path.resolve(recordsRoot), "control-plane", "submissions");
+  for (const entry of await fsp.readdir(submissionsRoot)) {
+    if (!entry.endsWith(".json")) continue;
+    const submissionPath = path.join(submissionsRoot, entry);
+    const submission = JSON.parse(await fsp.readFile(submissionPath, "utf8")) as SubmissionRecord;
+    if (submission.deployRunId === deployRunId) return submissionPath;
+  }
+  throw Object.assign(new Error(`no submission found for deploy run ${deployRunId}`), {
+    code: "ENOENT",
+  });
+}
+
 async function resolveSubmissionPath(opts: {
   recordsRoot?: string;
   submissionId?: string;
@@ -96,9 +121,7 @@ async function resolveSubmissionPath(opts: {
   if (opts.submissionPath) return path.resolve(opts.submissionPath);
   if (opts.recordPath) return await submissionPathFromRecord(path.resolve(opts.recordPath));
   if (opts.recordsRoot && opts.deployRunId) {
-    return await submissionPathFromRecord(
-      path.join(path.resolve(opts.recordsRoot), "runs", `${opts.deployRunId}.json`),
-    );
+    return await submissionPathFromDeployRunId(opts.recordsRoot, opts.deployRunId);
   }
   if (opts.recordsRoot && opts.submissionId) {
     return submissionPathFor(opts.recordsRoot, opts.submissionId);

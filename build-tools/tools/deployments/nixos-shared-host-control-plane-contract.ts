@@ -4,6 +4,7 @@ import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 import type { NixosSharedHostPublishInput } from "./nixos-shared-host-publish-input.ts";
+import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
 import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
 import type {
   DeploymentControlPlaneAuthorizationDecision,
@@ -15,9 +16,9 @@ import type {
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA =
-  "nixos-shared-host-control-plane-snapshot@3";
+  "nixos-shared-host-control-plane-snapshot@4";
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMISSION_SCHEMA =
-  "nixos-shared-host-control-plane-submission@2";
+  "nixos-shared-host-control-plane-submission@3";
 
 export type NixosSharedHostPublishBehavior = "deploy" | "publish-only";
 
@@ -53,6 +54,7 @@ export type NixosSharedHostControlPlaneSnapshot = {
   providerTargetIdentity: string;
   lockScope: string;
   deployment: NixosSharedHostDeployment;
+  progressiveRollout?: NixosSharedHostProgressiveRollout;
   recordedReleaseActions?: DeploymentReleaseAction[];
   provisionerPlan?: NixosSharedHostProvisionerPlanRef;
   admittedContext?: NixosSharedHostAdmittedContext;
@@ -99,18 +101,19 @@ export type NixosSharedHostControlPlaneSubmission = {
   deployRunId?: string;
   resultRecordPath?: string;
   finalOutcome?: string;
+  progressiveRollout?: NixosSharedHostProgressiveRollout;
   requestedBy?: DeploymentPrincipal;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
   rejectionCode?: DeploymentControlPlaneSubmitRejectionCode;
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
   latestAction?: {
     actionId: string;
-    action: "cancel" | "resume";
+    action: "cancel" | "resume" | "abort";
     submittedAt: string;
     dedupe: DeploymentControlPlaneRequestDedupe;
     lifecycleState: DeploymentControlPlaneLifecycleState;
     requestedBy?: DeploymentPrincipal;
-    rejectionCode?: DeploymentControlPlaneSubmitRejectionCode | "not_resumable";
+    rejectionCode?: DeploymentControlPlaneSubmitRejectionCode | "not_resumable" | "not_paused";
   };
   execution?: {
     currentStep:

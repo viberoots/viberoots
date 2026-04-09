@@ -47,7 +47,7 @@ test("pending approval submissions are observable and cancel idempotently before
         submissionPath = String(error.submissionPath || "");
         assert.equal(
           error.submission.schemaVersion,
-          "nixos-shared-host-control-plane-submission@2",
+          "nixos-shared-host-control-plane-submission@3",
         );
         assert.equal(error.submission.lifecycleState, "pending_approval");
         assert.equal(error.submission.pendingReasonCode, "approval_required");
@@ -95,7 +95,7 @@ test("resume fails closed for current non-resumable submissions", async () => {
       submissionPath,
       JSON.stringify(
         {
-          schemaVersion: "nixos-shared-host-control-plane-submission@2",
+          schemaVersion: "nixos-shared-host-control-plane-submission@3",
           submissionId: "submission-1",
           submittedAt: "2026-04-06T12:00:00.000Z",
           operationKind: "deploy",

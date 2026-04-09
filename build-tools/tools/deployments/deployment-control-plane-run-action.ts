@@ -12,6 +12,10 @@ import {
 } from "./deployment-control-plane-idempotency.ts";
 import { runActionResponseFromSubmission } from "./deployment-control-plane-status.ts";
 import {
+  abortPausedProgressiveRun,
+  resumePausedProgressiveRun,
+} from "./deployment-control-plane-progressive-run-action.ts";
+import {
   readControlPlaneJson,
   runActionRequestPathFor,
   writeControlPlaneJson,
@@ -32,6 +36,7 @@ type SubmissionRecord = {
     | "queued"
     | "waiting_for_lock"
     | "running"
+    | "paused"
     | "cancelling"
     | "finished"
     | "cancelled";
@@ -53,6 +58,10 @@ type SubmissionRecord = {
       | "release_actions.post_smoke";
     mutationStartedAt?: string;
   };
+  deployRunId?: string;
+  resultRecordPath?: string;
+  finalOutcome?: string;
+  progressiveRollout?: any;
   cancellationRequested?: {
     requestedAt: string;
     requestedBy: DeploymentPrincipal;
@@ -76,7 +85,7 @@ type SubmissionRecord = {
   };
   latestAction?: {
     actionId: string;
-    action: "cancel" | "resume";
+    action: "cancel" | "resume" | "abort";
     submittedAt: string;
     dedupe: {
       mode: "created" | "reused";
@@ -88,6 +97,7 @@ type SubmissionRecord = {
       | "queued"
       | "waiting_for_lock"
       | "running"
+      | "paused"
       | "cancelling"
       | "finished"
       | "cancelled";
@@ -99,7 +109,8 @@ type SubmissionRecord = {
       | "idempotency_conflict"
       | "unauthorized"
       | "no_longer_admitted"
-      | "not_resumable";
+      | "not_resumable"
+      | "not_paused";
   };
 };
 
@@ -107,7 +118,16 @@ function nextLifecycleState(
   lifecycleState: SubmissionRecord["lifecycleState"],
   action: DeploymentControlPlaneRunAction,
 ) {
-  if (action === "resume") return { lifecycleState, rejectionCode: "not_resumable" as const };
+  if (action === "resume") {
+    return lifecycleState === "paused"
+      ? { lifecycleState: "running" as const }
+      : { lifecycleState, rejectionCode: "not_resumable" as const };
+  }
+  if (action === "abort") {
+    return lifecycleState === "paused"
+      ? { lifecycleState: "finished" as const }
+      : { lifecycleState, rejectionCode: "not_paused" as const };
+  }
   if (
     lifecycleState === "pending_approval" ||
     lifecycleState === "queued" ||
@@ -156,6 +176,23 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
     ...(opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : {}),
   });
   const next = nextLifecycleState(submission.lifecycleState, opts.action);
+  if (opts.action === "abort" && submission.lifecycleState === "paused") {
+    await abortPausedProgressiveRun({
+      recordsRoot: opts.recordsRoot,
+      submissionPath: opts.submissionPath,
+      submission,
+      actionId,
+      submittedAt,
+      requestedBy,
+      dedupe: {
+        mode: dedupe.mode,
+        requestFingerprint,
+        ...(opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : {}),
+      },
+    });
+    const status = await readDeploymentControlPlaneStatus({ submissionPath: opts.submissionPath });
+    return runActionResponseFromSubmission(status, actionId, opts.action);
+  }
   const updated = {
     ...submission,
     lifecycleState: next.lifecycleState,
@@ -196,8 +233,18 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
       : {}),
   };
   await writeControlPlaneJson(opts.submissionPath, updated);
-  const status = await readDeploymentControlPlaneStatus({
-    submissionPath: opts.submissionPath,
-  });
+  if (
+    opts.action === "resume" &&
+    submission.lifecycleState === "paused" &&
+    submission.progressiveRollout?.resumable
+  ) {
+    await resumePausedProgressiveRun({
+      recordsRoot: opts.recordsRoot,
+      submissionPath: opts.submissionPath,
+      submission,
+      updated,
+    });
+  }
+  const status = await readDeploymentControlPlaneStatus({ submissionPath: opts.submissionPath });
   return runActionResponseFromSubmission(status, actionId, opts.action);
 }

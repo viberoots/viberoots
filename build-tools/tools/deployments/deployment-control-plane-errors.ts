@@ -7,7 +7,8 @@ import type {
 export type DeploymentAdmissionFailureCode =
   | "approval_required"
   | "approval_no_longer_valid"
-  | "no_longer_admitted";
+  | "no_longer_admitted"
+  | "supersedence_blocked";
 
 export class DeploymentControlPlaneError extends Error {
   code:

@@ -2,6 +2,7 @@
 import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
+import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
 import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
 import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
 import { writeNixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
@@ -36,6 +37,7 @@ export function staticDeployRecordFields(opts: {
   provisionerPlan?: NixosSharedHostProvisionerPlanRef;
   deploymentMetadataFingerprint?: string;
   replaySnapshotPath?: string;
+  progressiveRollout?: NixosSharedHostProgressiveRollout;
 }) {
   return {
     ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
@@ -48,6 +50,7 @@ export function staticDeployRecordFields(opts: {
       ? { deploymentMetadataFingerprint: opts.deploymentMetadataFingerprint }
       : {}),
     ...(opts.replaySnapshotPath ? { replaySnapshotPath: opts.replaySnapshotPath } : {}),
+    ...(opts.progressiveRollout ? { progressiveRollout: opts.progressiveRollout } : {}),
   };
 }
 
@@ -63,6 +66,7 @@ export async function captureStaticDeployReplaySnapshot(opts: {
   hostConfig: unknown;
   provisionerPlan?: NixosSharedHostProvisionerPlanRef;
   controlPlaneExecutionSnapshotPath: string;
+  progressiveRollout?: NixosSharedHostProgressiveRollout;
 }) {
   if (!opts.artifact && opts.componentArtifacts.length === 0) return {};
   return await writeNixosSharedHostReplaySnapshot({
@@ -77,6 +81,7 @@ export async function captureStaticDeployReplaySnapshot(opts: {
     admittedContext: opts.admittedContext,
     platformState: opts.platformState,
     hostConfig: opts.hostConfig,
+    ...(opts.progressiveRollout ? { progressiveRollout: opts.progressiveRollout } : {}),
     ...(opts.provisionerPlan ? { provisionerPlan: opts.provisionerPlan } : {}),
     controlPlaneExecutionSnapshotPath: opts.controlPlaneExecutionSnapshotPath,
   });
