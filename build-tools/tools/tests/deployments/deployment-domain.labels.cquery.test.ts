@@ -7,8 +7,8 @@ import {
   DEPLOYMENT_DOMAIN_LABEL,
   REVIEWED_DEPLOYMENT_TEST_AREA,
 } from "../../lib/deployment-verify-scope.ts";
+import { resolveNestedBuckIsolation } from "../../lib/buck-command-env.ts";
 import { normalizeTargetLabel } from "../../lib/labels.ts";
-import { inheritedBuckIsolation } from "../lib/test-helpers.ts";
 
 function autoZxTargetForScript(scriptPath: string): string {
   let name = scriptPath;
@@ -56,16 +56,46 @@ function buckEnv(): NodeJS.ProcessEnv {
   };
 }
 
+async function runCqueryWithScopedIsolation(opts: {
+  root: string;
+  isolationPrefix: string;
+  query: string;
+  attrs: string[];
+}): Promise<string> {
+  const { isolationDir, ownsIsolation } = resolveNestedBuckIsolation({
+    root: opts.root,
+    prefix: opts.isolationPrefix,
+  });
+  try {
+    const result = await $({
+      cwd: opts.root,
+      stdio: "pipe",
+      env: buckEnv(),
+    })`buck2 --isolation-dir ${isolationDir} cquery --target-platforms prelude//platforms:default ${opts.query} --json ${opts.attrs.flatMap((attr) => ["--output-attribute", attr])}`.quiet();
+    return String(result.stdout || "{}");
+  } finally {
+    if (ownsIsolation) {
+      await $({
+        cwd: opts.root,
+        stdio: "ignore",
+        reject: false,
+        env: buckEnv(),
+      })`buck2 --isolation-dir ${isolationDir} kill`;
+    }
+  }
+}
+
 test("deployment-domain label cquery resolves the reviewed deployment test suite", async () => {
   const root = process.cwd();
   const expected = (await deploymentTestScripts(root)).map(autoZxTargetForScript).sort();
   const query = `attrfilter(labels, "${DEPLOYMENT_DOMAIN_LABEL}", //...)`;
-  const result = await $({
-    cwd: root,
-    stdio: "pipe",
-    env: buckEnv(),
-  })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-domain-label-cquery")} cquery --target-platforms prelude//platforms:default ${query} --json --output-attribute name`.quiet();
-  assert.deepEqual(parseCqueryTargets(String(result.stdout || "{}")), expected);
+  const stdout = await runCqueryWithScopedIsolation({
+    root,
+    isolationPrefix: "deployment-domain-label-cquery",
+    query,
+    attrs: ["name"],
+  });
+  assert.deepEqual(parseCqueryTargets(stdout), expected);
 });
 
 test("reviewed non-deployment tests do not acquire the deployment-domain label", async () => {
@@ -75,12 +105,13 @@ test("reviewed non-deployment tests do not acquire the deployment-domain label",
     "build-tools/tools/tests/lib/providers.patch-filename.policy.test.ts",
   ];
   const query = `set(${sampleScripts.map(autoZxTargetForScript).join(" ")})`;
-  const result = await $({
-    cwd: root,
-    stdio: "pipe",
-    env: buckEnv(),
-  })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-domain-negative-cquery")} cquery --target-platforms prelude//platforms:default ${query} --json --output-attribute labels`.quiet();
-  const labelsByTarget = parseCqueryLabels(String(result.stdout || "{}"));
+  const stdout = await runCqueryWithScopedIsolation({
+    root,
+    isolationPrefix: "deployment-domain-negative-cquery",
+    query,
+    attrs: ["labels"],
+  });
+  const labelsByTarget = parseCqueryLabels(stdout);
   for (const script of sampleScripts) {
     const target = autoZxTargetForScript(script);
     assert.ok(labelsByTarget.has(target), `expected cquery labels for ${target}`);
