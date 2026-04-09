@@ -16,6 +16,7 @@ import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
 import { recordAuthorityFields } from "./nixos-shared-host-record-authority.ts";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
+import { SSR_WEBAPP_COMPONENT } from "./contract.ts";
 
 export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-08";
 
@@ -107,7 +108,7 @@ export type NixosSharedHostDeployRecord = {
   failedStep?: NixosSharedHostFailedStep;
   provisionerType?: string;
   publisherType?: string;
-  smokeRunnerType?: "nixos-shared-host-static-webapp-smoke";
+  smokeRunnerType?: "nixos-shared-host-static-webapp-smoke" | "nixos-shared-host-ssr-webapp-smoke";
   provisionerPlan?: NixosSharedHostProvisionerPlanRef;
   deploymentMetadataFingerprint?: string;
   replaySnapshotPath?: string;
@@ -193,7 +194,10 @@ export function createNixosSharedHostDeployRecord(
     outcome.runClassification !== "provision_only"
       ? {
           publisherType: deployment.publisher.type,
-          smokeRunnerType: "nixos-shared-host-static-webapp-smoke" as const,
+          smokeRunnerType:
+            deployment.component.kind === SSR_WEBAPP_COMPONENT
+              ? ("nixos-shared-host-ssr-webapp-smoke" as const)
+              : ("nixos-shared-host-static-webapp-smoke" as const),
         }
       : {}),
     ...(outcome.provisionerPlan ? { provisionerPlan: outcome.provisionerPlan } : {}),

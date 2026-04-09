@@ -1,5 +1,10 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostDeployment, NixosSharedHostDeploymentComponent } from "./contract.ts";
+import {
+  SSR_WEBAPP_COMPONENT,
+  hasNixosSharedHostSsrRuntimeContract,
+  type NixosSharedHostDeployment,
+  type NixosSharedHostDeploymentComponent,
+} from "./contract.ts";
 import {
   type NixosSharedHostPlatformState,
   validateNixosSharedHostPlatformState,
@@ -11,12 +16,14 @@ export type NixosSharedHostContainer = {
   hostname: string;
   backendIdentity: string;
   backendAddress: string;
-  runtime: "static-app-host";
+  runtime: "static-app-host" | "ssr-webapp-host";
   containerPort: number;
   publishRoot: string;
   releaseRoot: string;
   activeReleaseLink: string;
   healthPath?: string;
+  serverEntry?: string;
+  clientDir?: string;
 };
 
 export type NixosSharedHostRoute = {
@@ -87,19 +94,35 @@ export function renderNixosSharedHostConfig(
   const containers = Object.fromEntries(
     flattenedDeployments(state).map(({ component }) => [
       component.providerTarget.containerName,
-      {
-        containerName: component.providerTarget.containerName,
-        targetGroup: component.providerTarget.targetGroup,
-        hostname: component.providerTarget.hostname,
-        backendIdentity: backendIdentityFor(component),
-        backendAddress: backendAddressFor(component),
-        runtime: "static-app-host",
-        containerPort: component.runtime.containerPort,
-        publishRoot: "/srv/static-app/current",
-        releaseRoot: "/srv/static-app/releases",
-        activeReleaseLink: "/srv/static-app/live",
-        ...(component.runtime.healthPath ? { healthPath: component.runtime.healthPath } : {}),
-      },
+      component.kind === SSR_WEBAPP_COMPONENT && hasNixosSharedHostSsrRuntimeContract(component)
+        ? {
+            containerName: component.providerTarget.containerName,
+            targetGroup: component.providerTarget.targetGroup,
+            hostname: component.providerTarget.hostname,
+            backendIdentity: backendIdentityFor(component),
+            backendAddress: backendAddressFor(component),
+            runtime: "ssr-webapp-host" as const,
+            containerPort: component.runtime.containerPort,
+            publishRoot: "/srv/ssr-app/current",
+            releaseRoot: "/srv/ssr-app/releases",
+            activeReleaseLink: "/srv/ssr-app/live",
+            serverEntry: `/srv/ssr-app/live/${component.runtime.runtimeContract.serverEntry}`,
+            clientDir: `/srv/ssr-app/live/${component.runtime.runtimeContract.clientDir}`,
+            ...(component.runtime.healthPath ? { healthPath: component.runtime.healthPath } : {}),
+          }
+        : {
+            containerName: component.providerTarget.containerName,
+            targetGroup: component.providerTarget.targetGroup,
+            hostname: component.providerTarget.hostname,
+            backendIdentity: backendIdentityFor(component),
+            backendAddress: backendAddressFor(component),
+            runtime: "static-app-host" as const,
+            containerPort: component.runtime.containerPort,
+            publishRoot: "/srv/static-app/current",
+            releaseRoot: "/srv/static-app/releases",
+            activeReleaseLink: "/srv/static-app/live",
+            ...(component.runtime.healthPath ? { healthPath: component.runtime.healthPath } : {}),
+          },
     ]),
   );
 

@@ -86,3 +86,42 @@ test("promotion compatibility rejects provisioner drift inside one lane", () => 
   const errors = promotionCompatibilityErrors(target, source);
   assert.ok(errors.some((entry) => entry.includes("provisioner mismatch")));
 });
+
+test("promotion compatibility rejects SSR runtime-contract drift inside one lane", () => {
+  const sourceDeployment = nixosSharedHostDeploymentFixture({
+    component: { kind: "ssr-webapp", target: "//projects/apps/demoapp:app" },
+  });
+  const target = nixosSharedHostDeploymentFixture({
+    environmentStage: "staging",
+    component: { kind: "ssr-webapp", target: "//projects/apps/demoapp:app" },
+    runtime: {
+      ...sourceDeployment.runtime!,
+      runtimeContract: {
+        ...(sourceDeployment.runtime as any).runtimeContract,
+        framework: "next",
+      },
+    } as any,
+    admissionPolicy: nixosSharedHostAdmissionPolicyFixture({
+      ref: "//projects/deployments/pleomino-shared:staging_release",
+      name: "staging_release",
+      allowedRefs: ["env/pleomino/staging"],
+      requiredChecks: [],
+    }),
+  });
+  const errors = promotionCompatibilityErrors(target, {
+    record: {
+      finalOutcome: "succeeded",
+      publishMode: "normal",
+      deploymentId: sourceDeployment.deploymentId,
+    },
+    replaySnapshot: {
+      artifact: { identity: "artifact-compat-123" },
+      admittedContext: {
+        lanePolicyFingerprint: sourceDeployment.lanePolicy.fingerprint,
+        source: { sourceRevision: "rev-source-123" },
+      },
+      deployment: sourceDeployment,
+    },
+  });
+  assert.ok(errors.some((entry) => entry.includes("runtime contract mismatch")));
+});

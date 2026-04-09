@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import {
-  admitNixosSharedHostStaticArtifact,
+  admitNixosSharedHostArtifact,
   type NixosSharedHostAdmittedArtifact,
 } from "./nixos-shared-host-artifacts.ts";
 import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint.ts";
@@ -24,9 +24,10 @@ export async function admitNixosSharedHostComponentArtifacts(opts: {
     }
     resolved.push({
       componentId: component.id,
-      artifact: await admitNixosSharedHostStaticArtifact({
+      artifact: await admitNixosSharedHostArtifact({
         recordsRoot: opts.recordsRoot,
         artifactDir,
+        kind: component.kind,
       }),
     });
   }

@@ -507,6 +507,13 @@ Resolved component expectations:
   `artifact_ref`
 - `ssr-webapp` should also preserve the reviewed runtime-contract reference required by the
   publisher/runtime slice
+  - for the reviewed `nixos-shared-host` SSR slice that means:
+    - `type = "node-dist-server-v1"`
+    - `framework`
+    - `serverEntry = "dist/server/index.js"`
+    - `clientDir = "dist/client"`
+    - `servingTopology = "single-host-node-with-nginx"`
+    - `environmentNeutralBuild = true`
 - default smoke or release-health classification should derive from the reviewed component kind:
   - `static-webapp`: HTTP smoke, 5 minute budget
   - `ssr-webapp`: HTTP or runtime-contract smoke, 10 minute budget

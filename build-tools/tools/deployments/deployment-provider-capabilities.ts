@@ -31,7 +31,7 @@ export type DeploymentProviderCapability = {
 const PROVIDER_CAPABILITIES: Record<string, DeploymentProviderCapability> = {
   "nixos-shared-host": {
     provider: "nixos-shared-host",
-    supportedComponentKinds: [STATIC_WEBAPP_COMPONENT_KIND],
+    supportedComponentKinds: [STATIC_WEBAPP_COMPONENT_KIND, SSR_WEBAPP_COMPONENT_KIND],
     multiComponentKinds: [STATIC_WEBAPP_COMPONENT_KIND],
     supportedRolloutModes: ["all_at_once", "ordered_best_effort"],
     defaultRolloutMode: "all_at_once",

@@ -13,7 +13,7 @@ import {
 
 const SHARED_NONPROD = "shared_nonprod";
 
-export type RawStaticWebappComponent = {
+export type RawNixosSharedHostComponent = {
   id: string;
   kind: string;
   target: string;
@@ -21,9 +21,15 @@ export type RawStaticWebappComponent = {
   containerPort: number;
   healthPath: string;
   targetGroup: string;
+  ssrFramework: string;
+  ssrRuntimeContract: string;
+  ssrServerEntry: string;
+  ssrClientDir: string;
+  ssrServingTopology: string;
+  ssrEnvironmentNeutralBuild: string;
 };
 
-export function readRawStaticWebappComponents(node: GraphNode): RawStaticWebappComponent[] {
+export function readRawNixosSharedHostComponents(node: GraphNode): RawNixosSharedHostComponent[] {
   const legacyTarget = readLabel(node, "component");
   const legacyKind = readString(node, "component_kind");
   const legacyAppName = readString(node, "app_name");
@@ -38,6 +44,12 @@ export function readRawStaticWebappComponents(node: GraphNode): RawStaticWebappC
     containerPort: Number(entry.container_port || 0),
     healthPath: entry.health_path || "",
     targetGroup: entry.target_group || legacyTargetGroup,
+    ssrFramework: entry.ssr_framework || "",
+    ssrRuntimeContract: entry.ssr_runtime_contract || "",
+    ssrServerEntry: entry.ssr_server_entry || "",
+    ssrClientDir: entry.ssr_client_dir || "",
+    ssrServingTopology: entry.ssr_serving_topology || "",
+    ssrEnvironmentNeutralBuild: entry.ssr_environment_neutral_build || "",
   }));
   if (raw.length > 0) return raw;
   return [
@@ -49,6 +61,12 @@ export function readRawStaticWebappComponents(node: GraphNode): RawStaticWebappC
       containerPort: legacyPort,
       healthPath: legacyHealthPath,
       targetGroup: legacyTargetGroup,
+      ssrFramework: "",
+      ssrRuntimeContract: "",
+      ssrServerEntry: "",
+      ssrClientDir: "",
+      ssrServingTopology: "",
+      ssrEnvironmentNeutralBuild: "",
     },
   ];
 }
@@ -60,7 +78,7 @@ export function componentError(label: string, componentId: string, message: stri
 export function rolloutPolicyErrorsForNixosSharedHost(
   label: string,
   protectionClass: string,
-  components: RawStaticWebappComponent[],
+  components: RawNixosSharedHostComponent[],
   rolloutPolicy?: DeploymentRolloutPolicy,
 ): string[] {
   const errors: string[] = [];

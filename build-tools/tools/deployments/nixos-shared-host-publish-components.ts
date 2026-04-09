@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostDeployment, NixosSharedHostDeploymentComponent } from "./contract.ts";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
 import {
   baseNixosSharedHostComponentResult,
   buildNixosSharedHostPublishFailureResults,
@@ -7,39 +8,24 @@ import {
   withNixosSharedHostSmokeState,
   type NixosSharedHostComponentResult,
 } from "./nixos-shared-host-component-results.ts";
-import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
 import {
   orderedNixosSharedHostComponents,
   primaryNixosSharedHostComponent,
 } from "./nixos-shared-host-components.ts";
-import { nixosSharedHostContainerRoot } from "./nixos-shared-host-runtime.ts";
 import {
-  publishNixosSharedHostStaticWebapp,
-  resolveNixosSharedHostStaticWebappLiveState,
-} from "./nixos-shared-host-static-publisher.ts";
+  publishNixosSharedHostComponentRuntime,
+  resolveNixosSharedHostLiveReuse,
+  type NixosSharedHostPublishedSmokeInput,
+} from "./nixos-shared-host-publish-runtime.ts";
+import { smokeNixosSharedHostSsrWebapp } from "./nixos-shared-host-ssr-smoke.ts";
 import { smokeNixosSharedHostStaticWebapp } from "./nixos-shared-host-static-smoke.ts";
 import type { NixosSharedHostConfig } from "./nixos-shared-host.ts";
 
 type PublishedComponent = {
   component: NixosSharedHostDeploymentComponent;
   result: NixosSharedHostComponentResult;
-  indexPath: string;
+  smokeInput: NixosSharedHostPublishedSmokeInput;
 };
-
-function componentContainer(
-  rendered: NixosSharedHostConfig,
-  component: NixosSharedHostDeploymentComponent,
-) {
-  const containerName = component.providerTarget.containerName;
-  if (!containerName) throw new Error(`component "${component.id}" is missing containerName`);
-  const container = rendered.containers[containerName];
-  if (!container) {
-    throw new Error(
-      `publish target is missing realized container for ${component.providerTarget.sharedDevTargetIdentity || component.id}`,
-    );
-  }
-  return container;
-}
 
 async function maybeReusePublishedComponent(opts: {
   component: NixosSharedHostDeploymentComponent;
@@ -51,16 +37,8 @@ async function maybeReusePublishedComponent(opts: {
 }): Promise<PublishedComponent | undefined> {
   if (!opts.allowLiveComponentReuse) return undefined;
   if (opts.priorResult?.publishState?.finalOutcome !== "succeeded") return undefined;
-  const container = componentContainer(opts.rendered, opts.component);
-  const live = await resolveNixosSharedHostStaticWebappLiveState({
-    containerRoot: nixosSharedHostContainerRoot(opts.hostRoot, container.containerName),
-    layout: {
-      releaseRoot: container.releaseRoot,
-      publishRoot: container.publishRoot,
-      activeReleaseLink: container.activeReleaseLink,
-    },
-  });
-  if (!live || live.artifactIdentity !== opts.artifact.identity) return undefined;
+  const live = await resolveNixosSharedHostLiveReuse(opts);
+  if (!live) return undefined;
   return {
     component: opts.component,
     result: withNixosSharedHostPublishState(
@@ -70,10 +48,10 @@ async function maybeReusePublishedComponent(opts: {
         mode: "reused_live_identity",
         releasePath: live.releasePath,
         activatedPath: live.activatedPath,
-        liveArtifactIdentity: live.artifactIdentity,
+        liveArtifactIdentity: live.liveArtifactIdentity,
       },
     ),
-    indexPath: live.indexPath,
+    smokeInput: live.smokeInput,
   };
 }
 
@@ -82,18 +60,8 @@ async function publishOneComponent(opts: {
   rendered: NixosSharedHostConfig;
   hostRoot: string;
   artifact: NixosSharedHostResolvedComponentArtifact["artifact"];
-}) {
-  const container = componentContainer(opts.rendered, opts.component);
-  const published = await publishNixosSharedHostStaticWebapp({
-    artifactDir: opts.artifact.storedArtifactPath,
-    artifactIdentity: opts.artifact.identity,
-    containerRoot: nixosSharedHostContainerRoot(opts.hostRoot, container.containerName),
-    layout: {
-      releaseRoot: container.releaseRoot,
-      publishRoot: container.publishRoot,
-      activeReleaseLink: container.activeReleaseLink,
-    },
-  });
+}): Promise<PublishedComponent> {
+  const published = await publishNixosSharedHostComponentRuntime(opts);
   return {
     component: opts.component,
     result: withNixosSharedHostPublishState(
@@ -103,11 +71,11 @@ async function publishOneComponent(opts: {
         mode: "published",
         releasePath: published.releasePath,
         activatedPath: published.activatedPath,
-        liveArtifactIdentity: published.artifactIdentity,
+        liveArtifactIdentity: published.liveArtifactIdentity,
       },
     ),
-    indexPath: published.indexPath,
-  } satisfies PublishedComponent;
+    smokeInput: published.smokeInput,
+  };
 }
 
 export async function publishNixosSharedHostArtifacts(opts: {
@@ -133,16 +101,15 @@ export async function publishNixosSharedHostArtifacts(opts: {
     const artifact = artifactById.get(component.id);
     if (!artifact) throw new Error(`missing exact artifact for component "${component.id}"`);
     try {
-      const reused = await maybeReusePublishedComponent({
-        component,
-        rendered: opts.rendered,
-        hostRoot: opts.hostRoot,
-        artifact,
-        priorResult: priorResultById.get(component.id),
-        allowLiveComponentReuse: !!opts.allowLiveComponentReuse,
-      });
       published.push(
-        reused ||
+        (await maybeReusePublishedComponent({
+          component,
+          rendered: opts.rendered,
+          hostRoot: opts.hostRoot,
+          artifact,
+          priorResult: priorResultById.get(component.id),
+          allowLiveComponentReuse: !!opts.allowLiveComponentReuse,
+        })) ||
           (await publishOneComponent({
             component,
             rendered: opts.rendered,
@@ -169,6 +136,30 @@ export async function publishNixosSharedHostArtifacts(opts: {
   return published;
 }
 
+async function smokePublishedComponent(opts: {
+  component: NixosSharedHostDeploymentComponent;
+  smokeInput: NixosSharedHostPublishedSmokeInput;
+  connectOverride?: {
+    protocol: "http:" | "https:";
+    hostname: string;
+    port: number;
+    rejectUnauthorized?: boolean;
+  };
+}) {
+  return opts.smokeInput.kind === "ssr-webapp"
+    ? await smokeNixosSharedHostSsrWebapp({
+        hostname: opts.component.providerTarget.hostname || "",
+        healthPath: opts.component.runtime.healthPath,
+        connectOverride: opts.connectOverride,
+      })
+    : await smokeNixosSharedHostStaticWebapp({
+        hostname: opts.component.providerTarget.hostname || "",
+        indexPath: opts.smokeInput.indexPath,
+        healthPath: opts.component.runtime.healthPath,
+        connectOverride: opts.connectOverride,
+      });
+}
+
 export async function smokeNixosSharedHostPublishedComponents(opts: {
   deployment: NixosSharedHostDeployment;
   published: PublishedComponent[];
@@ -184,49 +175,36 @@ export async function smokeNixosSharedHostPublishedComponents(opts: {
   healthUrl?: string;
 }> {
   const primaryComponent = primaryNixosSharedHostComponent(opts.deployment);
-  const singleComponent = opts.published.length === 1;
   const componentResults: NixosSharedHostComponentResult[] = [];
-  for (const { component, result, indexPath } of opts.published) {
+  for (const published of opts.published) {
     try {
-      const smoke = await smokeNixosSharedHostStaticWebapp({
-        hostname: component.providerTarget.hostname || "",
-        indexPath,
-        healthPath: component.runtime.healthPath,
+      const smoke = await smokePublishedComponent({
+        component: published.component,
+        smokeInput: published.smokeInput,
         connectOverride: opts.smokeConnectOverride,
       });
       componentResults.push(
-        withNixosSharedHostSmokeState(result, {
+        withNixosSharedHostSmokeState(published.result, {
           finalOutcome: "succeeded",
           publicUrl: smoke.publicUrl,
           ...(smoke.healthUrl ? { healthUrl: smoke.healthUrl } : {}),
         }),
       );
     } catch (error) {
-      if (singleComponent) {
-        throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
-          failedStep: "smoke" as const,
-          componentResults: [
-            withNixosSharedHostSmokeState(result, {
-              finalOutcome: "smoke_failed_after_publish",
-            }),
-          ],
-        });
-      }
-      componentResults.push(
-        withNixosSharedHostSmokeState(result, {
-          finalOutcome: "smoke_failed_after_publish",
-        }),
-      );
-      for (const remaining of opts.published.slice(componentResults.length)) {
-        componentResults.push(
-          withNixosSharedHostSmokeState(remaining.result, {
-            finalOutcome: "not_run",
-          }),
-        );
-      }
+      const failed = withNixosSharedHostSmokeState(published.result, {
+        finalOutcome: "smoke_failed_after_publish",
+      });
       throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
         failedStep: "smoke" as const,
-        componentResults,
+        componentResults: [
+          ...componentResults,
+          failed,
+          ...opts.published
+            .slice(componentResults.length + 1)
+            .map(({ result }) =>
+              withNixosSharedHostSmokeState(result, { finalOutcome: "not_run" }),
+            ),
+        ],
       });
     }
   }

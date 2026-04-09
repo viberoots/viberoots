@@ -100,7 +100,10 @@ export function requireBuiltInExecutionBoundary(deployment: DeploymentTarget) {
     }
     return;
   }
-  if (deployment.publisher.type !== "nixos-shared-host-static-webapp") {
+  if (
+    deployment.publisher.type !== "nixos-shared-host-static-webapp" &&
+    deployment.publisher.type !== "nixos-shared-host-ssr-webapp"
+  ) {
     throw new DeploymentAdmissionError(
       "no_longer_admitted",
       `protected/shared admission rejects non-built-in nixos-shared-host publisher ${deployment.publisher.type}`,

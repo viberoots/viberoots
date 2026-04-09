@@ -2,7 +2,9 @@
 import {
   deriveNixosSharedHostProviderTarget,
   NIXOS_SHARED_HOST_PROVIDER,
+  SSR_WEBAPP_COMPONENT,
   STATIC_WEBAPP_COMPONENT,
+  type NixosSharedHostSsrRuntimeContract,
   type NixosSharedHostDeployment,
 } from "../../deployments/contract.ts";
 import {
@@ -12,6 +14,21 @@ import {
   type DeploymentLanePolicy,
 } from "../../deployments/deployment-policy.ts";
 import type { GraphNode } from "../../lib/graph.ts";
+
+export function nixosSharedHostSsrRuntimeContractFixture(
+  overrides: Partial<NixosSharedHostSsrRuntimeContract> = {},
+): NixosSharedHostSsrRuntimeContract {
+  return {
+    type: "node-dist-server-v1",
+    framework: overrides.framework || "vite",
+    serverEntry: overrides.serverEntry || "dist/server/index.js",
+    clientDir: overrides.clientDir || "dist/client",
+    servingTopology: overrides.servingTopology || "single-host-node-with-nginx",
+    environmentNeutralBuild: overrides.environmentNeutralBuild ?? true,
+    runtimeConfigInjection: overrides.runtimeConfigInjection || "runtime_config_requirements",
+    secretInjection: overrides.secretInjection || "secret_requirements",
+  };
+}
 
 export function nixosSharedHostLanePolicyFixture(
   overrides: Partial<DeploymentLanePolicy> = {},
@@ -96,6 +113,7 @@ export function nixosSharedHostDeploymentFixture(
 ): NixosSharedHostDeployment {
   const appName = overrides.runtime?.appName || "demoapp";
   const targetGroup = overrides.runtime?.targetGroup || "default";
+  const componentKind = overrides.component?.kind || STATIC_WEBAPP_COMPONENT;
   const lanePolicy = overrides.lanePolicy || nixosSharedHostLanePolicyFixture();
   const admissionPolicy =
     overrides.admissionPolicy || nixosSharedHostAdmissionPolicyFixture({ requiredChecks: [] });
@@ -106,13 +124,21 @@ export function nixosSharedHostDeploymentFixture(
   const components = overrides.components || [
     {
       id: "default",
-      kind: STATIC_WEBAPP_COMPONENT,
+      kind: componentKind,
       target: overrides.component?.target || "//projects/apps/demoapp:app",
       runtime: {
         appName,
         containerPort: overrides.runtime?.containerPort || 3000,
         ...(overrides.runtime?.healthPath ? { healthPath: overrides.runtime.healthPath } : {}),
         ...(overrides.runtime?.targetGroup ? { targetGroup: overrides.runtime.targetGroup } : {}),
+        ...(componentKind === SSR_WEBAPP_COMPONENT
+          ? {
+              runtimeContract:
+                "runtimeContract" in (overrides.runtime || {})
+                  ? (overrides.runtime as any).runtimeContract
+                  : nixosSharedHostSsrRuntimeContractFixture(),
+            }
+          : {}),
       },
       providerTarget: defaultComponentProviderTarget,
     },
@@ -143,7 +169,7 @@ export function nixosSharedHostDeploymentFixture(
     ...(overrides.rolloutPolicy ? { rolloutPolicy: overrides.rolloutPolicy } : {}),
     ...(overrides.bootstrap ? { bootstrap: overrides.bootstrap } : {}),
     component: {
-      kind: STATIC_WEBAPP_COMPONENT,
+      kind: components[0]?.kind || componentKind,
       target: components[0]?.target || overrides.component?.target || "//projects/apps/demoapp:app",
     },
     components,

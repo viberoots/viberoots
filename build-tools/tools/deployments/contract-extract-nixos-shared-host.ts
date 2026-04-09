@@ -9,7 +9,7 @@ import {
 } from "./contract-types.ts";
 import {
   pushDuplicateNixosSharedHostAppNameErrors,
-  readRawStaticWebappComponents,
+  readRawNixosSharedHostComponents,
   rolloutPolicyErrorsForNixosSharedHost,
 } from "./contract-extract-components.ts";
 import {
@@ -30,6 +30,7 @@ import {
 import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
 import { readDeploymentRequirements } from "./deployment-requirements.ts";
 import {
+  nixosSharedHostPromotionCompatibilityErrors,
   pushNixosSharedHostReleaseActionErrors,
   resolveNixosSharedHostComponents,
 } from "./nixos-shared-host-extract-helpers.ts";
@@ -83,7 +84,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
     const releaseActionRefs = readLabelList(node, "release_actions");
     const targetExceptionRefs = readLabelList(node, "target_exceptions");
     const deploymentErrors: string[] = [];
-    const rawComponents = readRawStaticWebappComponents(node);
+    const rawComponents = readRawNixosSharedHostComponents(node);
     if (!label) {
       context.errors.push("deployment target missing canonical label");
       continue;
@@ -172,6 +173,12 @@ export function extractNixosSharedHostDeploymentsFromContext(
         rolloutPolicy,
       ),
     );
+    deploymentErrors.push(
+      ...nixosSharedHostPromotionCompatibilityErrors({
+        label,
+        components: resolvedComponents,
+      }),
+    );
     if (deploymentErrors.length > 0) {
       context.errors.push(...deploymentErrors);
       continue;
@@ -194,7 +201,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
       targetExceptions,
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
       ...(bootstrap ? { bootstrap } : {}),
-      component: { kind: STATIC_WEBAPP_COMPONENT, target: resolvedComponents[0]!.target },
+      component: { kind: resolvedComponents[0]!.kind, target: resolvedComponents[0]!.target },
       components: resolvedComponents,
       publisher: { type: publisher },
       ...(provisioner ? { provisioner: { type: provisioner } } : {}),

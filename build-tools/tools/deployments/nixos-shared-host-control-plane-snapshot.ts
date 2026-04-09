@@ -6,7 +6,7 @@ import {
   type NixosSharedHostResolvedComponentArtifact,
 } from "./nixos-shared-host-component-artifacts.ts";
 import {
-  admitNixosSharedHostStaticArtifact,
+  admitNixosSharedHostArtifact,
   type NixosSharedHostAdmittedArtifact,
 } from "./nixos-shared-host-artifacts.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
@@ -128,9 +128,10 @@ export async function createNixosSharedHostControlPlaneSnapshot(
         !opts.artifactDir &&
         !(singleComponentArtifacts && singleComponentArtifacts.length > 0)
           ? undefined
-          : await admitNixosSharedHostStaticArtifact({
+          : await admitNixosSharedHostArtifact({
               recordsRoot: opts.paths.recordsRoot,
               artifactDir: path.resolve(opts.artifactDir || ""),
+              kind: opts.deployment.component.kind,
             }));
   const componentArtifacts =
     opts.operationKind !== "explicit_removal" && multiComponent

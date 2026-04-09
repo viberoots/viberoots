@@ -1,4 +1,4 @@
-{ lib, config, ... }:
+{ lib, config, pkgs, ... }:
 let
   cfg = config.nixosSharedHost;
 
@@ -51,13 +51,34 @@ let
   backendIdentityFor = deployment:
     "${deployment.providerTarget.containerName}:${toString deployment.runtime.containerPort}";
 
+  containerRuntimeFor = deployment:
+    if deployment.component.kind == "ssr-webapp" then
+      {
+        runtime = "ssr-webapp-host";
+        publishRoot = "/srv/ssr-app/current";
+        releaseRoot = "/srv/ssr-app/releases";
+        activeReleaseLink = "/srv/ssr-app/live";
+        serverEntry = "/srv/ssr-app/live/dist/server/index.js";
+        clientDir = "/srv/ssr-app/live/dist/client";
+      }
+    else
+      {
+        runtime = "static-app-host";
+        publishRoot = "/srv/static-app/current";
+        releaseRoot = "/srv/static-app/releases";
+        activeReleaseLink = "/srv/static-app/live";
+        serverEntry = null;
+        clientDir = null;
+      };
+
   renderedEntries = map
     (deployment:
       let
         addr = backendAddressFor deployment;
+        runtime = containerRuntimeFor deployment;
       in
       {
-        inherit deployment addr;
+        inherit deployment addr runtime;
         containerName = deployment.providerTarget.containerName;
         hostname = deployment.providerTarget.hostname;
         backendIdentity = backendIdentityFor deployment;
@@ -116,11 +137,13 @@ let
           backendAddress = entry.addr.backendAddress;
           hostAddress = entry.addr.hostAddress;
           localAddress = entry.addr.localAddress;
-          runtime = "static-app-host";
+          runtime = entry.runtime.runtime;
           containerPort = entry.deployment.runtime.containerPort;
-          publishRoot = "/srv/static-app/current";
-          releaseRoot = "/srv/static-app/releases";
-          activeReleaseLink = "/srv/static-app/live";
+          publishRoot = entry.runtime.publishRoot;
+          releaseRoot = entry.runtime.releaseRoot;
+          activeReleaseLink = entry.runtime.activeReleaseLink;
+          serverEntry = entry.runtime.serverEntry;
+          clientDir = entry.runtime.clientDir;
           healthPath = entry.deployment.runtime.healthPath or null;
         })
       renderedEntries);
@@ -151,31 +174,56 @@ let
           localAddress = entry.addr.localAddress;
           config =
             { ... }:
-            {
-              system.stateVersion = "24.11";
-              services.nginx = {
-                enable = true;
-                virtualHosts.localhost = {
-                  listen = [
-                    {
-                      addr = "0.0.0.0";
-                      port = entry.deployment.runtime.containerPort;
-                    }
-                  ];
-                  root = "/srv/static-app/live";
-                  locations."/" = {
-                    tryFiles = "$uri $uri/ /index.html";
+            if entry.deployment.component.kind == "ssr-webapp" then
+              {
+                system.stateVersion = "24.11";
+                environment.systemPackages = [ pkgs.nodejs ];
+                systemd.services.nixos-shared-host-app = {
+                  wantedBy = [ "multi-user.target" ];
+                  serviceConfig = {
+                    WorkingDirectory = "/srv/ssr-app/live";
+                    ExecStart = "${pkgs.nodejs}/bin/node /srv/ssr-app/live/dist/server/index.js";
+                    Restart = "always";
+                  };
+                  environment = {
+                    PORT = toString entry.deployment.runtime.containerPort;
+                    HOST = "0.0.0.0";
                   };
                 };
+                systemd.tmpfiles.rules = [
+                  "d /srv/ssr-app 0755 root root -"
+                  "d /srv/ssr-app/releases 0755 root root -"
+                  "d /srv/ssr-app/releases/.empty 0755 root root -"
+                  "L+ /srv/ssr-app/current - - - - /srv/ssr-app/releases/.empty"
+                  "L+ /srv/ssr-app/live - - - - /srv/ssr-app/current"
+                ];
+              }
+            else
+              {
+                system.stateVersion = "24.11";
+                services.nginx = {
+                  enable = true;
+                  virtualHosts.localhost = {
+                    listen = [
+                      {
+                        addr = "0.0.0.0";
+                        port = entry.deployment.runtime.containerPort;
+                      }
+                    ];
+                    root = "/srv/static-app/live";
+                    locations."/" = {
+                      tryFiles = "$uri $uri/ /index.html";
+                    };
+                  };
+                };
+                systemd.tmpfiles.rules = [
+                  "d /srv/static-app 0755 root root -"
+                  "d /srv/static-app/releases 0755 root root -"
+                  "d /srv/static-app/releases/.empty 0755 root root -"
+                  "L+ /srv/static-app/current - - - - /srv/static-app/releases/.empty"
+                  "L+ /srv/static-app/live - - - - /srv/static-app/current"
+                ];
               };
-              systemd.tmpfiles.rules = [
-                "d /srv/static-app 0755 root root -"
-                "d /srv/static-app/releases 0755 root root -"
-                "d /srv/static-app/releases/.empty 0755 root root -"
-                "L+ /srv/static-app/current - - - - /srv/static-app/releases/.empty"
-                "L+ /srv/static-app/live - - - - /srv/static-app/current"
-              ];
-            };
         })
       renderedEntries);
 in

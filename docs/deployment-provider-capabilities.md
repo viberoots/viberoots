@@ -66,11 +66,13 @@ Normative-source note:
 
 - supported component kinds:
   - `static-webapp`
+  - `ssr-webapp`
 - multi-component support:
   - reviewed for `shared_nonprod` only when every component is a `static-webapp`
   - all components must resolve to one `target_group`
   - every component must declare a distinct `app_name`
   - replay-style flows (`publish-only`, retry, rollback, promotion) are reviewed for the ordered-best-effort static-webapp slice when the replay source preserves per-component exact artifact and publish state
+  - the reviewed `ssr-webapp` slice is single-component only
 - additional unsupported shapes:
   - explicit subdomain-style overrides
   - provider-family use with non-webapp component targets
@@ -101,6 +103,20 @@ Normative-source note:
 - default smoke model:
   - when `healthPath` is declared, smoke resolves against `https://${appName}.apps.kilty.io${healthPath}`
   - every static-webapp publish also validates `https://${appName}.apps.kilty.io/` and rejects success when the public root does not serve the just-published `index.html`
+  - every reviewed `ssr-webapp` publish validates `https://${appName}.apps.kilty.io/` and optional `healthPath` against the admitted SSR runtime instead of inferring a static artifact contract
+
+### Built-In Publisher Contract
+
+- built-in publisher types:
+  - `nixos-shared-host-static-webapp`
+  - `nixos-shared-host-ssr-webapp`
+- reviewed SSR runtime contract for `nixos-shared-host-ssr-webapp`:
+  - admitted immutable artifact kind is `ssr-webapp`
+  - the artifact must contain `dist/server/index.js`
+  - the artifact must contain `dist/client`
+  - the host runtime starts the server with `node dist/server/index.js`
+  - `runtime_config_requirements` and `secret_requirements` remain the only reviewed runtime-config and secret injection boundary for this slice
+  - promotion-safe lanes require the reviewed contract `node-dist-server-v1` and serving topology `single-host-node-with-nginx`
 
 ### Retry / Idempotency
 
@@ -112,6 +128,11 @@ Normative-source note:
   - admitted deploys persist the exact static artifact under the local artifact/provenance store before publish starts
   - the shared control-plane execution snapshot freezes publish input as an exact-artifact reference instead of a workstation-local `artifactDir`
   - multi-component replay may skip a previously published component only when the host can prove the live immutable artifact identity already matches the recorded exact artifact identity; otherwise it must republish conservatively
+- reviewed initial publish contract for `nixos-shared-host-ssr-webapp`:
+  - stage immutable artifact contents under `/srv/ssr-app/releases/<artifact-identity>`
+  - activate by atomically repointing `/srv/ssr-app/current`
+  - keep `/srv/ssr-app/live` stable for the reviewed Node runtime and nginx ingress contract
+  - preserve exact SSR runtime-contract provenance in records and replay snapshots
 
 ### Replay Snapshot Baseline
 
@@ -197,7 +218,7 @@ Normative-source note:
 ### Protected/Shared Eligibility
 
 - `protection_class` defaults to `shared_nonprod`
-- the initial reviewed slice supports shared-dev metadata extraction, authoritative platform-state reconciliation, and deterministic host realization for static webapps on a NixOS host
+- the initial reviewed slice supports shared-dev metadata extraction, authoritative platform-state reconciliation, and deterministic host realization for static webapps plus the single-component reviewed SSR runtime slice on a NixOS host
 - protected/shared execution must stay inside the vetted built-in publisher, provisioner, smoke-runner, and reviewed built-in `release_actions` registry; package-local executable hooks are rejected on the normal control-plane path
 
 ## Capability Entry: `cloudflare-pages`

@@ -16,6 +16,13 @@ function staticWebappComponent(label: string): GraphNode {
   };
 }
 
+function ssrWebappComponent(label: string): GraphNode {
+  return {
+    name: label,
+    labels: ["kind:app", "webapp:ssr", "framework:vite"],
+  };
+}
+
 function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
   return {
     name: "//projects/deployments/demoapp-dev:deploy",
@@ -167,7 +174,9 @@ test("validation rejects malformed bootstrap policy", () => {
 });
 
 test("validation rejects reviewed non-static kinds until nixos-shared-host declares capability support", () => {
-  for (const kind of REVIEWED_NON_STATIC_COMPONENT_KINDS) {
+  for (const kind of REVIEWED_NON_STATIC_COMPONENT_KINDS.filter(
+    (entry) => entry !== "ssr-webapp",
+  )) {
     const { errors } = extractNixosSharedHostDeployments([
       staticWebappComponent("//projects/apps/demoapp:app"),
       ...policyNodes(),
@@ -178,4 +187,70 @@ test("validation rejects reviewed non-static kinds until nixos-shared-host decla
       `expected nixos-shared-host to reject ${kind}, saw: ${errors.join("\n")}`,
     );
   }
+});
+
+test("validation accepts the reviewed single-component ssr-webapp slice", () => {
+  const { deployments, errors } = extractNixosSharedHostDeployments([
+    ssrWebappComponent("//projects/apps/demoapp:app"),
+    ...policyNodes(),
+    deploymentNode({
+      component_kind: "ssr-webapp",
+      publisher: "nixos-shared-host-ssr-webapp",
+      components: [
+        {
+          id: "default",
+          kind: "ssr-webapp",
+          target: "//projects/apps/demoapp:app",
+          app_name: "demoapp",
+          container_port: "3000",
+          health_path: "/healthz",
+          ssr_framework: "vite",
+          ssr_runtime_contract: "node-dist-server-v1",
+          ssr_server_entry: "dist/server/index.js",
+          ssr_client_dir: "dist/client",
+          ssr_serving_topology: "single-host-node-with-nginx",
+          ssr_environment_neutral_build: "true",
+        },
+      ],
+    }),
+  ]);
+  assert.deepEqual(errors, []);
+  assert.equal(deployments[0]?.component.kind, "ssr-webapp");
+  assert.equal(
+    (deployments[0]?.components[0] as any)?.runtime?.runtimeContract?.type,
+    "node-dist-server-v1",
+  );
+});
+
+test("validation rejects reviewed host SSR slices with unsupported runtime-contract drift", () => {
+  const { errors } = extractNixosSharedHostDeployments([
+    ssrWebappComponent("//projects/apps/demoapp:app"),
+    ...policyNodes(),
+    deploymentNode({
+      component_kind: "ssr-webapp",
+      publisher: "nixos-shared-host-ssr-webapp",
+      components: [
+        {
+          id: "default",
+          kind: "ssr-webapp",
+          target: "//projects/apps/demoapp:app",
+          app_name: "demoapp",
+          container_port: "3000",
+          ssr_framework: "vite",
+          ssr_runtime_contract: "custom-runtime",
+          ssr_server_entry: "server.js",
+          ssr_client_dir: "public",
+          ssr_serving_topology: "other-topology",
+          ssr_environment_neutral_build: "false",
+        },
+      ],
+    }),
+  ]);
+  assert.ok(errors.some((entry) => entry.includes("unsupported ssr_runtime_contract")));
+  assert.ok(
+    errors.some((entry) => entry.includes("ssr_server_entry must be dist/server/index.js")),
+  );
+  assert.ok(errors.some((entry) => entry.includes("ssr_client_dir must be dist/client")));
+  assert.ok(errors.some((entry) => entry.includes("unsupported ssr_serving_topology")));
+  assert.ok(errors.some((entry) => entry.includes("ssr_environment_neutral_build must be true")));
 });

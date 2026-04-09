@@ -21,6 +21,17 @@ async function writeArtifact(root: string): Promise<void> {
   await fsp.writeFile(path.join(root, "healthz"), "ok\n", "utf8");
 }
 
+async function writeSsrArtifact(root: string): Promise<void> {
+  await fsp.mkdir(path.join(root, "dist", "server"), { recursive: true });
+  await fsp.mkdir(path.join(root, "dist", "client"), { recursive: true });
+  await fsp.writeFile(
+    path.join(root, "dist", "server", "index.js"),
+    "import http from 'node:http';\nhttp.createServer((req,res)=>res.end('ok')).listen(Number(process.env.PORT||3000), process.env.HOST || '127.0.0.1');\n",
+    "utf8",
+  );
+  await fsp.writeFile(path.join(root, "dist", "client", "index.html"), "<html>ok</html>\n", "utf8");
+}
+
 test("nixos-shared-host replay snapshots preserve exact artifact refs and admitted deployment inputs", async () => {
   await runInTemp("nixos-shared-host-replay-contract", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture({
@@ -31,7 +42,11 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
-    const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
+    const server = await startNixosSharedHostPublicServer({
+      deployment,
+      hostRoot,
+      fixedRoot: artifactDir,
+    });
     try {
       const result = await submitNixosSharedHostControlPlaneRun({
         workspaceRoot: tmp,
@@ -105,7 +120,11 @@ test("nixos-shared-host replay resolution fails closed when the stored exact art
     const hostRoot = path.join(tmp, "host");
     await writeArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
-    const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
+    const server = await startNixosSharedHostPublicServer({
+      deployment,
+      hostRoot,
+      fixedRoot: artifactDir,
+    });
     try {
       const result = await submitNixosSharedHostControlPlaneRun({
         workspaceRoot: tmp,
@@ -133,6 +152,66 @@ test("nixos-shared-host replay resolution fails closed when the stored exact art
         resolveNixosSharedHostReplaySource({ recordPath: result.recordPath }),
         /recorded exact artifact is unavailable/,
       );
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+test("nixos-shared-host replay snapshots preserve SSR runtime-contract provenance", async () => {
+  await runInTemp("nixos-shared-host-replay-ssr-contract", async (tmp, $) => {
+    const deployment = nixosSharedHostDeploymentFixture({
+      component: { kind: "ssr-webapp", target: "//projects/apps/demoapp:app" },
+      publisher: { type: "nixos-shared-host-ssr-webapp" },
+      runtime: {
+        appName: "demoapp",
+        containerPort: 3000,
+        healthPath: "/healthz",
+        runtimeContract: {
+          type: "node-dist-server-v1",
+          framework: "vite",
+          serverEntry: "dist/server/index.js",
+          clientDir: "dist/client",
+          servingTopology: "single-host-node-with-nginx",
+          environmentNeutralBuild: true,
+          runtimeConfigInjection: "runtime_config_requirements",
+          secretInjection: "secret_requirements",
+        },
+      } as any,
+    });
+    const artifactDir = path.join(tmp, "artifact");
+    const hostRoot = path.join(tmp, "host");
+    const recordsRoot = path.join(tmp, "records");
+    await writeSsrArtifact(artifactDir);
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const server = await startNixosSharedHostPublicServer({
+      deployment,
+      hostRoot,
+      fixedRoot: artifactDir,
+    });
+    try {
+      const result = await submitNixosSharedHostControlPlaneRun({
+        workspaceRoot: tmp,
+        operationKind: "deploy",
+        deployment,
+        artifactDir,
+        paths: {
+          statePath: path.join(tmp, "platform-state.json"),
+          hostRoot,
+          recordsRoot,
+        },
+        smokeConnectOverride: {
+          protocol: "http:",
+          hostname: "127.0.0.1",
+          port: server.port,
+        },
+      });
+      const replay = await resolveNixosSharedHostReplaySource({ recordPath: result.recordPath });
+      assert.equal(
+        (replay.replaySnapshot.deployment.components[0] as any).runtime.runtimeContract.framework,
+        "vite",
+      );
+      assert.equal(replay.replaySnapshot.publishInput.components[0]?.artifact.kind, "ssr-webapp");
     } finally {
       await server.close();
     }

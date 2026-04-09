@@ -43,6 +43,21 @@ function componentTargets(deployment: DeploymentTarget): string {
     .join(",");
 }
 
+function componentRuntimeContracts(deployment: DeploymentTarget): string {
+  if (deployment.provider !== "nixos-shared-host") return "";
+  return deployment.components
+    .map((component) =>
+      JSON.stringify({
+        id: component.id,
+        kind: component.kind,
+        runtimeContract:
+          "runtimeContract" in component.runtime ? component.runtime.runtimeContract : null,
+      }),
+    )
+    .sort()
+    .join(",");
+}
+
 function sourceStage(source: PromotionSourceLike): string {
   return source.replaySnapshot.deployment.environmentStage;
 }
@@ -115,6 +130,9 @@ export function promotionCompatibilityErrors(
     errors.push(
       `publisher type mismatch: current=${deployment.publisher.type} source=${sourceDeployment.publisher.type}`,
     );
+  }
+  if (componentRuntimeContracts(sourceDeployment) !== componentRuntimeContracts(deployment)) {
+    errors.push("runtime contract mismatch between source and target deployment");
   }
   if (rolloutSignature(sourceDeployment) !== rolloutSignature(deployment)) {
     errors.push("rollout semantics mismatch between source and target deployment");

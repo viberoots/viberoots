@@ -59,6 +59,12 @@ test("provider capabilities make built-in release-action posture explicit", () =
   assert.equal(providerDeclaresReleaseActionType("kubernetes", "cache_warmup"), false);
 });
 
+test("nixos-shared-host capability declares the reviewed ssr-webapp slice", () => {
+  const nixos = providerCapabilityFor("nixos-shared-host");
+  assert.deepEqual(nixos?.supportedComponentKinds, ["static-webapp", "ssr-webapp"]);
+  assert.deepEqual(nixos?.multiComponentKinds, ["static-webapp"]);
+});
+
 test("kubernetes capability declares the reviewed service-style component slice", () => {
   const kubernetes = providerCapabilityFor("kubernetes");
   assert.deepEqual(kubernetes?.supportedComponentKinds, ["service", "third-party-service"]);

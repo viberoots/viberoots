@@ -7,6 +7,10 @@ import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import type { DeploymentRequirement } from "./deployment-requirements.ts";
 import type { DeploymentTargetException } from "./deployment-target-exceptions.ts";
 import {
+  SSR_WEBAPP_COMPONENT_KIND,
+  STATIC_WEBAPP_COMPONENT_KIND,
+} from "./deployment-component-kinds.ts";
+import {
   CLOUDFLARE_PAGES_PROVIDER,
   KUBERNETES_PROVIDER,
   NIXOS_SHARED_HOST_PROVIDER,
@@ -19,6 +23,7 @@ import {
 import { packagePathFromLabel } from "../lib/labels.ts";
 
 export const STATIC_WEBAPP_COMPONENT = "static-webapp";
+export const SSR_WEBAPP_COMPONENT = "ssr-webapp";
 export {
   CLOUDFLARE_PAGES_PROVIDER,
   KUBERNETES_PROVIDER,
@@ -91,14 +96,33 @@ type DeploymentBase = {
 };
 
 export type NixosSharedHostDeploymentComponent = DeploymentComponent & {
-  kind: typeof STATIC_WEBAPP_COMPONENT;
+  kind: typeof STATIC_WEBAPP_COMPONENT_KIND | typeof SSR_WEBAPP_COMPONENT_KIND;
   runtime: {
     appName: string;
     containerPort: number;
     healthPath?: string;
     targetGroup?: string;
-  };
+  } & (
+    | {}
+    | {
+        runtimeContract: NixosSharedHostSsrRuntimeContract;
+      }
+  );
   providerTarget: NixosSharedHostProviderTarget;
+};
+
+export type NixosSharedHostSsrFramework = "express" | "next" | "vite" | "hatch";
+export type NixosSharedHostSsrServingTopology = "single-host-node-with-nginx";
+
+export type NixosSharedHostSsrRuntimeContract = {
+  type: "node-dist-server-v1";
+  framework: NixosSharedHostSsrFramework;
+  serverEntry: "dist/server/index.js";
+  clientDir: "dist/client";
+  servingTopology: NixosSharedHostSsrServingTopology;
+  environmentNeutralBuild: true;
+  runtimeConfigInjection: "runtime_config_requirements";
+  secretInjection: "secret_requirements";
 };
 
 export type NixosSharedHostDeployment = DeploymentBase & {
@@ -147,6 +171,17 @@ export type DeploymentTarget =
   | CloudflarePagesDeployment
   | S3StaticDeployment
   | KubernetesDeployment;
+
+export function hasNixosSharedHostSsrRuntimeContract(
+  component: NixosSharedHostDeploymentComponent,
+): component is NixosSharedHostDeploymentComponent & {
+  kind: typeof SSR_WEBAPP_COMPONENT;
+  runtime: NixosSharedHostDeploymentComponent["runtime"] & {
+    runtimeContract: NixosSharedHostSsrRuntimeContract;
+  };
+} {
+  return component.kind === SSR_WEBAPP_COMPONENT && "runtimeContract" in component.runtime;
+}
 
 function packageBaseName(label: string): string {
   return path.posix.basename(packagePathFromLabel(label));

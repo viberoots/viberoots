@@ -45,7 +45,7 @@ export async function resolveArtifactDirForCli(
   const artifactDir = getFlagStr("artifact-dir", "").trim();
   if (artifactDir) return path.resolve(artifactDir);
   const outPath = await buildSelectedOutPath(workspaceRoot, deployment.component.target);
-  return path.join(outPath, "dist");
+  return deployment.component.kind === "ssr-webapp" ? outPath : path.join(outPath, "dist");
 }
 
 export async function resolveComponentArtifactDirsForCli(

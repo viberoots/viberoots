@@ -51,3 +51,54 @@ test("nixos-shared-host Nix module derives containers and nginx routes from auth
     assert.equal(out.rendered.runtime, "static-app-host");
   });
 });
+
+test("nixos-shared-host Nix module renders the reviewed SSR host runtime contract", async () => {
+  await runInTemp("nixos-shared-host-module-ssr-eval", async (tmp, $) => {
+    const statePath = path.join(tmp, "nixos-shared-host-platform-state.json");
+    await fsp.writeFile(
+      statePath,
+      JSON.stringify(
+        createNixosSharedHostPlatformState([
+          nixosSharedHostDeploymentFixture({
+            component: { kind: "ssr-webapp", target: "//projects/apps/demoapp:app" },
+            publisher: { type: "nixos-shared-host-ssr-webapp" },
+            runtime: {
+              appName: "demoapp",
+              containerPort: 3000,
+              healthPath: "/healthz",
+              runtimeContract: {
+                type: "node-dist-server-v1",
+                framework: "vite",
+                serverEntry: "dist/server/index.js",
+                clientDir: "dist/client",
+                servingTopology: "single-host-node-with-nginx",
+                environmentNeutralBuild: true,
+                runtimeConfigInjection: "runtime_config_requirements",
+                secretInjection: "secret_requirements",
+              },
+            } as any,
+          }),
+        ]),
+        null,
+        2,
+      ),
+    );
+    const expr = `
+      let
+        system = import <nixpkgs/nixos> {
+          configuration = {
+            imports = [ ./build-tools/tools/nix/nixos-shared-host-module.nix ];
+            nixosSharedHost.enable = true;
+            nixosSharedHost.statePath = ./. + "/nixos-shared-host-platform-state.json";
+            system.stateVersion = "24.11";
+          };
+        };
+      in system.config.nixosSharedHost.rendered.demoapp
+    `;
+    const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;
+    const rendered = JSON.parse(String(stdout || "{}")) as Record<string, unknown>;
+    assert.equal(rendered.runtime, "ssr-webapp-host");
+    assert.equal(rendered.serverEntry, "/srv/ssr-app/live/dist/server/index.js");
+    assert.equal(rendered.clientDir, "/srv/ssr-app/live/dist/client");
+  });
+});

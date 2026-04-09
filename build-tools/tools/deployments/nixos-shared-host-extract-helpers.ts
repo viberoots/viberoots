@@ -1,27 +1,47 @@
 #!/usr/bin/env zx-wrapper
-import type { RawStaticWebappComponent } from "./contract-extract-components.ts";
+import type { RawNixosSharedHostComponent } from "./contract-extract-components.ts";
 import { componentError } from "./contract-extract-components.ts";
 import type { DeploymentExtractionContext } from "./contract-extract-shared.ts";
 import {
   deriveNixosSharedHostProviderTarget,
+  SSR_WEBAPP_COMPONENT,
   STATIC_WEBAPP_COMPONENT,
+  type NixosSharedHostSsrRuntimeContract,
   type NixosSharedHostDeploymentComponent,
 } from "./contract-types.ts";
-import { isStaticWebappNode } from "./deployment-component-kinds.ts";
+import { isSupportedComponentNode } from "./deployment-component-kinds.ts";
 import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import {
   providerDeclaresReleaseActionType,
   providerSupportsComponentKind,
 } from "./deployment-provider-capabilities.ts";
 import { missingRequirementNames, type DeploymentRequirement } from "./deployment-requirements.ts";
+import type { NixosSharedHostDeployment } from "./contract.ts";
 
 const APP_NAME_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const TARGET_GROUP_RE = APP_NAME_RE;
+const SSR_FRAMEWORKS = new Set(["express", "next", "vite", "hatch"]);
+
+function ssrRuntimeContractFor(
+  rawComponent: RawNixosSharedHostComponent,
+): NixosSharedHostSsrRuntimeContract | undefined {
+  if (rawComponent.kind !== SSR_WEBAPP_COMPONENT) return undefined;
+  return {
+    type: "node-dist-server-v1",
+    framework: rawComponent.ssrFramework as NixosSharedHostSsrRuntimeContract["framework"],
+    serverEntry: "dist/server/index.js",
+    clientDir: "dist/client",
+    servingTopology: "single-host-node-with-nginx",
+    environmentNeutralBuild: true,
+    runtimeConfigInjection: "runtime_config_requirements",
+    secretInjection: "secret_requirements",
+  };
+}
 
 export function resolveNixosSharedHostComponents(opts: {
   context: Pick<DeploymentExtractionContext, "components">;
   label: string;
-  rawComponents: RawStaticWebappComponent[];
+  rawComponents: RawNixosSharedHostComponent[];
   errors: string[];
 }): NixosSharedHostDeploymentComponent[] {
   const seenIds = new Set<string>();
@@ -92,25 +112,84 @@ export function resolveNixosSharedHostComponents(opts: {
         ),
       );
     }
+    if (rawComponent.kind === SSR_WEBAPP_COMPONENT) {
+      if (!SSR_FRAMEWORKS.has(rawComponent.ssrFramework)) {
+        opts.errors.push(
+          componentError(
+            opts.label,
+            rawComponent.id,
+            `ssr_framework must be one of ${Array.from(SSR_FRAMEWORKS).join("|")}`,
+          ),
+        );
+      }
+      if (rawComponent.ssrRuntimeContract !== "node-dist-server-v1") {
+        opts.errors.push(
+          componentError(
+            opts.label,
+            rawComponent.id,
+            `unsupported ssr_runtime_contract "${rawComponent.ssrRuntimeContract || "<empty>"}"`,
+          ),
+        );
+      }
+      if (rawComponent.ssrServerEntry !== "dist/server/index.js") {
+        opts.errors.push(
+          componentError(
+            opts.label,
+            rawComponent.id,
+            "ssr_server_entry must be dist/server/index.js for the reviewed host slice",
+          ),
+        );
+      }
+      if (rawComponent.ssrClientDir !== "dist/client") {
+        opts.errors.push(
+          componentError(
+            opts.label,
+            rawComponent.id,
+            "ssr_client_dir must be dist/client for the reviewed host slice",
+          ),
+        );
+      }
+      if (rawComponent.ssrServingTopology !== "single-host-node-with-nginx") {
+        opts.errors.push(
+          componentError(
+            opts.label,
+            rawComponent.id,
+            `unsupported ssr_serving_topology "${rawComponent.ssrServingTopology || "<empty>"}"`,
+          ),
+        );
+      }
+      if (rawComponent.ssrEnvironmentNeutralBuild !== "true") {
+        opts.errors.push(
+          componentError(
+            opts.label,
+            rawComponent.id,
+            "ssr_environment_neutral_build must be true for promotion-safe host SSR lanes",
+          ),
+        );
+      }
+    }
     const componentNode = opts.context.components.get(rawComponent.target);
-    if (rawComponent.target && !isStaticWebappNode(componentNode)) {
+    if (rawComponent.target && !isSupportedComponentNode(rawComponent.kind as any, componentNode)) {
       opts.errors.push(
         componentError(
           opts.label,
           rawComponent.id,
-          `component target ${rawComponent.target} is not a supported static-webapp`,
+          `component target ${rawComponent.target} is not a supported ${rawComponent.kind || "deployment component"}`,
         ),
       );
     }
+    const runtimeContract = ssrRuntimeContractFor(rawComponent);
     resolvedComponents.push({
       id: rawComponent.id,
-      kind: STATIC_WEBAPP_COMPONENT,
+      kind:
+        rawComponent.kind === SSR_WEBAPP_COMPONENT ? SSR_WEBAPP_COMPONENT : STATIC_WEBAPP_COMPONENT,
       target: rawComponent.target,
       runtime: {
         appName: rawComponent.appName,
         containerPort: rawComponent.containerPort,
         ...(rawComponent.healthPath ? { healthPath: rawComponent.healthPath } : {}),
         ...(rawComponent.targetGroup ? { targetGroup: rawComponent.targetGroup } : {}),
+        ...(runtimeContract ? { runtimeContract } : {}),
       },
       providerTarget: deriveNixosSharedHostProviderTarget({
         appName: rawComponent.appName,
@@ -151,4 +230,21 @@ export function pushNixosSharedHostReleaseActionErrors(opts: {
       );
     }
   }
+}
+
+export function nixosSharedHostPromotionCompatibilityErrors(
+  deployment: Pick<NixosSharedHostDeployment, "label" | "components">,
+): string[] {
+  const firstKind = deployment.components[0]?.kind || "";
+  if (deployment.components.some((component) => component.kind !== firstKind)) {
+    return [
+      `${deployment.label}: nixos-shared-host deployments must not mix static-webapp and ssr-webapp components`,
+    ];
+  }
+  if (firstKind === SSR_WEBAPP_COMPONENT && deployment.components.length > 1) {
+    return [
+      `${deployment.label}: reviewed nixos-shared-host ssr-webapp support is single-component only`,
+    ];
+  }
+  return [];
 }

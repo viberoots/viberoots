@@ -16,6 +16,36 @@ async function writeArtifact(root: string): Promise<void> {
   await fsp.writeFile(path.join(root, "healthz"), "ok\n", "utf8");
 }
 
+async function writeSsrArtifact(root: string): Promise<void> {
+  await fsp.mkdir(path.join(root, "dist", "server"), { recursive: true });
+  await fsp.mkdir(path.join(root, "dist", "client"), { recursive: true });
+  await fsp.writeFile(
+    path.join(root, "dist", "server", "index.js"),
+    [
+      "import http from 'node:http';",
+      "import fs from 'node:fs';",
+      "import path from 'node:path';",
+      "import { fileURLToPath } from 'node:url';",
+      "const __dirname = path.dirname(fileURLToPath(import.meta.url));",
+      "const port = Number(process.env.PORT || '3000');",
+      "const clientRoot = path.join(__dirname, '..', 'client');",
+      "const server = http.createServer((req, res) => {",
+      "  if (req.url === '/healthz') { res.writeHead(200); res.end('ok\\n'); return; }",
+      "  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });",
+      "  res.end(fs.readFileSync(path.join(clientRoot, 'index.html'), 'utf8'));",
+      "});",
+      "server.listen(port, process.env.HOST || '127.0.0.1');",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await fsp.writeFile(
+    path.join(root, "dist", "client", "index.html"),
+    "<html>demoapp-ssr</html>\n",
+    "utf8",
+  );
+}
+
 test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow end to end", async () => {
   await runInTemp("nixos-shared-host-e2e", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture({
@@ -27,7 +57,11 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
     await writeArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
-    const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
+    const server = await startNixosSharedHostPublicServer({
+      deployment,
+      hostRoot,
+      fixedRoot: artifactDir,
+    });
     try {
       const result = await $({
         cwd: tmp,
@@ -87,6 +121,62 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
       assert.equal(admission.admittedContext.targetEnvironment.targetRef, "env/pleomino/dev");
       const rendered = JSON.parse(await fsp.readFile(path.join(tmp, "rendered-host.json"), "utf8"));
       assert.ok(rendered.containers.demoapp);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+test("nixos-shared-host deploy CLI completes the reviewed ssr-webapp flow end to end", async () => {
+  await runInTemp("nixos-shared-host-ssr-e2e", async (tmp, $) => {
+    const deployment = nixosSharedHostDeploymentFixture({
+      component: { kind: "ssr-webapp", target: "//projects/apps/demoapp:app" },
+      publisher: { type: "nixos-shared-host-ssr-webapp" },
+      runtime: {
+        appName: "demoapp",
+        containerPort: 3000,
+        healthPath: "/healthz",
+        runtimeContract: {
+          type: "node-dist-server-v1",
+          framework: "vite",
+          serverEntry: "dist/server/index.js",
+          clientDir: "dist/client",
+          servingTopology: "single-host-node-with-nginx",
+          environmentNeutralBuild: true,
+          runtimeConfigInjection: "runtime_config_requirements",
+          secretInjection: "secret_requirements",
+        },
+      } as any,
+    });
+    const deploymentJson = path.join(tmp, "deployment.json");
+    const artifactDir = path.join(tmp, "artifact");
+    const hostRoot = path.join(tmp, "host");
+    await writeSsrArtifact(artifactDir);
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
+    const server = await startNixosSharedHostPublicServer({
+      deployment,
+      hostRoot,
+      fixedRoot: artifactDir,
+    });
+    try {
+      const result = await $({
+        cwd: tmp,
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${path.join(tmp, "records")} --host-config-out ${path.join(tmp, "rendered-host.json")} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`;
+      const summary = JSON.parse(String(result.stdout));
+      assert.equal(summary.finalOutcome, "succeeded");
+      assert.equal(summary.publicUrl, "https://demoapp.apps.kilty.io/");
+      const rendered = JSON.parse(await fsp.readFile(path.join(tmp, "rendered-host.json"), "utf8"));
+      assert.equal(rendered.containers.demoapp.runtime, "ssr-webapp-host");
+      assert.equal(
+        rendered.containers.demoapp.serverEntry,
+        "/srv/ssr-app/live/dist/server/index.js",
+      );
+      const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
+      assert.equal(record.publisherType, "nixos-shared-host-ssr-webapp");
+      assert.equal(record.smokeRunnerType, "nixos-shared-host-ssr-webapp-smoke");
+      assert.equal(record.componentResults[0].artifact.kind, "ssr-webapp");
+      assert.equal(record.componentResults[0].artifactIdentity.startsWith("ssr-webapp:"), true);
     } finally {
       await server.close();
     }
