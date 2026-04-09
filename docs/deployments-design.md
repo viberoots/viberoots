@@ -654,6 +654,13 @@ Bootstrap execution options that stay within this design:
   - when the normal control plane or its database is unavailable, a reviewed offline-capable bootstrap or
     recovery procedure may restore the control plane's minimum dependencies before normal operation resumes
 
+Implemented repo surface:
+
+- the repo-level `deploy` front door exposes bootstrap as an explicit separate path rather than a fallback from
+  ordinary deploy
+- bootstrap targets must opt in through reviewed deployment metadata and later reconcile their evidence back into
+  the authoritative control-plane record surface
+
 Conceptual split:
 
 - bootstrap mode answers "how do we create or recover the deployment authority itself?"

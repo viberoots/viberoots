@@ -21,6 +21,7 @@ export const NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMISSION_SCHEMA =
   "nixos-shared-host-control-plane-submission@3";
 
 export type NixosSharedHostPublishBehavior = "deploy" | "publish-only";
+export type NixosSharedHostBootstrapMode = "first_install" | "offline_recovery";
 
 export type NixosSharedHostControlPlaneOperationKind =
   | "deploy"
@@ -190,9 +191,23 @@ export type NixosSharedHostBreakGlassAuthority = {
   selection: { kind: "exact_artifact"; artifactIdentity: string };
 };
 
+export type NixosSharedHostBootstrapAuthority = {
+  kind: "bootstrap-worker";
+  mode: NixosSharedHostBootstrapMode;
+  evidencePath: string;
+  executionSnapshotPath: string;
+  lockScope: string;
+  requestedBy: DeploymentPrincipal;
+  executedBy: DeploymentPrincipal;
+  ownershipProof: string;
+  targetIdentityProof: string;
+  selection: { kind: "exact_artifact"; artifactIdentity: string };
+};
+
 export type NixosSharedHostMutationAuthority =
   | NixosSharedHostControlPlaneWorkerAuthority
-  | NixosSharedHostBreakGlassAuthority;
+  | NixosSharedHostBreakGlassAuthority
+  | NixosSharedHostBootstrapAuthority;
 
 export function requireNixosSharedHostControlPlaneAuthority(
   deployment: NixosSharedHostDeployment,
@@ -203,7 +218,11 @@ export function requireNixosSharedHostControlPlaneAuthority(
       `unsupported protection_class "${deployment.protectionClass}" for nixos-shared-host mutation`,
     );
   }
-  if (authority?.kind === "control-plane-worker" || authority?.kind === "break-glass-worker")
+  if (
+    authority?.kind === "control-plane-worker" ||
+    authority?.kind === "break-glass-worker" ||
+    authority?.kind === "bootstrap-worker"
+  )
     return authority;
   throw new Error(
     `nixos-shared-host ${deployment.protectionClass} mutation must execute through the shared control plane`,

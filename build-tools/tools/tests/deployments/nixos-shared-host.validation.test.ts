@@ -144,3 +144,21 @@ test("validation rejects multi-component shared-host rollout steps that omit a c
     errors.some((entry) => entry.includes("steps must list every component id exactly once")),
   );
 });
+
+test("validation rejects malformed bootstrap policy", () => {
+  const { errors } = extractNixosSharedHostDeployments([
+    staticWebappComponent("//projects/apps/demoapp:app"),
+    ...policyNodes(),
+    deploymentNode({
+      bootstrap: {
+        scope: "ordinary_deploy",
+      },
+    }),
+  ]);
+  assert.ok(errors.some((entry) => entry.includes("unsupported bootstrap.scope")));
+  assert.ok(
+    errors.some((entry) =>
+      entry.includes("bootstrap policy must enable allow_first_install or allow_offline_recovery"),
+    ),
+  );
+});

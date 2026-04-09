@@ -51,13 +51,19 @@ export type DeploymentControlPlaneRunActionRejectionCode =
   | "no_longer_admitted"
   | "not_paused";
 
-export type DeploymentControlPlaneRole = "submitter" | "approver" | "operator" | "break_glass";
+export type DeploymentControlPlaneRole =
+  | "submitter"
+  | "approver"
+  | "operator"
+  | "break_glass"
+  | "bootstrap";
 
 export type DeploymentControlPlaneScope =
   | { kind: "deployment_id"; value: string }
   | { kind: "provider_target_identity"; value: string }
   | { kind: "lane_policy"; value: string }
-  | { kind: "break_glass_incident"; value: string };
+  | { kind: "break_glass_incident"; value: string }
+  | { kind: "bootstrap_deployment"; value: string };
 
 export type DeploymentControlPlaneGrant = {
   role: DeploymentControlPlaneRole;

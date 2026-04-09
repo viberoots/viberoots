@@ -22,6 +22,7 @@ import {
   readString,
   type DeploymentExtractionContext,
 } from "./contract-extract-shared.ts";
+import { readBootstrapPolicy } from "./deployment-bootstrap-policy.ts";
 import {
   resolveDeploymentMetadataRefs,
   validateExplicitDeploymentRequirements,
@@ -32,8 +33,30 @@ import {
   pushNixosSharedHostReleaseActionErrors,
   resolveNixosSharedHostComponents,
 } from "./nixos-shared-host-extract-helpers.ts";
+import type { DeploymentBootstrapPolicy } from "./contract-types.ts";
 
 const SHARED_NONPROD = "shared_nonprod";
+
+function validateBootstrapPolicy(
+  label: string,
+  bootstrap: DeploymentBootstrapPolicy | undefined,
+  errors: string[],
+) {
+  if (!bootstrap) return;
+  if (bootstrap.scope !== "deployment_authority") {
+    errors.push(
+      deploymentError(label, `unsupported bootstrap.scope "${bootstrap.scope || "<empty>"}"`),
+    );
+  }
+  if (bootstrap.modes.length === 0) {
+    errors.push(
+      deploymentError(
+        label,
+        "bootstrap policy must enable allow_first_install or allow_offline_recovery",
+      ),
+    );
+  }
+}
 
 export function extractNixosSharedHostDeploymentsFromContext(
   context: DeploymentExtractionContext,
@@ -48,6 +71,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
     const prerequisites = readPrerequisites(node, "prerequisites");
     const protectionClass = readString(node, "protection_class") || SHARED_NONPROD;
     const preview = readPreviewPolicy(node, "preview");
+    const bootstrap = readBootstrapPolicy(node, "bootstrap");
     const publisher = readString(node, "publisher");
     const provisioner = readString(node, "provisioner");
     const rolloutPolicy = readRolloutPolicy(node);
@@ -71,6 +95,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
         deploymentError(label, "preview is not supported for nixos-shared-host"),
       );
     }
+    validateBootstrapPolicy(label, bootstrap, deploymentErrors);
     if (protectionClass !== SHARED_NONPROD) {
       deploymentErrors.push(
         deploymentError(
@@ -168,6 +193,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
       releaseActions,
       targetExceptions,
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
+      ...(bootstrap ? { bootstrap } : {}),
       component: { kind: STATIC_WEBAPP_COMPONENT, target: resolvedComponents[0]!.target },
       components: resolvedComponents,
       publisher: { type: publisher },

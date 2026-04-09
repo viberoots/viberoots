@@ -29,6 +29,13 @@ export type DeploymentPreviewPolicy = {
   lockScope: "shared" | "preview";
 };
 
+export type DeploymentBootstrapMode = "first_install" | "offline_recovery";
+
+export type DeploymentBootstrapPolicy = {
+  scope: "deployment_authority";
+  modes: DeploymentBootstrapMode[];
+};
+
 export type DeploymentComponent = {
   id: string;
   kind: typeof STATIC_WEBAPP_COMPONENT;
@@ -51,6 +58,7 @@ type DeploymentBase = {
   releaseActions: DeploymentReleaseAction[];
   targetExceptions: DeploymentTargetException[];
   rolloutPolicy?: DeploymentRolloutPolicy;
+  bootstrap?: DeploymentBootstrapPolicy;
   component: {
     kind: typeof STATIC_WEBAPP_COMPONENT;
     target: string;

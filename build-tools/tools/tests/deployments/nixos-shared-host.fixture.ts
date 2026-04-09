@@ -141,6 +141,7 @@ export function nixosSharedHostDeploymentFixture(
     releaseActions: overrides.releaseActions || [],
     targetExceptions: overrides.targetExceptions || [],
     ...(overrides.rolloutPolicy ? { rolloutPolicy: overrides.rolloutPolicy } : {}),
+    ...(overrides.bootstrap ? { bootstrap: overrides.bootstrap } : {}),
     component: {
       kind: STATIC_WEBAPP_COMPONENT,
       target: components[0]?.target || overrides.component?.target || "//projects/apps/demoapp:app",

@@ -14,6 +14,7 @@ import {
 } from "./contract.ts";
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
+import { recordAuthorityFields } from "./nixos-shared-host-record-authority.ts";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
 
 export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-08";
@@ -70,6 +71,22 @@ export type NixosSharedHostDeployRecord = {
     justification: string;
     bypassReason: string;
     selection: { kind: "exact_artifact"; artifactIdentity: string };
+  };
+  bootstrap?: {
+    mode: "first_install" | "offline_recovery";
+    evidencePath: string;
+    executionSnapshotPath: string;
+    lockScope: string;
+    requestedBy: DeploymentPrincipal;
+    executedBy: DeploymentPrincipal;
+    ownershipProof: string;
+    targetIdentityProof: string;
+    selection: { kind: "exact_artifact"; artifactIdentity: string };
+    reconciliation: {
+      status: "pending" | "ingested";
+      reconciledAt?: string;
+      reconciledBy?: DeploymentPrincipal;
+    };
   };
   deployBatchId?: string;
   parentRunId?: string;
@@ -145,34 +162,7 @@ export function createNixosSharedHostDeployRecord(
     providerTarget: deployment.providerTarget,
     effectiveRunTarget: deployment.providerTarget,
     providerTargetIdentity: nixosSharedHostDeploymentTargetIdentity(deployment),
-    ...(outcome.authority?.kind === "control-plane-worker"
-      ? {
-          controlPlane: {
-            submissionId: outcome.authority.submissionId,
-            submissionPath: outcome.authority.submissionPath,
-            workerId: outcome.authority.workerId,
-            admission: "admitted" as const,
-            lockScope: outcome.authority.lockScope,
-            executionSnapshotPath: outcome.authority.executionSnapshotPath,
-          },
-        }
-      : {}),
-    ...(outcome.authority?.kind === "break-glass-worker"
-      ? {
-          breakGlass: {
-            incidentRef: outcome.authority.incidentRef,
-            freezeId: outcome.authority.freezeId,
-            freezePath: outcome.authority.freezePath,
-            evidencePath: outcome.authority.evidencePath,
-            requestedBy: outcome.authority.requestedBy,
-            ...(outcome.authority.approvedBy ? { approvedBy: outcome.authority.approvedBy } : {}),
-            executedBy: outcome.authority.executedBy,
-            justification: outcome.authority.justification,
-            bypassReason: outcome.authority.bypassReason,
-            selection: outcome.authority.selection,
-          },
-        }
-      : {}),
+    ...recordAuthorityFields(outcome.authority),
     ...(outcome.deployBatchId ? { deployBatchId: outcome.deployBatchId } : {}),
     ...(outcome.parentRunId ? { parentRunId: outcome.parentRunId } : {}),
     ...(outcome.releaseLineageId ? { releaseLineageId: outcome.releaseLineageId } : {}),

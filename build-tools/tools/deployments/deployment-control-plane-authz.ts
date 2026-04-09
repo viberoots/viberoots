@@ -16,6 +16,9 @@ function defaultScopeForRole(
   deployment: DeploymentTarget,
   role: DeploymentControlPlaneRole,
 ): DeploymentControlPlaneScope {
+  if (role === "bootstrap") {
+    return { kind: "bootstrap_deployment", value: deployment.deploymentId };
+  }
   if (role === "submitter" || role === "approver") {
     return { kind: "deployment_id", value: deployment.deploymentId };
   }
@@ -28,6 +31,7 @@ function defaultScopeForRole(
 function scopeMatches(deployment: DeploymentTarget, scope: DeploymentControlPlaneScope): boolean {
   return (
     (scope.kind === "deployment_id" && scope.value === deployment.deploymentId) ||
+    (scope.kind === "bootstrap_deployment" && scope.value === deployment.deploymentId) ||
     (scope.kind === "provider_target_identity" &&
       scope.value === providerTargetIdentityFor(deployment)) ||
     (scope.kind === "lane_policy" && scope.value === deployment.lanePolicyRef)
@@ -124,6 +128,28 @@ export function authorizeControlPlaneBreakGlass(opts: {
   if (!grant || grant.scope.value !== opts.incidentRef) {
     throw new DeploymentUnauthorizedError(
       `principal ${opts.authorization.requestedBy.principalId} is not authorized for break-glass incident ${opts.incidentRef} on ${opts.deployment.deploymentId}`,
+    );
+  }
+  return {
+    principal: opts.authorization.requestedBy,
+    role: grant.role,
+    scope: grant.scope,
+  };
+}
+
+export function authorizeControlPlaneBootstrap(opts: {
+  deployment: DeploymentTarget;
+  authorization: DeploymentControlPlaneAuthorization;
+}): DeploymentControlPlaneAuthorizationDecision {
+  const grant = opts.authorization.grants.find(
+    (entry) =>
+      entry.role === "bootstrap" &&
+      entry.scope.kind === "bootstrap_deployment" &&
+      entry.scope.value === opts.deployment.deploymentId,
+  );
+  if (!grant) {
+    throw new DeploymentUnauthorizedError(
+      `principal ${opts.authorization.requestedBy.principalId} is not authorized for bootstrap on ${opts.deployment.deploymentId}`,
     );
   }
   return {

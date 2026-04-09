@@ -5,10 +5,10 @@ import type { NixosSharedHostDeployment, NixosSharedHostDeploymentComponent } fr
 import {
   baseNixosSharedHostComponentResult,
   buildNixosSharedHostPublishFailureResults,
-  withNixosSharedHostPublishState,
   withNixosSharedHostSmokeState,
   type NixosSharedHostComponentResult,
 } from "./nixos-shared-host-component-results.ts";
+import { publishComponent } from "./nixos-shared-host-progressive-publish.ts";
 import {
   summarizeProgressiveRolloutState,
   updateProgressiveRolloutPhase,
@@ -16,11 +16,6 @@ import {
   type NixosSharedHostProgressiveGateDecision,
   type NixosSharedHostProgressiveRollout,
 } from "./nixos-shared-host-progressive-rollout.ts";
-import { nixosSharedHostContainerRoot } from "./nixos-shared-host-runtime.ts";
-import {
-  publishNixosSharedHostStaticWebapp,
-  resolveNixosSharedHostStaticWebappLiveState,
-} from "./nixos-shared-host-static-publisher.ts";
 import { smokeNixosSharedHostStaticWebapp } from "./nixos-shared-host-static-smoke.ts";
 import type { NixosSharedHostConfig } from "./nixos-shared-host.ts";
 
@@ -30,70 +25,6 @@ export type NixosSharedHostGateEvaluator = (opts: {
   outcome: "succeeded" | "failed";
   defaultDecision: NixosSharedHostProgressiveGateDecision;
 }) => NixosSharedHostProgressiveGateDecision | undefined;
-
-function renderedContainer(
-  rendered: NixosSharedHostConfig,
-  component: NixosSharedHostDeploymentComponent,
-) {
-  return rendered.containers[component.providerTarget.containerName || ""];
-}
-
-async function publishComponent(opts: {
-  component: NixosSharedHostDeploymentComponent;
-  artifact: NixosSharedHostResolvedComponentArtifact["artifact"];
-  rendered: NixosSharedHostConfig;
-  hostRoot: string;
-  priorResult?: NixosSharedHostComponentResult;
-  allowLiveComponentReuse: boolean;
-}) {
-  const container = renderedContainer(opts.rendered, opts.component);
-  if (!container) throw new Error(`missing realized container for ${opts.component.id}`);
-  if (
-    opts.allowLiveComponentReuse &&
-    opts.priorResult?.publishState?.finalOutcome === "succeeded"
-  ) {
-    const live = await resolveNixosSharedHostStaticWebappLiveState({
-      containerRoot: nixosSharedHostContainerRoot(opts.hostRoot, container.containerName),
-      layout: {
-        releaseRoot: container.releaseRoot,
-        publishRoot: container.publishRoot,
-        activeReleaseLink: container.activeReleaseLink,
-      },
-    });
-    if (live && live.artifactIdentity === opts.artifact.identity) {
-      return withNixosSharedHostPublishState(
-        baseNixosSharedHostComponentResult(opts.component, opts.artifact),
-        {
-          finalOutcome: "succeeded",
-          mode: "reused_live_identity",
-          releasePath: live.releasePath,
-          activatedPath: live.activatedPath,
-          liveArtifactIdentity: live.artifactIdentity,
-        },
-      );
-    }
-  }
-  const published = await publishNixosSharedHostStaticWebapp({
-    artifactDir: opts.artifact.storedArtifactPath,
-    artifactIdentity: opts.artifact.identity,
-    containerRoot: nixosSharedHostContainerRoot(opts.hostRoot, container.containerName),
-    layout: {
-      releaseRoot: container.releaseRoot,
-      publishRoot: container.publishRoot,
-      activeReleaseLink: container.activeReleaseLink,
-    },
-  });
-  return withNixosSharedHostPublishState(
-    baseNixosSharedHostComponentResult(opts.component, opts.artifact),
-    {
-      finalOutcome: "succeeded",
-      mode: "published",
-      releasePath: published.releasePath,
-      activatedPath: published.activatedPath,
-      liveArtifactIdentity: published.artifactIdentity,
-    },
-  );
-}
 
 export async function runNixosSharedHostProgressiveExecution(opts: {
   deployment: NixosSharedHostDeployment;

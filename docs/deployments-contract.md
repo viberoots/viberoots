@@ -15,6 +15,7 @@ design has been explicitly updated first.
 - Buck owns deployment structure, validation, dependency graph, and build artifacts.
 - Live deployment side effects do not run as ordinary Buck actions.
 - Protected/shared mutation runs only through the shared deployment control plane, except for an explicitly documented incident-bounded break-glass procedure for control-plane unavailability.
+- Bootstrap mutation for the deployment authority itself is allowed only through an explicit reviewed bootstrap path on deployment-system-owned infrastructure; it is not part of the ordinary protected/shared deploy path.
 - Trusted CI may build, attest, and submit, but it is not a peer mutating authority.
 - Preview is `publish_mode = preview`, not a peer `operation_kind`.
 - Preview must publish only to an explicitly isolated preview target or be rejected.
@@ -165,6 +166,9 @@ design has been explicitly updated first.
 - If a reviewed provisioner plan/diff must be regenerated and no longer matches the reviewed artifact materially, the run must fail closed or obtain fresh approval before mutation.
 - Break-glass mutation is in policy only for an explicitly documented incident-bounded control-plane-unavailability path with mandatory fencing or equivalent concurrency protection and post-incident reconciliation back into the authoritative deployment record.
 - When break-glass mutation is used, the resulting authoritative record must preserve structured emergency evidence sufficient to explain who requested, approved, and executed the action, which incident justified it, which artifact or source-run selection path was used, and why the normal control plane was unavailable or bypassed.
+- Bootstrap mutation is in policy only for deployment targets that explicitly declare reviewed bootstrap ownership for deployment-system infrastructure.
+- Bootstrap mutation must use explicit bootstrap-scoped authorization, exact immutable admitted artifacts, explicit target-identity proof, and explicit ownership proof; it must fail closed when any proof is absent or mismatched.
+- Bootstrap records may start as pending reconciliation evidence, but once the normal control plane is available they must be ingested back into authoritative records and routine updates must return to the normal control-plane path.
 - Protected/shared authorization must use one explicit hierarchical scope model with repo-wide administrative scope, lane scope, deployment scope, and incident-bounded break-glass scope.
 - Permission evaluation must be least-privilege and resource-scoped by default; CLI, API, and UI authorization decisions must use the same action vocabulary and scope semantics.
 

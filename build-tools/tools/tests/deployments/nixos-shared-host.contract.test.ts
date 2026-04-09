@@ -120,3 +120,39 @@ test("extractNixosSharedHostDeployments preserves valid prerequisite metadata", 
     { deploymentId: "demoapp-dev", mode: "ordering_only" },
   ]);
 });
+
+test("extractNixosSharedHostDeployments preserves bootstrap policy metadata", () => {
+  const nodes: GraphNode[] = [
+    staticWebappComponent("//projects/apps/demoapp:app"),
+    nixosSharedHostLanePolicyNodeFixture(),
+    nixosSharedHostAdmissionPolicyNodeFixture(),
+    {
+      name: "//projects/deployments/deploy-system-dev:deploy",
+      provider: "nixos-shared-host",
+      component: "//projects/apps/demoapp:app",
+      component_kind: "static-webapp",
+      publisher: "nixos-shared-host-static-webapp",
+      provisioner: "nixos-shared-host-manifest",
+      protection_class: "shared_nonprod",
+      lane_policy: "//projects/deployments/pleomino-shared:lane",
+      environment_stage: "dev",
+      admission_policy: "//projects/deployments/pleomino-shared:dev_release",
+      bootstrap: {
+        scope: "deployment_authority",
+        allow_first_install: "true",
+        allow_offline_recovery: "true",
+      },
+      secret_requirements: [],
+      runtime_config_requirements: [],
+      app_name: "demoapp",
+      container_port: 3000,
+    },
+  ];
+
+  const { deployments, errors } = extractNixosSharedHostDeployments(nodes);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(deployments[0]?.bootstrap, {
+    scope: "deployment_authority",
+    modes: ["first_install", "offline_recovery"],
+  });
+});

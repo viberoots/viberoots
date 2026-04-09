@@ -260,6 +260,32 @@ Expected behavior:
 
 Situation:
 
+- a protected/shared retry run is queued or paused
+- a newer normal deploy is submitted for the same target
+
+Expected behavior:
+
+- the retry is not silently treated as the same thing as a later normal deploy
+- the system preserves the retry's own replay intent, lineage, and review posture
+- ordinary supersedence policy remains narrow and reviewed
+
+## 18. Deployment-Authority Bootstrap And Reconciliation
+
+Situation:
+
+- the deployment authority itself must be brought up for first install or restored after an outage
+- the target declares reviewed bootstrap ownership for deployment-system infrastructure
+
+Expected behavior:
+
+- the operator submits an explicit bootstrap flow with exact immutable admitted artifacts plus explicit bootstrap authority
+- bootstrap fails closed unless target identity and ownership proof are explicit and match the reviewed deployment target
+- bootstrap records the bounded mutation as bootstrap evidence rather than pretending the normal control plane already exists
+- once the normal control plane is available again, bootstrap evidence is reconciled into authoritative records
+- after reconciliation, routine updates return to the normal control-plane deploy path instead of continuing through bootstrap
+
+Situation:
+
 - an operator submits a protected/shared `retry` for a failed publish
 - while it is queued, a separate fresh normal deploy is admitted for the same deployment
 

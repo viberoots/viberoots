@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import {
+  authorizeControlPlaneBootstrap,
   authorizeControlPlaneRunAction,
   authorizeControlPlaneSubmit,
   grantsFor,
@@ -10,6 +11,7 @@ import {
 import { resolveSubmitIdempotency } from "../../deployments/deployment-control-plane-idempotency.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
 
 test("control-plane RBAC keeps submitter and operator scopes distinct", () => {
   const deployment = cloudflarePagesDeploymentFixture();
@@ -82,4 +84,33 @@ test("submit idempotency reuses matching requests and fails closed on payload dr
       /idempotency key submit-key-1 does not match the previous request/,
     );
   });
+});
+
+test("bootstrap RBAC is distinct from ordinary submit authority", () => {
+  const deployment = nixosSharedHostDeploymentFixture({
+    bootstrap: {
+      scope: "deployment_authority",
+      modes: ["first_install"],
+    },
+  });
+  const submitter = grantsFor({ principalId: "user:submitter" }, [
+    { role: "submitter", scope: { kind: "deployment_id", value: deployment.deploymentId } },
+  ]);
+  assert.throws(
+    () =>
+      authorizeControlPlaneBootstrap({
+        deployment,
+        authorization: submitter,
+      }),
+    /not authorized for bootstrap/,
+  );
+  const bootstrap = grantsFor({ principalId: "user:bootstrap" }, [
+    { role: "bootstrap", scope: { kind: "bootstrap_deployment", value: deployment.deploymentId } },
+  ]);
+  const decision = authorizeControlPlaneBootstrap({
+    deployment,
+    authorization: bootstrap,
+  });
+  assert.equal(decision.role, "bootstrap");
+  assert.equal(decision.scope.kind, "bootstrap_deployment");
 });
