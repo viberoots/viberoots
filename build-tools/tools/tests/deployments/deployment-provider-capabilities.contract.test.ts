@@ -13,9 +13,11 @@ test("provider capabilities declare explicit default rollout modes", () => {
   const nixos = providerCapabilityFor("nixos-shared-host");
   const cloudflare = providerCapabilityFor("cloudflare-pages");
   const s3Static = providerCapabilityFor("s3-static");
+  const kubernetes = providerCapabilityFor("kubernetes");
   assert.equal(nixos?.defaultRolloutMode, "all_at_once");
   assert.equal(cloudflare?.defaultRolloutMode, "all_at_once");
   assert.equal(s3Static?.defaultRolloutMode, "all_at_once");
+  assert.equal(kubernetes?.defaultRolloutMode, "all_at_once");
 });
 
 test("rollout policy omission is in policy only for the reviewed deployment shapes", () => {
@@ -32,11 +34,13 @@ test("rollout policy omission is in policy only for the reviewed deployment shap
     true,
   );
   assert.equal(rolloutPolicyOmissionInPolicy({ provider: "s3-static", componentCount: 1 }), true);
+  assert.equal(rolloutPolicyOmissionInPolicy({ provider: "kubernetes", componentCount: 1 }), true);
   assert.equal(
     rolloutPolicyOmissionInPolicy({ provider: "cloudflare-pages", componentCount: 2 }),
     false,
   );
   assert.equal(rolloutPolicyOmissionInPolicy({ provider: "s3-static", componentCount: 2 }), false);
+  assert.equal(rolloutPolicyOmissionInPolicy({ provider: "kubernetes", componentCount: 2 }), false);
 });
 
 test("provider capabilities make built-in release-action posture explicit", () => {
@@ -52,6 +56,14 @@ test("provider capabilities make built-in release-action posture explicit", () =
   );
   assert.equal(providerDeclaresReleaseActionType("cloudflare-pages", "cache_warmup"), false);
   assert.equal(providerDeclaresReleaseActionType("s3-static", "cache_warmup"), false);
+  assert.equal(providerDeclaresReleaseActionType("kubernetes", "cache_warmup"), false);
+});
+
+test("kubernetes capability declares the reviewed service-style component slice", () => {
+  const kubernetes = providerCapabilityFor("kubernetes");
+  assert.deepEqual(kubernetes?.supportedComponentKinds, ["service", "third-party-service"]);
+  assert.deepEqual(kubernetes?.multiComponentKinds, ["service", "third-party-service"]);
+  assert.deepEqual(kubernetes?.supportedRolloutModes, ["all_at_once", "ordered_best_effort"]);
 });
 
 test("the reviewed non-static component kinds are available for later provider slices", () => {

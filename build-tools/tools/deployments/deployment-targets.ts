@@ -2,11 +2,13 @@
 import type {
   CloudflarePagesDeployment,
   DeploymentTarget,
+  KubernetesDeployment,
   NixosSharedHostDeployment,
   S3StaticDeployment,
 } from "./contract-types.ts";
 import {
   CLOUDFLARE_PAGES_PROVIDER,
+  KUBERNETES_PROVIDER,
   NIXOS_SHARED_HOST_PROVIDER,
   S3_STATIC_PROVIDER,
 } from "./contract-types.ts";
@@ -27,6 +29,12 @@ export function isS3StaticDeployment(
   deployment: DeploymentTarget,
 ): deployment is S3StaticDeployment {
   return deployment.provider === S3_STATIC_PROVIDER;
+}
+
+export function isKubernetesDeployment(
+  deployment: DeploymentTarget,
+): deployment is KubernetesDeployment {
+  return deployment.provider === KUBERNETES_PROVIDER;
 }
 
 export function isMultiComponentDeployment(deployment: DeploymentTarget): boolean {

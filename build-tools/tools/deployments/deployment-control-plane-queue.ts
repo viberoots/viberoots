@@ -101,20 +101,12 @@ export async function supersedeOlderQueuedRuns(opts: {
       continue;
     }
     if (Date.parse(snapshot.submittedAt) > Date.parse(opts.snapshot.submittedAt)) continue;
-    await fsp.writeFile(
-      filePath,
-      JSON.stringify(
-        {
-          ...submission,
-          lifecycleState: "finished",
-          terminationReason: "superseded",
-          completedAt: new Date().toISOString(),
-        },
-        null,
-        2,
-      ) + "\n",
-      "utf8",
-    );
+    await writeControlPlaneJson(filePath, {
+      ...submission,
+      lifecycleState: "finished",
+      terminationReason: "superseded",
+      completedAt: new Date().toISOString(),
+    });
   }
 }
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentRolloutMode } from "./deployment-rollout.ts";
+import { KUBERNETES_PROVIDER } from "./deployment-provider-targets.ts";
 import {
   SERVICE_COMPONENT_KIND,
   SSR_WEBAPP_COMPONENT_KIND,
@@ -65,6 +66,22 @@ const PROVIDER_CAPABILITIES: Record<string, DeploymentProviderCapability> = {
     supportedComponentKinds: [STATIC_WEBAPP_COMPONENT_KIND],
     multiComponentKinds: [],
     supportedRolloutModes: ["all_at_once"],
+    defaultRolloutMode: "all_at_once",
+    rolloutPolicyOmissionInPolicy: {
+      singleComponent: true,
+      multiComponent: false,
+    },
+    releaseActions: {
+      supportsProtectedShared: false,
+      declaredTypes: [],
+      routineAllowedTypes: [],
+    },
+  },
+  [KUBERNETES_PROVIDER]: {
+    provider: KUBERNETES_PROVIDER,
+    supportedComponentKinds: [SERVICE_COMPONENT_KIND, THIRD_PARTY_SERVICE_COMPONENT_KIND],
+    multiComponentKinds: [SERVICE_COMPONENT_KIND, THIRD_PARTY_SERVICE_COMPONENT_KIND],
+    supportedRolloutModes: ["all_at_once", "ordered_best_effort"],
     defaultRolloutMode: "all_at_once",
     rolloutPolicyOmissionInPolicy: {
       singleComponent: true,

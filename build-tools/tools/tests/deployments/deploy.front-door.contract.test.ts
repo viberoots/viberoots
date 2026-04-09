@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { findRepoRoot } from "../../lib/repo.ts";
 import { listDeploymentsForCli } from "../../deployments/deploy-front-door.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import { kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
 import { s3StaticDeploymentFixture } from "./s3-static.fixture.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
@@ -73,6 +74,21 @@ test("deploy front door rejects s3-static --provision-only", async () => {
           stdio: "pipe",
         })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --provision-only`,
       /provisions as part of deploy/,
+    );
+  });
+});
+
+test("deploy front door rejects kubernetes mutation flow until runtime is implemented", async () => {
+  await runInTemp("deploy-kubernetes-runtime-guard", async (tmp, $) => {
+    const deploymentJson = path.join(tmp, "deployment.json");
+    await writeDeploymentJson(deploymentJson, kubernetesDeploymentFixture());
+    await assert.rejects(
+      async () =>
+        await $({
+          cwd: tmp,
+          stdio: "pipe",
+        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson}`,
+      /kubernetes deploy execution is not implemented yet/,
     );
   });
 });

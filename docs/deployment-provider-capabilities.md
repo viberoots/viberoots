@@ -423,6 +423,102 @@ Normative-source note:
 - in policy for protected/shared single-component static-webapp deployments
 - protected/shared execution must stay inside vetted built-in publisher, provisioner, and smoke-runner code
 
+## Capability Entry: `kubernetes`
+
+### Identity
+
+- `provider`: `kubernetes`
+- canonical target identity fields:
+  - `cluster`
+  - `namespace`
+  - `release`
+- canonical lock-key shape:
+  - `kubernetes:<cluster>/<namespace>/<release>`
+
+### Component Support
+
+- supported component kinds:
+  - `service`
+  - `third-party-service`
+- multi-component support:
+  - supported for reviewed service plus sidecar or shared-platform slices
+  - every component must be `service` or `third-party-service`
+- additional unsupported shapes:
+  - `static-webapp`
+  - `ssr-webapp`
+  - `mobile-app`
+
+### Rollout Support
+
+- default rollout mode:
+  - `all_at_once`
+- rollout-policy omission posture:
+  - omission is reviewed only for the single-component service slice
+  - protected/shared multi-component deployments must declare rollout policy explicitly
+- supported rollout modes:
+  - `all_at_once`
+  - `ordered_best_effort`
+- reviewed multi-component posture:
+  - `ordered_best_effort`
+  - `abort = stop_on_first_failure`
+  - `smoke = final_only`
+  - `steps` must list every component id exactly once
+
+### Preview Support
+
+- preview support:
+  - not reviewed in the initial `kubernetes` slice
+
+### Smoke / Release Health
+
+- default smoke model:
+  - built-in service-health smoke against the reviewed release endpoint after publish
+  - the initial slice assumes namespace and release identity come from authoritative deployment metadata rather than from Helm values drift
+
+### Built-In Publisher Contract
+
+- built-in publisher type:
+  - `helm-release`
+- exact publish input:
+  - one or more admitted immutable service-style component artifacts
+- checked-in provider config:
+  - `helm/values.yaml` or equivalent release values remain provider-local publish configuration only
+  - deployment metadata remains authoritative for cluster, namespace, and release identity; config drift must fail closed before publish
+
+### Retry / Idempotency
+
+- exact-artifact retry must reuse the same reviewed provider-target identity and release values fingerprint
+- ambiguous provider outcomes must fail closed rather than silently replaying Helm mutation
+- the initial slice does not define preview, rollback, or promotion workflows
+
+### Partial Publish Observability
+
+- the adapter should preserve:
+  - canonical provider-target identity
+  - namespace and release identity
+  - exact component artifact identities
+  - per-component publish state for shared-platform or sidecar-shaped deployments
+
+### Provisioner Support
+
+- reviewed built-in provisioners for the initial slice:
+  - `terraform-stack`
+  - `cdktf-stack`
+- meaning:
+  - the normal deploy path may prepare namespace, ingress, storage, service-account, or related cluster wiring before publish
+  - deployment metadata stays authoritative for target identity while the provisioner config stays provider-local
+
+### Built-In `release_actions` Support
+
+- protected/shared built-in `release_actions`:
+  - not supported in the reviewed initial `kubernetes` capability entry
+
+### Protected/Shared Eligibility
+
+- in policy for protected/shared single-component service deployments
+- in policy for protected/shared reviewed multi-component service plus sidecar or shared-platform deployments only when the deployment declares the reviewed explicit rollout policy
+- protected/shared execution must stay inside vetted built-in publisher, provisioner, and service-health smoke code
+
 ## Adding Another Provider
 
 Before adding a new built-in provider for protected/shared use:

@@ -11,7 +11,11 @@ import {
 import { runCloudflareDeployFrontDoor } from "./cloudflare-pages-front-door.ts";
 import { resolveSmokeConnectOverride } from "./deployment-cli-smoke.ts";
 import { runFromChangesCli } from "./deployment-from-changes-cli.ts";
-import { isNixosSharedHostDeployment, isS3StaticDeployment } from "./contract.ts";
+import {
+  isCloudflarePagesDeployment,
+  isNixosSharedHostDeployment,
+  isS3StaticDeployment,
+} from "./contract.ts";
 import { maybeRunNixosSharedHostRemoteProfile } from "./nixos-shared-host-remote-cli.ts";
 import { runNixosSharedHostDeployFrontDoor } from "./deploy-provider-front-door.ts";
 import { runS3StaticDeployFrontDoor } from "./s3-static-front-door.ts";
@@ -109,7 +113,7 @@ async function main() {
     });
     return;
   }
-  if (!isNixosSharedHostDeployment(deployment)) {
+  if (isCloudflarePagesDeployment(deployment)) {
     await runCloudflareDeployFrontDoor({
       workspaceRoot,
       deployment,
@@ -128,6 +132,11 @@ async function main() {
       provisionOnly,
     });
     return;
+  }
+  if (!isNixosSharedHostDeployment(deployment)) {
+    throw new Error(
+      "kubernetes deploy execution is not implemented yet; use --validate-only or --list for the current provider-contract slice",
+    );
   }
   if (await maybeRunNixosSharedHostRemoteProfile({ workspaceRoot, deployment })) return;
   await runNixosSharedHostDeployFrontDoor({

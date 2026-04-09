@@ -14,6 +14,7 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "publisher",
   "publisher_config",
   "provisioner",
+  "provisioner_config",
   "protection_class",
   "lane_policy",
   "environment_stage",

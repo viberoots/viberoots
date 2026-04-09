@@ -67,8 +67,14 @@ export function runActionIdempotencyPathFor(recordsRoot: string, idempotencyKey:
 }
 
 export async function writeControlPlaneJson(filePath: string, value: unknown): Promise<void> {
-  await fsp.mkdir(path.dirname(filePath), { recursive: true });
-  await fsp.writeFile(filePath, JSON.stringify(value, null, 2) + "\n", "utf8");
+  const dir = path.dirname(filePath);
+  const tempPath = path.join(
+    dir,
+    `.${path.basename(filePath)}.${process.pid}.${crypto.randomBytes(6).toString("hex")}.tmp`,
+  );
+  await fsp.mkdir(dir, { recursive: true });
+  await fsp.writeFile(tempPath, JSON.stringify(value, null, 2) + "\n", "utf8");
+  await fsp.rename(tempPath, filePath);
 }
 
 export async function readControlPlaneJson<T>(filePath: string): Promise<T> {
