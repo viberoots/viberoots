@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import type { DeploymentAdmissionPolicy, DeploymentLanePolicy } from "./deployment-policy.ts";
+import type { DeploymentComponentKind } from "./deployment-component-kinds.ts";
 import type { DeploymentRolloutPolicy } from "./deployment-rollout.ts";
 import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import type { DeploymentRequirement } from "./deployment-requirements.ts";
@@ -38,7 +39,7 @@ export type DeploymentBootstrapPolicy = {
 
 export type DeploymentComponent = {
   id: string;
-  kind: typeof STATIC_WEBAPP_COMPONENT;
+  kind: DeploymentComponentKind;
   target: string;
 };
 
@@ -60,7 +61,7 @@ type DeploymentBase = {
   rolloutPolicy?: DeploymentRolloutPolicy;
   bootstrap?: DeploymentBootstrapPolicy;
   component: {
-    kind: typeof STATIC_WEBAPP_COMPONENT;
+    kind: DeploymentComponentKind;
     target: string;
   };
   components: DeploymentComponent[];
@@ -89,6 +90,7 @@ export type CloudflarePagesProviderTarget = {
 };
 
 export type NixosSharedHostDeploymentComponent = DeploymentComponent & {
+  kind: typeof STATIC_WEBAPP_COMPONENT;
   runtime: {
     appName: string;
     containerPort: number;

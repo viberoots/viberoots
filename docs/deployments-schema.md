@@ -67,10 +67,20 @@ Required keys:
 - `kind`
 - `target`
 
-Initial reviewed `nixos-shared-host` component rule:
+Canonical reviewed component-kind registry:
+
+- `static-webapp`
+- `ssr-webapp`
+- `mobile-app`
+- `service`
+- `third-party-service`
+
+Current reviewed provider-specific rule for `nixos-shared-host`:
 
 - every component must use `kind = "static-webapp"`
 - single-component deployments may rely on provider-default rollout behavior
+- provider-default rollout behavior is in policy only for reviewed shapes where the authoritative
+  provider-capability entry explicitly allows omission of `rollout_policy`
 - protected/shared multi-component deployments must:
   - resolve every component into one `target_group`
   - declare distinct component ids and distinct `app_name` values
@@ -490,6 +500,19 @@ Minimum fields:
 | replay reference-resolution policy                  | yes when relevant | Must preserve whether exact reference reuse is required and fail-closed behavior when an admitted reference is unavailable. |
 | approval payload-binding snapshot or reference      | yes when relevant | Required when human or policy approval was part of admission.                                                               |
 | rollout runtime state snapshot                      | yes when relevant | Required for progressive rollout replay, resume, or auditability.                                                           |
+
+Resolved component expectations:
+
+- every resolved component entry should preserve `id`, `kind`, `target`, `artifact_identity`, and
+  `artifact_ref`
+- `ssr-webapp` should also preserve the reviewed runtime-contract reference required by the
+  publisher/runtime slice
+- default smoke or release-health classification should derive from the reviewed component kind:
+  - `static-webapp`: HTTP smoke, 5 minute budget
+  - `ssr-webapp`: HTTP or runtime-contract smoke, 10 minute budget
+  - `mobile-app`: release-health validation by default
+  - `service`: service-health validation, 10 minute budget
+  - `third-party-service`: service-health validation, 10 minute budget
 
 Minimum `approval payload-binding snapshot` fields when present:
 

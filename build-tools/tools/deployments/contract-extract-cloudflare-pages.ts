@@ -11,7 +11,6 @@ import { readPrimaryDeploymentComponent } from "./contract-extract-components.ts
 import {
   deploymentError,
   duplicateValueEntries,
-  isStaticWebappNode,
   pushRolloutPolicyFieldErrors,
   pushTokenFieldErrors,
   readLabel,
@@ -29,6 +28,7 @@ import {
   validateExplicitDeploymentRequirements,
 } from "./deployment-extract-metadata.ts";
 import { readDeploymentRequirements } from "./deployment-requirements.ts";
+import { pushCloudflareComponentKindErrors } from "./cloudflare-pages-capability-validation.ts";
 import {
   allowsCloudflareAliasCollision,
   pushCloudflarePreviewErrors,
@@ -37,10 +37,6 @@ import {
 const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/;
 const SHARED_NONPROD = "shared_nonprod";
 const PRODUCTION_FACING = "production_facing";
-
-function validProtectionClass(value: string): boolean {
-  return value === SHARED_NONPROD || value === PRODUCTION_FACING;
-}
 
 export function extractCloudflarePagesDeploymentsFromContext(
   context: DeploymentExtractionContext,
@@ -77,14 +73,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
       context.errors.push("deployment target missing canonical label");
       continue;
     }
-    if ((primaryComponent?.kind || componentKind) !== STATIC_WEBAPP_COMPONENT) {
-      deploymentErrors.push(
-        deploymentError(
-          label,
-          `unsupported cloudflare-pages component_kind "${primaryComponent?.kind || componentKind || "<empty>"}"`,
-        ),
-      );
-    }
+    const declaredKind = primaryComponent?.kind || componentKind;
     if (!primaryComponent?.target) {
       deploymentErrors.push(deploymentError(label, "missing required component target"));
     }
@@ -114,7 +103,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
         invalidMessage: `${fieldPath} must be lowercase alphanumeric plus internal hyphens`,
       });
     }
-    if (!validProtectionClass(protectionClass)) {
+    if (protectionClass !== SHARED_NONPROD && protectionClass !== PRODUCTION_FACING) {
       deploymentErrors.push(
         deploymentError(
           label,
@@ -164,15 +153,13 @@ export function extractCloudflarePagesDeploymentsFromContext(
       );
     }
     pushCloudflarePreviewErrors(label, preview, deploymentErrors);
-    const componentNode = context.components.get(primaryComponent?.target || "");
-    if (primaryComponent?.target && !isStaticWebappNode(componentNode)) {
-      deploymentErrors.push(
-        deploymentError(
-          label,
-          `component target ${primaryComponent.target} is not a supported static-webapp`,
-        ),
-      );
-    }
+    pushCloudflareComponentKindErrors({
+      label,
+      declaredKind,
+      componentTarget: primaryComponent?.target,
+      componentNode: context.components.get(primaryComponent?.target || ""),
+      errors: deploymentErrors,
+    });
     const releaseActions = resolveDeploymentMetadataRefs({
       refs: releaseActionRefs,
       label,

@@ -145,11 +145,6 @@ export function readPrerequisites(node: GraphNode, key: string): DeploymentPrere
     .filter((entry): entry is DeploymentPrerequisite => !!entry);
 }
 
-export function isStaticWebappNode(node: GraphNode | undefined): boolean {
-  const labels = new Set(Array.isArray(node?.labels) ? node.labels : []);
-  return labels.has("kind:app") && (labels.has("webapp:static") || labels.has("webapp:pwa"));
-}
-
 export function deploymentError(label: string, message: string): string {
   return `${normalizeTargetLabel(label)}: ${message}`;
 }

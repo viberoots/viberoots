@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GraphNode } from "../../lib/graph.ts";
 import { extractNixosSharedHostDeployments } from "../../deployments/contract.ts";
+import { REVIEWED_NON_STATIC_COMPONENT_KINDS } from "../../deployments/deployment-provider-capabilities.ts";
 import {
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostLanePolicyNodeFixture,
@@ -80,7 +81,9 @@ test("validation rejects unsupported component kinds for nixos-shared-host", () 
     ...policyNodes(),
     deploymentNode({ component_kind: "http-service" }),
   ]);
-  assert.ok(errors.some((entry) => entry.includes("unsupported nixos-shared-host component_kind")));
+  assert.ok(
+    errors.some((entry) => entry.includes('does not support component_kind "http-service"')),
+  );
 });
 
 test("validation rejects protected multi-component shared-host deployments without rollout_policy", () => {
@@ -161,4 +164,18 @@ test("validation rejects malformed bootstrap policy", () => {
       entry.includes("bootstrap policy must enable allow_first_install or allow_offline_recovery"),
     ),
   );
+});
+
+test("validation rejects reviewed non-static kinds until nixos-shared-host declares capability support", () => {
+  for (const kind of REVIEWED_NON_STATIC_COMPONENT_KINDS) {
+    const { errors } = extractNixosSharedHostDeployments([
+      staticWebappComponent("//projects/apps/demoapp:app"),
+      ...policyNodes(),
+      deploymentNode({ component_kind: kind }),
+    ]);
+    assert.ok(
+      errors.some((entry) => entry.includes(`does not support component_kind "${kind}"`)),
+      `expected nixos-shared-host to reject ${kind}, saw: ${errors.join("\n")}`,
+    );
+  }
 });

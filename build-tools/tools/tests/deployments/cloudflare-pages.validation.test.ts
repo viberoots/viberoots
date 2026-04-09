@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GraphNode } from "../../lib/graph.ts";
 import { extractCloudflarePagesDeployments } from "../../deployments/contract.ts";
+import { REVIEWED_NON_STATIC_COMPONENT_KINDS } from "../../deployments/deployment-provider-capabilities.ts";
 import {
   cloudflarePagesAdmissionPolicyNodeFixture,
   cloudflarePagesLanePolicyNodeFixture,
@@ -135,4 +136,18 @@ test("validation rejects multi-component cloudflare-pages deployments", () => {
     }),
   ]);
   assert.ok(errors.some((entry) => entry.includes("does not support multi-component")));
+});
+
+test("validation rejects reviewed non-static kinds until cloudflare-pages declares capability support", () => {
+  for (const kind of REVIEWED_NON_STATIC_COMPONENT_KINDS) {
+    const { errors } = extractCloudflarePagesDeployments([
+      { name: "//projects/apps/pleomino:app", labels: ["kind:app", "webapp:ssr"] },
+      ...policyNodes(),
+      deploymentNode({ component_kind: kind }),
+    ]);
+    assert.ok(
+      errors.some((entry) => entry.includes(`does not support component_kind "${kind}"`)),
+      `expected cloudflare-pages to reject ${kind}, saw: ${errors.join("\n")}`,
+    );
+  }
 });

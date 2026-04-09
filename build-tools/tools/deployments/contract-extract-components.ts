@@ -2,6 +2,7 @@
 import type { GraphNode } from "../lib/graph.ts";
 import { normalizeTargetLabel } from "../lib/labels.ts";
 import type { DeploymentRolloutPolicy } from "./deployment-rollout.ts";
+import { rolloutPolicyOmissionInPolicy } from "./deployment-provider-capabilities.ts";
 import {
   deploymentError,
   pushRolloutPolicyFieldErrors,
@@ -10,7 +11,6 @@ import {
   readStringRecordList,
 } from "./contract-extract-shared.ts";
 
-const STATIC_WEBAPP_COMPONENT = "static-webapp";
 const SHARED_NONPROD = "shared_nonprod";
 
 export type RawStaticWebappComponent = {
@@ -76,8 +76,18 @@ export function rolloutPolicyErrorsForNixosSharedHost(
     }
     return errors;
   }
-  if (protectionClass !== SHARED_NONPROD && !rolloutPolicy) return errors;
   if (!rolloutPolicy) {
+    if (protectionClass !== SHARED_NONPROD) {
+      return errors;
+    }
+    if (
+      rolloutPolicyOmissionInPolicy({
+        provider: "nixos-shared-host",
+        componentCount: components.length,
+      })
+    ) {
+      return errors;
+    }
     errors.push(
       deploymentError(
         label,
@@ -152,7 +162,7 @@ export function readPrimaryDeploymentComponent(node: GraphNode): {
   return {
     componentTarget,
     componentKind,
-    components: [{ id: "default", kind: STATIC_WEBAPP_COMPONENT, target: componentTarget }],
+    components: [{ id: "default", kind: componentKind, target: componentTarget }],
     primaryComponent: { id: "default", kind: componentKind, target: componentTarget },
   };
 }

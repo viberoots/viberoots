@@ -22,6 +22,7 @@ Normative-source note:
 | supported component kinds          | Defines which component shapes the provider can publish.                                                                                        |
 | supported rollout modes            | Defines which `rollout_policy` modes are valid.                                                                                                 |
 | default rollout mode               | Defines the provider's default rollout semantics when deployment metadata omits `rollout_policy`.                                               |
+| rollout-policy omission posture    | Defines which reviewed deployment shapes may omit `rollout_policy` and rely on the explicit provider default.                                   |
 | preview support                    | States whether preview is unsupported, supported with restrictions, or fully supported.                                                         |
 | preview isolation model            | Defines how preview target isolation is proven.                                                                                                 |
 | preview cleanup default            | Defines the concrete default cleanup/TTL behavior when deployment metadata relies on provider defaults.                                         |
@@ -78,6 +79,10 @@ Normative-source note:
 
 - default rollout mode:
   - `all_at_once` for single-component deployments
+- rollout-policy omission posture:
+  - omission is reviewed only for single-component deployments
+  - protected/shared multi-component deployments must declare `rollout_policy` explicitly even
+    when the intended behavior would otherwise match the provider default
 - supported rollout modes:
   - `all_at_once` for single-component deployments
   - `ordered_best_effort` for the reviewed multi-component static-webapp slice, with:
@@ -183,9 +188,9 @@ Normative-source note:
   - supported only for the reviewed built-in types:
     - `cache_warmup`
     - `post_publish_verification`
-  - `schema_migration` remains a reviewed built-in action type, but it is destructive and therefore
-    rejected on the ordinary protected/shared deploy path until a separate destructive-intent
-    workflow is used
+  - reviewed built-in action types that must be rejected on the ordinary protected/shared deploy
+    path:
+    - `schema_migration`
   - replay follows the recorded per-action replay policy for `retry`, `rollback`, and `promotion`
   - package-local executable hooks remain out of policy
 
@@ -221,6 +226,9 @@ Normative-source note:
 
 - default rollout mode:
   - `all_at_once`
+- rollout-policy omission posture:
+  - omission is reviewed only for the single-component static-webapp slice
+  - no multi-component or advanced-rollout omission path is in policy
 - supported rollout modes:
   - `all_at_once`
 - unsupported rollout modes:
@@ -307,8 +315,13 @@ Normative-source note:
 
 - protected/shared built-in `release_actions`:
   - not supported in the reviewed `cloudflare-pages` capability entry
+  - allowed built-in action types: none
+  - rejected built-in action types: all until a reviewed capability update explicitly allows
+    specific types and their replay expectations
 - implication:
-  - protected/shared `cloudflare-pages` deployments should reject `release_actions` until a reviewed capability update explicitly allows specific built-in action types and their replay expectations
+  - protected/shared `cloudflare-pages` deployments should reject `release_actions` until a
+    reviewed capability update explicitly allows specific built-in action types and their replay
+    expectations
 
 ### Protected/Shared Eligibility
 

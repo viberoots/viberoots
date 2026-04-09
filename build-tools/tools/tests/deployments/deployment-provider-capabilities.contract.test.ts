@@ -1,0 +1,59 @@
+#!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import {
+  REVIEWED_NON_STATIC_COMPONENT_KINDS,
+  providerAllowsRoutineProtectedSharedReleaseActionType,
+  providerCapabilityFor,
+  providerDeclaresReleaseActionType,
+  rolloutPolicyOmissionInPolicy,
+} from "../../deployments/deployment-provider-capabilities.ts";
+
+test("provider capabilities declare explicit default rollout modes", () => {
+  const nixos = providerCapabilityFor("nixos-shared-host");
+  const cloudflare = providerCapabilityFor("cloudflare-pages");
+  assert.equal(nixos?.defaultRolloutMode, "all_at_once");
+  assert.equal(cloudflare?.defaultRolloutMode, "all_at_once");
+});
+
+test("rollout policy omission is in policy only for the reviewed deployment shapes", () => {
+  assert.equal(
+    rolloutPolicyOmissionInPolicy({ provider: "nixos-shared-host", componentCount: 1 }),
+    true,
+  );
+  assert.equal(
+    rolloutPolicyOmissionInPolicy({ provider: "nixos-shared-host", componentCount: 2 }),
+    false,
+  );
+  assert.equal(
+    rolloutPolicyOmissionInPolicy({ provider: "cloudflare-pages", componentCount: 1 }),
+    true,
+  );
+  assert.equal(
+    rolloutPolicyOmissionInPolicy({ provider: "cloudflare-pages", componentCount: 2 }),
+    false,
+  );
+});
+
+test("provider capabilities make built-in release-action posture explicit", () => {
+  assert.equal(providerDeclaresReleaseActionType("nixos-shared-host", "cache_warmup"), true);
+  assert.equal(
+    providerDeclaresReleaseActionType("nixos-shared-host", "post_publish_verification"),
+    true,
+  );
+  assert.equal(providerDeclaresReleaseActionType("nixos-shared-host", "schema_migration"), true);
+  assert.equal(
+    providerAllowsRoutineProtectedSharedReleaseActionType("nixos-shared-host", "schema_migration"),
+    false,
+  );
+  assert.equal(providerDeclaresReleaseActionType("cloudflare-pages", "cache_warmup"), false);
+});
+
+test("the reviewed non-static component kinds are available for later provider slices", () => {
+  assert.deepEqual(REVIEWED_NON_STATIC_COMPONENT_KINDS, [
+    "ssr-webapp",
+    "mobile-app",
+    "service",
+    "third-party-service",
+  ]);
+});

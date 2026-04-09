@@ -1,16 +1,18 @@
 #!/usr/bin/env zx-wrapper
 import type { RawStaticWebappComponent } from "./contract-extract-components.ts";
 import { componentError } from "./contract-extract-components.ts";
-import { isStaticWebappNode, type DeploymentExtractionContext } from "./contract-extract-shared.ts";
+import type { DeploymentExtractionContext } from "./contract-extract-shared.ts";
 import {
   deriveNixosSharedHostProviderTarget,
   STATIC_WEBAPP_COMPONENT,
   type NixosSharedHostDeploymentComponent,
 } from "./contract-types.ts";
+import { isStaticWebappNode } from "./deployment-component-kinds.ts";
+import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import {
-  NIXOS_SHARED_HOST_RELEASE_ACTION_TYPES,
-  type DeploymentReleaseAction,
-} from "./deployment-release-actions.ts";
+  providerDeclaresReleaseActionType,
+  providerSupportsComponentKind,
+} from "./deployment-provider-capabilities.ts";
 import { missingRequirementNames, type DeploymentRequirement } from "./deployment-requirements.ts";
 
 const APP_NAME_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
@@ -32,14 +34,15 @@ export function resolveNixosSharedHostComponents(opts: {
       opts.errors.push(componentError(opts.label, rawComponent.id, "duplicate component id"));
     }
     seenIds.add(rawComponent.id);
-    if (rawComponent.kind !== STATIC_WEBAPP_COMPONENT) {
+    if (!providerSupportsComponentKind("nixos-shared-host", rawComponent.kind)) {
       opts.errors.push(
         componentError(
           opts.label,
           rawComponent.id,
-          `unsupported nixos-shared-host component_kind "${rawComponent.kind || "<empty>"}"`,
+          `nixos-shared-host provider capability does not support component_kind "${rawComponent.kind || "<empty>"}"`,
         ),
       );
+      continue;
     }
     if (!rawComponent.target) {
       opts.errors.push(
@@ -126,7 +129,7 @@ export function pushNixosSharedHostReleaseActionErrors(opts: {
   errors: string[];
 }) {
   for (const action of opts.releaseActions) {
-    if (!NIXOS_SHARED_HOST_RELEASE_ACTION_TYPES.has(action.type)) {
+    if (!providerDeclaresReleaseActionType("nixos-shared-host", action.type)) {
       opts.errors.push(
         `${opts.label}: unsupported nixos-shared-host release_action type "${action.type}"`,
       );

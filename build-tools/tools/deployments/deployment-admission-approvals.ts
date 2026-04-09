@@ -1,11 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentTarget } from "./contract.ts";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
-import {
-  NIXOS_SHARED_HOST_RELEASE_ACTION_TYPES,
-  destructiveReleaseActions,
-  releaseActionRefs,
-} from "./deployment-release-actions.ts";
+import { destructiveReleaseActions, releaseActionRefs } from "./deployment-release-actions.ts";
+import { providerDeclaresReleaseActionType } from "./deployment-provider-capabilities.ts";
 import type {
   DeploymentAdmissionApprovalFact,
   DeploymentAdmissionEvidence,
@@ -95,7 +92,7 @@ export function requireBuiltInExecutionBoundary(deployment: DeploymentTarget) {
     );
   }
   for (const action of deployment.releaseActions) {
-    if (!NIXOS_SHARED_HOST_RELEASE_ACTION_TYPES.has(action.type)) {
+    if (!providerDeclaresReleaseActionType("nixos-shared-host", action.type)) {
       throw new DeploymentAdmissionError(
         "no_longer_admitted",
         `protected/shared admission rejects non-built-in release_action ${action.ref}`,
