@@ -15,26 +15,26 @@ import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import type { NixosSharedHostGateEvaluator } from "./nixos-shared-host-progressive-execution.ts";
 import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
-import { withFailedStep } from "./nixos-shared-host-deploy-failure.ts";
-import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
-import { smokeNixosSharedHostPublishedComponents } from "./nixos-shared-host-publish-components.ts";
 import {
   createNixosSharedHostDeployRunId,
   type NixosSharedHostDeployRecord,
 } from "./nixos-shared-host-records.ts";
 import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
-import {
-  writeNixosSharedHostProvisionOnlyRecord,
-  writeNixosSharedHostSuccessRecord,
-} from "./nixos-shared-host-provision-record.ts";
+import { writeNixosSharedHostProvisionOnlyRecord } from "./nixos-shared-host-provision-record.ts";
 import { createNixosSharedHostReleasePhaseRunner } from "./nixos-shared-host-release-phase.ts";
 import { writeNixosSharedHostReplayComponentResults } from "./nixos-shared-host-replay.ts";
-import { prepareNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy-setup.ts";
-import { materializeNixosSharedHostRuntime } from "./nixos-shared-host-runtime.ts";
 import {
-  failStaticDeployWithRecord,
-  runStaticDeployProgressivePhases,
-} from "./nixos-shared-host-static-deploy-progressive.ts";
+  materializeNixosSharedHostRuntimeWithSecrets,
+  runNixosSharedHostReleasePhaseWithSecrets,
+  smokeNixosSharedHostPublishedComponentsWithSecrets,
+} from "./nixos-shared-host-secret-runtime.ts";
+import { prepareNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy-setup.ts";
+import {
+  failNixosSharedHostStaticDeploy,
+  writeSuccessfulNixosSharedHostStaticDeployRecord,
+} from "./nixos-shared-host-static-deploy-failure.ts";
+import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
+import { runStaticDeployProgressivePhases } from "./nixos-shared-host-static-deploy-progressive.ts";
 
 type StaticOperationKind = "deploy" | "promotion" | "provision_only" | "retry" | "rollback";
 type StaticPublishBehavior = "deploy" | "publish-only" | "provision-only";
@@ -69,8 +69,22 @@ export async function runNixosSharedHostStaticDeploy(opts: {
   const operationKind = opts.operationKind || "deploy";
   const publishBehavior = opts.publishBehavior || "deploy";
   const releaseActions = opts.releaseActions || opts.deployment.releaseActions;
-  let deploymentMetadataFingerprint: string | undefined;
-  let replaySnapshotPath: string | undefined;
+  let deploymentMetadataFingerprint: string | undefined, replaySnapshotPath: string | undefined;
+  const baseReplayState = {
+    deployBatchId: opts.deployBatchId,
+    parentRunId: opts.parentRunId,
+    releaseLineageId: opts.releaseLineageId,
+    artifact: opts.artifact,
+    artifactLineageId: opts.artifactLineageId,
+    admittedContext: opts.admittedContext,
+    provisionerPlan: opts.provisionerPlan,
+  };
+  let replayState = { ...baseReplayState, deploymentMetadataFingerprint };
+  const secretRuntime = createVaultDeploymentSecretRuntime({
+    authority,
+    admittedContext: opts.admittedContext,
+    fallbackTargetScope: authority.kind,
+  });
   try {
     const runReleasePhase = createNixosSharedHostReleasePhaseRunner({
       recordsRoot: opts.recordsRoot,
@@ -97,43 +111,43 @@ export async function runNixosSharedHostStaticDeploy(opts: {
     const {
       componentArtifacts,
       topLevelArtifactIdentity,
-      state,
       rendered,
       deploymentMetadataFingerprint: preparedDeploymentMetadataFingerprint,
       replaySnapshotPath: preparedReplaySnapshotPath,
     } = prepared;
     deploymentMetadataFingerprint = preparedDeploymentMetadataFingerprint;
     replaySnapshotPath = preparedReplaySnapshotPath;
+    replayState = { ...baseReplayState, deploymentMetadataFingerprint };
     if (publishBehavior === "provision-only") {
-      await materializeNixosSharedHostRuntime(opts.hostRoot, rendered).catch((error) => {
-        throw withFailedStep("provision", error);
-      });
+      await materializeNixosSharedHostRuntimeWithSecrets(secretRuntime, opts.hostRoot, rendered);
       return await writeNixosSharedHostProvisionOnlyRecord({
         deployment: opts.deployment,
         recordsRoot: opts.recordsRoot,
         deployRunId: runId,
         operationKind: "provision_only",
         authority,
-        deployBatchId: opts.deployBatchId,
-        parentRunId: opts.parentRunId,
-        releaseLineageId: opts.releaseLineageId,
         artifactIdentity: topLevelArtifactIdentity,
-        artifact: opts.artifact,
-        artifactLineageId: opts.artifactLineageId,
-        admittedContext: opts.admittedContext,
-        provisionerPlan: opts.provisionerPlan,
-        deploymentMetadataFingerprint,
         replaySnapshotPath,
+        ...replayState,
       });
     }
-    if (publishBehavior === "deploy")
-      await materializeNixosSharedHostRuntime(opts.hostRoot, rendered).catch((error) => {
-        throw withFailedStep("provision", error);
-      });
+    if (publishBehavior === "deploy") {
+      await materializeNixosSharedHostRuntimeWithSecrets(secretRuntime, opts.hostRoot, rendered);
+    }
     for (const componentArtifact of componentArtifacts) {
       await requireNixosSharedHostAdmittedArtifactPath(componentArtifact.artifact);
     }
-    await runReleasePhase("pre_publish", { artifactIdentity: topLevelArtifactIdentity });
+    await runNixosSharedHostReleasePhaseWithSecrets(
+      secretRuntime,
+      runReleasePhase,
+      operationKind,
+      releaseActions,
+      "pre_publish",
+      {
+        artifactIdentity: topLevelArtifactIdentity,
+      },
+    );
+    await secretRuntime.enterStep("publish");
     const progressive = await runStaticDeployProgressivePhases({
       deployment: opts.deployment,
       rendered,
@@ -151,36 +165,41 @@ export async function runNixosSharedHostStaticDeploy(opts: {
       ...(opts.gateEvaluator ? { gateEvaluator: opts.gateEvaluator } : {}),
       ...(replaySnapshotPath ? { replaySnapshotPath } : {}),
       replayState: {
-        deployBatchId: opts.deployBatchId,
-        parentRunId: opts.parentRunId,
-        releaseLineageId: opts.releaseLineageId,
         artifactIdentity: topLevelArtifactIdentity,
-        artifact: opts.artifact,
-        artifactLineageId: opts.artifactLineageId,
-        admittedContext: opts.admittedContext,
-        provisionerPlan: opts.provisionerPlan,
-        deploymentMetadataFingerprint,
         replaySnapshotPath,
+        ...replayState,
       },
       authority,
     });
-    await runReleasePhase("post_publish_pre_smoke", {
-      artifactIdentity: topLevelArtifactIdentity,
-    });
+    await runNixosSharedHostReleasePhaseWithSecrets(
+      secretRuntime,
+      runReleasePhase,
+      operationKind,
+      releaseActions,
+      "post_publish_pre_smoke",
+      {
+        artifactIdentity: topLevelArtifactIdentity,
+      },
+    );
     const smoke = progressive.smoke
       ? progressive.smoke
-      : await smokeNixosSharedHostPublishedComponents({
+      : await smokeNixosSharedHostPublishedComponentsWithSecrets({
+          secretRuntime,
           deployment: opts.deployment,
           published: progressive.published,
-          ...resolveDeploymentSmokeExecutionMode({ deployment: opts.deployment }),
           ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
-        }).catch((error) => {
-          throw withFailedStep((error as any)?.failedStep || "smoke", error);
         });
-    await runReleasePhase("post_smoke", {
-      artifactIdentity: topLevelArtifactIdentity,
-      publicUrl: smoke.publicUrl,
-    });
+    await runNixosSharedHostReleasePhaseWithSecrets(
+      secretRuntime,
+      runReleasePhase,
+      operationKind,
+      releaseActions,
+      "post_smoke",
+      {
+        artifactIdentity: topLevelArtifactIdentity,
+        publicUrl: smoke.publicUrl,
+      },
+    );
     if (replaySnapshotPath && smoke.componentResults.length > 0)
       await writeNixosSharedHostReplayComponentResults(
         replaySnapshotPath,
@@ -190,22 +209,15 @@ export async function runNixosSharedHostStaticDeploy(opts: {
     const smokeOutcome = "smokeOutcome" in smoke ? smoke.smokeOutcome : "passed";
     const smokeException = "smokeException" in smoke ? smoke.smokeException : undefined;
     const smokeError = "smokeError" in smoke ? smoke.smokeError : undefined;
-    return await writeNixosSharedHostSuccessRecord({
+    return await writeSuccessfulNixosSharedHostStaticDeployRecord({
       deployment: opts.deployment,
       recordsRoot: opts.recordsRoot,
       deployRunId: runId,
       operationKind,
       authority,
-      deployBatchId: opts.deployBatchId,
-      parentRunId: opts.parentRunId,
-      releaseLineageId: opts.releaseLineageId,
       artifactIdentity: topLevelArtifactIdentity,
-      artifact: opts.artifact,
-      artifactLineageId: opts.artifactLineageId,
-      admittedContext: opts.admittedContext,
-      provisionerPlan: opts.provisionerPlan,
-      deploymentMetadataFingerprint,
       replaySnapshotPath,
+      ...replayState,
       progressiveRollout: progressive.progressiveRollout || opts.progressiveRollout,
       smokeOutcome,
       ...(smokeException ? { smokeException } : {}),
@@ -216,7 +228,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
     });
   } catch (error) {
     if ((error as any)?.paused || (error as any)?.recordPath) throw error;
-    await failStaticDeployWithRecord({
+    await failNixosSharedHostStaticDeploy({
       error,
       deployment: opts.deployment,
       recordsRoot: opts.recordsRoot,
@@ -225,16 +237,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
       replaySnapshotPath,
       fallbackArtifactIdentity: opts.compositeArtifactIdentity || opts.artifact?.identity,
       progressiveRollout: opts.progressiveRollout,
-      replayState: {
-        deployBatchId: opts.deployBatchId,
-        parentRunId: opts.parentRunId,
-        releaseLineageId: opts.releaseLineageId,
-        artifact: opts.artifact,
-        artifactLineageId: opts.artifactLineageId,
-        admittedContext: opts.admittedContext,
-        provisionerPlan: opts.provisionerPlan,
-        deploymentMetadataFingerprint,
-      },
+      replayState,
       authority,
     });
   }

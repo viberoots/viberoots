@@ -16,6 +16,7 @@ import {
 import { smokeS3StaticWebapp } from "./s3-static-smoke.ts";
 import { writeS3StaticProvisionerPlan } from "./s3-static-provisioner-plan.ts";
 import { resolveInitialS3StaticAdmittedContext } from "./s3-static-admission.ts";
+import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
 import {
   admitStaticWebappArtifact,
   requireAdmittedStaticWebappArtifactPath,
@@ -62,8 +63,12 @@ export async function submitS3StaticDeploy(opts: {
     },
   });
   const deploymentMetadataFingerprint = deploymentMetadataFingerprintFor(opts.deployment);
+  const secretRuntime = createVaultDeploymentSecretRuntime({
+    admittedContext,
+  });
   let providerConfigFingerprint = "";
   try {
+    await secretRuntime.enterStep("publish");
     const artifactPath = await requireAdmittedStaticWebappArtifactPath(artifact);
     const preparedConfig = await prepareS3StaticPublisherConfig({
       workspaceRoot: opts.workspaceRoot,
@@ -84,11 +89,16 @@ export async function submitS3StaticDeploy(opts: {
             publicUrl: opts.deployment.providerTarget.canonicalUrl,
             smokeOutcome: "omitted_by_exception" as const,
           }
-        : await smokeS3StaticWebapp({
-            deployment: opts.deployment,
-            indexPath: path.join(artifactPath, "index.html"),
-            connectOverride: opts.smokeConnectOverride,
-          })
+        : await secretRuntime
+            .enterStep("smoke")
+            .then(
+              async () =>
+                await smokeS3StaticWebapp({
+                  deployment: opts.deployment,
+                  indexPath: path.join(artifactPath, "index.html"),
+                  connectOverride: opts.smokeConnectOverride,
+                }),
+            )
             .then((result) => ({ ...result, smokeOutcome: "passed" as const }))
             .catch((error) => {
               if (smokeMode.mode !== "nonblocking") throw error;

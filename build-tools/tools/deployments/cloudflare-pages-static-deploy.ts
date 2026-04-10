@@ -21,6 +21,7 @@ import { smokeCloudflarePagesStaticWebapp } from "./cloudflare-pages-static-smok
 import type { CloudflarePagesDeployment } from "./contract.ts";
 import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
+import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
 import {
   requireAdmittedStaticWebappArtifactPath,
   type AdmittedStaticWebappArtifact,
@@ -64,10 +65,14 @@ export async function runCloudflarePagesStaticDeploy(opts: {
   const publishMode = opts.publishMode || "normal";
   const effectiveRunTarget = opts.effectiveRunTarget || opts.deployment.providerTarget;
   const deploymentMetadataFingerprint = deploymentMetadataFingerprintFor(opts.deployment);
+  const secretRuntime = createVaultDeploymentSecretRuntime({
+    admittedContext: opts.admittedContext,
+  });
   let providerConfigFingerprint: string | undefined;
   let replaySnapshotPath: string | undefined;
   try {
     const artifactDir = await requireAdmittedStaticWebappArtifactPath(opts.artifact);
+    await secretRuntime.enterStep("publish");
     const preparedConfig = await prepareCloudflarePagesWranglerConfig({
       workspaceRoot: opts.workspaceRoot,
       deployment: opts.deployment,
@@ -112,6 +117,7 @@ export async function runCloudflarePagesStaticDeploy(opts: {
       };
     } else {
       try {
+        await secretRuntime.enterStep("smoke");
         const completedSmoke = await smokeCloudflarePagesStaticWebapp({
           deployment: opts.deployment,
           indexPath: path.join(artifactDir, "index.html"),

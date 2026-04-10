@@ -66,6 +66,26 @@ export function rollbackCompatibilityErrors(actions: DeploymentReleaseAction[]):
     .filter((error): error is string => !!error);
 }
 
+export function assertNixosSharedHostReleaseActionPhaseReplayAllowed(opts: {
+  operationKind: "deploy" | "promotion" | "retry" | "rollback";
+  phase: DeploymentReleaseAction["phase"];
+  releaseActions: DeploymentReleaseAction[];
+}) {
+  const replayContext = replayContextFor(opts.operationKind);
+  if (!replayContext) return;
+  for (const action of opts.releaseActions) {
+    if (action.phase !== opts.phase || action.runCondition === "failure_only") continue;
+    const disposition = action.replayPolicy[replayContext];
+    if (disposition === "skip") continue;
+    if (disposition === "fail") {
+      throw new Error(`release action ${action.ref} does not permit ${replayContext} replay`);
+    }
+    if (action.duplicateSafety[replayContext] === "not_duplicate_safe") {
+      throw new Error(`release action ${action.ref} is not duplicate-safe for ${replayContext}`);
+    }
+  }
+}
+
 export async function runNixosSharedHostReleaseActionPhase(opts: {
   recordsRoot: string;
   deployRunId: string;
@@ -76,18 +96,12 @@ export async function runNixosSharedHostReleaseActionPhase(opts: {
   artifactIdentity?: string;
   publicUrl?: string;
 }) {
-  const replayContext = replayContextFor(opts.operationKind);
+  assertNixosSharedHostReleaseActionPhaseReplayAllowed(opts);
   for (const action of opts.releaseActions) {
     if (action.phase !== opts.phase || action.runCondition === "failure_only") continue;
-    if (replayContext) {
-      const disposition = action.replayPolicy[replayContext];
-      if (disposition === "skip") continue;
-      if (disposition === "fail") {
-        throw new Error(`release action ${action.ref} does not permit ${replayContext} replay`);
-      }
-      if (action.duplicateSafety[replayContext] === "not_duplicate_safe") {
-        throw new Error(`release action ${action.ref} is not duplicate-safe for ${replayContext}`);
-      }
+    if (replayContextFor(opts.operationKind)) {
+      const replayContext = replayContextFor(opts.operationKind)!;
+      if (action.replayPolicy[replayContext] === "skip") continue;
     }
     await writeReleaseActionMarker({
       recordsRoot: opts.recordsRoot,

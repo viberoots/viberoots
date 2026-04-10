@@ -26,6 +26,8 @@ import type { AppStoreConnectDeployment } from "./contract.ts";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
+import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
+import { evaluateMobileStoreReleaseHealth } from "./mobile-store-secret-runtime.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 
 type SourceRecordLike = {
@@ -40,9 +42,7 @@ async function publishRecordedArtifact(opts: {
   recordsRoot: string;
   operationKind: "deploy" | "promotion" | "retry" | "rollback";
   artifact: AdmittedMobileAppArtifact;
-  admittedContext:
-    | Awaited<ReturnType<typeof resolveInitialAppStoreConnectAdmittedContext>>
-    | Awaited<ReturnType<typeof resolvePromotionAppStoreConnectAdmittedContext>>;
+  admittedContext: any;
   parentRunId?: string;
   releaseLineageId?: string;
   artifactLineageId?: string;
@@ -52,7 +52,11 @@ async function publishRecordedArtifact(opts: {
 }): Promise<{ record: AppStoreConnectDeployRecord; recordPath: string }> {
   const deployRunId = createAppStoreConnectDeployRunId(opts.operationKind);
   const deploymentMetadataFingerprint = deploymentMetadataFingerprintFor(opts.deployment);
+  const secretRuntime = createVaultDeploymentSecretRuntime({
+    admittedContext: opts.admittedContext,
+  });
   try {
+    await secretRuntime.enterStep("publish");
     const published = await publishAppStoreConnectMobileApp({
       workspaceRoot: opts.workspaceRoot,
       deployment: opts.deployment,
@@ -61,19 +65,11 @@ async function publishRecordedArtifact(opts: {
       ...(opts.sourceTrack ? { sourceTrack: opts.sourceTrack } : {}),
     });
     const smokeMode = resolveDeploymentSmokeExecutionMode({ deployment: opts.deployment });
-    let smokeOutcome: "passed" | "failed_nonblocking" | "omitted_by_exception" = "passed";
-    let smokeError: string | undefined;
-    if (smokeMode.mode === "omitted") {
-      smokeOutcome = "omitted_by_exception";
-    } else {
-      try {
-        assertHealthyAppStoreConnectRelease(published);
-      } catch (error) {
-        if (smokeMode.mode !== "nonblocking") throw error;
-        smokeOutcome = "failed_nonblocking";
-        smokeError = error instanceof Error ? error.message : String(error);
-      }
-    }
+    const smoke = await evaluateMobileStoreReleaseHealth({
+      secretRuntime,
+      smokeMode,
+      assertHealthy: () => assertHealthyAppStoreConnectRelease(published),
+    });
     const replay = await writeAppStoreConnectReplaySnapshot({
       recordsRoot: opts.recordsRoot,
       deployRunId,
@@ -105,9 +101,9 @@ async function publishRecordedArtifact(opts: {
       trackState: published.trackState,
       rolloutState: published.rolloutState,
       releaseHealth: published.releaseHealth,
-      smokeOutcome,
+      smokeOutcome: smoke.smokeOutcome,
       ...(smokeMode.smokeException ? { smokeException: smokeMode.smokeException } : {}),
-      ...(smokeError ? { smokeError } : {}),
+      ...(smoke.smokeError ? { smokeError: smoke.smokeError } : {}),
     });
     return { record, recordPath: await writeAppStoreConnectDeployRecord(opts.recordsRoot, record) };
   } catch (error) {
