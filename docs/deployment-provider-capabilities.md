@@ -727,6 +727,10 @@ Normative-source note:
 - checked-in provider config:
   - `helm/values.yaml` or equivalent release values remain provider-local publish configuration only
   - deployment metadata remains authoritative for cluster, namespace, and release identity; config drift must fail closed before publish
+  - the reviewed initial slice requires a provider-local `chart` entry and may declare `smoke_url`
+    plus optional `smoke_expect_contains` for service-health validation
+  - the rendered publish config injects the admitted per-component artifact paths and identities so
+    the release step consumes exact resolved inputs instead of ambient workspace state
 
 ### Retry / Idempotency
 
@@ -750,6 +754,8 @@ Normative-source note:
 - meaning:
   - the normal deploy path may prepare namespace, ingress, storage, service-account, or related cluster wiring before publish
   - deployment metadata stays authoritative for target identity while the provisioner config stays provider-local
+  - the initial reviewed deploy flow records a provisioner plan artifact alongside publish records
+    when a built-in Kubernetes provisioner is declared
 
 ### Built-In `release_actions` Support
 

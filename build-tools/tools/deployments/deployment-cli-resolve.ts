@@ -7,6 +7,7 @@ import { getFlagStr } from "../lib/cli.ts";
 import type { DeploymentTarget } from "./contract.ts";
 import { resolveDeploymentFromTarget } from "./deployment-query.ts";
 import {
+  artifactDirFromBuiltOutPath,
   buildArtifactDirsByComponentId,
   parseComponentArtifactDirs,
 } from "./deployment-component-artifact-dirs.ts";
@@ -45,9 +46,7 @@ export async function resolveArtifactDirForCli(
   const artifactDir = getFlagStr("artifact-dir", "").trim();
   if (artifactDir) return path.resolve(artifactDir);
   const outPath = await buildSelectedOutPath(workspaceRoot, deployment.component.target);
-  return deployment.component.kind === "ssr-webapp" || deployment.component.kind === "mobile-app"
-    ? outPath
-    : path.join(outPath, "dist");
+  return artifactDirFromBuiltOutPath(deployment.component.kind, outPath);
 }
 
 export async function resolveComponentArtifactDirsForCli(

@@ -155,8 +155,8 @@ test("deploy front door rejects s3-static --provision-only", async () => {
   });
 });
 
-test("deploy front door rejects kubernetes mutation flow until runtime is implemented", async () => {
-  await runInTemp("deploy-kubernetes-runtime-guard", async (tmp, $) => {
+test("deploy front door routes kubernetes deploys through the reviewed provider guardrails", async () => {
+  await runInTemp("deploy-kubernetes-provision-only-guard", async (tmp, $) => {
     const deploymentJson = path.join(tmp, "deployment.json");
     await writeDeploymentJson(deploymentJson, kubernetesDeploymentFixture());
     await assert.rejects(
@@ -164,8 +164,8 @@ test("deploy front door rejects kubernetes mutation flow until runtime is implem
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson}`,
-      /kubernetes deploy execution is not implemented yet/,
+        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --provision-only`,
+      /kubernetes initial slice provisions as part of deploy/,
     );
   });
 });

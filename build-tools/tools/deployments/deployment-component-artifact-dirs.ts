@@ -3,6 +3,10 @@ import path from "node:path";
 import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
 import type { DeploymentTarget } from "./contract.ts";
 
+export function artifactDirFromBuiltOutPath(componentKind: string, outPath: string): string {
+  return componentKind === "static-webapp" ? path.join(outPath, "dist") : outPath;
+}
+
 export async function buildArtifactDirsByComponentId(
   workspaceRoot: string,
   deployment: DeploymentTarget,
@@ -11,7 +15,7 @@ export async function buildArtifactDirsByComponentId(
     await Promise.all(
       deployment.components.map(async (component) => {
         const outPath = await buildSelectedOutPath(workspaceRoot, component.target);
-        return [component.id, path.join(outPath, "dist")] as const;
+        return [component.id, artifactDirFromBuiltOutPath(component.kind, outPath)] as const;
       }),
     ),
   );

@@ -11,12 +11,14 @@ import {
 import { runCloudflareDeployFrontDoor } from "./cloudflare-pages-front-door.ts";
 import { runAppStoreConnectDeployFrontDoor } from "./app-store-connect-front-door.ts";
 import { runGooglePlayDeployFrontDoor } from "./google-play-front-door.ts";
+import { runKubernetesDeployFrontDoor } from "./kubernetes-front-door.ts";
 import { resolveSmokeConnectOverride } from "./deployment-cli-smoke.ts";
 import { runFromChangesCli } from "./deployment-from-changes-cli.ts";
 import {
   isAppStoreConnectDeployment,
   isCloudflarePagesDeployment,
   isGooglePlayDeployment,
+  isKubernetesDeployment,
   isNixosSharedHostDeployment,
   isS3StaticDeployment,
 } from "./contract.ts";
@@ -161,10 +163,22 @@ async function main() {
     });
     return;
   }
+  if (isKubernetesDeployment(deployment)) {
+    await runKubernetesDeployFrontDoor({
+      workspaceRoot,
+      deployment,
+      publishOnly,
+      provisionOnly,
+      rollback,
+      sourceRunId,
+      artifactDirFlag,
+      ...(admissionEvidence ? { admissionEvidence } : {}),
+      ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
+    });
+    return;
+  }
   if (!isNixosSharedHostDeployment(deployment)) {
-    throw new Error(
-      "kubernetes deploy execution is not implemented yet; use --validate-only or --list for the current provider-contract slice",
-    );
+    throw new Error(`unsupported deployment provider: ${deployment.provider}`);
   }
   if (
     await maybeRunNixosSharedHostRemoteProfile({

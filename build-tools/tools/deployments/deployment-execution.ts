@@ -4,6 +4,7 @@ import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
 import {
   isAppStoreConnectDeployment,
   isGooglePlayDeployment,
+  isKubernetesDeployment,
   isNixosSharedHostDeployment,
   isS3StaticDeployment,
   type DeploymentTarget,
@@ -11,9 +12,13 @@ import {
 import { submitAppStoreConnectDeploy } from "./app-store-connect-deploy.ts";
 import { submitGooglePlayDeploy } from "./google-play-deploy.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { buildArtifactDirsByComponentId } from "./deployment-component-artifact-dirs.ts";
+import {
+  artifactDirFromBuiltOutPath,
+  buildArtifactDirsByComponentId,
+} from "./deployment-component-artifact-dirs.ts";
 import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
 import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-control-plane.ts";
+import { submitKubernetesDeploy } from "./kubernetes-deploy.ts";
 import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
 import { submitS3StaticDeploy } from "./s3-static-deploy.ts";
 
@@ -64,12 +69,16 @@ function defaultGooglePlayRecordsRoot(workspaceRoot: string): string {
   return path.join(workspaceRoot, ".local", "deployments", "google-play", "records");
 }
 
+function defaultKubernetesRecordsRoot(workspaceRoot: string): string {
+  return path.join(workspaceRoot, ".local", "deployments", "kubernetes", "records");
+}
+
 async function resolveArtifactDir(
   workspaceRoot: string,
   deployment: Pick<DeploymentTarget, "component">,
 ): Promise<string> {
   const outPath = await buildSelectedOutPath(workspaceRoot, deployment.component.target);
-  return path.join(outPath, "dist");
+  return artifactDirFromBuiltOutPath(deployment.component.kind, outPath);
 }
 
 export async function runNormalDeployment(opts: {
@@ -115,6 +124,24 @@ export async function runNormalDeployment(opts: {
       ),
       artifactPath: await resolveArtifactDir(opts.workspaceRoot, opts.deployment),
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
+    });
+  }
+  if (isKubernetesDeployment(opts.deployment)) {
+    const artifactDirsByComponentId =
+      opts.deployment.components.length > 1
+        ? await buildArtifactDirsByComponentId(opts.workspaceRoot, opts.deployment)
+        : undefined;
+    return await submitKubernetesDeploy({
+      workspaceRoot: opts.workspaceRoot,
+      deployment: opts.deployment,
+      recordsRoot: path.resolve(
+        opts.sharedRecordsRoot || defaultKubernetesRecordsRoot(opts.workspaceRoot),
+      ),
+      ...(artifactDirsByComponentId
+        ? { artifactDirsByComponentId }
+        : { artifactDir: await resolveArtifactDir(opts.workspaceRoot, opts.deployment) }),
+      ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
+      ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
     });
   }
   if (!isNixosSharedHostDeployment(opts.deployment)) {

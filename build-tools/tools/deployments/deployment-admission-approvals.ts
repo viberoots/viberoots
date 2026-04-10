@@ -130,6 +130,30 @@ export function requireBuiltInExecutionBoundary(deployment: DeploymentTarget) {
     }
     return;
   }
+  if (deployment.provider === "kubernetes") {
+    if (deployment.publisher.type !== "helm-release") {
+      throw new DeploymentAdmissionError(
+        "no_longer_admitted",
+        `protected/shared admission rejects non-built-in kubernetes publisher ${deployment.publisher.type}`,
+      );
+    }
+    if (
+      deployment.provisioner?.type &&
+      !["terraform-stack", "cdktf-stack"].includes(deployment.provisioner.type)
+    ) {
+      throw new DeploymentAdmissionError(
+        "no_longer_admitted",
+        `protected/shared admission rejects non-built-in kubernetes provisioner ${deployment.provisioner.type}`,
+      );
+    }
+    if (deployment.releaseActions.length > 0) {
+      throw new DeploymentAdmissionError(
+        "no_longer_admitted",
+        `protected/shared admission rejects kubernetes deployment-local release_actions: ${releaseActionRefs(deployment.releaseActions).join(", ")}`,
+      );
+    }
+    return;
+  }
   if (
     deployment.publisher.type !== "nixos-shared-host-static-webapp" &&
     deployment.publisher.type !== "nixos-shared-host-ssr-webapp"
