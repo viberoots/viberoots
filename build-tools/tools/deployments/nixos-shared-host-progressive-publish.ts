@@ -4,7 +4,6 @@ import type { NixosSharedHostDeploymentComponent } from "./contract.ts";
 import {
   baseNixosSharedHostComponentResult,
   withNixosSharedHostPublishState,
-  type NixosSharedHostComponentResult,
 } from "./nixos-shared-host-component-results.ts";
 import { nixosSharedHostContainerRoot } from "./nixos-shared-host-runtime.ts";
 import {
@@ -25,15 +24,11 @@ export async function publishComponent(opts: {
   artifact: NixosSharedHostResolvedComponentArtifact["artifact"];
   rendered: NixosSharedHostConfig;
   hostRoot: string;
-  priorResult?: NixosSharedHostComponentResult;
   allowLiveComponentReuse: boolean;
 }) {
   const container = renderedContainer(opts.rendered, opts.component);
   if (!container) throw new Error(`missing realized container for ${opts.component.id}`);
-  if (
-    opts.allowLiveComponentReuse &&
-    opts.priorResult?.publishState?.finalOutcome === "succeeded"
-  ) {
+  if (opts.allowLiveComponentReuse) {
     const live = await resolveNixosSharedHostStaticWebappLiveState({
       containerRoot: nixosSharedHostContainerRoot(opts.hostRoot, container.containerName),
       layout: {

@@ -122,11 +122,17 @@ export function extractNixosSharedHostDeploymentsFromContext(
       requirements: runtimeConfigRequirements,
       errors: deploymentErrors,
     });
-    pushSmokePolicyErrors({ label, protectionClass, smoke, errors: deploymentErrors });
     const resolvedComponents = resolveNixosSharedHostComponents({
       context,
       label,
       rawComponents,
+      errors: deploymentErrors,
+    });
+    pushSmokePolicyErrors({
+      label,
+      protectionClass,
+      componentKind: resolvedComponents[0]?.kind || STATIC_WEBAPP_COMPONENT,
+      smoke,
       errors: deploymentErrors,
     });
     const releaseActions = resolveDeploymentMetadataRefs({

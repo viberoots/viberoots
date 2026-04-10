@@ -8,6 +8,7 @@ import type {
   AppStoreConnectRolloutState,
   AppStoreConnectTrackState,
 } from "./app-store-connect-publisher.ts";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
 import type {
   DeploymentSmokeException,
   DeploymentSmokeOutcome,
@@ -51,6 +52,7 @@ export type AppStoreConnectDeployRecord = {
   smokeOutcome?: DeploymentSmokeOutcome;
   smokeException?: DeploymentSmokeException;
   smokeError?: string;
+  executionPolicy?: DeploymentExecutionPolicyFacts;
   failedStep?: "publish" | "release_health";
   error?: string;
   errorFingerprint?: string;

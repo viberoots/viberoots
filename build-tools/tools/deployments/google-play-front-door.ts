@@ -8,7 +8,8 @@ import type { GooglePlayDeployment } from "./contract.ts";
 import { invalidatingTargetException } from "./deployment-target-exceptions.ts";
 import { resolveCrossDeploymentPromotionSelection } from "./deployment-promotion.ts";
 import { resolveGooglePlayReplaySource } from "./google-play-replay.ts";
-import { submitGooglePlayDeploy, submitGooglePlayExactArtifactRun } from "./google-play-deploy.ts";
+import { submitGooglePlayDeploy } from "./google-play-deploy.ts";
+import { submitGooglePlayExactArtifactRun } from "./google-play-exact-run.ts";
 
 function sameDeploymentRollbackErrors(
   current: GooglePlayDeployment,

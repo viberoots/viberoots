@@ -164,6 +164,39 @@ test("nixos-shared-host publish-only can republish a retained exact artifact wit
   });
 });
 
+test("nixos-shared-host reuses a live exact artifact on a second deploy instead of republishing", async () => {
+  await runInTemp("nixos-shared-host-live-reuse", async (tmp, $) => {
+    const deployment = nixosSharedHostDeploymentFixture();
+    const deploymentJson = path.join(tmp, "deployment.json");
+    const artifactDir = path.join(tmp, "artifact");
+    const hostRoot = path.join(tmp, "host");
+    const statePath = path.join(tmp, "platform-state.json");
+    const recordsRoot = path.join(tmp, "records");
+    await writeArtifact(artifactDir, "v1");
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await writeDeploymentJson(deploymentJson, deployment);
+    const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
+    try {
+      await $({
+        cwd: tmp,
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      const second = await $({
+        cwd: tmp,
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      const summary = JSON.parse(String(second.stdout));
+      const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
+      assert.equal(record.componentResults[0].publishState.mode, "reused_live_identity");
+      assert.equal(
+        record.componentResults[0].publishState.liveArtifactIdentity,
+        record.artifact.identity,
+      );
+      assert.match(await fsp.readFile(liveIndexPath(hostRoot, "demoapp"), "utf8"), /v1/);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
 test("nixos-shared-host rollback restores a prior known-good exact artifact", async () => {
   await runInTemp("nixos-shared-host-rollback-e2e", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture();

@@ -5,11 +5,7 @@ import {
   requireAdmittedMobileAppArtifactPath,
   type AdmittedMobileAppArtifact,
 } from "./app-store-connect-artifacts.ts";
-import {
-  resolveInitialAppStoreConnectAdmittedContext,
-  resolvePromotionAppStoreConnectAdmittedContext,
-  resolveSourceRunAppStoreConnectAdmittedContext,
-} from "./app-store-connect-admission.ts";
+import { resolveInitialAppStoreConnectAdmittedContext } from "./app-store-connect-admission.ts";
 import { prepareAppStoreConnectPublisherConfig } from "./app-store-connect-config.ts";
 import {
   assertHealthyAppStoreConnectRelease,
@@ -23,20 +19,19 @@ import {
 } from "./app-store-connect-records.ts";
 import { writeAppStoreConnectReplaySnapshot } from "./app-store-connect-replay.ts";
 import type { AppStoreConnectDeployment } from "./contract.ts";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
+import {
+  mergeExecutionPolicyFacts,
+  publishWithFailClosedRetry,
+} from "./mobile-store-deploy-shared.ts";
 import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
 import { evaluateMobileStoreReleaseHealth } from "./mobile-store-secret-runtime.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 
-type SourceRecordLike = {
-  deployRunId: string;
-  deploymentId: string;
-  admittedContext?: any;
-};
-
-async function publishRecordedArtifact(opts: {
+export async function publishRecordedAppStoreConnectArtifact(opts: {
   workspaceRoot: string;
   deployment: AppStoreConnectDeployment;
   recordsRoot: string;
@@ -55,21 +50,30 @@ async function publishRecordedArtifact(opts: {
   const secretRuntime = createVaultDeploymentSecretRuntime({
     admittedContext: opts.admittedContext,
   });
+  let executionPolicy: DeploymentExecutionPolicyFacts | undefined;
   try {
     await secretRuntime.enterStep("publish");
-    const published = await publishAppStoreConnectMobileApp({
-      workspaceRoot: opts.workspaceRoot,
-      deployment: opts.deployment,
-      artifactPath: await requireAdmittedMobileAppArtifactPath(opts.artifact),
-      operationKind: opts.operationKind,
-      ...(opts.sourceTrack ? { sourceTrack: opts.sourceTrack } : {}),
+    const published = await publishWithFailClosedRetry(
+      async () =>
+        await publishAppStoreConnectMobileApp({
+          workspaceRoot: opts.workspaceRoot,
+          deployment: opts.deployment,
+          artifactPath: await requireAdmittedMobileAppArtifactPath(opts.artifact),
+          operationKind: opts.operationKind,
+          ...(opts.sourceTrack ? { sourceTrack: opts.sourceTrack } : {}),
+        }),
+    ).catch((error) => {
+      executionPolicy = (error as any).executionPolicy;
+      throw error;
     });
+    executionPolicy = published.executionPolicy;
     const smokeMode = resolveDeploymentSmokeExecutionMode({ deployment: opts.deployment });
     const smoke = await evaluateMobileStoreReleaseHealth({
       secretRuntime,
-      smokeMode,
-      assertHealthy: () => assertHealthyAppStoreConnectRelease(published),
+      smokeMode: { ...smokeMode, budget: smokeMode.budget },
+      assertHealthy: () => assertHealthyAppStoreConnectRelease(published.result),
     });
+    executionPolicy = mergeExecutionPolicyFacts(executionPolicy, smoke.executionPolicy);
     const replay = await writeAppStoreConnectReplaySnapshot({
       recordsRoot: opts.recordsRoot,
       deployRunId,
@@ -96,14 +100,15 @@ async function publishRecordedArtifact(opts: {
         ? { providerConfigFingerprint: opts.providerConfigFingerprint }
         : {}),
       replaySnapshotPath: replay.replaySnapshotPath,
-      storeSubmissionId: published.storeSubmissionId,
-      providerReleaseId: published.providerReleaseId,
-      trackState: published.trackState,
-      rolloutState: published.rolloutState,
-      releaseHealth: published.releaseHealth,
+      storeSubmissionId: published.result.storeSubmissionId,
+      providerReleaseId: published.result.providerReleaseId,
+      trackState: published.result.trackState,
+      rolloutState: published.result.rolloutState,
+      releaseHealth: published.result.releaseHealth,
       smokeOutcome: smoke.smokeOutcome,
       ...(smokeMode.smokeException ? { smokeException: smokeMode.smokeException } : {}),
       ...(smoke.smokeError ? { smokeError: smoke.smokeError } : {}),
+      ...(executionPolicy ? { executionPolicy } : {}),
     });
     return { record, recordPath: await writeAppStoreConnectDeployRecord(opts.recordsRoot, record) };
   } catch (error) {
@@ -128,6 +133,7 @@ async function publishRecordedArtifact(opts: {
       ...(opts.providerConfigFingerprint
         ? { providerConfigFingerprint: opts.providerConfigFingerprint }
         : {}),
+      ...(executionPolicy ? { executionPolicy } : {}),
       failedStep,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -169,75 +175,13 @@ export async function submitAppStoreConnectDeploy(opts: {
     deployment: opts.deployment,
     outputPath: path.join(opts.recordsRoot, "provider-config", `${artifact.identity}.asc.json`),
   });
-  return await publishRecordedArtifact({
+  return await publishRecordedAppStoreConnectArtifact({
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.deployment,
     recordsRoot: opts.recordsRoot,
     operationKind: "deploy",
     artifact,
     admittedContext,
-    providerConfigFingerprint: preparedConfig.fingerprint,
-    providerConfigSnapshotPath: preparedConfig.renderedConfigPath,
-  });
-}
-
-export async function submitAppStoreConnectExactArtifactRun(opts: {
-  workspaceRoot: string;
-  deployment: AppStoreConnectDeployment;
-  recordsRoot: string;
-  operationKind: "promotion" | "retry" | "rollback";
-  artifact: AdmittedMobileAppArtifact;
-  sourceRecord: SourceRecordLike;
-  parentRunId: string;
-  releaseLineageId: string;
-  artifactLineageId: string;
-  sourceTrack?: string;
-  admissionEvidence?: DeploymentAdmissionEvidence;
-}) {
-  const admittedContext =
-    opts.operationKind === "promotion"
-      ? await resolvePromotionAppStoreConnectAdmittedContext({
-          workspaceRoot: opts.workspaceRoot,
-          deployment: opts.deployment,
-          artifactIdentity: opts.artifact.identity,
-          sourceRecord: opts.sourceRecord,
-        })
-      : await resolveSourceRunAppStoreConnectAdmittedContext({
-          workspaceRoot: opts.workspaceRoot,
-          deployment: opts.deployment,
-          artifactIdentity: opts.artifact.identity,
-          sourceRecord: opts.sourceRecord,
-        });
-  admittedContext.policyEvaluation = await evaluateDeploymentAdmission({
-    workspaceRoot: opts.workspaceRoot,
-    recordsRoot: opts.recordsRoot,
-    deployment: opts.deployment,
-    operationKind: opts.operationKind,
-    admittedContext,
-    sourceRecord: opts.sourceRecord as any,
-    artifactLineageId: opts.artifactLineageId,
-    evidence: opts.admissionEvidence,
-  });
-  const preparedConfig = await prepareAppStoreConnectPublisherConfig({
-    workspaceRoot: opts.workspaceRoot,
-    deployment: opts.deployment,
-    outputPath: path.join(
-      opts.recordsRoot,
-      "provider-config",
-      `${opts.parentRunId}.${opts.operationKind}.asc.json`,
-    ),
-  });
-  return await publishRecordedArtifact({
-    workspaceRoot: opts.workspaceRoot,
-    deployment: opts.deployment,
-    recordsRoot: opts.recordsRoot,
-    operationKind: opts.operationKind,
-    artifact: opts.artifact,
-    admittedContext,
-    parentRunId: opts.parentRunId,
-    releaseLineageId: opts.releaseLineageId,
-    artifactLineageId: opts.artifactLineageId,
-    sourceTrack: opts.sourceTrack,
     providerConfigFingerprint: preparedConfig.fingerprint,
     providerConfigSnapshotPath: preparedConfig.renderedConfigPath,
   });

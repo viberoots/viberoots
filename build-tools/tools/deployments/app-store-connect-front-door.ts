@@ -8,10 +8,8 @@ import type { AppStoreConnectDeployment } from "./contract.ts";
 import { invalidatingTargetException } from "./deployment-target-exceptions.ts";
 import { resolveCrossDeploymentPromotionSelection } from "./deployment-promotion.ts";
 import { resolveAppStoreConnectReplaySource } from "./app-store-connect-replay.ts";
-import {
-  submitAppStoreConnectDeploy,
-  submitAppStoreConnectExactArtifactRun,
-} from "./app-store-connect-deploy.ts";
+import { submitAppStoreConnectDeploy } from "./app-store-connect-deploy.ts";
+import { submitAppStoreConnectExactArtifactRun } from "./app-store-connect-exact-run.ts";
 
 function sameDeploymentRollbackErrors(
   current: AppStoreConnectDeployment,

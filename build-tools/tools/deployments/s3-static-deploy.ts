@@ -3,8 +3,14 @@ import path from "node:path";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
 import type { S3StaticDeployment } from "./contract.ts";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
+import {
+  classifySmokeRetry,
+  noPublishAutoRetry,
+  runWithAutomaticRetry,
+} from "./deployment-retry-policy.ts";
 import { prepareS3StaticPublisherConfig } from "./s3-static-config.ts";
 import { publishS3StaticWebapp } from "./s3-static-publisher.ts";
 import {
@@ -67,6 +73,7 @@ export async function submitS3StaticDeploy(opts: {
     admittedContext,
   });
   let providerConfigFingerprint = "";
+  let executionPolicy: DeploymentExecutionPolicyFacts | undefined;
   try {
     await secretRuntime.enterStep("publish");
     const artifactPath = await requireAdmittedStaticWebappArtifactPath(artifact);
@@ -76,13 +83,30 @@ export async function submitS3StaticDeploy(opts: {
       outputPath: path.join(opts.recordsRoot, "provider-config", `${deployRunId}.s3.json`),
     });
     providerConfigFingerprint = preparedConfig.fingerprint;
-    const published = await publishS3StaticWebapp({
-      workspaceRoot: opts.workspaceRoot,
-      deployment: opts.deployment,
-      artifactDir: artifactPath,
-      renderedConfigPath: preparedConfig.renderedConfigPath,
-    });
+    const published = await runWithAutomaticRetry({
+      step: "publish",
+      run: async () =>
+        await publishS3StaticWebapp({
+          workspaceRoot: opts.workspaceRoot,
+          deployment: opts.deployment,
+          artifactDir: artifactPath,
+          renderedConfigPath: preparedConfig.renderedConfigPath,
+        }),
+      classifyError: () => noPublishAutoRetry(),
+    })
+      .then((result) => {
+        executionPolicy = { retries: [result.audit] };
+        return result.result;
+      })
+      .catch((error) => {
+        executionPolicy = { retries: [(error as any).retryAudit] };
+        throw error;
+      });
     const smokeMode = resolveDeploymentSmokeExecutionMode({ deployment: opts.deployment });
+    executionPolicy = {
+      smokeBudget: smokeMode.budget,
+      retries: [...(executionPolicy?.retries || [])],
+    };
     const smoke =
       smokeMode.mode === "omitted"
         ? {
@@ -93,14 +117,30 @@ export async function submitS3StaticDeploy(opts: {
             .enterStep("smoke")
             .then(
               async () =>
-                await smokeS3StaticWebapp({
-                  deployment: opts.deployment,
-                  indexPath: path.join(artifactPath, "index.html"),
-                  connectOverride: opts.smokeConnectOverride,
+                await runWithAutomaticRetry({
+                  step: "smoke",
+                  totalBudgetMs: smokeMode.budget.totalBudgetMs,
+                  run: async () =>
+                    await smokeS3StaticWebapp({
+                      deployment: opts.deployment,
+                      indexPath: path.join(artifactPath, "index.html"),
+                      connectOverride: opts.smokeConnectOverride,
+                    }),
+                  classifyError: classifySmokeRetry,
                 }),
             )
-            .then((result) => ({ ...result, smokeOutcome: "passed" as const }))
+            .then((result) => {
+              executionPolicy = {
+                smokeBudget: smokeMode.budget,
+                retries: [...(executionPolicy?.retries || []), result.audit],
+              };
+              return { ...result.result, smokeOutcome: "passed" as const };
+            })
             .catch((error) => {
+              executionPolicy = {
+                smokeBudget: smokeMode.budget,
+                retries: [...(executionPolicy?.retries || []), (error as any).retryAudit],
+              };
               if (smokeMode.mode !== "nonblocking") throw error;
               return {
                 publicUrl: opts.deployment.providerTarget.canonicalUrl,
@@ -122,6 +162,7 @@ export async function submitS3StaticDeploy(opts: {
       smokeOutcome: smoke.smokeOutcome,
       ...(smokeMode.smokeException ? { smokeException: smokeMode.smokeException } : {}),
       ...(smoke.smokeError ? { smokeError: smoke.smokeError } : {}),
+      ...(executionPolicy ? { executionPolicy } : {}),
       deploymentMetadataFingerprint,
       providerConfigFingerprint,
       publicUrl: smoke.publicUrl,
@@ -142,6 +183,7 @@ export async function submitS3StaticDeploy(opts: {
       admittedContext,
       ...(opts.deployment.provisioner ? { provisionerType: opts.deployment.provisioner.type } : {}),
       ...(provisionerPlan ? { provisionerPlan } : {}),
+      ...(executionPolicy ? { executionPolicy } : {}),
       deploymentMetadataFingerprint,
       ...(providerConfigFingerprint ? { providerConfigFingerprint } : {}),
       failedStep,

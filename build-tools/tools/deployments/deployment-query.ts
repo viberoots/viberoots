@@ -28,6 +28,8 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "provider_target",
   "smoke",
   "smoke_exception",
+  "smoke_runner_class",
+  "smoke_timeout_budget_ms",
   "prerequisites",
   "secret_requirements",
   "runtime_config_requirements",

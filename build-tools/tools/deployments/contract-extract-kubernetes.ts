@@ -143,7 +143,13 @@ export function extractKubernetesDeploymentsFromContext(
       rolloutPolicy,
       errors: deploymentErrors,
     });
-    pushSmokePolicyErrors({ label, protectionClass, smoke, errors: deploymentErrors });
+    pushSmokePolicyErrors({
+      label,
+      protectionClass,
+      componentKind: primaryComponent?.kind || componentKind,
+      smoke,
+      errors: deploymentErrors,
+    });
     const releaseActions = resolveDeploymentMetadataRefs({
       refs: releaseActionRefs,
       label,

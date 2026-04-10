@@ -116,3 +116,36 @@ test("validation preserves reviewed smoke exceptions from authoritative deployme
   assert.equal(deployments[0]?.smoke?.exception?.scope, "preview-downgrade-to-nonblocking");
   assert.equal(deployments[0]?.smoke?.exception?.downgradeMode, "nonblocking-preview-http");
 });
+
+test("validation rejects unsupported smoke runner classes and non-positive timeout budgets", () => {
+  const { errors } = extractCloudflarePagesDeployments([
+    staticWebappComponent("//projects/apps/pleomino:app"),
+    cloudflarePagesLanePolicyNodeFixture(),
+    cloudflarePagesAdmissionPolicyNodeFixture(),
+    cloudflareNode({
+      smoke_runner_class: "release_health",
+      smoke_timeout_budget_ms: "0",
+    }),
+  ]);
+  assert.ok(
+    errors.some((entry) => entry.includes("release_health is reviewed only for mobile-app")),
+  );
+  assert.ok(
+    errors.some((entry) => entry.includes("smoke.timeoutBudgetMs must be a positive integer")),
+  );
+});
+
+test("validation preserves explicit smoke timeout metadata for reviewed static-webapp slices", () => {
+  const { deployments, errors } = extractCloudflarePagesDeployments([
+    staticWebappComponent("//projects/apps/pleomino:app"),
+    cloudflarePagesLanePolicyNodeFixture(),
+    cloudflarePagesAdmissionPolicyNodeFixture(),
+    cloudflareNode({
+      smoke_runner_class: "http_10m",
+      smoke_timeout_budget_ms: "120000",
+    }),
+  ]);
+  assert.deepEqual(errors, []);
+  assert.equal(deployments[0]?.smoke?.runnerClass, "http_10m");
+  assert.equal(deployments[0]?.smoke?.timeoutBudgetMs, 120000);
+});

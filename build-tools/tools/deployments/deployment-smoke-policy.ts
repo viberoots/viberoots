@@ -1,6 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import type { GraphNode } from "../lib/graph.ts";
+import type {
+  DeploymentComponentKind,
+  DeploymentDefaultSmokeClass,
+} from "./deployment-component-kinds.ts";
 import type { DeploymentTarget } from "./contract-types.ts";
+import {
+  DEPLOYMENT_SMOKE_CLASSES,
+  resolveDeploymentSmokeBudget,
+  type DeploymentSmokeBudget,
+} from "./deployment-smoke-budget.ts";
 
 export type DeploymentSmokeException = {
   owner: string;
@@ -13,6 +22,8 @@ export type DeploymentSmokeException = {
 
 export type DeploymentSmokePolicy = {
   exception?: DeploymentSmokeException;
+  runnerClass?: DeploymentDefaultSmokeClass;
+  timeoutBudgetMs?: number;
 };
 
 export type DeploymentSmokeExecutionMode = "blocking" | "nonblocking" | "omitted";
@@ -57,6 +68,15 @@ function parsedDate(value: string | undefined): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function parseSmokeTimeoutBudget(value: unknown): number | undefined {
+  if (typeof value === "number") return Number.isInteger(value) ? value : Number.NaN;
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (trimmed === "") return undefined;
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isInteger(parsed) ? parsed : Number.NaN;
+}
+
 function exceptionTargetsPreviewOnly(scope: string): boolean {
   return scope.toLowerCase().includes("preview");
 }
@@ -75,17 +95,53 @@ function isProtectedSmokeClass(protectionClass: string): boolean {
 
 export function readDeploymentSmokePolicy(node: GraphNode): DeploymentSmokePolicy | undefined {
   const smokeException = parseSmokeException(readStringRecord(node, "smoke_exception"));
-  return smokeException ? { exception: smokeException } : undefined;
+  const runnerClass = String(node.smoke_runner_class || "").trim() as DeploymentDefaultSmokeClass;
+  const timeoutBudgetMs = parseSmokeTimeoutBudget(node.smoke_timeout_budget_ms);
+  if (!smokeException && !runnerClass && timeoutBudgetMs === undefined) return undefined;
+  return {
+    ...(smokeException ? { exception: smokeException } : {}),
+    ...(runnerClass ? { runnerClass } : {}),
+    ...(timeoutBudgetMs !== undefined ? { timeoutBudgetMs } : {}),
+  };
 }
 
 export function pushSmokePolicyErrors(opts: {
   label: string;
   protectionClass: string;
+  componentKind?: DeploymentComponentKind;
   smoke?: DeploymentSmokePolicy;
   errors: string[];
   now?: Date;
 }) {
   const exception = opts.smoke?.exception;
+  if (
+    opts.smoke?.runnerClass &&
+    !DEPLOYMENT_SMOKE_CLASSES.has(opts.smoke.runnerClass as DeploymentDefaultSmokeClass)
+  ) {
+    opts.errors.push(
+      deploymentError(opts.label, `unsupported smoke.runnerClass "${opts.smoke.runnerClass}"`),
+    );
+  }
+  if (
+    opts.smoke?.timeoutBudgetMs !== undefined &&
+    (!Number.isInteger(opts.smoke.timeoutBudgetMs) || opts.smoke.timeoutBudgetMs <= 0)
+  ) {
+    opts.errors.push(
+      deploymentError(opts.label, "smoke.timeoutBudgetMs must be a positive integer"),
+    );
+  }
+  if (
+    opts.componentKind &&
+    opts.smoke?.runnerClass === "release_health" &&
+    opts.componentKind !== "mobile-app"
+  ) {
+    opts.errors.push(
+      deploymentError(
+        opts.label,
+        "smoke.runnerClass release_health is reviewed only for mobile-app deployments",
+      ),
+    );
+  }
   if (!exception) return;
   if (!exception.owner) {
     opts.errors.push(deploymentError(opts.label, "smoke.exception.owner is required"));
@@ -134,22 +190,28 @@ export function pushSmokePolicyErrors(opts: {
 }
 
 export function resolveDeploymentSmokeExecutionMode(opts: {
-  deployment: Pick<DeploymentTarget, "label" | "protectionClass" | "smoke">;
+  deployment: Pick<DeploymentTarget, "label" | "protectionClass" | "component" | "smoke">;
   publishMode?: "normal" | "preview";
   now?: Date;
 }): {
   mode: DeploymentSmokeExecutionMode;
   smokeException?: DeploymentSmokeException;
+  budget: DeploymentSmokeBudget;
 } {
+  const budget = resolveDeploymentSmokeBudget({
+    componentKind: opts.deployment.component.kind,
+    smoke: opts.deployment.smoke,
+  });
   if (!isProtectedSmokeClass(opts.deployment.protectionClass)) {
-    return { mode: "blocking" };
+    return { mode: "blocking", budget };
   }
   const exception = opts.deployment.smoke?.exception;
-  if (!exception) return { mode: "blocking" };
+  if (!exception) return { mode: "blocking", budget };
   const validationErrors: string[] = [];
   pushSmokePolicyErrors({
     label: opts.deployment.label,
     protectionClass: opts.deployment.protectionClass,
+    componentKind: opts.deployment.component.kind,
     smoke: opts.deployment.smoke,
     errors: validationErrors,
     now: opts.now,
@@ -161,13 +223,13 @@ export function resolveDeploymentSmokeExecutionMode(opts: {
     (opts.publishMode || "normal") !== "preview" &&
     exceptionTargetsPreviewOnly(exception.scope)
   ) {
-    return { mode: "blocking" };
+    return { mode: "blocking", budget };
   }
   if (exceptionRequestsOmit(exception.scope)) {
-    return { mode: "omitted", smokeException: exception };
+    return { mode: "omitted", smokeException: exception, budget };
   }
   if (exceptionRequestsDowngrade(exception.scope)) {
-    return { mode: "nonblocking", smokeException: exception };
+    return { mode: "nonblocking", smokeException: exception, budget };
   }
-  return { mode: "blocking" };
+  return { mode: "blocking", budget };
 }

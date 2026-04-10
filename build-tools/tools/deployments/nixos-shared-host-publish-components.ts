@@ -35,11 +35,9 @@ async function maybeReusePublishedComponent(opts: {
   rendered: NixosSharedHostConfig;
   hostRoot: string;
   artifact: NixosSharedHostResolvedComponentArtifact["artifact"];
-  priorResult?: NixosSharedHostComponentResult;
   allowLiveComponentReuse: boolean;
 }): Promise<PublishedComponent | undefined> {
   if (!opts.allowLiveComponentReuse) return undefined;
-  if (opts.priorResult?.publishState?.finalOutcome !== "succeeded") return undefined;
   const live = await resolveNixosSharedHostLiveReuse(opts);
   if (!live) return undefined;
   return {
@@ -95,9 +93,6 @@ export async function publishNixosSharedHostArtifacts(opts: {
       componentArtifact.artifact,
     ]),
   );
-  const priorResultById = new Map(
-    (opts.sourceComponentResults || []).map((result) => [result.componentId, result]),
-  );
   const published: PublishedComponent[] = [];
   const orderedComponents = orderedNixosSharedHostComponents(opts.deployment);
   for (const component of orderedComponents) {
@@ -110,7 +105,6 @@ export async function publishNixosSharedHostArtifacts(opts: {
           rendered: opts.rendered,
           hostRoot: opts.hostRoot,
           artifact,
-          priorResult: priorResultById.get(component.id),
           allowLiveComponentReuse: !!opts.allowLiveComponentReuse,
         })) ||
           (await publishOneComponent({

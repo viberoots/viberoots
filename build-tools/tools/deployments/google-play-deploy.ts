@@ -5,11 +5,7 @@ import {
   requireAdmittedGooglePlayArtifactPath,
   type AdmittedGooglePlayArtifact,
 } from "./google-play-artifacts.ts";
-import {
-  resolveInitialGooglePlayAdmittedContext,
-  resolvePromotionGooglePlayAdmittedContext,
-  resolveSourceRunGooglePlayAdmittedContext,
-} from "./google-play-admission.ts";
+import { resolveInitialGooglePlayAdmittedContext } from "./google-play-admission.ts";
 import { prepareGooglePlayPublisherConfig } from "./google-play-config.ts";
 import {
   assertHealthyGooglePlayRelease,
@@ -23,16 +19,19 @@ import {
 } from "./google-play-records.ts";
 import { writeGooglePlayReplaySnapshot } from "./google-play-replay.ts";
 import type { GooglePlayDeployment } from "./contract.ts";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
+import {
+  mergeExecutionPolicyFacts,
+  publishWithFailClosedRetry,
+} from "./mobile-store-deploy-shared.ts";
 import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
 import { evaluateMobileStoreReleaseHealth } from "./mobile-store-secret-runtime.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 
-type SourceRecordLike = { deployRunId: string; deploymentId: string; admittedContext?: any };
-
-async function publishRecordedArtifact(opts: {
+export async function publishRecordedGooglePlayArtifact(opts: {
   workspaceRoot: string;
   deployment: GooglePlayDeployment;
   recordsRoot: string;
@@ -51,21 +50,30 @@ async function publishRecordedArtifact(opts: {
   const secretRuntime = createVaultDeploymentSecretRuntime({
     admittedContext: opts.admittedContext,
   });
+  let executionPolicy: DeploymentExecutionPolicyFacts | undefined;
   try {
     await secretRuntime.enterStep("publish");
-    const published = await publishGooglePlayMobileApp({
-      workspaceRoot: opts.workspaceRoot,
-      deployment: opts.deployment,
-      artifactPath: await requireAdmittedGooglePlayArtifactPath(opts.artifact),
-      operationKind: opts.operationKind,
-      ...(opts.sourceTrack ? { sourceTrack: opts.sourceTrack } : {}),
+    const published = await publishWithFailClosedRetry(
+      async () =>
+        await publishGooglePlayMobileApp({
+          workspaceRoot: opts.workspaceRoot,
+          deployment: opts.deployment,
+          artifactPath: await requireAdmittedGooglePlayArtifactPath(opts.artifact),
+          operationKind: opts.operationKind,
+          ...(opts.sourceTrack ? { sourceTrack: opts.sourceTrack } : {}),
+        }),
+    ).catch((error) => {
+      executionPolicy = (error as any).executionPolicy;
+      throw error;
     });
+    executionPolicy = published.executionPolicy;
     const smokeMode = resolveDeploymentSmokeExecutionMode({ deployment: opts.deployment });
     const smoke = await evaluateMobileStoreReleaseHealth({
       secretRuntime,
-      smokeMode,
-      assertHealthy: () => assertHealthyGooglePlayRelease(published),
+      smokeMode: { ...smokeMode, budget: smokeMode.budget },
+      assertHealthy: () => assertHealthyGooglePlayRelease(published.result),
     });
+    executionPolicy = mergeExecutionPolicyFacts(executionPolicy, smoke.executionPolicy);
     const replay = await writeGooglePlayReplaySnapshot({
       recordsRoot: opts.recordsRoot,
       deployRunId,
@@ -92,14 +100,15 @@ async function publishRecordedArtifact(opts: {
         ? { providerConfigFingerprint: opts.providerConfigFingerprint }
         : {}),
       replaySnapshotPath: replay.replaySnapshotPath,
-      storeSubmissionId: published.storeSubmissionId,
-      providerReleaseId: published.providerReleaseId,
-      trackState: published.trackState,
-      rolloutState: published.rolloutState,
-      releaseHealth: published.releaseHealth,
+      storeSubmissionId: published.result.storeSubmissionId,
+      providerReleaseId: published.result.providerReleaseId,
+      trackState: published.result.trackState,
+      rolloutState: published.result.rolloutState,
+      releaseHealth: published.result.releaseHealth,
       smokeOutcome: smoke.smokeOutcome,
       ...(smokeMode.smokeException ? { smokeException: smokeMode.smokeException } : {}),
       ...(smoke.smokeError ? { smokeError: smoke.smokeError } : {}),
+      ...(executionPolicy ? { executionPolicy } : {}),
     });
     return { record, recordPath: await writeGooglePlayDeployRecord(opts.recordsRoot, record) };
   } catch (error) {
@@ -124,6 +133,7 @@ async function publishRecordedArtifact(opts: {
       ...(opts.providerConfigFingerprint
         ? { providerConfigFingerprint: opts.providerConfigFingerprint }
         : {}),
+      ...(executionPolicy ? { executionPolicy } : {}),
       failedStep,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -169,75 +179,13 @@ export async function submitGooglePlayDeploy(opts: {
       `${artifact.identity}.google-play.json`,
     ),
   });
-  return await publishRecordedArtifact({
+  return await publishRecordedGooglePlayArtifact({
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.deployment,
     recordsRoot: opts.recordsRoot,
     operationKind: "deploy",
     artifact,
     admittedContext,
-    providerConfigFingerprint: preparedConfig.fingerprint,
-    providerConfigSnapshotPath: preparedConfig.renderedConfigPath,
-  });
-}
-
-export async function submitGooglePlayExactArtifactRun(opts: {
-  workspaceRoot: string;
-  deployment: GooglePlayDeployment;
-  recordsRoot: string;
-  operationKind: "promotion" | "retry" | "rollback";
-  artifact: AdmittedGooglePlayArtifact;
-  sourceRecord: SourceRecordLike;
-  parentRunId: string;
-  releaseLineageId: string;
-  artifactLineageId: string;
-  sourceTrack?: string;
-  admissionEvidence?: DeploymentAdmissionEvidence;
-}) {
-  const admittedContext =
-    opts.operationKind === "promotion"
-      ? await resolvePromotionGooglePlayAdmittedContext({
-          workspaceRoot: opts.workspaceRoot,
-          deployment: opts.deployment,
-          artifactIdentity: opts.artifact.identity,
-          sourceRecord: opts.sourceRecord,
-        })
-      : await resolveSourceRunGooglePlayAdmittedContext({
-          workspaceRoot: opts.workspaceRoot,
-          deployment: opts.deployment,
-          artifactIdentity: opts.artifact.identity,
-          sourceRecord: opts.sourceRecord,
-        });
-  admittedContext.policyEvaluation = await evaluateDeploymentAdmission({
-    workspaceRoot: opts.workspaceRoot,
-    recordsRoot: opts.recordsRoot,
-    deployment: opts.deployment,
-    operationKind: opts.operationKind,
-    admittedContext,
-    sourceRecord: opts.sourceRecord as any,
-    artifactLineageId: opts.artifactLineageId,
-    evidence: opts.admissionEvidence,
-  });
-  const preparedConfig = await prepareGooglePlayPublisherConfig({
-    workspaceRoot: opts.workspaceRoot,
-    deployment: opts.deployment,
-    outputPath: path.join(
-      opts.recordsRoot,
-      "provider-config",
-      `${opts.parentRunId}.${opts.operationKind}.google-play.json`,
-    ),
-  });
-  return await publishRecordedArtifact({
-    workspaceRoot: opts.workspaceRoot,
-    deployment: opts.deployment,
-    recordsRoot: opts.recordsRoot,
-    operationKind: opts.operationKind,
-    artifact: opts.artifact,
-    admittedContext,
-    parentRunId: opts.parentRunId,
-    releaseLineageId: opts.releaseLineageId,
-    artifactLineageId: opts.artifactLineageId,
-    sourceTrack: opts.sourceTrack,
     providerConfigFingerprint: preparedConfig.fingerprint,
     providerConfigSnapshotPath: preparedConfig.renderedConfigPath,
   });

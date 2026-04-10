@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { S3StaticAdmittedContext } from "./s3-static-admission.ts";
 import type { S3StaticDeployment } from "./contract.ts";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
 import type {
   DeploymentSmokeException,
   DeploymentSmokeOutcome,
@@ -34,6 +35,7 @@ export type S3StaticDeployRecord = {
   smokeOutcome?: DeploymentSmokeOutcome;
   smokeException?: DeploymentSmokeException;
   smokeError?: string;
+  executionPolicy?: DeploymentExecutionPolicyFacts;
   provisionerPlan?: S3StaticProvisionerPlanRef;
   deploymentMetadataFingerprint?: string;
   providerConfigFingerprint?: string;

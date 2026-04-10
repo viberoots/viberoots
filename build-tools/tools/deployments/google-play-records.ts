@@ -8,6 +8,7 @@ import type {
   GooglePlayRolloutState,
   GooglePlayTrackState,
 } from "./google-play-publisher.ts";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
 import type {
   DeploymentSmokeException,
   DeploymentSmokeOutcome,
@@ -50,6 +51,7 @@ export type GooglePlayDeployRecord = {
   smokeOutcome?: DeploymentSmokeOutcome;
   smokeException?: DeploymentSmokeException;
   smokeError?: string;
+  executionPolicy?: DeploymentExecutionPolicyFacts;
   failedStep?: "publish" | "release_health";
   error?: string;
   errorFingerprint?: string;

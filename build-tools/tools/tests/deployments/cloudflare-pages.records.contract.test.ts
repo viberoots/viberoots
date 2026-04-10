@@ -50,6 +50,23 @@ test("cloudflare-pages preview records preserve both live and effective preview 
     },
     effectiveRunTarget,
     previewIdentitySelector: cloudflarePagesPreviewIdentitySelector("deploy-123"),
+    executionPolicy: {
+      smokeBudget: {
+        runnerClass: "http_5m",
+        totalBudgetMs: 300000,
+        source: "component_kind_default",
+      },
+      retries: [
+        {
+          step: "smoke",
+          maxRetries: 2,
+          totalAttempts: 2,
+          retriesUsed: 1,
+          exhaustedBudget: false,
+          attempts: [],
+        },
+      ],
+    },
   });
   assert.equal(record.providerTargetIdentity, deployment.providerTarget.providerTargetIdentity);
   assert.equal(
@@ -59,4 +76,6 @@ test("cloudflare-pages preview records preserve both live and effective preview 
   assert.equal(record.deployBatchId, "batch-123");
   assert.equal(record.previewIdentitySelector?.sourceRunId, "deploy-123");
   assert.equal(record.publishMode, "preview");
+  assert.equal(record.executionPolicy?.smokeBudget?.runnerClass, "http_5m");
+  assert.equal(record.executionPolicy?.retries?.[0]?.retriesUsed, 1);
 });

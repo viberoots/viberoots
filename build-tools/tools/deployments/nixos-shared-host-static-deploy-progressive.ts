@@ -38,8 +38,7 @@ type StaticDeployProgressiveOpts = {
 };
 
 export async function runStaticDeployProgressivePhases(opts: StaticDeployProgressiveOpts) {
-  const allowLiveComponentReuse =
-    opts.componentArtifacts.length > 1 && opts.releaseActions.length === 0;
+  const allowLiveComponentReuse = opts.releaseActions.length === 0;
   const priorComponentResults = opts.progressiveRollout?.componentResults.length
     ? opts.progressiveRollout.componentResults
     : opts.sourceComponentResults || [];

@@ -29,12 +29,15 @@ import {
 import { readDeploymentRequirements } from "./deployment-requirements.ts";
 import { pushGooglePlayComponentKindErrors } from "./google-play-capability-validation.ts";
 import { pushGooglePlayRolloutErrors } from "./google-play-rollout-validation.ts";
+import {
+  MOBILE_STORE_TARGET_TOKEN_RE,
+  pushDuplicateProviderTargetErrors,
+  pushMobileStoreProtectionClassError,
+} from "./mobile-store-extract-helpers.ts";
 import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
 
-const TOKEN_RE = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$/;
 const VALID_TRACKS = new Set(["internal", "alpha", "beta", "production"]);
 const VALID_SIGNING_MODELS = new Set(["play-app-signing"]);
-const VALID_PROTECTION_CLASSES = new Set(["shared_nonprod", "production_facing"]);
 
 export function extractGooglePlayDeploymentsFromContext(
   context: DeploymentExtractionContext,
@@ -81,14 +84,12 @@ export function extractGooglePlayDeploymentsFromContext(
         deploymentError(label, "google-play does not support multi-component deployments"),
       );
     }
-    if (!VALID_PROTECTION_CLASSES.has(protectionClass)) {
-      deploymentErrors.push(
-        deploymentError(
-          label,
-          'google-play deployments must use protection_class "shared_nonprod" or "production_facing"',
-        ),
-      );
-    }
+    pushMobileStoreProtectionClassError({
+      label,
+      provider: "google-play",
+      protectionClass,
+      errors: deploymentErrors,
+    });
     for (const [fieldPath, value] of [
       ["provider_target.developer_account", developerAccount],
       ["provider_target.app", app],
@@ -99,7 +100,7 @@ export function extractGooglePlayDeploymentsFromContext(
         label,
         fieldPath,
         value,
-        pattern: TOKEN_RE,
+        pattern: MOBILE_STORE_TARGET_TOKEN_RE,
         invalidMessage: `${fieldPath} must use reviewed token characters only`,
       });
     }
@@ -162,7 +163,13 @@ export function extractGooglePlayDeploymentsFromContext(
       errors: deploymentErrors,
     });
     pushGooglePlayRolloutErrors({ label, rolloutPolicy, errors: deploymentErrors });
-    pushSmokePolicyErrors({ label, protectionClass, smoke, errors: deploymentErrors });
+    pushSmokePolicyErrors({
+      label,
+      protectionClass,
+      componentKind: "mobile-app",
+      smoke,
+      errors: deploymentErrors,
+    });
     const releaseActions = resolveDeploymentMetadataRefs({
       refs: releaseActionRefs,
       label,
@@ -226,20 +233,14 @@ export function extractGooglePlayDeploymentsFromContext(
       }),
     });
   }
-  for (const duplicate of duplicateValueEntries(
-    deployments.map((deployment) => ({
-      value: deployment.providerTarget.providerTargetIdentity,
-      label: deployment.label,
-    })),
-  )) {
-    for (const label of duplicate.labels) {
-      context.errors.push(
-        deploymentError(
-          label,
-          `duplicate provider_target identity "${duplicate.value}" collides with ${duplicate.labels.join(", ")}`,
-        ),
-      );
-    }
-  }
+  pushDuplicateProviderTargetErrors(
+    context.errors,
+    duplicateValueEntries(
+      deployments.map((deployment) => ({
+        value: deployment.providerTarget.providerTargetIdentity,
+        label: deployment.label,
+      })),
+    ),
+  );
   return deployments.sort((a, b) => a.label.localeCompare(b.label));
 }

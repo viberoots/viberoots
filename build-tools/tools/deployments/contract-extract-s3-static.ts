@@ -127,7 +127,13 @@ export function extractS3StaticDeploymentsFromContext(
     if (preview) {
       deploymentErrors.push(deploymentError(label, "s3-static does not support preview"));
     }
-    pushSmokePolicyErrors({ label, protectionClass, smoke, errors: deploymentErrors });
+    pushSmokePolicyErrors({
+      label,
+      protectionClass,
+      componentKind: STATIC_WEBAPP_COMPONENT,
+      smoke,
+      errors: deploymentErrors,
+    });
     if (provisioner && !BUILT_IN_PROVISIONERS.has(provisioner)) {
       deploymentErrors.push(
         deploymentError(

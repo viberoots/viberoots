@@ -16,6 +16,8 @@ export type NixosSharedHostStaticSmokeResult = {
   healthUrl?: string;
 };
 
+const SMOKE_REQUEST_TIMEOUT_MS = 5_000;
+
 function requestForUrl(rawUrl: string, connect?: SmokeConnectOverride): Promise<SmokeResponse> {
   const url = new URL(rawUrl);
   const transportProtocol = connect?.protocol || url.protocol;
@@ -39,6 +41,11 @@ function requestForUrl(rawUrl: string, connect?: SmokeConnectOverride): Promise<
         res.on("end", () => resolve({ status: res.statusCode || 0, body }));
       },
     );
+    req.setTimeout(SMOKE_REQUEST_TIMEOUT_MS, () => {
+      req.destroy(
+        new Error(`ETIMEDOUT smoke request to ${rawUrl} after ${SMOKE_REQUEST_TIMEOUT_MS}ms`),
+      );
+    });
     req.on("error", reject);
     req.end();
   });

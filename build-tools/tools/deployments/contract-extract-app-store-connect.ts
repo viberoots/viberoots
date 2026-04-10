@@ -29,11 +29,14 @@ import {
 import { readDeploymentRequirements } from "./deployment-requirements.ts";
 import { pushAppStoreConnectComponentKindErrors } from "./app-store-connect-capability-validation.ts";
 import { pushAppStoreConnectRolloutErrors } from "./app-store-connect-rollout-validation.ts";
+import {
+  APP_STORE_CONNECT_VALID_SIGNING_MODELS,
+  APP_STORE_CONNECT_VALID_TRACKS,
+  MOBILE_STORE_TARGET_TOKEN_RE,
+  pushDuplicateProviderTargetErrors,
+  pushMobileStoreProtectionClassError,
+} from "./mobile-store-extract-helpers.ts";
 import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
-const TOKEN_RE = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$/;
-const VALID_TRACKS = new Set(["testflight-internal", "testflight-external", "app-store"]);
-const VALID_SIGNING_MODELS = new Set(["app-store"]);
-const VALID_PROTECTION_CLASSES = new Set(["shared_nonprod", "production_facing"]);
 export function extractAppStoreConnectDeploymentsFromContext(
   context: DeploymentExtractionContext,
 ): AppStoreConnectDeployment[] {
@@ -79,14 +82,12 @@ export function extractAppStoreConnectDeploymentsFromContext(
         deploymentError(label, "app-store-connect does not support multi-component deployments"),
       );
     }
-    if (!VALID_PROTECTION_CLASSES.has(protectionClass)) {
-      deploymentErrors.push(
-        deploymentError(
-          label,
-          'app-store-connect deployments must use protection_class "shared_nonprod" or "production_facing"',
-        ),
-      );
-    }
+    pushMobileStoreProtectionClassError({
+      label,
+      provider: "app-store-connect",
+      protectionClass,
+      errors: deploymentErrors,
+    });
     for (const [fieldPath, value] of [
       ["provider_target.issuer", issuer],
       ["provider_target.app", app],
@@ -97,7 +98,7 @@ export function extractAppStoreConnectDeploymentsFromContext(
         label,
         fieldPath,
         value,
-        pattern: TOKEN_RE,
+        pattern: MOBILE_STORE_TARGET_TOKEN_RE,
         invalidMessage: `${fieldPath} must use reviewed token characters only`,
       });
     }
@@ -109,19 +110,19 @@ export function extractAppStoreConnectDeploymentsFromContext(
         ),
       );
     }
-    if (!VALID_TRACKS.has(track)) {
+    if (!APP_STORE_CONNECT_VALID_TRACKS.has(track)) {
       deploymentErrors.push(
         deploymentError(
           label,
-          `app-store-connect track must be one of ${Array.from(VALID_TRACKS).join(", ")}`,
+          `app-store-connect track must be one of ${Array.from(APP_STORE_CONNECT_VALID_TRACKS).join(", ")}`,
         ),
       );
     }
-    if (!VALID_SIGNING_MODELS.has(signingModel)) {
+    if (!APP_STORE_CONNECT_VALID_SIGNING_MODELS.has(signingModel)) {
       deploymentErrors.push(
         deploymentError(
           label,
-          `app-store-connect signing_model must be one of ${Array.from(VALID_SIGNING_MODELS).join(", ")}`,
+          `app-store-connect signing_model must be one of ${Array.from(APP_STORE_CONNECT_VALID_SIGNING_MODELS).join(", ")}`,
         ),
       );
     }
@@ -165,7 +166,13 @@ export function extractAppStoreConnectDeploymentsFromContext(
       errors: deploymentErrors,
     });
     pushAppStoreConnectRolloutErrors({ label, rolloutPolicy, errors: deploymentErrors });
-    pushSmokePolicyErrors({ label, protectionClass, smoke, errors: deploymentErrors });
+    pushSmokePolicyErrors({
+      label,
+      protectionClass,
+      componentKind: "mobile-app",
+      smoke,
+      errors: deploymentErrors,
+    });
     const releaseActions = resolveDeploymentMetadataRefs({
       refs: releaseActionRefs,
       label,
@@ -229,20 +236,14 @@ export function extractAppStoreConnectDeploymentsFromContext(
       }),
     });
   }
-  for (const duplicate of duplicateValueEntries(
-    deployments.map((deployment) => ({
-      value: deployment.providerTarget.providerTargetIdentity,
-      label: deployment.label,
-    })),
-  )) {
-    for (const label of duplicate.labels) {
-      context.errors.push(
-        deploymentError(
-          label,
-          `duplicate provider_target identity "${duplicate.value}" collides with ${duplicate.labels.join(", ")}`,
-        ),
-      );
-    }
-  }
+  pushDuplicateProviderTargetErrors(
+    context.errors,
+    duplicateValueEntries(
+      deployments.map((deployment) => ({
+        value: deployment.providerTarget.providerTargetIdentity,
+        label: deployment.label,
+      })),
+    ),
+  );
   return deployments.sort((a, b) => a.label.localeCompare(b.label));
 }

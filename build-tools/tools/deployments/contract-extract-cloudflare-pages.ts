@@ -156,7 +156,13 @@ export function extractCloudflarePagesDeploymentsFromContext(
       );
     }
     pushCloudflarePreviewErrors(label, preview, deploymentErrors);
-    pushSmokePolicyErrors({ label, protectionClass, smoke, errors: deploymentErrors });
+    pushSmokePolicyErrors({
+      label,
+      protectionClass,
+      componentKind: STATIC_WEBAPP_COMPONENT,
+      smoke,
+      errors: deploymentErrors,
+    });
     pushCloudflareComponentKindErrors({
       label,
       declaredKind,

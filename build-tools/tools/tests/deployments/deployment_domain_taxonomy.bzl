@@ -24,6 +24,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-promotion-compatibility.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-provider-capabilities.contract.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-prerequisites.validation.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-retry-policy.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-smoke-exception.validation.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-target-exceptions.validation.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-verify-scope.boundary.test.ts": True,

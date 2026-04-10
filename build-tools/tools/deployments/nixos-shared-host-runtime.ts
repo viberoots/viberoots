@@ -7,7 +7,15 @@ function containerRoot(hostRoot: string, containerName: string): string {
   return path.join(hostRoot, "containers", containerName);
 }
 
-async function ensureSymlink(linkPath: string, target: string): Promise<void> {
+async function ensureSymlink(
+  linkPath: string,
+  target: string,
+  opts?: { preserveExisting?: boolean },
+): Promise<void> {
+  try {
+    await fsp.lstat(linkPath);
+    if (opts?.preserveExisting) return;
+  } catch {}
   await fsp.rm(linkPath, { recursive: true, force: true });
   await fsp.symlink(target, linkPath);
 }
@@ -25,8 +33,8 @@ async function materializeContainerRoot(
   const publishRootAbs = path.join(root, publishRoot.replace(/^\//, ""));
   const activeReleaseAbs = path.join(root, activeReleaseLink.replace(/^\//, ""));
   await fsp.mkdir(emptyReleaseAbs, { recursive: true });
-  await ensureSymlink(publishRootAbs, emptyReleaseAbs);
-  await ensureSymlink(activeReleaseAbs, publishRootAbs);
+  await ensureSymlink(publishRootAbs, emptyReleaseAbs, { preserveExisting: true });
+  await ensureSymlink(activeReleaseAbs, publishRootAbs, { preserveExisting: true });
 }
 
 export function nixosSharedHostContainerRoot(hostRoot: string, containerName: string): string {

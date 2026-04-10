@@ -19,23 +19,20 @@ import {
 import { writeCloudflarePagesReplaySnapshot } from "./cloudflare-pages-replay.ts";
 import { smokeCloudflarePagesStaticWebapp } from "./cloudflare-pages-static-smoke.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
+import { withFailedStep } from "./deployment-failed-step.ts";
 import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
+import {
+  classifySmokeRetry,
+  noPublishAutoRetry,
+  runWithAutomaticRetry,
+} from "./deployment-retry-policy.ts";
+import { executionPolicyWithRetry, retryAuditFrom } from "./deployment-retry-records.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
 import {
   requireAdmittedStaticWebappArtifactPath,
   type AdmittedStaticWebappArtifact,
 } from "./static-webapp-artifacts.ts";
-
-type DeployFailureStep = "publish" | "smoke";
-
-function withFailedStep(
-  step: DeployFailureStep,
-  error: unknown,
-): Error & { failedStep: DeployFailureStep } {
-  const base = error instanceof Error ? error : new Error(String(error));
-  return Object.assign(base, { failedStep: step });
-}
 
 export async function runCloudflarePagesStaticDeploy(opts: {
   workspaceRoot: string;
@@ -65,11 +62,16 @@ export async function runCloudflarePagesStaticDeploy(opts: {
   const publishMode = opts.publishMode || "normal";
   const effectiveRunTarget = opts.effectiveRunTarget || opts.deployment.providerTarget;
   const deploymentMetadataFingerprint = deploymentMetadataFingerprintFor(opts.deployment);
+  const smokeMode = resolveDeploymentSmokeExecutionMode({
+    deployment: opts.deployment,
+    publishMode,
+  });
   const secretRuntime = createVaultDeploymentSecretRuntime({
     admittedContext: opts.admittedContext,
   });
   let providerConfigFingerprint: string | undefined;
   let replaySnapshotPath: string | undefined;
+  let executionPolicy: ReturnType<typeof executionPolicyWithRetry> | undefined;
   try {
     const artifactDir = await requireAdmittedStaticWebappArtifactPath(opts.artifact);
     await secretRuntime.enterStep("publish");
@@ -90,19 +92,32 @@ export async function runCloudflarePagesStaticDeploy(opts: {
       providerConfigSnapshotPath: preparedConfig.renderedConfigPath,
       controlPlaneExecutionSnapshotPath: authority.executionSnapshotPath,
     }));
-    const published = await publishCloudflarePagesStaticWebapp({
-      workspaceRoot: opts.workspaceRoot,
-      deployment: opts.deployment,
-      artifactDir,
-      renderedConfigPath: preparedConfig.renderedConfigPath,
-      effectiveRunTarget,
-    }).catch((error) => {
-      throw withFailedStep("publish", error);
-    });
-    const smokeMode = resolveDeploymentSmokeExecutionMode({
-      deployment: opts.deployment,
-      publishMode,
-    });
+    const published = await runWithAutomaticRetry({
+      step: "publish",
+      run: async () =>
+        await publishCloudflarePagesStaticWebapp({
+          workspaceRoot: opts.workspaceRoot,
+          deployment: opts.deployment,
+          artifactDir,
+          renderedConfigPath: preparedConfig.renderedConfigPath,
+          effectiveRunTarget,
+        }),
+      classifyError: () => noPublishAutoRetry(),
+    })
+      .then((result) => {
+        executionPolicy = executionPolicyWithRetry({
+          budget: smokeMode.budget,
+          retryAudit: result.audit,
+        });
+        return result.result;
+      })
+      .catch((error) => {
+        executionPolicy = executionPolicyWithRetry({
+          budget: smokeMode.budget,
+          retryAudit: retryAuditFrom(error),
+        });
+        throw withFailedStep("publish", error);
+      });
     let smoke:
       | {
           publicUrl?: string;
@@ -115,17 +130,37 @@ export async function runCloudflarePagesStaticDeploy(opts: {
         publicUrl: effectiveRunTarget.canonicalUrl,
         smokeOutcome: "omitted_by_exception",
       };
+      executionPolicy = executionPolicyWithRetry({
+        budget: smokeMode.budget,
+        prior: executionPolicy,
+      });
     } else {
       try {
         await secretRuntime.enterStep("smoke");
-        const completedSmoke = await smokeCloudflarePagesStaticWebapp({
-          deployment: opts.deployment,
-          indexPath: path.join(artifactDir, "index.html"),
-          effectiveRunTarget,
-          connectOverride: opts.smokeConnectOverride,
+        const completedSmoke = await runWithAutomaticRetry({
+          step: "smoke",
+          totalBudgetMs: smokeMode.budget.totalBudgetMs,
+          run: async () =>
+            await smokeCloudflarePagesStaticWebapp({
+              deployment: opts.deployment,
+              indexPath: path.join(artifactDir, "index.html"),
+              effectiveRunTarget,
+              connectOverride: opts.smokeConnectOverride,
+            }),
+          classifyError: classifySmokeRetry,
         });
-        smoke = { publicUrl: completedSmoke.publicUrl, smokeOutcome: "passed" };
+        executionPolicy = executionPolicyWithRetry({
+          budget: smokeMode.budget,
+          prior: executionPolicy,
+          retryAudit: completedSmoke.audit,
+        });
+        smoke = { publicUrl: completedSmoke.result.publicUrl, smokeOutcome: "passed" };
       } catch (error) {
+        executionPolicy = executionPolicyWithRetry({
+          budget: smokeMode.budget,
+          prior: executionPolicy,
+          retryAudit: retryAuditFrom(error),
+        });
         if (smokeMode.mode !== "nonblocking") {
           throw withFailedStep("smoke", error);
         }
@@ -160,6 +195,7 @@ export async function runCloudflarePagesStaticDeploy(opts: {
       ...(smoke?.smokeOutcome ? { smokeOutcome: smoke.smokeOutcome } : {}),
       ...(smokeMode.smokeException ? { smokeException: smokeMode.smokeException } : {}),
       ...(smoke?.smokeError ? { smokeError: smoke.smokeError } : {}),
+      ...(executionPolicy ? { executionPolicy } : {}),
       ...(replaySnapshotPath ? { replaySnapshotPath } : {}),
       publicUrl: smoke.publicUrl,
       ...(published.providerReleaseId ? { providerReleaseId: published.providerReleaseId } : {}),
@@ -195,6 +231,7 @@ export async function runCloudflarePagesStaticDeploy(opts: {
         ? { previewIdentitySelector: opts.previewIdentitySelector }
         : {}),
       deploymentMetadataFingerprint,
+      ...(executionPolicy ? { executionPolicy } : {}),
       ...(providerConfigFingerprint ? { providerConfigFingerprint } : {}),
       ...(replaySnapshotPath ? { replaySnapshotPath } : {}),
       error: message,

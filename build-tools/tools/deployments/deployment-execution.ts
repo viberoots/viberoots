@@ -167,6 +167,9 @@ export function summarizeDeploymentResult(result: DeploymentExecutionResult) {
     ...("smokeOutcome" in result.record && (result.record as any).smokeOutcome
       ? { smokeOutcome: (result.record as any).smokeOutcome }
       : {}),
+    ...("executionPolicy" in result.record && (result.record as any).executionPolicy
+      ? { executionPolicy: (result.record as any).executionPolicy }
+      : {}),
     publicUrl: result.record.publicUrl,
     recordPath: result.recordPath,
     ...(result.record.controlPlane ? { controlPlane: result.record.controlPlane } : {}),

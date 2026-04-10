@@ -5,6 +5,7 @@ import path from "node:path";
 import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
 import type { CloudflarePagesControlPlaneWorkerAuthority } from "./cloudflare-pages-control-plane-contract.ts";
 import type { CloudflarePagesPublishMode } from "./cloudflare-pages-control-plane-contract.ts";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
 import type {
   DeploymentSmokeException,
   DeploymentSmokeOutcome,
@@ -62,6 +63,7 @@ export type CloudflarePagesDeployRecord = {
   smokeOutcome?: DeploymentSmokeOutcome;
   smokeException?: DeploymentSmokeException;
   smokeError?: string;
+  executionPolicy?: DeploymentExecutionPolicyFacts;
   deploymentMetadataFingerprint?: string;
   providerConfigFingerprint?: string;
   replaySnapshotPath?: string;
@@ -93,6 +95,7 @@ type RecordOutcome = {
   smokeOutcome?: CloudflarePagesDeployRecord["smokeOutcome"];
   smokeException?: CloudflarePagesDeployRecord["smokeException"];
   smokeError?: string;
+  executionPolicy?: DeploymentExecutionPolicyFacts;
   deploymentMetadataFingerprint?: string;
   providerConfigFingerprint?: string;
   replaySnapshotPath?: string;
@@ -169,6 +172,7 @@ export function createCloudflarePagesDeployRecord(
     ...(outcome.smokeOutcome ? { smokeOutcome: outcome.smokeOutcome } : {}),
     ...(outcome.smokeException ? { smokeException: outcome.smokeException } : {}),
     ...(outcome.smokeError ? { smokeError: outcome.smokeError } : {}),
+    ...(outcome.executionPolicy ? { executionPolicy: outcome.executionPolicy } : {}),
     ...(outcome.deploymentMetadataFingerprint
       ? { deploymentMetadataFingerprint: outcome.deploymentMetadataFingerprint }
       : {}),
