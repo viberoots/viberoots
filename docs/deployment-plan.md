@@ -5358,6 +5358,222 @@ contract.
 
 ---
 
+## PR-41: `failure_only` release-action execution closeout
+
+### Description
+
+I will close the remaining `release_actions` execution gap by making the reviewed
+`run_condition = "failure_only"` contract real at runtime rather than validation-only metadata.
+This PR ensures failure-scoped actions run in the documented lifecycle phases when publish or smoke
+fails, records their execution and failure semantics canonically, and keeps replay behavior
+fail-closed and explicit instead of silently skipping declared failure-path actions.
+
+### Scope & Changes
+
+- Implement runtime execution semantics for built-in `release_actions` with
+  `run_condition = "failure_only"` across the reviewed `nixos-shared-host` flow.
+- Add explicit phase handling so failure-scoped actions may run only in the documented contexts:
+  - `pre_publish` actions after a pre-publish failure boundary when that phase can fail
+  - `post_publish_pre_smoke` actions after publish succeeds but before or when smoke is skipped due
+    to an earlier failure boundary
+  - `post_smoke` actions after smoke completes with a failed outcome
+- Ensure the deploy runtime distinguishes:
+  - actions that should run on the success path
+  - actions that should run on the failure path
+  - actions that should run in both paths via `run_condition = "always"`
+- Record failure-path release-action execution using the same canonical failed-step and
+  outcome-model vocabulary already used for success-path actions.
+- Make failure-path release-action execution participate in the reviewed abort and later-lifecycle
+  failure-propagation semantics rather than bypassing them through ad hoc error handling.
+- Ensure replay gating for retry, rollback, promotion, and same-deployment `--publish-only` uses
+  the recorded action-plan snapshot for failure-path actions as well as success-path actions.
+- Fail closed when the runtime cannot determine whether a declared failure-path action should run in
+  the current replay context.
+- Update any helper abstractions that currently conflate "not on the success path" with "never
+  execute".
+
+### Tests (in this PR)
+
+- Add execution tests proving `failure_only` actions run when:
+  - publish fails after the action's declared phase becomes relevant
+  - smoke fails for `post_smoke`
+  - a deployment declares `always` and the failure-path action still runs
+- Add negative tests proving `failure_only` actions do not run on successful deploys.
+- Add replay tests proving failure-path actions:
+  - obey recorded `rerun`, `skip`, and `fail` dispositions
+  - respect duplicate-safety requirements in replay contexts where rerun is allowed
+  - fail closed when the stored replay plan does not authorize rerun
+- Add failure-record tests proving the recorded failed step and final outcome remain canonical when
+  a failure-path release action runs or fails.
+- Add regression tests proving the existing success-path release-action behavior remains unchanged
+  for `success_only` and `always`.
+
+### Docs (in this PR)
+
+- Document the runtime semantics for `run_condition = "failure_only"` across the reviewed deploy
+  lifecycle.
+- Document which failure boundaries may trigger each release-action phase.
+- Document operator-visible behavior when a failure-path release action itself fails.
+- Align the release-action contract docs with the actual replay and failure-path execution model.
+
+### Verification Commands
+
+- `buck2 test //...`
+- release-action replay and failure-path inspection flows introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-owned release-action execution, replay handling, record
+  persistence, and deployment-domain tests. Under the deployment-only verify policy, default `v` /
+  CI can run the reviewed deployment suite instead of the full non-deployment build-system verify
+  scope.
+
+### Acceptance Criteria
+
+- Declared built-in `failure_only` release actions execute in the reviewed failure-path contexts
+  instead of being silently skipped.
+- `always` actions execute in both success and failure paths where their declared phase applies.
+- Failure-path release-action replay obeys the recorded action-plan snapshot and duplicate-safety
+  contract.
+- Records, tests, and docs all describe the same failure-path release-action behavior.
+
+### Risks
+
+Failure-path lifecycle work can accidentally blur which phase is responsible for which outcome and
+create ambiguous operator expectations.
+
+### Mitigation
+
+Keep the triggering rules phase-specific, preserve canonical failed-step vocabulary, and fail closed
+whenever the runtime cannot prove the intended failure-path behavior.
+
+### Consequence of Not Implementing
+
+The deployment design would continue to advertise `failure_only` as a reviewed built-in contract
+value even though the runtime never executes it.
+
+### Downsides for Implementing
+
+Adds more branching and test surface to the release-action runtime and replay model.
+
+### Recommendation
+
+Implement immediately after the current record/replay closeout so the reviewed release-action
+contract is behaviorally complete before any later provider or workflow expansion depends on it.
+
+---
+
+## PR-42: Cross-provider runner-identity provenance parity for replayable deployment families
+
+### Description
+
+I will close the remaining replay-provenance gap by extending the PR-40 runner-identity contract
+from `nixos-shared-host` to every replayable deployment family. This PR makes record and replay
+compatibility checks use stable runner implementation identities across Cloudflare Pages, S3
+static, Kubernetes, App Store Connect, and Google Play rather than relying only on provider-local
+type strings or partial per-provider fields.
+
+### Scope & Changes
+
+- Add reviewed runner-identity persistence for every replayable provider family, including where
+  applicable:
+  - publisher runner identity
+  - provisioner runner identity
+  - smoke runner identity
+  - any other built-in runner identity that materially affects replay safety for that provider
+- Extend durable deployment records and replay snapshots for replayable providers so runner
+  identities are stored explicitly rather than inferred indirectly from current code.
+- Add shared compatibility helpers so replay paths compare stored runner identities against the
+  current built-in implementation identities and fail closed on mismatch.
+- Apply that compatibility gate to replay-capable flows including:
+  - same-deployment `--publish-only`
+  - retry
+  - rollback
+  - promotion
+  - preview-source reuse where replay provenance is authoritative
+- Add reviewed migration or compatibility behavior for already-persisted provider records that lack
+  the new runner-identity fields:
+  - migrate explicitly where the identity can be derived safely
+  - otherwise reject with a clear incompatibility error
+- Align provider-specific record schemas and replay snapshot schemas so the cross-provider runner
+  provenance contract uses one reviewed vocabulary instead of ad hoc per-provider persistence.
+- Backfill any provider-specific provenance tests that currently cover schema versioning but not
+  runner-identity replay safety.
+
+### Tests (in this PR)
+
+- Add record and replay-snapshot tests proving every replayable provider stores explicit runner
+  identities.
+- Add replay-compatibility tests for Cloudflare Pages, S3 static, Kubernetes, App Store Connect,
+  and Google Play proving:
+  - replay succeeds when stored runner identities match current built-in identities
+  - replay fails closed when a stored runner identity no longer matches
+  - migrated older records only replay when reviewed compatibility can be proven
+- Add promotion and rollback tests for non-`nixos-shared-host` providers proving the runner
+  compatibility gate applies to cross-run artifact reuse.
+- Add regression tests proving current replay flows still work for matching identities and reviewed
+  migrated schemas.
+
+### Docs (in this PR)
+
+- Document the cross-provider runner-identity provenance contract for replayable providers.
+- Document the operator-visible failure mode when replay compatibility fails because a stored runner
+  identity no longer matches the current implementation.
+- Document any reviewed migration behavior for older provider records and snapshots that predate the
+  explicit runner-identity fields.
+- Align the record/replay compatibility docs so `nixos-shared-host` is no longer a special-case
+  provenance contract.
+
+### Verification Commands
+
+- `buck2 test //...`
+- provider replay-compatibility inspection flows introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-owned record schemas, replay resolution, compatibility
+  helpers, provider-specific deploy/replay code, and deployment-domain tests. Under the
+  deployment-only verify policy, default `v` / CI can run the reviewed deployment suite instead of
+  the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- Every replayable provider family stores explicit runner implementation identities in the reviewed
+  record and replay surfaces.
+- Replay, rollback, retry, promotion, and other immutable-reuse flows fail closed when runner
+  compatibility cannot be proven.
+- Older provider records either migrate through reviewed explicit compatibility paths or fail closed
+  clearly.
+- Tests and docs describe one consistent cross-provider runner-provenance contract.
+
+### Risks
+
+Cross-provider provenance hardening can accidentally create inconsistent migration behavior or
+provider-specific exceptions that are hard for operators to reason about.
+
+### Mitigation
+
+Centralize the compatibility vocabulary, keep migrations explicit and minimal, and reject any older
+persisted shape whose runner provenance cannot be proven safely.
+
+### Consequence of Not Implementing
+
+The deployment plan would continue to overstate PR-40 by implying cross-provider replay provenance
+hardening that only fully exists for `nixos-shared-host`.
+
+### Downsides for Implementing
+
+Adds schema, migration, and replay-compatibility work across several provider slices at once.
+
+### Recommendation
+
+Implement last so all replayable provider families converge on one final provenance and
+compatibility contract before the deployment model is treated as fully complete.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -5396,9 +5612,11 @@ contract.
     attestation/supply-chain enforcement and explicit smoke exceptions.
 15. PR-37 through PR-38: close the remaining protected/shared execution contracts for secrets,
     credential lifecycle, publish safety, automatic retry, and smoke timeout budgets.
-16. PR-39 through PR-40: close lane-governance verification plus the final record/replay,
-    compatibility, provenance, and explicit `release_actions` contract so the full deployment
-    design is implemented end to end.
+16. PR-39 through PR-40: close lane-governance verification plus the core record/replay,
+    compatibility, provenance, and explicit `release_actions` contract work.
+17. PR-41 through PR-42: close the remaining behavioral and cross-provider parity gaps for
+    failure-path `release_actions` execution and runner-identity replay provenance so the full
+    deployment design is implemented end to end.
 
 ## Companion Docs
 
