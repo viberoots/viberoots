@@ -3,17 +3,18 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { DeploymentTarget } from "./contract.ts";
 import { requiredDeploymentStageBranch } from "./contract.ts";
-import type { AppStoreConnectDeployRecord } from "./app-store-connect-records.ts";
 import {
   resolveAppStoreConnectReplaySource,
   type AppStoreConnectReplaySnapshot,
 } from "./app-store-connect-replay.ts";
-import type { CloudflarePagesDeployRecord } from "./cloudflare-pages-records.ts";
+import {
+  resolveGooglePlayReplaySource,
+  type GooglePlayReplaySnapshot,
+} from "./google-play-replay.ts";
 import {
   resolveCloudflarePagesReplaySource,
   type CloudflarePagesReplaySnapshot,
 } from "./cloudflare-pages-replay.ts";
-import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
 import {
   nixosSharedHostReplayArtifactIdentity,
   resolveNixosSharedHostReplaySource,
@@ -24,45 +25,16 @@ import {
   promotionCompatibilityErrors,
   sourcePromotionRevision,
 } from "./deployment-promotion-compatibility.ts";
-import type { AdmittedMobileAppArtifact } from "./app-store-connect-artifacts.ts";
-import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
-
-export type DeploymentPromotionSourceRecord =
-  | AppStoreConnectDeployRecord
-  | CloudflarePagesDeployRecord
-  | NixosSharedHostDeployRecord;
-
-export type DeploymentPromotionSourceReplaySnapshot =
-  | AppStoreConnectReplaySnapshot
-  | CloudflarePagesReplaySnapshot
-  | NixosSharedHostReplaySnapshot;
-
-export type DeploymentPromotionSource = {
-  record: DeploymentPromotionSourceRecord;
-  recordPath: string;
-  replaySnapshot: DeploymentPromotionSourceReplaySnapshot;
-  replaySnapshotPath: string;
-  artifact?: AdmittedMobileAppArtifact | AdmittedStaticWebappArtifact;
-  artifactIdentity: string;
-};
-
-export type CrossDeploymentPromotionSelection<TDeployment extends DeploymentTarget> = {
-  operationKind: "promotion";
-  deployment: TDeployment;
-  artifact: AdmittedMobileAppArtifact | AdmittedStaticWebappArtifact;
-  parentRunId: string;
-  releaseLineageId: string;
-  artifactLineageId: string;
-  sourceRecordPath: string;
-  sourceReplaySnapshotPath: string;
-  sourceRecord: DeploymentPromotionSourceRecord;
-  sourceReplaySnapshot: DeploymentPromotionSourceReplaySnapshot;
-};
-
-export type CrossDeploymentPromotionSourceSelection<TDeployment extends DeploymentTarget> = Omit<
-  CrossDeploymentPromotionSelection<TDeployment>,
-  "artifact" | "artifactLineageId"
->;
+import type {
+  CrossDeploymentPromotionSelection,
+  CrossDeploymentPromotionSourceSelection,
+  DeploymentPromotionSource,
+} from "./deployment-promotion-types.ts";
+export type {
+  CrossDeploymentPromotionSelection,
+  CrossDeploymentPromotionSourceSelection,
+  DeploymentPromotionSource,
+} from "./deployment-promotion-types.ts";
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
@@ -88,6 +60,7 @@ function defaultRecordsRoots(workspaceRoot: string, recordsRoot: string): string
       path.join(workspaceRoot, ".local", "deployments", "nixos-shared-host", "records"),
       path.join(workspaceRoot, ".local", "deployments", "cloudflare-pages", "records"),
       path.join(workspaceRoot, ".local", "deployments", "app-store-connect", "records"),
+      path.join(workspaceRoot, ".local", "deployments", "google-play", "records"),
     ]),
   );
 }
@@ -111,6 +84,17 @@ async function resolvePromotionSourceByPath(
   }
   if (raw.provider === "app-store-connect") {
     const source = await resolveAppStoreConnectReplaySource({ recordPath });
+    return {
+      record: source.record,
+      recordPath: source.recordPath,
+      replaySnapshot: source.replaySnapshot,
+      replaySnapshotPath: source.record.replaySnapshotPath || "",
+      artifactIdentity: source.replaySnapshot.artifact.identity,
+      artifact: source.replaySnapshot.artifact,
+    };
+  }
+  if (raw.provider === "google-play") {
+    const source = await resolveGooglePlayReplaySource({ recordPath });
     return {
       record: source.record,
       recordPath: source.recordPath,

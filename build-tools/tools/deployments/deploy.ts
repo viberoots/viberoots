@@ -10,11 +10,13 @@ import {
 } from "./deploy-front-door.ts";
 import { runCloudflareDeployFrontDoor } from "./cloudflare-pages-front-door.ts";
 import { runAppStoreConnectDeployFrontDoor } from "./app-store-connect-front-door.ts";
+import { runGooglePlayDeployFrontDoor } from "./google-play-front-door.ts";
 import { resolveSmokeConnectOverride } from "./deployment-cli-smoke.ts";
 import { runFromChangesCli } from "./deployment-from-changes-cli.ts";
 import {
   isAppStoreConnectDeployment,
   isCloudflarePagesDeployment,
+  isGooglePlayDeployment,
   isNixosSharedHostDeployment,
   isS3StaticDeployment,
 } from "./contract.ts";
@@ -137,6 +139,18 @@ async function main() {
   }
   if (isAppStoreConnectDeployment(deployment)) {
     await runAppStoreConnectDeployFrontDoor({
+      workspaceRoot,
+      deployment,
+      publishOnly,
+      rollback,
+      sourceRunId,
+      artifactDirFlag,
+      ...(admissionEvidence ? { admissionEvidence } : {}),
+    });
+    return;
+  }
+  if (isGooglePlayDeployment(deployment)) {
+    await runGooglePlayDeployFrontDoor({
       workspaceRoot,
       deployment,
       publishOnly,

@@ -332,6 +332,117 @@ Normative-source note:
 - in policy for protected/shared single-component signed iOS `mobile-app` deployments
 - protected/shared execution must stay inside the vetted built-in publisher and release-health validation path
 
+## Capability Entry: `google-play`
+
+### Identity
+
+- `provider`: `google-play`
+- canonical target identity fields:
+  - `developer_account`
+  - `app`
+  - `track`
+- canonical lock-key shape:
+  - `google-play:<developer_account>/<app>#track:<track>`
+- required reviewed provider-target fields:
+  - `package_name`
+  - `platform = android`
+  - `signing_model = play-app-signing`
+
+### Component Support
+
+- supported component kinds:
+  - `mobile-app`
+- multi-component support:
+  - not supported in the reviewed initial slice
+  - deployments must contain exactly one `mobile-app` component
+- additional unsupported shapes:
+  - iOS or mixed-platform releases
+  - non-mobile component kinds
+
+### Rollout Support
+
+- default rollout mode:
+  - `all_at_once`
+- rollout-policy omission posture:
+  - omission is reviewed only for the single-component Android mobile-app slice
+- supported rollout modes:
+  - `all_at_once`
+  - `store_staged`
+- reviewed staged-rollout posture:
+  - `abort = "stop_on_first_failure"`
+  - `smoke = "final_only"`
+  - `steps` may be omitted or set to `["default"]`
+
+### Preview Support
+
+- preview support:
+  - not reviewed in the initial `google-play` slice
+
+### Smoke / Release Health
+
+- default smoke model:
+  - built-in release-health validation rather than URL smoke
+  - success requires reviewed upload receipt, processing success, installability, explicit track progression evidence, and, when `store_staged` is used, staged-rollout health evidence
+
+### Built-In Publisher Contract
+
+- built-in publisher type:
+  - `google-play-mobile-release`
+- exact publish input:
+  - one admitted immutable signed Android release artifact (`.aab`)
+- checked-in provider config:
+  - `google-play.jsonc` remains provider-local publish configuration only
+  - deployment metadata stays authoritative for developer account, app, package name, track, platform, and signing model; config drift must fail closed before publish
+
+### Retry / Idempotency
+
+- shared `--publish-only` reuses only an admitted exact artifact selected with `--source-run-id`
+- same-deployment `--publish-only` is reviewed as `retry`
+- same-deployment rollback is reviewed only for prior successful normal runs on the same canonical store target identity
+- cross-deployment promotion is reviewed only for exact-artifact reuse through the branch-backed lane contract
+
+### Replay Snapshot Baseline
+
+- each admitted run persists:
+  - the exact immutable mobile artifact reference
+  - canonical provider-target identity
+  - deployment metadata fingerprint
+  - provider-config snapshot path
+  - release-health evidence, track state, and rollout state needed for replay eligibility decisions
+
+### Promotion Compatibility
+
+- promotion-safe mobile lanes treat these as explicit compatibility inputs:
+  - publisher type must match exactly
+  - signing model must match exactly
+  - track progression must move forward through the reviewed Google Play track order
+  - rollout progression may stay at `all_at_once` or advance to `store_staged`, but must not regress
+
+### Partial Publish Observability
+
+- the adapter records:
+  - store submission id
+  - provider release id
+  - exact artifact identity
+  - track state
+  - rollout state
+  - release-health evidence
+
+### Provisioner Support
+
+- deployment-owned provisioners for protected/shared mutation:
+  - not supported in the reviewed `google-play` capability entry
+
+### Built-In `release_actions` Support
+
+- protected/shared built-in `release_actions`:
+  - not supported in the reviewed `google-play` capability entry
+
+### Protected/Shared Eligibility
+
+- in policy for protected/shared single-component signed Android `mobile-app` deployments
+- protected/shared execution must stay inside the vetted built-in publisher and release-health validation path
+
 ## Capability Entry: `cloudflare-pages`
 
 ### Identity

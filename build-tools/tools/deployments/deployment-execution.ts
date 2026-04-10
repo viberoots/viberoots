@@ -3,11 +3,13 @@ import path from "node:path";
 import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
 import {
   isAppStoreConnectDeployment,
+  isGooglePlayDeployment,
   isNixosSharedHostDeployment,
   isS3StaticDeployment,
   type DeploymentTarget,
 } from "./contract.ts";
 import { submitAppStoreConnectDeploy } from "./app-store-connect-deploy.ts";
+import { submitGooglePlayDeploy } from "./google-play-deploy.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import { buildArtifactDirsByComponentId } from "./deployment-component-artifact-dirs.ts";
 import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
@@ -58,6 +60,10 @@ function defaultAppStoreConnectRecordsRoot(workspaceRoot: string): string {
   return path.join(workspaceRoot, ".local", "deployments", "app-store-connect", "records");
 }
 
+function defaultGooglePlayRecordsRoot(workspaceRoot: string): string {
+  return path.join(workspaceRoot, ".local", "deployments", "google-play", "records");
+}
+
 async function resolveArtifactDir(
   workspaceRoot: string,
   deployment: Pick<DeploymentTarget, "component">,
@@ -95,6 +101,17 @@ export async function runNormalDeployment(opts: {
       deployment: opts.deployment,
       recordsRoot: path.resolve(
         opts.sharedRecordsRoot || defaultAppStoreConnectRecordsRoot(opts.workspaceRoot),
+      ),
+      artifactPath: await resolveArtifactDir(opts.workspaceRoot, opts.deployment),
+      ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
+    });
+  }
+  if (isGooglePlayDeployment(opts.deployment)) {
+    return await submitGooglePlayDeploy({
+      workspaceRoot: opts.workspaceRoot,
+      deployment: opts.deployment,
+      recordsRoot: path.resolve(
+        opts.sharedRecordsRoot || defaultGooglePlayRecordsRoot(opts.workspaceRoot),
       ),
       artifactPath: await resolveArtifactDir(opts.workspaceRoot, opts.deployment),
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),

@@ -8,6 +8,7 @@ import {
 } from "./contract-extract-shared.ts";
 import { extractCloudflarePagesDeploymentsFromContext } from "./contract-extract-cloudflare-pages.ts";
 import { extractAppStoreConnectDeploymentsFromContext } from "./contract-extract-app-store-connect.ts";
+import { extractGooglePlayDeploymentsFromContext } from "./contract-extract-google-play.ts";
 import { extractKubernetesDeploymentsFromContext } from "./contract-extract-kubernetes.ts";
 import { extractNixosSharedHostDeploymentsFromContext } from "./contract-extract-nixos-shared-host.ts";
 import { extractS3StaticDeploymentsFromContext } from "./contract-extract-s3-static.ts";
@@ -100,6 +101,7 @@ export function extractDeployments(nodes: GraphNode[]): {
     ...extractNixosSharedHostDeploymentsFromContext(context),
     ...extractCloudflarePagesDeploymentsFromContext(context),
     ...extractAppStoreConnectDeploymentsFromContext(context),
+    ...extractGooglePlayDeploymentsFromContext(context),
     ...extractS3StaticDeploymentsFromContext(context),
     ...extractKubernetesDeploymentsFromContext(context),
   ].sort((a, b) => a.label.localeCompare(b.label));

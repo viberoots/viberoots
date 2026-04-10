@@ -3,6 +3,7 @@ import type {
   AppStoreConnectDeployment,
   CloudflarePagesDeployment,
   DeploymentTarget,
+  GooglePlayDeployment,
   KubernetesDeployment,
   NixosSharedHostDeployment,
   S3StaticDeployment,
@@ -10,6 +11,7 @@ import type {
 import {
   APP_STORE_CONNECT_PROVIDER,
   CLOUDFLARE_PAGES_PROVIDER,
+  GOOGLE_PLAY_PROVIDER,
   KUBERNETES_PROVIDER,
   NIXOS_SHARED_HOST_PROVIDER,
   S3_STATIC_PROVIDER,
@@ -43,6 +45,12 @@ export function isAppStoreConnectDeployment(
   deployment: DeploymentTarget,
 ): deployment is AppStoreConnectDeployment {
   return deployment.provider === APP_STORE_CONNECT_PROVIDER;
+}
+
+export function isGooglePlayDeployment(
+  deployment: DeploymentTarget,
+): deployment is GooglePlayDeployment {
+  return deployment.provider === GOOGLE_PLAY_PROVIDER;
 }
 
 export function isMultiComponentDeployment(deployment: DeploymentTarget): boolean {

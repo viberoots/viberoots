@@ -11,11 +11,13 @@ import {
 
 test("provider capabilities declare explicit default rollout modes", () => {
   const appStoreConnect = providerCapabilityFor("app-store-connect");
+  const googlePlay = providerCapabilityFor("google-play");
   const nixos = providerCapabilityFor("nixos-shared-host");
   const cloudflare = providerCapabilityFor("cloudflare-pages");
   const s3Static = providerCapabilityFor("s3-static");
   const kubernetes = providerCapabilityFor("kubernetes");
   assert.equal(appStoreConnect?.defaultRolloutMode, "all_at_once");
+  assert.equal(googlePlay?.defaultRolloutMode, "all_at_once");
   assert.equal(nixos?.defaultRolloutMode, "all_at_once");
   assert.equal(cloudflare?.defaultRolloutMode, "all_at_once");
   assert.equal(s3Static?.defaultRolloutMode, "all_at_once");
@@ -27,6 +29,7 @@ test("rollout policy omission is in policy only for the reviewed deployment shap
     rolloutPolicyOmissionInPolicy({ provider: "app-store-connect", componentCount: 1 }),
     true,
   );
+  assert.equal(rolloutPolicyOmissionInPolicy({ provider: "google-play", componentCount: 1 }), true);
   assert.equal(
     rolloutPolicyOmissionInPolicy({ provider: "nixos-shared-host", componentCount: 1 }),
     true,
@@ -80,6 +83,13 @@ test("kubernetes capability declares the reviewed service-style component slice"
 
 test("app-store-connect capability declares the reviewed mobile-app slice", () => {
   const capability = providerCapabilityFor("app-store-connect");
+  assert.deepEqual(capability?.supportedComponentKinds, ["mobile-app"]);
+  assert.deepEqual(capability?.multiComponentKinds, []);
+  assert.deepEqual(capability?.supportedRolloutModes, ["all_at_once", "store_staged"]);
+});
+
+test("google-play capability declares the reviewed mobile-app slice", () => {
+  const capability = providerCapabilityFor("google-play");
   assert.deepEqual(capability?.supportedComponentKinds, ["mobile-app"]);
   assert.deepEqual(capability?.multiComponentKinds, []);
   assert.deepEqual(capability?.supportedRolloutModes, ["all_at_once", "store_staged"]);

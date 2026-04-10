@@ -36,10 +36,10 @@ function mobilePromotionCompatibilityErrors(
   deployment: DeploymentTarget,
   sourceDeployment: DeploymentTarget,
 ): string[] {
-  if (
-    deployment.provider !== "app-store-connect" ||
-    sourceDeployment.provider !== "app-store-connect"
-  ) {
+  if (deployment.provider !== sourceDeployment.provider) {
+    return [];
+  }
+  if (!["app-store-connect", "google-play"].includes(deployment.provider)) {
     return [];
   }
   const errors: string[] = [];
@@ -48,8 +48,12 @@ function mobilePromotionCompatibilityErrors(
       `signing model mismatch: current=${deployment.providerTarget.signingModel} source=${sourceDeployment.providerTarget.signingModel}`,
     );
   }
-  const sourceTrackRank = appStoreTrackRank(sourceDeployment.providerTarget.track);
-  const targetTrackRank = appStoreTrackRank(deployment.providerTarget.track);
+  const trackRank = (track: string) =>
+    deployment.provider === "google-play"
+      ? ({ internal: 0, alpha: 1, beta: 2, production: 3 }[track] ?? -1)
+      : appStoreTrackRank(track);
+  const sourceTrackRank = trackRank(sourceDeployment.providerTarget.track);
+  const targetTrackRank = trackRank(deployment.providerTarget.track);
   if (sourceTrackRank < 0 || targetTrackRank < 0 || targetTrackRank < sourceTrackRank) {
     errors.push(
       `mobile track progression mismatch: current=${deployment.providerTarget.track} source=${sourceDeployment.providerTarget.track}`,
@@ -180,7 +184,7 @@ export function promotionCompatibilityErrors(
     errors.push("runtime contract mismatch between source and target deployment");
   }
   if (
-    deployment.provider !== "app-store-connect" &&
+    !["app-store-connect", "google-play"].includes(deployment.provider) &&
     rolloutSignature(sourceDeployment) !== rolloutSignature(deployment)
   ) {
     errors.push("rollout semantics mismatch between source and target deployment");

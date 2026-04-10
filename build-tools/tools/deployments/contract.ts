@@ -3,6 +3,7 @@ import type { GraphNode } from "../lib/graph.ts";
 import { createDeploymentExtractionContext, uniqueErrors } from "./contract-extract-shared.ts";
 import { extractAppStoreConnectDeploymentsFromContext } from "./contract-extract-app-store-connect.ts";
 import { extractCloudflarePagesDeploymentsFromContext } from "./contract-extract-cloudflare-pages.ts";
+import { extractGooglePlayDeploymentsFromContext } from "./contract-extract-google-play.ts";
 import { extractKubernetesDeploymentsFromContext } from "./contract-extract-kubernetes.ts";
 import { extractNixosSharedHostDeploymentsFromContext } from "./contract-extract-nixos-shared-host.ts";
 import { extractS3StaticDeploymentsFromContext } from "./contract-extract-s3-static.ts";
@@ -31,6 +32,14 @@ export function extractAppStoreConnectDeployments(nodes: GraphNode[]) {
   };
 }
 
+export function extractGooglePlayDeployments(nodes: GraphNode[]) {
+  const context = createDeploymentExtractionContext(nodes);
+  return {
+    deployments: extractGooglePlayDeploymentsFromContext(context),
+    errors: uniqueErrors(context.errors),
+  };
+}
+
 export function extractS3StaticDeployments(nodes: GraphNode[]) {
   const context = createDeploymentExtractionContext(nodes);
   return {
@@ -51,6 +60,7 @@ export * from "./contract-types.ts";
 export * from "./contract-extract.ts";
 export * from "./contract-extract-cloudflare-pages.ts";
 export * from "./contract-extract-app-store-connect.ts";
+export * from "./contract-extract-google-play.ts";
 export * from "./contract-extract-kubernetes.ts";
 export * from "./contract-extract-nixos-shared-host.ts";
 export * from "./contract-extract-s3-static.ts";

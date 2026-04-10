@@ -14,11 +14,13 @@ import {
 import {
   APP_STORE_CONNECT_PROVIDER,
   CLOUDFLARE_PAGES_PROVIDER,
+  GOOGLE_PLAY_PROVIDER,
   KUBERNETES_PROVIDER,
   NIXOS_SHARED_HOST_PROVIDER,
   S3_STATIC_PROVIDER,
   type AppStoreConnectProviderTarget,
   type CloudflarePagesProviderTarget,
+  type GooglePlayProviderTarget,
   type KubernetesProviderTarget,
   type NixosSharedHostProviderTarget,
   type S3StaticProviderTarget,
@@ -32,16 +34,19 @@ export const MOBILE_APP_COMPONENT = MOBILE_APP_COMPONENT_KIND;
 export {
   APP_STORE_CONNECT_PROVIDER,
   CLOUDFLARE_PAGES_PROVIDER,
+  GOOGLE_PLAY_PROVIDER,
   KUBERNETES_PROVIDER,
   NIXOS_SHARED_HOST_PROVIDER,
   S3_STATIC_PROVIDER,
   deriveAppStoreConnectProviderTarget,
   deriveCloudflarePagesProviderTarget,
+  deriveGooglePlayProviderTarget,
   deriveKubernetesProviderTarget,
   deriveNixosSharedHostProviderTarget,
   deriveS3StaticProviderTarget,
   type AppStoreConnectProviderTarget,
   type CloudflarePagesProviderTarget,
+  type GooglePlayProviderTarget,
   type KubernetesProviderTarget,
   type NixosSharedHostProviderTarget,
   type S3StaticProviderTarget,
@@ -183,12 +188,22 @@ export type AppStoreConnectDeployment = DeploymentBase & {
   providerTarget: AppStoreConnectProviderTarget;
 };
 
+export type GooglePlayDeployment = DeploymentBase & {
+  provider: typeof GOOGLE_PLAY_PROVIDER;
+  publisher: {
+    type: string;
+    config: string;
+  };
+  providerTarget: GooglePlayProviderTarget;
+};
+
 export type DeploymentTarget =
   | NixosSharedHostDeployment
   | CloudflarePagesDeployment
   | S3StaticDeployment
   | KubernetesDeployment
-  | AppStoreConnectDeployment;
+  | AppStoreConnectDeployment
+  | GooglePlayDeployment;
 
 export function hasNixosSharedHostSsrRuntimeContract(
   component: NixosSharedHostDeploymentComponent,

@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { promotionCompatibilityErrors } from "../../deployments/deployment-promotion-compatibility.ts";
 import { appStoreConnectDeploymentFixture } from "./app-store-connect.fixture.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import { googlePlayDeploymentFixture } from "./google-play.fixture.ts";
 import {
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostDeploymentFixture,
@@ -190,6 +191,90 @@ test("promotion compatibility rejects mobile track regression", () => {
         "app-store-connect:ios-platform/demo-ios-app#track:testflight-internal",
     },
   });
+  const errors = promotionCompatibilityErrors(target, {
+    record: {
+      finalOutcome: "succeeded",
+      publishMode: "normal",
+      deploymentId: sourceDeployment.deploymentId,
+    },
+    replaySnapshot: {
+      artifact: { identity: "mobile-app:artifact-123" },
+      admittedContext: {
+        lanePolicyFingerprint: sourceDeployment.lanePolicy.fingerprint,
+        source: { sourceRevision: "rev-source-123" },
+      },
+      deployment: sourceDeployment,
+    },
+  });
+  assert.ok(errors.some((entry) => entry.includes("mobile track progression mismatch")));
+});
+
+test("promotion compatibility rejects google-play rollout regression", () => {
+  const sourceDeployment = googlePlayDeploymentFixture({
+    deploymentId: "demo-android-staging",
+    label: "//projects/deployments/demo-android-staging:deploy",
+    environmentStage: "staging",
+    rolloutPolicy: {
+      mode: "store_staged",
+      abort: "stop_on_first_failure",
+      smoke: "final_only",
+      steps: ["default"],
+    },
+    providerTarget: {
+      developerAccount: "android-platform",
+      app: "demo-android-app",
+      packageName: "com.example.demo.android",
+      platform: "android",
+      track: "beta",
+      signingModel: "play-app-signing",
+      providerTargetIdentity: "google-play:android-platform/demo-android-app#track:beta",
+    },
+  });
+  const target = googlePlayDeploymentFixture({
+    providerTarget: {
+      developerAccount: "android-platform",
+      app: "demo-android-app",
+      packageName: "com.example.demo.android",
+      platform: "android",
+      track: "production",
+      signingModel: "play-app-signing",
+      providerTargetIdentity: "google-play:android-platform/demo-android-app#track:production",
+    },
+  });
+  const errors = promotionCompatibilityErrors(target, {
+    record: {
+      finalOutcome: "succeeded",
+      publishMode: "normal",
+      deploymentId: sourceDeployment.deploymentId,
+    },
+    replaySnapshot: {
+      artifact: { identity: "mobile-app:artifact-123" },
+      admittedContext: {
+        lanePolicyFingerprint: sourceDeployment.lanePolicy.fingerprint,
+        source: { sourceRevision: "rev-source-123" },
+      },
+      deployment: sourceDeployment,
+    },
+  });
+  assert.ok(errors.some((entry) => entry.includes("mobile rollout progression mismatch")));
+});
+
+test("promotion compatibility rejects google-play track regression", () => {
+  const sourceDeployment = googlePlayDeploymentFixture({
+    deploymentId: "demo-android-staging",
+    label: "//projects/deployments/demo-android-staging:deploy",
+    environmentStage: "staging",
+    providerTarget: {
+      developerAccount: "android-platform",
+      app: "demo-android-app",
+      packageName: "com.example.demo.android",
+      platform: "android",
+      track: "beta",
+      signingModel: "play-app-signing",
+      providerTargetIdentity: "google-play:android-platform/demo-android-app#track:beta",
+    },
+  });
+  const target = googlePlayDeploymentFixture();
   const errors = promotionCompatibilityErrors(target, {
     record: {
       finalOutcome: "succeeded",

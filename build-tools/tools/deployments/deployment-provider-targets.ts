@@ -4,6 +4,7 @@ export const CLOUDFLARE_PAGES_PROVIDER = "cloudflare-pages";
 export const S3_STATIC_PROVIDER = "s3-static";
 export const KUBERNETES_PROVIDER = "kubernetes";
 export const APP_STORE_CONNECT_PROVIDER = "app-store-connect";
+export const GOOGLE_PLAY_PROVIDER = "google-play";
 
 export type NixosSharedHostProviderTarget = {
   host: "nixos-shared-host";
@@ -50,6 +51,16 @@ export type AppStoreConnectProviderTarget = {
   platform: "ios";
   track: "testflight-internal" | "testflight-external" | "app-store";
   signingModel: "app-store";
+  providerTargetIdentity: string;
+};
+
+export type GooglePlayProviderTarget = {
+  developerAccount: string;
+  app: string;
+  packageName: string;
+  platform: "android";
+  track: "internal" | "alpha" | "beta" | "production";
+  signingModel: "play-app-signing";
   providerTargetIdentity: string;
 };
 
@@ -172,5 +183,31 @@ export function deriveAppStoreConnectProviderTarget(input: {
     track,
     signingModel,
     providerTargetIdentity: `${APP_STORE_CONNECT_PROVIDER}:${issuer}/${app}#track:${track}`,
+  };
+}
+
+export function deriveGooglePlayProviderTarget(input: {
+  developerAccount: string;
+  app: string;
+  packageName: string;
+  platform?: string;
+  track: string;
+  signingModel: string;
+}): GooglePlayProviderTarget {
+  const developerAccount = input.developerAccount.trim();
+  const app = input.app.trim();
+  const packageName = input.packageName.trim();
+  const platform = "android";
+  const track = (input.track.trim() || "internal") as GooglePlayProviderTarget["track"];
+  const signingModel = (input.signingModel.trim() ||
+    "play-app-signing") as GooglePlayProviderTarget["signingModel"];
+  return {
+    developerAccount,
+    app,
+    packageName,
+    platform,
+    track,
+    signingModel,
+    providerTargetIdentity: `${GOOGLE_PLAY_PROVIDER}:${developerAccount}/${app}#track:${track}`,
   };
 }
