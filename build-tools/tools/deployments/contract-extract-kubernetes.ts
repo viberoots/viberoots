@@ -15,6 +15,7 @@ import {
   readLabelList,
   readPrerequisites,
   readRolloutPolicy,
+  readSmokePolicy,
   readString,
   readStringRecord,
   type DeploymentExtractionContext,
@@ -24,6 +25,7 @@ import { resolveDeploymentMetadataRefs } from "./deployment-extract-metadata.ts"
 import { pushKubernetesComponentKindErrors } from "./kubernetes-capability-validation.ts";
 import { pushKubernetesRolloutErrors } from "./kubernetes-rollout-validation.ts";
 import { readDeploymentRequirements } from "./deployment-requirements.ts";
+import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
 
 const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/;
 const BUILT_IN_PROVISIONERS = new Set(["terraform-stack", "cdktf-stack"]);
@@ -59,6 +61,7 @@ export function extractKubernetesDeploymentsFromContext(
     );
     const releaseActionRefs = readLabelList(node, "release_actions");
     const targetExceptionRefs = readLabelList(node, "target_exceptions");
+    const smoke = readSmokePolicy(node);
     const rolloutPolicy = readRolloutPolicy(node);
     const cluster = providerTarget.cluster || "";
     const namespace = providerTarget.namespace || "";
@@ -140,6 +143,7 @@ export function extractKubernetesDeploymentsFromContext(
       rolloutPolicy,
       errors: deploymentErrors,
     });
+    pushSmokePolicyErrors({ label, protectionClass, smoke, errors: deploymentErrors });
     const releaseActions = resolveDeploymentMetadataRefs({
       refs: releaseActionRefs,
       label,
@@ -182,6 +186,7 @@ export function extractKubernetesDeploymentsFromContext(
       runtimeConfigRequirements,
       releaseActions,
       targetExceptions,
+      ...(smoke ? { smoke } : {}),
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
       component: { kind: primaryComponent?.kind || componentKind, target: componentTarget },
       components,

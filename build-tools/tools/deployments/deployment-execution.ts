@@ -164,6 +164,9 @@ export function summarizeDeploymentResult(result: DeploymentExecutionResult) {
     ...(result.record.parentRunId ? { parentRunId: result.record.parentRunId } : {}),
     ...(result.record.deployBatchId ? { deployBatchId: result.record.deployBatchId } : {}),
     ...(result.record.componentResults ? { componentResults: result.record.componentResults } : {}),
+    ...("smokeOutcome" in result.record && (result.record as any).smokeOutcome
+      ? { smokeOutcome: (result.record as any).smokeOutcome }
+      : {}),
     publicUrl: result.record.publicUrl,
     recordPath: result.recordPath,
     ...(result.record.controlPlane ? { controlPlane: result.record.controlPlane } : {}),

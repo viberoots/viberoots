@@ -27,7 +27,10 @@ import {
   type DeploymentAdmissionPolicy,
   type DeploymentLanePolicy,
 } from "./deployment-policy.ts";
-
+import {
+  readDeploymentSmokePolicy,
+  type DeploymentSmokePolicy,
+} from "./deployment-smoke-policy.ts";
 export type DeploymentExtractionContext = {
   nodes: GraphNode[];
   components: Map<string, GraphNode>;
@@ -41,11 +44,9 @@ export type DeploymentExtractionContext = {
 export function readString(node: GraphNode, key: string): string {
   return typeof node[key] === "string" ? String(node[key]).trim() : "";
 }
-
 export function readLabel(node: GraphNode, key: string): string {
   return normalizeTargetLabel(readString(node, key));
 }
-
 export function readStringRecord(node: GraphNode, key: string): Record<string, string> {
   const value = node[key];
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -108,6 +109,10 @@ export function readPreviewPolicy(
     smokeTarget: (preview.smoke_target || "normal_url") as "normal_url" | "preview_url",
     lockScope: (preview.lock_scope || "shared") as "shared" | "preview",
   };
+}
+
+export function readSmokePolicy(node: GraphNode): DeploymentSmokePolicy | undefined {
+  return readDeploymentSmokePolicy(node);
 }
 
 export function readRolloutPolicy(node: GraphNode): DeploymentRolloutPolicy | undefined {

@@ -16,6 +16,7 @@ import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import type { NixosSharedHostGateEvaluator } from "./nixos-shared-host-progressive-execution.ts";
 import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
 import { withFailedStep } from "./nixos-shared-host-deploy-failure.ts";
+import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
 import { smokeNixosSharedHostPublishedComponents } from "./nixos-shared-host-publish-components.ts";
 import {
   createNixosSharedHostDeployRunId,
@@ -171,6 +172,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
       : await smokeNixosSharedHostPublishedComponents({
           deployment: opts.deployment,
           published: progressive.published,
+          ...resolveDeploymentSmokeExecutionMode({ deployment: opts.deployment }),
           ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
         }).catch((error) => {
           throw withFailedStep((error as any)?.failedStep || "smoke", error);
@@ -185,6 +187,9 @@ export async function runNixosSharedHostStaticDeploy(opts: {
         smoke.componentResults,
         progressive?.rollout || opts.progressiveRollout,
       );
+    const smokeOutcome = "smokeOutcome" in smoke ? smoke.smokeOutcome : "passed";
+    const smokeException = "smokeException" in smoke ? smoke.smokeException : undefined;
+    const smokeError = "smokeError" in smoke ? smoke.smokeError : undefined;
     return await writeNixosSharedHostSuccessRecord({
       deployment: opts.deployment,
       recordsRoot: opts.recordsRoot,
@@ -202,6 +207,9 @@ export async function runNixosSharedHostStaticDeploy(opts: {
       deploymentMetadataFingerprint,
       replaySnapshotPath,
       progressiveRollout: progressive.progressiveRollout || opts.progressiveRollout,
+      smokeOutcome,
+      ...(smokeException ? { smokeException } : {}),
+      ...(smokeError ? { smokeError } : {}),
       componentResults: smoke.componentResults,
       publicUrl: smoke.publicUrl,
       healthUrl: smoke.healthUrl,

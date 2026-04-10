@@ -11,6 +11,7 @@ import { readPrimaryDeploymentComponent } from "./contract-extract-components.ts
 import {
   deploymentError,
   duplicateValueEntries,
+  readSmokePolicy,
   pushRolloutPolicyFieldErrors,
   pushTokenFieldErrors,
   readLabel,
@@ -22,6 +23,7 @@ import {
   readStringRecord,
   type DeploymentExtractionContext,
 } from "./contract-extract-shared.ts";
+import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
 import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
 import {
   resolveDeploymentMetadataRefs,
@@ -66,6 +68,7 @@ export function extractS3StaticDeploymentsFromContext(
     const releaseActionRefs = readLabelList(node, "release_actions");
     const targetExceptionRefs = readLabelList(node, "target_exceptions");
     const preview = readPreviewPolicy(node, "preview");
+    const smoke = readSmokePolicy(node);
     const rolloutPolicy = readRolloutPolicy(node);
     const account = providerTarget.account || "";
     const bucket = providerTarget.bucket || "";
@@ -124,6 +127,7 @@ export function extractS3StaticDeploymentsFromContext(
     if (preview) {
       deploymentErrors.push(deploymentError(label, "s3-static does not support preview"));
     }
+    pushSmokePolicyErrors({ label, protectionClass, smoke, errors: deploymentErrors });
     if (provisioner && !BUILT_IN_PROVISIONERS.has(provisioner)) {
       deploymentErrors.push(
         deploymentError(
@@ -200,6 +204,7 @@ export function extractS3StaticDeploymentsFromContext(
       runtimeConfigRequirements,
       releaseActions,
       targetExceptions,
+      ...(smoke ? { smoke } : {}),
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
       component: { kind: STATIC_WEBAPP_COMPONENT, target: componentTarget },
       components: [

@@ -8,6 +8,10 @@ import type {
   GooglePlayRolloutState,
   GooglePlayTrackState,
 } from "./google-play-publisher.ts";
+import type {
+  DeploymentSmokeException,
+  DeploymentSmokeOutcome,
+} from "./deployment-smoke-policy.ts";
 import type { GooglePlayDeployment } from "./contract.ts";
 import type { AdmittedGooglePlayArtifact } from "./google-play-artifacts.ts";
 import { GOOGLE_PLAY_PROVIDER } from "./contract.ts";
@@ -43,6 +47,9 @@ export type GooglePlayDeployRecord = {
   trackState?: GooglePlayTrackState;
   rolloutState?: GooglePlayRolloutState;
   releaseHealth?: GooglePlayReleaseHealth;
+  smokeOutcome?: DeploymentSmokeOutcome;
+  smokeException?: DeploymentSmokeException;
+  smokeError?: string;
   failedStep?: "publish" | "release_health";
   error?: string;
   errorFingerprint?: string;

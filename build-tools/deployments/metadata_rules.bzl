@@ -5,6 +5,9 @@ def _label_list(attrs):
     return [str(attr.label) for attr in attrs]
 
 def _deployment_document(ctx):
+    smoke = dict(ctx.attrs.smoke)
+    if ctx.attrs.smoke_exception:
+        smoke["exception"] = ctx.attrs.smoke_exception
     return {
         "name": ctx.label.name,
         "provider": ctx.attrs.provider,
@@ -25,6 +28,8 @@ def _deployment_document(ctx):
         "health_path": ctx.attrs.health_path,
         "target_group": ctx.attrs.target_group,
         "provider_target": ctx.attrs.provider_target,
+        "smoke": smoke,
+        "smoke_exception": ctx.attrs.smoke_exception,
         "preview": ctx.attrs.preview,
         "bootstrap": ctx.attrs.bootstrap,
         "prerequisites": ctx.attrs.prerequisites,
@@ -59,6 +64,8 @@ deployment_target = rule(
         "health_path": attrs.string(default = ""),
         "target_group": attrs.string(default = ""),
         "provider_target": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
+        "smoke": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
+        "smoke_exception": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
         "preview": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
         "bootstrap": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
         "prerequisites": attrs.list(attrs.dict(key = attrs.string(), value = attrs.string()), default = []),

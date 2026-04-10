@@ -8,6 +8,10 @@ import type {
   AppStoreConnectRolloutState,
   AppStoreConnectTrackState,
 } from "./app-store-connect-publisher.ts";
+import type {
+  DeploymentSmokeException,
+  DeploymentSmokeOutcome,
+} from "./deployment-smoke-policy.ts";
 import type { AppStoreConnectDeployment } from "./contract.ts";
 import type { AdmittedMobileAppArtifact } from "./app-store-connect-artifacts.ts";
 import { APP_STORE_CONNECT_PROVIDER } from "./contract.ts";
@@ -44,6 +48,9 @@ export type AppStoreConnectDeployRecord = {
   trackState?: AppStoreConnectTrackState;
   rolloutState?: AppStoreConnectRolloutState;
   releaseHealth?: AppStoreConnectReleaseHealth;
+  smokeOutcome?: DeploymentSmokeOutcome;
+  smokeException?: DeploymentSmokeException;
+  smokeError?: string;
   failedStep?: "publish" | "release_health";
   error?: string;
   errorFingerprint?: string;

@@ -19,6 +19,7 @@ import {
 import { writeCloudflarePagesReplaySnapshot } from "./cloudflare-pages-replay.ts";
 import { smokeCloudflarePagesStaticWebapp } from "./cloudflare-pages-static-smoke.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
+import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 import {
   requireAdmittedStaticWebappArtifactPath,
@@ -93,14 +94,42 @@ export async function runCloudflarePagesStaticDeploy(opts: {
     }).catch((error) => {
       throw withFailedStep("publish", error);
     });
-    const smoke = await smokeCloudflarePagesStaticWebapp({
+    const smokeMode = resolveDeploymentSmokeExecutionMode({
       deployment: opts.deployment,
-      indexPath: path.join(artifactDir, "index.html"),
-      effectiveRunTarget,
-      connectOverride: opts.smokeConnectOverride,
-    }).catch((error) => {
-      throw withFailedStep("smoke", error);
+      publishMode,
     });
+    let smoke:
+      | {
+          publicUrl?: string;
+          smokeOutcome: "passed" | "failed_nonblocking" | "omitted_by_exception";
+          smokeError?: string;
+        }
+      | undefined;
+    if (smokeMode.mode === "omitted") {
+      smoke = {
+        publicUrl: effectiveRunTarget.canonicalUrl,
+        smokeOutcome: "omitted_by_exception",
+      };
+    } else {
+      try {
+        const completedSmoke = await smokeCloudflarePagesStaticWebapp({
+          deployment: opts.deployment,
+          indexPath: path.join(artifactDir, "index.html"),
+          effectiveRunTarget,
+          connectOverride: opts.smokeConnectOverride,
+        });
+        smoke = { publicUrl: completedSmoke.publicUrl, smokeOutcome: "passed" };
+      } catch (error) {
+        if (smokeMode.mode !== "nonblocking") {
+          throw withFailedStep("smoke", error);
+        }
+        smoke = {
+          publicUrl: effectiveRunTarget.canonicalUrl,
+          smokeOutcome: "failed_nonblocking",
+          smokeError: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
     const record = createCloudflarePagesDeployRecord(opts.deployment, {
       deployRunId: runId,
       operationKind,
@@ -122,6 +151,9 @@ export async function runCloudflarePagesStaticDeploy(opts: {
         : {}),
       deploymentMetadataFingerprint,
       providerConfigFingerprint,
+      ...(smoke?.smokeOutcome ? { smokeOutcome: smoke.smokeOutcome } : {}),
+      ...(smokeMode.smokeException ? { smokeException: smokeMode.smokeException } : {}),
+      ...(smoke?.smokeError ? { smokeError: smoke.smokeError } : {}),
       ...(replaySnapshotPath ? { replaySnapshotPath } : {}),
       publicUrl: smoke.publicUrl,
       ...(published.providerReleaseId ? { providerReleaseId: published.providerReleaseId } : {}),

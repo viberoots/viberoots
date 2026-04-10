@@ -51,6 +51,7 @@ export function s3StaticDeploymentFixture(
     runtimeConfigRequirements: overrides.runtimeConfigRequirements || [],
     releaseActions: overrides.releaseActions || [],
     targetExceptions: overrides.targetExceptions || [],
+    ...(overrides.smoke ? { smoke: overrides.smoke } : {}),
     ...(overrides.rolloutPolicy ? { rolloutPolicy: overrides.rolloutPolicy } : {}),
     component: {
       kind: STATIC_WEBAPP_COMPONENT,

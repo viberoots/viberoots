@@ -1,5 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostDeployment, NixosSharedHostDeploymentComponent } from "./contract.ts";
+import type {
+  DeploymentSmokeException,
+  DeploymentSmokeExecutionMode,
+} from "./deployment-smoke-policy.ts";
 import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
 import {
   baseNixosSharedHostComponentResult,
@@ -17,8 +21,7 @@ import {
   resolveNixosSharedHostLiveReuse,
   type NixosSharedHostPublishedSmokeInput,
 } from "./nixos-shared-host-publish-runtime.ts";
-import { smokeNixosSharedHostSsrWebapp } from "./nixos-shared-host-ssr-smoke.ts";
-import { smokeNixosSharedHostStaticWebapp } from "./nixos-shared-host-static-smoke.ts";
+import { smokeNixosSharedHostComponent } from "./nixos-shared-host-publish-smoke.ts";
 import type { NixosSharedHostConfig } from "./nixos-shared-host.ts";
 
 type PublishedComponent = {
@@ -136,33 +139,11 @@ export async function publishNixosSharedHostArtifacts(opts: {
   return published;
 }
 
-async function smokePublishedComponent(opts: {
-  component: NixosSharedHostDeploymentComponent;
-  smokeInput: NixosSharedHostPublishedSmokeInput;
-  connectOverride?: {
-    protocol: "http:" | "https:";
-    hostname: string;
-    port: number;
-    rejectUnauthorized?: boolean;
-  };
-}) {
-  return opts.smokeInput.kind === "ssr-webapp"
-    ? await smokeNixosSharedHostSsrWebapp({
-        hostname: opts.component.providerTarget.hostname || "",
-        healthPath: opts.component.runtime.healthPath,
-        connectOverride: opts.connectOverride,
-      })
-    : await smokeNixosSharedHostStaticWebapp({
-        hostname: opts.component.providerTarget.hostname || "",
-        indexPath: opts.smokeInput.indexPath,
-        healthPath: opts.component.runtime.healthPath,
-        connectOverride: opts.connectOverride,
-      });
-}
-
 export async function smokeNixosSharedHostPublishedComponents(opts: {
   deployment: NixosSharedHostDeployment;
   published: PublishedComponent[];
+  smokeMode?: DeploymentSmokeExecutionMode;
+  smokeException?: DeploymentSmokeException;
   smokeConnectOverride?: {
     protocol: "http:" | "https:";
     hostname: string;
@@ -171,14 +152,32 @@ export async function smokeNixosSharedHostPublishedComponents(opts: {
   };
 }): Promise<{
   componentResults: NixosSharedHostComponentResult[];
+  smokeOutcome: "passed" | "failed_nonblocking" | "omitted_by_exception";
+  smokeException?: DeploymentSmokeException;
+  smokeError?: string;
   publicUrl?: string;
   healthUrl?: string;
 }> {
   const primaryComponent = primaryNixosSharedHostComponent(opts.deployment);
+  if ((opts.smokeMode || "blocking") === "omitted") {
+    const primaryPublished = opts.published.find(
+      (published) => published.component.id === primaryComponent.id,
+    );
+    return {
+      componentResults: opts.published.map(({ result }) =>
+        withNixosSharedHostSmokeState(result, { finalOutcome: "omitted_by_exception" }),
+      ),
+      smokeOutcome: "omitted_by_exception",
+      ...(opts.smokeException ? { smokeException: opts.smokeException } : {}),
+      ...(primaryPublished?.component.providerTarget.canonicalUrl
+        ? { publicUrl: primaryPublished.component.providerTarget.canonicalUrl }
+        : {}),
+    };
+  }
   const componentResults: NixosSharedHostComponentResult[] = [];
   for (const published of opts.published) {
     try {
-      const smoke = await smokePublishedComponent({
+      const smoke = await smokeNixosSharedHostComponent({
         component: published.component,
         smokeInput: published.smokeInput,
         connectOverride: opts.smokeConnectOverride,
@@ -186,11 +185,39 @@ export async function smokeNixosSharedHostPublishedComponents(opts: {
       componentResults.push(
         withNixosSharedHostSmokeState(published.result, {
           finalOutcome: "succeeded",
+          smokeOutcome: "passed",
           publicUrl: smoke.publicUrl,
           ...(smoke.healthUrl ? { healthUrl: smoke.healthUrl } : {}),
         }),
       );
     } catch (error) {
+      if ((opts.smokeMode || "blocking") === "nonblocking") {
+        const primaryPublished = opts.published.find(
+          (entry) => entry.component.id === primaryComponent.id,
+        );
+        const failedResult = withNixosSharedHostSmokeState(published.result, {
+          finalOutcome: "smoke_failed_nonblocking",
+          smokeOutcome: "failed_nonblocking",
+          smokeError: error instanceof Error ? error.message : String(error),
+        });
+        return {
+          componentResults: [
+            ...componentResults,
+            failedResult,
+            ...opts.published
+              .slice(componentResults.length + 1)
+              .map(({ result }) =>
+                withNixosSharedHostSmokeState(result, { finalOutcome: "not_run" }),
+              ),
+          ],
+          smokeOutcome: "failed_nonblocking",
+          ...(opts.smokeException ? { smokeException: opts.smokeException } : {}),
+          smokeError: error instanceof Error ? error.message : String(error),
+          ...(primaryPublished?.component.providerTarget.canonicalUrl
+            ? { publicUrl: primaryPublished.component.providerTarget.canonicalUrl }
+            : {}),
+        };
+      }
       const failed = withNixosSharedHostSmokeState(published.result, {
         finalOutcome: "smoke_failed_after_publish",
       });
@@ -213,6 +240,8 @@ export async function smokeNixosSharedHostPublishedComponents(opts: {
   );
   return {
     componentResults,
+    smokeOutcome: "passed",
+    ...(opts.smokeException ? { smokeException: opts.smokeException } : {}),
     ...(primaryResult?.publicUrl ? { publicUrl: primaryResult.publicUrl } : {}),
     ...(primaryResult?.healthUrl ? { healthUrl: primaryResult.healthUrl } : {}),
   };

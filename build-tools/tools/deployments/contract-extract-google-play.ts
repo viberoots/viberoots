@@ -16,6 +16,7 @@ import {
   readLabelList,
   readPrerequisites,
   readRolloutPolicy,
+  readSmokePolicy,
   readString,
   readStringRecord,
   type DeploymentExtractionContext,
@@ -28,6 +29,7 @@ import {
 import { readDeploymentRequirements } from "./deployment-requirements.ts";
 import { pushGooglePlayComponentKindErrors } from "./google-play-capability-validation.ts";
 import { pushGooglePlayRolloutErrors } from "./google-play-rollout-validation.ts";
+import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
 
 const TOKEN_RE = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$/;
 const VALID_TRACKS = new Set(["internal", "alpha", "beta", "production"]);
@@ -62,6 +64,7 @@ export function extractGooglePlayDeploymentsFromContext(
     );
     const releaseActionRefs = readLabelList(node, "release_actions");
     const targetExceptionRefs = readLabelList(node, "target_exceptions");
+    const smoke = readSmokePolicy(node);
     const rolloutPolicy = readRolloutPolicy(node);
     const deploymentErrors: string[] = [];
     const developerAccount = providerTarget.developer_account || "";
@@ -159,6 +162,7 @@ export function extractGooglePlayDeploymentsFromContext(
       errors: deploymentErrors,
     });
     pushGooglePlayRolloutErrors({ label, rolloutPolicy, errors: deploymentErrors });
+    pushSmokePolicyErrors({ label, protectionClass, smoke, errors: deploymentErrors });
     const releaseActions = resolveDeploymentMetadataRefs({
       refs: releaseActionRefs,
       label,
@@ -201,6 +205,7 @@ export function extractGooglePlayDeploymentsFromContext(
       runtimeConfigRequirements,
       releaseActions,
       targetExceptions,
+      ...(smoke ? { smoke } : {}),
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
       component: { kind: MOBILE_APP_COMPONENT_KIND, target: componentTarget },
       components: [

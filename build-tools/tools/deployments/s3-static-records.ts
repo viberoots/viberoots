@@ -4,6 +4,10 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { S3StaticAdmittedContext } from "./s3-static-admission.ts";
 import type { S3StaticDeployment } from "./contract.ts";
+import type {
+  DeploymentSmokeException,
+  DeploymentSmokeOutcome,
+} from "./deployment-smoke-policy.ts";
 import type { S3StaticProvisionerPlanRef } from "./s3-static-provisioner-plan.ts";
 import { S3_STATIC_PROVIDER } from "./contract.ts";
 import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
@@ -27,6 +31,9 @@ export type S3StaticDeployRecord = {
   admittedContext: S3StaticAdmittedContext;
   publisherType: string;
   provisionerType?: string;
+  smokeOutcome?: DeploymentSmokeOutcome;
+  smokeException?: DeploymentSmokeException;
+  smokeError?: string;
   provisionerPlan?: S3StaticProvisionerPlanRef;
   deploymentMetadataFingerprint?: string;
   providerConfigFingerprint?: string;

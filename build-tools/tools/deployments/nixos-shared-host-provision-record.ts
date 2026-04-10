@@ -55,6 +55,9 @@ export async function writeNixosSharedHostSuccessRecord(opts: {
   deploymentMetadataFingerprint?: string;
   replaySnapshotPath?: string;
   progressiveRollout?: any;
+  smokeOutcome?: any;
+  smokeException?: any;
+  smokeError?: string;
   componentResults: any[];
   publicUrl?: string;
   healthUrl?: string;
@@ -65,6 +68,9 @@ export async function writeNixosSharedHostSuccessRecord(opts: {
     runClassification: opts.operationKind,
     finalOutcome: "succeeded",
     ...staticDeployRecordFields(opts),
+    ...(opts.smokeOutcome ? { smokeOutcome: opts.smokeOutcome } : {}),
+    ...(opts.smokeException ? { smokeException: opts.smokeException } : {}),
+    ...(opts.smokeError ? { smokeError: opts.smokeError } : {}),
     componentResults: opts.componentResults,
     publicUrl: opts.publicUrl,
     healthUrl: opts.healthUrl,

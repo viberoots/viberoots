@@ -4,6 +4,7 @@ import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidenc
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
 import type { S3StaticDeployment } from "./contract.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
+import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
 import { prepareS3StaticPublisherConfig } from "./s3-static-config.ts";
 import { publishS3StaticWebapp } from "./s3-static-publisher.ts";
 import {
@@ -76,11 +77,27 @@ export async function submitS3StaticDeploy(opts: {
       artifactDir: artifactPath,
       renderedConfigPath: preparedConfig.renderedConfigPath,
     });
-    const smoke = await smokeS3StaticWebapp({
-      deployment: opts.deployment,
-      indexPath: path.join(artifactPath, "index.html"),
-      connectOverride: opts.smokeConnectOverride,
-    });
+    const smokeMode = resolveDeploymentSmokeExecutionMode({ deployment: opts.deployment });
+    const smoke =
+      smokeMode.mode === "omitted"
+        ? {
+            publicUrl: opts.deployment.providerTarget.canonicalUrl,
+            smokeOutcome: "omitted_by_exception" as const,
+          }
+        : await smokeS3StaticWebapp({
+            deployment: opts.deployment,
+            indexPath: path.join(artifactPath, "index.html"),
+            connectOverride: opts.smokeConnectOverride,
+          })
+            .then((result) => ({ ...result, smokeOutcome: "passed" as const }))
+            .catch((error) => {
+              if (smokeMode.mode !== "nonblocking") throw error;
+              return {
+                publicUrl: opts.deployment.providerTarget.canonicalUrl,
+                smokeOutcome: "failed_nonblocking" as const,
+                smokeError: error instanceof Error ? error.message : String(error),
+              };
+            });
     const record = createS3StaticDeployRecord(opts.deployment, {
       deployRunId,
       operationKind: "deploy",
@@ -92,6 +109,9 @@ export async function submitS3StaticDeploy(opts: {
       admittedContext,
       ...(opts.deployment.provisioner ? { provisionerType: opts.deployment.provisioner.type } : {}),
       ...(provisionerPlan ? { provisionerPlan } : {}),
+      smokeOutcome: smoke.smokeOutcome,
+      ...(smokeMode.smokeException ? { smokeException: smokeMode.smokeException } : {}),
+      ...(smoke.smokeError ? { smokeError: smoke.smokeError } : {}),
       deploymentMetadataFingerprint,
       providerConfigFingerprint,
       publicUrl: smoke.publicUrl,

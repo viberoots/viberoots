@@ -11,6 +11,7 @@ import { readPrimaryDeploymentComponent } from "./contract-extract-components.ts
 import {
   deploymentError,
   duplicateValueEntries,
+  readSmokePolicy,
   pushRolloutPolicyFieldErrors,
   pushTokenFieldErrors,
   readLabel,
@@ -22,6 +23,7 @@ import {
   readStringRecord,
   type DeploymentExtractionContext,
 } from "./contract-extract-shared.ts";
+import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
 import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
 import {
   resolveDeploymentMetadataRefs,
@@ -64,6 +66,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
     const releaseActionRefs = readLabelList(node, "release_actions");
     const targetExceptionRefs = readLabelList(node, "target_exceptions");
     const preview = readPreviewPolicy(node, "preview");
+    const smoke = readSmokePolicy(node);
     const rolloutPolicy = readRolloutPolicy(node);
     const account = providerTarget.account || "";
     const project = providerTarget.project || "";
@@ -153,6 +156,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
       );
     }
     pushCloudflarePreviewErrors(label, preview, deploymentErrors);
+    pushSmokePolicyErrors({ label, protectionClass, smoke, errors: deploymentErrors });
     pushCloudflareComponentKindErrors({
       label,
       declaredKind,
@@ -202,6 +206,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
       runtimeConfigRequirements,
       releaseActions,
       targetExceptions,
+      ...(smoke ? { smoke } : {}),
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
       component: { kind: STATIC_WEBAPP_COMPONENT, target: componentTarget },
       components: [

@@ -19,6 +19,7 @@ import {
   readPrerequisites,
   readPreviewPolicy,
   readRolloutPolicy,
+  readSmokePolicy,
   readString,
   type DeploymentExtractionContext,
 } from "./contract-extract-shared.ts";
@@ -35,6 +36,7 @@ import {
   resolveNixosSharedHostComponents,
 } from "./nixos-shared-host-extract-helpers.ts";
 import type { DeploymentBootstrapPolicy } from "./contract-types.ts";
+import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
 
 const SHARED_NONPROD = "shared_nonprod";
 
@@ -72,6 +74,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
     const prerequisites = readPrerequisites(node, "prerequisites");
     const protectionClass = readString(node, "protection_class") || SHARED_NONPROD;
     const preview = readPreviewPolicy(node, "preview");
+    const smoke = readSmokePolicy(node);
     const bootstrap = readBootstrapPolicy(node, "bootstrap");
     const publisher = readString(node, "publisher");
     const provisioner = readString(node, "provisioner");
@@ -119,6 +122,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
       requirements: runtimeConfigRequirements,
       errors: deploymentErrors,
     });
+    pushSmokePolicyErrors({ label, protectionClass, smoke, errors: deploymentErrors });
     const resolvedComponents = resolveNixosSharedHostComponents({
       context,
       label,
@@ -199,6 +203,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
       runtimeConfigRequirements,
       releaseActions,
       targetExceptions,
+      ...(smoke ? { smoke } : {}),
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
       ...(bootstrap ? { bootstrap } : {}),
       component: { kind: resolvedComponents[0]!.kind, target: resolvedComponents[0]!.target },

@@ -25,6 +25,7 @@ import { writeAppStoreConnectReplaySnapshot } from "./app-store-connect-replay.t
 import type { AppStoreConnectDeployment } from "./contract.ts";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
+import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 
 type SourceRecordLike = {
@@ -59,7 +60,20 @@ async function publishRecordedArtifact(opts: {
       operationKind: opts.operationKind,
       ...(opts.sourceTrack ? { sourceTrack: opts.sourceTrack } : {}),
     });
-    assertHealthyAppStoreConnectRelease(published);
+    const smokeMode = resolveDeploymentSmokeExecutionMode({ deployment: opts.deployment });
+    let smokeOutcome: "passed" | "failed_nonblocking" | "omitted_by_exception" = "passed";
+    let smokeError: string | undefined;
+    if (smokeMode.mode === "omitted") {
+      smokeOutcome = "omitted_by_exception";
+    } else {
+      try {
+        assertHealthyAppStoreConnectRelease(published);
+      } catch (error) {
+        if (smokeMode.mode !== "nonblocking") throw error;
+        smokeOutcome = "failed_nonblocking";
+        smokeError = error instanceof Error ? error.message : String(error);
+      }
+    }
     const replay = await writeAppStoreConnectReplaySnapshot({
       recordsRoot: opts.recordsRoot,
       deployRunId,
@@ -91,6 +105,9 @@ async function publishRecordedArtifact(opts: {
       trackState: published.trackState,
       rolloutState: published.rolloutState,
       releaseHealth: published.releaseHealth,
+      smokeOutcome,
+      ...(smokeMode.smokeException ? { smokeException: smokeMode.smokeException } : {}),
+      ...(smokeError ? { smokeError } : {}),
     });
     return { record, recordPath: await writeAppStoreConnectDeployRecord(opts.recordsRoot, record) };
   } catch (error) {

@@ -26,6 +26,8 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "health_path",
   "target_group",
   "provider_target",
+  "smoke",
+  "smoke_exception",
   "prerequisites",
   "secret_requirements",
   "runtime_config_requirements",

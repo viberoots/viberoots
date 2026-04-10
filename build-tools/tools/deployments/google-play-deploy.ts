@@ -25,6 +25,7 @@ import { writeGooglePlayReplaySnapshot } from "./google-play-replay.ts";
 import type { GooglePlayDeployment } from "./contract.ts";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
+import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 
 type SourceRecordLike = { deployRunId: string; deploymentId: string; admittedContext?: any };
@@ -55,7 +56,20 @@ async function publishRecordedArtifact(opts: {
       operationKind: opts.operationKind,
       ...(opts.sourceTrack ? { sourceTrack: opts.sourceTrack } : {}),
     });
-    assertHealthyGooglePlayRelease(published);
+    const smokeMode = resolveDeploymentSmokeExecutionMode({ deployment: opts.deployment });
+    let smokeOutcome: "passed" | "failed_nonblocking" | "omitted_by_exception" = "passed";
+    let smokeError: string | undefined;
+    if (smokeMode.mode === "omitted") {
+      smokeOutcome = "omitted_by_exception";
+    } else {
+      try {
+        assertHealthyGooglePlayRelease(published);
+      } catch (error) {
+        if (smokeMode.mode !== "nonblocking") throw error;
+        smokeOutcome = "failed_nonblocking";
+        smokeError = error instanceof Error ? error.message : String(error);
+      }
+    }
     const replay = await writeGooglePlayReplaySnapshot({
       recordsRoot: opts.recordsRoot,
       deployRunId,
@@ -87,6 +101,9 @@ async function publishRecordedArtifact(opts: {
       trackState: published.trackState,
       rolloutState: published.rolloutState,
       releaseHealth: published.releaseHealth,
+      smokeOutcome,
+      ...(smokeMode.smokeException ? { smokeException: smokeMode.smokeException } : {}),
+      ...(smokeError ? { smokeError } : {}),
     });
     return { record, recordPath: await writeGooglePlayDeployRecord(opts.recordsRoot, record) };
   } catch (error) {

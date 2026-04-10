@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostDeploymentComponent } from "./contract.ts";
+import type { DeploymentSmokeOutcome } from "./deployment-smoke-policy.ts";
 import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
 
 export type NixosSharedHostComponentPublishState = {
@@ -11,9 +12,16 @@ export type NixosSharedHostComponentPublishState = {
 };
 
 export type NixosSharedHostComponentSmokeState = {
-  finalOutcome: "succeeded" | "smoke_failed_after_publish" | "not_run";
+  finalOutcome:
+    | "succeeded"
+    | "smoke_failed_after_publish"
+    | "smoke_failed_nonblocking"
+    | "omitted_by_exception"
+    | "not_run";
   publicUrl?: string;
   healthUrl?: string;
+  smokeOutcome?: DeploymentSmokeOutcome;
+  smokeError?: string;
 };
 
 export type NixosSharedHostComponentResult = {
@@ -23,7 +31,12 @@ export type NixosSharedHostComponentResult = {
   artifact?: NixosSharedHostAdmittedArtifact;
   publicUrl?: string;
   healthUrl?: string;
-  finalOutcome: "succeeded" | "publish_failed" | "smoke_failed_after_publish" | "not_started";
+  finalOutcome:
+    | "succeeded"
+    | "publish_failed"
+    | "smoke_failed_after_publish"
+    | "smoke_failed_nonblocking"
+    | "not_started";
   publishState?: NixosSharedHostComponentPublishState;
   smokeState?: NixosSharedHostComponentSmokeState;
 };
@@ -63,7 +76,9 @@ export function withNixosSharedHostSmokeState(
     finalOutcome:
       smokeState.finalOutcome === "smoke_failed_after_publish"
         ? "smoke_failed_after_publish"
-        : result.finalOutcome,
+        : smokeState.finalOutcome === "smoke_failed_nonblocking"
+          ? "smoke_failed_nonblocking"
+          : result.finalOutcome,
   };
 }
 

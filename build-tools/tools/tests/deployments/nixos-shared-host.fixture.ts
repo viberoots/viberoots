@@ -187,6 +187,7 @@ export function nixosSharedHostDeploymentFixture(
     runtimeConfigRequirements: overrides.runtimeConfigRequirements || [],
     releaseActions: overrides.releaseActions || [],
     targetExceptions: overrides.targetExceptions || [],
+    ...(overrides.smoke ? { smoke: overrides.smoke } : {}),
     ...(overrides.rolloutPolicy ? { rolloutPolicy: overrides.rolloutPolicy } : {}),
     ...(overrides.bootstrap ? { bootstrap: overrides.bootstrap } : {}),
     component: {

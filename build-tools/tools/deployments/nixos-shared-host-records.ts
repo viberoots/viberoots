@@ -13,13 +13,15 @@ import {
   type NixosSharedHostProviderTarget,
 } from "./contract.ts";
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
+import type {
+  DeploymentSmokeException,
+  DeploymentSmokeOutcome,
+} from "./deployment-smoke-policy.ts";
 import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
 import { recordAuthorityFields } from "./nixos-shared-host-record-authority.ts";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
 import { SSR_WEBAPP_COMPONENT } from "./contract.ts";
-
 export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-08";
-
 export type NixosSharedHostOperationKind =
   | "deploy"
   | "promotion"
@@ -33,6 +35,7 @@ export type NixosSharedHostFinalOutcome =
   | "provision_failed"
   | "release_action_failed"
   | "publish_failed"
+  | "smoke_failed_nonblocking"
   | "smoke_failed_after_publish";
 export type NixosSharedHostFailedStep =
   | "provision"
@@ -109,6 +112,9 @@ export type NixosSharedHostDeployRecord = {
   provisionerType?: string;
   publisherType?: string;
   smokeRunnerType?: "nixos-shared-host-static-webapp-smoke" | "nixos-shared-host-ssr-webapp-smoke";
+  smokeOutcome?: DeploymentSmokeOutcome;
+  smokeException?: DeploymentSmokeException;
+  smokeError?: string;
   provisionerPlan?: NixosSharedHostProvisionerPlanRef;
   deploymentMetadataFingerprint?: string;
   replaySnapshotPath?: string;
@@ -138,15 +144,16 @@ type NixosSharedHostRecordOutcome = {
   artifactProvenancePath?: string;
   admittedContext?: NixosSharedHostAdmittedContext;
   componentResults?: NixosSharedHostComponentResult[];
+  smokeOutcome?: DeploymentSmokeOutcome;
+  smokeException?: DeploymentSmokeException;
+  smokeError?: string;
   provisionerPlan?: NixosSharedHostProvisionerPlanRef;
   deploymentMetadataFingerprint?: string;
   replaySnapshotPath?: string;
 };
-
 export function createNixosSharedHostDeployRunId(prefix = "deploy"): string {
   return `${prefix}-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
 }
-
 export function createNixosSharedHostDeployRecord(
   deployment: NixosSharedHostDeployment,
   outcome: NixosSharedHostRecordOutcome,
@@ -200,6 +207,9 @@ export function createNixosSharedHostDeployRecord(
               : ("nixos-shared-host-static-webapp-smoke" as const),
         }
       : {}),
+    ...(outcome.smokeOutcome ? { smokeOutcome: outcome.smokeOutcome } : {}),
+    ...(outcome.smokeException ? { smokeException: outcome.smokeException } : {}),
+    ...(outcome.smokeError ? { smokeError: outcome.smokeError } : {}),
     ...(outcome.provisionerPlan ? { provisionerPlan: outcome.provisionerPlan } : {}),
     ...(outcome.deploymentMetadataFingerprint
       ? { deploymentMetadataFingerprint: outcome.deploymentMetadataFingerprint }
@@ -214,7 +224,6 @@ export function createNixosSharedHostDeployRecord(
 export function deployRecordPathFor(recordsRoot: string, deployRunId: string): string {
   return path.join(path.resolve(recordsRoot), "runs", `${deployRunId}.json`);
 }
-
 export async function writeNixosSharedHostDeployRecord(
   recordsRoot: string,
   record: NixosSharedHostDeployRecord,
