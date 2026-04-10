@@ -7,6 +7,7 @@ import {
   uniqueErrors,
 } from "./contract-extract-shared.ts";
 import { extractCloudflarePagesDeploymentsFromContext } from "./contract-extract-cloudflare-pages.ts";
+import { extractAppStoreConnectDeploymentsFromContext } from "./contract-extract-app-store-connect.ts";
 import { extractKubernetesDeploymentsFromContext } from "./contract-extract-kubernetes.ts";
 import { extractNixosSharedHostDeploymentsFromContext } from "./contract-extract-nixos-shared-host.ts";
 import { extractS3StaticDeploymentsFromContext } from "./contract-extract-s3-static.ts";
@@ -98,6 +99,7 @@ export function extractDeployments(nodes: GraphNode[]): {
   const deployments = [
     ...extractNixosSharedHostDeploymentsFromContext(context),
     ...extractCloudflarePagesDeploymentsFromContext(context),
+    ...extractAppStoreConnectDeploymentsFromContext(context),
     ...extractS3StaticDeploymentsFromContext(context),
     ...extractKubernetesDeploymentsFromContext(context),
   ].sort((a, b) => a.label.localeCompare(b.label));

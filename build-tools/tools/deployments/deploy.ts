@@ -9,9 +9,11 @@ import {
   validateDeploymentForCli,
 } from "./deploy-front-door.ts";
 import { runCloudflareDeployFrontDoor } from "./cloudflare-pages-front-door.ts";
+import { runAppStoreConnectDeployFrontDoor } from "./app-store-connect-front-door.ts";
 import { resolveSmokeConnectOverride } from "./deployment-cli-smoke.ts";
 import { runFromChangesCli } from "./deployment-from-changes-cli.ts";
 import {
+  isAppStoreConnectDeployment,
   isCloudflarePagesDeployment,
   isNixosSharedHostDeployment,
   isS3StaticDeployment,
@@ -130,6 +132,18 @@ async function main() {
       ...(admissionEvidence ? { admissionEvidence } : {}),
       ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
       provisionOnly,
+    });
+    return;
+  }
+  if (isAppStoreConnectDeployment(deployment)) {
+    await runAppStoreConnectDeployFrontDoor({
+      workspaceRoot,
+      deployment,
+      publishOnly,
+      rollback,
+      sourceRunId,
+      artifactDirFlag,
+      ...(admissionEvidence ? { admissionEvidence } : {}),
     });
     return;
   }

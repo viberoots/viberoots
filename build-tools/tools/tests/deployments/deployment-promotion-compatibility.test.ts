@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { promotionCompatibilityErrors } from "../../deployments/deployment-promotion-compatibility.ts";
+import { appStoreConnectDeploymentFixture } from "./app-store-connect.fixture.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
 import {
   nixosSharedHostAdmissionPolicyFixture,
@@ -124,4 +125,85 @@ test("promotion compatibility rejects SSR runtime-contract drift inside one lane
     },
   });
   assert.ok(errors.some((entry) => entry.includes("runtime contract mismatch")));
+});
+
+test("promotion compatibility rejects mobile signing-model drift", () => {
+  const sourceDeployment = appStoreConnectDeploymentFixture();
+  const target = appStoreConnectDeploymentFixture({
+    deploymentId: "demo-ios-staging",
+    label: "//projects/deployments/demo-ios-staging:deploy",
+    environmentStage: "staging",
+    providerTarget: {
+      ...sourceDeployment.providerTarget,
+      track: "testflight-external",
+      signingModel: "app-store",
+      providerTargetIdentity:
+        "app-store-connect:ios-platform/demo-ios-app#track:testflight-external",
+    },
+  });
+  const errors = promotionCompatibilityErrors(target, {
+    record: {
+      finalOutcome: "succeeded",
+      publishMode: "normal",
+      deploymentId: sourceDeployment.deploymentId,
+    },
+    replaySnapshot: {
+      artifact: { identity: "mobile-app:artifact-123" },
+      admittedContext: {
+        lanePolicyFingerprint: sourceDeployment.lanePolicy.fingerprint,
+        source: { sourceRevision: "rev-source-123" },
+      },
+      deployment: {
+        ...sourceDeployment,
+        providerTarget: { ...sourceDeployment.providerTarget, signingModel: "enterprise" as any },
+      },
+    },
+  });
+  assert.ok(errors.some((entry) => entry.includes("signing model mismatch")));
+});
+
+test("promotion compatibility rejects mobile track regression", () => {
+  const sourceDeployment = appStoreConnectDeploymentFixture({
+    deploymentId: "demo-ios-staging",
+    label: "//projects/deployments/demo-ios-staging:deploy",
+    environmentStage: "staging",
+    providerTarget: {
+      issuer: "ios-platform",
+      app: "demo-ios-app",
+      bundleId: "com.example.demo",
+      platform: "ios",
+      track: "testflight-external",
+      signingModel: "app-store",
+      providerTargetIdentity:
+        "app-store-connect:ios-platform/demo-ios-app#track:testflight-external",
+    },
+  });
+  const target = appStoreConnectDeploymentFixture({
+    providerTarget: {
+      issuer: "ios-platform",
+      app: "demo-ios-app",
+      bundleId: "com.example.demo",
+      platform: "ios",
+      track: "testflight-internal",
+      signingModel: "app-store",
+      providerTargetIdentity:
+        "app-store-connect:ios-platform/demo-ios-app#track:testflight-internal",
+    },
+  });
+  const errors = promotionCompatibilityErrors(target, {
+    record: {
+      finalOutcome: "succeeded",
+      publishMode: "normal",
+      deploymentId: sourceDeployment.deploymentId,
+    },
+    replaySnapshot: {
+      artifact: { identity: "mobile-app:artifact-123" },
+      admittedContext: {
+        lanePolicyFingerprint: sourceDeployment.lanePolicy.fingerprint,
+        source: { sourceRevision: "rev-source-123" },
+      },
+      deployment: sourceDeployment,
+    },
+  });
+  assert.ok(errors.some((entry) => entry.includes("mobile track progression mismatch")));
 });

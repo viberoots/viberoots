@@ -100,6 +100,21 @@ export function requireBuiltInExecutionBoundary(deployment: DeploymentTarget) {
     }
     return;
   }
+  if (deployment.provider === "app-store-connect") {
+    if (deployment.publisher.type !== "app-store-connect-mobile-release") {
+      throw new DeploymentAdmissionError(
+        "no_longer_admitted",
+        `protected/shared admission rejects non-built-in app-store-connect publisher ${deployment.publisher.type}`,
+      );
+    }
+    if (deployment.releaseActions.length > 0) {
+      throw new DeploymentAdmissionError(
+        "no_longer_admitted",
+        `protected/shared admission rejects app-store-connect deployment-local release_actions: ${releaseActionRefs(deployment.releaseActions).join(", ")}`,
+      );
+    }
+    return;
+  }
   if (
     deployment.publisher.type !== "nixos-shared-host-static-webapp" &&
     deployment.publisher.type !== "nixos-shared-host-ssr-webapp"

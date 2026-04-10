@@ -2,10 +2,12 @@
 import path from "node:path";
 import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
 import {
+  isAppStoreConnectDeployment,
   isNixosSharedHostDeployment,
   isS3StaticDeployment,
   type DeploymentTarget,
 } from "./contract.ts";
+import { submitAppStoreConnectDeploy } from "./app-store-connect-deploy.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import { buildArtifactDirsByComponentId } from "./deployment-component-artifact-dirs.ts";
 import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
@@ -52,6 +54,10 @@ function defaultS3StaticRecordsRoot(workspaceRoot: string): string {
   return path.join(workspaceRoot, ".local", "deployments", "s3-static", "records");
 }
 
+function defaultAppStoreConnectRecordsRoot(workspaceRoot: string): string {
+  return path.join(workspaceRoot, ".local", "deployments", "app-store-connect", "records");
+}
+
 async function resolveArtifactDir(
   workspaceRoot: string,
   deployment: Pick<DeploymentTarget, "component">,
@@ -81,6 +87,17 @@ export async function runNormalDeployment(opts: {
       artifactDir: await resolveArtifactDir(opts.workspaceRoot, opts.deployment),
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
       ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
+    });
+  }
+  if (isAppStoreConnectDeployment(opts.deployment)) {
+    return await submitAppStoreConnectDeploy({
+      workspaceRoot: opts.workspaceRoot,
+      deployment: opts.deployment,
+      recordsRoot: path.resolve(
+        opts.sharedRecordsRoot || defaultAppStoreConnectRecordsRoot(opts.workspaceRoot),
+      ),
+      artifactPath: await resolveArtifactDir(opts.workspaceRoot, opts.deployment),
+      ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
     });
   }
   if (!isNixosSharedHostDeployment(opts.deployment)) {

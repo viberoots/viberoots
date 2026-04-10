@@ -72,6 +72,8 @@ async function withLockEnv<T>(overrides: Record<string, string>, fn: () => Promi
   }
 }
 
+const INTEGRATION_LOCK_WAIT_TIMEOUT_MS = "10000";
+
 test(
   "shared control plane times out queued runs after the default lock wait budget",
   { concurrency: false },
@@ -122,7 +124,7 @@ test(
   async () => {
     await withLockEnv(
       {
-        BNX_DEPLOY_LOCK_WAIT_TIMEOUT_MS: "2000",
+        BNX_DEPLOY_LOCK_WAIT_TIMEOUT_MS: INTEGRATION_LOCK_WAIT_TIMEOUT_MS,
         BNX_DEPLOY_LOCK_POLL_MS: "25",
       },
       async () => {
@@ -207,7 +209,7 @@ test(
   async () => {
     await withLockEnv(
       {
-        BNX_DEPLOY_LOCK_WAIT_TIMEOUT_MS: "2000",
+        BNX_DEPLOY_LOCK_WAIT_TIMEOUT_MS: INTEGRATION_LOCK_WAIT_TIMEOUT_MS,
         BNX_DEPLOY_LOCK_POLL_MS: "25",
       },
       async () => {

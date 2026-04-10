@@ -22,6 +22,51 @@ function rolloutSignature(deployment: DeploymentTarget): string {
   return JSON.stringify(deployment.rolloutPolicy || null);
 }
 
+function appStoreTrackRank(track: string): number {
+  return (
+    {
+      "testflight-internal": 0,
+      "testflight-external": 1,
+      "app-store": 2,
+    }[track] ?? -1
+  );
+}
+
+function mobilePromotionCompatibilityErrors(
+  deployment: DeploymentTarget,
+  sourceDeployment: DeploymentTarget,
+): string[] {
+  if (
+    deployment.provider !== "app-store-connect" ||
+    sourceDeployment.provider !== "app-store-connect"
+  ) {
+    return [];
+  }
+  const errors: string[] = [];
+  if (deployment.providerTarget.signingModel !== sourceDeployment.providerTarget.signingModel) {
+    errors.push(
+      `signing model mismatch: current=${deployment.providerTarget.signingModel} source=${sourceDeployment.providerTarget.signingModel}`,
+    );
+  }
+  const sourceTrackRank = appStoreTrackRank(sourceDeployment.providerTarget.track);
+  const targetTrackRank = appStoreTrackRank(deployment.providerTarget.track);
+  if (sourceTrackRank < 0 || targetTrackRank < 0 || targetTrackRank < sourceTrackRank) {
+    errors.push(
+      `mobile track progression mismatch: current=${deployment.providerTarget.track} source=${sourceDeployment.providerTarget.track}`,
+    );
+  }
+  const rolloutRank = (mode: string) =>
+    mode === "store_staged" ? 1 : mode === "all_at_once" ? 0 : -1;
+  const sourceRollout = sourceDeployment.rolloutPolicy?.mode || "all_at_once";
+  const targetRollout = deployment.rolloutPolicy?.mode || "all_at_once";
+  if (rolloutRank(sourceRollout) < 0 || rolloutRank(targetRollout) < rolloutRank(sourceRollout)) {
+    errors.push(
+      `mobile rollout progression mismatch: current=${targetRollout} source=${sourceRollout}`,
+    );
+  }
+  return errors;
+}
+
 function componentIds(deployment: DeploymentTarget): string {
   return deployment.components
     .map((component) => component.id)
@@ -134,9 +179,13 @@ export function promotionCompatibilityErrors(
   if (componentRuntimeContracts(sourceDeployment) !== componentRuntimeContracts(deployment)) {
     errors.push("runtime contract mismatch between source and target deployment");
   }
-  if (rolloutSignature(sourceDeployment) !== rolloutSignature(deployment)) {
+  if (
+    deployment.provider !== "app-store-connect" &&
+    rolloutSignature(sourceDeployment) !== rolloutSignature(deployment)
+  ) {
     errors.push("rollout semantics mismatch between source and target deployment");
   }
+  errors.push(...mobilePromotionCompatibilityErrors(deployment, sourceDeployment));
   const sourceProvisioner = provisionerTypeFor(sourceDeployment);
   const targetProvisioner = provisionerTypeFor(deployment);
   if (sourceProvisioner !== targetProvisioner) {

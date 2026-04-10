@@ -3,6 +3,7 @@ export const NIXOS_SHARED_HOST_PROVIDER = "nixos-shared-host";
 export const CLOUDFLARE_PAGES_PROVIDER = "cloudflare-pages";
 export const S3_STATIC_PROVIDER = "s3-static";
 export const KUBERNETES_PROVIDER = "kubernetes";
+export const APP_STORE_CONNECT_PROVIDER = "app-store-connect";
 
 export type NixosSharedHostProviderTarget = {
   host: "nixos-shared-host";
@@ -39,6 +40,16 @@ export type KubernetesProviderTarget = {
   namespace: string;
   release: string;
   id: string;
+  providerTargetIdentity: string;
+};
+
+export type AppStoreConnectProviderTarget = {
+  issuer: string;
+  app: string;
+  bundleId: string;
+  platform: "ios";
+  track: "testflight-internal" | "testflight-external" | "app-store";
+  signingModel: "app-store";
   providerTargetIdentity: string;
 };
 
@@ -134,5 +145,32 @@ export function deriveKubernetesProviderTarget(input: {
     release,
     id,
     providerTargetIdentity: `${KUBERNETES_PROVIDER}:${cluster}/${namespace}/${release}`,
+  };
+}
+
+export function deriveAppStoreConnectProviderTarget(input: {
+  issuer: string;
+  app: string;
+  bundleId: string;
+  platform?: string;
+  track: string;
+  signingModel: string;
+}): AppStoreConnectProviderTarget {
+  const issuer = input.issuer.trim();
+  const app = input.app.trim();
+  const bundleId = input.bundleId.trim();
+  const platform = "ios";
+  const track = (input.track.trim() ||
+    "testflight-internal") as AppStoreConnectProviderTarget["track"];
+  const signingModel = (input.signingModel.trim() ||
+    "app-store") as AppStoreConnectProviderTarget["signingModel"];
+  return {
+    issuer,
+    app,
+    bundleId,
+    platform,
+    track,
+    signingModel,
+    providerTargetIdentity: `${APP_STORE_CONNECT_PROVIDER}:${issuer}/${app}#track:${track}`,
   };
 }

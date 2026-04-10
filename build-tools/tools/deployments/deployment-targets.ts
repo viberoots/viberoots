@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type {
+  AppStoreConnectDeployment,
   CloudflarePagesDeployment,
   DeploymentTarget,
   KubernetesDeployment,
@@ -7,6 +8,7 @@ import type {
   S3StaticDeployment,
 } from "./contract-types.ts";
 import {
+  APP_STORE_CONNECT_PROVIDER,
   CLOUDFLARE_PAGES_PROVIDER,
   KUBERNETES_PROVIDER,
   NIXOS_SHARED_HOST_PROVIDER,
@@ -35,6 +37,12 @@ export function isKubernetesDeployment(
   deployment: DeploymentTarget,
 ): deployment is KubernetesDeployment {
   return deployment.provider === KUBERNETES_PROVIDER;
+}
+
+export function isAppStoreConnectDeployment(
+  deployment: DeploymentTarget,
+): deployment is AppStoreConnectDeployment {
+  return deployment.provider === APP_STORE_CONNECT_PROVIDER;
 }
 
 export function isMultiComponentDeployment(deployment: DeploymentTarget): boolean {

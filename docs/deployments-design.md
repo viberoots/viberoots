@@ -3611,10 +3611,11 @@ Provider capability summary:
 
 - the table below summarizes built-in provider capability entries that are defined in the authoritative provider-capabilities registry
 
-| Provider           | Supported component kinds        | Component cardinality  | Mixed-kind rules                                               | Preview support                        | Protected/shared rollout support     | Default rollout mode | Effective target boundary                                               | Allowed built-in publisher types | Allowed built-in provisioner types | Allowed built-in `release_actions` | Default smoke class guidance |
-| ------------------ | -------------------------------- | ---------------------- | -------------------------------------------------------------- | -------------------------------------- | ------------------------------------ | -------------------- | ----------------------------------------------------------------------- | -------------------------------- | ---------------------------------- | ---------------------------------- | ---------------------------- |
-| `cloudflare-pages` | exactly one `static-webapp`      | exactly 1 component    | no mixed kinds; exactly one `static-webapp`                    | yes, only with explicit preview policy | `all_at_once`                        | `all_at_once`        | one Pages project identity from canonical `provider_target`             | `wrangler-pages`                 | `cdktf-stack`, `terraform-stack`   | none by default                    | `static-webapp` HTTP smoke   |
-| `kubernetes`       | `service`, `third-party-service` | one or more components | reviewed mixes limited to `service` plus `third-party-service` | no, not in the initial slice           | `all_at_once`, `ordered_best_effort` | `all_at_once`        | one cluster/namespace/release identity from canonical `provider_target` | `helm-release`                   | `cdktf-stack`, `terraform-stack`   | none by default                    | `service` health smoke       |
+| Provider            | Supported component kinds        | Component cardinality  | Mixed-kind rules                                               | Preview support                        | Protected/shared rollout support     | Default rollout mode | Effective target boundary                                                      | Allowed built-in publisher types   | Allowed built-in provisioner types | Allowed built-in `release_actions` | Default smoke class guidance |
+| ------------------- | -------------------------------- | ---------------------- | -------------------------------------------------------------- | -------------------------------------- | ------------------------------------ | -------------------- | ------------------------------------------------------------------------------ | ---------------------------------- | ---------------------------------- | ---------------------------------- | ---------------------------- |
+| `app-store-connect` | exactly one `mobile-app`         | exactly 1 component    | no mixed kinds; exactly one signed iOS `mobile-app`            | no, not in the initial slice           | `all_at_once`, `store_staged`        | `all_at_once`        | one App Store Connect app plus reviewed track from canonical `provider_target` | `app-store-connect-mobile-release` | none                               | none by default                    | `mobile-app` release health  |
+| `cloudflare-pages`  | exactly one `static-webapp`      | exactly 1 component    | no mixed kinds; exactly one `static-webapp`                    | yes, only with explicit preview policy | `all_at_once`                        | `all_at_once`        | one Pages project identity from canonical `provider_target`                    | `wrangler-pages`                   | `cdktf-stack`, `terraform-stack`   | none by default                    | `static-webapp` HTTP smoke   |
+| `kubernetes`        | `service`, `third-party-service` | one or more components | reviewed mixes limited to `service` plus `third-party-service` | no, not in the initial slice           | `all_at_once`, `ordered_best_effort` | `all_at_once`        | one cluster/namespace/release identity from canonical `provider_target`        | `helm-release`                     | `cdktf-stack`, `terraform-stack`   | none by default                    | `service` health smoke       |
 
 Summary-table rule:
 
@@ -5215,6 +5216,13 @@ Mobile defaulting philosophy:
 
 - the common case should still look like "build signed artifact once, promote that exact artifact through store tracks"
 - teams should not need a second deployment model just because the destination is a store instead of a URL
+
+Reviewed initial mobile-store slice:
+
+- `app-store-connect` is the first implemented `mobile-app` provider family
+- the reviewed target identity is one App Store Connect app plus one explicit track
+- the initial slice supports signed immutable iOS artifacts, exact-artifact promotion, same-deployment retry/rollback, and built-in release-health validation
+- promotion-safe compatibility is explicit for publisher type, signing model, track progression, and rollout progression instead of inferring safety from store-family similarity
 
 ### Non-Static SSR Web Apps
 

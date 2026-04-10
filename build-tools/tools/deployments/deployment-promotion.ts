@@ -3,6 +3,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { DeploymentTarget } from "./contract.ts";
 import { requiredDeploymentStageBranch } from "./contract.ts";
+import type { AppStoreConnectDeployRecord } from "./app-store-connect-records.ts";
+import {
+  resolveAppStoreConnectReplaySource,
+  type AppStoreConnectReplaySnapshot,
+} from "./app-store-connect-replay.ts";
 import type { CloudflarePagesDeployRecord } from "./cloudflare-pages-records.ts";
 import {
   resolveCloudflarePagesReplaySource,
@@ -19,13 +24,16 @@ import {
   promotionCompatibilityErrors,
   sourcePromotionRevision,
 } from "./deployment-promotion-compatibility.ts";
+import type { AdmittedMobileAppArtifact } from "./app-store-connect-artifacts.ts";
 import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
 
 export type DeploymentPromotionSourceRecord =
+  | AppStoreConnectDeployRecord
   | CloudflarePagesDeployRecord
   | NixosSharedHostDeployRecord;
 
 export type DeploymentPromotionSourceReplaySnapshot =
+  | AppStoreConnectReplaySnapshot
   | CloudflarePagesReplaySnapshot
   | NixosSharedHostReplaySnapshot;
 
@@ -34,14 +42,14 @@ export type DeploymentPromotionSource = {
   recordPath: string;
   replaySnapshot: DeploymentPromotionSourceReplaySnapshot;
   replaySnapshotPath: string;
-  artifact?: AdmittedStaticWebappArtifact;
+  artifact?: AdmittedMobileAppArtifact | AdmittedStaticWebappArtifact;
   artifactIdentity: string;
 };
 
 export type CrossDeploymentPromotionSelection<TDeployment extends DeploymentTarget> = {
   operationKind: "promotion";
   deployment: TDeployment;
-  artifact: AdmittedStaticWebappArtifact;
+  artifact: AdmittedMobileAppArtifact | AdmittedStaticWebappArtifact;
   parentRunId: string;
   releaseLineageId: string;
   artifactLineageId: string;
@@ -79,6 +87,7 @@ function defaultRecordsRoots(workspaceRoot: string, recordsRoot: string): string
       path.resolve(recordsRoot),
       path.join(workspaceRoot, ".local", "deployments", "nixos-shared-host", "records"),
       path.join(workspaceRoot, ".local", "deployments", "cloudflare-pages", "records"),
+      path.join(workspaceRoot, ".local", "deployments", "app-store-connect", "records"),
     ]),
   );
 }
@@ -98,6 +107,17 @@ async function resolvePromotionSourceByPath(
         ? { artifact: source.replaySnapshot.publishInput.artifact }
         : {}),
       artifactIdentity: nixosSharedHostReplayArtifactIdentity(source.replaySnapshot),
+    };
+  }
+  if (raw.provider === "app-store-connect") {
+    const source = await resolveAppStoreConnectReplaySource({ recordPath });
+    return {
+      record: source.record,
+      recordPath: source.recordPath,
+      replaySnapshot: source.replaySnapshot,
+      replaySnapshotPath: source.record.replaySnapshotPath || "",
+      artifactIdentity: source.replaySnapshot.artifact.identity,
+      artifact: source.replaySnapshot.artifact,
     };
   }
   if (raw.provider === "cloudflare-pages") {

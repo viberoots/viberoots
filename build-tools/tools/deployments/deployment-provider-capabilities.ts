@@ -29,6 +29,22 @@ export type DeploymentProviderCapability = {
 };
 
 const PROVIDER_CAPABILITIES: Record<string, DeploymentProviderCapability> = {
+  "app-store-connect": {
+    provider: "app-store-connect",
+    supportedComponentKinds: ["mobile-app"],
+    multiComponentKinds: [],
+    supportedRolloutModes: ["all_at_once", "store_staged"],
+    defaultRolloutMode: "all_at_once",
+    rolloutPolicyOmissionInPolicy: {
+      singleComponent: true,
+      multiComponent: false,
+    },
+    releaseActions: {
+      supportsProtectedShared: false,
+      declaredTypes: [],
+      routineAllowedTypes: [],
+    },
+  },
   "nixos-shared-host": {
     provider: "nixos-shared-host",
     supportedComponentKinds: [STATIC_WEBAPP_COMPONENT_KIND, SSR_WEBAPP_COMPONENT_KIND],

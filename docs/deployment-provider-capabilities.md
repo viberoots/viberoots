@@ -221,6 +221,117 @@ Normative-source note:
 - the initial reviewed slice supports shared-dev metadata extraction, authoritative platform-state reconciliation, and deterministic host realization for static webapps plus the single-component reviewed SSR runtime slice on a NixOS host
 - protected/shared execution must stay inside the vetted built-in publisher, provisioner, smoke-runner, and reviewed built-in `release_actions` registry; package-local executable hooks are rejected on the normal control-plane path
 
+## Capability Entry: `app-store-connect`
+
+### Identity
+
+- `provider`: `app-store-connect`
+- canonical target identity fields:
+  - `issuer`
+  - `app`
+  - `track`
+- canonical lock-key shape:
+  - `app-store-connect:<issuer>/<app>#track:<track>`
+- required reviewed provider-target fields:
+  - `bundle_id`
+  - `platform = ios`
+  - `signing_model = app-store`
+
+### Component Support
+
+- supported component kinds:
+  - `mobile-app`
+- multi-component support:
+  - not supported in the reviewed initial slice
+  - deployments must contain exactly one `mobile-app` component
+- additional unsupported shapes:
+  - Android or mixed-platform releases
+  - non-mobile component kinds
+
+### Rollout Support
+
+- default rollout mode:
+  - `all_at_once`
+- rollout-policy omission posture:
+  - omission is reviewed only for the single-component iOS mobile-app slice
+- supported rollout modes:
+  - `all_at_once`
+  - `store_staged`
+- reviewed staged-rollout posture:
+  - `abort = "stop_on_first_failure"`
+  - `smoke = "final_only"`
+  - `steps` may be omitted or set to `["default"]`
+
+### Preview Support
+
+- preview support:
+  - not reviewed in the initial `app-store-connect` slice
+
+### Smoke / Release Health
+
+- default smoke model:
+  - built-in release-health validation rather than URL smoke
+  - success requires reviewed upload receipt, processing success, installability, and, when `store_staged` is used, staged-rollout health evidence
+
+### Built-In Publisher Contract
+
+- built-in publisher type:
+  - `app-store-connect-mobile-release`
+- exact publish input:
+  - one admitted immutable signed iOS release artifact (`.ipa`)
+- checked-in provider config:
+  - `app-store-connect.jsonc` remains provider-local publish configuration only
+  - deployment metadata stays authoritative for issuer, app, bundle id, track, platform, and signing model; config drift must fail closed before publish
+
+### Retry / Idempotency
+
+- shared `--publish-only` reuses only an admitted exact artifact selected with `--source-run-id`
+- same-deployment `--publish-only` is reviewed as `retry`
+- same-deployment rollback is reviewed only for prior successful normal runs on the same canonical store target identity
+- cross-deployment promotion is reviewed only for exact-artifact reuse through the branch-backed lane contract
+
+### Replay Snapshot Baseline
+
+- each admitted run persists:
+  - the exact immutable mobile artifact reference
+  - canonical provider-target identity
+  - deployment metadata fingerprint
+  - provider-config snapshot path
+  - release-health evidence, track state, and rollout state needed for replay eligibility decisions
+
+### Promotion Compatibility
+
+- promotion-safe mobile lanes treat these as explicit compatibility inputs:
+  - publisher type must match exactly
+  - signing model must match exactly
+  - track progression must move forward through the reviewed App Store Connect track order
+  - rollout progression may stay at `all_at_once` or advance to `store_staged`, but must not regress
+
+### Partial Publish Observability
+
+- the adapter records:
+  - store submission id
+  - provider release id
+  - exact artifact identity
+  - track state
+  - rollout state
+  - release-health evidence
+
+### Provisioner Support
+
+- deployment-owned provisioners for protected/shared mutation:
+  - not supported in the reviewed `app-store-connect` capability entry
+
+### Built-In `release_actions` Support
+
+- protected/shared built-in `release_actions`:
+  - not supported in the reviewed `app-store-connect` capability entry
+
+### Protected/Shared Eligibility
+
+- in policy for protected/shared single-component signed iOS `mobile-app` deployments
+- protected/shared execution must stay inside the vetted built-in publisher and release-health validation path
+
 ## Capability Entry: `cloudflare-pages`
 
 ### Identity

@@ -7,14 +7,17 @@ import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import type { DeploymentRequirement } from "./deployment-requirements.ts";
 import type { DeploymentTargetException } from "./deployment-target-exceptions.ts";
 import {
+  MOBILE_APP_COMPONENT_KIND,
   SSR_WEBAPP_COMPONENT_KIND,
   STATIC_WEBAPP_COMPONENT_KIND,
 } from "./deployment-component-kinds.ts";
 import {
+  APP_STORE_CONNECT_PROVIDER,
   CLOUDFLARE_PAGES_PROVIDER,
   KUBERNETES_PROVIDER,
   NIXOS_SHARED_HOST_PROVIDER,
   S3_STATIC_PROVIDER,
+  type AppStoreConnectProviderTarget,
   type CloudflarePagesProviderTarget,
   type KubernetesProviderTarget,
   type NixosSharedHostProviderTarget,
@@ -24,15 +27,20 @@ import { packagePathFromLabel } from "../lib/labels.ts";
 
 export const STATIC_WEBAPP_COMPONENT = "static-webapp";
 export const SSR_WEBAPP_COMPONENT = "ssr-webapp";
+export { MOBILE_APP_COMPONENT_KIND };
+export const MOBILE_APP_COMPONENT = MOBILE_APP_COMPONENT_KIND;
 export {
+  APP_STORE_CONNECT_PROVIDER,
   CLOUDFLARE_PAGES_PROVIDER,
   KUBERNETES_PROVIDER,
   NIXOS_SHARED_HOST_PROVIDER,
   S3_STATIC_PROVIDER,
+  deriveAppStoreConnectProviderTarget,
   deriveCloudflarePagesProviderTarget,
   deriveKubernetesProviderTarget,
   deriveNixosSharedHostProviderTarget,
   deriveS3StaticProviderTarget,
+  type AppStoreConnectProviderTarget,
   type CloudflarePagesProviderTarget,
   type KubernetesProviderTarget,
   type NixosSharedHostProviderTarget,
@@ -166,11 +174,21 @@ export type KubernetesDeployment = DeploymentBase & {
   providerTarget: KubernetesProviderTarget;
 };
 
+export type AppStoreConnectDeployment = DeploymentBase & {
+  provider: typeof APP_STORE_CONNECT_PROVIDER;
+  publisher: {
+    type: string;
+    config: string;
+  };
+  providerTarget: AppStoreConnectProviderTarget;
+};
+
 export type DeploymentTarget =
   | NixosSharedHostDeployment
   | CloudflarePagesDeployment
   | S3StaticDeployment
-  | KubernetesDeployment;
+  | KubernetesDeployment
+  | AppStoreConnectDeployment;
 
 export function hasNixosSharedHostSsrRuntimeContract(
   component: NixosSharedHostDeploymentComponent,
