@@ -56,7 +56,7 @@ test("nixos-shared-host durable records persist canonical provider-target identi
       destructiveReasons: [],
     },
   });
-  assert.equal(record.schemaVersion, "deploy-record@2026-04-08");
+  assert.equal(record.schemaVersion, "deploy-record@2026-04-10");
   assert.equal(record.operationKind, "deploy");
   assert.equal(record.publishMode, "normal");
   assert.equal(record.lifecycleState, "finished");
@@ -88,6 +88,11 @@ test("nixos-shared-host durable records persist canonical provider-target identi
   assert.equal(record.replaySnapshotPath, "/tmp/records/replay/deploy-123/snapshot.json");
   assert.equal(record.publisherType, "nixos-shared-host-static-webapp");
   assert.equal(record.smokeRunnerType, "nixos-shared-host-static-webapp-smoke");
+  assert.deepEqual(record.runnerIdentities, {
+    publisher: "nixos-shared-host-static-webapp",
+    provisioner: "nixos-shared-host-manifest",
+    smoke: "nixos-shared-host-static-webapp-smoke",
+  });
   assert.equal(
     record.provisionerPlan?.artifactPath,
     "/tmp/control-plane/provisioner-plans/cp-123.json",

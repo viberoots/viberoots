@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { readVersionedJson } from "./deployment-schema-compat.ts";
 import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
 import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention.ts";
@@ -82,9 +83,12 @@ export async function writeCloudflarePagesReplaySnapshot(opts: {
 export async function readCloudflarePagesReplaySnapshot(
   replaySnapshotPath: string,
 ): Promise<CloudflarePagesReplaySnapshot> {
-  return JSON.parse(
-    await fsp.readFile(replaySnapshotPath, "utf8"),
-  ) as CloudflarePagesReplaySnapshot;
+  return await readVersionedJson(replaySnapshotPath, {
+    kind: "cloudflare-pages replay snapshot",
+    currentSchemaVersion: CLOUDFLARE_PAGES_REPLAY_SNAPSHOT_SCHEMA,
+    validateCurrent: (raw): raw is CloudflarePagesReplaySnapshot =>
+      typeof raw.deployRunId === "string" && typeof raw.deploymentLabel === "string",
+  });
 }
 
 function requireReplaySnapshotPath(record: CloudflarePagesDeployRecord): string {

@@ -11,7 +11,10 @@ const RELEASE_ACTION_RESULT_DIR = "release-actions";
 
 function replayContextFor(
   operationKind: "deploy" | "promotion" | "retry" | "rollback",
+  publishBehavior?: "deploy" | "publish-only",
 ): DeploymentReleaseActionReplayContext | undefined {
+  if (operationKind === "deploy" && publishBehavior === "publish-only")
+    return "deploy_publish_slice";
   return operationKind === "retry" || operationKind === "rollback" || operationKind === "promotion"
     ? operationKind
     : undefined;
@@ -68,10 +71,11 @@ export function rollbackCompatibilityErrors(actions: DeploymentReleaseAction[]):
 
 export function assertNixosSharedHostReleaseActionPhaseReplayAllowed(opts: {
   operationKind: "deploy" | "promotion" | "retry" | "rollback";
+  publishBehavior?: "deploy" | "publish-only";
   phase: DeploymentReleaseAction["phase"];
   releaseActions: DeploymentReleaseAction[];
 }) {
-  const replayContext = replayContextFor(opts.operationKind);
+  const replayContext = replayContextFor(opts.operationKind, opts.publishBehavior);
   if (!replayContext) return;
   for (const action of opts.releaseActions) {
     if (action.phase !== opts.phase || action.runCondition === "failure_only") continue;
@@ -91,6 +95,7 @@ export async function runNixosSharedHostReleaseActionPhase(opts: {
   deployRunId: string;
   deployment: NixosSharedHostDeployment;
   operationKind: "deploy" | "promotion" | "retry" | "rollback";
+  publishBehavior?: "deploy" | "publish-only";
   phase: DeploymentReleaseAction["phase"];
   releaseActions: DeploymentReleaseAction[];
   artifactIdentity?: string;
@@ -99,8 +104,8 @@ export async function runNixosSharedHostReleaseActionPhase(opts: {
   assertNixosSharedHostReleaseActionPhaseReplayAllowed(opts);
   for (const action of opts.releaseActions) {
     if (action.phase !== opts.phase || action.runCondition === "failure_only") continue;
-    if (replayContextFor(opts.operationKind)) {
-      const replayContext = replayContextFor(opts.operationKind)!;
+    if (replayContextFor(opts.operationKind, opts.publishBehavior)) {
+      const replayContext = replayContextFor(opts.operationKind, opts.publishBehavior)!;
       if (action.replayPolicy[replayContext] === "skip") continue;
     }
     await writeReleaseActionMarker({

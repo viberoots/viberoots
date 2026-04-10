@@ -91,6 +91,7 @@ export async function runNixosSharedHostStaticDeploy(opts: {
       deployRunId: runId,
       deployment: opts.deployment,
       operationKind,
+      publishBehavior,
       releaseActions,
     });
     const prepared = await prepareNixosSharedHostStaticDeploy({

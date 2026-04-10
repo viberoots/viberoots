@@ -2,6 +2,7 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { readVersionedJson } from "./deployment-schema-compat.ts";
 import type { GooglePlayAdmittedContext } from "./google-play-admission.ts";
 import type {
   GooglePlayReleaseHealth,
@@ -104,5 +105,10 @@ export async function writeGooglePlayDeployRecord(
 export async function readGooglePlayDeployRecord(
   recordPath: string,
 ): Promise<GooglePlayDeployRecord> {
-  return JSON.parse(await fsp.readFile(recordPath, "utf8")) as GooglePlayDeployRecord;
+  return await readVersionedJson(recordPath, {
+    kind: "google-play deploy record",
+    currentSchemaVersion: GOOGLE_PLAY_RECORD_SCHEMA,
+    validateCurrent: (raw): raw is GooglePlayDeployRecord =>
+      typeof raw.deployRunId === "string" && typeof raw.deploymentLabel === "string",
+  });
 }

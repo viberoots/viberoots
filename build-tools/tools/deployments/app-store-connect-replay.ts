@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { readVersionedJson } from "./deployment-schema-compat.ts";
 import type { AppStoreConnectAdmittedContext } from "./app-store-connect-admission.ts";
 import type { AdmittedMobileAppArtifact } from "./app-store-connect-artifacts.ts";
 import { requireAdmittedMobileAppArtifactPath } from "./app-store-connect-artifacts.ts";
@@ -80,9 +81,12 @@ export async function resolveAppStoreConnectReplaySource(opts: {
   if (!record.replaySnapshotPath) {
     throw new Error(`deploy record is missing replaySnapshotPath: ${record.deployRunId}`);
   }
-  const replaySnapshot = JSON.parse(
-    await fsp.readFile(record.replaySnapshotPath, "utf8"),
-  ) as AppStoreConnectReplaySnapshot;
+  const replaySnapshot = await readVersionedJson(record.replaySnapshotPath, {
+    kind: "app-store-connect replay snapshot",
+    currentSchemaVersion: APP_STORE_CONNECT_REPLAY_SNAPSHOT_SCHEMA,
+    validateCurrent: (raw): raw is AppStoreConnectReplaySnapshot =>
+      typeof raw.deployRunId === "string" && typeof raw.deploymentLabel === "string",
+  });
   await assertProtectedSharedReplayUsable({
     protectionClass: replaySnapshot.deployment.protectionClass as
       | "shared_nonprod"

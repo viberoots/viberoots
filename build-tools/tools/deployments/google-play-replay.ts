@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { readVersionedJson } from "./deployment-schema-compat.ts";
 import type { GooglePlayAdmittedContext } from "./google-play-admission.ts";
 import type { AdmittedGooglePlayArtifact } from "./google-play-artifacts.ts";
 import { requireAdmittedGooglePlayArtifactPath } from "./google-play-artifacts.ts";
@@ -80,9 +81,12 @@ export async function resolveGooglePlayReplaySource(opts: {
   if (!record.replaySnapshotPath) {
     throw new Error(`deploy record is missing replaySnapshotPath: ${record.deployRunId}`);
   }
-  const replaySnapshot = JSON.parse(
-    await fsp.readFile(record.replaySnapshotPath, "utf8"),
-  ) as GooglePlayReplaySnapshot;
+  const replaySnapshot = await readVersionedJson(record.replaySnapshotPath, {
+    kind: "google-play replay snapshot",
+    currentSchemaVersion: GOOGLE_PLAY_REPLAY_SNAPSHOT_SCHEMA,
+    validateCurrent: (raw): raw is GooglePlayReplaySnapshot =>
+      typeof raw.deployRunId === "string" && typeof raw.deploymentLabel === "string",
+  });
   await assertProtectedSharedReplayUsable({
     protectionClass: replaySnapshot.deployment.protectionClass as
       | "shared_nonprod"

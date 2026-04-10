@@ -2,6 +2,7 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { readVersionedJson } from "./deployment-schema-compat.ts";
 import type { AppStoreConnectAdmittedContext } from "./app-store-connect-admission.ts";
 import type {
   AppStoreConnectReleaseHealth,
@@ -105,5 +106,10 @@ export async function writeAppStoreConnectDeployRecord(
 export async function readAppStoreConnectDeployRecord(
   recordPath: string,
 ): Promise<AppStoreConnectDeployRecord> {
-  return JSON.parse(await fsp.readFile(recordPath, "utf8")) as AppStoreConnectDeployRecord;
+  return await readVersionedJson(recordPath, {
+    kind: "app-store-connect deploy record",
+    currentSchemaVersion: APP_STORE_CONNECT_RECORD_SCHEMA,
+    validateCurrent: (raw): raw is AppStoreConnectDeployRecord =>
+      typeof raw.deployRunId === "string" && typeof raw.deploymentLabel === "string",
+  });
 }

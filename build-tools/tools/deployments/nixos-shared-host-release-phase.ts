@@ -9,6 +9,7 @@ export function createNixosSharedHostReleasePhaseRunner(opts: {
   deployRunId: string;
   deployment: NixosSharedHostDeployment;
   operationKind: string;
+  publishBehavior: "deploy" | "publish-only" | "provision-only";
   releaseActions: DeploymentReleaseAction[];
 }) {
   return async (

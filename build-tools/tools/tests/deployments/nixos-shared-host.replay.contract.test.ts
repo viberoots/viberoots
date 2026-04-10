@@ -80,8 +80,13 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
         replay.replaySnapshot.providerTargetIdentity,
         result.record.providerTargetIdentity,
       );
+      assert.equal(
+        replay.replaySnapshot.runnerIdentities.publisher,
+        result.record.runnerIdentities?.publisher,
+      );
       assert.equal(replay.replaySnapshot.publishInput.kind, "component-artifacts");
       assert.equal(replay.replaySnapshot.publishInput.components.length, 1);
+      assert.equal(replay.replaySnapshot.releaseActionPlan, undefined);
       assert.equal(
         replay.replaySnapshot.publishInput.components[0]?.artifact.identity,
         result.record.artifact?.identity,

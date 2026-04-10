@@ -6,6 +6,7 @@ import type { NixosSharedHostDeployment } from "./contract.ts";
 import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention.ts";
 import {
   liveRollbackCompatibilityErrors,
+  replayRunnerCompatibilityErrors,
   rollbackSourceEligibilityErrors,
   sameDeploymentReplayErrors,
 } from "./nixos-shared-host-replay-guardrails.ts";
@@ -150,6 +151,19 @@ export async function resolveNixosSharedHostReplaySelection(opts: {
     deployRunId: opts.sourceRunId,
   });
   const errors = sameDeploymentReplayErrors(opts.deployment, source.replaySnapshot.deployment);
+  errors.push(
+    ...replayRunnerCompatibilityErrors({
+      deployment: opts.deployment,
+      record: source.record,
+      replaySnapshot: source.replaySnapshot,
+    }),
+  );
+  if (
+    source.replaySnapshot.deployment.releaseActions.length > 0 &&
+    !source.replaySnapshot.releaseActionPlan?.length
+  ) {
+    errors.push("recorded replay snapshot is missing the release-action plan required for replay");
+  }
   if (errors.length > 0) {
     throw new Error(`shared replay source is not compatible with the current deployment:
 ${errors.join("\n")}`);

@@ -119,7 +119,7 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
       assert.equal(summary.publicUrl, "https://demoapp.apps.kilty.io/");
       assert.equal(summary.controlPlane.lockScope, "nixos-shared-host:default:demoapp");
       const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
-      assert.equal(record.schemaVersion, "deploy-record@2026-04-08");
+      assert.equal(record.schemaVersion, "deploy-record@2026-04-10");
       assert.equal(record.deployRunId, summary.deployRunId);
       assert.equal(record.runClassification, "deploy");
       assert.equal(record.lifecycleState, "finished");

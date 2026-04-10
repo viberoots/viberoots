@@ -7,8 +7,19 @@ import type { NixosSharedHostComponentResult } from "./nixos-shared-host-compone
 import type { NixosSharedHostMutationAuthority } from "./nixos-shared-host-control-plane-contract.ts";
 import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
 import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
+import { readVersionedJson } from "./deployment-schema-compat.ts";
+import {
+  isCurrentNixosSharedHostDeployRecord,
+  NIXOS_SHARED_HOST_RECORD_MIGRATIONS,
+  type NixosSharedHostRecordOutcome,
+} from "./nixos-shared-host-record-compat.ts";
+import {
+  nixosSharedHostRunnerIdentities,
+  type NixosSharedHostRunnerIdentities,
+} from "./nixos-shared-host-provenance.ts";
 import {
   NIXOS_SHARED_HOST_PROVIDER,
+  SSR_WEBAPP_COMPONENT,
   type NixosSharedHostDeployment,
   type NixosSharedHostProviderTarget,
 } from "./contract.ts";
@@ -20,8 +31,7 @@ import type {
 import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
 import { recordAuthorityFields } from "./nixos-shared-host-record-authority.ts";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
-import { SSR_WEBAPP_COMPONENT } from "./contract.ts";
-export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-08";
+export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-10";
 export type NixosSharedHostOperationKind =
   | "deploy"
   | "promotion"
@@ -115,6 +125,7 @@ export type NixosSharedHostDeployRecord = {
   smokeOutcome?: DeploymentSmokeOutcome;
   smokeException?: DeploymentSmokeException;
   smokeError?: string;
+  runnerIdentities?: NixosSharedHostRunnerIdentities;
   provisionerPlan?: NixosSharedHostProvisionerPlanRef;
   deploymentMetadataFingerprint?: string;
   replaySnapshotPath?: string;
@@ -124,33 +135,6 @@ export type NixosSharedHostDeployRecord = {
   errorFingerprint?: string;
 };
 
-type NixosSharedHostRecordOutcome = {
-  deployRunId: string;
-  operationKind?: NixosSharedHostOperationKind;
-  runClassification: NixosSharedHostRunClassification;
-  finalOutcome: NixosSharedHostFinalOutcome;
-  progressiveRollout?: NixosSharedHostProgressiveRollout;
-  artifactIdentity?: string;
-  failedStep?: NixosSharedHostFailedStep;
-  publicUrl?: string;
-  healthUrl?: string;
-  error?: string;
-  parentRunId?: string;
-  releaseLineageId?: string;
-  artifactLineageId?: string;
-  deployBatchId?: string;
-  authority?: NixosSharedHostMutationAuthority;
-  artifactStoredArtifactPath?: string;
-  artifactProvenancePath?: string;
-  admittedContext?: NixosSharedHostAdmittedContext;
-  componentResults?: NixosSharedHostComponentResult[];
-  smokeOutcome?: DeploymentSmokeOutcome;
-  smokeException?: DeploymentSmokeException;
-  smokeError?: string;
-  provisionerPlan?: NixosSharedHostProvisionerPlanRef;
-  deploymentMetadataFingerprint?: string;
-  replaySnapshotPath?: string;
-};
 export function createNixosSharedHostDeployRunId(prefix = "deploy"): string {
   return `${prefix}-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
 }
@@ -210,6 +194,7 @@ export function createNixosSharedHostDeployRecord(
     ...(outcome.smokeOutcome ? { smokeOutcome: outcome.smokeOutcome } : {}),
     ...(outcome.smokeException ? { smokeException: outcome.smokeException } : {}),
     ...(outcome.smokeError ? { smokeError: outcome.smokeError } : {}),
+    runnerIdentities: nixosSharedHostRunnerIdentities(deployment, deployment.releaseActions),
     ...(outcome.provisionerPlan ? { provisionerPlan: outcome.provisionerPlan } : {}),
     ...(outcome.deploymentMetadataFingerprint
       ? { deploymentMetadataFingerprint: outcome.deploymentMetadataFingerprint }
@@ -238,13 +223,10 @@ export async function writeNixosSharedHostDeployRecord(
 export async function readNixosSharedHostDeployRecord(
   recordPath: string,
 ): Promise<NixosSharedHostDeployRecord> {
-  const record = JSON.parse(await fsp.readFile(recordPath, "utf8")) as NixosSharedHostDeployRecord;
-  if (
-    record.schemaVersion !== NIXOS_SHARED_HOST_RECORD_SCHEMA ||
-    typeof record.deployRunId !== "string" ||
-    typeof record.deploymentLabel !== "string"
-  ) {
-    throw new Error(`invalid nixos-shared-host deploy record: ${recordPath}`);
-  }
-  return record;
+  return await readVersionedJson(recordPath, {
+    kind: "nixos-shared-host deploy record",
+    currentSchemaVersion: NIXOS_SHARED_HOST_RECORD_SCHEMA,
+    migrations: NIXOS_SHARED_HOST_RECORD_MIGRATIONS,
+    validateCurrent: isCurrentNixosSharedHostDeployRecord,
+  });
 }

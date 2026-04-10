@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
-import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 import type { NixosSharedHostPublishInput } from "./nixos-shared-host-publish-input.ts";
+import type { NixosSharedHostRecordedReleaseAction } from "./nixos-shared-host-provenance.ts";
 import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
 import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
 import type {
@@ -57,7 +57,7 @@ export type NixosSharedHostControlPlaneSnapshot = {
   lockScope: string;
   deployment: NixosSharedHostDeployment;
   progressiveRollout?: NixosSharedHostProgressiveRollout;
-  recordedReleaseActions?: DeploymentReleaseAction[];
+  recordedReleaseActions?: NixosSharedHostRecordedReleaseAction[];
   provisionerPlan?: NixosSharedHostProvisionerPlanRef;
   admittedContext?: NixosSharedHostAdmittedContext;
   paths: NixosSharedHostControlPlanePaths;

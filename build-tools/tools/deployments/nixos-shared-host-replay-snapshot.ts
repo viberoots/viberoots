@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { readVersionedJson } from "./deployment-schema-compat.ts";
 import {
   compositeNixosSharedHostArtifactIdentity,
   type NixosSharedHostResolvedComponentArtifact,
@@ -11,6 +12,12 @@ import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
+import {
+  nixosSharedHostRunnerIdentities,
+  recordedReleaseActionPlan,
+  type NixosSharedHostRecordedReleaseAction,
+  type NixosSharedHostRunnerIdentities,
+} from "./nixos-shared-host-provenance.ts";
 import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
 import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
 import {
@@ -18,7 +25,7 @@ import {
   type NixosSharedHostPublishInput,
 } from "./nixos-shared-host-publish-input.ts";
 
-export const NIXOS_SHARED_HOST_REPLAY_SNAPSHOT_SCHEMA = "nixos-shared-host-replay-snapshot@2";
+export const NIXOS_SHARED_HOST_REPLAY_SNAPSHOT_SCHEMA = "nixos-shared-host-replay-snapshot@3";
 
 export type NixosSharedHostReplaySnapshot = {
   schemaVersion: typeof NIXOS_SHARED_HOST_REPLAY_SNAPSHOT_SCHEMA;
@@ -31,6 +38,8 @@ export type NixosSharedHostReplaySnapshot = {
   artifactIdentity: string;
   artifact?: NixosSharedHostAdmittedArtifact;
   publishInput: NixosSharedHostPublishInput;
+  runnerIdentities: NixosSharedHostRunnerIdentities;
+  releaseActionPlan?: NixosSharedHostRecordedReleaseAction[];
   componentResults?: NixosSharedHostComponentResult[];
   progressiveRollout?: NixosSharedHostProgressiveRollout;
   admittedContext: NixosSharedHostAdmittedContext;
@@ -131,6 +140,13 @@ export async function writeNixosSharedHostReplaySnapshot(opts: {
     artifactIdentity: nixosSharedHostPublishInputArtifactIdentity(publishInput),
     ...(publishInput.kind === "exact-artifact" ? { artifact: publishInput.artifact } : {}),
     publishInput,
+    runnerIdentities: nixosSharedHostRunnerIdentities(
+      opts.deployment,
+      opts.deployment.releaseActions,
+    ),
+    ...(opts.deployment.releaseActions.length > 0
+      ? { releaseActionPlan: recordedReleaseActionPlan(opts.deployment.releaseActions) }
+      : {}),
     ...(opts.progressiveRollout ? { progressiveRollout: opts.progressiveRollout } : {}),
     admittedContext: opts.admittedContext,
     deployment: opts.deployment,
@@ -166,7 +182,29 @@ export async function writeNixosSharedHostReplayComponentResults(
 export async function readNixosSharedHostReplaySnapshot(
   replaySnapshotPath: string,
 ): Promise<NixosSharedHostReplaySnapshot> {
-  return JSON.parse(
-    await fsp.readFile(replaySnapshotPath, "utf8"),
-  ) as NixosSharedHostReplaySnapshot;
+  return await readVersionedJson(replaySnapshotPath, {
+    kind: "nixos-shared-host replay snapshot",
+    currentSchemaVersion: NIXOS_SHARED_HOST_REPLAY_SNAPSHOT_SCHEMA,
+    migrations: {
+      "nixos-shared-host-replay-snapshot@2": (raw) =>
+        ({
+          ...raw,
+          schemaVersion: NIXOS_SHARED_HOST_REPLAY_SNAPSHOT_SCHEMA,
+          runnerIdentities:
+            typeof raw.runnerIdentities === "object" && raw.runnerIdentities
+              ? raw.runnerIdentities
+              : nixosSharedHostRunnerIdentities(
+                  raw.deployment as NixosSharedHostDeployment,
+                  (raw.deployment as NixosSharedHostDeployment).releaseActions || [],
+                ),
+          releaseActionPlan: Array.isArray(raw.releaseActionPlan)
+            ? raw.releaseActionPlan
+            : recordedReleaseActionPlan(
+                ((raw.deployment as NixosSharedHostDeployment).releaseActions || []).slice(),
+              ),
+        }) as NixosSharedHostReplaySnapshot,
+    },
+    validateCurrent: (raw): raw is NixosSharedHostReplaySnapshot =>
+      typeof raw.deployRunId === "string" && typeof raw.deploymentLabel === "string",
+  });
 }

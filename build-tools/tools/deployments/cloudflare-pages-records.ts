@@ -2,6 +2,7 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { readVersionedJson } from "./deployment-schema-compat.ts";
 import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
 import type { CloudflarePagesControlPlaneWorkerAuthority } from "./cloudflare-pages-control-plane-contract.ts";
 import type { CloudflarePagesPublishMode } from "./cloudflare-pages-control-plane-contract.ts";
@@ -203,13 +204,10 @@ export async function writeCloudflarePagesDeployRecord(
 export async function readCloudflarePagesDeployRecord(
   recordPath: string,
 ): Promise<CloudflarePagesDeployRecord> {
-  const record = JSON.parse(await fsp.readFile(recordPath, "utf8")) as CloudflarePagesDeployRecord;
-  if (
-    record.schemaVersion !== CLOUDFLARE_PAGES_RECORD_SCHEMA ||
-    typeof record.deployRunId !== "string" ||
-    typeof record.deploymentLabel !== "string"
-  ) {
-    throw new Error(`invalid cloudflare-pages deploy record: ${recordPath}`);
-  }
-  return record;
+  return await readVersionedJson(recordPath, {
+    kind: "cloudflare-pages deploy record",
+    currentSchemaVersion: CLOUDFLARE_PAGES_RECORD_SCHEMA,
+    validateCurrent: (raw): raw is CloudflarePagesDeployRecord =>
+      typeof raw.deployRunId === "string" && typeof raw.deploymentLabel === "string",
+  });
 }

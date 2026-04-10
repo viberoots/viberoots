@@ -107,6 +107,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/nixos-shared-host.records.contract.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.remote-transport.fake.ts": False,
     "build-tools/tools/tests/deployments/nixos-shared-host.replay.contract.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.replay.provenance.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.replay.retention.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.replay.rollback-eligibility.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.target-exceptions.replay.test.ts": True,

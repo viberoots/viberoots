@@ -191,7 +191,11 @@ export async function createNixosSharedHostControlPlaneSnapshot(
     deployment: opts.deployment,
     ...(progressiveRollout ? { progressiveRollout } : {}),
     ...(hasReplaySnapshot(opts.source)
-      ? { recordedReleaseActions: opts.source.replaySnapshot.deployment.releaseActions }
+      ? {
+          recordedReleaseActions:
+            opts.source.replaySnapshot.releaseActionPlan ||
+            opts.source.replaySnapshot.deployment.releaseActions,
+        }
       : {}),
     ...(admittedContext ? { admittedContext } : {}),
     paths: {

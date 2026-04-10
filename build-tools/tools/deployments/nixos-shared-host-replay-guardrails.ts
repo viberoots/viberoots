@@ -5,8 +5,18 @@ import { invalidatingTargetException } from "./deployment-target-exceptions.ts";
 import { rollbackCompatibilityErrors } from "./nixos-shared-host-release-actions.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
-import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
-import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
+import {
+  nixosSharedHostRunnerIdentities,
+  runnerIdentityCompatibilityErrors,
+} from "./nixos-shared-host-provenance.ts";
+import {
+  readNixosSharedHostReplaySnapshot,
+  type NixosSharedHostReplaySnapshot,
+} from "./nixos-shared-host-replay.ts";
+import {
+  readNixosSharedHostDeployRecord,
+  type NixosSharedHostDeployRecord,
+} from "./nixos-shared-host-records.ts";
 
 function replayMismatch(field: string, expected: string, actual: string): string {
   return `${field} mismatch: current=${expected} source=${actual}`;
@@ -49,6 +59,21 @@ export function sameDeploymentReplayErrors(
   return errors;
 }
 
+export function replayRunnerCompatibilityErrors(opts: {
+  deployment: NixosSharedHostDeployment;
+  record: NixosSharedHostDeployRecord;
+  replaySnapshot: NixosSharedHostReplaySnapshot;
+}): string[] {
+  const expected = nixosSharedHostRunnerIdentities(
+    opts.deployment,
+    opts.replaySnapshot.deployment.releaseActions || [],
+  );
+  return [
+    ...runnerIdentityCompatibilityErrors(expected, opts.record.runnerIdentities),
+    ...runnerIdentityCompatibilityErrors(expected, opts.replaySnapshot.runnerIdentities),
+  ];
+}
+
 export function rollbackSourceEligibilityErrors(record: NixosSharedHostDeployRecord): string[] {
   const errors: string[] = [];
   if (record.finalOutcome !== "succeeded")
@@ -77,9 +102,7 @@ export async function latestSuccessfulNormalReplaySnapshot(opts: {
       .filter((entry) => entry.endsWith(".json"))
       .map(async (entry) => {
         const recordPath = path.join(runsDir, entry);
-        const record = JSON.parse(
-          await fsp.readFile(recordPath, "utf8"),
-        ) as NixosSharedHostDeployRecord;
+        const record = await readNixosSharedHostDeployRecord(recordPath);
         return { record, recordPath };
       }),
   );
@@ -97,9 +120,7 @@ export async function latestSuccessfulNormalReplaySnapshot(opts: {
         parseRecordTimestamp(right.recordPath) - parseRecordTimestamp(left.recordPath),
     )[0];
   if (!latest?.record.replaySnapshotPath) return undefined;
-  return JSON.parse(
-    await fsp.readFile(latest.record.replaySnapshotPath, "utf8"),
-  ) as NixosSharedHostReplaySnapshot;
+  return await readNixosSharedHostReplaySnapshot(latest.record.replaySnapshotPath);
 }
 
 export async function liveRollbackCompatibilityErrors(opts: {
@@ -108,5 +129,9 @@ export async function liveRollbackCompatibilityErrors(opts: {
   sourceRunId: string;
 }): Promise<string[]> {
   const latest = await latestSuccessfulNormalReplaySnapshot(opts);
-  return latest ? rollbackCompatibilityErrors(latest.deployment.releaseActions) : [];
+  if (!latest) return [];
+  if (!latest.releaseActionPlan?.length && latest.deployment.releaseActions.length > 0) {
+    return ["latest successful replay snapshot is missing a recorded release-action plan"];
+  }
+  return rollbackCompatibilityErrors(latest.releaseActionPlan || latest.deployment.releaseActions);
 }
