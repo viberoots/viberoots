@@ -14,6 +14,7 @@ type EvidenceOpts = {
   sourceRunId?: string;
   artifactIdentity?: string;
   artifactLineageId?: string;
+  buildInputsFingerprint?: string;
   requiredChecks?: string[];
   requiredApprovals?: string[];
   requestedBy?: string;
@@ -22,6 +23,19 @@ type EvidenceOpts = {
   expiresAt?: string;
   prerequisiteHealth?: Array<{ deploymentId: string; status?: "healthy" | "unhealthy" }>;
   provisionerPlanFingerprint?: string;
+  attestationStatus?: "verified" | "expired" | "revoked" | "untrusted" | "invalid";
+  signatureStatus?: "verified" | "missing" | "untrusted";
+  builderIdentity?: string;
+  signerIdentities?: string[];
+  provenanceFormat?: string;
+  sbomStatus?: "valid" | "invalid";
+  sbomFormat?: string;
+  supplyChainGates?: Array<{
+    name: string;
+    category: "vulnerability" | "license" | "other";
+    applyAt: "build_admission" | "publish_admission" | "both";
+    status?: "passed" | "failed";
+  }>;
 };
 
 export function admissionBindingFixture(opts: EvidenceOpts) {
@@ -34,6 +48,7 @@ export function admissionBindingFixture(opts: EvidenceOpts) {
     ...(opts.provisionerPlanFingerprint
       ? { provisionerPlanFingerprint: opts.provisionerPlanFingerprint }
       : {}),
+    ...(opts.buildInputsFingerprint ? { buildInputsFingerprint: opts.buildInputsFingerprint } : {}),
   });
 }
 
@@ -86,6 +101,50 @@ export function deploymentAdmissionEvidenceFixture(
       : {}),
     ...(opts.provisionerPlanFingerprint
       ? { provisionerPlanFingerprint: opts.provisionerPlanFingerprint }
+      : {}),
+    ...(opts.buildInputsFingerprint ? { buildInputsFingerprint: opts.buildInputsFingerprint } : {}),
+    ...(opts.deployment.admissionPolicy.attestation
+      ? {
+          attestations: [
+            {
+              builderIdentity: opts.builderIdentity || "builder:trusted",
+              provenanceFormat: opts.provenanceFormat || "slsa_provenance_v1",
+              artifactIdentity: opts.artifactIdentity || "artifact-123",
+              sourceRevision: opts.sourceRevision,
+              buildInputsFingerprint: opts.buildInputsFingerprint || "sha256:build-inputs",
+              status: opts.attestationStatus || "verified",
+              verifiedAt: "2026-04-06T12:03:00.000Z",
+              signerIdentities: opts.signerIdentities || ["signer:trusted"],
+              signatureStatus: opts.signatureStatus || "verified",
+              recordRef: "attestation://artifact",
+            },
+          ],
+        }
+      : {}),
+    ...(opts.deployment.admissionPolicy.sbom?.required
+      ? {
+          sboms: [
+            {
+              artifactIdentity: opts.artifactIdentity || "artifact-123",
+              format: opts.sbomFormat || "cyclonedx-json",
+              status: opts.sbomStatus || "valid",
+              verifiedAt: "2026-04-06T12:04:00.000Z",
+              recordRef: "sbom://artifact",
+            },
+          ],
+        }
+      : {}),
+    ...(opts.supplyChainGates && opts.supplyChainGates.length > 0
+      ? {
+          supplyChainGates: opts.supplyChainGates.map((gate) => ({
+            name: gate.name,
+            category: gate.category,
+            applyAt: gate.applyAt,
+            status: gate.status || "passed",
+            evaluatedAt: "2026-04-06T12:05:00.000Z",
+            recordRef: `gate://${gate.name}/${gate.applyAt}`,
+          })),
+        }
       : {}),
   };
 }

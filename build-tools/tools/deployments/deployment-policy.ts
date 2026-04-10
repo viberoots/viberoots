@@ -2,6 +2,18 @@
 import crypto from "node:crypto";
 import { normalizeTargetLabel } from "../lib/labels.ts";
 import type { GraphNode } from "../lib/graph.ts";
+import {
+  readAttestationPolicy,
+  readSbomPolicy,
+  readSupplyChainGatePolicies,
+  type DeploymentAttestationPolicy,
+  type DeploymentSbomPolicy,
+  type DeploymentSupplyChainGatePolicy,
+} from "./deployment-admission-supply-chain.ts";
+import {
+  admissionPolicyExtensionFingerprintPart,
+  validateAdmissionPolicyExtensions,
+} from "./deployment-policy-admission-extensions.ts";
 
 export const DEPLOYMENT_LANE_POLICY_RULE = "deployment_lane_policy";
 export const DEPLOYMENT_ADMISSION_POLICY_RULE = "deployment_admission_policy";
@@ -30,6 +42,9 @@ export type DeploymentAdmissionPolicy = {
   retryBranchPolicy: RetryBranchPolicy;
   retryApprovalReuse: RetryApprovalReuse;
   artifactAttestationMode: ArtifactAttestationMode;
+  attestation?: DeploymentAttestationPolicy;
+  sbom?: DeploymentSbomPolicy;
+  supplyChainGates: DeploymentSupplyChainGatePolicy[];
   fingerprint: string;
 };
 
@@ -163,6 +178,9 @@ export function extractDeploymentAdmissionPolicies(nodes: GraphNode[]): {
       "fresh_only") as RetryApprovalReuse;
     const artifactAttestationMode = (readString(node, "artifact_attestation_mode") ||
       "recorded_exact_artifact") as ArtifactAttestationMode;
+    const attestation = readAttestationPolicy(node);
+    const sbom = readSbomPolicy(node);
+    const supplyChainGates = readSupplyChainGatePolicies(node);
     if (!ref) {
       errors.push("deployment admission policy missing canonical label");
       continue;
@@ -182,6 +200,7 @@ export function extractDeploymentAdmissionPolicies(nodes: GraphNode[]): {
         policyError(ref, `unsupported artifact_attestation_mode "${artifactAttestationMode}"`),
       );
     }
+    errors.push(...validateAdmissionPolicyExtensions({ ref, attestation, supplyChainGates }));
     if (errors.some((entry) => entry.startsWith(`${ref}:`))) continue;
     const fingerprint = fingerprintFor({
       name,
@@ -191,6 +210,7 @@ export function extractDeploymentAdmissionPolicies(nodes: GraphNode[]): {
       retryBranchPolicy,
       retryApprovalReuse,
       artifactAttestationMode,
+      ...admissionPolicyExtensionFingerprintPart({ attestation, sbom, supplyChainGates }),
     });
     policies.set(ref, {
       ref,
@@ -201,6 +221,9 @@ export function extractDeploymentAdmissionPolicies(nodes: GraphNode[]): {
       retryBranchPolicy,
       retryApprovalReuse,
       artifactAttestationMode,
+      ...(attestation ? { attestation } : {}),
+      ...(sbom ? { sbom } : {}),
+      supplyChainGates,
       fingerprint,
     });
   }

@@ -161,6 +161,8 @@ design has been explicitly updated first.
 - Fresh workstation builds are out of policy for protected/shared mutation.
 - Ad hoc control-plane rebuilds for mutation are out of policy unless the lane explicitly uses reviewed `rebuild_per_stage` promotion flow.
 - Artifact attestation verification must enforce the admission policy's reviewed trust contract for accepted builder identities, provenance format, and artifact-to-source binding.
+- When protected/shared `admission_policy` requires signatures, SBOMs, or supply-chain gates, mutating admission must fail closed on missing evidence, untrusted builder or signer identity, expired or revoked attestation material, invalid SBOM format, or failed vulnerability or license gate.
+- Protected/shared records and replay snapshots must preserve secret-safe attestation, SBOM, and supply-chain evaluation facts, including durable references to any retained evidence artifacts when those references exist.
 - Rollback may use an earlier retained admitted run even when the branch head has moved forward, but the current branch/lane state must still authorize performing rollback.
 - Rollback must also honor the recorded data-compatibility posture of any already-applied stateful `release_actions`; unsafe rollback must fail closed rather than re-publish an older artifact by default.
 - Admission must preserve enough approval evidence to explain why the run was authorized.

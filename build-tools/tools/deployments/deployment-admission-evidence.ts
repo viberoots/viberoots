@@ -1,5 +1,16 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentPrerequisiteMode } from "./contract-types.ts";
+import {
+  normalizeAttestationEvidence,
+  normalizeSbomEvidence,
+  normalizeSupplyChainGateEvidence,
+  type DeploymentAttestationEvidence,
+  type DeploymentAttestationFact,
+  type DeploymentSbomEvidence,
+  type DeploymentSbomFact,
+  type DeploymentSupplyChainGateEvidence,
+  type DeploymentSupplyChainGateFact,
+} from "./deployment-admission-supply-chain.ts";
 
 export type DeploymentPrincipal = {
   principalId: string;
@@ -41,6 +52,10 @@ export type DeploymentAdmissionEvidence = {
   approvals?: DeploymentApprovalEvidence[];
   prerequisiteHealth?: DeploymentHealthEvidence[];
   provisionerPlanFingerprint?: string;
+  buildInputsFingerprint?: string;
+  attestations?: DeploymentAttestationEvidence[];
+  sboms?: DeploymentSbomEvidence[];
+  supplyChainGates?: DeploymentSupplyChainGateEvidence[];
 };
 
 export type DeploymentAdmissionBinding = {
@@ -51,6 +66,7 @@ export type DeploymentAdmissionBinding = {
   artifactIdentity?: string;
   artifactLineageId?: string;
   provisionerPlanFingerprint?: string;
+  buildInputsFingerprint?: string;
 };
 
 export type DeploymentAdmissionCheckFact = {
@@ -86,6 +102,9 @@ export type DeploymentAdmissionPolicyEvaluation = {
   requiredChecks: DeploymentAdmissionCheckFact[];
   requiredApprovals: DeploymentAdmissionApprovalFact[];
   prerequisites: DeploymentPrerequisiteFact[];
+  attestation?: DeploymentAttestationFact;
+  sbom?: DeploymentSbomFact;
+  supplyChainGates: DeploymentSupplyChainGateFact[];
 };
 
 function normalizePrincipal(value: unknown): DeploymentPrincipal | undefined {
@@ -183,6 +202,11 @@ export function normalizeAdmissionEvidence(
   const submittedBy = normalizePrincipal(raw.submittedBy);
   const provisionerPlanFingerprint =
     typeof raw.provisionerPlanFingerprint === "string" ? raw.provisionerPlanFingerprint.trim() : "";
+  const buildInputsFingerprint =
+    typeof raw.buildInputsFingerprint === "string" ? raw.buildInputsFingerprint.trim() : "";
+  const attestations = normalizeAttestationEvidence(raw.attestations);
+  const sboms = normalizeSbomEvidence(raw.sboms);
+  const supplyChainGates = normalizeSupplyChainGateEvidence(raw.supplyChainGates);
   return {
     ...(requestedBy ? { requestedBy } : {}),
     ...(submittedBy ? { submittedBy } : {}),
@@ -190,5 +214,9 @@ export function normalizeAdmissionEvidence(
     ...(approvals.length > 0 ? { approvals } : {}),
     ...(prerequisiteHealth.length > 0 ? { prerequisiteHealth } : {}),
     ...(provisionerPlanFingerprint ? { provisionerPlanFingerprint } : {}),
+    ...(buildInputsFingerprint ? { buildInputsFingerprint } : {}),
+    ...(attestations.length > 0 ? { attestations } : {}),
+    ...(sboms.length > 0 ? { sboms } : {}),
+    ...(supplyChainGates.length > 0 ? { supplyChainGates } : {}),
   };
 }

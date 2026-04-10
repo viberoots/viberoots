@@ -22,6 +22,11 @@ import {
   sourceAdmissionChecks,
   type DeploymentRunRecordLike,
 } from "./deployment-admission-records.ts";
+import {
+  evaluateAttestationPolicy,
+  evaluateSbomPolicy,
+  evaluateSupplyChainGatePolicies,
+} from "./deployment-admission-supply-chain-evaluator.ts";
 
 type AdmittedContextLike = {
   source: {
@@ -157,6 +162,24 @@ export async function evaluateDeploymentAdmission(opts: {
       opts.sourceRecord?.artifactLineageId ||
       opts.sourceRecord?.artifact?.identity,
     provisionerPlanFingerprint: opts.evidence?.provisionerPlanFingerprint,
+    buildInputsFingerprint: opts.evidence?.buildInputsFingerprint,
+  });
+  const attestation = evaluateAttestationPolicy({
+    policy: opts.deployment.admissionPolicy,
+    binding,
+    admittedContext: opts.admittedContext,
+    evidence: opts.evidence?.attestations,
+  });
+  const sbom = evaluateSbomPolicy({
+    policy: opts.deployment.admissionPolicy,
+    binding,
+    evidence: opts.evidence?.sboms,
+  });
+  const supplyChainGates = evaluateSupplyChainGatePolicies({
+    policy: opts.deployment.admissionPolicy,
+    operationKind: opts.operationKind,
+    sourceRecord: opts.sourceRecord,
+    evidence: opts.evidence?.supplyChainGates,
   });
   return {
     evaluatedAt: new Date().toISOString(),
@@ -184,5 +207,8 @@ export async function evaluateDeploymentAdmission(opts: {
       deployment: opts.deployment,
       evidence: opts.evidence,
     }),
+    ...(attestation ? { attestation } : {}),
+    ...(sbom ? { sbom } : {}),
+    supplyChainGates,
   };
 }

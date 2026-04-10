@@ -10,6 +10,9 @@ type EvidenceLike = {
   requiredChecks?: Array<{ recordRef?: string }>;
   requiredApprovals?: Array<{ recordRef?: string }>;
   prerequisites?: Array<{ sourceRecordPath?: string; healthEvidenceRef?: string }>;
+  attestation?: { recordRef?: string };
+  sbom?: { recordRef?: string };
+  supplyChainGates?: Array<{ recordRef?: string }>;
 };
 
 type ArtifactLike = {
@@ -69,6 +72,9 @@ function requiredEvidencePaths(evidence?: EvidenceLike): string[] {
     ...(evidence.requiredApprovals || []).map((entry) => entry.recordRef || ""),
     ...(evidence.prerequisites || []).map((entry) => entry.sourceRecordPath || ""),
     ...(evidence.prerequisites || []).map((entry) => entry.healthEvidenceRef || ""),
+    evidence.attestation?.recordRef || "",
+    evidence.sbom?.recordRef || "",
+    ...(evidence.supplyChainGates || []).map((entry) => entry.recordRef || ""),
   ]).filter(isFileBackedEvidenceRef);
 }
 

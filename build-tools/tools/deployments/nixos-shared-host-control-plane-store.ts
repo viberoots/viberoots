@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { sanitizeName } from "../lib/sanitize.ts";
+import { throwLockAbort } from "./deployment-control-plane-lock-abort.ts";
 import { assertNoBreakGlassFreeze } from "./nixos-shared-host-break-glass-freeze.ts";
 
 type LockOwner = {
@@ -143,10 +144,6 @@ function sameOwner(owner: LockOwner | null, holderId: string, fencingToken: stri
   return !!owner && owner.holderId === holderId && owner.fencingToken === fencingToken;
 }
 
-function lockError(code: string, message: string): Error {
-  return Object.assign(new Error(message), { code });
-}
-
 export async function acquireControlPlaneLock(
   recordsRoot: string,
   lockScope: string,
@@ -182,21 +179,24 @@ export async function acquireControlPlaneLock(
     }
   };
   const deadline = Date.now() + (opts?.waitTimeoutMs ?? lockWaitTimeoutMs());
-  while (!(await tryAcquire())) {
+  while (true) {
+    const abortReason = await opts?.shouldAbort?.();
+    if (abortReason) throwLockAbort(abortReason);
+    if (await tryAcquire()) {
+      const postAcquireAbortReason = await opts?.shouldAbort?.();
+      if (!postAcquireAbortReason) break;
+      await fsp.rm(lockDir, { recursive: true, force: true });
+      throwLockAbort(postAcquireAbortReason);
+    }
     const owner = await readLockOwner(lockDir);
     if (!owner || !pidAlive(owner.pid) || leaseExpired(owner)) {
       await fsp.rm(lockDir, { recursive: true, force: true });
       continue;
     }
-    const abortReason = await opts?.shouldAbort?.();
-    if (abortReason) {
-      throw lockError(
-        abortReason,
-        `shared control-plane wait ended because the run was ${abortReason.replaceAll("_", " ")}`,
-      );
-    }
     if (Date.now() >= deadline) {
-      throw lockError("lock_timeout", `shared control-plane lock timeout for ${lockScope}`);
+      throw Object.assign(new Error(`shared control-plane lock timeout for ${lockScope}`), {
+        code: "lock_timeout",
+      });
     }
     await sleep(lockPollMs());
   }
@@ -228,9 +228,9 @@ export async function acquireControlPlaneLock(
     assertCurrentAuthority: async () => {
       const owner = await readLockOwner(lockDir);
       if (!sameOwner(owner, holderId, fencingToken) || leaseExpired(owner)) {
-        throw lockError(
-          "lock_authority_lost",
-          `shared control-plane lock authority lost for ${lockScope}`,
+        throw Object.assign(
+          new Error(`shared control-plane lock authority lost for ${lockScope}`),
+          { code: "lock_authority_lost" },
         );
       }
     },

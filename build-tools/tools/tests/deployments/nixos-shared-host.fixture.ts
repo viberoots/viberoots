@@ -14,6 +14,11 @@ import {
   type DeploymentLanePolicy,
 } from "../../deployments/deployment-policy.ts";
 import type { GraphNode } from "../../lib/graph.ts";
+import type {
+  DeploymentAttestationPolicy,
+  DeploymentSbomPolicy,
+  DeploymentSupplyChainGatePolicy,
+} from "../../deployments/deployment-admission-supply-chain.ts";
 
 export function nixosSharedHostSsrRuntimeContractFixture(
   overrides: Partial<NixosSharedHostSsrRuntimeContract> = {},
@@ -60,6 +65,11 @@ export function nixosSharedHostAdmissionPolicyFixture(
     retryBranchPolicy: overrides.retryBranchPolicy || "branch_independent",
     retryApprovalReuse: overrides.retryApprovalReuse || "fresh_only",
     artifactAttestationMode: overrides.artifactAttestationMode || "recorded_exact_artifact",
+    ...(overrides.attestation
+      ? { attestation: overrides.attestation as DeploymentAttestationPolicy }
+      : {}),
+    ...(overrides.sbom ? { sbom: overrides.sbom as DeploymentSbomPolicy } : {}),
+    supplyChainGates: overrides.supplyChainGates || ([] as DeploymentSupplyChainGatePolicy[]),
     fingerprint: overrides.fingerprint || "sha256:admission-pleomino-dev",
   };
 }
@@ -92,6 +102,17 @@ export function nixosSharedHostAdmissionPolicyNodeFixture(
     retry_branch_policy: policy.retryBranchPolicy,
     retry_approval_reuse: policy.retryApprovalReuse,
     artifact_attestation_mode: policy.artifactAttestationMode,
+    trusted_builder_identities: policy.attestation?.trustedBuilderIdentities || [],
+    accepted_provenance_formats: policy.attestation?.acceptedProvenanceFormats || [],
+    artifact_binding: policy.attestation?.artifactBinding || "",
+    expired_attestation_behavior: policy.attestation?.expiredBehavior || "",
+    revoked_attestation_behavior: policy.attestation?.revokedBehavior || "",
+    attestation_trust_drift_behavior: policy.attestation?.trustDriftBehavior || "",
+    require_artifact_signatures: policy.attestation?.signatureRequired || false,
+    trusted_signer_identities: policy.attestation?.trustedSignerIdentities || [],
+    sbom_required: policy.sbom?.required || false,
+    accepted_sbom_formats: policy.sbom?.acceptedFormats || [],
+    supply_chain_gates: policy.supplyChainGates || [],
     ...overrides,
   };
 }

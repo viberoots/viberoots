@@ -18,6 +18,7 @@ type BindingOpts = {
   artifactIdentity?: string;
   artifactLineageId?: string;
   provisionerPlanFingerprint?: string;
+  buildInputsFingerprint?: string;
 };
 
 function canonicalize(value: unknown): unknown {
@@ -49,6 +50,7 @@ export function createDeploymentAdmissionBinding(opts: BindingOpts): DeploymentA
     artifactIdentity: opts.artifactIdentity || "",
     artifactLineageId: opts.artifactLineageId || "",
     provisionerPlanFingerprint: opts.provisionerPlanFingerprint || "",
+    buildInputsFingerprint: opts.buildInputsFingerprint || "",
   });
   return {
     payloadFingerprint,
@@ -60,6 +62,7 @@ export function createDeploymentAdmissionBinding(opts: BindingOpts): DeploymentA
     ...(opts.provisionerPlanFingerprint
       ? { provisionerPlanFingerprint: opts.provisionerPlanFingerprint }
       : {}),
+    ...(opts.buildInputsFingerprint ? { buildInputsFingerprint: opts.buildInputsFingerprint } : {}),
   };
 }
 
