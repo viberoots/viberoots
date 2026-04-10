@@ -10,6 +10,7 @@ import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string): Promise<void> {
@@ -153,6 +154,7 @@ test(
                 hostRoot,
                 recordsRoot,
               },
+              admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
               smokeConnectOverride: {
                 protocol: "https:",
                 hostname: "127.0.0.1",
@@ -178,6 +180,11 @@ test(
                 hostRoot,
                 recordsRoot,
               },
+              admissionEvidence: reviewedLaneAdmissionEvidenceFixture({
+                deployment: nixosSharedHostDeploymentFixture({
+                  runtime: { appName: "demoapp", containerPort: 3000, healthPath: "/healthz" },
+                }),
+              }),
               smokeConnectOverride: {
                 protocol: "https:",
                 hostname: "127.0.0.1",
@@ -234,6 +241,7 @@ test(
                 hostRoot: path.join(tmp, "host"),
                 recordsRoot,
               },
+              admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
             });
             const submissionPath = await waitForSubmission(recordsRoot);
             await waitForLifecycle(submissionPath, "waiting_for_lock");

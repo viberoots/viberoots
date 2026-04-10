@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
 import { resolveNixosSharedHostReplaySource } from "../../deployments/nixos-shared-host-replay.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
@@ -26,6 +27,13 @@ test("replay fails explicitly when the replay bundle is incomplete or the retain
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const admissionEvidence = deploymentAdmissionEvidenceFixture({
+      deployment,
+      operationKind: "deploy",
+      sourceRevision: "rev-replay-retention-1",
+      artifactIdentity: "artifact-replay-retention-1",
+      artifactLineageId: "artifact-replay-retention-1",
+    });
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
       const result = await submitNixosSharedHostControlPlaneRun({
@@ -38,6 +46,7 @@ test("replay fails explicitly when the replay bundle is incomplete or the retain
           hostRoot,
           recordsRoot,
         },
+        admissionEvidence,
         smokeConnectOverride: {
           protocol: "https:",
           hostname: "127.0.0.1",

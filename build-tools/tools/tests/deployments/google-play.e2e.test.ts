@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { readGooglePlayDeployRecord } from "../../deployments/google-play-records.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { googlePlayDeploymentFixture } from "./google-play.fixture.ts";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostLanePolicyFixture,
@@ -98,6 +99,18 @@ test("google-play deploy and promotion preserve release-health evidence", async 
     await writeDeploymentJson(stagingJson, staging);
     await ensureNixosSharedHostStageBranch(tmp, $, dev);
     await ensureNixosSharedHostStageBranch(tmp, $, staging);
+    const devEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
+      tmp,
+      $,
+      deploymentJson: devJson,
+      deployment: dev,
+    });
+    const stagingEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
+      tmp,
+      $,
+      deploymentJson: stagingJson,
+      deployment: staging,
+    });
     const env = {
       ...process.env,
       BNX_GOOGLE_PLAY_FAKE_STORE_ROOT: path.join(tmp, "fake-store"),
@@ -105,12 +118,12 @@ test("google-play deploy and promotion preserve release-health evidence", async 
     const devRun = await $({
       cwd: tmp,
       env,
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${devJson} --artifact-dir ${artifactPath} --records-root ${recordsRoot}`;
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${devJson} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactPath} --records-root ${recordsRoot}`;
     const devSummary = JSON.parse(String(devRun.stdout));
     const promotionRun = await $({
       cwd: tmp,
       env,
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --publish-only --source-run-id ${devSummary.deployRunId} --records-root ${recordsRoot}`;
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --publish-only --source-run-id ${devSummary.deployRunId} --records-root ${recordsRoot}`;
     const promotionSummary = JSON.parse(String(promotionRun.stdout));
     const promotionRecord = await readGooglePlayDeployRecord(promotionSummary.recordPath);
     assert.equal(promotionRecord.operationKind, "promotion");
@@ -158,6 +171,12 @@ test("google-play rollback reuses a prior successful exact artifact", async () =
     await writeConfig(tmp, staging);
     await writeDeploymentJson(stagingJson, staging);
     await ensureNixosSharedHostStageBranch(tmp, $, staging);
+    const stagingEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
+      tmp,
+      $,
+      deploymentJson: stagingJson,
+      deployment: staging,
+    });
     const env = {
       ...process.env,
       BNX_GOOGLE_PLAY_FAKE_STORE_ROOT: path.join(tmp, "fake-store"),
@@ -168,21 +187,21 @@ test("google-play rollback reuses a prior successful exact artifact", async () =
           await $({
             cwd: tmp,
             env,
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --artifact-dir ${artifactA} --records-root ${recordsRoot}`
+          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --artifact-dir ${artifactA} --records-root ${recordsRoot}`
         ).stdout,
       ),
     );
     await $({
       cwd: tmp,
       env,
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --artifact-dir ${artifactB} --records-root ${recordsRoot}`;
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --artifact-dir ${artifactB} --records-root ${recordsRoot}`;
     const rollback = JSON.parse(
       String(
         (
           await $({
             cwd: tmp,
             env,
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --publish-only --rollback --source-run-id ${runA.deployRunId} --records-root ${recordsRoot}`
+          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --publish-only --rollback --source-run-id ${runA.deployRunId} --records-root ${recordsRoot}`
         ).stdout,
       ),
     );

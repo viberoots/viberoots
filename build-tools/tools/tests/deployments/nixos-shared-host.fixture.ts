@@ -19,6 +19,7 @@ import type {
   DeploymentSbomPolicy,
   DeploymentSupplyChainGatePolicy,
 } from "../../deployments/deployment-admission-supply-chain.ts";
+import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture.ts";
 
 export function nixosSharedHostSsrRuntimeContractFixture(
   overrides: Partial<NixosSharedHostSsrRuntimeContract> = {},
@@ -38,6 +39,7 @@ export function nixosSharedHostSsrRuntimeContractFixture(
 export function nixosSharedHostLanePolicyFixture(
   overrides: Partial<DeploymentLanePolicy> = {},
 ): DeploymentLanePolicy {
+  const governance = overrides.governance || nixosSharedHostLaneGovernanceFixture();
   return {
     ref: overrides.ref || "//projects/deployments/pleomino-shared:lane",
     name: overrides.name || "lane",
@@ -49,6 +51,8 @@ export function nixosSharedHostLanePolicyFixture(
     },
     allowedPromotionEdges: overrides.allowedPromotionEdges || ["dev->staging", "staging->prod"],
     artifactReuseMode: overrides.artifactReuseMode || "same_artifact",
+    governanceRef: overrides.governanceRef || governance.ref,
+    governance,
     fingerprint: overrides.fingerprint || "sha256:lane-pleomino",
   };
 }
@@ -85,6 +89,7 @@ export function nixosSharedHostLanePolicyNodeFixture(
     stage_branches: policy.stageBranches,
     allowed_promotion_edges: policy.allowedPromotionEdges,
     artifact_reuse_mode: policy.artifactReuseMode,
+    governance_policy: policy.governanceRef,
     ...overrides,
   };
 }

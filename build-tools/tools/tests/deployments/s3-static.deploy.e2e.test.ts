@@ -4,6 +4,8 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers.ts";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import { s3StaticDeploymentFixture } from "./s3-static.fixture.ts";
 import { installFakeS3StaticAwsCli } from "./s3-static.fake-aws.ts";
 import { startS3StaticPublicServer } from "./s3-static.public-server.ts";
@@ -32,6 +34,12 @@ test("s3-static deploy CLI completes the static-webapp flow end to end", async (
       "utf8",
     );
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
+    const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
+      tmp,
+      $,
+      deploymentJson,
+      deployment,
+    });
     const server = await startS3StaticPublicServer({
       deployment,
       publishRoot: fake.publishRoot,
@@ -47,7 +55,7 @@ test("s3-static deploy CLI completes the static-webapp flow end to end", async (
           BNX_S3_STATIC_FAKE_AWS_LOG: fake.logPath,
           BNX_S3_STATIC_AWS_BIN: path.join(fake.binDir, "aws"),
         },
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.finalOutcome, "succeeded");
       assert.equal(summary.publicUrl, "https://staging.example.test/");
@@ -78,6 +86,13 @@ test("s3-static fails closed on ambiguous publish results", async () => {
       "{}\n",
       "utf8",
     );
+    const admissionEvidence = deploymentAdmissionEvidenceFixture({
+      deployment,
+      operationKind: "deploy",
+      sourceRevision: "1111111111111111111111111111111111111111",
+      artifactIdentity: "artifact-ambiguous",
+      artifactLineageId: "artifact-ambiguous",
+    });
     process.env.PATH = `${fake.binDir}:${process.env.PATH || ""}`;
     process.env.BNX_S3_STATIC_FAKE_PUBLISH_ROOT = fake.publishRoot;
     process.env.BNX_S3_STATIC_FAKE_AWS_LOG = fake.logPath;
@@ -92,6 +107,7 @@ test("s3-static fails closed on ambiguous publish results", async () => {
               deployment,
               artifactDir,
               recordsRoot,
+              admissionEvidence,
             }),
           ),
         /ambiguous publish result/,

@@ -89,6 +89,17 @@ deployment_lane_policy = rule(
         "stage_branches": attrs.dict(key = attrs.string(), value = attrs.string()),
         "allowed_promotion_edges": attrs.list(attrs.string(), default = []),
         "artifact_reuse_mode": attrs.string(default = "same_artifact"),
+        "governance_policy": attrs.option(attrs.dep(), default = None),
+        "labels": attrs.list(attrs.string(), default = []),
+    },
+)
+
+deployment_lane_governance = rule(
+    impl = _write_stub_json,
+    attrs = {
+        "scm_backend": attrs.string(),
+        "repository": attrs.string(),
+        "branch_protections": attrs.list(attrs.dict(key = attrs.string(), value = attrs.string()), default = []),
         "labels": attrs.list(attrs.string(), default = []),
     },
 )

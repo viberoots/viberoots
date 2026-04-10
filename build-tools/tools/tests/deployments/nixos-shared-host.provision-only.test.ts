@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers.ts";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
@@ -20,10 +21,16 @@ test("nixos-shared-host --provision-only writes state and records without publis
     const recordsRoot = path.join(tmp, "records");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
+    const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
+      tmp,
+      $,
+      deploymentJson,
+      deployment,
+    });
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --provision-only`;
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --provision-only`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.operationKind, "provision_only");
     assert.equal(summary.runClassification, "provision_only");

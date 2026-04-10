@@ -12,6 +12,7 @@ import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string): Promise<void> {
@@ -60,6 +61,7 @@ test("shared control plane admits shared_nonprod deploys and executes from the f
           port: server.port,
           rejectUnauthorized: false,
         },
+        admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
         hooks: {
           afterSnapshotWritten: async () => {
             deployment.deploymentId = "tampered";
@@ -140,6 +142,7 @@ test("shared control plane rejects routine deploys whose provisioner plan would 
           hostRoot: path.join(tmp, "host"),
           recordsRoot: path.join(tmp, "records"),
         },
+        admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
       }),
       (error: any) => {
         assert.equal(error.submission.admission.decision, "rejected");
@@ -170,6 +173,7 @@ test("shared control plane rejects replay when the current lane policy no longer
         deployment,
         artifactDir,
         paths,
+        admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
         smokeConnectOverride: {
           protocol: "https:",
           hostname: "127.0.0.1",
@@ -204,6 +208,9 @@ test("shared control plane rejects replay when the current lane policy no longer
             replaySnapshot: replay.sourceReplaySnapshot,
           },
           paths,
+          admissionEvidence: reviewedLaneAdmissionEvidenceFixture({
+            deployment: driftedDeployment,
+          }),
           smokeConnectOverride: {
             protocol: "https:",
             hostname: "127.0.0.1",
@@ -265,6 +272,7 @@ test("shared control plane times out queued runs when another holder keeps the s
             hostRoot: path.join(tmp, "host"),
             recordsRoot: path.join(tmp, "records"),
           },
+          admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
           hooks: {
             onLockAcquired: async () => {
               lockAcquired();
@@ -283,6 +291,9 @@ test("shared control plane times out queued runs when another holder keeps the s
               hostRoot: path.join(tmp, "host"),
               recordsRoot: path.join(tmp, "records"),
             },
+            admissionEvidence: reviewedLaneAdmissionEvidenceFixture({
+              deployment: nixosSharedHostDeploymentFixture(),
+            }),
           }),
           (error: any) => {
             assert.equal(error.submission.admission.decision, "admitted");

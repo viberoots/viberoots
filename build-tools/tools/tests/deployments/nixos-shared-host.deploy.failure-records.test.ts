@@ -9,6 +9,7 @@ import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string, files: Record<string, string>): Promise<void> {
@@ -42,6 +43,7 @@ test("nixos-shared-host deploy records smoke failure when the public health path
             hostRoot,
             recordsRoot,
           },
+          admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
           smokeConnectOverride: {
             protocol: "https:",
             hostname: "127.0.0.1",
@@ -90,6 +92,7 @@ test("nixos-shared-host deploy rejects a reachable hostname serving the wrong ar
             hostRoot: path.join(tmp, "host"),
             recordsRoot: path.join(tmp, "records"),
           },
+          admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
           smokeConnectOverride: {
             protocol: "https:",
             hostname: "127.0.0.1",

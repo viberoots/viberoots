@@ -72,6 +72,7 @@ function requiredEvidencePaths(evidence?: EvidenceLike): string[] {
     ...(evidence.requiredApprovals || []).map((entry) => entry.recordRef || ""),
     ...(evidence.prerequisites || []).map((entry) => entry.sourceRecordPath || ""),
     ...(evidence.prerequisites || []).map((entry) => entry.healthEvidenceRef || ""),
+    evidence.laneGovernance?.recordRef || "",
     evidence.attestation?.recordRef || "",
     evidence.sbom?.recordRef || "",
     ...(evidence.supplyChainGates || []).map((entry) => entry.recordRef || ""),

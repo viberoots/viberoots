@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloudflare-pages-control-plane.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
 import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
 
 async function writeArtifact(root: string): Promise<void> {
@@ -19,6 +20,13 @@ test("cloudflare-pages rejects wrangler config drift before publish begins", asy
     const artifactDir = path.join(tmp, "artifact");
     await writeArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const admissionEvidence = deploymentAdmissionEvidenceFixture({
+      deployment,
+      operationKind: "deploy",
+      sourceRevision: "rev-cloudflare-config-drift-1",
+      artifactIdentity: "artifact-cloudflare-config-drift-1",
+      artifactLineageId: "artifact-cloudflare-config-drift-1",
+    });
     const configPath = path.join(
       tmp,
       "projects",
@@ -39,6 +47,7 @@ test("cloudflare-pages rejects wrangler config drift before publish begins", asy
           deployment,
           artifactDir,
           recordsRoot: path.join(tmp, "records"),
+          admissionEvidence,
         }),
       /does not match deployment provider_target\.project/,
     );

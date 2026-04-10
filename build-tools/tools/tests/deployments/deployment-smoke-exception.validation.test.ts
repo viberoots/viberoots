@@ -8,8 +8,10 @@ import {
 } from "../../deployments/contract.ts";
 import {
   cloudflarePagesAdmissionPolicyNodeFixture,
+  cloudflarePagesLaneGovernanceNodeFixture,
   cloudflarePagesLanePolicyNodeFixture,
 } from "./cloudflare-pages.fixture.ts";
+import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture.ts";
 import {
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostLanePolicyNodeFixture,
@@ -65,6 +67,7 @@ function nixosNode(overrides: Partial<GraphNode> = {}): GraphNode {
 test("validation rejects protected/shared smoke exceptions with missing reviewed fields", () => {
   const { errors } = extractCloudflarePagesDeployments([
     staticWebappComponent("//projects/apps/pleomino:app"),
+    cloudflarePagesLaneGovernanceNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
     cloudflareNode({
@@ -83,6 +86,7 @@ test("validation rejects protected/shared smoke exceptions with missing reviewed
 test("validation rejects smoke exceptions whose review boundary has expired", () => {
   const { errors } = extractNixosSharedHostDeployments([
     staticWebappComponent("//projects/apps/demoapp:app"),
+    nixosSharedHostLaneGovernanceNodeFixture(),
     nixosSharedHostLanePolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture(),
     nixosNode({
@@ -100,6 +104,7 @@ test("validation rejects smoke exceptions whose review boundary has expired", ()
 test("validation preserves reviewed smoke exceptions from authoritative deployment metadata", () => {
   const { deployments, errors } = extractCloudflarePagesDeployments([
     staticWebappComponent("//projects/apps/pleomino:app"),
+    cloudflarePagesLaneGovernanceNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
     cloudflareNode({
@@ -120,6 +125,7 @@ test("validation preserves reviewed smoke exceptions from authoritative deployme
 test("validation rejects unsupported smoke runner classes and non-positive timeout budgets", () => {
   const { errors } = extractCloudflarePagesDeployments([
     staticWebappComponent("//projects/apps/pleomino:app"),
+    cloudflarePagesLaneGovernanceNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
     cloudflareNode({
@@ -138,6 +144,7 @@ test("validation rejects unsupported smoke runner classes and non-positive timeo
 test("validation preserves explicit smoke timeout metadata for reviewed static-webapp slices", () => {
   const { deployments, errors } = extractCloudflarePagesDeployments([
     staticWebappComponent("//projects/apps/pleomino:app"),
+    cloudflarePagesLaneGovernanceNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
     cloudflareNode({

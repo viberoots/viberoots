@@ -7,6 +7,7 @@ import {
   type CloudflarePagesDeployment,
 } from "../../deployments/contract.ts";
 import type { GraphNode } from "../../lib/graph.ts";
+import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture.ts";
 import {
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostAdmissionPolicyNodeFixture,
@@ -98,4 +99,10 @@ export function cloudflarePagesLanePolicyNodeFixture(
   overrides: Partial<GraphNode> = {},
 ): GraphNode {
   return nixosSharedHostLanePolicyNodeFixture(overrides);
+}
+
+export function cloudflarePagesLaneGovernanceNodeFixture(
+  overrides: Partial<GraphNode> = {},
+): GraphNode {
+  return nixosSharedHostLaneGovernanceNodeFixture(overrides);
 }

@@ -1,13 +1,18 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import type { NixosSharedHostDeployment } from "../../deployments/contract.ts";
+import { resolveDeploymentFromTarget } from "../../deployments/deployment-query.ts";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
 import { createNixosSharedHostInstallFixture } from "./nixos-shared-host.install.fixture.ts";
+
+export const REVIEWED_PLEOMINO_DEPLOYMENT_LABEL = "//projects/deployments/pleomino-dev:deploy";
 
 export function pleominoDeploymentFixture() {
   return nixosSharedHostDeploymentFixture({
     deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino-dev:deploy",
+    label: REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
     component: { target: "//projects/apps/pleomino:app" },
     runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
   });
@@ -70,13 +75,26 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
   await fsp.writeFile(
     sharedTargetsPath,
     [
-      'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_policy")',
+      'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_governance", "deployment_lane_policy")',
+      "",
+      "deployment_lane_governance(",
+      '    name = "lane_governance",',
+      '    scm_backend = "github",',
+      '    repository = "kiltyj/bucknix-fresh",',
+      "    branch_protections = [",
+      '        {"stage": "dev", "branch": "env/pleomino/dev", "required_checks": "", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},',
+      '        {"stage": "staging", "branch": "env/pleomino/staging", "required_checks": "deploy/pleomino-staging", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},',
+      '        {"stage": "prod", "branch": "env/pleomino/prod", "required_checks": "deploy/pleomino-prod", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},',
+      "    ],",
+      '    visibility = ["PUBLIC"],',
+      ")",
       "",
       "deployment_lane_policy(",
       '    name = "lane",',
       '    stages = ["dev", "staging", "prod"],',
       '    stage_branches = {"dev": "env/pleomino/dev", "staging": "env/pleomino/staging", "prod": "env/pleomino/prod"},',
       '    allowed_promotion_edges = ["dev->staging", "staging->prod"],',
+      '    governance_policy = ":lane_governance",',
       '    visibility = ["PUBLIC"],',
       ")",
       "",
@@ -109,6 +127,27 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
     ].join("\n"),
     "utf8",
   );
+}
+
+export async function writeReviewedPleominoAdmissionEvidence(
+  tmp: string,
+  $: any,
+): Promise<{ admissionEvidencePath: string; deployment: NixosSharedHostDeployment }> {
+  const deploymentJson = path.join(tmp, "reviewed-deployment.json");
+  const deployment = (await resolveDeploymentFromTarget(
+    tmp,
+    REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+  )) as NixosSharedHostDeployment;
+  await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
+  return {
+    deployment,
+    admissionEvidencePath: await writeReviewedLaneAdmissionEvidenceJson({
+      tmp,
+      $,
+      deploymentJson,
+      deployment,
+    }),
+  };
 }
 
 export async function prepareReviewedRemoteHostPaths(opts: {

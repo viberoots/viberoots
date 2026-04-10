@@ -2,6 +2,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { NixosSharedHostDeployment } from "./contract.ts";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import {
   buildRemoteArtifactStageArgv,
   buildRemoteCleanupScript,
@@ -140,6 +141,7 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
   plan: NixosSharedHostRemotePlan;
   localArtifactDir: string;
   retainRemoteArtifact: boolean;
+  admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: NixosSharedHostRemoteSmokeConnectOverride;
   hostApply: NixosSharedHostRemotePlan["hostApply"];
 }): Promise<NixosSharedHostRemoteDeploySummary> {
@@ -180,6 +182,9 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
           plan: opts.plan,
           deploymentLabel: opts.deployment.label,
           remoteArtifactPath: stagedArtifactPath,
+          ...(opts.admissionEvidence
+            ? { admissionEvidenceJson: JSON.stringify(opts.admissionEvidence) }
+            : {}),
           ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
         }),
       ),

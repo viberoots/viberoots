@@ -9,6 +9,7 @@ import {
   resolveNixosSharedHostReplaySource,
 } from "../../deployments/nixos-shared-host-replay.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
@@ -42,6 +43,13 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const admissionEvidence = deploymentAdmissionEvidenceFixture({
+      deployment,
+      operationKind: "deploy",
+      sourceRevision: "rev-replay-contract-1",
+      artifactIdentity: "artifact-replay-contract-1",
+      artifactLineageId: "artifact-replay-contract-1",
+    });
     const server = await startNixosSharedHostPublicServer({
       deployment,
       hostRoot,
@@ -58,6 +66,7 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
           hostRoot,
           recordsRoot,
         },
+        admissionEvidence,
         smokeConnectOverride: {
           protocol: "https:",
           hostname: "127.0.0.1",
@@ -120,6 +129,13 @@ test("nixos-shared-host replay resolution fails closed when the stored exact art
     const hostRoot = path.join(tmp, "host");
     await writeArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const admissionEvidence = deploymentAdmissionEvidenceFixture({
+      deployment,
+      operationKind: "deploy",
+      sourceRevision: "rev-replay-contract-2",
+      artifactIdentity: "artifact-replay-contract-2",
+      artifactLineageId: "artifact-replay-contract-2",
+    });
     const server = await startNixosSharedHostPublicServer({
       deployment,
       hostRoot,
@@ -136,6 +152,7 @@ test("nixos-shared-host replay resolution fails closed when the stored exact art
           hostRoot,
           recordsRoot: path.join(tmp, "records"),
         },
+        admissionEvidence,
         smokeConnectOverride: {
           protocol: "https:",
           hostname: "127.0.0.1",
@@ -184,6 +201,13 @@ test("nixos-shared-host replay snapshots preserve SSR runtime-contract provenanc
     const recordsRoot = path.join(tmp, "records");
     await writeSsrArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const admissionEvidence = deploymentAdmissionEvidenceFixture({
+      deployment,
+      operationKind: "deploy",
+      sourceRevision: "rev-replay-contract-3",
+      artifactIdentity: "artifact-replay-contract-3",
+      artifactLineageId: "artifact-replay-contract-3",
+    });
     const server = await startNixosSharedHostPublicServer({
       deployment,
       hostRoot,
@@ -200,6 +224,7 @@ test("nixos-shared-host replay snapshots preserve SSR runtime-contract provenanc
           hostRoot,
           recordsRoot,
         },
+        admissionEvidence,
         smokeConnectOverride: {
           protocol: "http:",
           hostname: "127.0.0.1",

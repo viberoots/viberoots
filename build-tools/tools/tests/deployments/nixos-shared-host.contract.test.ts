@@ -6,6 +6,7 @@ import {
   deriveNixosSharedHostProviderTarget,
   extractNixosSharedHostDeployments,
 } from "../../deployments/contract.ts";
+import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture.ts";
 import {
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostLanePolicyNodeFixture,
@@ -35,6 +36,7 @@ test("deriveNixosSharedHostProviderTarget normalizes hostname, container name, a
 test("extractNixosSharedHostDeployments defaults protection_class to shared_nonprod", () => {
   const nodes: GraphNode[] = [
     staticWebappComponent("//projects/apps/demoapp:app"),
+    nixosSharedHostLaneGovernanceNodeFixture(),
     nixosSharedHostLanePolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture(),
     {
@@ -70,6 +72,7 @@ test("extractNixosSharedHostDeployments defaults protection_class to shared_nonp
 test("extractNixosSharedHostDeployments preserves valid prerequisite metadata", () => {
   const nodes: GraphNode[] = [
     staticWebappComponent("//projects/apps/demoapp:app"),
+    nixosSharedHostLaneGovernanceNodeFixture(),
     nixosSharedHostLanePolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture({
@@ -124,6 +127,7 @@ test("extractNixosSharedHostDeployments preserves valid prerequisite metadata", 
 test("extractNixosSharedHostDeployments preserves bootstrap policy metadata", () => {
   const nodes: GraphNode[] = [
     staticWebappComponent("//projects/apps/demoapp:app"),
+    nixosSharedHostLaneGovernanceNodeFixture(),
     nixosSharedHostLanePolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture(),
     {

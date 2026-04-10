@@ -10,6 +10,10 @@ import {
   kubernetesAdmissionPolicyNodeFixture,
   kubernetesLanePolicyNodeFixture,
 } from "./kubernetes.fixture.ts";
+import {
+  nixosSharedHostLaneGovernanceFixture,
+  nixosSharedHostLaneGovernanceNodeFixture,
+} from "./deployment-lane-governance.fixture.ts";
 
 function serviceComponent(label: string): GraphNode {
   return { name: label, labels: ["kind:app"] };
@@ -37,6 +41,43 @@ test("extractKubernetesDeployments reads shared-platform provider target and rol
     serviceComponent("//projects/observability/otel-collector:image"),
     serviceComponent("//projects/observability/metrics-agent:image"),
     kubernetesLanePolicyNodeFixture(),
+    nixosSharedHostLaneGovernanceNodeFixture({
+      branch_protections: nixosSharedHostLaneGovernanceFixture({
+        branchProtections: [
+          {
+            stage: "dev",
+            branch: "env/pleomino/dev",
+            requiredChecks: ["deploy/pleomino-dev"],
+            fastForwardOnly: true,
+            normalAdvancePrincipals: ["app:deploy-bot"],
+            emergencyDirectPushPrincipals: ["team:sre-break-glass"],
+          },
+          {
+            stage: "staging",
+            branch: "env/pleomino/staging",
+            requiredChecks: ["deploy/pleomino-staging"],
+            fastForwardOnly: true,
+            normalAdvancePrincipals: ["app:deploy-bot"],
+            emergencyDirectPushPrincipals: ["team:sre-break-glass"],
+          },
+          {
+            stage: "prod",
+            branch: "env/pleomino/prod",
+            requiredChecks: ["deploy/shared-observability-prod"],
+            fastForwardOnly: true,
+            normalAdvancePrincipals: ["app:deploy-bot"],
+            emergencyDirectPushPrincipals: ["team:sre-break-glass"],
+          },
+        ],
+      }).branchProtections.map((entry) => ({
+        stage: entry.stage,
+        branch: entry.branch,
+        required_checks: entry.requiredChecks.join(","),
+        fast_forward_only: "true",
+        normal_advance_principals: entry.normalAdvancePrincipals.join(","),
+        emergency_direct_push_principals: entry.emergencyDirectPushPrincipals.join(","),
+      })),
+    }),
     kubernetesAdmissionPolicyNodeFixture(),
     {
       name: "//projects/deployments/shared-observability-prod:deploy",

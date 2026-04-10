@@ -2,10 +2,13 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { NixosSharedHostDeployment } from "../../deployments/contract.ts";
+import { resolveDeploymentFromTarget } from "../../deployments/deployment-query.ts";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
+  nixosSharedHostLanePolicyFixture,
 } from "./nixos-shared-host.fixture.ts";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import { createNixosSharedHostInstallFixture } from "./nixos-shared-host.install.fixture.ts";
 import { installFakeRemoteTransport } from "./nixos-shared-host.remote-transport.fake.ts";
 
@@ -15,6 +18,7 @@ export type RemoteExecFixture = {
   deployment: NixosSharedHostDeployment;
   env: Record<string, string>;
   artifactDir: string;
+  admissionEvidencePath: string;
   profileRoot: string;
   remoteRuntimeRoot: string;
   remoteRecordsRoot: string;
@@ -27,6 +31,37 @@ export function pleominoDeploymentFixture(): NixosSharedHostDeployment {
     label: REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
     component: { target: "//projects/apps/pleomino:app" },
     runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
+    lanePolicy: nixosSharedHostLanePolicyFixture({
+      governance: {
+        ...nixosSharedHostDeploymentFixture().lanePolicy.governance,
+        branchProtections: [
+          {
+            stage: "dev",
+            branch: "env/pleomino/dev",
+            requiredChecks: [],
+            fastForwardOnly: true,
+            normalAdvancePrincipals: ["app:deploy-bot"],
+            emergencyDirectPushPrincipals: ["team:sre-break-glass"],
+          },
+          {
+            stage: "staging",
+            branch: "env/pleomino/staging",
+            requiredChecks: ["deploy/pleomino-staging"],
+            fastForwardOnly: true,
+            normalAdvancePrincipals: ["app:deploy-bot"],
+            emergencyDirectPushPrincipals: ["team:sre-break-glass"],
+          },
+          {
+            stage: "prod",
+            branch: "env/pleomino/prod",
+            requiredChecks: ["deploy/pleomino-prod"],
+            fastForwardOnly: true,
+            normalAdvancePrincipals: ["app:deploy-bot"],
+            emergencyDirectPushPrincipals: ["team:sre-break-glass"],
+          },
+        ],
+      },
+    }),
   });
 }
 
@@ -82,13 +117,26 @@ async function installReviewedPleominoTargets(tmp: string): Promise<void> {
   await fsp.writeFile(
     sharedTargetsPath,
     [
-      'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_policy")',
+      'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_governance", "deployment_lane_policy")',
+      "",
+      "deployment_lane_governance(",
+      '    name = "lane_governance",',
+      '    scm_backend = "github",',
+      '    repository = "kiltyj/bucknix-fresh",',
+      "    branch_protections = [",
+      '        {"stage": "dev", "branch": "env/pleomino/dev", "required_checks": "", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},',
+      '        {"stage": "staging", "branch": "env/pleomino/staging", "required_checks": "deploy/pleomino-staging", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},',
+      '        {"stage": "prod", "branch": "env/pleomino/prod", "required_checks": "deploy/pleomino-prod", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},',
+      "    ],",
+      '    visibility = ["PUBLIC"],',
+      ")",
       "",
       "deployment_lane_policy(",
       '    name = "lane",',
       '    stages = ["dev", "staging", "prod"],',
       '    stage_branches = {"dev": "env/pleomino/dev", "staging": "env/pleomino/staging", "prod": "env/pleomino/prod"},',
       '    allowed_promotion_edges = ["dev->staging", "staging->prod"],',
+      '    governance_policy = ":lane_governance",',
       '    visibility = ["PUBLIC"],',
       ")",
       "",
@@ -150,14 +198,19 @@ export async function prepareRemoteExecFixture(opts: {
   artifactFiles: Record<string, string>;
   remoteRepoPath?: string;
 }): Promise<RemoteExecFixture> {
-  const deployment = pleominoDeploymentFixture();
+  const deploymentJsonPath = path.join(opts.tmp, "reviewed-deployment.json");
   const { env } = await installFakeRemoteTransport(opts.tmp);
   const artifactDir = path.join(opts.tmp, "artifact");
   const profileRoot = path.join(opts.tmp, "profiles");
+  const admissionEvidencePath = path.join(opts.tmp, "admission-evidence.json");
   const remoteRuntimeRoot = path.join(opts.tmp, "remote-runtime");
   const remoteRecordsRoot = path.join(opts.tmp, "remote-records");
   const remoteStatePath = path.join(opts.tmp, "remote-state", "platform-state.json");
   await installReviewedPleominoTargets(opts.tmp);
+  const deployment = (await resolveDeploymentFromTarget(
+    opts.tmp,
+    REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+  )) as NixosSharedHostDeployment;
   await ensureNixosSharedHostStageBranch(opts.tmp, opts.$, deployment);
   await prepareReviewedRemoteHostPaths({
     remoteStatePath,
@@ -165,6 +218,13 @@ export async function prepareRemoteExecFixture(opts: {
     remoteRecordsRoot,
   });
   await writeArtifact(artifactDir, opts.artifactFiles);
+  await fsp.writeFile(deploymentJsonPath, JSON.stringify(deployment, null, 2) + "\n", "utf8");
+  await writeReviewedLaneAdmissionEvidenceJson({
+    tmp: opts.tmp,
+    $: opts.$,
+    deploymentJson: deploymentJsonPath,
+    deployment,
+  });
   await installClientProfile(
     opts.$,
     profileRoot,
@@ -177,6 +237,7 @@ export async function prepareRemoteExecFixture(opts: {
     deployment,
     env,
     artifactDir,
+    admissionEvidencePath,
     profileRoot,
     remoteRuntimeRoot,
     remoteRecordsRoot,

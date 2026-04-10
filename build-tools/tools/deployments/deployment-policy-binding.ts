@@ -47,6 +47,34 @@ export function resolveSharedDeploymentPolicies(opts: {
       );
     }
     const stageBranch = lanePolicy.stageBranches[opts.environmentStage];
+    const governanceProtection = lanePolicy.governance.branchProtections.find(
+      (entry) => entry.stage === opts.environmentStage,
+    );
+    if (!governanceProtection) {
+      opts.errors.push(
+        deploymentError(
+          opts.label,
+          `lane governance ${lanePolicy.governanceRef} does not define stage ${opts.environmentStage}`,
+        ),
+      );
+    } else if (governanceProtection.branch !== stageBranch) {
+      opts.errors.push(
+        deploymentError(
+          opts.label,
+          `lane governance ${lanePolicy.governanceRef} branch mismatch for ${opts.environmentStage}`,
+        ),
+      );
+    } else if (
+      admissionPolicy &&
+      governanceProtection.requiredChecks.join("\n") !== admissionPolicy.requiredChecks.join("\n")
+    ) {
+      opts.errors.push(
+        deploymentError(
+          opts.label,
+          `admission_policy ${opts.admissionPolicyRef} required_checks must match governance for ${opts.environmentStage}`,
+        ),
+      );
+    }
     if (admissionPolicy && stageBranch && !admissionPolicy.allowedRefs.includes(stageBranch)) {
       opts.errors.push(
         deploymentError(

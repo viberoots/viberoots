@@ -14,12 +14,19 @@ import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-ser
 
 test("remote deploy stages the artifact, runs deploy remotely, writes remote records, and cleans up by default", async () => {
   await runInTemp("nixos-shared-host-remote-exec", async (tmp, $) => {
-    const { deployment, env, artifactDir, profileRoot, remoteRuntimeRoot, remoteRecordsRoot } =
-      await prepareRemoteExecFixture({
-        tmp,
-        $,
-        artifactFiles: { "index.html": "<html>pleomino</html>\n", healthz: "ok\n" },
-      });
+    const {
+      deployment,
+      env,
+      artifactDir,
+      admissionEvidencePath,
+      profileRoot,
+      remoteRuntimeRoot,
+      remoteRecordsRoot,
+    } = await prepareRemoteExecFixture({
+      tmp,
+      $,
+      artifactFiles: { "index.html": "<html>pleomino</html>\n", healthz: "ok\n" },
+    });
     const server = await startNixosSharedHostPublicServer({
       deployment,
       hostRoot: remoteRuntimeRoot,
@@ -28,7 +35,7 @@ test("remote deploy stages the artifact, runs deploy remotely, writes remote rec
       const result = await $({
         cwd: tmp,
         env: remoteExecEnv(env),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.executionMode, "remote-profile");
       assert.equal(summary.stagedArtifactCleanup, "removed");
@@ -58,7 +65,7 @@ test("remote deploy stages the artifact, runs deploy remotely, writes remote rec
 
 test("remote deploy retains the staged artifact when retention is requested explicitly", async () => {
   await runInTemp("nixos-shared-host-remote-retain", async (tmp, $) => {
-    const { deployment, env, artifactDir, profileRoot, remoteRuntimeRoot } =
+    const { deployment, env, artifactDir, admissionEvidencePath, profileRoot, remoteRuntimeRoot } =
       await prepareRemoteExecFixture({
         tmp,
         $,
@@ -72,7 +79,7 @@ test("remote deploy retains the staged artifact when retention is requested expl
       const result = await $({
         cwd: tmp,
         env: remoteExecEnv(env),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --retain-remote-artifact --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --retain-remote-artifact --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.stagedArtifactCleanup, "retained");
       assert.equal(summary.retentionRequested, true);
@@ -88,16 +95,18 @@ test("remote deploy retains the staged artifact when retention is requested expl
 
 test("remote deploy fails closed when the reviewed remote repo checkout is missing", async () => {
   await runInTemp("nixos-shared-host-remote-missing-repo", async (tmp, $) => {
-    const { env, artifactDir, profileRoot } = await prepareRemoteExecFixture({
-      tmp,
-      $,
-      artifactFiles: { "index.html": "<html>missing</html>\n", healthz: "ok\n" },
-      remoteRepoPath: path.join(tmp, "does-not-exist"),
-    });
+    const { env, artifactDir, admissionEvidencePath, profileRoot } = await prepareRemoteExecFixture(
+      {
+        tmp,
+        $,
+        artifactFiles: { "index.html": "<html>missing</html>\n", healthz: "ok\n" },
+        remoteRepoPath: path.join(tmp, "does-not-exist"),
+      },
+    );
     const result = await $({
       cwd: tmp,
       env: remoteExecEnv(env),
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /remote repo preflight failed/);
     assert.match(String(result.stderr), /missing reviewed remote repo checkout/);

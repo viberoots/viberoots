@@ -8,6 +8,7 @@ import { submitDeploymentControlPlaneRunAction } from "../../deployments/deploym
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
 import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
@@ -77,6 +78,13 @@ test("progressive rollout can pause and resume on the same deploy_run_id", async
     await writeArtifact(frontendArtifact, "frontend");
     await writeArtifact(apiArtifact, "api");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const admissionEvidence = deploymentAdmissionEvidenceFixture({
+      deployment,
+      operationKind: "deploy",
+      sourceRevision: "rev-progressive-1",
+      artifactIdentity: "artifact-progressive-1",
+      artifactLineageId: "artifact-progressive-1",
+    });
     const server = await startStaticWebappHttpsMultiServer({
       hosts: {
         "demoapp.apps.kilty.io": () =>
@@ -99,6 +107,7 @@ test("progressive rollout can pause and resume on the same deploy_run_id", async
             hostRoot,
             recordsRoot,
           },
+          admissionEvidence,
           smokeConnectOverride: {
             protocol: "https:",
             hostname: "127.0.0.1",
@@ -145,6 +154,13 @@ test("abort finishes a paused progressive rollout with an aborted record", async
     await writeArtifact(frontendArtifact, "frontend");
     await writeArtifact(apiArtifact, "api");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const admissionEvidence = deploymentAdmissionEvidenceFixture({
+      deployment,
+      operationKind: "deploy",
+      sourceRevision: "rev-progressive-2",
+      artifactIdentity: "artifact-progressive-2",
+      artifactLineageId: "artifact-progressive-2",
+    });
     const server = await startStaticWebappHttpsMultiServer({
       hosts: {
         "demoapp.apps.kilty.io": () =>
@@ -167,6 +183,7 @@ test("abort finishes a paused progressive rollout with an aborted record", async
             hostRoot,
             recordsRoot,
           },
+          admissionEvidence,
           smokeConnectOverride: {
             protocol: "https:",
             hostname: "127.0.0.1",
@@ -207,6 +224,13 @@ test("newer runs are rejected while a progressive rollout is paused", async () =
     await writeArtifact(frontendArtifact, "frontend");
     await writeArtifact(apiArtifact, "api");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const admissionEvidence = deploymentAdmissionEvidenceFixture({
+      deployment,
+      operationKind: "deploy",
+      sourceRevision: "rev-progressive-3",
+      artifactIdentity: "artifact-progressive-3",
+      artifactLineageId: "artifact-progressive-3",
+    });
     const server = await startStaticWebappHttpsMultiServer({
       hosts: {
         "demoapp.apps.kilty.io": () =>
@@ -228,6 +252,7 @@ test("newer runs are rejected while a progressive rollout is paused", async () =
             hostRoot,
             recordsRoot,
           },
+          admissionEvidence,
           smokeConnectOverride: {
             protocol: "https:",
             hostname: "127.0.0.1",
@@ -252,6 +277,7 @@ test("newer runs are rejected while a progressive rollout is paused", async () =
             hostRoot,
             recordsRoot,
           },
+          admissionEvidence,
         }),
         (error: any) => {
           assert.equal(error.submission.rejectionCode, "supersedence_blocked");

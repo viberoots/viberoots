@@ -166,7 +166,14 @@ async function main() {
       "kubernetes deploy execution is not implemented yet; use --validate-only or --list for the current provider-contract slice",
     );
   }
-  if (await maybeRunNixosSharedHostRemoteProfile({ workspaceRoot, deployment })) return;
+  if (
+    await maybeRunNixosSharedHostRemoteProfile({
+      workspaceRoot,
+      deployment,
+      ...(admissionEvidence ? { admissionEvidence } : {}),
+    })
+  )
+    return;
   await runNixosSharedHostDeployFrontDoor({
     workspaceRoot,
     deployment,

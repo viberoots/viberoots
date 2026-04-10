@@ -5,6 +5,7 @@ import { test } from "node:test";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 import {
   replayDeploymentFixture,
@@ -29,6 +30,7 @@ test("rollback rejects a successful retry source while retry reuse stays availab
         deployment,
         artifactDir,
         paths,
+        admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
         smokeConnectOverride: replaySmokeConnect(server.port),
       });
       const retrySource = await resolveReplaySelection({
@@ -54,6 +56,9 @@ test("rollback rejects a successful retry source while retry reuse stays availab
           replaySnapshot: retrySource.sourceReplaySnapshot,
         },
         paths,
+        admissionEvidence: reviewedLaneAdmissionEvidenceFixture({
+          deployment: retrySource.deployment,
+        }),
         smokeConnectOverride: replaySmokeConnect(server.port),
       });
       const retrySelection = await resolveReplaySelection({
@@ -97,6 +102,7 @@ test("rollback rejects a successful rollback source while retry reuse stays avai
         deployment,
         artifactDir,
         paths,
+        admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
         smokeConnectOverride: replaySmokeConnect(server.port),
       });
       const rollbackSource = await resolveReplaySelection({
@@ -124,6 +130,9 @@ test("rollback rejects a successful rollback source while retry reuse stays avai
           replaySnapshot: rollbackSource.sourceReplaySnapshot,
         },
         paths,
+        admissionEvidence: reviewedLaneAdmissionEvidenceFixture({
+          deployment: rollbackSource.deployment,
+        }),
         smokeConnectOverride: replaySmokeConnect(server.port),
       });
       const retrySelection = await resolveReplaySelection({
@@ -163,6 +172,7 @@ test("rollback rejects explicit-removal source runs with actionable diagnostics"
         deployment,
         artifactDir,
         paths,
+        admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
         smokeConnectOverride: replaySmokeConnect(server.port),
       });
       const removal = await submitNixosSharedHostControlPlaneRun({
@@ -170,6 +180,7 @@ test("rollback rejects explicit-removal source runs with actionable diagnostics"
         operationKind: "explicit_removal",
         deployment,
         paths,
+        admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
       });
       await assert.rejects(
         resolveReplaySelection({
@@ -201,6 +212,7 @@ test("rollback rejects non-successful runs while retry reuse stays available", a
         deployment,
         artifactDir,
         paths,
+        admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
         smokeConnectOverride: replaySmokeConnect(server.port),
       }).then(
         () => assert.fail("expected deploy failure"),

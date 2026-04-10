@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { submitS3StaticDeploy } from "../../deployments/s3-static-deploy.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
 import { s3StaticDeploymentFixture } from "./s3-static.fixture.ts";
 import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
 
@@ -19,6 +20,13 @@ test("s3-static rejects provider config drift before publish begins", async () =
     const artifactDir = path.join(tmp, "artifact");
     await writeArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    const admissionEvidence = deploymentAdmissionEvidenceFixture({
+      deployment,
+      operationKind: "deploy",
+      sourceRevision: "rev-s3-config-drift-1",
+      artifactIdentity: "artifact-s3-config-drift-1",
+      artifactLineageId: "artifact-s3-config-drift-1",
+    });
     const configPath = path.join(
       tmp,
       "projects",
@@ -39,6 +47,7 @@ test("s3-static rejects provider config drift before publish begins", async () =
           deployment,
           artifactDir,
           recordsRoot: path.join(tmp, "records"),
+          admissionEvidence,
         }),
       /does not match deployment provider_target\.bucket/,
     );

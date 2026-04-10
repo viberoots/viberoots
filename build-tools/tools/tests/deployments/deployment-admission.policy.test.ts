@@ -10,6 +10,7 @@ import {
 } from "./deployment-admission.fixture.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
 
 function admittedContextFixture(
   deployment: ReturnType<typeof nixosSharedHostDeploymentFixture>,
@@ -162,7 +163,10 @@ test("retry may reuse approval only when policy explicitly allows same-lineage r
     admittedContext,
     sourceRecord,
     artifactLineageId: "artifact-lineage-123",
-    evidence: { requestedBy: { principalId: "user:submitter" } },
+    evidence: reviewedLaneAdmissionEvidenceFixture({
+      deployment,
+      requestedBy: "user:submitter",
+    }),
   });
   assert.equal(evaluation.requiredApprovals[0]?.status, "reused");
   await assert.rejects(
@@ -183,7 +187,10 @@ test("retry may reuse approval only when policy explicitly allows same-lineage r
       admittedContext,
       sourceRecord,
       artifactLineageId: "artifact-lineage-123",
-      evidence: { requestedBy: { principalId: "user:submitter" } },
+      evidence: reviewedLaneAdmissionEvidenceFixture({
+        deployment,
+        requestedBy: "user:submitter",
+      }),
     }),
     /requires approval human\/retry/,
   );

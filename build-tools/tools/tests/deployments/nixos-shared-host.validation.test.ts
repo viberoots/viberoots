@@ -4,6 +4,7 @@ import { test } from "node:test";
 import type { GraphNode } from "../../lib/graph.ts";
 import { extractNixosSharedHostDeployments } from "../../deployments/contract.ts";
 import { REVIEWED_NON_STATIC_COMPONENT_KINDS } from "../../deployments/deployment-provider-capabilities.ts";
+import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture.ts";
 import {
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostLanePolicyNodeFixture,
@@ -46,7 +47,11 @@ function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
 }
 
 function policyNodes(): GraphNode[] {
-  return [nixosSharedHostLanePolicyNodeFixture(), nixosSharedHostAdmissionPolicyNodeFixture()];
+  return [
+    nixosSharedHostLaneGovernanceNodeFixture(),
+    nixosSharedHostLanePolicyNodeFixture(),
+    nixosSharedHostAdmissionPolicyNodeFixture(),
+  ];
 }
 
 test("validation rejects duplicate app_name collisions", () => {
@@ -80,6 +85,16 @@ test("validation rejects invalid target_group", () => {
     deploymentNode({ target_group: "group.a" }),
   ]);
   assert.ok(errors.some((entry) => entry.includes("target_group must be lowercase")));
+});
+
+test("validation rejects protected/shared lane policy without governance metadata", () => {
+  const { errors } = extractNixosSharedHostDeployments([
+    staticWebappComponent("//projects/apps/demoapp:app"),
+    nixosSharedHostLanePolicyNodeFixture({ governance_policy: "" }),
+    nixosSharedHostAdmissionPolicyNodeFixture(),
+    deploymentNode(),
+  ]);
+  assert.ok(errors.some((entry) => entry.includes("lane policy must define governance_policy")));
 });
 
 test("validation rejects unsupported component kinds for nixos-shared-host", () => {

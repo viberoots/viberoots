@@ -3,6 +3,7 @@ import path from "node:path";
 import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
 import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import {
   defaultManagedRoot,
   normalizeHostLogicalPath,
@@ -131,6 +132,7 @@ async function createPlan(
 export async function maybeRunNixosSharedHostRemoteProfile(opts: {
   workspaceRoot: string;
   deployment: NixosSharedHostDeployment;
+  admissionEvidence?: DeploymentAdmissionEvidence;
 }): Promise<boolean> {
   const profileRequested = hasFlag("profile") || hasFlag("profile-root");
   const profileName = hasFlag("profile") ? requireNamedFlagValue("profile") : "";
@@ -184,6 +186,7 @@ export async function maybeRunNixosSharedHostRemoteProfile(opts: {
         plan,
         localArtifactDir: await resolveLocalArtifactDir(opts.workspaceRoot, opts.deployment),
         retainRemoteArtifact,
+        ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
         ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
         hostApply: plan.hostApply,
       }),

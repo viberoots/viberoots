@@ -6,6 +6,7 @@ import {
   type DeploymentAdmissionOperationKind,
 } from "../../deployments/deployment-admission-binding.ts";
 import type { DeploymentAdmissionEvidence } from "../../deployments/deployment-admission-evidence.ts";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
 
 type EvidenceOpts = {
   deployment: DeploymentTarget;
@@ -60,7 +61,12 @@ export function deploymentAdmissionEvidenceFixture(
   const requiredChecks = opts.requiredChecks || opts.deployment.admissionPolicy.requiredChecks;
   const requiredApprovals =
     opts.requiredApprovals || opts.deployment.admissionPolicy.requiredApprovals;
+  const laneGovernanceEvidence =
+    opts.deployment.protectionClass === "local_only"
+      ? {}
+      : reviewedLaneAdmissionEvidenceFixture({ deployment: opts.deployment });
   return {
+    ...laneGovernanceEvidence,
     requestedBy: { principalId: opts.requestedBy || "user:submitter" },
     ...(requiredChecks.length > 0
       ? {

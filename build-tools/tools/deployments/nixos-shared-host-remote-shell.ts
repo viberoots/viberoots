@@ -65,6 +65,7 @@ export function buildRemoteDeployScript(opts: {
   plan: NixosSharedHostRemotePlan;
   deploymentLabel: string;
   remoteArtifactPath: string;
+  admissionEvidenceJson?: string;
   smokeConnectOverride?: NixosSharedHostRemoteSmokeConnectOverride;
 }): string {
   const args: Array<[string, string]> = [
@@ -81,10 +82,21 @@ export function buildRemoteDeployScript(opts: {
       ["smoke-connect-protocol", opts.smokeConnectOverride.protocol],
     );
   }
+  const admissionEvidenceSetup = opts.admissionEvidenceJson
+    ? [
+        'admission_evidence_json="$(mktemp)"',
+        `printf '%s\\n' ${shSingleQuote(opts.admissionEvidenceJson)} > "$admission_evidence_json"`,
+        "trap 'rm -f \"$admission_evidence_json\"' EXIT",
+      ]
+    : [];
+  const admissionEvidenceArg = opts.admissionEvidenceJson
+    ? ' --admission-evidence-json "$admission_evidence_json"'
+    : "";
   return [
     "set -euo pipefail",
     `cd ${shSingleQuote(opts.plan.remoteRepoPath)}`,
-    `exec direnv exec . build-tools/tools/bin/deploy ${commandArgs(args)}`,
+    ...admissionEvidenceSetup,
+    `exec direnv exec . build-tools/tools/bin/deploy ${commandArgs(args)}${admissionEvidenceArg}`,
   ].join("; ");
 }
 

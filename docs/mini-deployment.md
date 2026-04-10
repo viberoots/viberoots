@@ -240,6 +240,11 @@ For the current `mini` shared-dev deployment path, that means:
     environment stage, target branch head revision, and canonical provider-target identity
 - durable run records and replay snapshots preserve that admitted context so retry and rollback do
   not silently reinterpret current repo metadata as if it had been part of the original run
+- the lane also resolves one reviewed governance object for `env/pleomino/dev`,
+  `env/pleomino/staging`, and `env/pleomino/prod`
+  - verification compares that contract against the current SCM branch-protection state
+  - admission records the verified governance facts so operators can inspect which protected-branch
+    guarantees were actually proven for the run
 
 Operationally, this keeps the current shared-dev provider narrow while still enforcing the core
 protected/shared model:

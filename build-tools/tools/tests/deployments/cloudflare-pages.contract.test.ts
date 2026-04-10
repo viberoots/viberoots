@@ -10,6 +10,7 @@ import { deriveCloudflarePagesPreviewTarget } from "../../deployments/cloudflare
 import {
   cloudflarePagesAdmissionPolicyNodeFixture,
   cloudflarePagesDeploymentFixture,
+  cloudflarePagesLaneGovernanceNodeFixture,
   cloudflarePagesLanePolicyNodeFixture,
   cloudflarePagesPreviewFixture,
 } from "./cloudflare-pages.fixture.ts";
@@ -38,6 +39,7 @@ test("deriveCloudflarePagesProviderTarget normalizes canonical url and lock iden
 test("extractCloudflarePagesDeployments reads provider target and publisher config", () => {
   const nodes: GraphNode[] = [
     staticWebappComponent("//projects/apps/pleomino:app"),
+    cloudflarePagesLaneGovernanceNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture({

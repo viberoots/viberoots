@@ -13,6 +13,7 @@ import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string): Promise<void> {
@@ -41,6 +42,7 @@ test("protected/shared retention blocks early deletion and allows post-window cl
           hostRoot,
           recordsRoot,
         },
+        admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
         smokeConnectOverride: {
           protocol: "https:",
           hostname: "127.0.0.1",

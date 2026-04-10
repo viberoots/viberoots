@@ -6,6 +6,7 @@ import { extractCloudflarePagesDeployments } from "../../deployments/contract.ts
 import { REVIEWED_NON_STATIC_COMPONENT_KINDS } from "../../deployments/deployment-provider-capabilities.ts";
 import {
   cloudflarePagesAdmissionPolicyNodeFixture,
+  cloudflarePagesLaneGovernanceNodeFixture,
   cloudflarePagesLanePolicyNodeFixture,
 } from "./cloudflare-pages.fixture.ts";
 
@@ -40,7 +41,11 @@ function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
 }
 
 function policyNodes(): GraphNode[] {
-  return [cloudflarePagesLanePolicyNodeFixture(), cloudflarePagesAdmissionPolicyNodeFixture()];
+  return [
+    cloudflarePagesLaneGovernanceNodeFixture(),
+    cloudflarePagesLanePolicyNodeFixture(),
+    cloudflarePagesAdmissionPolicyNodeFixture(),
+  ];
 }
 
 test("validation rejects duplicate cloudflare provider target identity collisions", () => {

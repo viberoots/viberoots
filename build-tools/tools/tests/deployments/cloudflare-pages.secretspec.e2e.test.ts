@@ -7,6 +7,7 @@ import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloud
 import { deploymentRequirementFixture } from "./deployment-metadata.fixture.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
 import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
@@ -63,6 +64,13 @@ test("cloudflare-pages deploy keeps secretspec-backed Vault values out of record
       },
     });
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const admissionEvidence = deploymentAdmissionEvidenceFixture({
+      deployment,
+      operationKind: "deploy",
+      sourceRevision: "rev-cloudflare-secretspec-1",
+      artifactIdentity: "artifact-cloudflare-secretspec-1",
+      artifactLineageId: "artifact-cloudflare-secretspec-1",
+    });
     const server = await startCloudflarePagesPublicServer({
       deployment,
       publishRoot: fake.publishRoot,
@@ -80,6 +88,7 @@ test("cloudflare-pages deploy keeps secretspec-backed Vault values out of record
         deployment,
         artifactDir,
         recordsRoot,
+        admissionEvidence,
         smokeConnectOverride: {
           protocol: "https:",
           hostname: "127.0.0.1",
@@ -133,6 +142,13 @@ test("cloudflare-pages deploy fails closed when a required secretspec contract i
     );
     await writeVaultFixture(fixturePath, {});
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const admissionEvidence = deploymentAdmissionEvidenceFixture({
+      deployment,
+      operationKind: "deploy",
+      sourceRevision: "rev-cloudflare-secretspec-2",
+      artifactIdentity: "artifact-cloudflare-secretspec-2",
+      artifactLineageId: "artifact-cloudflare-secretspec-2",
+    });
     const originalEnv = { ...process.env };
     process.env.PATH = `${fake.binDir}:${originalEnv.PATH || ""}`;
     process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT = fake.publishRoot;
@@ -147,6 +163,7 @@ test("cloudflare-pages deploy fails closed when a required secretspec contract i
             deployment,
             artifactDir,
             recordsRoot,
+            admissionEvidence,
           }),
         /required secret contract secret:\/\/deployments\/pleomino\/cloudflare_api_token is missing/,
       );

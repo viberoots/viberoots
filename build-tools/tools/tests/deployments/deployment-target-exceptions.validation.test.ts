@@ -5,6 +5,7 @@ import type { GraphNode } from "../../lib/graph.ts";
 import { extractCloudflarePagesDeployments } from "../../deployments/contract.ts";
 import {
   cloudflarePagesAdmissionPolicyNodeFixture,
+  cloudflarePagesLaneGovernanceNodeFixture,
   cloudflarePagesLanePolicyNodeFixture,
 } from "./cloudflare-pages.fixture.ts";
 import { deploymentTargetExceptionNodeFixture } from "./deployment-metadata.fixture.ts";
@@ -41,6 +42,7 @@ test("validation allows reviewed alias windows for shared cloudflare target iden
   const nodes: GraphNode[] = [
     staticWebappComponent("//projects/apps/demoapp:app"),
     staticWebappComponent("//projects/apps/demoapp-next:app"),
+    cloudflarePagesLaneGovernanceNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
     deploymentTargetExceptionNodeFixture({

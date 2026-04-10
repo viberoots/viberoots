@@ -1,6 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentPrerequisiteMode } from "./contract-types.ts";
 import {
+  normalizeLaneGovernanceEvidence,
+  type DeploymentLaneGovernanceFact,
+} from "./deployment-admission-governance.ts";
+import {
   normalizeAttestationEvidence,
   normalizeSbomEvidence,
   normalizeSupplyChainGateEvidence,
@@ -51,6 +55,7 @@ export type DeploymentAdmissionEvidence = {
   checks?: DeploymentCheckEvidence[];
   approvals?: DeploymentApprovalEvidence[];
   prerequisiteHealth?: DeploymentHealthEvidence[];
+  laneGovernance?: DeploymentLaneGovernanceFact;
   provisionerPlanFingerprint?: string;
   buildInputsFingerprint?: string;
   attestations?: DeploymentAttestationEvidence[];
@@ -102,6 +107,7 @@ export type DeploymentAdmissionPolicyEvaluation = {
   requiredChecks: DeploymentAdmissionCheckFact[];
   requiredApprovals: DeploymentAdmissionApprovalFact[];
   prerequisites: DeploymentPrerequisiteFact[];
+  laneGovernance?: DeploymentLaneGovernanceFact;
   attestation?: DeploymentAttestationFact;
   sbom?: DeploymentSbomFact;
   supplyChainGates: DeploymentSupplyChainGateFact[];
@@ -200,6 +206,7 @@ export function normalizeAdmissionEvidence(
   });
   const requestedBy = normalizePrincipal(raw.requestedBy);
   const submittedBy = normalizePrincipal(raw.submittedBy);
+  const laneGovernance = normalizeLaneGovernanceEvidence(raw.laneGovernance);
   const provisionerPlanFingerprint =
     typeof raw.provisionerPlanFingerprint === "string" ? raw.provisionerPlanFingerprint.trim() : "";
   const buildInputsFingerprint =
@@ -213,6 +220,7 @@ export function normalizeAdmissionEvidence(
     ...(checks.length > 0 ? { checks } : {}),
     ...(approvals.length > 0 ? { approvals } : {}),
     ...(prerequisiteHealth.length > 0 ? { prerequisiteHealth } : {}),
+    ...(laneGovernance ? { laneGovernance } : {}),
     ...(provisionerPlanFingerprint ? { provisionerPlanFingerprint } : {}),
     ...(buildInputsFingerprint ? { buildInputsFingerprint } : {}),
     ...(attestations.length > 0 ? { attestations } : {}),

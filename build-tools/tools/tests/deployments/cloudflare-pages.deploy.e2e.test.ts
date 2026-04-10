@@ -6,6 +6,10 @@ import { test } from "node:test";
 import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloudflare-pages-control-plane.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import {
+  reviewedLaneAdmissionEvidenceFixture,
+  writeReviewedLaneAdmissionEvidenceJson,
+} from "./deployment-lane-governance.fixture.ts";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
 import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
@@ -37,6 +41,12 @@ test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", 
     );
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
+    const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
+      tmp,
+      $,
+      deploymentJson,
+      deployment,
+    });
     const server = await startCloudflarePagesPublicServer({
       deployment,
       publishRoot: fake.publishRoot,
@@ -52,7 +62,7 @@ test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", 
           BNX_CLOUDFLARE_FAKE_WRANGLER_LOG: fake.logPath,
           BNX_CLOUDFLARE_PAGES_WRANGLER_BIN: path.join(fake.binDir, "wrangler"),
         },
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.operationKind, "deploy");
       assert.equal(summary.runClassification, "deploy");
@@ -118,6 +128,7 @@ test("cloudflare-pages smoke failure blocks success after publish", async () => 
             deployment,
             artifactDir,
             recordsRoot,
+            admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
             smokeConnectOverride: {
               protocol: "https:",
               hostname: "127.0.0.1",
@@ -159,6 +170,12 @@ test("cloudflare-pages smoke retries transient readiness failures within the sha
     );
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
+    const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
+      tmp,
+      $,
+      deploymentJson,
+      deployment,
+    });
     let requests = 0;
     const expectedRoot = path.join(tmp, "expected-root");
     const wrongRoot = path.join(tmp, "wrong-root");
@@ -182,7 +199,7 @@ test("cloudflare-pages smoke retries transient readiness failures within the sha
           BNX_CLOUDFLARE_FAKE_WRANGLER_LOG: fake.logPath,
           BNX_CLOUDFLARE_PAGES_WRANGLER_BIN: path.join(fake.binDir, "wrangler"),
         },
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.finalOutcome, "succeeded");
       assert.equal(summary.executionPolicy.smokeBudget.totalBudgetMs, 1000);

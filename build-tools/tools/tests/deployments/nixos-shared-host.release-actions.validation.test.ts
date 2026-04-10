@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GraphNode } from "../../lib/graph.ts";
 import { extractNixosSharedHostDeployments } from "../../deployments/contract.ts";
+import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture.ts";
 import {
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostLanePolicyNodeFixture,
@@ -40,6 +41,7 @@ function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
 function baseNodes(overrides: Partial<GraphNode> = {}): GraphNode[] {
   return [
     staticWebappComponent("//projects/apps/demoapp:app"),
+    nixosSharedHostLaneGovernanceNodeFixture(),
     nixosSharedHostLanePolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture(),
     deploymentReleaseActionNodeFixture(),

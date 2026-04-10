@@ -4,9 +4,11 @@ import { test } from "node:test";
 import type { GraphNode } from "../../lib/graph.ts";
 import { extractDeployments } from "../../deployments/contract.ts";
 import {
+  cloudflarePagesLaneGovernanceNodeFixture,
   cloudflarePagesAdmissionPolicyNodeFixture,
   cloudflarePagesLanePolicyNodeFixture,
 } from "./cloudflare-pages.fixture.ts";
+import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture.ts";
 import {
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostLanePolicyNodeFixture,
@@ -19,6 +21,7 @@ function staticWebappComponent(label: string): GraphNode {
 test("deployment prerequisite extraction preserves valid direct-edge metadata", () => {
   const { deployments, errors } = extractDeployments([
     staticWebappComponent("//projects/apps/pleomino:app"),
+    nixosSharedHostLaneGovernanceNodeFixture(),
     nixosSharedHostLanePolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
@@ -68,12 +71,27 @@ test("deployment prerequisite extraction preserves valid direct-edge metadata", 
 test("deployment extraction rejects cross-lane prerequisites", () => {
   const { errors } = extractDeployments([
     staticWebappComponent("//projects/apps/pleomino:app"),
+    nixosSharedHostLaneGovernanceNodeFixture(),
+    cloudflarePagesLaneGovernanceNodeFixture({
+      name: "//build-tools/deployments/lanes:marketing_governance",
+      branch_protections: [
+        {
+          stage: "staging",
+          branch: "env/marketing/staging",
+          required_checks: "deploy/marketing-staging",
+          fast_forward_only: "true",
+          normal_advance_principals: "app:deploy-bot",
+          emergency_direct_push_principals: "team:sre-break-glass",
+        },
+      ],
+    }),
     nixosSharedHostLanePolicyNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture({
       name: "//build-tools/deployments/lanes:marketing",
       stages: ["staging"],
       stage_branches: { staging: "env/marketing/staging" },
       allowed_promotion_edges: [],
+      governance_policy: "//build-tools/deployments/lanes:marketing_governance",
     }),
     nixosSharedHostAdmissionPolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
@@ -122,6 +140,7 @@ test("deployment extraction rejects cross-lane prerequisites", () => {
 test("deployment extraction rejects cyclic prerequisite graphs", () => {
   const { errors } = extractDeployments([
     staticWebappComponent("//projects/apps/pleomino:app"),
+    nixosSharedHostLaneGovernanceNodeFixture(),
     nixosSharedHostLanePolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture({

@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
 import { resolveNixosSharedHostReplaySelection } from "../../deployments/nixos-shared-host-replay.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
@@ -40,6 +41,13 @@ test("replay fails closed when an active migration exception invalidates the rec
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, sourceDeployment);
+    const admissionEvidence = deploymentAdmissionEvidenceFixture({
+      deployment: sourceDeployment,
+      operationKind: "deploy",
+      sourceRevision: "rev-target-exception-1",
+      artifactIdentity: "artifact-target-exception-1",
+      artifactLineageId: "artifact-target-exception-1",
+    });
     const server = await startNixosSharedHostPublicServer({
       deployment: sourceDeployment,
       hostRoot,
@@ -55,6 +63,7 @@ test("replay fails closed when an active migration exception invalidates the rec
           hostRoot,
           recordsRoot,
         },
+        admissionEvidence,
         smokeConnectOverride: {
           protocol: "https:",
           hostname: "127.0.0.1",

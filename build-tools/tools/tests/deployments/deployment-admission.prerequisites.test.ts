@@ -69,6 +69,11 @@ test("ordering_only prerequisites require a prior successful run and health_gate
       deployment: orderingOnly,
       operationKind: "deploy",
       admittedContext: admittedContextFixture(orderingOnly),
+      evidence: deploymentAdmissionEvidenceFixture({
+        deployment: orderingOnly,
+        operationKind: "deploy",
+        sourceRevision: "rev-source-123",
+      }),
     });
     assert.equal(orderingEval.prerequisites[0]?.mode, "ordering_only");
     const healthGated = nixosSharedHostDeploymentFixture({
@@ -81,6 +86,11 @@ test("ordering_only prerequisites require a prior successful run and health_gate
         deployment: healthGated,
         operationKind: "deploy",
         admittedContext: admittedContextFixture(healthGated),
+        evidence: deploymentAdmissionEvidenceFixture({
+          deployment: healthGated,
+          operationKind: "deploy",
+          sourceRevision: "rev-source-123",
+        }),
       }),
       /lacks fresh health evidence/,
     );

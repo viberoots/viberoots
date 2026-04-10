@@ -17,6 +17,7 @@ import {
   type DeploymentAdmissionPolicyEvaluation,
   type DeploymentPrerequisiteFact,
 } from "./deployment-admission-evidence.ts";
+import { evaluateLaneGovernanceFact } from "./deployment-admission-governance.ts";
 import {
   latestSuccessfulDeploymentRecord,
   sourceAdmissionChecks,
@@ -206,6 +207,10 @@ export async function evaluateDeploymentAdmission(opts: {
       recordsRoot: opts.recordsRoot,
       deployment: opts.deployment,
       evidence: opts.evidence,
+    }),
+    laneGovernance: evaluateLaneGovernanceFact({
+      deployment: opts.deployment,
+      evidence: opts.evidence?.laneGovernance,
     }),
     ...(attestation ? { attestation } : {}),
     ...(sbom ? { sbom } : {}),

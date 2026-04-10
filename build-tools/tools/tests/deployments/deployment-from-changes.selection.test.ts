@@ -67,6 +67,33 @@ function pleominoDeployments() {
   ];
 }
 
+function sandboxDeployments() {
+  const lanePolicy = nixosSharedHostLanePolicyFixture({
+    ref: "//sandbox/deployments/shared:lane",
+    governanceRef: "//sandbox/deployments/shared:lane_governance",
+    governance: {
+      ...nixosSharedHostLanePolicyFixture().governance,
+      ref: "//sandbox/deployments/shared:lane_governance",
+    },
+  });
+  return [
+    nixosSharedHostDeploymentFixture({
+      deploymentId: "sandbox-dev",
+      label: "//sandbox/deployments/demo-dev:deploy",
+      lanePolicyRef: lanePolicy.ref,
+      lanePolicy,
+      admissionPolicyRef: "//sandbox/deployments/shared:dev_release",
+      admissionPolicy: {
+        ...nixosSharedHostDeploymentFixture().admissionPolicy,
+        ref: "//sandbox/deployments/shared:dev_release",
+      },
+      component: { kind: "static-webapp", target: "//sandbox/apps/demo:app" },
+      runtime: { appName: "demo", containerPort: 3000 },
+      prerequisites: [],
+    }),
+  ];
+}
+
 test("from-changes selects deployments whose component project is in the impacted Buck closure", async () => {
   await withTempRoot(async (tmp) => {
     await writeGraph(tmp, [
@@ -107,5 +134,25 @@ test("from-changes widens only one direct prerequisite edge from changed deploym
       ),
       true,
     );
+  });
+});
+
+test("from-changes derives owned component and deployment prefixes from the deployment set", async () => {
+  await withTempRoot(async (tmp) => {
+    await writeGraph(tmp, [
+      { name: "//sandbox/apps/demo:app", deps: ["//sandbox/libs/ui:lib"] },
+      { name: "//sandbox/libs/ui:lib", deps: [] },
+    ]);
+    const plan = await resolveDeploymentsFromChanges({
+      workspaceRoot: tmp,
+      changedPaths: ["sandbox/libs/ui/src/index.ts"],
+      deployments: sandboxDeployments(),
+    });
+
+    assert.deepEqual(
+      plan.selectedDeployments.map((deployment) => deployment.deploymentId),
+      ["sandbox-dev"],
+    );
+    assert.equal(plan.reasonsByDeploymentId["sandbox-dev"]?.[0]?.kind, "component-project");
   });
 });

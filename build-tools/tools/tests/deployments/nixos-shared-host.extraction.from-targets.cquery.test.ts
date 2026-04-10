@@ -51,6 +51,7 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
       "//projects/deployments/demoapp-dev:deploy",
       "//projects/apps/demoapp:app",
       "//projects/deployments/pleomino-shared:lane",
+      "//projects/deployments/pleomino-shared:lane_governance",
       "//projects/deployments/pleomino-shared:dev_release",
     ]);
     const { deployments, errors } = extractNixosSharedHostDeployments(nodes);
@@ -129,6 +130,7 @@ test("nixos-shared-host multi-component extraction reads rollout policy and comp
       "//projects/apps/demoapp:app",
       "//projects/apps/demoapi:api",
       "//projects/deployments/pleomino-shared:lane",
+      "//projects/deployments/pleomino-shared:lane_governance",
       "//projects/deployments/pleomino-shared:dev_release",
     ]);
     const { deployments, errors } = extractNixosSharedHostDeployments(nodes);

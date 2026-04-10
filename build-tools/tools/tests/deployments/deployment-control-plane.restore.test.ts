@@ -9,6 +9,7 @@ import {
 } from "../../deployments/deployment-control-plane-resilience.ts";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
@@ -29,6 +30,13 @@ test("control-plane restore test persists operator-visible resilience state", as
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const admissionEvidence = deploymentAdmissionEvidenceFixture({
+      deployment,
+      operationKind: "deploy",
+      sourceRevision: "rev-restore-1",
+      artifactIdentity: "artifact-restore-1",
+      artifactLineageId: "artifact-restore-1",
+    });
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
       await submitNixosSharedHostControlPlaneRun({
@@ -41,6 +49,7 @@ test("control-plane restore test persists operator-visible resilience state", as
           hostRoot,
           recordsRoot,
         },
+        admissionEvidence,
         smokeConnectOverride: {
           protocol: "https:",
           hostname: "127.0.0.1",

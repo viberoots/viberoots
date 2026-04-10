@@ -1,10 +1,13 @@
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-domain.taxonomy-drift.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-admission.lane-governance.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admission.policy.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admission.prerequisites.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admission.supply-chain.replay.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admission.supply-chain.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-lane-governance.fixture.ts": False,
+    "build-tools/tools/tests/deployments/deployment-lane-governance.verify.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-component-kinds.contract.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.authz-idempotency.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.bootstrap.test.ts": True,

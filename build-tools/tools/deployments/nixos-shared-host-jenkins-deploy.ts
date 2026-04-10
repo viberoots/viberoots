@@ -148,6 +148,9 @@ function childArgs(ctx: JenkinsContext): string[] {
   return [
     "--deployment",
     ctx.deploymentLabel,
+    ...(hasFlag("admission-evidence-json")
+      ? ["--admission-evidence-json", requireFlagValue("admission-evidence-json")]
+      : []),
     "--profile",
     ctx.profileName,
     "--artifact-dir",

@@ -7,8 +7,10 @@ import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloud
 import { resolveCloudflarePagesPromotionSelection } from "../../deployments/cloudflare-pages-promotion.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
@@ -58,11 +60,17 @@ async function createSuccessfulDevRun(tmp: string, $: any, recordsRoot: string):
   await writeArtifact(artifactDir, "<html>source</html>\n");
   await ensureNixosSharedHostStageBranch(tmp, $, deployment);
   await writeDeploymentJson(deploymentJson, deployment);
+  const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
+    tmp,
+    $,
+    deploymentJson,
+    deployment,
+  });
   const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
   try {
     const run = await $({
       cwd: tmp,
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
     return JSON.parse(String(run.stdout)).deployRunId;
   } finally {
     await server.close();
@@ -136,11 +144,19 @@ test("promotion rejects attempts to reuse one deployment id instead of promoting
     const originalEnv = { ...process.env };
     Object.assign(process.env, fakeCloudflareEnv(fake));
     try {
+      const admissionEvidence = deploymentAdmissionEvidenceFixture({
+        deployment,
+        operationKind: "deploy",
+        sourceRevision: "rev-cloudflare-promotion-guardrail-1",
+        artifactIdentity: "artifact-cloudflare-promotion-guardrail-1",
+        artifactLineageId: "artifact-cloudflare-promotion-guardrail-1",
+      });
       const result = await submitCloudflarePagesControlPlaneDeploy({
         workspaceRoot: tmp,
         deployment,
         artifactDir,
         recordsRoot,
+        admissionEvidence,
         smokeConnectOverride: {
           protocol: "https:",
           hostname: "127.0.0.1",

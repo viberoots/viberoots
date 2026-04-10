@@ -35,6 +35,10 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "runtime_config_requirements",
   "release_actions",
   "target_exceptions",
+  "governance_policy",
+  "scm_backend",
+  "repository",
+  "branch_protections",
   "stages",
   "stage_branches",
   "allowed_promotion_edges",
@@ -92,6 +96,40 @@ function queryLabelList(node: Record<string, unknown>, key: string): string[] {
     .filter(Boolean);
 }
 
+function relatedLabelsForNodes(
+  nodes: ReturnType<typeof nodesFromCqueryJson>,
+  excluded: string[],
+): string[] {
+  const blocked = new Set(excluded.map((label) => normalizeTargetLabel(label)));
+  return Array.from(
+    new Set(
+      nodes.flatMap((node) =>
+        [
+          normalizeTargetLabel(String((node as any).component || "")),
+          normalizeTargetLabel(String((node as any).lane_policy || "")),
+          normalizeTargetLabel(String((node as any).governance_policy || "")),
+          normalizeTargetLabel(String((node as any).admission_policy || "")),
+          ...queryLabelList(node as Record<string, unknown>, "release_actions"),
+          ...queryLabelList(node as Record<string, unknown>, "target_exceptions"),
+        ].filter((label) => label && !blocked.has(label)),
+      ),
+    ),
+  );
+}
+
+async function queryDeploymentNodesExpanded(
+  workspaceRoot: string,
+  labels: string[],
+): Promise<ReturnType<typeof nodesFromCqueryJson>> {
+  const allLabels = Array.from(new Set(labels.map((label) => normalizeTargetLabel(label))));
+  while (true) {
+    const nodes = await queryDeploymentNodes(workspaceRoot, allLabels);
+    const extraLabels = relatedLabelsForNodes(nodes, allLabels);
+    if (extraLabels.length === 0) return nodes;
+    allLabels.push(...extraLabels);
+  }
+}
+
 export async function queryDeploymentNodes(
   workspaceRoot: string,
   labels: string[],
@@ -117,13 +155,14 @@ export async function resolveDeploymentFromTarget(
   const extraLabels = [
     normalizeTargetLabel(String((deploymentNode as any).component || "")),
     normalizeTargetLabel(String((deploymentNode as any).lane_policy || "")),
+    normalizeTargetLabel(String((deploymentNode as any).governance_policy || "")),
     normalizeTargetLabel(String((deploymentNode as any).admission_policy || "")),
     ...queryLabelList(deploymentNode as Record<string, unknown>, "release_actions"),
     ...queryLabelList(deploymentNode as Record<string, unknown>, "target_exceptions"),
   ].filter((label) => label && label !== deploymentTarget);
   const nodes =
     extraLabels.length > 0
-      ? await queryDeploymentNodes(workspaceRoot, [deploymentTarget, ...extraLabels])
+      ? await queryDeploymentNodesExpanded(workspaceRoot, [deploymentTarget, ...extraLabels])
       : initialNodes;
   const extracted = extractDeployments(nodes);
   if (extracted.errors.length > 0) throw new Error(extracted.errors.join("\n"));
@@ -149,7 +188,7 @@ export async function resolveDeploymentFromTarget(
 }
 
 export async function listDeploymentTargets(workspaceRoot: string): Promise<string[]> {
-  const query = 'kind("deployment_target", //projects/deployments/...)';
+  const query = 'kind("deployment_target", //...)';
   const { stdout } = await $({
     cwd: workspaceRoot,
     stdio: "pipe",
@@ -166,22 +205,10 @@ export async function resolveAllDeployments(workspaceRoot: string): Promise<Depl
   const labels = await listDeploymentTargets(workspaceRoot);
   if (labels.length === 0) return [];
   const nodes = await queryDeploymentNodes(workspaceRoot, labels);
-  const extraLabels = Array.from(
-    new Set(
-      nodes.flatMap((node) =>
-        [
-          normalizeTargetLabel(String((node as any).component || "")),
-          normalizeTargetLabel(String((node as any).lane_policy || "")),
-          normalizeTargetLabel(String((node as any).admission_policy || "")),
-          ...queryLabelList(node as Record<string, unknown>, "release_actions"),
-          ...queryLabelList(node as Record<string, unknown>, "target_exceptions"),
-        ].filter(Boolean),
-      ),
-    ),
-  ).filter((label) => !labels.includes(label));
+  const extraLabels = relatedLabelsForNodes(nodes, labels);
   const allNodes =
     extraLabels.length > 0
-      ? await queryDeploymentNodes(workspaceRoot, [...labels, ...extraLabels])
+      ? await queryDeploymentNodesExpanded(workspaceRoot, [...labels, ...extraLabels])
       : nodes;
   const extracted = extractDeployments(allNodes);
   if (extracted.errors.length > 0) throw new Error(extracted.errors.join("\n"));

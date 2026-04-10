@@ -7,6 +7,7 @@ import { resolveCloudflarePagesPromotionSelection } from "../../deployments/clou
 import { runInTemp } from "../lib/test-helpers.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
 import {
   ensureNixosSharedHostStageBranch,
@@ -100,6 +101,12 @@ test("cloudflare-pages rejects cross-provider same-artifact promotion when the c
     await writeDeploymentJson(devJson, dev);
     await writeDeploymentJson(stagingJson, staging);
     await writeDeploymentJson(prodJson, prod);
+    const devEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
+      tmp,
+      $,
+      deploymentJson: devJson,
+      deployment: dev,
+    });
     const devServer = await startNixosSharedHostPublicServer({ deployment: dev, hostRoot });
     const stagingServer = await startCloudflarePagesPublicServer({
       deployment: staging,
@@ -114,7 +121,7 @@ test("cloudflare-pages rejects cross-provider same-artifact promotion when the c
     try {
       const devRun = await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${devJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${devJson} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
       await assert.rejects(
         resolveCloudflarePagesPromotionSelection({
@@ -159,6 +166,12 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
     await ensureNixosSharedHostStageBranch(tmp, $, dev);
     await ensureNixosSharedHostStageBranch(tmp, $, staging);
     await writeDeploymentJson(devJson, dev);
+    const devEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
+      tmp,
+      $,
+      deploymentJson: devJson,
+      deployment: dev,
+    });
     const devServer = await startNixosSharedHostPublicServer({ deployment: dev, hostRoot });
     const wrongPublishRoot = path.join(tmp, "wrong-public");
     await writeArtifact(
@@ -175,7 +188,7 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
     try {
       const devRun = await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${devJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${devJson} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
       await assert.rejects(
         resolveCloudflarePagesPromotionSelection({

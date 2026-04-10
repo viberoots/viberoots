@@ -10,12 +10,14 @@ import {
 } from "../lib/project-graph.ts";
 import { componentTargetsFor, type DeploymentTarget } from "./contract.ts";
 import {
+  ownedComponentProjectPrefixes,
+  ownedDeploymentPrefixes,
+  ownedWorkspaceRoots,
+} from "./deployment-from-changes-owned-paths.ts";
+import {
   resolveDirectPrerequisiteDependents,
   sortDeploymentsTopologically,
 } from "./deployment-prerequisites.ts";
-
-const COMPONENT_PROJECT_PREFIXES = ["projects/apps/", "projects/libs/"] as const;
-const OWNED_DEPLOYMENT_PREFIX = "projects/deployments/";
 
 export type DeploymentChangeReason =
   | { kind: "broad-change"; paths: string[] }
@@ -62,7 +64,9 @@ function addReasonForDeployments(
   deploymentIds: Iterable<string>,
   reason: DeploymentChangeReason,
 ) {
-  for (const deploymentId of deploymentIds) addReason(reasonsByDeploymentId, deploymentId, reason);
+  for (const deploymentId of deploymentIds) {
+    addReason(reasonsByDeploymentId, deploymentId, reason);
+  }
 }
 
 function directDeploymentIdsFromPaths(
@@ -82,23 +86,29 @@ function directDeploymentIdsFromPaths(
   );
 }
 
-function hasBroadProjectChange(changedPaths: string[]): boolean {
+function hasBroadProjectChangeInOwnedRoots(
+  changedPaths: string[],
+  componentProjectPrefixes: string[],
+  deploymentPrefixes: string[],
+): boolean {
+  const workspaceRoots = ownedWorkspaceRoots(componentProjectPrefixes, deploymentPrefixes);
   return changedPaths.some((changedPath) => {
     const normalized = cleanChangedPath(changedPath);
-    if (!normalized.startsWith("projects/")) return false;
-    if (normalized.startsWith(OWNED_DEPLOYMENT_PREFIX)) return false;
-    return !projectFromRepoPath(normalized, COMPONENT_PROJECT_PREFIXES);
+    if (!workspaceRoots.some((root) => normalized.startsWith(root))) return false;
+    if (deploymentPrefixes.some((prefix) => normalized.startsWith(prefix))) return false;
+    return !projectFromRepoPath(normalized, componentProjectPrefixes);
   });
 }
 
 function hasUnmatchedDeploymentPath(
   changedPaths: string[],
+  deploymentPrefixes: string[],
   deployments: DeploymentTarget[],
 ): boolean {
   const packages = Array.from(deploymentPackagePaths(deployments).keys());
   return changedPaths.some((changedPath) => {
     const normalized = cleanChangedPath(changedPath);
-    if (!normalized.startsWith(OWNED_DEPLOYMENT_PREFIX)) return false;
+    if (!deploymentPrefixes.some((prefix) => normalized.startsWith(prefix))) return false;
     return !packages.some(
       (packagePath) =>
         normalized === `${packagePath}/TARGETS` || normalized.startsWith(`${packagePath}/`),
@@ -109,12 +119,13 @@ function hasUnmatchedDeploymentPath(
 function componentImpactedDeploymentIds(
   deployments: DeploymentTarget[],
   projectIds: string[],
+  projectPrefixes: string[],
 ): string[] {
   const impactedProjects = new Set(projectIds);
   return deployments
     .filter((deployment) =>
       componentTargetsFor(deployment).some((target) =>
-        impactedProjects.has(projectFromTargetLabel(target) || ""),
+        impactedProjects.has(projectFromTargetLabel(target, projectPrefixes) || ""),
       ),
     )
     .map((deployment) => deployment.deploymentId)
@@ -127,6 +138,9 @@ export async function resolveDeploymentsFromChanges(opts: {
   deployments: DeploymentTarget[];
 }): Promise<DeploymentFromChangesPlan> {
   const changedPaths = toSortedUnique(opts.changedPaths.map((path) => cleanChangedPath(path)));
+  const componentProjectPrefixes = ownedComponentProjectPrefixes(opts.deployments);
+  const deploymentPrefixes = ownedDeploymentPrefixes(opts.deployments);
+  const workspaceRoots = ownedWorkspaceRoots(componentProjectPrefixes, deploymentPrefixes);
   const reasonsByDeploymentId = new Map<string, DeploymentChangeReason[]>();
   const directDeploymentIds = new Set<string>();
   const broadChangePaths = changedPaths.filter((changedPath) =>
@@ -135,14 +149,14 @@ export async function resolveDeploymentsFromChanges(opts: {
 
   if (
     broadChangePaths.length > 0 ||
-    hasBroadProjectChange(changedPaths) ||
-    hasUnmatchedDeploymentPath(changedPaths, opts.deployments)
+    hasBroadProjectChangeInOwnedRoots(changedPaths, componentProjectPrefixes, deploymentPrefixes) ||
+    hasUnmatchedDeploymentPath(changedPaths, deploymentPrefixes, opts.deployments)
   ) {
     const paths =
       broadChangePaths.length > 0
         ? broadChangePaths
         : changedPaths.filter((changedPath) =>
-            normalizeRepoPath(changedPath).startsWith("projects/"),
+            workspaceRoots.some((root) => normalizeRepoPath(changedPath).startsWith(root)),
           );
     addReasonForDeployments(
       reasonsByDeploymentId,
@@ -155,7 +169,7 @@ export async function resolveDeploymentsFromChanges(opts: {
     addReasonForDeployments(reasonsByDeploymentId, deploymentPathIds, {
       kind: "deployment-path",
       paths: changedPaths.filter((changedPath) =>
-        normalizeRepoPath(changedPath).startsWith(OWNED_DEPLOYMENT_PREFIX),
+        deploymentPrefixes.some((prefix) => normalizeRepoPath(changedPath).startsWith(prefix)),
       ),
     });
     for (const deploymentId of deploymentPathIds) directDeploymentIds.add(deploymentId);
@@ -163,7 +177,7 @@ export async function resolveDeploymentsFromChanges(opts: {
     const projectImpact = await resolveProjectImpactSelection({
       root: opts.workspaceRoot,
       changedPaths,
-      projectPrefixes: COMPONENT_PROJECT_PREFIXES,
+      projectPrefixes: componentProjectPrefixes,
     });
     if (
       projectImpact.mode === "fallback-build-system-scope" &&
@@ -174,13 +188,19 @@ export async function resolveDeploymentsFromChanges(opts: {
         opts.deployments.map((deployment) => deployment.deploymentId),
         { kind: "broad-change", paths: changedPaths },
       );
-      for (const deployment of opts.deployments) directDeploymentIds.add(deployment.deploymentId);
+      for (const deployment of opts.deployments) {
+        directDeploymentIds.add(deployment.deploymentId);
+      }
     } else if (projectImpact.mode === "project-impact") {
       const projectIds = [
         ...projectImpact.diagnostics.changedProjects,
         ...projectImpact.diagnostics.dependentProjects,
       ];
-      const impacted = componentImpactedDeploymentIds(opts.deployments, projectIds);
+      const impacted = componentImpactedDeploymentIds(
+        opts.deployments,
+        projectIds,
+        componentProjectPrefixes,
+      );
       addReasonForDeployments(reasonsByDeploymentId, impacted, {
         kind: "component-project",
         paths: changedPaths,

@@ -13,6 +13,7 @@ import {
 } from "../../deployments/cloudflare-pages-preview.ts";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 
@@ -55,6 +56,12 @@ test("cloudflare-pages preview publish and explicit preview cleanup run end to e
     );
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
+    const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
+      tmp,
+      $,
+      deploymentJson,
+      deployment,
+    });
     const normalServer = await startCloudflarePagesPublicServer({
       deployment,
       publishRoot: fake.publishRoot,
@@ -64,7 +71,7 @@ test("cloudflare-pages preview publish and explicit preview cleanup run end to e
       const normalRun = await $({
         cwd: tmp,
         env: fakeCloudflareEnv(fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(normalServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(normalServer.port)} --smoke-connect-protocol https:`;
       const normalSummary = JSON.parse(String(normalRun.stdout));
       await normalServer.close();
       const previewTarget = deriveCloudflarePagesPreviewTarget(
@@ -81,7 +88,7 @@ test("cloudflare-pages preview publish and explicit preview cleanup run end to e
         const previewRun = await $({
           cwd: tmp,
           env: fakeCloudflareEnv(fake),
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --preview --source-run-id ${normalSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(previewServer.port)} --smoke-connect-protocol https:`;
+        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --preview --source-run-id ${normalSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(previewServer.port)} --smoke-connect-protocol https:`;
         const previewSummary = JSON.parse(String(previewRun.stdout));
         const previewRecord = JSON.parse(await fsp.readFile(previewSummary.recordPath, "utf8"));
         assert.equal(previewRecord.operationKind, "deploy");
@@ -112,7 +119,7 @@ test("cloudflare-pages preview publish and explicit preview cleanup run end to e
         const cleanupRun = await $({
           cwd: tmp,
           env: fakeCloudflareEnv(fake),
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --preview-cleanup --source-run-id ${normalSummary.deployRunId} --cleanup-reason manual_cleanup --records-root ${recordsRoot}`;
+        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --preview-cleanup --source-run-id ${normalSummary.deployRunId} --cleanup-reason manual_cleanup --records-root ${recordsRoot}`;
         const cleanupSummary = JSON.parse(String(cleanupRun.stdout));
         const cleanupRecord = JSON.parse(await fsp.readFile(cleanupSummary.recordPath, "utf8"));
         assert.equal(cleanupRecord.operationKind, "preview_cleanup");

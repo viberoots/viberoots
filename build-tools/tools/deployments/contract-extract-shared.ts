@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { GraphNode } from "../lib/graph.ts";
 import { normalizeTargetLabel } from "../lib/labels.ts";
+import { readString, readStringRecord } from "./deployment-graph-readers.ts";
 import type {
   DeploymentPrerequisite,
   DeploymentPrerequisiteMode,
@@ -23,10 +24,11 @@ import {
 } from "./deployment-rollout.ts";
 import {
   extractDeploymentAdmissionPolicies,
-  extractDeploymentLanePolicies,
+  extractDeploymentLanePoliciesWithGovernance,
   type DeploymentAdmissionPolicy,
   type DeploymentLanePolicy,
 } from "./deployment-policy.ts";
+import { extractDeploymentLaneGovernancePolicies } from "./deployment-lane-governance.ts";
 import {
   readDeploymentSmokePolicy,
   type DeploymentSmokePolicy,
@@ -41,24 +43,10 @@ export type DeploymentExtractionContext = {
   errors: string[];
 };
 
-export function readString(node: GraphNode, key: string): string {
-  return typeof node[key] === "string" ? String(node[key]).trim() : "";
-}
 export function readLabel(node: GraphNode, key: string): string {
   return normalizeTargetLabel(readString(node, key));
 }
-export function readStringRecord(node: GraphNode, key: string): Record<string, string> {
-  const value = node[key];
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .filter(
-        ([entryKey, entryValue]) => typeof entryKey === "string" && typeof entryValue === "string",
-      )
-      .map(([entryKey, entryValue]) => [entryKey.trim(), String(entryValue).trim()])
-      .filter(([entryKey, entryValue]) => entryKey !== "" && entryValue !== ""),
-  );
-}
+export { readString, readStringRecord };
 
 export function readStringRecordList(node: GraphNode, key: string): Record<string, string>[] {
   const value = node[key];
@@ -207,7 +195,10 @@ export function pushTokenFieldErrors(opts: {
 }
 
 export function createDeploymentExtractionContext(nodes: GraphNode[]): DeploymentExtractionContext {
-  const { policies: lanePolicies, errors: laneErrors } = extractDeploymentLanePolicies(nodes);
+  const { policies: laneGovernancePolicies, errors: laneGovernanceErrors } =
+    extractDeploymentLaneGovernancePolicies(nodes);
+  const { policies: lanePolicies, errors: laneErrors } =
+    extractDeploymentLanePoliciesWithGovernance(nodes, laneGovernancePolicies);
   const { policies: admissionPolicies, errors: admissionErrors } =
     extractDeploymentAdmissionPolicies(nodes);
   const { actions: releaseActions, errors: releaseActionErrors } =
@@ -226,7 +217,13 @@ export function createDeploymentExtractionContext(nodes: GraphNode[]): Deploymen
     admissionPolicies,
     releaseActions,
     targetExceptions,
-    errors: [...laneErrors, ...admissionErrors, ...releaseActionErrors, ...targetExceptionErrors],
+    errors: [
+      ...laneGovernanceErrors,
+      ...laneErrors,
+      ...admissionErrors,
+      ...releaseActionErrors,
+      ...targetExceptionErrors,
+    ],
   };
 }
 

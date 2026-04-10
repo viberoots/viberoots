@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { artifactIdentityForStaticWebappDir } from "../../deployments/static-webapp-artifacts.ts";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import {
   cloudflarePagesPreviewFixture,
   cloudflarePagesDeploymentFixture,
@@ -53,6 +54,12 @@ test("cloudflare-pages rollback rejects preview source runs and missing exact ar
     );
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
+    const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
+      tmp,
+      $,
+      deploymentJson,
+      deployment,
+    });
     const normalServer = await startCloudflarePagesPublicServer({
       deployment,
       publishRoot: fake.publishRoot,
@@ -62,7 +69,7 @@ test("cloudflare-pages rollback rejects preview source runs and missing exact ar
       const normalRun = await $({
         cwd: tmp,
         env: fakeCloudflareEnv(fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(normalServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(normalServer.port)} --smoke-connect-protocol https:`;
       const normalSummary = JSON.parse(String(normalRun.stdout));
       const previewRunId = "preview-source-run";
       const previewRecord = JSON.parse(await fsp.readFile(normalSummary.recordPath, "utf8"));
@@ -89,7 +96,7 @@ test("cloudflare-pages rollback rejects preview source runs and missing exact ar
             cwd: tmp,
             stdio: "pipe",
             env: fakeCloudflareEnv(fake),
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --publish-only --rollback --source-run-id ${previewRunId} --records-root ${recordsRoot}`,
+          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --rollback --source-run-id ${previewRunId} --records-root ${recordsRoot}`,
         /preview rather than the normal live target/,
       );
       const firstRecord = JSON.parse(await fsp.readFile(normalSummary.recordPath, "utf8"));
@@ -100,7 +107,7 @@ test("cloudflare-pages rollback rejects preview source runs and missing exact ar
             cwd: tmp,
             stdio: "pipe",
             env: fakeCloudflareEnv(fake),
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --publish-only --rollback --source-run-id ${normalSummary.deployRunId} --records-root ${recordsRoot}`,
+          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --rollback --source-run-id ${normalSummary.deployRunId} --records-root ${recordsRoot}`,
         /recorded exact artifact is unavailable/,
       );
     } finally {

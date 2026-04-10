@@ -2,6 +2,8 @@
 import crypto from "node:crypto";
 import { normalizeTargetLabel } from "../lib/labels.ts";
 import type { GraphNode } from "../lib/graph.ts";
+import { readString, readStringArray, readStringRecord } from "./deployment-graph-readers.ts";
+import type { DeploymentLaneGovernance } from "./deployment-lane-governance.ts";
 import {
   readAttestationPolicy,
   readSbomPolicy,
@@ -17,7 +19,6 @@ import {
 
 export const DEPLOYMENT_LANE_POLICY_RULE = "deployment_lane_policy";
 export const DEPLOYMENT_ADMISSION_POLICY_RULE = "deployment_admission_policy";
-
 export type ArtifactReuseMode = "same_artifact" | "rebuild_per_stage";
 export type RetryBranchPolicy = "branch_independent" | "branch_coupled";
 export type RetryApprovalReuse = "fresh_only" | "same_lineage";
@@ -30,6 +31,8 @@ export type DeploymentLanePolicy = {
   stageBranches: Record<string, string>;
   allowedPromotionEdges: string[];
   artifactReuseMode: ArtifactReuseMode;
+  governanceRef: string;
+  governance: DeploymentLaneGovernance;
   fingerprint: string;
 };
 
@@ -47,28 +50,6 @@ export type DeploymentAdmissionPolicy = {
   supplyChainGates: DeploymentSupplyChainGatePolicy[];
   fingerprint: string;
 };
-
-function readString(node: GraphNode, key: string): string {
-  return typeof node[key] === "string" ? String(node[key]).trim() : "";
-}
-
-function readStringArray(node: GraphNode, key: string): string[] {
-  return Array.isArray(node[key])
-    ? node[key].filter((value): value is string => typeof value === "string" && value.trim() !== "")
-    : [];
-}
-
-function readStringRecord(node: GraphNode, key: string): Record<string, string> {
-  if (!node[key] || typeof node[key] !== "object" || Array.isArray(node[key])) return {};
-  return Object.fromEntries(
-    Object.entries(node[key] as Record<string, unknown>)
-      .filter(
-        ([entryKey, entryValue]) => typeof entryKey === "string" && typeof entryValue === "string",
-      )
-      .map(([entryKey, entryValue]) => [entryKey.trim(), String(entryValue).trim()])
-      .filter(([entryKey, entryValue]) => entryKey && entryValue),
-  );
-}
 
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);
@@ -91,15 +72,10 @@ function policyError(ref: string, message: string): string {
   return `${normalizeTargetLabel(ref)}: ${message}`;
 }
 
-export function requiredLaneStageBranch(policy: DeploymentLanePolicy, stage: string): string {
-  const stageBranch = policy.stageBranches[stage];
-  if (!stageBranch) {
-    throw new Error(`lane policy ${policy.ref} does not define stage branch for ${stage}`);
-  }
-  return stageBranch;
-}
-
-export function extractDeploymentLanePolicies(nodes: GraphNode[]): {
+export function extractDeploymentLanePoliciesWithGovernance(
+  nodes: GraphNode[],
+  governancePolicies: Map<string, DeploymentLaneGovernance>,
+): {
   policies: Map<string, DeploymentLanePolicy>;
   errors: string[];
 } {
@@ -114,6 +90,8 @@ export function extractDeploymentLanePolicies(nodes: GraphNode[]): {
     const allowedPromotionEdges = readStringArray(node, "allowed_promotion_edges");
     const artifactReuseMode = (readString(node, "artifact_reuse_mode") ||
       "same_artifact") as ArtifactReuseMode;
+    const governanceRef = normalizeTargetLabel(readString(node, "governance_policy"));
+    const governance = governancePolicies.get(governanceRef);
     if (!ref) {
       errors.push("deployment lane policy missing canonical label");
       continue;
@@ -138,6 +116,27 @@ export function extractDeploymentLanePolicies(nodes: GraphNode[]): {
     if (artifactReuseMode !== "same_artifact" && artifactReuseMode !== "rebuild_per_stage") {
       errors.push(policyError(ref, `unsupported artifact_reuse_mode "${artifactReuseMode}"`));
     }
+    if (!governanceRef) {
+      errors.push(policyError(ref, "lane policy must define governance_policy"));
+    } else if (!governance) {
+      errors.push(policyError(ref, `governance_policy target not found: ${governanceRef}`));
+    } else {
+      for (const stage of stages) {
+        const protection = governance.branchProtections.find((entry) => entry.stage === stage);
+        if (!protection) {
+          errors.push(
+            policyError(ref, `governance_policy ${governanceRef} is missing stage ${stage}`),
+          );
+        } else if (protection.branch !== stageBranches[stage]) {
+          errors.push(
+            policyError(
+              ref,
+              `governance_policy ${governanceRef} branch mismatch for ${stage}: ${protection.branch}`,
+            ),
+          );
+        }
+      }
+    }
     if (errors.some((entry) => entry.startsWith(`${ref}:`))) continue;
     const fingerprint = fingerprintFor({
       name,
@@ -145,6 +144,7 @@ export function extractDeploymentLanePolicies(nodes: GraphNode[]): {
       stageBranches,
       allowedPromotionEdges,
       artifactReuseMode,
+      governanceFingerprint: governance!.fingerprint,
     });
     policies.set(ref, {
       ref,
@@ -153,6 +153,8 @@ export function extractDeploymentLanePolicies(nodes: GraphNode[]): {
       stageBranches,
       allowedPromotionEdges,
       artifactReuseMode,
+      governanceRef,
+      governance: governance!,
       fingerprint,
     });
   }

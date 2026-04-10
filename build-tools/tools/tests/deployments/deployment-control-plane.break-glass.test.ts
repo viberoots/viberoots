@@ -12,6 +12,7 @@ import {
   compositeNixosSharedHostArtifactIdentity,
 } from "../../deployments/nixos-shared-host-component-artifacts.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
@@ -37,6 +38,13 @@ test("break-glass deploy captures evidence and records exact admitted-artifact r
     await writeArtifact(originalArtifact, "original");
     await writeArtifact(emergencyArtifact, "emergency");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const admissionEvidence = deploymentAdmissionEvidenceFixture({
+      deployment,
+      operationKind: "deploy",
+      sourceRevision: "rev-break-glass-1",
+      artifactIdentity: "artifact-break-glass-1",
+      artifactLineageId: "artifact-break-glass-1",
+    });
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot: paths.hostRoot });
     try {
       await submitNixosSharedHostControlPlaneRun({
@@ -45,6 +53,7 @@ test("break-glass deploy captures evidence and records exact admitted-artifact r
         deployment,
         artifactDir: originalArtifact,
         paths,
+        admissionEvidence,
         smokeConnectOverride: {
           protocol: "https:",
           hostname: "127.0.0.1",

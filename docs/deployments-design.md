@@ -4522,6 +4522,14 @@ Minimum branch-policy assumptions:
 - the normal path should be PR merge or automation-driven fast-forward, not ad hoc branch mutation from an operator workstation
 - required checks for each environment should run before that environment branch advances
 - deploy automation for a named environment should use the corresponding environment branch as its default source of truth
+- every protected/shared lane should resolve one reviewed governance object that names:
+  - the SCM backend and repository being verified
+  - the protected branch for each lane stage
+  - the required checks that must gate branch advancement for that stage
+  - the reviewed normal-path automation identities allowed to advance the branch
+  - the reviewed emergency identities allowed to bypass the normal path during break-glass
+- protected/shared admission should fail closed when the reviewed governance object cannot be verified against current server-side policy
+- operator inspection output should preserve the latest successful governance verification facts so promotion authority is never implicit or prose-only
 
 Rollback policy for bad app releases:
 

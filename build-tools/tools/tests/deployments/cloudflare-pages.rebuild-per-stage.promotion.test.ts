@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
 import {
   nixosSharedHostAdmissionPolicyFixture,
@@ -114,6 +115,12 @@ async function createSourceRun(
   );
   await ensureNixosSharedHostStageBranch(tmp, $, deployment);
   await writeDeploymentJson(deploymentJson, deployment);
+  const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
+    tmp,
+    $,
+    deploymentJson,
+    deployment,
+  });
   const server = await startCloudflarePagesPublicServer({
     deployment,
     publishRoot: fake.publishRoot,
@@ -123,7 +130,7 @@ async function createSourceRun(
     const run = await $({
       cwd: tmp,
       env: fakeCloudflareEnv(fake),
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
     const summary = JSON.parse(String(run.stdout));
     const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
     return { deployment, summary, record };
@@ -141,12 +148,18 @@ test("cloudflare-pages rebuild-per-stage promotion rejects publish-only exact-ar
     const stagingJson = path.join(tmp, "pleomino-rebuild-staging.json");
     await ensureNixosSharedHostStageBranch(tmp, $, staging);
     await writeDeploymentJson(stagingJson, staging);
+    const stagingEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
+      tmp,
+      $,
+      deploymentJson: stagingJson,
+      deployment: staging,
+    });
     await assert.rejects(
       async () =>
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --publish-only --source-run-id ${summary.deployRunId} --records-root ${recordsRoot}`,
+        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --publish-only --source-run-id ${summary.deployRunId} --records-root ${recordsRoot}`,
       /requires target-stage rebuild/,
     );
   });
@@ -171,6 +184,12 @@ test("cloudflare-pages rebuild-per-stage promotion admits a new stage artifact b
     await ensureNixosSharedHostStageBranch(tmp, $, sourceDeployment);
     await ensureNixosSharedHostStageBranch(tmp, $, staging);
     await writeDeploymentJson(stagingJson, staging);
+    const stagingEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
+      tmp,
+      $,
+      deploymentJson: stagingJson,
+      deployment: staging,
+    });
     const server = await startCloudflarePagesPublicServer({
       deployment: staging,
       publishRoot: fake.publishRoot,
@@ -182,7 +201,7 @@ test("cloudflare-pages rebuild-per-stage promotion admits a new stage artifact b
       const run = await $({
         cwd: tmp,
         env: fakeCloudflareEnv(fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --artifact-dir ${stagingArtifactDir} --source-run-id ${sourceSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --artifact-dir ${stagingArtifactDir} --source-run-id ${sourceSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(run.stdout));
       const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
       const snapshot = JSON.parse(

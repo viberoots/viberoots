@@ -15,6 +15,7 @@ import {
   pleominoDeploymentFixture,
   prepareReviewedRemoteHostPaths,
   writeArtifact,
+  writeReviewedPleominoAdmissionEvidence,
   writeJenkinsAuthFiles,
 } from "./nixos-shared-host.jenkins.fixture.ts";
 
@@ -44,6 +45,7 @@ test("jenkins wrapper stages the Pleomino artifact, runs remote deploy, optional
       remoteRuntimeRoot,
       remoteRecordsRoot,
     );
+    const { admissionEvidencePath } = await writeReviewedPleominoAdmissionEvidence(tmp, $);
     const auth = await writeJenkinsAuthFiles(tmp);
     const fixture = await installManagedRemoteHost($, tmp);
     const server = await startNixosSharedHostPublicServer({
@@ -59,7 +61,7 @@ test("jenkins wrapper stages the Pleomino artifact, runs remote deploy, optional
           IN_NIX_SHELL: "1",
           NIXOS_SHARED_HOST_SERVER_ROOT: fixture.hostRoot,
         },
-      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --apply-host --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --apply-host --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.ok, true);
       assert.equal(summary.schemaVersion, "nixos-shared-host-jenkins-deploy@1");

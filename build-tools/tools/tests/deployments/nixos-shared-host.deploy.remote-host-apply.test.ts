@@ -16,7 +16,7 @@ import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-ser
 
 test("remote deploy can run reviewed host apply explicitly after a successful deploy", async () => {
   await runInTemp("nixos-shared-host-remote-host-apply", async (tmp, $) => {
-    const { deployment, env, artifactDir, profileRoot, remoteRuntimeRoot } =
+    const { deployment, env, artifactDir, admissionEvidencePath, profileRoot, remoteRuntimeRoot } =
       await prepareRemoteExecFixture({
         tmp,
         $,
@@ -35,7 +35,7 @@ test("remote deploy can run reviewed host apply explicitly after a successful de
           FAKE_NIXOS_REBUILD_LOG: rebuildLog,
           NIXOS_SHARED_HOST_SERVER_ROOT: fixture.hostRoot,
         }),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --apply-host --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --apply-host --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.remoteDeployResult.finalOutcome, "succeeded");
       assert.equal(summary.hostApply.selectedMode, "switch");
@@ -50,7 +50,7 @@ test("remote deploy can run reviewed host apply explicitly after a successful de
 
 test("remote deploy supports explicit dry-run host apply without silently switching the host", async () => {
   await runInTemp("nixos-shared-host-remote-host-apply-dry-run", async (tmp, $) => {
-    const { deployment, env, artifactDir, profileRoot, remoteRuntimeRoot } =
+    const { deployment, env, artifactDir, admissionEvidencePath, profileRoot, remoteRuntimeRoot } =
       await prepareRemoteExecFixture({
         tmp,
         $,
@@ -72,7 +72,7 @@ test("remote deploy supports explicit dry-run host apply without silently switch
           FAKE_NIXOS_REBUILD_LOG: rebuildLog,
           NIXOS_SHARED_HOST_SERVER_ROOT: fixture.hostRoot,
         }),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --apply-host-dry-run --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --apply-host-dry-run --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.hostApply.selectedMode, "dry-run");
       assert.equal(summary.hostApply.result.mode, "dry-run");
@@ -86,7 +86,7 @@ test("remote deploy supports explicit dry-run host apply without silently switch
 
 test("remote host apply fails closed when the selected server is unmanaged or missing wiring", async () => {
   await runInTemp("nixos-shared-host-remote-host-apply-preflight", async (tmp, $) => {
-    const { deployment, env, artifactDir, profileRoot, remoteRuntimeRoot } =
+    const { deployment, env, artifactDir, admissionEvidencePath, profileRoot, remoteRuntimeRoot } =
       await prepareRemoteExecFixture({
         tmp,
         $,
@@ -105,7 +105,7 @@ test("remote host apply fails closed when the selected server is unmanaged or mi
       const unmanaged = await $({
         cwd: tmp,
         env: remoteExecEnv(env, { NIXOS_SHARED_HOST_SERVER_ROOT: unmanagedFixture.hostRoot }),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --apply-host --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(unmanagedServer.port)} --smoke-connect-protocol https:`.nothrow();
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --apply-host --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(unmanagedServer.port)} --smoke-connect-protocol https:`.nothrow();
       assert.notEqual(unmanaged.exitCode, 0);
       assert.match(String(unmanaged.stderr), /remote host apply failed/);
       assert.match(String(unmanaged.stderr), /not a managed nixos-shared-host install/);
@@ -127,7 +127,7 @@ test("remote host apply fails closed when the selected server is unmanaged or mi
         env: remoteExecEnv(env, {
           NIXOS_SHARED_HOST_SERVER_ROOT: missingWiringFixture.hostRoot,
         }),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --apply-host --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(missingWiringServer.port)} --smoke-connect-protocol https:`.nothrow();
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --apply-host --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(missingWiringServer.port)} --smoke-connect-protocol https:`.nothrow();
       assert.notEqual(missingWiring.exitCode, 0);
       assert.match(String(missingWiring.stderr), /remote host apply failed/);
       assert.match(String(missingWiring.stderr), /managed wiring is missing/);
@@ -139,12 +139,19 @@ test("remote host apply fails closed when the selected server is unmanaged or mi
 
 test("remote host apply surfaces apply failures without reporting a false deploy success", async () => {
   await runInTemp("nixos-shared-host-remote-host-apply-failure", async (tmp, $) => {
-    const { deployment, env, artifactDir, profileRoot, remoteRuntimeRoot, remoteRecordsRoot } =
-      await prepareRemoteExecFixture({
-        tmp,
-        $,
-        artifactFiles: { "index.html": "<html>apply-fail</html>\n", healthz: "ok\n" },
-      });
+    const {
+      deployment,
+      env,
+      artifactDir,
+      admissionEvidencePath,
+      profileRoot,
+      remoteRuntimeRoot,
+      remoteRecordsRoot,
+    } = await prepareRemoteExecFixture({
+      tmp,
+      $,
+      artifactFiles: { "index.html": "<html>apply-fail</html>\n", healthz: "ok\n" },
+    });
     const fixture = await installManagedRemoteHost($, tmp, "managed-dropin");
     const server = await startNixosSharedHostPublicServer({
       deployment,
@@ -157,7 +164,7 @@ test("remote host apply surfaces apply failures without reporting a false deploy
           FAKE_NIXOS_REBUILD_FAIL: "1",
           NIXOS_SHARED_HOST_SERVER_ROOT: fixture.hostRoot,
         }),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --apply-host --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`.nothrow();
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --apply-host --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`.nothrow();
       assert.notEqual(result.exitCode, 0);
       assert.match(String(result.stderr), /remote host apply failed/);
       assert.match(String(result.stderr), /fake nixos-rebuild failure/);
