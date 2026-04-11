@@ -98,16 +98,33 @@ export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
   tmp: string;
   $: any;
   deployment: {
+    admissionPolicy: {
+      requiredChecks: string[];
+    };
+    environmentStage: string;
     lanePolicy: {
+      stageBranches: Record<string, string>;
       governance: DeploymentLaneGovernance;
     };
   };
   deploymentJson?: string;
   deploymentLabel?: string;
   requestedBy?: string;
+  includeRequiredChecks?: boolean;
 }): Promise<string> {
   const snapshotPath = path.join(opts.tmp, "scm-policy.json");
   const evidencePath = path.join(opts.tmp, "admission-evidence.json");
+  const sourceRef = opts.deployment.lanePolicy.stageBranches[opts.deployment.environmentStage];
+  const sourceRevision = opts.includeRequiredChecks
+    ? String(
+        (
+          await opts.$({
+            cwd: opts.tmp,
+            stdio: "pipe",
+          })`git rev-parse ${sourceRef}`
+        ).stdout,
+      ).trim()
+    : "";
   const selectorArgs = opts.deploymentLabel
     ? ["--deployment", opts.deploymentLabel]
     : opts.deploymentJson
@@ -140,6 +157,17 @@ export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
       {
         requestedBy: { principalId: opts.requestedBy || "user:submitter" },
         laneGovernance: JSON.parse(String(verified.stdout)),
+        ...(opts.includeRequiredChecks && sourceRevision
+          ? {
+              checks: opts.deployment.admissionPolicy.requiredChecks.map((name) => ({
+                name,
+                subject: sourceRevision,
+                status: "passed" as const,
+                checkedAt: "2026-04-06T12:00:00.000Z",
+                recordRef: `check://${name}`,
+              })),
+            }
+          : {}),
       },
       null,
       2,

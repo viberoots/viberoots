@@ -1057,26 +1057,26 @@ flowchart TB
 
     subgraph CLI["CLI and repo-facing front door"]
         BIN["build-tools/tools/bin/deploy<br/>thin executable wrapper"]
-        FRONT["build-tools/tools/deploy/deploy.ts<br/>operator CLI entrypoint"]
-        SHARED["build-tools/tools/deploy/shared/<br/>versioned payloads, shared types, common helpers"]
+        FRONT["build-tools/tools/deployments/deploy.ts<br/>operator CLI entrypoint"]
+        SHARED["build-tools/tools/deployments/*<br/>versioned payloads, shared types, common helpers"]
     end
 
     subgraph REPOL["Repo-facing logic"]
-        EXTRACT["build-tools/tools/deploy/extract.*<br/>Buck extraction adapter"]
-        VALIDATE["build-tools/tools/deploy/validate.*<br/>deployment validation"]
-        SELECT["build-tools/tools/deploy/select.*<br/>impact selection / --from-changes"]
+        EXTRACT["build-tools/tools/deployments/extract.*<br/>Buck extraction adapter"]
+        VALIDATE["build-tools/tools/deployments/validate.*<br/>deployment validation"]
+        SELECT["build-tools/tools/deployments/deployment-from-changes-*<br/>impact selection / --from-changes"]
     end
 
     subgraph CPLANE["Shared control-plane service"]
-        API["build-tools/tools/deploy/control-plane/api/*<br/>submission + status API"]
-        ADMIT["build-tools/tools/deploy/control-plane/admission/*<br/>lane + admission evaluation"]
-        APPROVAL["build-tools/tools/deploy/control-plane/approvals/*<br/>approval binding + reuse logic"]
-        ORCH["build-tools/tools/deploy/control-plane/orchestrator/*<br/>run orchestration"]
-        LOCK["build-tools/tools/deploy/control-plane/locking/*<br/>lock and fencing logic"]
-        PREVIEW["build-tools/tools/deploy/control-plane/previews/*<br/>preview lifecycle + cleanup"]
-        RECOVER["build-tools/tools/deploy/control-plane/recovery/*<br/>in-doubt reconciliation"]
-        AUTHZ["build-tools/tools/deploy/control-plane/authz/*<br/>scoped authz / RBAC"]
-        OBS["build-tools/tools/deploy/control-plane/observability/*<br/>audit events, metrics, dashboards"]
+        API["build-tools/tools/deployments/nixos-shared-host-control-plane-server.ts<br/>submission + status API"]
+        ADMIT["build-tools/tools/deployments/*control-plane-admission*<br/>lane + admission evaluation"]
+        APPROVAL["build-tools/tools/deployments/*control-plane-run-action*<br/>approval binding + reuse logic"]
+        ORCH["build-tools/tools/deployments/nixos-shared-host-control-plane-worker*.ts<br/>run orchestration"]
+        LOCK["build-tools/tools/deployments/*control-plane-backend-locks*<br/>lock and fencing logic"]
+        PREVIEW["build-tools/tools/deployments/*preview-control-plane*<br/>preview lifecycle + cleanup"]
+        RECOVER["build-tools/tools/deployments/*control-plane-recovery*<br/>in-doubt reconciliation"]
+        AUTHZ["build-tools/tools/deployments/deployment-control-plane-authz.ts<br/>scoped authz / RBAC"]
+        OBS["build-tools/tools/deployments/deployment-control-plane-observability.ts<br/>audit events, metrics, dashboards"]
     end
 
     subgraph RUNNERS["Built-in execution adapters"]
@@ -1121,9 +1121,13 @@ flowchart TB
 How to read this map:
 
 - `build-tools/tools/bin/deploy` stays as the thin user-facing executable
-- `build-tools/tools/deploy/` is the main implementation root for CLI, extraction, validation, shared contracts, and control-plane code
-- `build-tools/tools/deploy/control-plane/` is where the authoritative protected/shared mutating service logic should live
-- `build-tools/tools/deploy/providers/`, `provisioners/`, and `release-actions/` hold only vetted built-in execution adapters
+- `build-tools/tools/deployments/` is the main implementation root for CLI, extraction, validation, shared contracts, and control-plane code
+- the current reviewed `nixos-shared-host` control-plane service entrypoint is `build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts`
+- the current reviewed `nixos-shared-host` worker-loop entrypoint is `build-tools/tools/deployments/nixos-shared-host-control-plane-worker.ts`
+- the current reviewed `nixos-shared-host` authoritative backend is Postgres, configured for the service and worker via `--control-plane-database-url` / `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL`
+- JSON submissions and snapshots under `<records-root>/control-plane/` remain the compatibility and operator-readable mirror rather than the lock/idempotency authority
+- isolated fixture tests and explicitly local harnesses may use an explicit `pgmem://...` backend URL, but that harness is not the reviewed operator backend
+- provider, provisioner, and release-action modules still hold only vetted built-in execution adapters
 - `build-tools/deploy/lanes/` and `build-tools/deploy/policies/` remain repo-owned policy-definition locations rather than control-plane implementation code
 - exact filenames may evolve, but these directory boundaries should remain stable so the implementation matches the design's trust and ownership model
 

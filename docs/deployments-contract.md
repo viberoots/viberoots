@@ -10,6 +10,11 @@ design has been explicitly updated first.
 
 ## Non-Negotiable Rules
 
+Current reviewed shared-host implementation note:
+
+- For the current `nixos-shared-host` shared-control-plane path, `build-tools/tools/bin/deploy --control-plane-url <url>` acts as the thin repo-level client, `build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts` is the reviewed submit/status API process, `build-tools/tools/deployments/nixos-shared-host-control-plane-worker.ts` is the reviewed worker-loop process, and Postgres configured via `--control-plane-database-url <postgres-url>` or `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL` is the authoritative queue/lock/idempotency backend.
+- JSON submissions and snapshots under `<records-root>/control-plane/` remain the compatibility and operator-readable mirror; explicit `pgmem://...` backend URLs are reserved for isolated fixture tests and local harnesses, not the reviewed operator path.
+
 - `TARGETS` is the authoritative source of deployment metadata.
 - Every concrete deployment lives at `projects/deployments/<deployment-id>/` and exposes a canonical `:deploy` target.
 - Buck owns deployment structure, validation, dependency graph, and build artifacts.

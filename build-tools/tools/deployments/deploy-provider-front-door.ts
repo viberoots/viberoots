@@ -10,6 +10,7 @@ import { printDeployJson } from "./deploy-front-door.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
 import { maybeHandleNixosSharedHostBootstrapCli } from "./nixos-shared-host-bootstrap-cli.ts";
+import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door.ts";
 import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
 import { submitNixosSharedHostPublishOnlyRun } from "./nixos-shared-host-publish-only.ts";
 import { submitNixosSharedHostProvisionOnlyRun } from "./nixos-shared-host-provision-only.ts";
@@ -56,6 +57,13 @@ export async function runNixosSharedHostDeployFrontDoor(opts: {
     ),
   );
   const hostConfigPath = getFlagStr("host-config-out", "").trim();
+  const controlPlaneUrl =
+    getFlagStr("control-plane-url", "").trim() ||
+    String(process.env.BNX_DEPLOY_CONTROL_PLANE_URL || "").trim();
+  const controlPlaneToken =
+    getFlagStr("control-plane-token", "").trim() ||
+    String(process.env.BNX_DEPLOY_CONTROL_PLANE_TOKEN || "").trim() ||
+    undefined;
   const paths = {
     statePath: path.resolve(getFlagStr("state", path.join(hostRoot, "platform-state.json"))),
     hostRoot,
@@ -72,6 +80,42 @@ export async function runNixosSharedHostDeployFrontDoor(opts: {
   });
   if (bootstrapResult) {
     printDeployJson(bootstrapResult.value);
+    return;
+  }
+  if (controlPlaneUrl && !opts.publishOnly && !opts.provisionOnly) {
+    const serviceResult = remove
+      ? await runNixosSharedHostDirectServiceMutation({
+          controlPlaneUrl,
+          ...(controlPlaneToken ? { controlPlaneToken } : {}),
+          deployment: opts.deployment,
+          operationKind: "explicit_removal",
+          ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
+        })
+      : await runNixosSharedHostDirectServiceMutation({
+          controlPlaneUrl,
+          ...(controlPlaneToken ? { controlPlaneToken } : {}),
+          deployment: opts.deployment,
+          operationKind: "deploy",
+          ...(isMultiComponentNixosSharedHostDeployment(opts.deployment)
+            ? {
+                artifactDirsByComponentId: await resolveComponentArtifactDirsForCli(
+                  opts.workspaceRoot,
+                  opts.deployment,
+                ),
+              }
+            : {
+                artifactDir: await resolveArtifactDirForCli(opts.workspaceRoot, opts.deployment),
+              }),
+          ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
+          ...(opts.smokeConnectOverride
+            ? { smokeConnectOverride: opts.smokeConnectOverride as any }
+            : {}),
+        });
+    printDeployJson(
+      serviceResult.kind === "result"
+        ? summarizeDeploymentResult(serviceResult.result as any)
+        : serviceResult.status,
+    );
     return;
   }
   const result = remove

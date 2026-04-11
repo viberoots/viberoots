@@ -16,34 +16,24 @@ import type {
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneRequestDedupe,
 } from "./deployment-control-plane-contract.ts";
-import { createNixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-submission.ts";
-import {
-  createNixosSharedHostControlPlaneSnapshot,
-  createNixosSharedHostSubmissionId,
-  createNixosSharedHostWorkerId,
-  type NixosSharedHostControlPlaneSourceSelection,
-} from "./nixos-shared-host-control-plane-snapshot.ts";
-import { evaluateNixosSharedHostControlPlaneAdmission } from "./nixos-shared-host-control-plane-admission.ts";
-import { createAdmissionFailureSubmission } from "./nixos-shared-host-control-plane-admission-failure.ts";
-import {
-  ensureNoActiveProgressiveRun,
-  executeSubmittedNixosSharedHostControlPlaneRun,
-} from "./nixos-shared-host-control-plane-submit-helpers.ts";
-import { queueSubmissionForLock } from "./deployment-control-plane-queue.ts";
+import { executeSubmittedNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-submit-helpers.ts";
 import {
   createLockConflictSubmission,
   createWaitTerminalSubmission,
 } from "./nixos-shared-host-control-plane-terminal.ts";
-import { writeNixosSharedHostProvisionerPlan } from "./nixos-shared-host-provisioner-plan.ts";
-import {
-  executionSnapshotPathFor,
-  submissionPathFor,
-  writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
+import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
 import {
   createNixosSharedHostDeployRunId,
   type NixosSharedHostDeployRecord,
 } from "./nixos-shared-host-records.ts";
+import {
+  prepareNixosSharedHostControlPlaneRun,
+  type PrepareNixosSharedHostControlPlaneRunOpts,
+} from "./nixos-shared-host-control-plane-prepare.ts";
+import {
+  createNixosSharedHostSubmissionId,
+  type NixosSharedHostControlPlaneSourceSelection,
+} from "./nixos-shared-host-control-plane-snapshot.ts";
 
 type SubmitOpts = {
   workspaceRoot: string;
@@ -73,6 +63,20 @@ type SubmitOpts = {
   };
 };
 
+export async function prepareSubmittedNixosSharedHostControlPlaneRun(
+  opts: Omit<SubmitOpts, "dedupe"> & {
+    dedupe?: DeploymentControlPlaneRequestDedupe;
+  },
+) {
+  const submissionId = opts.submissionId || createNixosSharedHostSubmissionId();
+  const dedupe = opts.dedupe || directControlPlaneDedupe(submissionId || "direct");
+  return await prepareNixosSharedHostControlPlaneRun({
+    ...(opts as Omit<PrepareNixosSharedHostControlPlaneRunOpts, "submissionId" | "dedupe">),
+    submissionId,
+    dedupe,
+  });
+}
+
 export async function submitNixosSharedHostControlPlaneRun(opts: SubmitOpts): Promise<{
   submission: NixosSharedHostControlPlaneSubmission;
   submissionPath: string;
@@ -81,63 +85,10 @@ export async function submitNixosSharedHostControlPlaneRun(opts: SubmitOpts): Pr
   record: NixosSharedHostDeployRecord;
   recordPath: string;
 }> {
-  const submissionId = opts.submissionId || createNixosSharedHostSubmissionId();
-  const dedupe = opts.dedupe || directControlPlaneDedupe(submissionId);
-  const snapshot = await createNixosSharedHostControlPlaneSnapshot(opts, submissionId);
-  const deployRunId = createNixosSharedHostDeployRunId();
-  snapshot.provisionerPlan = await writeNixosSharedHostProvisionerPlan({ snapshot });
-  const executionSnapshotPath = executionSnapshotPathFor(opts.paths.recordsRoot, submissionId);
-  const submissionPath = submissionPathFor(opts.paths.recordsRoot, submissionId);
-  await writeControlPlaneJson(executionSnapshotPath, snapshot);
-  await opts.hooks?.afterSnapshotWritten?.(executionSnapshotPath);
-  try {
-    await ensureNoActiveProgressiveRun(opts.paths.recordsRoot, snapshot.lockScope, submissionId);
-    await evaluateNixosSharedHostControlPlaneAdmission({
-      workspaceRoot: opts.workspaceRoot,
-      recordsRoot: opts.paths.recordsRoot,
-      deployment: opts.deployment,
-      snapshot,
-      source: opts.source,
-      artifactLineageId: opts.artifactLineageId,
-      admissionEvidence: opts.admissionEvidence,
-    });
-    if (snapshot.admittedContext) {
-      await writeControlPlaneJson(executionSnapshotPath, snapshot);
-    }
-  } catch (error) {
-    const submission = createAdmissionFailureSubmission({
-      error,
-      snapshot,
-      executionSnapshotPath,
-      dedupe,
-      requestedBy: opts.requestedBy,
-      authorization: opts.authorization,
-    });
-    if (submission) {
-      await writeControlPlaneJson(submissionPath, submission);
-      throw Object.assign(error, {
-        submission,
-        submissionPath,
-        executionSnapshotPath,
-      });
-    }
-    throw error;
-  }
-  let submission = createNixosSharedHostControlPlaneSubmission(snapshot, executionSnapshotPath, {
-    admission: { decision: "admitted", reason: "shared_nonprod" },
-    lifecycleState: "queued",
-    dedupe,
-    requestedBy: opts.requestedBy,
-    authorization: opts.authorization,
-    ...(snapshot.progressiveRollout ? { progressiveRollout: snapshot.progressiveRollout } : {}),
-    deployRunId,
-  });
-  submission = await queueSubmissionForLock({
-    recordsRoot: opts.paths.recordsRoot,
-    submissionPath,
-    snapshot,
-    submission,
-  });
+  const prepared = await prepareSubmittedNixosSharedHostControlPlaneRun(opts);
+  let { submission, submissionPath, executionSnapshotPath, lockScope, snapshot, deployRunId } =
+    prepared;
+  const dedupe = submission.dedupe;
   try {
     const { submission: completed, result } = await executeSubmittedNixosSharedHostControlPlaneRun({
       submission,
@@ -157,7 +108,7 @@ export async function submitNixosSharedHostControlPlaneRun(opts: SubmitOpts): Pr
       submission,
       submissionPath,
       executionSnapshotPath,
-      lockScope: snapshot.lockScope,
+      lockScope,
       record: result.record,
       recordPath: result.recordPath,
     };

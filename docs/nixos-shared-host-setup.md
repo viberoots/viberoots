@@ -683,18 +683,45 @@ not create any managed assets on disk.
 ## Deploying After Install
 
 Once the server is installed and its authoritative config imports the managed
-anchor, the normal deploy flow remains:
+anchor, provision the reviewed Postgres database for the control plane and
+start the reviewed shared control plane on `mini`:
 
 ```bash
-direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+cd /srv/common
+export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
+direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts \
   --host-root /var/lib/bucknix/nixos-shared-host/runtime \
   --state /var/lib/bucknix/nixos-shared-host/platform-state.json \
-  --records-root /var/lib/bucknix/nixos-shared-host/records
+  --records-root /var/lib/bucknix/nixos-shared-host/records \
+  --control-plane-database-url "$BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL" \
+  --port 7780
 ```
 
-For `shared_nonprod`, that command now submits to the shared control plane. The
-control-plane state lands under:
+Start the reviewed worker loop in a second long-running process:
+
+```bash
+cd /srv/common
+direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-worker.ts \
+  --records-root /var/lib/bucknix/nixos-shared-host/records \
+  --control-plane-database-url "$BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL"
+```
+
+Then the reviewed same-host deploy flow becomes:
+
+```bash
+cd /srv/common
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --control-plane-url http://127.0.0.1:7780
+```
+
+Use that path only when the caller is running from the same reviewed checkout as
+the service and the service can read the submitted artifact paths directly.
+
+For `shared_nonprod`, that command is now a thin client to the shared control
+plane. The authoritative queue/lock/idempotency state now lives in the
+configured Postgres database, and the operator-readable control-plane mirror
+still lands under:
 
 - `<records-root>/control-plane/submissions/*.json`
 - `<records-root>/control-plane/snapshots/*.json`
@@ -710,7 +737,7 @@ sudo nixos-rebuild switch
 
 ## Deploying Pleomino To `mini` From Jenkins
 
-The reviewed CI entrypoint is now:
+The reviewed CI entrypoint remains:
 
 ```bash
 direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
@@ -720,6 +747,9 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
   --ssh-identity-file "$JENKINS_SSH_IDENTITY" \
   --ssh-known-hosts "$JENKINS_KNOWN_HOSTS"
 ```
+
+The current Jenkins and remote-profile wrappers still use the reviewed SSH-based
+remote execution path. They do not accept `--control-plane-url` yet.
 
 Minimum Jenkins contract:
 

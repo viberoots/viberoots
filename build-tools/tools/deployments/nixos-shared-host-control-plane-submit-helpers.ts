@@ -65,10 +65,27 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
   deployment: any;
   onLockAcquired?: () => Promise<void> | void;
   gateEvaluator?: NixosSharedHostGateEvaluator;
+  acquireLocks?: (args: {
+    recordsRoot: string;
+    deployment: any;
+    shouldAbort?: () => Promise<"cancelled" | "superseded" | "no_longer_admitted" | null>;
+  }) => Promise<{ fencingToken?: string; release: () => Promise<void> }>;
 }) {
   let lock: Awaited<ReturnType<typeof acquireNixosSharedHostControlPlaneLocks>> | undefined;
   try {
-    lock = await acquireNixosSharedHostControlPlaneLocks(opts.recordsRoot, opts.deployment, {
+    const acquireLocks =
+      opts.acquireLocks ||
+      (async (args: {
+        recordsRoot: string;
+        deployment: any;
+        shouldAbort?: () => Promise<"cancelled" | "superseded" | "no_longer_admitted" | null>;
+      }) =>
+        await acquireNixosSharedHostControlPlaneLocks(args.recordsRoot, args.deployment, {
+          ...(args.shouldAbort ? { shouldAbort: args.shouldAbort } : {}),
+        }));
+    lock = await acquireLocks({
+      recordsRoot: opts.recordsRoot,
+      deployment: opts.deployment,
       shouldAbort: async () => await lockWaitAbortReasonForSubmission(opts.submissionPath),
     });
   } catch (error) {

@@ -50,6 +50,8 @@ function collectProfileModeConflicts(): string[] {
     "state",
     "records-root",
     "host-config-out",
+    "control-plane-url",
+    "control-plane-token",
     "publish-only",
     "rollback",
     "source-run-id",

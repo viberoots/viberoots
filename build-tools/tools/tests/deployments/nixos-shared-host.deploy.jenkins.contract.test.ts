@@ -116,3 +116,30 @@ test("jenkins wrapper rejects incompatible host-apply flags", async () => {
     assert.equal(failure.error.code, "incompatible_flags");
   });
 });
+
+test("jenkins wrapper rejects unsupported local control-plane flags", async () => {
+  await runInTemp("nixos-shared-host-jenkins-control-plane-flags", async (tmp, $) => {
+    const artifactDir = path.join(tmp, "artifact");
+    const profileRoot = path.join(tmp, "profiles");
+    await installReviewedPleominoTargets(tmp);
+    await writeArtifact(artifactDir, { "index.html": "<html>control-plane</html>\n" });
+    await installClientProfile(
+      $,
+      profileRoot,
+      "/srv/common",
+      "/var/lib/bucknix/nixos-shared-host/platform-state.json",
+      "/var/lib/bucknix/nixos-shared-host/runtime",
+      "/var/lib/bucknix/nixos-shared-host/records",
+    );
+    const auth = await writeJenkinsAuthFiles(tmp);
+    const result = await $({
+      cwd: tmp,
+      env: { ...process.env, IN_NIX_SHELL: "1" },
+    })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --control-plane-url http://127.0.0.1:7780`.nothrow();
+    assert.notEqual(result.exitCode, 0);
+    const failure = JSON.parse(String(result.stdout));
+    assert.equal(failure.ok, false);
+    assert.equal(failure.error.code, "unsupported_flag");
+    assert.match(failure.error.message, /--control-plane-url/);
+  });
+});

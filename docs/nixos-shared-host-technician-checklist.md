@@ -97,6 +97,32 @@ Completion criteria:
 
 If `wiringState` is `missing` or `unknown`, stop and escalate.
 
+## Start The Control Plane
+
+Run on `mini` from `/srv/common` in two long-running shells or services:
+
+```bash
+export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
+direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts \
+  --host-root /var/lib/bucknix/nixos-shared-host/runtime \
+  --state /var/lib/bucknix/nixos-shared-host/platform-state.json \
+  --records-root /var/lib/bucknix/nixos-shared-host/records \
+  --control-plane-database-url "$BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL" \
+  --port 7780
+```
+
+```bash
+direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-worker.ts \
+  --records-root /var/lib/bucknix/nixos-shared-host/records \
+  --control-plane-database-url "$BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL"
+```
+
+Completion criteria:
+
+- the service reports a bound URL on stdout
+- the worker stays running without immediate error
+- both processes use the same reviewed Postgres URL from `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL`
+
 ## Client Setup
 
 Run from a repo checkout on each dev machine or CI worker that should target
@@ -155,3 +181,17 @@ The plan must resolve to:
 - remote records root `/var/lib/bucknix/nixos-shared-host/records`
 
 If the plan shows different remote paths, stop and escalate.
+
+If an operator will run shared-host mutation directly on `mini`, also confirm
+the reviewed same-host service path works from the repo checkout that started
+the service, for example:
+
+```bash
+cd /srv/common
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --control-plane-url http://127.0.0.1:7780
+```
+
+Remote-profile and Jenkins wrapper flows still use the reviewed SSH path and do
+not accept `--control-plane-url` yet.

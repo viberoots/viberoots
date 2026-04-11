@@ -131,6 +131,19 @@ test("deploy plan rejects profile mode mixed with local mutation flags", async (
   });
 });
 
+test("deploy plan rejects local control-plane service flags in remote profile mode", async () => {
+  await runInTemp("nixos-shared-host-remote-plan-control-plane-conflict", async (tmp, $) => {
+    const deploymentJson = await writeDeploymentJson(tmp);
+    const profileRoot = path.join(tmp, "profiles");
+    await installClientProfile($, profileRoot);
+    const result =
+      await $`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --profile mini --profile-root ${profileRoot} --plan --control-plane-url http://127.0.0.1:7780`.nothrow();
+    assert.notEqual(result.exitCode, 0);
+    assert.match(String(result.stderr), /--profile cannot be combined with local execution flags/);
+    assert.match(String(result.stderr), /--control-plane-url/);
+  });
+});
+
 test("deploy plan rejects host-apply path overrides unless host apply is selected", async () => {
   await runInTemp("nixos-shared-host-remote-plan-host-apply-overrides", async (tmp, $) => {
     const deploymentJson = await writeDeploymentJson(tmp);

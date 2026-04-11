@@ -30,6 +30,8 @@ const UNSUPPORTED_FLAGS = [
   "state",
   "records-root",
   "host-config-out",
+  "control-plane-url",
+  "control-plane-token",
   "remove",
   "dry-run",
 ] as const;
