@@ -7,6 +7,16 @@ working end-to-end milestone prioritized around the `mini` shared-dev flow descr
 
 Each PR includes code, tests, and documentation updates together.
 
+Documentation updates are not limited to design/contract/schema docs. When a PR changes real
+operator, technician, setup, usage, troubleshooting, or day-to-day workflow behavior, that same PR
+must update the corresponding usage/instructions docs too. For `nixos-shared-host` and other
+operator-facing deployment flows, this explicitly includes docs such as
+[nixos-shared-host-setup.md](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+and
+[nixos-shared-host-technician-checklist.md](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-technician-checklist.md)
+whenever the reviewed workflow, required commands, operator responsibilities, or troubleshooting
+expectations change.
+
 Priority goal:
 
 - get `mini`-based shared dev working end to end for static webapps first
@@ -5969,6 +5979,388 @@ reviewed protected/shared promotion contract.
 
 ---
 
+## PR-46: Buck-authoritative repo front-door closeout + internal extracted-metadata boundary
+
+### Description
+
+I will close the remaining source-of-truth gap between the deployment design and the current
+front-door implementation by removing the public mutating `--deployment-json` bypass from the
+repo-level `deploy` workflow and making Buck/TARGETS the only reviewed public source of deployment
+metadata. Versioned extracted-metadata documents will remain in policy only as internal
+implementation contracts between extraction, the front door, tests, and the shared control plane,
+not as a second public operator input surface that can bypass authoritative Buck metadata.
+
+### Scope & Changes
+
+- Make Buck/TARGETS authoritative for the public repo-facing deploy workflow:
+  - protected/shared and local deploy runs must resolve deployment metadata from
+    `--deployment <label>` or another Buck-backed selector
+  - the public repo-level `deploy` front door must not accept arbitrary checked-in or ad hoc
+    deployment JSON as a mutating input path
+- Narrow the extracted-metadata document role to an internal contract:
+  - keep the versioned extracted-metadata schema as the reviewed implementation boundary between
+    Buck extraction, control-plane submission, and isolated tests/tools
+  - document that extracted-metadata documents are generated artifacts, not a second operator-owned
+    source of truth
+- Remove or explicitly internalize the current public `--deployment-json` mutating path:
+  - either retire it from the public CLI entirely, or
+  - move it behind an explicitly non-public internal/test-only entrypoint that the repo-level
+    operator interface does not advertise or rely on
+- Rework reviewed integration and e2e tests so public-front-door coverage exercises real Buck /
+  `TARGETS` resolution rather than direct deployment-JSON injection.
+- Keep fail-closed validation behavior:
+  - provider config validation
+  - component-kind validation
+  - lane/admission metadata resolution
+  - deployment discovery via Buck queries
+- Preserve versioned payload-contract work already introduced for downstream components, but make
+  the contract origin unambiguous:
+  - extracted metadata is produced from Buck
+  - the public CLI does not treat hand-authored JSON as authoritative deployment definition
+
+### Tests (in this PR)
+
+- Replace public-front-door integration tests that currently mutate through `--deployment-json`
+  with temp-workspace tests that define real `TARGETS` and invoke the public CLI through
+  `--deployment <label>`.
+- Add contract tests proving the public repo-level `deploy` front door rejects `--deployment-json`
+  for mutating execution paths.
+- Add tests proving `--list`, `--validate-only`, and ordinary deploy flows still resolve
+  authoritative metadata from Buck and fail closed on malformed provider config or target-kind
+  drift.
+- Add tests for the internal extracted-metadata document boundary proving:
+  - documents are generated from Buck extraction
+  - internal consumers still accept the reviewed versioned schema
+  - public operator workflows do not rely on hand-authored deployment JSON
+- Extend replay / front-door tests where needed so the reviewed operator contract remains exercised
+  after the `--deployment-json` public-path removal.
+
+### Docs (in this PR)
+
+- Update [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) and
+  [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) to make the
+  public-versus-internal metadata boundary explicit:
+  - `TARGETS` is the only public reviewed source of truth
+  - extracted-metadata documents are internal versioned contracts, not peer operator inputs
+- Update repo deploy-front-door docs/help text to remove or clearly internalize the
+  `--deployment-json` path.
+- Document the reviewed testing posture for deployment e2e coverage so future tests continue to
+  exercise Buck-authoritative metadata resolution.
+- Update any reviewed operator-facing usage docs whose invocation examples or workflow assumptions
+  change because of the front-door contract tightening.
+
+### Verification Commands
+
+- `buck2 test //...`
+- deploy front-door contract / extraction / e2e flows updated in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment front-door, Buck extraction/query wiring, payload-contract
+  boundary code, deployment fixtures, and deployment-domain tests/docs. Under the deployment-only
+  verify policy, default `v` / CI can run the reviewed deployment suite rather than the full
+  non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- The public repo-level `deploy` workflow no longer accepts hand-authored deployment JSON as a
+  mutating source of truth.
+- Public deploy/list/validate flows resolve authoritative metadata from Buck / `TARGETS`.
+- Versioned extracted-metadata documents remain available only as reviewed internal contracts.
+- Tests and docs in this PR describe the same source-of-truth boundary.
+
+### Risks
+
+Removing the public JSON bypass can break a large amount of existing fixture and end-to-end test
+coverage if the replacement Buck-backed test harness is not ready first.
+
+### Mitigation
+
+Land the Buck-backed fixture scaffolding and migrate reviewed tests in the same PR so the source of
+truth gets stricter without sacrificing coverage.
+
+### Consequence of Not Implementing
+
+The deployment system would continue to carry a public path that contradicts the design's
+authoritative-metadata invariant, making it possible for operator workflows and tests to validate a
+less strict contract than the one the design claims.
+
+### Downsides for Implementing
+
+This increases fixture/setup work in tests and may make some integration scenarios slower or more
+verbose because they now need real Buck-visible deployment packages.
+
+### Recommendation
+
+Implement first after PR-45 so the final closeout work builds on one unambiguous source-of-truth
+boundary for all later control-plane and approval-surface work.
+
+---
+
+## PR-47: Shared deploy control-plane API + authoritative backend / worker split closeout
+
+### Description
+
+I will close the remaining gap between the reviewed deployment design's shared-control-plane
+architecture and the current in-process/file-backed execution path by introducing the real reviewed
+protected/shared control-plane service boundary: a submission/status API, a separate worker loop or
+worker service, and an authoritative backend for runs, queue state, locks, idempotency, and
+status. The goal of this PR is not to change deployment semantics, but to move the already-reviewed
+protected/shared behavior onto the architecture the design says operators should rely on.
+
+### Scope & Changes
+
+- Add the reviewed shared-control-plane service surface for protected/shared mutation:
+  - submit API using the existing versioned request/response contracts
+  - status/read API for polling and operator inspection
+  - reviewed run-action API for cancel / resume / abort behavior already in policy
+- Split execution authority across the intended roles:
+  - the repo-level `deploy` CLI becomes a thin authenticated client for protected/shared mutation
+  - the control-plane service persists the authoritative run/submission state
+  - a separate worker loop or sibling worker service claims queued runs and performs provider-side
+    mutation
+- Introduce an authoritative backend for protected/shared state:
+  - submissions
+  - run actions
+  - queue state
+  - idempotency records
+  - lock ownership / fencing state
+  - status/read models and authoritative run references
+- Keep the reviewed filesystem/JSON implementation only where it is still appropriate:
+  - isolated fixture tests
+  - explicitly local dev harnesses
+  - compatibility shims during migration
+  - but not as the normal reviewed protected/shared operator backend
+- Ensure protected/shared CLI flows no longer perform direct in-process submit-and-run execution
+  against local records roots as the normal architecture.
+- Preserve already-reviewed behavior during the migration:
+  - immutable execution snapshots
+  - admission and revalidation
+  - queue/supersedence behavior
+  - lock fencing
+  - replay / recovery / retention / observability hooks
+- Add reviewed startup/configuration support for the control-plane service and worker processes so a
+  homelab or single-host shared deployment setup can run the intended architecture without ad hoc
+  local wiring.
+
+### Tests (in this PR)
+
+- Add integration tests covering submit/status/run-action behavior through the reviewed API surface
+  rather than direct in-process helper calls.
+- Add end-to-end tests proving the repo-level CLI submits protected/shared runs to the service and
+  reads status back through the API instead of mutating provider state locally.
+- Add queue / worker split tests proving:
+  - the API can accept and persist a run while no worker has claimed it yet
+  - a separate worker process or worker harness claims the queued run and executes it
+  - status remains durable across API and worker restarts
+- Add backend durability tests proving the authoritative backend preserves:
+  - submissions
+  - idempotency
+  - queue state
+  - lock state / fencing evidence
+  - run-action persistence
+- Extend recovery / resilience / observability tests so they still pass through the new service /
+  worker / backend boundary rather than only through local in-process helpers.
+- Add compatibility tests for the transitional local harness so deployment-domain tests can still run
+  deterministically without requiring external infrastructure.
+
+### Docs (in this PR)
+
+- Update [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) to mark
+  the shared-control-plane API / worker / authoritative-backend architecture as the reviewed
+  implemented execution model for protected/shared mutation.
+- Update [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) and
+  operational docs so the repo-level CLI is documented as a client of the control-plane service,
+  not an in-process peer mutator.
+- Add operator/technician docs for:
+  - starting the control-plane service
+  - starting the worker loop
+  - configuring the authoritative backend
+  - local reviewed test/harness usage
+- Update operator setup/instructions docs to match the reviewed shared-control-plane architecture,
+  including
+  [nixos-shared-host-setup.md](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  and
+  [nixos-shared-host-technician-checklist.md](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-technician-checklist.md)
+  wherever the install, startup, usage, or troubleshooting steps change.
+
+### Verification Commands
+
+- `buck2 test //...`
+- reviewed control-plane API / worker / backend integration flows introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment control-plane runtime, CLI client wiring, backend/locking
+  infrastructure, harness configuration, and deployment-domain tests/docs. Under the deployment-only
+  verify policy, default `v` / CI can run the reviewed deployment suite rather than the full
+  non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- Protected/shared mutation goes through a reviewed control-plane service boundary with a separate
+  worker execution path.
+- The authoritative backend, not local ad hoc records-root execution, is the normal persistence and
+  coordination layer for protected/shared runs.
+- The repo-level CLI acts as a client for protected/shared mutation instead of directly executing
+  the shared-control-plane logic in-process.
+- Existing protected/shared semantics remain preserved across the service/backend migration.
+
+### Risks
+
+This is an architectural migration across the control-plane trust boundary, so regressions in
+submission, queueing, locking, or restart behavior could be subtle and hard to diagnose if the new
+backend and worker split land without strong integration coverage.
+
+### Mitigation
+
+Keep the contracts versioned and stable, preserve a reviewed local harness for deterministic tests,
+and expand integration coverage around submission, worker claim, restart, recovery, and status
+reads in the same PR.
+
+### Consequence of Not Implementing
+
+The deployment system would continue to claim a service/API/worker/backend architecture in the
+design while the normal protected/shared path remained an in-process local execution model with a
+weaker authority boundary than the reviewed steady-state contract.
+
+### Downsides for Implementing
+
+This adds operational surface area, backend configuration, and more involved integration testing for
+the deployment system itself.
+
+### Recommendation
+
+Implement after PR-46 so the real shared-control-plane architecture lands on the already-correct
+Buck-authoritative front-door contract rather than preserving the older metadata bypasses.
+
+---
+
+## PR-48: Pending-approval advancement + reviewed approval service closeout
+
+### Description
+
+I will close the remaining approval-lifecycle gap by adding the reviewed protected/shared approval
+service and approval-grant operator flow that advances an existing `pending_approval` run into the
+next admissible lifecycle state instead of leaving approval as a static evidence check with no
+first-class same-run advancement path. This PR turns the already-reviewed approval-binding model
+into a complete operator workflow.
+
+### Scope & Changes
+
+- Add the reviewed approval service / approval-grant path for protected/shared runs:
+  - approval submission/grant request contract
+  - approval persistence with explicit approver identity and binding facts
+  - same-run advancement from `pending_approval` into `queued` / next admissible execution state
+- Keep approval bound to the existing reviewed immutable payload:
+  - `deploy_run_id` / submission identity
+  - canonical target identity
+  - payload fingerprint
+  - provisioner plan fingerprint when infra-affecting mutation is in scope
+  - source-run selector / replay selector when applicable
+- Add explicit authorization and policy handling for approval operations:
+  - approver role and scope enforcement
+  - self-approval rejection by default
+  - fail-closed handling for expired, revoked, superseded, or drifted approval inputs
+- Ensure approval advancement does not create a second run:
+  - the existing run remains the authoritative object
+  - lifecycle progression, lineage, and audit state stay attached to that run
+  - idempotent repeated approval requests for the same payload resolve safely
+- Extend status/read surfaces so operators can distinguish:
+  - pending approval
+  - approval granted
+  - approval no longer valid
+  - run resumed into queue/execution
+- Integrate the reviewed approval flow with existing retry / promotion / rollback policy:
+  - `promotion` always uses target-environment approval
+  - rollback freshness rules remain policy-driven
+  - retry approval reuse remains constrained by the reviewed admission policy
+
+### Tests (in this PR)
+
+- Add end-to-end control-plane tests proving a run in `pending_approval` can be approved and then
+  advances on the same run id rather than creating a second run.
+- Add idempotency tests for repeated approval requests against the same pending run.
+- Add authorization tests rejecting:
+  - self-approval where policy forbids it
+  - unauthorized approvers
+  - wrong scope / wrong target identity
+  - approval against a drifted payload or plan fingerprint
+- Add tests proving approval expiry or revocation while queued/running fails closed with the
+  canonical `approval_no_longer_valid` behavior.
+- Extend CLI/API/status tests so operator tooling can observe approval state transitions without
+  string parsing.
+- Extend provider-family e2e tests where protected/shared approval is meaningful so the approval
+  path is exercised on real deploy flows, not only synthetic fixtures.
+
+### Docs (in this PR)
+
+- Update [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) to
+  document the reviewed approval-grant flow and same-run advancement behavior for
+  `pending_approval`.
+- Update [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) so
+  the approval lifecycle is fully described as an operator-visible, versioned control-plane
+  contract rather than only an admission precondition.
+- Add operator docs for reviewing and approving pending protected/shared runs, including the
+  expected failure cases when approval inputs are stale, invalid, or drifted.
+- Update operator/technician workflow docs so the reviewed approval steps, run-state expectations,
+  and incident-handling instructions stay aligned with the implemented flow, including
+  [nixos-shared-host-setup.md](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  and
+  [nixos-shared-host-technician-checklist.md](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-technician-checklist.md)
+  when those docs describe the affected control-plane workflow.
+
+### Verification Commands
+
+- `buck2 test //...`
+- approval service / pending-approval advancement flows introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment control-plane approval services, status/read models,
+  authorization/policy handling, CLI/API approval wiring, and deployment-domain tests/docs. Under
+  the deployment-only verify policy, default `v` / CI can run the reviewed deployment suite rather
+  than the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- Protected/shared runs in `pending_approval` can be advanced through a reviewed approval-grant
+  workflow on the same run.
+- Approval remains fail-closed on drift, expiry, revocation, or authorization mismatch.
+- Status/read surfaces expose approval state and approval-driven lifecycle progression clearly.
+- Tests and docs in this PR describe the same approval-service contract.
+
+### Risks
+
+Approval advancement touches the same area as admission, idempotency, authorization, and queueing,
+so a weak implementation could accidentally allow duplicate advancement, stale approvals, or second
+run creation.
+
+### Mitigation
+
+Bind approvals strictly to the existing payload fingerprint and run identity, keep the advancement
+contract idempotent, and exercise the flow through end-to-end pending-approval integration tests in
+the same PR.
+
+### Consequence of Not Implementing
+
+The deployment system would continue to support `pending_approval` only as a terminal waiting state
+without the reviewed same-run approval-service behavior the design promises operators.
+
+### Downsides for Implementing
+
+This adds more state transitions and operator-surface complexity to the control plane.
+
+### Recommendation
+
+Implement after PR-47 so the approval service lands on the real reviewed control-plane API and
+authoritative backend rather than on the older in-process/shared-records execution shape.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -6016,6 +6408,11 @@ reviewed protected/shared promotion contract.
 18. PR-44 through PR-45: finish deployment-domain methodology compliance and then close the final
     promotion-compatibility gap so flexible `dev` environments can promote into stricter higher
     environments through one explicit reviewed cross-provider contract.
+19. PR-46 through PR-48: close the remaining review-identified end-state gaps by restoring
+    Buck/TARGETS as the sole public source of truth for deploy metadata, moving protected/shared
+    mutation onto the reviewed control-plane service / backend / worker architecture, and adding
+    the first-class approval-service flow that advances `pending_approval` runs without creating a
+    second run.
 
 ## Companion Docs
 
