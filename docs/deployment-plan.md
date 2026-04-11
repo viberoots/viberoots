@@ -5703,6 +5703,116 @@ declared fully complete while the public CLI still has known behavior gaps.
 
 ---
 
+## PR-44: Deployment-domain methodology compliance closeout for file-size boundaries
+
+### Description
+
+I will close the remaining methodology gap identified during plan review: the deployment system is
+functionally implemented and tested, but some deployment-owned files still violate the hard file-size
+boundary from [Project Documentation Methodology](/Users/kiltyj/Code/bucknix-fresh/METHODOLOGY.XML).
+This PR brings the deployment area into explicit compliance by splitting oversized deployment-owned
+modules and tests into smaller reviewed units without weakening behavior, coverage, or the deployment
+contracts already established by earlier PRs.
+
+### Scope & Changes
+
+- Audit deployment-owned implementation, test, and support files against the methodology file-size
+  rule.
+- Split any deployment-owned files over the reviewed limit into smaller modules with clear
+  responsibilities.
+- Prioritize cleanup of oversized deployment-domain test files and any deployment-owned runtime files
+  that cross or drift close enough to the limit to create immediate recurrence risk.
+- Preserve existing deployment contracts, target names, and reviewed operator behavior while
+  refactoring file boundaries.
+- Keep refactors surgical:
+  - no new deployment features
+  - no contract expansion
+  - no semantic behavior changes except where required to preserve existing behavior after the split
+- Add or tighten shared deployment-test helpers only where that reduces duplication and keeps the new
+  split files readable.
+- Add a reviewed deployment-domain compliance check or equivalent guardrail so future
+  deployment-owned files fail closed when they exceed the methodology limit.
+- Ensure any new compliance guardrail is scoped so it enforces the methodology requirement without
+  broadening into unrelated style-policy churn.
+
+### Tests (in this PR)
+
+- Add deployment-domain compliance tests proving reviewed deployment-owned files fail closed when
+  they exceed the file-size limit.
+- Update or add regression tests proving the refactored deployment tests and helpers still cover the
+  same runtime and policy behavior after the split.
+- Add tests proving any new deployment-domain file-size guardrail reports actionable diagnostics,
+  including the offending file path and measured line count.
+- Re-run the representative deployment suite covering:
+  - `nixos-shared-host` contract and end-to-end deploy behavior
+  - platform-state and promotion flows
+  - Cloudflare Pages deploy, promotion, preview, and rollback flows
+  - deployment verify-scope and control-plane policy coverage
+- Add tests proving the new helper boundaries do not silently drop deployment-domain labels,
+  taxonomy wiring, or verify-scope ownership semantics.
+
+### Docs (in this PR)
+
+- Update the deployment plan and any companion deployment docs that reference implementation
+  completion so they no longer leave the methodology-compliance gap implicit.
+- Document the deployment-domain methodology guardrail and how contributors should respond when a
+  deployment-owned file exceeds the reviewed size limit.
+- Document the intended module boundaries for any split deployment helpers or large test fixtures
+  where future contributors might otherwise recombine responsibilities.
+
+### Verification Commands
+
+- `buck2 test //...`
+- deployment-domain compliance or size-check commands introduced in this PR
+- representative deployment-domain Buck targets covering the refactored areas
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-owned implementation, deployment-domain tests, and any
+  deployment-scoped compliance wiring needed to enforce the methodology rule. Under the
+  deployment-only verify policy, default `v` / CI can run the reviewed deployment suite instead of
+  the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- Deployment-owned files in the reviewed deployment domain comply with the methodology file-size
+  limit.
+- Oversized deployment-domain tests or helpers are split into smaller reviewed modules without loss
+  of coverage or operator-visible behavior.
+- The repo has a fail-closed deployment-domain guardrail that prevents this methodology gap from
+  silently returning.
+- Tests and docs in this PR describe the same deployment-domain compliance contract.
+
+### Risks
+
+Late cleanup refactors can accidentally change behavior in subtle ways if large tests or helpers are
+split mechanically rather than along real responsibility boundaries.
+
+### Mitigation
+
+Keep the PR behavior-preserving, split along existing seams, preserve representative deployment
+end-to-end coverage, and add explicit compliance checks so the cleanup does not rely on manual
+discipline alone.
+
+### Consequence of Not Implementing
+
+The deployment plan could look functionally complete while still failing the repository methodology
+review that treats file-size compliance as a mandatory checkpoint rather than an optional cleanup.
+
+### Downsides for Implementing
+
+This is cleanup-heavy work late in the plan and does not add new operator-visible deployment
+features.
+
+### Recommendation
+
+Implement after PR-43 as the final deployment-domain methodology closeout so the deployment plan can
+be considered fully implemented not only functionally, but also against the reviewed repo
+methodology.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
