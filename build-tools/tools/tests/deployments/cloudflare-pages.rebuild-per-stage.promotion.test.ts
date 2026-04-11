@@ -130,7 +130,7 @@ async function createSourceRun(
     const run = await $({
       cwd: tmp,
       env: fakeCloudflareEnv(fake),
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
     const summary = JSON.parse(String(run.stdout));
     const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
     return { deployment, summary, record };
@@ -159,7 +159,7 @@ test("cloudflare-pages rebuild-per-stage promotion rejects publish-only exact-ar
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --publish-only --source-run-id ${summary.deployRunId} --records-root ${recordsRoot}`,
+        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --publish-only --source-run-id ${summary.deployRunId} --records-root ${recordsRoot}`,
       /requires target-stage rebuild/,
     );
   });
@@ -201,7 +201,7 @@ test("cloudflare-pages rebuild-per-stage promotion admits a new stage artifact b
       const run = await $({
         cwd: tmp,
         env: fakeCloudflareEnv(fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --artifact-dir ${stagingArtifactDir} --source-run-id ${sourceSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --artifact-dir ${stagingArtifactDir} --source-run-id ${sourceSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(run.stdout));
       const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
       const snapshot = JSON.parse(

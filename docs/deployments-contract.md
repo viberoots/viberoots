@@ -13,6 +13,8 @@ design has been explicitly updated first.
 - `TARGETS` is the authoritative source of deployment metadata.
 - Every concrete deployment lives at `projects/deployments/<deployment-id>/` and exposes a canonical `:deploy` target.
 - Buck owns deployment structure, validation, dependency graph, and build artifacts.
+- The public repo-level `deploy` CLI must resolve deployment metadata from Buck-backed selectors such as `--deployment <label>`; hand-authored deployment JSON is not a reviewed operator input.
+- Versioned extracted-metadata documents are generated internal contracts between Buck extraction, the repo CLI, tests/tools, and the control plane; they are not a second public source of truth.
 - Live deployment side effects do not run as ordinary Buck actions.
 - Protected/shared mutation runs only through the shared deployment control plane, except for an explicitly documented incident-bounded break-glass procedure for control-plane unavailability.
 - Bootstrap mutation for the deployment authority itself is allowed only through an explicit reviewed bootstrap path on deployment-system-owned infrastructure; it is not part of the ordinary protected/shared deploy path.
@@ -104,6 +106,7 @@ design has been explicitly updated first.
 - `--list` is the canonical non-mutating repo-level deployment discovery entry point and must keep one stable machine-readable output shape.
 - `--validate-only` is the canonical non-mutating repo-level deployment validation entry point and must not build, publish, or mutate external state.
 - `--validate-only` must reject reviewed provider-native config parse or semantic drift and reviewed target-kind mismatches before any mutating path can run.
+- Public repo-level deploy, list, and validate flows must resolve authoritative deployment metadata from Buck / `TARGETS`, not from hand-authored deployment JSON documents.
 - `publish_mode` is a separate field from `operation_kind`.
 - `preview_cleanup` is a destructive housekeeping run against preview resources; it should preserve preview context in records rather than being treated as a normal publish.
 - Retire/migrate-target records must preserve old target identity, new target identity when applicable, the reviewed exception object, and the resulting ownership state.

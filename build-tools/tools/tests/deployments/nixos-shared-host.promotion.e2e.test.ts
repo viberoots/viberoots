@@ -138,11 +138,11 @@ test("nixos-shared-host allows reviewed cross-provider same-artifact promotion o
     try {
       await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${targetJson} --admission-evidence-json ${targetEvidenceJson} --artifact-dir ${bootstrapArtifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(targetServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${targetJson} --admission-evidence-json ${targetEvidenceJson} --artifact-dir ${bootstrapArtifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(targetServer.port)} --smoke-connect-protocol https:`;
       const sourceRun = await $({
         cwd: tmp,
         env: fakeCloudflareEnv(fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${sourceJson} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${sourceJson} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
       const sourceSummary = JSON.parse(String(sourceRun.stdout));
       const promotion = await resolveCrossDeploymentPromotionSelection({
         workspaceRoot: tmp,
@@ -189,7 +189,7 @@ test("nixos-shared-host promotion rejects retained source runs that drift out of
       const sourceRun = await $({
         cwd: tmp,
         env: fakeCloudflareEnv(fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${sourceJson} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${sourceJson} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
       const sourceSummary = JSON.parse(String(sourceRun.stdout));
       await $({ cwd: tmp, stdio: "pipe" })`git config user.email test@example.com`;
       await $({ cwd: tmp, stdio: "pipe" })`git config user.name Test`;

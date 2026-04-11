@@ -5,9 +5,9 @@ import { runDeployCli } from "./deploy-cli.ts";
 async function main() {
   await runDeployCli({
     workspaceRoot: await findRepoRoot(process.cwd()),
-    allowDeploymentJson: false,
+    allowDeploymentJson: true,
     deploymentJsonErrorMessage:
-      "public repo-level deploy requires --deployment <label>; --deployment-json is internal/test-only and not a reviewed operator source of truth",
+      "internal deploy entrypoint accepts --deployment-json; use build-tools/tools/deployments/deploy.ts for Buck-authoritative public runs",
   });
 }
 

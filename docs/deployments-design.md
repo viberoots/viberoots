@@ -735,6 +735,8 @@ Some implementation details remain open, but the following behavioral contracts 
 - `TARGETS` is the source of truth for deployment metadata
 - Buck builds artifacts, but does not perform the live publish itself
 - the repo-level `deploy` command is the canonical repo-facing command operators are expected to learn
+  - the public repo-facing `deploy` interface resolves deployments from Buck-backed selectors such as `--deployment <label>`
+  - versioned extracted-metadata JSON documents remain generated internal contracts for extraction, tests/tools, and control-plane handoff; they are not peer operator inputs
 - the shared control-plane API is the authoritative mutating interface for `shared_nonprod` and `production_facing`
   - the repo-level `deploy` CLI and any control-plane UI are first-class clients of that API, not competing authorities
 - the canonical Buck `:deploy` target is for declaration, discovery, validation, and artifact resolution
@@ -2055,6 +2057,7 @@ In this example:
 Suggested metadata shape conventions:
 
 - the deployment macro is the authoritative source for repo-level deployment metadata, even if the exact extraction mechanism evolves later
+- versioned extracted-metadata documents may remain as internal generated artifacts between extraction and downstream implementation boundaries, but the public repo-level operator workflow still resolves deployments from Buck / `TARGETS`
 - dictionary-valued fields should use stable, explicit keys rather than relying on positional meaning or provider-specific shorthand
 - this document intentionally standardizes a small shared outer shape now so adapter authors and reviewers do not keep reopening the same field-shape question later
 - the goal is to standardize the repo-level contract without overfitting every provider to one rigid semantic vocabulary

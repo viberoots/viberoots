@@ -25,7 +25,7 @@ test("cloudflare-pages preview requires --source-run-id for shared/protected pre
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --preview`,
+        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --preview`,
       /--preview requires --source-run-id/,
     );
   });
@@ -43,7 +43,7 @@ test("cloudflare-pages preview cleanup requires explicit preview identity", asyn
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --preview-cleanup`,
+        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --preview-cleanup`,
       /--preview-cleanup requires --source-run-id/,
     );
   });
@@ -58,7 +58,7 @@ test("cloudflare-pages preview is rejected when deployment metadata does not opt
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --preview --source-run-id deploy-123`,
+        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --preview --source-run-id deploy-123`,
       /preview is not enabled/,
     );
   });

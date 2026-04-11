@@ -62,7 +62,7 @@ test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", 
           BNX_CLOUDFLARE_FAKE_WRANGLER_LOG: fake.logPath,
           BNX_CLOUDFLARE_PAGES_WRANGLER_BIN: path.join(fake.binDir, "wrangler"),
         },
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.operationKind, "deploy");
       assert.equal(summary.runClassification, "deploy");
@@ -199,7 +199,7 @@ test("cloudflare-pages smoke retries transient readiness failures within the sha
           BNX_CLOUDFLARE_FAKE_WRANGLER_LOG: fake.logPath,
           BNX_CLOUDFLARE_PAGES_WRANGLER_BIN: path.join(fake.binDir, "wrangler"),
         },
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.finalOutcome, "succeeded");
       assert.equal(summary.executionPolicy.smokeBudget.totalBudgetMs, 1000);

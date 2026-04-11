@@ -30,7 +30,7 @@ test("nixos-shared-host --provision-only writes state and records without publis
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --provision-only`;
+    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --provision-only`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.operationKind, "provision_only");
     assert.equal(summary.runClassification, "provision_only");

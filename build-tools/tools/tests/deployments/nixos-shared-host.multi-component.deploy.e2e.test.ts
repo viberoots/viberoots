@@ -97,7 +97,7 @@ test("nixos-shared-host multi-component deploy publishes components in rollout o
     try {
       const result = await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendArtifact, api: apiArtifact })} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --host-config-out ${path.join(tmp, "rendered-host.json")} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendArtifact, api: apiArtifact })} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --host-config-out ${path.join(tmp, "rendered-host.json")} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.finalOutcome, "succeeded");
       assert.deepEqual(
@@ -188,7 +188,7 @@ test("nixos-shared-host multi-component deploy stops after the first publish fai
     });
     const result = await $({
       cwd: tmp,
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendArtifact, api: apiArtifact })} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot}`.nothrow();
+    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendArtifact, api: apiArtifact })} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot}`.nothrow();
     assert.notEqual((result as any).exitCode, 0);
     const runs = await fsp.readdir(path.join(recordsRoot, "runs"));
     const record = JSON.parse(await fsp.readFile(path.join(recordsRoot, "runs", runs[0]!), "utf8"));

@@ -97,16 +97,26 @@ export function reviewedLaneAdmissionEvidenceFixture(opts: {
 export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
   tmp: string;
   $: any;
-  deploymentJson: string;
   deployment: {
     lanePolicy: {
       governance: DeploymentLaneGovernance;
     };
   };
+  deploymentJson?: string;
+  deploymentLabel?: string;
   requestedBy?: string;
 }): Promise<string> {
   const snapshotPath = path.join(opts.tmp, "scm-policy.json");
   const evidencePath = path.join(opts.tmp, "admission-evidence.json");
+  const selectorArgs = opts.deploymentLabel
+    ? ["--deployment", opts.deploymentLabel]
+    : opts.deploymentJson
+      ? ["--deployment-json", opts.deploymentJson]
+      : (() => {
+          throw new Error(
+            "writeReviewedLaneAdmissionEvidenceJson requires deploymentLabel or deploymentJson",
+          );
+        })();
   await fsp.writeFile(
     snapshotPath,
     JSON.stringify(
@@ -123,7 +133,7 @@ export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
   const verified = await opts.$({
     cwd: opts.tmp,
     stdio: "pipe",
-  })`zx-wrapper build-tools/tools/deployments/deployment-lane-governance-verify.ts --deployment-json ${opts.deploymentJson} --scm-policy-json ${snapshotPath}`;
+  })`zx-wrapper build-tools/tools/deployments/deployment-lane-governance-verify.ts ${selectorArgs} --scm-policy-json ${snapshotPath}`;
   await fsp.writeFile(
     evidencePath,
     JSON.stringify(

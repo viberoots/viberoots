@@ -111,7 +111,7 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
     try {
       const result = await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${path.join(tmp, "records")} --host-config-out ${path.join(tmp, "rendered-host.json")} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${path.join(tmp, "records")} --host-config-out ${path.join(tmp, "rendered-host.json")} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.operationKind, "deploy");
       assert.equal(summary.runClassification, "deploy");
@@ -218,7 +218,7 @@ test("nixos-shared-host deploy CLI completes the reviewed ssr-webapp flow end to
     try {
       const result = await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${path.join(tmp, "records")} --host-config-out ${path.join(tmp, "rendered-host.json")} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${path.join(tmp, "records")} --host-config-out ${path.join(tmp, "rendered-host.json")} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.finalOutcome, "succeeded");
       assert.equal(summary.publicUrl, "https://demoapp.apps.kilty.io/");

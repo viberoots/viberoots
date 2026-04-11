@@ -114,12 +114,12 @@ test("app-store-connect deploy and promotion preserve release-health evidence", 
     const devRun = await $({
       cwd: tmp,
       env,
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${devJson} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactPath} --records-root ${recordsRoot}`;
+    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${devJson} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactPath} --records-root ${recordsRoot}`;
     const devSummary = JSON.parse(String(devRun.stdout));
     const promotionRun = await $({
       cwd: tmp,
       env,
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --publish-only --source-run-id ${devSummary.deployRunId} --records-root ${recordsRoot}`;
+    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --publish-only --source-run-id ${devSummary.deployRunId} --records-root ${recordsRoot}`;
     const promotionSummary = JSON.parse(String(promotionRun.stdout));
     const promotionRecord = await readAppStoreConnectDeployRecord(promotionSummary.recordPath);
     assert.equal(promotionRecord.operationKind, "promotion");
@@ -185,21 +185,21 @@ test("app-store-connect rollback reuses a prior successful exact artifact", asyn
           await $({
             cwd: tmp,
             env,
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --artifact-dir ${artifactA} --records-root ${recordsRoot}`
+          })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --artifact-dir ${artifactA} --records-root ${recordsRoot}`
         ).stdout,
       ),
     );
     await $({
       cwd: tmp,
       env,
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --artifact-dir ${artifactB} --records-root ${recordsRoot}`;
+    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --artifact-dir ${artifactB} --records-root ${recordsRoot}`;
     const rollback = JSON.parse(
       String(
         (
           await $({
             cwd: tmp,
             env,
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --publish-only --rollback --source-run-id ${runA.deployRunId} --records-root ${recordsRoot}`
+          })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --publish-only --rollback --source-run-id ${runA.deployRunId} --records-root ${recordsRoot}`
         ).stdout,
       ),
     );

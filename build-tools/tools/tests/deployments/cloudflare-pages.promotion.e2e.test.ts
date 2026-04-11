@@ -140,7 +140,7 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
     try {
       const devRun = await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${devJson} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${devJson} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
       const stagingPromotion = await resolveCloudflarePagesPromotionSelection({
         workspaceRoot: tmp,
@@ -209,7 +209,7 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
     try {
       const devRun = await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${devJson} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${devJson} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
       const promotion = await resolveCloudflarePagesPromotionSelection({
         workspaceRoot: tmp,

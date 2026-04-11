@@ -28,9 +28,21 @@ async function readDeploymentFromJson(filePath: string): Promise<DeploymentTarge
 export async function resolveDeploymentForCli(
   workspaceRoot: string,
   requireFlag: (name: string) => string,
+  opts: {
+    allowDeploymentJson?: boolean;
+    deploymentJsonErrorMessage?: string;
+  } = {},
 ): Promise<DeploymentTarget> {
   const deploymentJson = getFlagStr("deployment-json", "").trim();
-  if (deploymentJson) return await readDeploymentFromJson(deploymentJson);
+  if (deploymentJson) {
+    if (!opts.allowDeploymentJson) {
+      throw new Error(
+        opts.deploymentJsonErrorMessage ||
+          "--deployment-json is internal/test-only; use --deployment <label>",
+      );
+    }
+    return await readDeploymentFromJson(deploymentJson);
+  }
   const deploymentTarget = await resolveSelectedTargetLabel(
     workspaceRoot,
     requireFlag("deployment"),

@@ -69,7 +69,7 @@ test("cloudflare-pages rollback rejects preview source runs and missing exact ar
       const normalRun = await $({
         cwd: tmp,
         env: fakeCloudflareEnv(fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(normalServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(normalServer.port)} --smoke-connect-protocol https:`;
       const normalSummary = JSON.parse(String(normalRun.stdout));
       const previewRunId = "preview-source-run";
       const previewRecord = JSON.parse(await fsp.readFile(normalSummary.recordPath, "utf8"));
@@ -96,7 +96,7 @@ test("cloudflare-pages rollback rejects preview source runs and missing exact ar
             cwd: tmp,
             stdio: "pipe",
             env: fakeCloudflareEnv(fake),
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --rollback --source-run-id ${previewRunId} --records-root ${recordsRoot}`,
+          })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --rollback --source-run-id ${previewRunId} --records-root ${recordsRoot}`,
         /preview rather than the normal live target/,
       );
       const firstRecord = JSON.parse(await fsp.readFile(normalSummary.recordPath, "utf8"));
@@ -107,7 +107,7 @@ test("cloudflare-pages rollback rejects preview source runs and missing exact ar
             cwd: tmp,
             stdio: "pipe",
             env: fakeCloudflareEnv(fake),
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --rollback --source-run-id ${normalSummary.deployRunId} --records-root ${recordsRoot}`,
+          })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --rollback --source-run-id ${normalSummary.deployRunId} --records-root ${recordsRoot}`,
         /recorded exact artifact is unavailable/,
       );
     } finally {
@@ -176,7 +176,7 @@ test("cloudflare-pages production rollback requires fresh approval evidence", as
       const seededRun = await $({
         cwd: tmp,
         env: fakeCloudflareEnv(fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https: --admission-evidence-json ${evidenceJson}`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https: --admission-evidence-json ${evidenceJson}`;
       const seededSummary = JSON.parse(String(seededRun.stdout));
       await assert.rejects(
         async () =>
@@ -184,7 +184,7 @@ test("cloudflare-pages production rollback requires fresh approval evidence", as
             cwd: tmp,
             stdio: "pipe",
             env: fakeCloudflareEnv(fake),
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --publish-only --rollback --source-run-id ${seededSummary.deployRunId} --records-root ${recordsRoot}`,
+          })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --publish-only --rollback --source-run-id ${seededSummary.deployRunId} --records-root ${recordsRoot}`,
         /requires approval prod-approval/,
       );
     } finally {

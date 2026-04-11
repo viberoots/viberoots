@@ -55,7 +55,7 @@ test("s3-static deploy CLI completes the static-webapp flow end to end", async (
           BNX_S3_STATIC_FAKE_AWS_LOG: fake.logPath,
           BNX_S3_STATIC_AWS_BIN: path.join(fake.binDir, "aws"),
         },
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.finalOutcome, "succeeded");
       assert.equal(summary.publicUrl, "https://staging.example.test/");

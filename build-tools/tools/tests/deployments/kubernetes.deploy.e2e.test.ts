@@ -70,7 +70,7 @@ test("kubernetes deploy CLI completes single-service publish with reviewed provi
           BNX_KUBERNETES_FAKE_PUBLISH_ROOT: fake.publishRoot,
           BNX_KUBERNETES_FAKE_HELM_LOG: fake.logPath,
         },
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.finalOutcome, "succeeded");
       const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
@@ -145,7 +145,7 @@ test("kubernetes deploy preserves ordered multi-component publish state", async 
           BNX_KUBERNETES_FAKE_PUBLISH_ROOT: fake.publishRoot,
           BNX_KUBERNETES_FAKE_HELM_LOG: fake.logPath,
         },
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --component-artifacts api=${apiArtifact},otel-sidecar=${sidecarArtifact} --admission-evidence-json ${admissionEvidenceJson} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --component-artifacts api=${apiArtifact},otel-sidecar=${sidecarArtifact} --admission-evidence-json ${admissionEvidenceJson} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`;
       const summary = JSON.parse(String(result.stdout));
       const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
       assert.equal(record.runnerIdentities.publisher, deployment.publisher.type);
