@@ -1467,7 +1467,7 @@ What it is for:
 - checking that the deployment target is wired correctly
 - confirming provider capability rules
 - confirming referenced Buck targets exist
-- confirming required config files are present
+- parsing provider-native config and rejecting semantic drift before any mutation path can run
 
 When you would use it:
 
