@@ -5574,6 +5574,135 @@ compatibility contract before the deployment model is treated as fully complete.
 
 ---
 
+## PR-43: Repo-level deploy front-door validation semantics + provision-only contract closeout
+
+### Description
+
+I will close the remaining repo-level `deploy` front-door gaps left behind after the earlier PR-27
+surface landed only partially. This PR makes `--validate-only` enforce the reviewed validation
+contract instead of only checking file presence, and it finishes the reviewed `--provision-only`
+operator path so the public CLI surface matches the documented deployment model for supported
+provider families.
+
+### Scope & Changes
+
+- Harden `deploy <id> --validate-only` so it validates the full reviewed non-mutating contract for
+  the selected deployment rather than returning success after provider-config existence checks only.
+- Require `--validate-only` to validate, as applicable for the selected provider slice:
+  - deployment metadata extraction and fail-closed schema/contract checks
+  - provider capability compatibility for the declared deployment shape
+  - referenced Buck target presence and reviewed target-kind expectations
+  - provider-native config parsing and semantic validation
+  - provider-target/config drift checks already enforced by mutating paths
+- Reuse the same reviewed provider-config validators already used by deploy-time execution paths so
+  validation and mutation do not drift on what counts as a valid provider-native config.
+- Add one reviewed provider-validation helper surface for repo-level front-door validation instead
+  of leaving validation semantics implicit inside provider-specific mutating flows.
+- Finish repo-level `deploy <id> --provision-only` for the provider families whose plan already
+  says the public front door should support it.
+- Replace current hard rejection of `--provision-only` with reviewed provision-only execution where
+  the provider contract is metadata/provisioner driven and does not require publish-phase artifact
+  mutation.
+- Preserve the reviewed provision-only rules on the repo-level front door:
+  - provision-only still validates
+  - provision-only does not publish
+  - provision-only does not run publish-phase `release_actions`
+  - protected/shared provision-only binds one admitted source revision and one frozen execution
+    snapshot whenever the provisioner uses immutable resolved inputs
+- Fail closed when a provider family or deployment shape still does not have a reviewed
+  provision-only contract, and make that refusal explicit and documented rather than looking like a
+  temporary hole in the front door.
+- Align repo-level front-door output and classification semantics so validation-only and
+  provision-only runs preserve the reviewed operator vocabulary instead of ad hoc success payloads.
+- Remove or update tests that currently lock in the incomplete behavior as the intended contract.
+
+### Tests (in this PR)
+
+- Add repo-level CLI tests proving `--validate-only` fails closed on invalid provider-native config
+  content, not just missing files.
+- Add provider-validation tests for reviewed config semantics, including at least:
+  - malformed Cloudflare `wrangler.jsonc`
+  - provider-target/config drift for Cloudflare Pages
+  - equivalent semantic validation for every provider family that exposes repo-level validation
+- Add tests proving `--validate-only` validates referenced deployment/component targets and still
+  performs no build, publish, provision, `release_actions`, or external mutation.
+- Replace the current repo-level tests that assert `--provision-only` rejection for supported
+  provider families with tests that prove the reviewed provision-only behavior.
+- Add provision-only tests proving:
+  - publish is skipped
+  - publish-phase `release_actions` are skipped
+  - protected/shared provision-only uses the reviewed admission and frozen-snapshot path when
+    immutable resolved inputs are involved
+  - unsupported provider families or unsupported deployment shapes still fail closed clearly
+- Add record/status tests proving provision-only preserves canonical run classification, lifecycle
+  state, and final outcome semantics on the repo-level front door.
+- Add regression tests proving normal deploy, preview, rollback, and promotion behavior continue to
+  use the same provider validators and are not weakened by the front-door validation refactor.
+
+### Docs (in this PR)
+
+- Update the PR-27-facing portions of the deployment plan and companion deployment docs so the
+  repo-level `deploy` operator surface matches the implemented validation and provision-only
+  contract exactly.
+- Document what `--validate-only` guarantees, including which classes of provider-native config and
+  metadata drift it must reject before any mutation path can run.
+- Document which provider families and deployment shapes support repo-level `--provision-only`, and
+  which still fail closed by design.
+- Document the operator-visible output and record semantics for validation-only and provision-only
+  runs.
+
+### Verification Commands
+
+- `buck2 test //...`
+- repo-level `deploy --validate-only` and `deploy --provision-only` inspection flows introduced in
+  this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-owned front-door CLI code, provider validation helpers,
+  provider-specific provision-only wiring, record/classification handling, and deployment-domain
+  tests. Under the deployment-only verify policy, default `v` / CI can run the reviewed deployment
+  suite instead of the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- `deploy <id> --validate-only` fails closed on invalid provider-native config content and reviewed
+  metadata/provider drift instead of only checking that files exist.
+- Repo-level validation and mutating provider paths use the same reviewed provider-config semantic
+  checks so operators do not see contradictory behavior between validate and deploy.
+- Repo-level `--provision-only` is implemented for the provider families and deployment shapes that
+  the plan says should support it, with tests and docs describing the same behavior.
+- Unsupported provision-only shapes fail closed explicitly and are documented as such.
+
+### Risks
+
+Front-door cleanup work can accidentally widen validation beyond reviewed provider contracts or
+introduce inconsistent provision-only behavior across providers.
+
+### Mitigation
+
+Centralize provider validation hooks, reuse existing mutating-path semantic validators wherever
+possible, and keep provision-only enablement limited to reviewed provider/deployment shapes with
+explicit tests and docs.
+
+### Consequence of Not Implementing
+
+The deployment plan would continue to overstate PR-27 by advertising repo-level validation and
+provision-only contracts that the current front door does not actually satisfy.
+
+### Downsides for Implementing
+
+This adds one more late cleanup PR and touches several provider front-door surfaces that currently
+look stable from the outside.
+
+### Recommendation
+
+Implement after PR-42 as the final front-door contract closeout so the deployment plan is not
+declared fully complete while the public CLI still has known behavior gaps.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -5614,9 +5743,10 @@ compatibility contract before the deployment model is treated as fully complete.
     credential lifecycle, publish safety, automatic retry, and smoke timeout budgets.
 16. PR-39 through PR-40: close lane-governance verification plus the core record/replay,
     compatibility, provenance, and explicit `release_actions` contract work.
-17. PR-41 through PR-42: close the remaining behavioral and cross-provider parity gaps for
-    failure-path `release_actions` execution and runner-identity replay provenance so the full
-    deployment design is implemented end to end.
+17. PR-41 through PR-43: close the remaining behavioral, replay-provenance, and repo-level
+    front-door contract gaps for failure-path `release_actions`, cross-provider runner identity,
+    and validation/provision-only semantics so the full deployment design is implemented end to
+    end.
 
 ## Companion Docs
 
