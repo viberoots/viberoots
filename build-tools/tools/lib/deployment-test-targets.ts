@@ -12,6 +12,9 @@ const CONFIG_SUFFIX = /\s+\([^)]*\)$/;
 
 export const DEPLOYMENT_SAFETY_FLOOR_TARGETS = [
   targetLabelFromScript(
+    "build-tools/tools/tests/deployments/deployment-domain.file-size-lint.test.ts",
+  ),
+  targetLabelFromScript(
     "build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts",
   ),
   targetLabelFromScript(

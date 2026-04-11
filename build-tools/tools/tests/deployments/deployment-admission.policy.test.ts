@@ -1,36 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import path from "node:path";
 import { test } from "node:test";
 import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator.ts";
-import { providerTargetIdentityFor } from "../../deployments/contract.ts";
 import {
   admissionBindingFixture,
   deploymentAdmissionEvidenceFixture,
 } from "./deployment-admission.fixture.ts";
+import { admissionEvalBase, admittedContextFixture } from "./deployment-admission.test-helpers.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
-
-function admittedContextFixture(
-  deployment: ReturnType<typeof nixosSharedHostDeploymentFixture>,
-  overrides: Partial<{
-    sourceRevision: string;
-    artifactIdentity: string;
-    sourceRunId: string;
-  }> = {},
-) {
-  return {
-    source: {
-      sourceRevision: overrides.sourceRevision || "rev-source-123",
-      artifactIdentity: overrides.artifactIdentity || "artifact-123",
-      ...(overrides.sourceRunId ? { sourceRunId: overrides.sourceRunId } : {}),
-    },
-    targetEnvironment: {
-      providerTargetIdentity: providerTargetIdentityFor(deployment),
-    },
-  };
-}
 
 test("admission rejects deploys without required check evidence", async () => {
   const deployment = nixosSharedHostDeploymentFixture({
@@ -41,17 +20,11 @@ test("admission rejects deploys without required check evidence", async () => {
   });
   await assert.rejects(
     evaluateDeploymentAdmission({
-      workspaceRoot: process.cwd(),
-      recordsRoot: path.join(
-        process.cwd(),
-        ".local",
-        "deployments",
-        "nixos-shared-host",
-        "records",
-      ),
-      deployment,
-      operationKind: "deploy",
-      admittedContext: admittedContextFixture(deployment),
+      ...admissionEvalBase("nixos-shared-host", {
+        deployment,
+        operationKind: "deploy",
+        admittedContext: admittedContextFixture(deployment),
+      }),
     }),
     /requires check ci\/deploy-ready/,
   );
@@ -67,7 +40,9 @@ test("admission rejects revoked or self-approved protected/shared approval evide
   });
   const admittedContext = {
     source: { sourceRevision: "rev-prod-123", artifactIdentity: "artifact-prod-123" },
-    targetEnvironment: { providerTargetIdentity: providerTargetIdentityFor(deployment) },
+    targetEnvironment: {
+      providerTargetIdentity: deployment.providerTarget.deploymentTargetIdentity,
+    },
   };
   const revokedEvidence = deploymentAdmissionEvidenceFixture({
     deployment,
@@ -79,12 +54,12 @@ test("admission rejects revoked or self-approved protected/shared approval evide
   });
   await assert.rejects(
     evaluateDeploymentAdmission({
-      workspaceRoot: process.cwd(),
-      recordsRoot: path.join(process.cwd(), ".local", "deployments", "cloudflare-pages", "records"),
-      deployment,
-      operationKind: "deploy",
-      admittedContext,
-      evidence: revokedEvidence,
+      ...admissionEvalBase("cloudflare-pages", {
+        deployment,
+        operationKind: "deploy",
+        admittedContext,
+        evidence: revokedEvidence,
+      }),
     }),
     /requires approval human\/prod/,
   );
@@ -99,12 +74,12 @@ test("admission rejects revoked or self-approved protected/shared approval evide
   });
   await assert.rejects(
     evaluateDeploymentAdmission({
-      workspaceRoot: process.cwd(),
-      recordsRoot: path.join(process.cwd(), ".local", "deployments", "cloudflare-pages", "records"),
-      deployment,
-      operationKind: "deploy",
-      admittedContext,
-      evidence: selfApproved,
+      ...admissionEvalBase("cloudflare-pages", {
+        deployment,
+        operationKind: "deploy",
+        admittedContext,
+        evidence: selfApproved,
+      }),
     }),
     /requires approval human\/prod/,
   );
@@ -156,33 +131,8 @@ test("retry may reuse approval only when policy explicitly allows same-lineage r
     },
   };
   const evaluation = await evaluateDeploymentAdmission({
-    workspaceRoot: process.cwd(),
-    recordsRoot: path.join(process.cwd(), ".local", "deployments", "nixos-shared-host", "records"),
-    deployment,
-    operationKind: "retry",
-    admittedContext,
-    sourceRecord,
-    artifactLineageId: "artifact-lineage-123",
-    evidence: reviewedLaneAdmissionEvidenceFixture({
+    ...admissionEvalBase("nixos-shared-host", {
       deployment,
-      requestedBy: "user:submitter",
-    }),
-  });
-  assert.equal(evaluation.requiredApprovals[0]?.status, "reused");
-  await assert.rejects(
-    evaluateDeploymentAdmission({
-      workspaceRoot: process.cwd(),
-      recordsRoot: path.join(
-        process.cwd(),
-        ".local",
-        "deployments",
-        "nixos-shared-host",
-        "records",
-      ),
-      deployment: {
-        ...deployment,
-        admissionPolicy: { ...deployment.admissionPolicy, retryApprovalReuse: "fresh_only" },
-      },
       operationKind: "retry",
       admittedContext,
       sourceRecord,
@@ -190,6 +140,25 @@ test("retry may reuse approval only when policy explicitly allows same-lineage r
       evidence: reviewedLaneAdmissionEvidenceFixture({
         deployment,
         requestedBy: "user:submitter",
+      }),
+    }),
+  });
+  assert.equal(evaluation.requiredApprovals[0]?.status, "reused");
+  await assert.rejects(
+    evaluateDeploymentAdmission({
+      ...admissionEvalBase("nixos-shared-host", {
+        deployment: {
+          ...deployment,
+          admissionPolicy: { ...deployment.admissionPolicy, retryApprovalReuse: "fresh_only" },
+        },
+        operationKind: "retry",
+        admittedContext,
+        sourceRecord,
+        artifactLineageId: "artifact-lineage-123",
+        evidence: reviewedLaneAdmissionEvidenceFixture({
+          deployment,
+          requestedBy: "user:submitter",
+        }),
       }),
     }),
     /requires approval human\/retry/,
@@ -214,21 +183,15 @@ test("approval binding fails closed when the reviewed provisioner plan fingerpri
   });
   await assert.rejects(
     evaluateDeploymentAdmission({
-      workspaceRoot: process.cwd(),
-      recordsRoot: path.join(
-        process.cwd(),
-        ".local",
-        "deployments",
-        "nixos-shared-host",
-        "records",
-      ),
-      deployment,
-      operationKind: "deploy",
-      admittedContext,
-      evidence: {
-        ...reviewed,
-        provisionerPlanFingerprint: "sha256:drifted-plan",
-      },
+      ...admissionEvalBase("nixos-shared-host", {
+        deployment,
+        operationKind: "deploy",
+        admittedContext,
+        evidence: {
+          ...reviewed,
+          provisionerPlanFingerprint: "sha256:drifted-plan",
+        },
+      }),
     }),
     /requires approval human\/dev/,
   );
@@ -259,18 +222,12 @@ test("protected/shared routine admission rejects destructive built-in release ac
   });
   await assert.rejects(
     evaluateDeploymentAdmission({
-      workspaceRoot: process.cwd(),
-      recordsRoot: path.join(
-        process.cwd(),
-        ".local",
-        "deployments",
-        "nixos-shared-host",
-        "records",
-      ),
-      deployment,
-      operationKind: "deploy",
-      admittedContext: admittedContextFixture(deployment),
-      evidence: { requestedBy: { principalId: "user:submitter" } },
+      ...admissionEvalBase("nixos-shared-host", {
+        deployment,
+        operationKind: "deploy",
+        admittedContext: admittedContextFixture(deployment),
+        evidence: { requestedBy: { principalId: "user:submitter" } },
+      }),
     }),
     /rejects destructive built-in release_actions/,
   );

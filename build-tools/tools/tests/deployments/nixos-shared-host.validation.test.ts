@@ -1,58 +1,19 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { GraphNode } from "../../lib/graph.ts";
 import { extractNixosSharedHostDeployments } from "../../deployments/contract.ts";
 import { REVIEWED_NON_STATIC_COMPONENT_KINDS } from "../../deployments/deployment-provider-capabilities.ts";
-import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture.ts";
+import type { GraphNode } from "../../lib/graph.ts";
 import {
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostLanePolicyNodeFixture,
 } from "./nixos-shared-host.fixture.ts";
-
-function staticWebappComponent(label: string): GraphNode {
-  return {
-    name: label,
-    labels: ["kind:app", "webapp:pwa"],
-  };
-}
-
-function ssrWebappComponent(label: string): GraphNode {
-  return {
-    name: label,
-    labels: ["kind:app", "webapp:ssr", "framework:vite"],
-  };
-}
-
-function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
-  return {
-    name: "//projects/deployments/demoapp-dev:deploy",
-    provider: "nixos-shared-host",
-    component: "//projects/apps/demoapp:app",
-    component_kind: "static-webapp",
-    publisher: "nixos-shared-host-static-webapp",
-    provisioner: "nixos-shared-host-manifest",
-    protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino-shared:lane",
-    environment_stage: "dev",
-    admission_policy: "//projects/deployments/pleomino-shared:dev_release",
-    secret_requirements: [],
-    runtime_config_requirements: [],
-    app_name: "demoapp",
-    container_port: 3000,
-    health_path: "/healthz",
-    target_group: "",
-    ...overrides,
-  };
-}
-
-function policyNodes(): GraphNode[] {
-  return [
-    nixosSharedHostLaneGovernanceNodeFixture(),
-    nixosSharedHostLanePolicyNodeFixture(),
-    nixosSharedHostAdmissionPolicyNodeFixture(),
-  ];
-}
+import {
+  deploymentNode,
+  policyNodes,
+  ssrWebappComponent,
+  staticWebappComponent,
+} from "./nixos-shared-host.validation.helpers.ts";
 
 test("validation rejects duplicate app_name collisions", () => {
   const nodes: GraphNode[] = [

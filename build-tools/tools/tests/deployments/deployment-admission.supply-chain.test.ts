@@ -1,33 +1,17 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import path from "node:path";
 import { test } from "node:test";
-import { providerTargetIdentityFor } from "../../deployments/contract.ts";
 import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator.ts";
 import { extractDeploymentAdmissionPolicies } from "../../deployments/deployment-policy.ts";
 import {
   admissionBindingFixture,
   deploymentAdmissionEvidenceFixture,
 } from "./deployment-admission.fixture.ts";
+import { admissionEvalBase, admittedContextFixture } from "./deployment-admission.test-helpers.ts";
 import {
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
-
-function admittedContextFixture(
-  deployment: ReturnType<typeof nixosSharedHostDeploymentFixture>,
-  overrides: Partial<{ sourceRevision: string; artifactIdentity: string }> = {},
-) {
-  return {
-    source: {
-      sourceRevision: overrides.sourceRevision || "rev-source-123",
-      artifactIdentity: overrides.artifactIdentity || "artifact-123",
-    },
-    targetEnvironment: {
-      providerTargetIdentity: providerTargetIdentityFor(deployment),
-    },
-  };
-}
 
 test("admission policy extraction preserves attestation, SBOM, and supply-chain policy fields", () => {
   const { policies, errors } = extractDeploymentAdmissionPolicies([
@@ -82,17 +66,11 @@ test("admission fails closed for missing or untrusted supply-chain evidence", as
   const admittedContext = admittedContextFixture(deployment);
   await assert.rejects(
     evaluateDeploymentAdmission({
-      workspaceRoot: process.cwd(),
-      recordsRoot: path.join(
-        process.cwd(),
-        ".local",
-        "deployments",
-        "nixos-shared-host",
-        "records",
-      ),
-      deployment,
-      operationKind: "deploy",
-      admittedContext,
+      ...admissionEvalBase("nixos-shared-host", {
+        deployment,
+        operationKind: "deploy",
+        admittedContext,
+      }),
     }),
     /requires artifact attestation evidence/,
   );
@@ -109,18 +87,12 @@ test("admission fails closed for missing or untrusted supply-chain evidence", as
   });
   await assert.rejects(
     evaluateDeploymentAdmission({
-      workspaceRoot: process.cwd(),
-      recordsRoot: path.join(
-        process.cwd(),
-        ".local",
-        "deployments",
-        "nixos-shared-host",
-        "records",
-      ),
-      deployment,
-      operationKind: "deploy",
-      admittedContext,
-      evidence: untrusted,
+      ...admissionEvalBase("nixos-shared-host", {
+        deployment,
+        operationKind: "deploy",
+        admittedContext,
+        evidence: untrusted,
+      }),
     }),
     /builder is untrusted/,
   );
@@ -137,18 +109,12 @@ test("admission fails closed for missing or untrusted supply-chain evidence", as
   });
   await assert.rejects(
     evaluateDeploymentAdmission({
-      workspaceRoot: process.cwd(),
-      recordsRoot: path.join(
-        process.cwd(),
-        ".local",
-        "deployments",
-        "nixos-shared-host",
-        "records",
-      ),
-      deployment,
-      operationKind: "deploy",
-      admittedContext,
-      evidence: invalidSbom,
+      ...admissionEvalBase("nixos-shared-host", {
+        deployment,
+        operationKind: "deploy",
+        admittedContext,
+        evidence: invalidSbom,
+      }),
     }),
     /SBOM material is invalid/,
   );
@@ -208,21 +174,21 @@ test("supply-chain timing semantics distinguish build and publish admission gate
     },
   };
   const evaluation = await evaluateDeploymentAdmission({
-    workspaceRoot: process.cwd(),
-    recordsRoot: path.join(process.cwd(), ".local", "deployments", "nixos-shared-host", "records"),
-    deployment,
-    operationKind: "deploy",
-    admittedContext,
-    sourceRecord,
-    evidence: deploymentAdmissionEvidenceFixture({
+    ...admissionEvalBase("nixos-shared-host", {
       deployment,
       operationKind: "deploy",
-      sourceRevision: admittedContext.source.sourceRevision,
-      artifactIdentity: admittedContext.source.artifactIdentity,
-      buildInputsFingerprint: "sha256:build-inputs",
-      supplyChainGates: [
-        { name: "license/allowlist", category: "license", applyAt: "publish_admission" },
-      ],
+      admittedContext,
+      sourceRecord,
+      evidence: deploymentAdmissionEvidenceFixture({
+        deployment,
+        operationKind: "deploy",
+        sourceRevision: admittedContext.source.sourceRevision,
+        artifactIdentity: admittedContext.source.artifactIdentity,
+        buildInputsFingerprint: "sha256:build-inputs",
+        supplyChainGates: [
+          { name: "license/allowlist", category: "license", applyAt: "publish_admission" },
+        ],
+      }),
     }),
   });
   assert.equal(evaluation.supplyChainGates.length, 2);

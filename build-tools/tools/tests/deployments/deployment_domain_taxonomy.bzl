@@ -1,5 +1,6 @@
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-domain.file-size-lint.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-domain.taxonomy-drift.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admission.lane-governance.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admission.policy.test.ts": True,
@@ -69,6 +70,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/s3-static.publisher.config-drift.test.ts": True,
     "build-tools/tools/tests/deployments/s3-static.validation.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.control-plane.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.control-plane.direct-reject.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.contract.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.failure-records.test.ts": True,
@@ -119,6 +121,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/nixos-shared-host.replay.rollback-eligibility.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.target-exceptions.replay.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.reuse.e2e.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.rollback.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.reuse.rollback-guardrails.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.validation.test.ts": True,
 }

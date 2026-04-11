@@ -34,3 +34,15 @@ export const SSR_TEST_FILES_SCOPE: FileSizeScope = {
   ],
   exclude: ["buck-out/**", "node_modules/**", "coverage/**"],
 };
+
+export const DEPLOYMENT_DOMAIN_FILES_SCOPE: FileSizeScope = {
+  include: [
+    "build-tools/deployments/**/*.bzl",
+    "build-tools/tools/deployments/**/*.ts",
+    "build-tools/tools/deployments/**/*.bzl",
+    "build-tools/tools/deployments/**/*.nix",
+    "build-tools/tools/tests/deployments/**/*.ts",
+    "build-tools/tools/tests/deployments/**/*.bzl",
+  ],
+  exclude: ["buck-out/**", "node_modules/**", "coverage/**"],
+};

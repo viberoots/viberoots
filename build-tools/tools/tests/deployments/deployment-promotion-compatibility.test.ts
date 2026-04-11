@@ -4,36 +4,15 @@ import { test } from "node:test";
 import { promotionCompatibilityErrors } from "../../deployments/deployment-promotion-compatibility.ts";
 import { appStoreConnectDeploymentFixture } from "./app-store-connect.fixture.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import {
+  sourceFixture,
+  sourceForDeployment,
+} from "./deployment-promotion-compatibility.helpers.ts";
 import { googlePlayDeploymentFixture } from "./google-play.fixture.ts";
 import {
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
-
-function sourceFixture(
-  overrides: Partial<
-    Parameters<typeof promotionCompatibilityErrors>[1]["replaySnapshot"]["deployment"]
-  > = {},
-) {
-  const deployment = cloudflarePagesDeploymentFixture({
-    ...overrides,
-  });
-  return {
-    record: {
-      finalOutcome: "succeeded",
-      publishMode: "normal",
-      deploymentId: deployment.deploymentId,
-    },
-    replaySnapshot: {
-      artifact: { identity: "artifact-compat-123" },
-      admittedContext: {
-        lanePolicyFingerprint: deployment.lanePolicy.fingerprint,
-        source: { sourceRevision: "rev-source-123" },
-      },
-      deployment,
-    },
-  };
-}
 
 test("promotion compatibility rejects provider and publisher drift", () => {
   const target = nixosSharedHostDeploymentFixture({
@@ -110,21 +89,7 @@ test("promotion compatibility rejects SSR runtime-contract drift inside one lane
       requiredChecks: [],
     }),
   });
-  const errors = promotionCompatibilityErrors(target, {
-    record: {
-      finalOutcome: "succeeded",
-      publishMode: "normal",
-      deploymentId: sourceDeployment.deploymentId,
-    },
-    replaySnapshot: {
-      artifact: { identity: "artifact-compat-123" },
-      admittedContext: {
-        lanePolicyFingerprint: sourceDeployment.lanePolicy.fingerprint,
-        source: { sourceRevision: "rev-source-123" },
-      },
-      deployment: sourceDeployment,
-    },
-  });
+  const errors = promotionCompatibilityErrors(target, sourceForDeployment(sourceDeployment));
   assert.ok(errors.some((entry) => entry.includes("runtime contract mismatch")));
 });
 
@@ -142,24 +107,13 @@ test("promotion compatibility rejects mobile signing-model drift", () => {
         "app-store-connect:ios-platform/demo-ios-app#track:testflight-external",
     },
   });
-  const errors = promotionCompatibilityErrors(target, {
-    record: {
-      finalOutcome: "succeeded",
-      publishMode: "normal",
-      deploymentId: sourceDeployment.deploymentId,
-    },
-    replaySnapshot: {
-      artifact: { identity: "mobile-app:artifact-123" },
-      admittedContext: {
-        lanePolicyFingerprint: sourceDeployment.lanePolicy.fingerprint,
-        source: { sourceRevision: "rev-source-123" },
-      },
-      deployment: {
-        ...sourceDeployment,
-        providerTarget: { ...sourceDeployment.providerTarget, signingModel: "enterprise" as any },
-      },
-    },
-  });
+  const errors = promotionCompatibilityErrors(
+    target,
+    sourceForDeployment({
+      ...sourceDeployment,
+      providerTarget: { ...sourceDeployment.providerTarget, signingModel: "enterprise" as any },
+    }),
+  );
   assert.ok(errors.some((entry) => entry.includes("signing model mismatch")));
 });
 
@@ -191,21 +145,7 @@ test("promotion compatibility rejects mobile track regression", () => {
         "app-store-connect:ios-platform/demo-ios-app#track:testflight-internal",
     },
   });
-  const errors = promotionCompatibilityErrors(target, {
-    record: {
-      finalOutcome: "succeeded",
-      publishMode: "normal",
-      deploymentId: sourceDeployment.deploymentId,
-    },
-    replaySnapshot: {
-      artifact: { identity: "mobile-app:artifact-123" },
-      admittedContext: {
-        lanePolicyFingerprint: sourceDeployment.lanePolicy.fingerprint,
-        source: { sourceRevision: "rev-source-123" },
-      },
-      deployment: sourceDeployment,
-    },
-  });
+  const errors = promotionCompatibilityErrors(target, sourceForDeployment(sourceDeployment));
   assert.ok(errors.some((entry) => entry.includes("mobile track progression mismatch")));
 });
 
@@ -241,21 +181,7 @@ test("promotion compatibility rejects google-play rollout regression", () => {
       providerTargetIdentity: "google-play:android-platform/demo-android-app#track:production",
     },
   });
-  const errors = promotionCompatibilityErrors(target, {
-    record: {
-      finalOutcome: "succeeded",
-      publishMode: "normal",
-      deploymentId: sourceDeployment.deploymentId,
-    },
-    replaySnapshot: {
-      artifact: { identity: "mobile-app:artifact-123" },
-      admittedContext: {
-        lanePolicyFingerprint: sourceDeployment.lanePolicy.fingerprint,
-        source: { sourceRevision: "rev-source-123" },
-      },
-      deployment: sourceDeployment,
-    },
-  });
+  const errors = promotionCompatibilityErrors(target, sourceForDeployment(sourceDeployment));
   assert.ok(errors.some((entry) => entry.includes("mobile rollout progression mismatch")));
 });
 
@@ -275,20 +201,6 @@ test("promotion compatibility rejects google-play track regression", () => {
     },
   });
   const target = googlePlayDeploymentFixture();
-  const errors = promotionCompatibilityErrors(target, {
-    record: {
-      finalOutcome: "succeeded",
-      publishMode: "normal",
-      deploymentId: sourceDeployment.deploymentId,
-    },
-    replaySnapshot: {
-      artifact: { identity: "mobile-app:artifact-123" },
-      admittedContext: {
-        lanePolicyFingerprint: sourceDeployment.lanePolicy.fingerprint,
-        source: { sourceRevision: "rev-source-123" },
-      },
-      deployment: sourceDeployment,
-    },
-  });
+  const errors = promotionCompatibilityErrors(target, sourceForDeployment(sourceDeployment));
   assert.ok(errors.some((entry) => entry.includes("mobile track progression mismatch")));
 });

@@ -32,6 +32,8 @@ Completion criteria:
   control-plane authority, immutable artifact handling, retry/rollback/promotion, preview cleanup,
   and authoritative records consistent with
   [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
+- reviewed deployment-owned files in the deployment domain stay within the repository methodology
+  file-size boundary, enforced by the deployment-domain guardrail introduced in PR-44
 
 ---
 

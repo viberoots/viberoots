@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import {
@@ -11,31 +10,14 @@ import {
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
+import {
+  componentArtifactFlag,
+  liveIndexPath,
+  liveRootPath,
+  writeArtifact,
+  writeDeploymentJson,
+} from "./nixos-shared-host.reuse.e2e.helpers.ts";
 import { startStaticWebappHttpsMultiServer } from "./static-webapp.https-server.ts";
-
-async function writeArtifact(root: string, name: string): Promise<void> {
-  await fsp.mkdir(root, { recursive: true });
-  await fsp.writeFile(path.join(root, "index.html"), `<html>${name}</html>\n`, "utf8");
-  await fsp.writeFile(path.join(root, "healthz"), "ok\n", "utf8");
-}
-
-async function writeDeploymentJson(filePath: string, deployment: unknown): Promise<void> {
-  await fsp.writeFile(filePath, JSON.stringify(deployment, null, 2) + "\n", "utf8");
-}
-
-function componentArtifactFlag(artifacts: Record<string, string>): string {
-  return Object.entries(artifacts)
-    .map(([componentId, artifactDir]) => `${componentId}=${artifactDir}`)
-    .join(",");
-}
-
-function liveRootPath(hostRoot: string, containerName: string): string {
-  return path.join(nixosSharedHostContainerRoot(hostRoot, containerName), "srv/static-app/live");
-}
-
-function liveIndexPath(hostRoot: string, containerName: string): string {
-  return path.join(liveRootPath(hostRoot, containerName), "index.html");
-}
 
 function multiComponentDeployment(
   environmentStage: "dev" | "staging" = "dev",

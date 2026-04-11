@@ -10,28 +10,13 @@ import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
+import {
+  waitFor,
+  withEnvOverrides,
+  writeDemoArtifact,
+} from "./nixos-shared-host.control-plane.helpers.ts";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
-
-async function writeArtifact(root: string): Promise<void> {
-  await fsp.mkdir(root, { recursive: true });
-  await fsp.writeFile(path.join(root, "index.html"), "<html>demoapp</html>\n", "utf8");
-  await fsp.writeFile(path.join(root, "healthz"), "ok\n", "utf8");
-}
-
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function waitFor<T>(fn: () => Promise<T | null>, message: string): Promise<T> {
-  const deadline = Date.now() + 5_000;
-  while (Date.now() < deadline) {
-    const value = await fn();
-    if (value) return value;
-    await sleep(25);
-  }
-  throw new Error(message);
-}
 
 async function submissionPaths(recordsRoot: string): Promise<string[]> {
   const dir = path.join(recordsRoot, "control-plane", "submissions");
@@ -60,26 +45,13 @@ async function waitForLifecycle(submissionPath: string, lifecycleState: string):
   }, `submission never reached ${lifecycleState}`);
 }
 
-async function withLockEnv<T>(overrides: Record<string, string>, fn: () => Promise<T>): Promise<T> {
-  const previous = Object.fromEntries(Object.keys(overrides).map((key) => [key, process.env[key]]));
-  Object.assign(process.env, overrides);
-  try {
-    return await fn();
-  } finally {
-    for (const [key, value] of Object.entries(previous)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-  }
-}
-
 const INTEGRATION_LOCK_WAIT_TIMEOUT_MS = "10000";
 
 test(
   "shared control plane times out queued runs after the default lock wait budget",
   { concurrency: false },
   async () => {
-    await withLockEnv(
+    await withEnvOverrides(
       {
         BNX_DEPLOY_LOCK_WAIT_TIMEOUT_MS: "200",
         BNX_DEPLOY_LOCK_POLL_MS: "25",
@@ -123,7 +95,7 @@ test(
   "later queued normal deploy supersedes older queued normal deploy for the same deployment and lock scope",
   { concurrency: false },
   async () => {
-    await withLockEnv(
+    await withEnvOverrides(
       {
         BNX_DEPLOY_LOCK_WAIT_TIMEOUT_MS: INTEGRATION_LOCK_WAIT_TIMEOUT_MS,
         BNX_DEPLOY_LOCK_POLL_MS: "25",
@@ -136,7 +108,7 @@ test(
           const artifactDir = path.join(tmp, "artifact");
           const hostRoot = path.join(tmp, "host");
           const recordsRoot = path.join(tmp, "records");
-          await writeArtifact(artifactDir);
+          await writeDemoArtifact(artifactDir);
           await ensureNixosSharedHostStageBranch(tmp, $, deployment);
           const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
           const blocker = await acquireControlPlaneLock(
@@ -214,7 +186,7 @@ test(
   "queued shared deploy revalidates branch state after lock acquisition and exits without mutation when stale",
   { concurrency: false },
   async () => {
-    await withLockEnv(
+    await withEnvOverrides(
       {
         BNX_DEPLOY_LOCK_WAIT_TIMEOUT_MS: INTEGRATION_LOCK_WAIT_TIMEOUT_MS,
         BNX_DEPLOY_LOCK_POLL_MS: "25",
@@ -224,7 +196,7 @@ test(
           const deployment = nixosSharedHostDeploymentFixture();
           const artifactDir = path.join(tmp, "artifact");
           const recordsRoot = path.join(tmp, "records");
-          await writeArtifact(artifactDir);
+          await writeDemoArtifact(artifactDir);
           await ensureNixosSharedHostStageBranch(tmp, $, deployment);
           const blocker = await acquireControlPlaneLock(
             recordsRoot,

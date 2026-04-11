@@ -3,76 +3,26 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as fsp from "node:fs/promises";
 import fg from "fast-glob";
-import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli.ts";
 import {
+  DEPLOYMENT_DOMAIN_FILES_SCOPE,
   SOURCE_FILES_SCOPE,
   SSR_TEST_FILES_SCOPE,
   type FileSizeScope,
 } from "./file-size-lint-scopes.ts";
 import { resolveSourceFileSizeExceptionPaths } from "./file-size-lint-exceptions.ts";
-type Options = {
-  root: string;
-  changedOnly: boolean;
-  threshold: number;
-  failOnOffenders: boolean;
-  allowKnown: boolean;
-  scope: FileSizeScope;
+import {
+  parseFileSizeLintArgs,
+  type FileSizeLintOptions as Options,
+} from "./file-size-lint-options.ts";
+export {
+  DEPLOYMENT_DOMAIN_FILES_SCOPE,
+  SOURCE_FILES_SCOPE,
+  SSR_TEST_FILES_SCOPE,
+  type FileSizeScope,
 };
-export { SOURCE_FILES_SCOPE, SSR_TEST_FILES_SCOPE, type FileSizeScope };
 
 function normalizeRelPath(p: string): string {
   return p.replaceAll("\\", "/").replace(/^\.\/+/, "");
-}
-
-function parseArgs(): Options {
-  const root = path.resolve(getFlagStr("root", process.cwd()));
-  const changedOnly = getFlagBool("changed-only") || getFlagBool("changedOnly");
-  const threshold = Number(getFlagStr("threshold", "250"));
-  const failOnOffenders = getFlagBool("fail");
-  const allowKnown = getFlagBool("allow-known");
-  const scopeName = getFlagStr("scope", "");
-  const include = getFlagList("include");
-  const exclude = getFlagList("exclude");
-
-  if (scopeName === "source") {
-    return {
-      root,
-      changedOnly,
-      threshold,
-      failOnOffenders,
-      allowKnown,
-      scope: {
-        include: include.length ? include : SOURCE_FILES_SCOPE.include,
-        exclude: exclude.length ? exclude : SOURCE_FILES_SCOPE.exclude,
-      },
-    };
-  }
-  if (scopeName === "ssr-tests") {
-    return {
-      root,
-      changedOnly,
-      threshold,
-      failOnOffenders,
-      allowKnown: false,
-      scope: {
-        include: include.length ? include : SSR_TEST_FILES_SCOPE.include,
-        exclude: exclude.length ? exclude : SSR_TEST_FILES_SCOPE.exclude,
-      },
-    };
-  }
-
-  const legacyExts = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs", ".bzl", ".nix"]);
-  const legacyInclude =
-    include.length > 0 ? include : Array.from(legacyExts).map((ext) => `**/*${ext}`);
-
-  return {
-    root,
-    changedOnly,
-    threshold,
-    failOnOffenders,
-    allowKnown,
-    scope: { include: legacyInclude, exclude },
-  };
 }
 
 async function listTrackedFilesFromRoot(root: string): Promise<string[]> {
@@ -201,7 +151,7 @@ function splitKnownOffenders(
 }
 
 async function runCli() {
-  const opts = parseArgs();
+  const opts = parseFileSizeLintArgs();
   const offenders = await findFileSizeOffenders(opts);
   if (offenders.length === 0) return;
   const knownPaths = isSourceFileScope(opts.scope)

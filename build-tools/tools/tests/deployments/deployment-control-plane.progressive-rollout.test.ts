@@ -6,67 +6,19 @@ import { test } from "node:test";
 import { readDeploymentControlPlaneStatus } from "../../deployments/deployment-control-plane-read.ts";
 import { submitDeploymentControlPlaneRunAction } from "../../deployments/deployment-control-plane-run-action.ts";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
-import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
 import {
-  ensureNixosSharedHostStageBranch,
-  nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
+  pauseOnFinalSmoke,
+  progressiveFixture,
+  progressiveHosts,
+} from "./deployment-control-plane.progressive-rollout.helpers.ts";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+import {
+  expectPausedSubmission,
+  writeDemoArtifact,
+} from "./nixos-shared-host.control-plane.helpers.ts";
 import { startStaticWebappHttpsMultiServer } from "./static-webapp.https-server.ts";
-
-async function writeArtifact(root: string, name: string) {
-  await fsp.mkdir(root, { recursive: true });
-  await fsp.writeFile(path.join(root, "index.html"), `<html>${name}</html>\n`, "utf8");
-  await fsp.writeFile(path.join(root, "healthz"), "ok\n", "utf8");
-}
-
-function progressiveFixture() {
-  return nixosSharedHostDeploymentFixture({
-    deploymentId: "demo-stack-dev",
-    label: "//projects/deployments/demo-stack-dev:deploy",
-    components: [
-      {
-        id: "frontend",
-        kind: "static-webapp",
-        target: "//projects/apps/demoapp:app",
-        runtime: { appName: "demoapp", containerPort: 3000, healthPath: "/healthz" },
-        providerTarget: {
-          host: "nixos-shared-host",
-          targetGroup: "default",
-          appNames: ["demoapp"],
-          deploymentTargetIdentity: "nixos-shared-host:default:demoapp",
-          appName: "demoapp",
-          hostname: "demoapp.apps.kilty.io",
-          containerName: "demoapp",
-          sharedDevTargetIdentity: "nixos-shared-host:default:demoapp",
-        },
-      },
-      {
-        id: "api",
-        kind: "static-webapp",
-        target: "//projects/apps/demoapi:app",
-        runtime: { appName: "demoapi", containerPort: 3001, healthPath: "/healthz" },
-        providerTarget: {
-          host: "nixos-shared-host",
-          targetGroup: "default",
-          appNames: ["demoapi"],
-          deploymentTargetIdentity: "nixos-shared-host:default:demoapi",
-          appName: "demoapi",
-          hostname: "demoapi.apps.kilty.io",
-          containerName: "demoapi",
-          sharedDevTargetIdentity: "nixos-shared-host:default:demoapi",
-        },
-      },
-    ],
-    rolloutPolicy: {
-      mode: "ordered_best_effort",
-      abort: "stop_on_first_failure",
-      smoke: "final_only",
-      steps: ["frontend", "api"],
-    },
-  });
-}
 
 test("progressive rollout can pause and resume on the same deploy_run_id", async () => {
   await runInTemp("deployment-control-plane-progressive-resume", async (tmp, $) => {
@@ -75,8 +27,8 @@ test("progressive rollout can pause and resume on the same deploy_run_id", async
     const recordsRoot = path.join(tmp, "records");
     const frontendArtifact = path.join(tmp, "artifacts", "frontend");
     const apiArtifact = path.join(tmp, "artifacts", "api");
-    await writeArtifact(frontendArtifact, "frontend");
-    await writeArtifact(apiArtifact, "api");
+    await writeDemoArtifact(frontendArtifact, "frontend");
+    await writeDemoArtifact(apiArtifact, "api");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
@@ -86,17 +38,11 @@ test("progressive rollout can pause and resume on the same deploy_run_id", async
       artifactLineageId: "artifact-progressive-1",
     });
     const server = await startStaticWebappHttpsMultiServer({
-      hosts: {
-        "demoapp.apps.kilty.io": () =>
-          path.join(nixosSharedHostContainerRoot(hostRoot, "demoapp"), "srv/static-app/live"),
-        "demoapi.apps.kilty.io": () =>
-          path.join(nixosSharedHostContainerRoot(hostRoot, "demoapi"), "srv/static-app/live"),
-      },
+      hosts: progressiveHosts(hostRoot),
       tlsRoot: hostRoot,
     });
     try {
-      let paused: any;
-      await assert.rejects(
+      const paused = await expectPausedSubmission(
         submitNixosSharedHostControlPlaneRun({
           workspaceRoot: tmp,
           operationKind: "deploy",
@@ -114,17 +60,12 @@ test("progressive rollout can pause and resume on the same deploy_run_id", async
             port: server.port,
             rejectUnauthorized: false,
           },
-          hooks: {
-            gateEvaluator: ({ phaseId, outcome, defaultDecision }) =>
-              phaseId === "smoke:final" && outcome === "succeeded" ? "pause" : defaultDecision,
-          },
+          ...pauseOnFinalSmoke(),
         }),
-        (error: any) => {
-          paused = error;
+        (error) => {
           assert.equal(error.submission.lifecycleState, "paused");
           assert.equal(error.submission.progressiveRollout.state, "paused");
           assert.ok(error.submission.deployRunId);
-          return true;
         },
       );
       const resumed = await submitDeploymentControlPlaneRunAction({
@@ -151,8 +92,8 @@ test("abort finishes a paused progressive rollout with an aborted record", async
     const recordsRoot = path.join(tmp, "records");
     const frontendArtifact = path.join(tmp, "artifacts", "frontend");
     const apiArtifact = path.join(tmp, "artifacts", "api");
-    await writeArtifact(frontendArtifact, "frontend");
-    await writeArtifact(apiArtifact, "api");
+    await writeDemoArtifact(frontendArtifact, "frontend");
+    await writeDemoArtifact(apiArtifact, "api");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
@@ -162,17 +103,11 @@ test("abort finishes a paused progressive rollout with an aborted record", async
       artifactLineageId: "artifact-progressive-2",
     });
     const server = await startStaticWebappHttpsMultiServer({
-      hosts: {
-        "demoapp.apps.kilty.io": () =>
-          path.join(nixosSharedHostContainerRoot(hostRoot, "demoapp"), "srv/static-app/live"),
-        "demoapi.apps.kilty.io": () =>
-          path.join(nixosSharedHostContainerRoot(hostRoot, "demoapi"), "srv/static-app/live"),
-      },
+      hosts: progressiveHosts(hostRoot),
       tlsRoot: hostRoot,
     });
     try {
-      let paused: any;
-      await assert.rejects(
+      const paused = await expectPausedSubmission(
         submitNixosSharedHostControlPlaneRun({
           workspaceRoot: tmp,
           operationKind: "deploy",
@@ -190,12 +125,8 @@ test("abort finishes a paused progressive rollout with an aborted record", async
             port: server.port,
             rejectUnauthorized: false,
           },
-          hooks: {
-            gateEvaluator: ({ phaseId, outcome, defaultDecision }) =>
-              phaseId === "smoke:final" && outcome === "succeeded" ? "pause" : defaultDecision,
-          },
+          ...pauseOnFinalSmoke(),
         }),
-        (error: any) => ((paused = error), true),
       );
       const aborted = await submitDeploymentControlPlaneRunAction({
         recordsRoot,
@@ -221,8 +152,8 @@ test("newer runs are rejected while a progressive rollout is paused", async () =
     const recordsRoot = path.join(tmp, "records");
     const frontendArtifact = path.join(tmp, "artifacts", "frontend");
     const apiArtifact = path.join(tmp, "artifacts", "api");
-    await writeArtifact(frontendArtifact, "frontend");
-    await writeArtifact(apiArtifact, "api");
+    await writeDemoArtifact(frontendArtifact, "frontend");
+    await writeDemoArtifact(apiArtifact, "api");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
@@ -232,12 +163,7 @@ test("newer runs are rejected while a progressive rollout is paused", async () =
       artifactLineageId: "artifact-progressive-3",
     });
     const server = await startStaticWebappHttpsMultiServer({
-      hosts: {
-        "demoapp.apps.kilty.io": () =>
-          path.join(nixosSharedHostContainerRoot(hostRoot, "demoapp"), "srv/static-app/live"),
-        "demoapi.apps.kilty.io": () =>
-          path.join(nixosSharedHostContainerRoot(hostRoot, "demoapi"), "srv/static-app/live"),
-      },
+      hosts: progressiveHosts(hostRoot),
       tlsRoot: hostRoot,
     });
     try {
