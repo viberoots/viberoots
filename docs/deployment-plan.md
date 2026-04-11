@@ -5815,6 +5815,160 @@ methodology.
 
 ---
 
+## PR-45: Cross-provider promotion compatibility contract for flexible `dev` lanes
+
+### Description
+
+I will add a reviewed cross-provider promotion-compatibility model so `dev` can remain operationally
+flexible without forcing `staging` and `prod` to inherit that flexibility. This PR replaces the
+current blanket rejection of provider and publisher mismatches during promotion with an explicit,
+fail-closed compatibility contract that can allow a lower environment such as `dev` on
+`nixos-shared-host` to promote into a higher environment on a different provider family when the
+lane declares that behavior and the source/target deployments still match the reviewed artifact,
+component, runtime, and rollout semantics for that promotion family.
+
+### Scope & Changes
+
+- Introduce a reviewed promotion-compatibility contract that distinguishes:
+  - strict same-provider / same-publisher promotion within higher environments
+  - explicitly reviewed cross-provider promotion from flexible lower environments such as `dev`
+- Add authoritative metadata or lane-policy support for declaring when a lane allows
+  cross-provider promotion on specific stage edges.
+- Keep the default fail-closed posture:
+  - provider mismatch still rejects promotion unless the lane explicitly opts into a reviewed
+    cross-provider compatibility mode
+  - publisher mismatch still rejects promotion unless the reviewed compatibility contract proves the
+    source artifact and target publish contract are compatible
+- Replace the current hard-coded provider/publisher equality gate with a closed compatibility
+  evaluation that compares:
+  - component ids
+  - component kinds
+  - resolved artifact semantics
+  - runtime contract
+  - rollout semantics
+  - provisioner behavior where relevant
+  - any reviewed provider-family-specific compatibility inputs
+- Define the repo policy for flexible lower environments:
+  - `dev` may differ from higher environments when the lane explicitly allows that shape
+  - higher-environment promotion edges such as `staging -> prod` remain strict unless the reviewed
+    compatibility contract says otherwise
+  - target-environment admission, target provider config, target smoke, and target publish behavior
+    remain authoritative for the promoted run
+- Generalize the compatibility model across reviewed deployment families rather than limiting it to
+  one component kind:
+  - static webapps
+  - SSR webapps
+  - mobile-app deployments
+  - service / third-party-service deployments where the reviewed provider capability and runtime
+    contract can express cross-provider promotion compatibility
+- Ensure lanes declaring `artifact_reuse_mode = "same_artifact"` continue to require
+  environment-neutral artifacts even when providers differ across the promotion edge.
+- Keep `rebuild_per_stage` semantics unchanged:
+  - cross-provider flexibility must not silently turn exact-artifact promotion into rebuild-per-stage
+  - lanes that need stage-specific builds must still use the reviewed rebuild-per-stage path
+- Update Pleomino's reviewed `dev -> staging -> prod` model so `dev` on `nixos-shared-host` can
+  promote into Cloudflare Pages staging/prod through the new reviewed compatibility contract.
+
+### Tests (in this PR)
+
+- Add compatibility tests proving provider/publisher mismatch remains rejected by default when no
+  reviewed cross-provider promotion contract is declared.
+- Add tests proving reviewed flexible-`dev` lanes allow cross-provider promotion only on the
+  declared stage edges and still reject the same mismatch on undeclared edges.
+- Add end-to-end Pleomino promotion tests proving:
+  - `pleomino-dev` on `nixos-shared-host` can promote into `pleomino-staging` on Cloudflare Pages
+  - `pleomino-staging` can promote into `pleomino-prod` under the lane's reviewed higher-environment
+    compatibility rules
+  - lineage fields and exact-artifact reuse semantics remain correct across the flexible `dev`
+    boundary
+- Add tests for reviewed non-static deployment families proving the compatibility gate evaluates
+  closed inputs rather than raw provider equality:
+  - matching reviewed runtime/artifact contract passes when the lane allows it
+  - runtime-contract drift, rollout drift, artifact-contract drift, or provisioner drift still fail
+    closed
+- Add tests rejecting:
+  - cross-provider promotion on lanes that do not explicitly opt in
+  - cross-provider promotion where source artifacts are not environment-neutral
+  - cross-provider promotion that would blur `same_artifact` and `rebuild_per_stage`
+  - cross-provider promotion where the target provider's reviewed capability entry does not declare
+    compatibility for that component kind / runtime contract
+- Extend front-door and replay tests to prove target-environment admission, smoke, and provider
+  config validation remain target-authoritative even when the source run came from a different
+  provider family.
+
+### Docs (in this PR)
+
+- Update [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) to
+  define the reviewed cross-provider promotion-compatibility model for flexible lower environments.
+- Update [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) so it
+  no longer implies unconditional provider/publisher equality when a reviewed cross-provider
+  compatibility contract is declared.
+- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+  to document which provider families and component/runtime contracts support cross-provider
+  promotion and which still fail closed.
+- Update the Pleomino example docs so they describe the reviewed `dev` flexibility and the stricter
+  higher-environment expectations consistently.
+- Document the operator-facing rule of thumb:
+  - `dev` may be operationally different
+  - promotion still uses one explicit reviewed compatibility contract rather than an informal
+    exception
+
+### Verification Commands
+
+- `buck2 test //...`
+- promotion compatibility and end-to-end promotion flows introduced or updated in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-domain policy extraction, promotion-compatibility
+  evaluation, provider-capability wiring, concrete deployment fixtures/packages, and
+  deployment-domain tests/docs. Under the deployment-only verify policy, default `v` / CI can run
+  the reviewed deployment suite instead of the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- The repo no longer treats provider and publisher equality as an unconditional prerequisite for
+  promotion.
+- Cross-provider promotion is allowed only through one explicit reviewed compatibility contract and
+  still fails closed by default.
+- Flexible `dev` lanes can promote into different higher-environment provider families when the
+  lane declares that shape and the reviewed compatibility inputs match.
+- Higher-environment promotion behavior remains explicit, reviewable, and target-authoritative for
+  admission, provider config, publish, and smoke.
+- Tests and docs in this PR describe the same cross-provider promotion contract.
+
+### Risks
+
+Relaxing provider/publisher equality can accidentally turn promotion into an under-specified
+"artifact seems close enough" path, especially if the compatibility model is open-ended or relies
+on provider-local heuristics.
+
+### Mitigation
+
+Keep the compatibility surface closed and declarative, make cross-provider promotion opt-in at the
+lane level, preserve target-authoritative admission/publish/smoke behavior, and reject any
+provider-family combination that lacks a reviewed compatibility contract.
+
+### Consequence of Not Implementing
+
+The deployment system would continue to reject the common and operationally sensible shape where
+`dev` runs on a cheaper or more flexible shared host while `staging` and `prod` use the production
+provider family, leaving the plan stricter than the repo's intended environment model.
+
+### Downsides for Implementing
+
+This broadens the promotion-compatibility surface and requires careful contract work across
+multiple deployment families rather than a small static-webapp-only exception.
+
+### Recommendation
+
+Implement after PR-44 as the final promotion-compatibility closeout so the deployment plan matches
+the intended flexible-`dev`, strict-higher-environment operating model without weakening the
+reviewed protected/shared promotion contract.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -5859,6 +6013,9 @@ methodology.
     front-door contract gaps for failure-path `release_actions`, cross-provider runner identity,
     and validation/provision-only semantics so the full deployment design is implemented end to
     end.
+18. PR-44 through PR-45: finish deployment-domain methodology compliance and then close the final
+    promotion-compatibility gap so flexible `dev` environments can promote into stricter higher
+    environments through one explicit reviewed cross-provider contract.
 
 ## Companion Docs
 
