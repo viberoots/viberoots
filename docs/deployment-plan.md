@@ -6361,6 +6361,237 @@ authoritative backend rather than on the older in-process/shared-records executi
 
 ---
 
+## PR-49: Authoritative backend durability + deploy-record closeout
+
+### Description
+
+I will close the remaining authoritative-backend gap by making the reviewed Postgres backend the
+canonical store for live worker ownership and final deploy records, so long-running or recovered
+runs cannot be reclaimed and re-executed after a short queue-claim timeout and control-plane
+results are no longer sourced from local JSON mirrors as the authority.
+
+### Scope & Changes
+
+- Extend the reviewed authoritative backend schema to persist canonical protected/shared deploy
+  records keyed by `deploy_run_id` / submission identity rather than treating `<records-root>/runs`
+  as the only durable record authority.
+- Persist lifecycle transitions into the backend as first-class control-plane state:
+  - accepted / queued
+  - waiting for lock
+  - claimed / running
+  - paused / cancelling when applicable
+  - finished / cancelled with terminal outcome and record linkage
+- Replace one-shot worker queue claims with reviewed durable worker ownership:
+  - claim heartbeat / renewal while execution is active
+  - fail-closed claim expiry and replacement-worker takeover rules
+  - explicit fencing-aware finalize / recovery checks before a worker may continue or settle an
+    in-doubt run
+- Serve control-plane status / result reads from the authoritative backend, with
+  `<records-root>/control-plane/*.json` and `<records-root>/runs/*.json` remaining operator-readable
+  mirrors rather than the queue / lock / deploy-record authority.
+- Keep the reviewed local `pgmem://...` harness aligned with the same claim, record, and read
+  contracts so deployment-domain tests remain deterministic without external infrastructure.
+- Preserve the PR-48 approval-service model without changing approval semantics:
+  - this PR hardens the backend lifecycle the approval flow runs on
+  - it does not redefine approval policy or same-run approval advancement
+
+### Tests (in this PR)
+
+- Add integration tests proving a long-running shared-host run remains singly owned beyond the
+  normal claim lease and is not re-executed by a second worker.
+- Add recovery tests proving replacement workers can take over only after the reviewed backend
+  ownership / expiry rules allow it, and that duplicate finalization is rejected fail-closed.
+- Add tests proving canonical deploy records are written to and read from the authoritative backend
+  by `deploy_run_id` and submission id, while the JSON mirror still lands under `<records-root>`.
+- Extend service/status/result tests so final result reads still work from authoritative backend
+  state when local mirror timing differs.
+- Extend deterministic `pgmem://...` harness coverage so backend claim heartbeat, record
+  persistence, and result/status reads are exercised in deployment-domain tests.
+
+### Docs (in this PR)
+
+- Update [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) to
+  state explicitly that the reviewed authoritative backend now backs both protected/shared deploy
+  records and durable claimed-running worker ownership.
+- Update [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) so
+  protected/shared status/result semantics and deploy-record authority describe Postgres as the
+  authoritative record store, with JSON as operator-readable mirrors.
+- Add operator docs describing:
+  - canonical backend state vs filesystem mirrors
+  - durable worker-ownership / recovery behavior
+  - what operators should trust during in-doubt recovery or restore testing
+- Update
+  [nixos-shared-host-setup.md](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  and
+  [nixos-shared-host-technician-checklist.md](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-technician-checklist.md)
+  wherever they describe where authoritative run state and final records live or how operators
+  inspect them.
+
+### Verification Commands
+
+- `buck2 test //...`
+- reviewed backend claim / recovery / deploy-record authority flows introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment control-plane backend schema, worker ownership / recovery,
+  status/result reads, record persistence, harness coverage, and deployment-domain tests/docs.
+  Under the deployment-only verify policy, default `v` / CI can run the reviewed deployment suite
+  rather than the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- A long-running protected/shared run cannot be reclaimed and re-executed while its reviewed worker
+  still holds authoritative ownership.
+- Replacement-worker recovery fails closed unless the backend ownership / expiry rules make
+  takeover authoritative.
+- Canonical protected/shared deploy records are persisted in and read from the authoritative
+  backend, not only from local JSON files.
+- JSON records and control-plane files remain operator-readable mirrors rather than the sole
+  authority.
+
+### Risks
+
+This changes the control-plane backend contract for running-worker ownership and final records, so
+an incomplete migration could make recovery behavior ambiguous or drift service reads away from the
+persisted canonical state.
+
+### Mitigation
+
+Land the schema and read-path migration together, preserve deterministic `pgmem://...` coverage for
+long-running claim / recovery cases, and add end-to-end tests that exercise canonical record reads
+through the reviewed service surfaces in the same PR.
+
+### Consequence of Not Implementing
+
+The deployment system would continue to describe Postgres as the authoritative protected/shared
+backend while still allowing duplicate execution after claim expiry and leaving deploy records
+authoritative only on local files.
+
+### Downsides for Implementing
+
+This adds more backend schema, migration, and recovery-test complexity to the deployment system
+itself.
+
+### Recommendation
+
+Implement after PR-48 so the pending-approval advancement / approval-service flow lands first and
+this PR can harden the backend lifecycle it relies on without overlapping that approval-specific
+work.
+
+---
+
+## PR-50: Service-only protected/shared client boundary closeout
+
+### Description
+
+I will remove the remaining peer-mutator protected/shared client paths by making every reviewed
+`nixos-shared-host` mutation entrypoint act as a thin client of the central control plane instead
+of falling back to in-process local submission or SSH peer authority when service configuration is
+missing.
+
+### Scope & Changes
+
+- Remove the repo front-door fallback that directly calls the shared-host control-plane logic
+  in-process for `shared_nonprod` when `--control-plane-url` is absent; same-host mutation must
+  fail closed or submit through the reviewed service.
+- Make same-host `deploy`, `--publish-only`, `--provision-only`, and explicit removal flows use the
+  reviewed service boundary rather than local peer mutation.
+- Rework the reviewed remote-profile and Jenkins wrapper flows so they submit to the central
+  control plane instead of remaining SSH peer mutators:
+  - wrappers may still perform reviewed artifact staging, plan rendering, or host-preflight work
+  - admission, lock acquisition, orchestration, run-action handling, and final deploy-record
+    authority remain central control-plane responsibilities
+- Add one reviewed client configuration model for service endpoint selection and required auth
+  material across same-host, remote-profile, and Jenkins callers.
+- Preserve PR-48 approval / run-action semantics by routing those operator actions through the same
+  control-plane API rather than introducing parallel local advancement paths.
+- Fail closed with explicit machine-readable errors when a protected/shared caller lacks required
+  service configuration or attempts to mix legacy peer-mutation flags with service-only mode.
+
+### Tests (in this PR)
+
+- Add repo CLI tests proving shared-host same-host mutation rejects missing service configuration and
+  submits through the service for all supported mutation kinds.
+- Add remote-profile and Jenkins wrapper contract tests proving those flows become control-plane
+  submission clients rather than direct peer mutators.
+- Add end-to-end tests proving service-routed same-host, remote-profile, and Jenkins submissions
+  all preserve the same admission, locking, and deploy-record semantics.
+- Add fail-closed tests for missing service endpoint, missing auth, unsupported mixed-mode flags,
+  and service-unavailable behavior.
+- Extend operator-surface tests so the machine-readable summaries for same-host, remote-profile, and
+  Jenkins callers continue to report authoritative submission / result information from the control
+  plane.
+
+### Docs (in this PR)
+
+- Update [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) and
+  [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) so
+  protected/shared client paths are documented uniformly as submission clients of the central
+  control plane rather than a mix of service and peer-mutator execution models.
+- Remove operator docs that describe reviewed SSH peer mutation or local in-process shared-host
+  mutation as normal protected/shared workflows.
+- Update
+  [nixos-shared-host-setup.md](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  and
+  [nixos-shared-host-technician-checklist.md](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-technician-checklist.md)
+  to document the reviewed same-host, remote-profile, and Jenkins service-submission workflows,
+  including required service endpoint / auth configuration.
+- Document the fail-closed error cases and migration guidance for callers that still expect the
+  older peer-mutator behavior.
+
+### Verification Commands
+
+- `buck2 test //...`
+- reviewed service-only client / wrapper submission flows introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment front-door client wiring, remote-profile / Jenkins wrapper
+  control-plane submission flow, service configuration handling, machine-readable result surfaces,
+  and deployment-domain tests/docs. Under the deployment-only verify policy, default `v` / CI can
+  run the reviewed deployment suite rather than the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- Every reviewed `nixos-shared-host` protected/shared mutation path submits through the central
+  control-plane service instead of falling back to local or SSH peer mutation.
+- Same-host, remote-profile, and Jenkins callers all use one explicit reviewed service/client
+  boundary with fail-closed configuration behavior.
+- Approval, run-action, locking, orchestration, and deploy-record authority remain centralized
+  behind the service boundary for every protected/shared client mode.
+- Tests and operator docs describe the same service-only client model.
+
+### Risks
+
+This changes every remaining reviewed mutation entrypoint for the shared-host slice, so a weak
+migration could strand operators, break wrapper automation, or accidentally preserve an undocumented
+peer-mutator escape hatch.
+
+### Mitigation
+
+Land the migration with explicit fail-closed errors, stable machine-readable client outputs, and
+end-to-end coverage for same-host, remote-profile, and Jenkins submission flows in the same PR.
+
+### Consequence of Not Implementing
+
+The deployment system would continue to claim a central protected/shared mutation authority while
+still shipping reviewed local or SSH peer-mutator paths that bypass the service boundary.
+
+### Downsides for Implementing
+
+This forces remaining callers to adopt explicit service configuration and may require wrapper /
+operator workflow changes during migration.
+
+### Recommendation
+
+Implement after PR-49 so all reviewed clients switch only once the authoritative backend already
+owns durable worker claims, status/result reads, and deploy-record persistence.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -6413,6 +6644,10 @@ authoritative backend rather than on the older in-process/shared-records executi
     mutation onto the reviewed control-plane service / backend / worker architecture, and adding
     the first-class approval-service flow that advances `pending_approval` runs without creating a
     second run.
+20. PR-49 through PR-50: harden the authoritative backend / worker-ownership contract and then
+    remove the remaining protected/shared peer-mutator client paths so every reviewed same-host,
+    remote-profile, and Jenkins caller routes through one central control-plane authority backed by
+    authoritative Postgres records.
 
 ## Companion Docs
 
