@@ -23,18 +23,14 @@ import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-prov
 import { writeNixosSharedHostProvisionOnlyRecord } from "./nixos-shared-host-provision-record.ts";
 import { createNixosSharedHostReleasePhaseRunner } from "./nixos-shared-host-release-phase.ts";
 import { writeNixosSharedHostReplayComponentResults } from "./nixos-shared-host-replay.ts";
-import {
-  materializeNixosSharedHostRuntimeWithSecrets,
-  runNixosSharedHostReleasePhaseWithSecrets,
-  smokeNixosSharedHostPublishedComponentsWithSecrets,
-} from "./nixos-shared-host-secret-runtime.ts";
+import { materializeNixosSharedHostRuntimeWithSecrets } from "./nixos-shared-host-secret-runtime.ts";
 import { prepareNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy-setup.ts";
+import { runNixosSharedHostStaticDeployLifecycle } from "./nixos-shared-host-static-deploy-lifecycle.ts";
 import {
   failNixosSharedHostStaticDeploy,
   writeSuccessfulNixosSharedHostStaticDeployRecord,
 } from "./nixos-shared-host-static-deploy-failure.ts";
 import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
-import { runStaticDeployProgressivePhases } from "./nixos-shared-host-static-deploy-progressive.ts";
 
 type StaticOperationKind = "deploy" | "promotion" | "provision_only" | "retry" | "rollback";
 type StaticPublishBehavior = "deploy" | "publish-only" | "provision-only";
@@ -138,25 +134,17 @@ export async function runNixosSharedHostStaticDeploy(opts: {
     for (const componentArtifact of componentArtifacts) {
       await requireNixosSharedHostAdmittedArtifactPath(componentArtifact.artifact);
     }
-    await runNixosSharedHostReleasePhaseWithSecrets(
+    const { progressive, smoke } = await runNixosSharedHostStaticDeployLifecycle({
       secretRuntime,
       runReleasePhase,
       operationKind,
       releaseActions,
-      "pre_publish",
-      {
-        artifactIdentity: topLevelArtifactIdentity,
-      },
-    );
-    await secretRuntime.enterStep("publish");
-    const progressive = await runStaticDeployProgressivePhases({
+      artifactIdentity: topLevelArtifactIdentity,
       deployment: opts.deployment,
       rendered,
       hostRoot: opts.hostRoot,
       recordsRoot: opts.recordsRoot,
       deployRunId: runId,
-      operationKind,
-      releaseActions,
       componentArtifacts,
       ...(opts.sourceComponentResults
         ? { sourceComponentResults: opts.sourceComponentResults }
@@ -172,35 +160,6 @@ export async function runNixosSharedHostStaticDeploy(opts: {
       },
       authority,
     });
-    await runNixosSharedHostReleasePhaseWithSecrets(
-      secretRuntime,
-      runReleasePhase,
-      operationKind,
-      releaseActions,
-      "post_publish_pre_smoke",
-      {
-        artifactIdentity: topLevelArtifactIdentity,
-      },
-    );
-    const smoke = progressive.smoke
-      ? progressive.smoke
-      : await smokeNixosSharedHostPublishedComponentsWithSecrets({
-          secretRuntime,
-          deployment: opts.deployment,
-          published: progressive.published,
-          ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
-        });
-    await runNixosSharedHostReleasePhaseWithSecrets(
-      secretRuntime,
-      runReleasePhase,
-      operationKind,
-      releaseActions,
-      "post_smoke",
-      {
-        artifactIdentity: topLevelArtifactIdentity,
-        publicUrl: smoke.publicUrl,
-      },
-    );
     if (replaySnapshotPath && smoke.componentResults.length > 0)
       await writeNixosSharedHostReplayComponentResults(
         replaySnapshotPath,

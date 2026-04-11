@@ -2,7 +2,10 @@
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import { withFailedStep } from "./nixos-shared-host-deploy-failure.ts";
-import { runNixosSharedHostReleaseActionPhase } from "./nixos-shared-host-release-actions.ts";
+import {
+  runNixosSharedHostReleaseActionPhase,
+  type NixosSharedHostReleaseActionExecutionPath,
+} from "./nixos-shared-host-release-actions.ts";
 
 export function createNixosSharedHostReleasePhaseRunner(opts: {
   recordsRoot: string;
@@ -15,8 +18,11 @@ export function createNixosSharedHostReleasePhaseRunner(opts: {
   return async (
     phase: "pre_publish" | "post_publish_pre_smoke" | "post_smoke",
     extra: { artifactIdentity?: string; publicUrl?: string } = {},
+    executionPath: NixosSharedHostReleaseActionExecutionPath = "success",
   ) =>
-    runNixosSharedHostReleaseActionPhase({ ...opts, phase, ...extra }).catch((error) => {
-      throw withFailedStep(`release_actions.${phase}`, error);
-    });
+    runNixosSharedHostReleaseActionPhase({ ...opts, phase, ...extra, executionPath }).catch(
+      (error) => {
+        throw withFailedStep(`release_actions.${phase}`, error);
+      },
+    );
 }

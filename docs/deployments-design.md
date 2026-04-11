@@ -3822,6 +3822,14 @@ Policy:
 - the common-case default should stay simple:
   - fresh `deploy <id>` runs the declared lifecycle actions in phase order
   - immutable-reuse flows such as `deploy_publish_slice`, `retry`, `rollback`, and `promotion` are fail-closed and only re-run actions whose built-in type explicitly declares replay safety for that replay context
+- built-in runtime execution should treat phase/path selection as explicit:
+  - `success_only` runs only on the success path for the declared phase
+  - `failure_only` runs only after the declared phase reaches its reviewed failure boundary
+  - `always` runs in both paths when the declared phase is reached
+- for the reviewed `nixos-shared-host` lifecycle, failure boundaries are phase-specific:
+  - `pre_publish`: after the pre-publish phase fails
+  - `post_publish_pre_smoke`: after publish fails or smoke is skipped because an earlier failure already ended the success path
+  - `post_smoke`: after smoke completes with a failed outcome
 - the protected/shared default is fail-closed:
   - a `release_action` does not re-run during `deploy_publish_slice`, `retry`, `rollback`, or `promotion` unless that action type explicitly declares that replay is safe and intended for that replay context
   - if the requested replay flow would require an action whose replay behavior is not explicitly allowed, the run must fail clearly rather than guess

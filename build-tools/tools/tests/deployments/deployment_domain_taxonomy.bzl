@@ -105,6 +105,8 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/nixos-shared-host.publish.missing-target.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.promotion.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.publisher.contract.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.release-actions.failure-path.replay.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.release-actions.failure-path.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.release-actions.replay-policy.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.release-actions.rollback.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.release-actions.validation.test.ts": True,

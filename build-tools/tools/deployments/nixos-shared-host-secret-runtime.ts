@@ -2,7 +2,11 @@
 import type { DeploymentRequirementStep } from "./deployment-requirements.ts";
 import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import type { NixosSharedHostConfig } from "./nixos-shared-host.ts";
-import { assertNixosSharedHostReleaseActionPhaseReplayAllowed } from "./nixos-shared-host-release-actions.ts";
+import {
+  assertNixosSharedHostReleaseActionPhaseReplayAllowed,
+  hasRunnableNixosSharedHostReleaseActionPhase,
+  type NixosSharedHostReleaseActionExecutionPath,
+} from "./nixos-shared-host-release-actions.ts";
 import { withFailedStep } from "./nixos-shared-host-deploy-failure.ts";
 import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
 import { smokeNixosSharedHostPublishedComponents } from "./nixos-shared-host-publish-components.ts";
@@ -34,19 +38,57 @@ export async function runNixosSharedHostReleasePhaseWithSecrets(
   runReleasePhase: (
     phase: keyof typeof RELEASE_PHASE_STEP,
     extra?: { artifactIdentity?: string; publicUrl?: string },
+    executionPath?: NixosSharedHostReleaseActionExecutionPath,
   ) => Promise<void>,
   operationKind: "deploy" | "promotion" | "retry" | "rollback",
   releaseActions: DeploymentReleaseAction[],
   phase: keyof typeof RELEASE_PHASE_STEP,
   extra?: { artifactIdentity?: string; publicUrl?: string },
+  executionPath: NixosSharedHostReleaseActionExecutionPath = "success",
 ) {
   assertNixosSharedHostReleaseActionPhaseReplayAllowed({
     operationKind,
     phase,
     releaseActions,
+    executionPath,
   });
+  if (
+    !hasRunnableNixosSharedHostReleaseActionPhase({
+      operationKind,
+      phase,
+      releaseActions,
+      executionPath,
+    })
+  ) {
+    return;
+  }
   await secretRuntime.enterStep(RELEASE_PHASE_STEP[phase]);
-  await runReleasePhase(phase, extra);
+  await runReleasePhase(phase, extra, executionPath);
+}
+
+export async function rethrowAfterNixosSharedHostReleasePhaseFailureWithSecrets(
+  secretRuntime: SecretRuntime,
+  runReleasePhase: (
+    phase: keyof typeof RELEASE_PHASE_STEP,
+    extra?: { artifactIdentity?: string; publicUrl?: string },
+    executionPath?: NixosSharedHostReleaseActionExecutionPath,
+  ) => Promise<void>,
+  operationKind: "deploy" | "promotion" | "retry" | "rollback",
+  releaseActions: DeploymentReleaseAction[],
+  phase: keyof typeof RELEASE_PHASE_STEP,
+  error: unknown,
+  extra?: { artifactIdentity?: string; publicUrl?: string },
+) {
+  await runNixosSharedHostReleasePhaseWithSecrets(
+    secretRuntime,
+    runReleasePhase,
+    operationKind,
+    releaseActions,
+    phase,
+    extra,
+    "failure",
+  );
+  throw error;
 }
 
 export async function smokeNixosSharedHostPublishedComponentsWithSecrets(opts: {

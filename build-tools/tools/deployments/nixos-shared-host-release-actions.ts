@@ -8,6 +8,7 @@ import type {
 import type { NixosSharedHostDeployment } from "./contract.ts";
 
 const RELEASE_ACTION_RESULT_DIR = "release-actions";
+export type NixosSharedHostReleaseActionExecutionPath = "success" | "failure";
 
 function replayContextFor(
   operationKind: "deploy" | "promotion" | "retry" | "rollback",
@@ -25,6 +26,26 @@ function rollbackCompatibilityError(action: DeploymentReleaseAction): string | u
     action.dataCompatibility === "reversible"
     ? undefined
     : `${action.ref} blocks rollback with data_compatibility=${action.dataCompatibility}`;
+}
+
+function actionMatchesExecutionPath(
+  action: DeploymentReleaseAction,
+  executionPath: NixosSharedHostReleaseActionExecutionPath,
+): boolean {
+  return executionPath === "failure"
+    ? action.runCondition === "failure_only" || action.runCondition === "always"
+    : action.runCondition === "success_only" || action.runCondition === "always";
+}
+
+function phaseActionsFor(opts: {
+  phase: DeploymentReleaseAction["phase"];
+  releaseActions: DeploymentReleaseAction[];
+  executionPath: NixosSharedHostReleaseActionExecutionPath;
+}) {
+  return opts.releaseActions.filter(
+    (action) =>
+      action.phase === opts.phase && actionMatchesExecutionPath(action, opts.executionPath),
+  );
 }
 
 async function writeReleaseActionMarker(opts: {
@@ -74,11 +95,15 @@ export function assertNixosSharedHostReleaseActionPhaseReplayAllowed(opts: {
   publishBehavior?: "deploy" | "publish-only";
   phase: DeploymentReleaseAction["phase"];
   releaseActions: DeploymentReleaseAction[];
+  executionPath?: NixosSharedHostReleaseActionExecutionPath;
 }) {
   const replayContext = replayContextFor(opts.operationKind, opts.publishBehavior);
   if (!replayContext) return;
-  for (const action of opts.releaseActions) {
-    if (action.phase !== opts.phase || action.runCondition === "failure_only") continue;
+  for (const action of phaseActionsFor({
+    phase: opts.phase,
+    releaseActions: opts.releaseActions,
+    executionPath: opts.executionPath || "success",
+  })) {
     const disposition = action.replayPolicy[replayContext];
     if (disposition === "skip") continue;
     if (disposition === "fail") {
@@ -88,6 +113,21 @@ export function assertNixosSharedHostReleaseActionPhaseReplayAllowed(opts: {
       throw new Error(`release action ${action.ref} is not duplicate-safe for ${replayContext}`);
     }
   }
+}
+
+export function hasRunnableNixosSharedHostReleaseActionPhase(opts: {
+  operationKind: "deploy" | "promotion" | "retry" | "rollback";
+  publishBehavior?: "deploy" | "publish-only";
+  phase: DeploymentReleaseAction["phase"];
+  releaseActions: DeploymentReleaseAction[];
+  executionPath?: NixosSharedHostReleaseActionExecutionPath;
+}) {
+  const replayContext = replayContextFor(opts.operationKind, opts.publishBehavior);
+  return phaseActionsFor({
+    phase: opts.phase,
+    releaseActions: opts.releaseActions,
+    executionPath: opts.executionPath || "success",
+  }).some((action) => !replayContext || action.replayPolicy[replayContext] !== "skip");
 }
 
 export async function runNixosSharedHostReleaseActionPhase(opts: {
@@ -100,22 +140,25 @@ export async function runNixosSharedHostReleaseActionPhase(opts: {
   releaseActions: DeploymentReleaseAction[];
   artifactIdentity?: string;
   publicUrl?: string;
+  executionPath?: NixosSharedHostReleaseActionExecutionPath;
 }) {
   assertNixosSharedHostReleaseActionPhaseReplayAllowed(opts);
-  for (const action of opts.releaseActions) {
-    if (action.phase !== opts.phase || action.runCondition === "failure_only") continue;
-    if (replayContextFor(opts.operationKind, opts.publishBehavior)) {
-      const replayContext = replayContextFor(opts.operationKind, opts.publishBehavior)!;
-      if (action.replayPolicy[replayContext] === "skip") continue;
-    }
+  const executionPath = opts.executionPath || "success";
+  const replayContext = replayContextFor(opts.operationKind, opts.publishBehavior);
+  for (const action of phaseActionsFor({
+    phase: opts.phase,
+    releaseActions: opts.releaseActions,
+    executionPath,
+  })) {
+    if (replayContext && action.replayPolicy[replayContext] === "skip") continue;
     await writeReleaseActionMarker({
       recordsRoot: opts.recordsRoot,
       deployRunId: opts.deployRunId,
       action,
       operationKind: opts.operationKind,
       deployment: opts.deployment,
+      publicUrl: opts.publicUrl,
       ...(opts.artifactIdentity ? { artifactIdentity: opts.artifactIdentity } : {}),
-      ...(opts.publicUrl ? { publicUrl: opts.publicUrl } : {}),
     }).catch((error) => {
       if (action.abortBehavior === "continue") return;
       throw new Error(
