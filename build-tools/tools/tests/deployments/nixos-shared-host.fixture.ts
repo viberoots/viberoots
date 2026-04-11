@@ -13,6 +13,7 @@ import {
   type DeploymentAdmissionPolicy,
   type DeploymentLanePolicy,
 } from "../../deployments/deployment-policy.ts";
+import type { DeploymentLanePromotionCompatibility } from "../../deployments/deployment-lane-promotion-compatibility.ts";
 import type { GraphNode } from "../../lib/graph.ts";
 import type {
   DeploymentAttestationPolicy,
@@ -40,6 +41,9 @@ export function nixosSharedHostLanePolicyFixture(
   overrides: Partial<DeploymentLanePolicy> = {},
 ): DeploymentLanePolicy {
   const governance = overrides.governance || nixosSharedHostLaneGovernanceFixture();
+  const promotionCompatibility = overrides.promotionCompatibility as
+    | DeploymentLanePromotionCompatibility
+    | undefined;
   return {
     ref: overrides.ref || "//projects/deployments/pleomino-shared:lane",
     name: overrides.name || "lane",
@@ -51,6 +55,7 @@ export function nixosSharedHostLanePolicyFixture(
     },
     allowedPromotionEdges: overrides.allowedPromotionEdges || ["dev->staging", "staging->prod"],
     artifactReuseMode: overrides.artifactReuseMode || "same_artifact",
+    ...(promotionCompatibility ? { promotionCompatibility } : {}),
     governanceRef: overrides.governanceRef || governance.ref,
     governance,
     fingerprint: overrides.fingerprint || "sha256:lane-pleomino",
@@ -89,6 +94,11 @@ export function nixosSharedHostLanePolicyNodeFixture(
     stage_branches: policy.stageBranches,
     allowed_promotion_edges: policy.allowedPromotionEdges,
     artifact_reuse_mode: policy.artifactReuseMode,
+    promotion_compatibility: policy.promotionCompatibility
+      ? JSON.stringify({
+          cross_provider_promotion_edges: policy.promotionCompatibility.crossProviderPromotionEdges,
+        })
+      : "",
     governance_policy: policy.governanceRef,
     ...overrides,
   };

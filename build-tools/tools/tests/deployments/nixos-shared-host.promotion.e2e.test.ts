@@ -32,12 +32,20 @@ async function writeWranglerConfig(filePath: string): Promise<void> {
 }
 
 function cloudflareDevDeployment() {
+  const lanePolicy = {
+    ...cloudflarePagesDeploymentFixture().lanePolicy,
+    promotionCompatibility: {
+      crossProviderPromotionEdges: ["dev->staging"],
+    },
+  };
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
     requiredChecks: [],
   });
   return cloudflarePagesDeploymentFixture({
     deploymentId: "pleomino-dev-pages",
     label: "//projects/deployments/pleomino-dev-pages:deploy",
+    lanePolicy,
+    lanePolicyRef: lanePolicy.ref,
     environmentStage: "dev",
     admissionPolicyRef: admissionPolicy.ref,
     admissionPolicy,
@@ -52,6 +60,12 @@ function cloudflareDevDeployment() {
 }
 
 function nixosStagingDeployment() {
+  const lanePolicy = {
+    ...cloudflarePagesDeploymentFixture().lanePolicy,
+    promotionCompatibility: {
+      crossProviderPromotionEdges: ["dev->staging"],
+    },
+  };
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
     ref: "//projects/deployments/pleomino-shared:staging_release",
     name: "staging_release",
@@ -62,6 +76,8 @@ function nixosStagingDeployment() {
   return nixosSharedHostDeploymentFixture({
     deploymentId: "pleomino-staging-host",
     label: "//projects/deployments/pleomino-staging-host:deploy",
+    lanePolicy,
+    lanePolicyRef: lanePolicy.ref,
     environmentStage: "staging",
     admissionPolicyRef: admissionPolicy.ref,
     admissionPolicy,
@@ -80,7 +96,7 @@ function fakeCloudflareEnv(fake: Awaited<ReturnType<typeof installFakeCloudflare
   };
 }
 
-test("nixos-shared-host rejects cross-provider same-artifact promotion when the compatibility gate fails", async () => {
+test("nixos-shared-host allows reviewed cross-provider same-artifact promotion on declared edges", async () => {
   await runInTemp("nixos-shared-host-promotion-e2e", async (tmp, $) => {
     const source = cloudflareDevDeployment();
     const target = nixosStagingDeployment();
@@ -128,15 +144,14 @@ test("nixos-shared-host rejects cross-provider same-artifact promotion when the 
         env: fakeCloudflareEnv(fake),
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${sourceJson} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
       const sourceSummary = JSON.parse(String(sourceRun.stdout));
-      await assert.rejects(
-        resolveCrossDeploymentPromotionSelection({
-          workspaceRoot: tmp,
-          deployment: target,
-          recordsRoot,
-          sourceRunId: sourceSummary.deployRunId,
-        }),
-        /provider mismatch|publisher type mismatch/,
-      );
+      const promotion = await resolveCrossDeploymentPromotionSelection({
+        workspaceRoot: tmp,
+        deployment: target,
+        recordsRoot,
+        sourceRunId: sourceSummary.deployRunId,
+      });
+      assert.equal(promotion.operationKind, "promotion");
+      assert.equal(promotion.parentRunId, sourceSummary.deployRunId);
     } finally {
       await sourceServer.close();
       await targetServer.close();
@@ -187,7 +202,7 @@ test("nixos-shared-host promotion rejects retained source runs that drift out of
           recordsRoot,
           sourceRunId: sourceSummary.deployRunId,
         }),
-        /provider mismatch|publisher type mismatch|no longer matches current promotable target state/,
+        /no longer matches current promotable target state/,
       );
     } finally {
       await sourceServer.close();

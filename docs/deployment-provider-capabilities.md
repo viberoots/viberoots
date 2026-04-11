@@ -289,6 +289,9 @@ Normative-source note:
 - same-deployment `--publish-only` is reviewed as `retry`
 - same-deployment rollback is reviewed only for prior successful normal runs on the same canonical store target identity
 - cross-deployment promotion is reviewed only for exact-artifact reuse through the branch-backed lane contract
+- static-webapp exact-artifact promotion may cross reviewed providers only on lane edges that
+  explicitly opt in, and only when the source and target both resolve to the same reviewed static
+  artifact compatibility family
 
 ### Replay Snapshot Baseline
 

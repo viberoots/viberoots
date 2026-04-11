@@ -89,6 +89,7 @@ deployment_lane_policy = rule(
         "stage_branches": attrs.dict(key = attrs.string(), value = attrs.string()),
         "allowed_promotion_edges": attrs.list(attrs.string(), default = []),
         "artifact_reuse_mode": attrs.string(default = "same_artifact"),
+        "promotion_compatibility": attrs.string(default = ""),
         "governance_policy": attrs.option(attrs.dep(), default = None),
         "labels": attrs.list(attrs.string(), default = []),
     },

@@ -29,6 +29,30 @@ test("promotion compatibility rejects provider and publisher drift", () => {
   assert.ok(errors.some((entry) => entry.includes("publisher type mismatch")));
 });
 
+test("promotion compatibility allows reviewed cross-provider dev promotion on declared edges", () => {
+  const lanePolicy = {
+    ...cloudflarePagesDeploymentFixture().lanePolicy,
+    promotionCompatibility: {
+      crossProviderPromotionEdges: ["dev->staging"],
+    },
+  };
+  const sourceDeployment = nixosSharedHostDeploymentFixture({
+    deploymentId: "pleomino-dev",
+    label: "//projects/deployments/pleomino-dev:deploy",
+    lanePolicy,
+    lanePolicyRef: lanePolicy.ref,
+    component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
+    runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
+  });
+  const target = cloudflarePagesDeploymentFixture({
+    lanePolicy,
+    lanePolicyRef: lanePolicy.ref,
+    component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
+  });
+  const errors = promotionCompatibilityErrors(target, sourceForDeployment(sourceDeployment));
+  assert.deepEqual(errors, []);
+});
+
 test("promotion compatibility rejects rollout-semantics drift", () => {
   const source = sourceFixture({
     rolloutPolicy: {

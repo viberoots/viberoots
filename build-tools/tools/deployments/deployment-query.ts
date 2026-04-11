@@ -43,6 +43,7 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "stage_branches",
   "allowed_promotion_edges",
   "artifact_reuse_mode",
+  "promotion_compatibility",
   "allowed_refs",
   "required_checks",
   "required_approvals",

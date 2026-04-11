@@ -33,9 +33,17 @@ async function writeWranglerConfig(root: string) {
 }
 
 function pleominoDevDeployment() {
+  const lanePolicy = {
+    ...cloudflarePagesDeploymentFixture().lanePolicy,
+    promotionCompatibility: {
+      crossProviderPromotionEdges: ["dev->staging"],
+    },
+  };
   return nixosSharedHostDeploymentFixture({
     deploymentId: "pleomino-dev",
     label: "//projects/deployments/pleomino-dev:deploy",
+    lanePolicy,
+    lanePolicyRef: lanePolicy.ref,
     component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
     runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
   });
@@ -95,7 +103,7 @@ test("promotion rejects source runs from an incompatible current lane policy", a
         recordsRoot,
         sourceRunId,
       }),
-      /provider mismatch|publisher type mismatch|lanePolicyFingerprint mismatch/,
+      /lanePolicyFingerprint mismatch/,
     );
   });
 });
@@ -103,7 +111,11 @@ test("promotion rejects source runs from an incompatible current lane policy", a
 test("promotion rejects retained source runs that no longer match the current promotable target state", async () => {
   await runInTemp("cloudflare-pages-promotion-eligibility-drift", async (tmp, $) => {
     const recordsRoot = path.join(tmp, "records");
-    const staging = cloudflarePagesDeploymentFixture();
+    const source = pleominoDevDeployment();
+    const staging = cloudflarePagesDeploymentFixture({
+      lanePolicy: source.lanePolicy,
+      lanePolicyRef: source.lanePolicyRef,
+    });
     await ensureNixosSharedHostStageBranch(tmp, $, staging);
     const sourceRunId = await createSuccessfulDevRun(tmp, $, recordsRoot);
     await $({ cwd: tmp, stdio: "pipe" })`git config user.email test@example.com`;
@@ -120,7 +132,7 @@ test("promotion rejects retained source runs that no longer match the current pr
         recordsRoot,
         sourceRunId,
       }),
-      /provider mismatch|publisher type mismatch|no longer matches current promotable target state/,
+      /no longer matches current promotable target state/,
     );
   });
 });

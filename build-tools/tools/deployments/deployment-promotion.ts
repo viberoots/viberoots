@@ -20,6 +20,7 @@ import {
   resolveNixosSharedHostReplaySource,
   type NixosSharedHostReplaySnapshot,
 } from "./nixos-shared-host-replay.ts";
+import { normalizeSingleComponentArtifactInput } from "./nixos-shared-host-single-component-artifact-input.ts";
 import {
   exactArtifactPromotionErrors,
   promotionCompatibilityErrors,
@@ -203,6 +204,11 @@ ${errors.join("\n")}`);
       }
       const source = selection.sourceReplaySnapshot as NixosSharedHostReplaySnapshot;
       if (source.publishInput.kind === "exact-artifact") return source.publishInput.artifact;
+      const normalizedArtifact = normalizeSingleComponentArtifactInput({
+        deployment: source.deployment,
+        componentArtifacts: source.publishInput.components,
+      });
+      if (normalizedArtifact) return normalizedArtifact;
       throw new Error(
         "multi-component same-artifact promotion requires per-component publish-only handling",
       );

@@ -1265,9 +1265,13 @@ Minimum promotion-compatibility rule:
   - it should separately name the environment-specific differences that are allowed within the lane
 - the control plane should reject promotion unless source and target are compatible in the ways that matter for safe reuse:
   - resolved component shape and artifact contract
-  - provider and publisher compatibility for the target publish path
+  - provider and publisher compatibility for the target publish path, unless the lane explicitly
+    opts one stage edge into a reviewed cross-provider compatibility family
   - rollout semantics required by the target deployment
   - any target-side `release_actions` or admission constraints that govern whether promotion is allowed
+- flexible lower environments such as `dev` may opt specific edges into that reviewed
+  cross-provider contract without weakening stricter higher-environment edges such as
+  `staging -> prod`
 - if a compatibility decision depends on a field not included in that closed contract, the lane design should be updated first rather than letting the adapter improvise
 - in other words, lane membership says two deployments participate in the same release flow; it does not by itself prove that any artifact from one deployment is valid for another without the target deployment's own compatibility checks
 

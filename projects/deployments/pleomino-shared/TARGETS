@@ -30,6 +30,7 @@ deployment_lane_policy(
         "staging->prod",
     ],
     artifact_reuse_mode = "same_artifact",
+    promotion_compatibility = """{"cross_provider_promotion_edges":["dev->staging"]}""",
     governance_policy = ":lane_governance",
     visibility = ["PUBLIC"],
 )

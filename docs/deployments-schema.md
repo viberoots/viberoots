@@ -281,15 +281,17 @@ Optional fields:
 
 Used to define the closed compatibility contract for cross-deployment promotion within a lane.
 
-Minimum fields when present:
+Minimum reviewed field when present:
 
-- `match_fields`
-  - closed allowlist of deployment-shape fields that must match exactly for promotion in that lane
-- `allow_environment_differences`
-  - closed allowlist of fields that are expected to differ safely across stages in that lane
+- `cross_provider_promotion_edges`
+  - closed allowlist of stage edges that may use the reviewed cross-provider compatibility contract
+  - edges not listed here stay on strict same-provider / same-publisher promotion semantics
 
 Schema expectation:
 
+- same-provider higher-environment promotion remains strict by default
+- cross-provider promotion is still validated against the repo's reviewed compatibility family for
+  the source and target deployment shapes; listing an edge here does not make promotion open-ended
 - any provisioner behavior that matters to promotability must be represented explicitly through this closed compatibility contract or the reviewed lane default it resolves to
 - provisioner differences must not be admitted through adapter-local "safe enough" heuristics outside that resolved contract
 

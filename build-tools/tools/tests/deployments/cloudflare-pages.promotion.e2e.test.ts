@@ -32,15 +32,29 @@ async function writeWranglerConfig(root: string) {
 }
 
 function pleominoDevDeployment() {
+  const lanePolicy = {
+    ...cloudflarePagesDeploymentFixture().lanePolicy,
+    promotionCompatibility: {
+      crossProviderPromotionEdges: ["dev->staging"],
+    },
+  };
   return nixosSharedHostDeploymentFixture({
     deploymentId: "pleomino-dev",
     label: "//projects/deployments/pleomino-dev:deploy",
+    lanePolicy,
+    lanePolicyRef: lanePolicy.ref,
     component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
     runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
   });
 }
 
 function pleominoProdDeployment() {
+  const lanePolicy = {
+    ...cloudflarePagesDeploymentFixture().lanePolicy,
+    promotionCompatibility: {
+      crossProviderPromotionEdges: ["dev->staging"],
+    },
+  };
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
     ref: "//projects/deployments/pleomino-shared:prod_release",
     name: "prod_release",
@@ -51,6 +65,8 @@ function pleominoProdDeployment() {
   return cloudflarePagesDeploymentFixture({
     deploymentId: "pleomino-prod",
     label: "//projects/deployments/pleomino-prod:deploy",
+    lanePolicy,
+    lanePolicyRef: lanePolicy.ref,
     protectionClass: "production_facing",
     environmentStage: "prod",
     admissionPolicyRef: admissionPolicy.ref,
@@ -75,10 +91,13 @@ function fakeCloudflareEnv(fake: Awaited<ReturnType<typeof installFakeCloudflare
   };
 }
 
-test("cloudflare-pages rejects cross-provider same-artifact promotion when the compatibility gate fails", async () => {
+test("cloudflare-pages allows reviewed cross-provider same-artifact promotion only on declared edges", async () => {
   await runInTemp("cloudflare-pages-promotion-e2e", async (tmp, $) => {
     const dev = pleominoDevDeployment();
-    const staging = cloudflarePagesDeploymentFixture();
+    const staging = cloudflarePagesDeploymentFixture({
+      lanePolicy: dev.lanePolicy,
+      lanePolicyRef: dev.lanePolicyRef,
+    });
     const prod = pleominoProdDeployment();
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
@@ -123,15 +142,14 @@ test("cloudflare-pages rejects cross-provider same-artifact promotion when the c
         cwd: tmp,
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${devJson} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
-      await assert.rejects(
-        resolveCloudflarePagesPromotionSelection({
-          workspaceRoot: tmp,
-          deployment: staging,
-          recordsRoot,
-          sourceRunId: devSummary.deployRunId,
-        }),
-        /provider mismatch|publisher type mismatch/,
-      );
+      const stagingPromotion = await resolveCloudflarePagesPromotionSelection({
+        workspaceRoot: tmp,
+        deployment: staging,
+        recordsRoot,
+        sourceRunId: devSummary.deployRunId,
+      });
+      assert.equal(stagingPromotion.operationKind, "promotion");
+      assert.equal(stagingPromotion.parentRunId, devSummary.deployRunId);
       await assert.rejects(
         resolveCloudflarePagesPromotionSelection({
           workspaceRoot: tmp,
@@ -139,7 +157,7 @@ test("cloudflare-pages rejects cross-provider same-artifact promotion when the c
           recordsRoot,
           sourceRunId: devSummary.deployRunId,
         }),
-        /provider mismatch|publisher type mismatch/,
+        /promotion edge is not allowed by the current lane policy/,
       );
     } finally {
       await devServer.close();
@@ -152,7 +170,10 @@ test("cloudflare-pages rejects cross-provider same-artifact promotion when the c
 test("cloudflare-pages promotion fails closed when staging smoke blocks the promoted artifact", async () => {
   await runInTemp("cloudflare-pages-promotion-smoke-failure", async (tmp, $) => {
     const dev = pleominoDevDeployment();
-    const staging = cloudflarePagesDeploymentFixture();
+    const staging = cloudflarePagesDeploymentFixture({
+      lanePolicy: dev.lanePolicy,
+      lanePolicyRef: dev.lanePolicyRef,
+    });
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
     const hostRoot = path.join(tmp, "host");
@@ -190,15 +211,13 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
         cwd: tmp,
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${devJson} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
-      await assert.rejects(
-        resolveCloudflarePagesPromotionSelection({
-          workspaceRoot: tmp,
-          deployment: staging,
-          recordsRoot,
-          sourceRunId: devSummary.deployRunId,
-        }),
-        /provider mismatch|publisher type mismatch/,
-      );
+      const promotion = await resolveCloudflarePagesPromotionSelection({
+        workspaceRoot: tmp,
+        deployment: staging,
+        recordsRoot,
+        sourceRunId: devSummary.deployRunId,
+      });
+      assert.equal(promotion.operationKind, "promotion");
       const records = await Promise.all(
         (await fsp.readdir(path.join(recordsRoot, "runs")))
           .sort()

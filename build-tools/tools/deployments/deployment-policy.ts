@@ -16,6 +16,11 @@ import {
   admissionPolicyExtensionFingerprintPart,
   validateAdmissionPolicyExtensions,
 } from "./deployment-policy-admission-extensions.ts";
+import {
+  lanePromotionCompatibilityFingerprintPart,
+  readLanePromotionCompatibility,
+  type DeploymentLanePromotionCompatibility,
+} from "./deployment-lane-promotion-compatibility.ts";
 
 export const DEPLOYMENT_LANE_POLICY_RULE = "deployment_lane_policy";
 export const DEPLOYMENT_ADMISSION_POLICY_RULE = "deployment_admission_policy";
@@ -31,6 +36,7 @@ export type DeploymentLanePolicy = {
   stageBranches: Record<string, string>;
   allowedPromotionEdges: string[];
   artifactReuseMode: ArtifactReuseMode;
+  promotionCompatibility?: DeploymentLanePromotionCompatibility;
   governanceRef: string;
   governance: DeploymentLaneGovernance;
   fingerprint: string;
@@ -90,6 +96,7 @@ export function extractDeploymentLanePoliciesWithGovernance(
     const allowedPromotionEdges = readStringArray(node, "allowed_promotion_edges");
     const artifactReuseMode = (readString(node, "artifact_reuse_mode") ||
       "same_artifact") as ArtifactReuseMode;
+    const promotionCompatibility = readLanePromotionCompatibility(node, ref);
     const governanceRef = normalizeTargetLabel(readString(node, "governance_policy"));
     const governance = governancePolicies.get(governanceRef);
     if (!ref) {
@@ -116,6 +123,7 @@ export function extractDeploymentLanePoliciesWithGovernance(
     if (artifactReuseMode !== "same_artifact" && artifactReuseMode !== "rebuild_per_stage") {
       errors.push(policyError(ref, `unsupported artifact_reuse_mode "${artifactReuseMode}"`));
     }
+    errors.push(...promotionCompatibility.errors);
     if (!governanceRef) {
       errors.push(policyError(ref, "lane policy must define governance_policy"));
     } else if (!governance) {
@@ -144,6 +152,7 @@ export function extractDeploymentLanePoliciesWithGovernance(
       stageBranches,
       allowedPromotionEdges,
       artifactReuseMode,
+      ...lanePromotionCompatibilityFingerprintPart(promotionCompatibility.value),
       governanceFingerprint: governance!.fingerprint,
     });
     policies.set(ref, {
@@ -153,6 +162,9 @@ export function extractDeploymentLanePoliciesWithGovernance(
       stageBranches,
       allowedPromotionEdges,
       artifactReuseMode,
+      ...(promotionCompatibility.value
+        ? { promotionCompatibility: promotionCompatibility.value }
+        : {}),
       governanceRef,
       governance: governance!,
       fingerprint,
