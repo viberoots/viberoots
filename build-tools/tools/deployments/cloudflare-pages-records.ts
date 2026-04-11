@@ -16,9 +16,13 @@ import type {
   CloudflarePagesPreviewIdentitySelector,
 } from "./cloudflare-pages-preview.ts";
 import { CLOUDFLARE_PAGES_PROVIDER, type CloudflarePagesDeployment } from "./contract.ts";
+import {
+  cloudflarePagesRunnerIdentities,
+  type DeploymentRunnerIdentities,
+} from "./deployment-runner-identities.ts";
 import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
 
-export const CLOUDFLARE_PAGES_RECORD_SCHEMA = "deploy-record@2026-04-04";
+export const CLOUDFLARE_PAGES_RECORD_SCHEMA = "deploy-record@2026-04-10";
 
 export type CloudflarePagesOperationKind = "deploy" | "promotion" | "rollback" | "preview_cleanup";
 export type CloudflarePagesRunClassification = CloudflarePagesOperationKind;
@@ -59,6 +63,7 @@ export type CloudflarePagesDeployRecord = {
   };
   admittedContext: CloudflarePagesAdmittedContext;
   failedStep?: "publish" | "smoke" | "preview_cleanup";
+  runnerIdentities?: DeploymentRunnerIdentities;
   publisherType?: string;
   smokeRunnerType?: "cloudflare-pages-static-webapp-smoke";
   smokeOutcome?: DeploymentSmokeOutcome;
@@ -164,6 +169,10 @@ export function createCloudflarePagesDeployRecord(
       : {}),
     admittedContext: outcome.admittedContext,
     ...(outcome.failedStep ? { failedStep: outcome.failedStep } : {}),
+    runnerIdentities:
+      outcome.operationKind !== "preview_cleanup"
+        ? cloudflarePagesRunnerIdentities(deployment)
+        : {},
     ...(outcome.operationKind !== "preview_cleanup"
       ? {
           publisherType: deployment.publisher.type,
@@ -207,6 +216,24 @@ export async function readCloudflarePagesDeployRecord(
   return await readVersionedJson(recordPath, {
     kind: "cloudflare-pages deploy record",
     currentSchemaVersion: CLOUDFLARE_PAGES_RECORD_SCHEMA,
+    migrations: {
+      "deploy-record@2026-04-04": (raw) =>
+        ({
+          ...raw,
+          schemaVersion: CLOUDFLARE_PAGES_RECORD_SCHEMA,
+          runnerIdentities:
+            typeof raw.runnerIdentities === "object" && raw.runnerIdentities
+              ? raw.runnerIdentities
+              : {
+                  ...(typeof raw.publisherType === "string"
+                    ? { publisher: raw.publisherType }
+                    : {}),
+                  ...(typeof raw.smokeRunnerType === "string"
+                    ? { smoke: `${raw.smokeRunnerType}@1` }
+                    : {}),
+                },
+        }) as CloudflarePagesDeployRecord,
+    },
     validateCurrent: (raw): raw is CloudflarePagesDeployRecord =>
       typeof raw.deployRunId === "string" && typeof raw.deploymentLabel === "string",
   });

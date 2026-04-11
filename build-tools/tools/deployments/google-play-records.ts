@@ -15,11 +15,15 @@ import type {
   DeploymentSmokeOutcome,
 } from "./deployment-smoke-policy.ts";
 import type { GooglePlayDeployment } from "./contract.ts";
+import {
+  googlePlayRunnerIdentities,
+  type DeploymentRunnerIdentities,
+} from "./deployment-runner-identities.ts";
 import type { AdmittedGooglePlayArtifact } from "./google-play-artifacts.ts";
 import { GOOGLE_PLAY_PROVIDER } from "./contract.ts";
 import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
 
-export const GOOGLE_PLAY_RECORD_SCHEMA = "google-play-deploy-record@1";
+export const GOOGLE_PLAY_RECORD_SCHEMA = "google-play-deploy-record@2";
 export type GooglePlayOperationKind = "deploy" | "promotion" | "retry" | "rollback";
 export type GooglePlayDeployRecord = {
   schemaVersion: typeof GOOGLE_PLAY_RECORD_SCHEMA;
@@ -40,6 +44,7 @@ export type GooglePlayDeployRecord = {
   parentRunId?: string;
   releaseLineageId?: string;
   artifactLineageId?: string;
+  runnerIdentities: DeploymentRunnerIdentities;
   publisherType: string;
   deploymentMetadataFingerprint?: string;
   providerConfigFingerprint?: string;
@@ -82,6 +87,7 @@ export function createGooglePlayDeployRecord(
     provider: GOOGLE_PLAY_PROVIDER,
     providerTarget: deployment.providerTarget,
     providerTargetIdentity: deployment.providerTarget.providerTargetIdentity,
+    runnerIdentities: googlePlayRunnerIdentities(deployment),
     publisherType: deployment.publisher.type,
     ...outcome,
     ...operatorErrorFields(outcome.error),
@@ -108,6 +114,22 @@ export async function readGooglePlayDeployRecord(
   return await readVersionedJson(recordPath, {
     kind: "google-play deploy record",
     currentSchemaVersion: GOOGLE_PLAY_RECORD_SCHEMA,
+    migrations: {
+      "google-play-deploy-record@1": (raw) =>
+        ({
+          ...raw,
+          schemaVersion: GOOGLE_PLAY_RECORD_SCHEMA,
+          runnerIdentities:
+            typeof raw.runnerIdentities === "object" && raw.runnerIdentities
+              ? raw.runnerIdentities
+              : {
+                  ...(typeof raw.publisherType === "string"
+                    ? { publisher: raw.publisherType }
+                    : {}),
+                  smoke: "google-play-release-health@1",
+                },
+        }) as GooglePlayDeployRecord,
+    },
     validateCurrent: (raw): raw is GooglePlayDeployRecord =>
       typeof raw.deployRunId === "string" && typeof raw.deploymentLabel === "string",
   });

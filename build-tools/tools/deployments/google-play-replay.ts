@@ -7,6 +7,11 @@ import type { AdmittedGooglePlayArtifact } from "./google-play-artifacts.ts";
 import { requireAdmittedGooglePlayArtifactPath } from "./google-play-artifacts.ts";
 import type { GooglePlayDeployment } from "./contract.ts";
 import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention.ts";
+import {
+  googlePlayRunnerIdentities,
+  runnerIdentityCompatibilityErrors,
+  type DeploymentRunnerIdentities,
+} from "./deployment-runner-identities.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 import {
   deployRecordPathFor,
@@ -14,7 +19,7 @@ import {
   type GooglePlayDeployRecord,
 } from "./google-play-records.ts";
 
-export const GOOGLE_PLAY_REPLAY_SNAPSHOT_SCHEMA = "google-play-replay-snapshot@1";
+export const GOOGLE_PLAY_REPLAY_SNAPSHOT_SCHEMA = "google-play-replay-snapshot@2";
 
 export type GooglePlayReplaySnapshot = {
   schemaVersion: typeof GOOGLE_PLAY_REPLAY_SNAPSHOT_SCHEMA;
@@ -24,6 +29,7 @@ export type GooglePlayReplaySnapshot = {
   deploymentLabel: string;
   providerTargetIdentity: string;
   deploymentMetadataFingerprint: string;
+  runnerIdentities: DeploymentRunnerIdentities;
   artifact: AdmittedGooglePlayArtifact;
   admittedContext: GooglePlayAdmittedContext;
   deployment: GooglePlayDeployment;
@@ -51,6 +57,7 @@ export async function writeGooglePlayReplaySnapshot(opts: {
     deploymentLabel: opts.deployment.label,
     providerTargetIdentity: opts.deployment.providerTarget.providerTargetIdentity,
     deploymentMetadataFingerprint: deploymentMetadataFingerprintFor(opts.deployment),
+    runnerIdentities: googlePlayRunnerIdentities(opts.deployment),
     artifact: opts.artifact,
     admittedContext: opts.admittedContext,
     deployment: opts.deployment,
@@ -84,9 +91,30 @@ export async function resolveGooglePlayReplaySource(opts: {
   const replaySnapshot = await readVersionedJson(record.replaySnapshotPath, {
     kind: "google-play replay snapshot",
     currentSchemaVersion: GOOGLE_PLAY_REPLAY_SNAPSHOT_SCHEMA,
+    migrations: {
+      "google-play-replay-snapshot@1": (raw) =>
+        ({
+          ...raw,
+          schemaVersion: GOOGLE_PLAY_REPLAY_SNAPSHOT_SCHEMA,
+          runnerIdentities:
+            typeof raw.runnerIdentities === "object" && raw.runnerIdentities
+              ? raw.runnerIdentities
+              : googlePlayRunnerIdentities(raw.deployment as GooglePlayDeployment),
+        }) as GooglePlayReplaySnapshot,
+    },
     validateCurrent: (raw): raw is GooglePlayReplaySnapshot =>
       typeof raw.deployRunId === "string" && typeof raw.deploymentLabel === "string",
   });
+  const expected = googlePlayRunnerIdentities(replaySnapshot.deployment);
+  const compatibilityErrors = [
+    ...runnerIdentityCompatibilityErrors(expected, record.runnerIdentities),
+    ...runnerIdentityCompatibilityErrors(expected, replaySnapshot.runnerIdentities),
+  ];
+  if (compatibilityErrors.length > 0) {
+    throw new Error(
+      `replay runner compatibility failed for ${record.deployRunId}\n${compatibilityErrors.join("\n")}`,
+    );
+  }
   await assertProtectedSharedReplayUsable({
     protectionClass: replaySnapshot.deployment.protectionClass as
       | "shared_nonprod"

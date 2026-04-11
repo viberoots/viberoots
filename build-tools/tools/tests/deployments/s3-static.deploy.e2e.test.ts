@@ -62,6 +62,9 @@ test("s3-static deploy CLI completes the static-webapp flow end to end", async (
       const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
       assert.equal(record.provider, "s3-static");
       assert.equal(record.providerReleaseId, "s3-sync-01TEST");
+      assert.equal(record.runnerIdentities.publisher, deployment.publisher.type);
+      assert.equal(record.runnerIdentities.provisioner, "terraform-stack");
+      assert.equal(record.runnerIdentities.smoke, "s3-static-static-webapp-smoke@1");
       assert.equal(record.provisionerType, "terraform-stack");
       assert.ok(record.provisionerPlan?.artifactPath);
     } finally {

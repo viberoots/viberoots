@@ -7,6 +7,11 @@ import type { AdmittedMobileAppArtifact } from "./app-store-connect-artifacts.ts
 import { requireAdmittedMobileAppArtifactPath } from "./app-store-connect-artifacts.ts";
 import type { AppStoreConnectDeployment } from "./contract.ts";
 import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention.ts";
+import {
+  appStoreConnectRunnerIdentities,
+  runnerIdentityCompatibilityErrors,
+  type DeploymentRunnerIdentities,
+} from "./deployment-runner-identities.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 import {
   deployRecordPathFor,
@@ -14,7 +19,7 @@ import {
   type AppStoreConnectDeployRecord,
 } from "./app-store-connect-records.ts";
 
-export const APP_STORE_CONNECT_REPLAY_SNAPSHOT_SCHEMA = "app-store-connect-replay-snapshot@1";
+export const APP_STORE_CONNECT_REPLAY_SNAPSHOT_SCHEMA = "app-store-connect-replay-snapshot@2";
 
 export type AppStoreConnectReplaySnapshot = {
   schemaVersion: typeof APP_STORE_CONNECT_REPLAY_SNAPSHOT_SCHEMA;
@@ -24,6 +29,7 @@ export type AppStoreConnectReplaySnapshot = {
   deploymentLabel: string;
   providerTargetIdentity: string;
   deploymentMetadataFingerprint: string;
+  runnerIdentities: DeploymentRunnerIdentities;
   artifact: AdmittedMobileAppArtifact;
   admittedContext: AppStoreConnectAdmittedContext;
   deployment: AppStoreConnectDeployment;
@@ -51,6 +57,7 @@ export async function writeAppStoreConnectReplaySnapshot(opts: {
     deploymentLabel: opts.deployment.label,
     providerTargetIdentity: opts.deployment.providerTarget.providerTargetIdentity,
     deploymentMetadataFingerprint: deploymentMetadataFingerprintFor(opts.deployment),
+    runnerIdentities: appStoreConnectRunnerIdentities(opts.deployment),
     artifact: opts.artifact,
     admittedContext: opts.admittedContext,
     deployment: opts.deployment,
@@ -84,9 +91,30 @@ export async function resolveAppStoreConnectReplaySource(opts: {
   const replaySnapshot = await readVersionedJson(record.replaySnapshotPath, {
     kind: "app-store-connect replay snapshot",
     currentSchemaVersion: APP_STORE_CONNECT_REPLAY_SNAPSHOT_SCHEMA,
+    migrations: {
+      "app-store-connect-replay-snapshot@1": (raw) =>
+        ({
+          ...raw,
+          schemaVersion: APP_STORE_CONNECT_REPLAY_SNAPSHOT_SCHEMA,
+          runnerIdentities:
+            typeof raw.runnerIdentities === "object" && raw.runnerIdentities
+              ? raw.runnerIdentities
+              : appStoreConnectRunnerIdentities(raw.deployment as AppStoreConnectDeployment),
+        }) as AppStoreConnectReplaySnapshot,
+    },
     validateCurrent: (raw): raw is AppStoreConnectReplaySnapshot =>
       typeof raw.deployRunId === "string" && typeof raw.deploymentLabel === "string",
   });
+  const expected = appStoreConnectRunnerIdentities(replaySnapshot.deployment);
+  const compatibilityErrors = [
+    ...runnerIdentityCompatibilityErrors(expected, record.runnerIdentities),
+    ...runnerIdentityCompatibilityErrors(expected, replaySnapshot.runnerIdentities),
+  ];
+  if (compatibilityErrors.length > 0) {
+    throw new Error(
+      `replay runner compatibility failed for ${record.deployRunId}\n${compatibilityErrors.join("\n")}`,
+    );
+  }
   await assertProtectedSharedReplayUsable({
     protectionClass: replaySnapshot.deployment.protectionClass as
       | "shared_nonprod"

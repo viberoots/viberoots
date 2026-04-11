@@ -9,6 +9,10 @@ import type {
   DeploymentSmokeException,
   DeploymentSmokeOutcome,
 } from "./deployment-smoke-policy.ts";
+import {
+  kubernetesRunnerIdentities,
+  type DeploymentRunnerIdentities,
+} from "./deployment-runner-identities.ts";
 import type { KubernetesProvisionerPlanRef } from "./kubernetes-provisioner-plan.ts";
 import { KUBERNETES_PROVIDER } from "./contract.ts";
 import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
@@ -37,6 +41,7 @@ export type KubernetesDeployRecord = {
     finalOutcome: "succeeded" | "publish_failed";
   }>;
   admittedContext: KubernetesAdmittedContext;
+  runnerIdentities: DeploymentRunnerIdentities;
   publisherType: string;
   provisionerType?: string;
   provisionerPlan?: KubernetesProvisionerPlanRef;
@@ -77,6 +82,7 @@ export function createKubernetesDeployRecord(
     provider: KUBERNETES_PROVIDER,
     providerTarget: deployment.providerTarget,
     providerTargetIdentity: deployment.providerTarget.providerTargetIdentity,
+    runnerIdentities: kubernetesRunnerIdentities(deployment),
     publisherType: deployment.publisher.type,
     ...outcome,
     ...operatorErrorFields(outcome.error),

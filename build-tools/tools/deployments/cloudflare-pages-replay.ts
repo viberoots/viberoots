@@ -5,6 +5,11 @@ import { readVersionedJson } from "./deployment-schema-compat.ts";
 import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
 import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention.ts";
+import {
+  cloudflarePagesRunnerIdentities,
+  runnerIdentityCompatibilityErrors,
+  type DeploymentRunnerIdentities,
+} from "./deployment-runner-identities.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
 import { requireAdmittedStaticWebappArtifactPath } from "./static-webapp-artifacts.ts";
@@ -14,7 +19,7 @@ import {
   type CloudflarePagesDeployRecord,
 } from "./cloudflare-pages-records.ts";
 
-export const CLOUDFLARE_PAGES_REPLAY_SNAPSHOT_SCHEMA = "cloudflare-pages-replay-snapshot@1";
+export const CLOUDFLARE_PAGES_REPLAY_SNAPSHOT_SCHEMA = "cloudflare-pages-replay-snapshot@2";
 
 export type CloudflarePagesReplaySnapshot = {
   schemaVersion: typeof CLOUDFLARE_PAGES_REPLAY_SNAPSHOT_SCHEMA;
@@ -24,6 +29,7 @@ export type CloudflarePagesReplaySnapshot = {
   deploymentLabel: string;
   providerTargetIdentity: string;
   deploymentMetadataFingerprint: string;
+  runnerIdentities: DeploymentRunnerIdentities;
   artifact: AdmittedStaticWebappArtifact;
   admittedContext: CloudflarePagesAdmittedContext;
   deployment: CloudflarePagesDeployment;
@@ -66,6 +72,7 @@ export async function writeCloudflarePagesReplaySnapshot(opts: {
     deploymentLabel: opts.deployment.label,
     providerTargetIdentity: opts.deployment.providerTarget.providerTargetIdentity,
     deploymentMetadataFingerprint,
+    runnerIdentities: cloudflarePagesRunnerIdentities(opts.deployment),
     artifact: opts.artifact,
     admittedContext: opts.admittedContext,
     deployment: opts.deployment,
@@ -86,6 +93,17 @@ export async function readCloudflarePagesReplaySnapshot(
   return await readVersionedJson(replaySnapshotPath, {
     kind: "cloudflare-pages replay snapshot",
     currentSchemaVersion: CLOUDFLARE_PAGES_REPLAY_SNAPSHOT_SCHEMA,
+    migrations: {
+      "cloudflare-pages-replay-snapshot@1": (raw) =>
+        ({
+          ...raw,
+          schemaVersion: CLOUDFLARE_PAGES_REPLAY_SNAPSHOT_SCHEMA,
+          runnerIdentities:
+            typeof raw.runnerIdentities === "object" && raw.runnerIdentities
+              ? raw.runnerIdentities
+              : cloudflarePagesRunnerIdentities(raw.deployment as CloudflarePagesDeployment),
+        }) as CloudflarePagesReplaySnapshot,
+    },
     validateCurrent: (raw): raw is CloudflarePagesReplaySnapshot =>
       typeof raw.deployRunId === "string" && typeof raw.deploymentLabel === "string",
   });
@@ -119,6 +137,16 @@ export async function resolveCloudflarePagesReplaySource(opts: {
   const record = await readCloudflarePagesDeployRecord(recordPath);
   const replaySnapshotPath = requireReplaySnapshotPath(record);
   const replaySnapshot = await readCloudflarePagesReplaySnapshot(replaySnapshotPath);
+  const expected = cloudflarePagesRunnerIdentities(replaySnapshot.deployment);
+  const compatibilityErrors = [
+    ...runnerIdentityCompatibilityErrors(expected, record.runnerIdentities),
+    ...runnerIdentityCompatibilityErrors(expected, replaySnapshot.runnerIdentities),
+  ];
+  if (compatibilityErrors.length > 0) {
+    throw new Error(
+      `replay runner compatibility failed for ${record.deployRunId}\n${compatibilityErrors.join("\n")}`,
+    );
+  }
   await assertProtectedSharedReplayUsable({
     protectionClass: replaySnapshot.deployment.protectionClass as
       | "shared_nonprod"

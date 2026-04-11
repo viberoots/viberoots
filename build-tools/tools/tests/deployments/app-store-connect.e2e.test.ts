@@ -123,6 +123,8 @@ test("app-store-connect deploy and promotion preserve release-health evidence", 
     const promotionSummary = JSON.parse(String(promotionRun.stdout));
     const promotionRecord = await readAppStoreConnectDeployRecord(promotionSummary.recordPath);
     assert.equal(promotionRecord.operationKind, "promotion");
+    assert.equal(promotionRecord.runnerIdentities.publisher, staging.publisher.type);
+    assert.equal(promotionRecord.runnerIdentities.smoke, "app-store-connect-release-health@1");
     assert.equal(promotionRecord.releaseHealth?.status, "healthy");
     assert.equal(promotionRecord.releaseHealth?.processingStatus, "processed");
     assert.equal(promotionRecord.trackState?.track, "testflight-external");
@@ -204,6 +206,7 @@ test("app-store-connect rollback reuses a prior successful exact artifact", asyn
     const rollbackRecord = await readAppStoreConnectDeployRecord(rollback.recordPath);
     assert.equal(rollbackRecord.operationKind, "rollback");
     assert.equal(rollbackRecord.parentRunId, runA.deployRunId);
+    assert.equal(rollbackRecord.runnerIdentities.publisher, staging.publisher.type);
     assert.equal(rollbackRecord.releaseHealth?.status, "healthy");
     assert.equal(rollbackRecord.trackState?.track, "testflight-external");
   });

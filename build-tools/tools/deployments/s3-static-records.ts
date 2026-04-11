@@ -9,6 +9,10 @@ import type {
   DeploymentSmokeException,
   DeploymentSmokeOutcome,
 } from "./deployment-smoke-policy.ts";
+import {
+  s3StaticRunnerIdentities,
+  type DeploymentRunnerIdentities,
+} from "./deployment-runner-identities.ts";
 import type { S3StaticProvisionerPlanRef } from "./s3-static-provisioner-plan.ts";
 import { S3_STATIC_PROVIDER } from "./contract.ts";
 import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
@@ -30,6 +34,7 @@ export type S3StaticDeployRecord = {
   providerTargetIdentity: string;
   artifact?: { identity: string; storedArtifactPath?: string; provenancePath?: string };
   admittedContext: S3StaticAdmittedContext;
+  runnerIdentities: DeploymentRunnerIdentities;
   publisherType: string;
   provisionerType?: string;
   smokeOutcome?: DeploymentSmokeOutcome;
@@ -70,6 +75,7 @@ export function createS3StaticDeployRecord(
     provider: S3_STATIC_PROVIDER,
     providerTarget: deployment.providerTarget,
     providerTargetIdentity: deployment.providerTarget.providerTargetIdentity,
+    runnerIdentities: s3StaticRunnerIdentities(deployment),
     publisherType: deployment.publisher.type,
     ...outcome,
     ...operatorErrorFields(outcome.error),

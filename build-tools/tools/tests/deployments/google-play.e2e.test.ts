@@ -127,6 +127,8 @@ test("google-play deploy and promotion preserve release-health evidence", async 
     const promotionSummary = JSON.parse(String(promotionRun.stdout));
     const promotionRecord = await readGooglePlayDeployRecord(promotionSummary.recordPath);
     assert.equal(promotionRecord.operationKind, "promotion");
+    assert.equal(promotionRecord.runnerIdentities.publisher, staging.publisher.type);
+    assert.equal(promotionRecord.runnerIdentities.smoke, "google-play-release-health@1");
     assert.equal(promotionRecord.releaseHealth?.status, "healthy");
     assert.equal(promotionRecord.releaseHealth?.processingStatus, "processed");
     assert.equal(promotionRecord.trackState?.track, "beta");
@@ -208,6 +210,7 @@ test("google-play rollback reuses a prior successful exact artifact", async () =
     const rollbackRecord = await readGooglePlayDeployRecord(rollback.recordPath);
     assert.equal(rollbackRecord.operationKind, "rollback");
     assert.equal(rollbackRecord.parentRunId, runA.deployRunId);
+    assert.equal(rollbackRecord.runnerIdentities.publisher, staging.publisher.type);
     assert.equal(rollbackRecord.releaseHealth?.status, "healthy");
     assert.equal(rollbackRecord.trackState?.track, "beta");
   });

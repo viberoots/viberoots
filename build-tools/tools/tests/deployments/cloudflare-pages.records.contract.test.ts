@@ -78,4 +78,6 @@ test("cloudflare-pages preview records preserve both live and effective preview 
   assert.equal(record.publishMode, "preview");
   assert.equal(record.executionPolicy?.smokeBudget?.runnerClass, "http_5m");
   assert.equal(record.executionPolicy?.retries?.[0]?.retriesUsed, 1);
+  assert.equal(record.runnerIdentities.publisher, deployment.publisher.type);
+  assert.equal(record.runnerIdentities.smoke, "cloudflare-pages-static-webapp-smoke@1");
 });

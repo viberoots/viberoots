@@ -15,11 +15,15 @@ import type {
   DeploymentSmokeOutcome,
 } from "./deployment-smoke-policy.ts";
 import type { AppStoreConnectDeployment } from "./contract.ts";
+import {
+  appStoreConnectRunnerIdentities,
+  type DeploymentRunnerIdentities,
+} from "./deployment-runner-identities.ts";
 import type { AdmittedMobileAppArtifact } from "./app-store-connect-artifacts.ts";
 import { APP_STORE_CONNECT_PROVIDER } from "./contract.ts";
 import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
 
-export const APP_STORE_CONNECT_RECORD_SCHEMA = "deploy-record@2026-04-09";
+export const APP_STORE_CONNECT_RECORD_SCHEMA = "deploy-record@2026-04-10";
 
 export type AppStoreConnectOperationKind = "deploy" | "promotion" | "retry" | "rollback";
 export type AppStoreConnectDeployRecord = {
@@ -41,6 +45,7 @@ export type AppStoreConnectDeployRecord = {
   parentRunId?: string;
   releaseLineageId?: string;
   artifactLineageId?: string;
+  runnerIdentities: DeploymentRunnerIdentities;
   publisherType: string;
   deploymentMetadataFingerprint?: string;
   providerConfigFingerprint?: string;
@@ -83,6 +88,7 @@ export function createAppStoreConnectDeployRecord(
     provider: APP_STORE_CONNECT_PROVIDER,
     providerTarget: deployment.providerTarget,
     providerTargetIdentity: deployment.providerTarget.providerTargetIdentity,
+    runnerIdentities: appStoreConnectRunnerIdentities(deployment),
     publisherType: deployment.publisher.type,
     ...outcome,
     ...operatorErrorFields(outcome.error),
@@ -109,6 +115,22 @@ export async function readAppStoreConnectDeployRecord(
   return await readVersionedJson(recordPath, {
     kind: "app-store-connect deploy record",
     currentSchemaVersion: APP_STORE_CONNECT_RECORD_SCHEMA,
+    migrations: {
+      "deploy-record@2026-04-09": (raw) =>
+        ({
+          ...raw,
+          schemaVersion: APP_STORE_CONNECT_RECORD_SCHEMA,
+          runnerIdentities:
+            typeof raw.runnerIdentities === "object" && raw.runnerIdentities
+              ? raw.runnerIdentities
+              : {
+                  ...(typeof raw.publisherType === "string"
+                    ? { publisher: raw.publisherType }
+                    : {}),
+                  smoke: "app-store-connect-release-health@1",
+                },
+        }) as AppStoreConnectDeployRecord,
+    },
     validateCurrent: (raw): raw is AppStoreConnectDeployRecord =>
       typeof raw.deployRunId === "string" && typeof raw.deploymentLabel === "string",
   });
