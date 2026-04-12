@@ -141,6 +141,18 @@ Expected steady-state result:
 - `wiringState` is `wired`
 - the managed paths listed above exist
 
+When a shared-host submission returns `lifecycleState = pending_approval`, do
+not resubmit the deploy. Approve the existing run through the reviewed
+run-action API on that same `deploy_run_id`.
+
+Minimum operator review before approval:
+
+- `status.approval.state = pending`
+- `status.approval.payloadFingerprint` matches the reviewed immutable payload
+- `status.approval.targetIdentity` matches the intended target
+- `status.approval.provisionerPlanFingerprint` matches the reviewed plan when
+  infra-affecting provisioning is in scope
+
 ### 5. Install a client profile on your dev machine or Jenkins worker
 
 From a repo checkout on the machine that will run deploys:

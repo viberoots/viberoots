@@ -136,12 +136,23 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
         });
       }
     } catch (error) {
-      if (error instanceof DeploymentAdmissionError && error.code === "no_longer_admitted") {
+      if (
+        error instanceof DeploymentAdmissionError &&
+        (error.code === "no_longer_admitted" || error.code === "approval_no_longer_valid")
+      ) {
         const noLongerAdmitted = {
           ...latestSubmission,
           lifecycleState: "finished" as const,
           terminationReason: "no_longer_admitted" as const,
           completedAt: new Date().toISOString(),
+          ...(error.code === "approval_no_longer_valid" && latestSubmission.approval
+            ? {
+                approval: {
+                  ...latestSubmission.approval,
+                  state: "no_longer_valid" as const,
+                },
+              }
+            : {}),
         };
         await writeControlPlaneJson(opts.submissionPath, noLongerAdmitted);
         throw Object.assign(error, { submission: noLongerAdmitted });

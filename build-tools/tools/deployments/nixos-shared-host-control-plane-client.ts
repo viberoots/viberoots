@@ -1,5 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type {
+  DeploymentControlPlaneRunActionResponse,
+  DeploymentControlPlaneRunActionRequest,
   DeploymentControlPlaneStatus,
   DeploymentControlPlaneSubmitResponse,
 } from "./deployment-control-plane-contract.ts";
@@ -69,4 +71,21 @@ export async function submitNixosSharedHostControlPlaneViaService(opts: {
     }
   }
   throw new Error(`timed out waiting for control-plane submission ${initial.submissionId}`);
+}
+
+export async function submitNixosSharedHostControlPlaneRunActionViaService(opts: {
+  controlPlaneUrl: string;
+  token?: string;
+  request: DeploymentControlPlaneRunActionRequest;
+}) {
+  return await readJson<DeploymentControlPlaneRunActionResponse>(
+    await fetch(new URL("/api/v1/run-actions", opts.controlPlaneUrl), {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...authHeaders(opts.token),
+      },
+      body: JSON.stringify(opts.request),
+    }),
+  );
 }

@@ -54,6 +54,34 @@ test("control-plane RBAC keeps submitter and operator scopes distinct", () => {
   assert.equal(actionDecision.scope.value, deployment.providerTarget.providerTargetIdentity);
 });
 
+test("approve run actions require approver-scoped authority", () => {
+  const deployment = cloudflarePagesDeploymentFixture();
+  const approver = grantsFor({ principalId: "user:reviewer" }, [
+    { role: "approver", scope: { kind: "deployment_id", value: deployment.deploymentId } },
+  ]);
+  const decision = authorizeControlPlaneRunAction({
+    deployment,
+    action: "approve",
+    authorization: approver,
+  });
+  assert.equal(decision.role, "approver");
+  assert.equal(decision.scope.kind, "deployment_id");
+  assert.throws(
+    () =>
+      authorizeControlPlaneRunAction({
+        deployment,
+        action: "approve",
+        authorization: grantsFor({ principalId: "user:wrong-scope" }, [
+          {
+            role: "approver",
+            scope: { kind: "deployment_id", value: `${deployment.deploymentId}-other` },
+          },
+        ]),
+      }),
+    /not authorized/,
+  );
+});
+
 test("submit idempotency reuses matching requests and fails closed on payload drift", async () => {
   await runInTemp("deployment-control-plane-submit-idempotency", async (tmp) => {
     const recordsRoot = path.join(tmp, "records");

@@ -82,6 +82,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
           200,
           await handleControlPlaneRunAction(await readJsonBody<ServiceRunActionRequest>(request), {
             backend,
+            workspaceRoot: opts.workspaceRoot,
           }),
         );
         return;

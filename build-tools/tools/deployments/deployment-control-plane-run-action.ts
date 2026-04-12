@@ -3,9 +3,10 @@ import { randomUUID } from "node:crypto";
 import { defaultRequestedBy, type DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 import {
   DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA,
-  type DeploymentControlPlaneAuthorizationDecision,
+  type DeploymentControlPlaneApprovalGrantRequest,
   type DeploymentControlPlaneRunAction,
 } from "./deployment-control-plane-contract.ts";
+import { approvePendingSubmission } from "./deployment-control-plane-approve-action.ts";
 import {
   resolveRunActionIdempotency,
   fingerprintControlPlanePayload,
@@ -24,100 +25,24 @@ import { readDeploymentControlPlaneStatus } from "./deployment-control-plane-rea
 
 type SubmissionRecord = {
   submissionId: string;
-  submittedAt: string;
-  deploymentId: string;
-  deploymentLabel: string;
-  operationKind: string;
-  providerTargetIdentity: string;
-  lockScope: string;
   executionSnapshotPath: string;
-  lifecycleState:
-    | "pending_approval"
-    | "queued"
-    | "waiting_for_lock"
-    | "running"
-    | "paused"
-    | "cancelling"
-    | "finished"
-    | "cancelled";
-  terminationReason: "cancelled" | "superseded" | "no_longer_admitted" | "lock_timeout" | null;
-  dedupe: {
-    mode: "created" | "reused";
-    requestFingerprint: string;
-    idempotencyKey?: string;
-  };
+  lifecycleState: string;
   requestedBy?: { principalId: string; displayName?: string };
-  authorization?: DeploymentControlPlaneAuthorizationDecision;
-  execution?: {
-    currentStep:
-      | "provision"
-      | "publish"
-      | "smoke"
-      | "release_actions.pre_publish"
-      | "release_actions.post_publish_pre_smoke"
-      | "release_actions.post_smoke";
-    mutationStartedAt?: string;
-  };
+  execution?: { currentStep?: string; mutationStartedAt?: string };
   deployRunId?: string;
-  resultRecordPath?: string;
-  finalOutcome?: string;
   progressiveRollout?: any;
-  cancellationRequested?: {
-    requestedAt: string;
-    requestedBy: DeploymentPrincipal;
-  };
-  cancellationSummary?: {
-    requestedAt: string;
-    requestedBy: DeploymentPrincipal;
-    activeStep:
-      | "provision"
-      | "publish"
-      | "smoke"
-      | "release_actions.pre_publish"
-      | "release_actions.post_publish_pre_smoke"
-      | "release_actions.post_smoke";
-    mutationMayHaveStarted: boolean;
-    enteredReconciliation: boolean;
-    terminalizationPath:
-      | "cancelled_without_mutation"
-      | "finished_after_reconciliation"
-      | "failed_after_reconciliation";
-  };
+  approval?: any;
   latestAction?: {
     actionId: string;
-    action: "cancel" | "resume" | "abort";
-    submittedAt: string;
-    dedupe: {
-      mode: "created" | "reused";
-      requestFingerprint: string;
-      idempotencyKey?: string;
-    };
-    lifecycleState:
-      | "pending_approval"
-      | "queued"
-      | "waiting_for_lock"
-      | "running"
-      | "paused"
-      | "cancelling"
-      | "finished"
-      | "cancelled";
-    requestedBy?: DeploymentPrincipal;
-    rejectionCode?:
-      | "lock_conflict"
-      | "approval_required"
-      | "approval_no_longer_valid"
-      | "idempotency_conflict"
-      | "unauthorized"
-      | "no_longer_admitted"
-      | "not_resumable"
-      | "not_paused";
+    action: DeploymentControlPlaneRunAction;
+    dedupe: { mode: "created" | "reused"; requestFingerprint: string; idempotencyKey?: string };
   };
 };
 
-function nextLifecycleState(
-  lifecycleState: SubmissionRecord["lifecycleState"],
-  action: DeploymentControlPlaneRunAction,
-) {
+function nextLifecycleState(lifecycleState: string, action: DeploymentControlPlaneRunAction) {
+  if (action === "approve") {
+    return { lifecycleState, rejectionCode: "no_longer_admitted" as const };
+  }
   if (action === "resume") {
     return lifecycleState === "paused"
       ? { lifecycleState: "running" as const }
@@ -146,11 +71,13 @@ function nextLifecycleState(
 }
 
 export async function submitDeploymentControlPlaneRunAction(opts: {
+  workspaceRoot?: string;
   recordsRoot: string;
   submissionPath: string;
   action: DeploymentControlPlaneRunAction;
   idempotencyKey?: string;
   requestedBy?: DeploymentPrincipal;
+  approval?: DeploymentControlPlaneApprovalGrantRequest;
 }) {
   const submission = await readControlPlaneJson<SubmissionRecord>(opts.submissionPath);
   const submittedAt = new Date().toISOString();
@@ -158,6 +85,7 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
   const requestFingerprint = fingerprintControlPlanePayload({
     submissionId: submission.submissionId,
     action: opts.action,
+    ...(opts.approval ? { approval: opts.approval } : {}),
   });
   const dedupe = await resolveRunActionIdempotency({
     recordsRoot: opts.recordsRoot,
@@ -174,7 +102,48 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
     submissionId: submission.submissionId,
     action: opts.action,
     ...(opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : {}),
+    ...(opts.approval ? { approval: opts.approval } : {}),
   });
+  if (dedupe.mode === "reused" && submission.latestAction?.actionId === actionId) {
+    const status = await readDeploymentControlPlaneStatus({ submissionPath: opts.submissionPath });
+    return runActionResponseFromSubmission(
+      {
+        ...status,
+        latestAction: {
+          ...status.latestAction!,
+          dedupe: {
+            ...status.latestAction!.dedupe,
+            mode: "reused",
+          },
+        },
+      },
+      actionId,
+      opts.action,
+    );
+  }
+  if (opts.action === "approve") {
+    if (!opts.workspaceRoot) {
+      throw new Error("approve run action requires workspaceRoot");
+    }
+    const approved = await approvePendingSubmission({
+      workspaceRoot: opts.workspaceRoot,
+      recordsRoot: opts.recordsRoot,
+      submissionPath: opts.submissionPath,
+      submission,
+      actionId,
+      submittedAt,
+      requestedBy,
+      dedupe: {
+        mode: dedupe.mode,
+        requestFingerprint,
+        ...(opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : {}),
+      },
+      ...(opts.approval ? { approval: opts.approval } : {}),
+    });
+    await writeControlPlaneJson(opts.submissionPath, approved);
+    const status = await readDeploymentControlPlaneStatus({ submissionPath: opts.submissionPath });
+    return runActionResponseFromSubmission(status, actionId, opts.action);
+  }
   const next = nextLifecycleState(submission.lifecycleState, opts.action);
   if (opts.action === "abort" && submission.lifecycleState === "paused") {
     await abortPausedProgressiveRun({

@@ -16,6 +16,7 @@ import type {
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneRequestDedupe,
 } from "./deployment-control-plane-contract.ts";
+import { defaultRequestedBy } from "./deployment-admission-evidence.ts";
 import { createNixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-submission.ts";
 import {
   createNixosSharedHostControlPlaneSnapshot,
@@ -72,6 +73,8 @@ export async function prepareNixosSharedHostControlPlaneRun(
   deployRunId: string;
 }> {
   const submissionId = opts.submissionId || createNixosSharedHostSubmissionId();
+  const requestedBy =
+    opts.requestedBy || opts.admissionEvidence?.requestedBy || defaultRequestedBy();
   const snapshot = await createNixosSharedHostControlPlaneSnapshot(opts, submissionId);
   const deployRunId = createNixosSharedHostDeployRunId();
   snapshot.provisionerPlan = await writeNixosSharedHostProvisionerPlan({ snapshot });
@@ -98,8 +101,9 @@ export async function prepareNixosSharedHostControlPlaneRun(
       error,
       snapshot,
       executionSnapshotPath,
+      deployRunId,
       dedupe: opts.dedupe,
-      requestedBy: opts.requestedBy,
+      requestedBy,
       authorization: opts.authorization,
     });
     if (submission) {
@@ -116,7 +120,7 @@ export async function prepareNixosSharedHostControlPlaneRun(
     admission: { decision: "admitted", reason: "shared_nonprod" },
     lifecycleState: "queued",
     dedupe: opts.dedupe,
-    requestedBy: opts.requestedBy,
+    requestedBy,
     authorization: opts.authorization,
     ...(snapshot.progressiveRollout ? { progressiveRollout: snapshot.progressiveRollout } : {}),
     deployRunId,

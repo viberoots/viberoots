@@ -1174,6 +1174,9 @@ Protected/shared submit-response contract:
 - the exact transport and HTTP status mapping can be implementation-specific, but the response payload contract should not be
 - when a request is valid and authorized to request deployment, but human approval is still outstanding, the canonical behavior should be to create a run in `pending_approval` rather than reject submission
 - approval-granting should then advance that same run into the next admissible lifecycle state rather than creating a second run
+- that pending response should already expose the stable `deploy_run_id` and a reviewed approval summary for the frozen payload being held
+- the reviewed `approve` run action should bind at least the operator's expected payload fingerprint and reviewed provisioner-plan fingerprint when infra-affecting mutation is in scope
+- the status/read model should expose machine-readable approval states such as `pending`, `granted`, and `no_longer_valid` without relying on free-form text parsing
 - duplicate submit handling should therefore distinguish at least:
   - accepted as a new run
   - accepted as an idempotent replay of an existing run submission

@@ -104,6 +104,8 @@ Current reviewed shared-host implementation note:
 - Reusing the same protected/shared run-action submission id with the same normalized action payload must resolve to the same accepted continuation result or same rejection result; reusing it with different payload contents must fail closed with an explicit idempotency-conflict result.
 - The shared control-plane run-action API must return one stable reviewed response contract that includes the target `deploy_run_id`, dedupe outcome, resulting lifecycle or rollout state when a run exists, and one machine-readable closed rejection code when the action is not accepted.
 - When a protected/shared request is valid and authorized to request deployment but still needs human approval, the canonical behavior is to create one run in `pending_approval` rather than reject submission and force clients to resubmit after approval.
+- That `pending_approval` response must already carry the stable `deploy_run_id` for the frozen run being held.
+- The reviewed `approve` run action must target that existing run, keep the same `deploy_run_id`, and fail closed when the caller's expected payload or reviewed provisioner-plan binding no longer matches the frozen run.
 
 ## Operator Semantics
 
@@ -117,6 +119,7 @@ Current reviewed shared-host implementation note:
 - Retire/migrate-target records must preserve old target identity, new target identity when applicable, the reviewed exception object, and the resulting ownership state.
 - Final outcome is a separate field from both operation kind and lifecycle state.
 - `pending_approval` is a first-class lifecycle state for accepted protected/shared runs awaiting required human approval.
+- The operator-visible status/read model must expose machine-readable approval state for protected/shared runs, including at least `pending`, `granted`, and `no_longer_valid`.
 - `termination_reason` uses the canonical set `cancelled`, `superseded`, `no_longer_admitted`, `lock_timeout`, or `null` when a canonical terminal outcome exists.
 - Cancellation is a first-class reviewed operator action, not an implementation-specific interrupt.
 - A cancel request may be accepted only while the run is in `pending_approval`, `queued`, `waiting_for_lock`, `running`, or `cancelling`.
@@ -140,6 +143,7 @@ Current reviewed shared-host implementation note:
 - `resume` is a first-class operator action on an existing paused progressive-rollout run, not a new `operation_kind`.
 - `resume` keeps the existing `deploy_run_id`, lineage, and frozen execution snapshot; it must reacquire lock and revalidate the paused run under the recorded rollout-resume policy before continuing.
 - If a paused rollout is not resumable under recorded rollout state, current approval state, or provider capability contract, `resume` must fail closed rather than creating an implicit replacement run.
+- If a granted approval expires, is revoked, or no longer matches the frozen admitted payload before mutation begins, the run must fail closed with operator-visible `approval_no_longer_valid` semantics and must not continue under stale approval evidence.
 
 ## Replay Rules
 

@@ -8,12 +8,14 @@ import type {
   DeploymentControlPlaneRequestDedupe,
 } from "./deployment-control-plane-contract.ts";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+import { pendingApprovalSummaryFor } from "./deployment-control-plane-approval.ts";
 import { createNixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-submission.ts";
 
 export function createAdmissionFailureSubmission(opts: {
   error: unknown;
   snapshot: NixosSharedHostControlPlaneSnapshot;
   executionSnapshotPath: string;
+  deployRunId: string;
   dedupe: DeploymentControlPlaneRequestDedupe;
   requestedBy?: NixosSharedHostControlPlaneSubmission["requestedBy"];
   authorization?: DeploymentControlPlaneAuthorizationDecision;
@@ -27,6 +29,15 @@ export function createAdmissionFailureSubmission(opts: {
       : { decision: "rejected", reason: opts.error.code },
     lifecycleState: pending ? "pending_approval" : "finished",
     dedupe: opts.dedupe,
+    ...(pending
+      ? {
+          deployRunId: opts.deployRunId,
+          approval: pendingApprovalSummaryFor({
+            snapshot: opts.snapshot,
+            approvalNames: opts.snapshot.deployment.admissionPolicy.requiredApprovals,
+          }),
+        }
+      : {}),
     requestedBy: opts.requestedBy,
     authorization: opts.authorization,
     ...(pending ? { pendingReasonCode: opts.error.code } : { rejectionCode: opts.error.code }),

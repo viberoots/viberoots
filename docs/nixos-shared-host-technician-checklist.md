@@ -122,6 +122,9 @@ Completion criteria:
 - the service reports a bound URL on stdout
 - the worker stays running without immediate error
 - both processes use the same reviewed Postgres URL from `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL`
+- operators know that `pending_approval` runs are resumed with the reviewed
+  `approve` run action on the existing `deploy_run_id`, not by resubmitting the
+  deploy request
 
 ## Client Setup
 

@@ -7,13 +7,17 @@ import type { NixosSharedHostRecordedReleaseAction } from "./nixos-shared-host-p
 import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
 import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
 import type {
+  DeploymentControlPlaneApprovalSummary,
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneLifecycleState,
   DeploymentControlPlaneRequestDedupe,
   DeploymentControlPlaneSubmitRejectionCode,
   DeploymentControlPlaneTerminationReason,
 } from "./deployment-control-plane-contract.ts";
-import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
+import type {
+  DeploymentAdmissionEvidence,
+  DeploymentPrincipal,
+} from "./deployment-admission-evidence.ts";
 
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA =
   "nixos-shared-host-control-plane-snapshot@4";
@@ -60,6 +64,7 @@ export type NixosSharedHostControlPlaneSnapshot = {
   recordedReleaseActions?: NixosSharedHostRecordedReleaseAction[];
   provisionerPlan?: NixosSharedHostProvisionerPlanRef;
   admittedContext?: NixosSharedHostAdmittedContext;
+  admissionEvidence?: DeploymentAdmissionEvidence;
   paths: NixosSharedHostControlPlanePaths;
   action:
     | {
@@ -108,9 +113,10 @@ export type NixosSharedHostControlPlaneSubmission = {
   authorization?: DeploymentControlPlaneAuthorizationDecision;
   rejectionCode?: DeploymentControlPlaneSubmitRejectionCode;
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
+  approval?: DeploymentControlPlaneApprovalSummary;
   latestAction?: {
     actionId: string;
-    action: "cancel" | "resume" | "abort";
+    action: "cancel" | "resume" | "abort" | "approve";
     submittedAt: string;
     dedupe: DeploymentControlPlaneRequestDedupe;
     lifecycleState: DeploymentControlPlaneLifecycleState;

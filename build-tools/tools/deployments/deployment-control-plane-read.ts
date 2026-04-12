@@ -48,9 +48,23 @@ type SubmissionRecord = {
     | "no_longer_admitted"
     | "not_resumable";
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
+  approval?: {
+    state: "pending" | "granted" | "no_longer_valid";
+    approvalNames: string[];
+    payloadFingerprint: string;
+    targetIdentity: string;
+    sourceRunId?: string;
+    artifactIdentity?: string;
+    provisionerPlanFingerprint?: string;
+    grantedAt?: string;
+    expiresAt?: string;
+    approvalId?: string;
+    approvalRecordPath?: string;
+    approver?: { principalId: string; displayName?: string };
+  };
   latestAction?: {
     actionId: string;
-    action: "cancel" | "resume" | "abort";
+    action: "cancel" | "resume" | "abort" | "approve";
     submittedAt: string;
     dedupe: {
       mode: "created" | "reused";

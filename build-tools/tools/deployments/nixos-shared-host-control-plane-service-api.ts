@@ -132,7 +132,7 @@ export async function handleControlPlaneSubmit(
 
 export async function handleControlPlaneRunAction(
   request: ServiceRunActionRequest,
-  opts: { backend: NixosSharedHostControlPlaneBackendTarget },
+  opts: { backend: NixosSharedHostControlPlaneBackendTarget; workspaceRoot: string },
 ) {
   const envelope = request.submissionId
     ? await readBackendSubmissionEnvelopeBySubmissionId(opts.backend, request.submissionId)
@@ -151,13 +151,23 @@ export async function handleControlPlaneRunAction(
       })
     : undefined;
   const response = await submitDeploymentControlPlaneRunAction({
+    workspaceRoot: opts.workspaceRoot,
     recordsRoot: opts.backend.recordsRoot,
     submissionPath: envelope.submissionPath,
     action: request.action,
     idempotencyKey: request.idempotencyKey || request.actionId,
-    ...(request.requestedBy ? { requestedBy: request.requestedBy } : {}),
+    ...(request.requestedBy || request.authorization?.requestedBy
+      ? { requestedBy: request.requestedBy || request.authorization?.requestedBy }
+      : {}),
+    ...(request.approval ? { approval: request.approval } : {}),
   });
   await syncBackendSubmission(opts.backend, envelope.submissionPath);
+  if (
+    request.action === "approve" &&
+    ["queued", "waiting_for_lock"].includes(response.lifecycleState)
+  ) {
+    await enqueueBackendSubmission(opts.backend, response.submissionId, response.submittedAt);
+  }
   await syncBackendRunAction(
     opts.backend,
     runActionRequestPathFor(opts.backend.recordsRoot, response.actionId),

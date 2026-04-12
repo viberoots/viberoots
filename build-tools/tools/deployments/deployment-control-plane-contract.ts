@@ -33,6 +33,8 @@ export type DeploymentControlPlaneTerminationReason =
   | "lock_timeout"
   | null;
 
+export type DeploymentControlPlaneApprovalState = "pending" | "granted" | "no_longer_valid";
+
 export type DeploymentControlPlaneSubmitRejectionCode =
   | "lock_conflict"
   | "approval_required"
@@ -94,6 +96,30 @@ export type DeploymentControlPlaneReplaySelector = {
   rollback: boolean;
 };
 
+export type DeploymentControlPlaneApprovalSummary = {
+  state: DeploymentControlPlaneApprovalState;
+  approvalNames: string[];
+  payloadFingerprint: string;
+  targetIdentity: string;
+  sourceRunId?: string;
+  artifactIdentity?: string;
+  provisionerPlanFingerprint?: string;
+  grantedAt?: string;
+  expiresAt?: string;
+  approvalId?: string;
+  approvalRecordPath?: string;
+  approver?: DeploymentPrincipal;
+};
+
+export type DeploymentControlPlaneApprovalGrantRequest = {
+  approvalId?: string;
+  approvalNames?: string[];
+  expiresAt?: string;
+  expectedPayloadFingerprint?: string;
+  expectedTargetIdentity?: string;
+  expectedProvisionerPlanFingerprint?: string;
+};
+
 export type DeploymentExtractedMetadataDocument = {
   schemaVersion: typeof DEPLOYMENT_EXTRACTED_METADATA_SCHEMA;
   deployments: DeploymentTarget[];
@@ -112,7 +138,7 @@ export type DeploymentControlPlaneSubmitRequest = {
   authorization?: DeploymentControlPlaneAuthorization;
 };
 
-export type DeploymentControlPlaneRunAction = "cancel" | "resume" | "abort";
+export type DeploymentControlPlaneRunAction = "cancel" | "resume" | "abort" | "approve";
 
 export type DeploymentControlPlaneRunActionRequest = {
   schemaVersion: typeof DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA;
@@ -121,6 +147,7 @@ export type DeploymentControlPlaneRunActionRequest = {
   submissionId: string;
   action: DeploymentControlPlaneRunAction;
   idempotencyKey?: string;
+  approval?: DeploymentControlPlaneApprovalGrantRequest;
   authorization?: DeploymentControlPlaneAuthorization;
 };
 
@@ -148,6 +175,7 @@ export type DeploymentControlPlaneResponseBase = {
     | DeploymentControlPlaneSubmitRejectionCode
     | DeploymentControlPlaneRunActionRejectionCode;
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
+  approval?: DeploymentControlPlaneApprovalSummary;
   latestAction?: {
     actionId: string;
     action: DeploymentControlPlaneRunAction;

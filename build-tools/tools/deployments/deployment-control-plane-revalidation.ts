@@ -1,6 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import * as fs from "node:fs/promises";
+import path from "node:path";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+import {
+  approvalGrantIsValid,
+  approvalSummaryFromGrant,
+  readApprovalGrantRecord,
+} from "./deployment-control-plane-approval.ts";
 import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract.ts";
 import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence.ts";
 import type { DeploymentRunRecordLike } from "./deployment-admission-records.ts";
@@ -82,8 +88,29 @@ export async function revalidateControlPlaneAdmission(opts: {
   for (const approval of evaluation.requiredApprovals) {
     if (approval.expiresAt && Date.parse(approval.expiresAt) < now) {
       throw new DeploymentAdmissionError(
-        "no_longer_admitted",
+        "approval_no_longer_valid",
         `shared control-plane approval expired while queued: ${approval.name}`,
+      );
+    }
+    if (!approval.recordRef || !path.isAbsolute(approval.recordRef)) continue;
+    const record = await readApprovalGrantRecord(approval.recordRef).catch(() => undefined);
+    if (!record) {
+      throw new DeploymentAdmissionError(
+        "approval_no_longer_valid",
+        `shared control-plane approval record disappeared while queued: ${approval.name}`,
+      );
+    }
+    if (
+      !approvalGrantIsValid({
+        record,
+        summary: approvalSummaryFromGrant(record, approval.recordRef),
+      }) ||
+      record.payloadFingerprint !== evaluation.binding.payloadFingerprint ||
+      record.targetIdentity !== evaluation.binding.targetIdentity
+    ) {
+      throw new DeploymentAdmissionError(
+        "approval_no_longer_valid",
+        `shared control-plane approval no longer matches the admitted payload: ${approval.name}`,
       );
     }
   }

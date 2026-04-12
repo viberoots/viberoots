@@ -37,6 +37,7 @@ import {
   publishInputFor,
   recordedComponentResults,
 } from "./nixos-shared-host-control-plane-snapshot-helpers.ts";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 
 export type NixosSharedHostControlPlaneSourceSelection = {
   record: NixosSharedHostDeployRecord | { deployRunId: string; deploymentId: string };
@@ -61,6 +62,7 @@ export type NixosSharedHostControlPlaneSnapshotOpts = {
   artifactLineageId?: string;
   smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;
   source?: NixosSharedHostControlPlaneSourceSelection;
+  admissionEvidence?: DeploymentAdmissionEvidence;
 };
 
 export function createNixosSharedHostSubmissionId(): string {
@@ -198,6 +200,7 @@ export async function createNixosSharedHostControlPlaneSnapshot(
         }
       : {}),
     ...(admittedContext ? { admittedContext } : {}),
+    ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
     paths: {
       statePath: path.resolve(opts.paths.statePath),
       hostRoot: path.resolve(opts.paths.hostRoot),

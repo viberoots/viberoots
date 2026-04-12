@@ -109,7 +109,11 @@ export function authorizeControlPlaneRunAction(opts: {
   authorization?: DeploymentControlPlaneAuthorization;
 }): DeploymentControlPlaneAuthorizationDecision {
   const requiredRoles: DeploymentControlPlaneRole[] =
-    opts.action === "resume" ? ["operator", "break_glass"] : ["operator", "break_glass"];
+    opts.action === "approve"
+      ? ["approver", "break_glass"]
+      : opts.action === "resume"
+        ? ["operator", "break_glass"]
+        : ["operator", "break_glass"];
   return authorize(
     opts.deployment,
     opts.authorization || synthesizeAuthorization(opts.deployment, requiredRoles[0]),
