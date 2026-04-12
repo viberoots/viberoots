@@ -67,9 +67,11 @@ async function initializeBackendSchema(pool: BackendPool) {
       submission_id TEXT PRIMARY KEY,
       enqueued_at TIMESTAMPTZ NOT NULL,
       claimed_by TEXT,
+      claim_token TEXT,
       claim_expires_at BIGINT,
       completed_at TIMESTAMPTZ
     );
+    ALTER TABLE queue ADD COLUMN IF NOT EXISTS claim_token TEXT;
     CREATE TABLE IF NOT EXISTS idempotency (
       kind TEXT NOT NULL,
       key_hash TEXT NOT NULL,
@@ -91,6 +93,15 @@ async function initializeBackendSchema(pool: BackendPool) {
       lease_expires_at BIGINT NOT NULL,
       updated_at BIGINT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS deploy_records (
+      deploy_run_id TEXT PRIMARY KEY,
+      submission_id TEXT NOT NULL,
+      record_path TEXT NOT NULL,
+      document_json JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS deploy_records_by_submission_id
+      ON deploy_records(submission_id);
   `);
 }
 

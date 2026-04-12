@@ -2,12 +2,15 @@
 import {
   claimBackendQueuedSubmission,
   acquireBackendControlPlaneLock,
+  startBackendSubmissionClaimLease,
+  syncBackendDeployRecord,
   syncBackendSnapshot,
   syncBackendSubmission,
 } from "./nixos-shared-host-control-plane-backend.ts";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
 import { executeSubmittedNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-submit-helpers.ts";
 import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
+import { reconcileNixosSharedHostRecoveredSubmission } from "./nixos-shared-host-recovery.ts";
 import type {
   NixosSharedHostControlPlaneSnapshot,
   NixosSharedHostControlPlaneSubmission,
@@ -57,6 +60,12 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
   };
   const claimed = await claimBackendQueuedSubmission(backend, opts.workerId);
   if (!claimed) return false;
+  const claimLease = startBackendSubmissionClaimLease({
+    backend,
+    submissionId: claimed.submissionId,
+    workerId: opts.workerId,
+    claimToken: claimed.claimToken,
+  });
   await syncBackendSnapshot(backend, claimed.executionSnapshotPath);
   const submission = await readControlPlaneJson<NixosSharedHostControlPlaneSubmission>(
     claimed.submissionPath,
@@ -65,6 +74,15 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
     claimed.executionSnapshotPath,
   );
   try {
+    if (["running", "cancelling"].includes(claimed.lifecycleState)) {
+      await reconcileNixosSharedHostRecoveredSubmission({
+        submissionPath: claimed.submissionPath,
+        recordsRoot: opts.recordsRoot,
+        backend,
+      });
+      await syncBackendSubmission(backend, claimed.submissionPath);
+      return true;
+    }
     await executeSubmittedNixosSharedHostControlPlaneRun({
       submission,
       submissionPath: claimed.submissionPath,
@@ -75,6 +93,15 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
       recordsRoot: opts.recordsRoot,
       operationKind: snapshot.operationKind,
       deployment: snapshot.deployment,
+      persistSubmission: async (submissionPath) =>
+        await syncBackendSubmission(backend, submissionPath),
+      persistRecord: async (recordPath) => await syncBackendDeployRecord(backend, recordPath),
+      assertCurrentAuthority: async () => await claimLease.assertCurrentAuthority(),
+      recoverSubmission: async (args) =>
+        await reconcileNixosSharedHostRecoveredSubmission({
+          ...args,
+          backend,
+        }),
       acquireLocks: async (args) =>
         await acquireBackendNixosSharedHostLocks({
           backend,
@@ -83,6 +110,7 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
         }),
     });
   } finally {
+    await claimLease.stop();
     await syncBackendSubmission(backend, claimed.submissionPath);
   }
   return true;

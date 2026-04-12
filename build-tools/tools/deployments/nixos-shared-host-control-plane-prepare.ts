@@ -25,7 +25,7 @@ import {
 } from "./nixos-shared-host-control-plane-snapshot.ts";
 import { evaluateNixosSharedHostControlPlaneAdmission } from "./nixos-shared-host-control-plane-admission.ts";
 import { createAdmissionFailureSubmission } from "./nixos-shared-host-control-plane-admission-failure.ts";
-import { ensureNoActiveProgressiveRun } from "./nixos-shared-host-control-plane-submit-helpers.ts";
+import { ensureNoActiveProgressiveRun } from "./nixos-shared-host-control-plane-progressive-guard.ts";
 import { queueSubmissionForLock } from "./deployment-control-plane-queue.ts";
 import { writeNixosSharedHostProvisionerPlan } from "./nixos-shared-host-provisioner-plan.ts";
 import {

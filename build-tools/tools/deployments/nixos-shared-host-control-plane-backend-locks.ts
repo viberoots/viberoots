@@ -6,13 +6,6 @@ import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-ho
 
 type LockAbortReason = "cancelled" | "superseded" | "no_longer_admitted";
 
-type ClaimedQueueEntry = {
-  submissionId: string;
-  submissionPath: string;
-  executionSnapshotPath: string;
-  lifecycleState: string;
-};
-
 function keyHash(value: string): string {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
@@ -73,55 +66,6 @@ export async function syncBackendRunAction(
     [doc.actionId, doc.submissionId, doc.action, JSON.stringify(doc), new Date().toISOString()],
   );
   return doc;
-}
-
-export async function claimBackendQueuedSubmission(
-  backend: NixosSharedHostControlPlaneBackendTarget,
-  workerId: string,
-  claimMs = 30_000,
-): Promise<ClaimedQueueEntry | null> {
-  const now = Date.now();
-  const row = (
-    await queryBackend<{
-      submission_id?: string;
-      submission_path?: string;
-      execution_snapshot_path?: string;
-      lifecycle_state?: string;
-    }>(
-      backend,
-      `WITH candidate AS (
-         SELECT q.submission_id
-         FROM queue q
-         JOIN submissions s ON s.submission_id = q.submission_id
-         WHERE q.completed_at IS NULL
-           AND (q.claimed_by IS NULL OR q.claim_expires_at IS NULL OR q.claim_expires_at <= $1)
-           AND s.lifecycle_state IN ('queued', 'waiting_for_lock')
-         ORDER BY q.enqueued_at ASC
-         LIMIT 1
-       ),
-       claimed AS (
-         UPDATE queue
-         SET claimed_by = $2,
-             claim_expires_at = $3
-         WHERE submission_id = (SELECT submission_id FROM candidate)
-           AND (claimed_by IS NULL OR claim_expires_at IS NULL OR claim_expires_at <= $1)
-         RETURNING submission_id
-       )
-       SELECT claimed.submission_id, s.submission_path, s.execution_snapshot_path, s.lifecycle_state
-       FROM claimed
-       JOIN submissions s ON s.submission_id = claimed.submission_id`,
-      [now, workerId, now + claimMs],
-    )
-  ).rows[0];
-  if (!row?.submission_id || !row.submission_path || !row.execution_snapshot_path) {
-    return null;
-  }
-  return {
-    submissionId: row.submission_id,
-    submissionPath: row.submission_path,
-    executionSnapshotPath: row.execution_snapshot_path,
-    lifecycleState: row.lifecycle_state || "queued",
-  };
 }
 
 export async function acquireBackendControlPlaneLock(

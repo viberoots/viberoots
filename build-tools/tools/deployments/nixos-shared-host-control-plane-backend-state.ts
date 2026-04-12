@@ -17,14 +17,24 @@ type SubmissionDoc = {
 
 type SnapshotDoc = { submissionId: string };
 
+function keepsQueueOwnershipActive(lifecycleState: string) {
+  return ["queued", "waiting_for_lock", "running", "cancelling"].includes(lifecycleState);
+}
+
 async function markQueueDone(
   backend: NixosSharedHostControlPlaneBackendTarget,
   submissionId: string,
 ) {
-  await queryBackend(backend, "UPDATE queue SET completed_at = $1 WHERE submission_id = $2", [
-    new Date().toISOString(),
-    submissionId,
-  ]);
+  await queryBackend(
+    backend,
+    `UPDATE queue
+     SET completed_at = $1,
+         claimed_by = NULL,
+         claim_token = NULL,
+         claim_expires_at = NULL
+     WHERE submission_id = $2`,
+    [new Date().toISOString(), submissionId],
+  );
 }
 
 export async function syncBackendSubmission(
@@ -60,7 +70,7 @@ export async function syncBackendSubmission(
       now,
     ],
   );
-  if (!["queued", "waiting_for_lock"].includes(doc.lifecycleState)) {
+  if (!keepsQueueOwnershipActive(doc.lifecycleState)) {
     await markQueueDone(backend, doc.submissionId);
   }
   return doc;
@@ -93,11 +103,13 @@ export async function enqueueBackendSubmission(
 ) {
   await queryBackend(
     backend,
-    `INSERT INTO queue (submission_id, enqueued_at, claimed_by, claim_expires_at, completed_at)
-     VALUES ($1, $2, NULL, NULL, NULL)
+    `INSERT INTO queue (
+       submission_id, enqueued_at, claimed_by, claim_token, claim_expires_at, completed_at
+     ) VALUES ($1, $2, NULL, NULL, NULL, NULL)
      ON CONFLICT(submission_id) DO UPDATE SET
        enqueued_at = EXCLUDED.enqueued_at,
        claimed_by = NULL,
+       claim_token = NULL,
        claim_expires_at = NULL,
        completed_at = NULL`,
     [submissionId, submittedAt],

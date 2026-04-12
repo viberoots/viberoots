@@ -2,12 +2,14 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
+import { readBackendDeployRecordEnvelopeBySubmissionId } from "./nixos-shared-host-control-plane-backend.ts";
 import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-contract.ts";
 import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
 import {
   readControlPlaneJson,
   writeControlPlaneJson,
 } from "./nixos-shared-host-control-plane-store.ts";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
 
 function runsDir(recordsRoot: string): string {
   return path.join(path.resolve(recordsRoot), "runs");
@@ -30,7 +32,20 @@ function terminalizationPathFor(
 async function maybeFindRecordForSubmission(
   recordsRoot: string,
   submissionId: string,
+  backend?: NixosSharedHostControlPlaneBackendTarget,
 ): Promise<{ record: NixosSharedHostDeployRecord; recordPath: string } | undefined> {
+  if (backend) {
+    const backendRecord = await readBackendDeployRecordEnvelopeBySubmissionId(
+      backend,
+      submissionId,
+    );
+    if (backendRecord) {
+      return {
+        record: backendRecord.record as NixosSharedHostDeployRecord,
+        recordPath: backendRecord.recordPath,
+      };
+    }
+  }
   try {
     const entries = await fsp.readdir(runsDir(recordsRoot));
     for (const entry of entries) {
@@ -68,12 +83,17 @@ export async function reconcileNixosSharedHostRecoveredSubmission(opts: {
   submissionPath: string;
   recordsRoot: string;
   recoveredBy?: DeploymentPrincipal;
+  backend?: NixosSharedHostControlPlaneBackendTarget;
 }) {
   const recoveredAt = new Date().toISOString();
   const submission = await readControlPlaneJson<NixosSharedHostControlPlaneSubmission>(
     opts.submissionPath,
   );
-  const existing = await maybeFindRecordForSubmission(opts.recordsRoot, submission.submissionId);
+  const existing = await maybeFindRecordForSubmission(
+    opts.recordsRoot,
+    submission.submissionId,
+    opts.backend,
+  );
   if (existing) {
     const updated: NixosSharedHostControlPlaneSubmission = {
       ...submission,

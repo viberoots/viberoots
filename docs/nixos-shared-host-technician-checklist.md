@@ -122,6 +122,8 @@ Completion criteria:
 - the service reports a bound URL on stdout
 - the worker stays running without immediate error
 - both processes use the same reviewed Postgres URL from `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL`
+- operators know the reviewed Postgres backend is authoritative for claimed-running ownership, status/result reads, and protected/shared deploy records
+- operators treat `<records-root>/control-plane/*.json` and `<records-root>/runs/*.json` as mirrors for inspection and restore testing rather than the sole source of truth during recovery
 - operators know that `pending_approval` runs are resumed with the reviewed
   `approve` run action on the existing `deploy_run_id`, not by resubmitting the
   deploy request

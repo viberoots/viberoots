@@ -732,14 +732,17 @@ the service and the service can read the submitted artifact paths directly.
 
 For `shared_nonprod`, that command is now a thin client to the shared control
 plane. The authoritative queue/lock/idempotency state now lives in the
-configured Postgres database, and the operator-readable control-plane mirror
-still lands under:
+configured Postgres database. That same backend is now the canonical store for
+claimed-running worker ownership, status/result reads, and protected/shared
+deploy records keyed by `deploy_run_id` and submission id. The operator-readable
+control-plane mirror still lands under:
 
 - `<records-root>/control-plane/submissions/*.json`
 - `<records-root>/control-plane/snapshots/*.json`
 
-The deploy record written under `<records-root>/runs/*.json` also records the
-admitted control-plane submission id, lock scope, and execution-snapshot path.
+The deploy record written under `<records-root>/runs/*.json` is now a mirror of
+the canonical backend record and still records the admitted control-plane
+submission id, lock scope, and execution-snapshot path for operator inspection.
 
 Then apply server config as usual:
 

@@ -813,6 +813,7 @@ treated as settled policy, not open brainstorming:
 - the shared deployment control plane should use one central authoritative transactional backend
   - it should back deployment-record storage
   - it should back shared-environment deploy locking
+  - it should back durable claimed-running worker ownership and takeover fencing
   - Postgres is the intended initial implementation because this design needs durable shared locks, fencing-capable coordination, and authoritative audited deploy records
   - because the shared control plane is the sole mutating authority for protected/shared environments, its own resilience is part of the deployment-system design
   - the authoritative backend and API tier should have reviewed backup, restore-test, failover, and disaster-recovery expectations rather than relying on break-glass as the routine answer to ordinary platform failure
@@ -1125,7 +1126,8 @@ How to read this map:
 - the current reviewed `nixos-shared-host` control-plane service entrypoint is `build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts`
 - the current reviewed `nixos-shared-host` worker-loop entrypoint is `build-tools/tools/deployments/nixos-shared-host-control-plane-worker.ts`
 - the current reviewed `nixos-shared-host` authoritative backend is Postgres, configured for the service and worker via `--control-plane-database-url` / `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL`
-- JSON submissions and snapshots under `<records-root>/control-plane/` remain the compatibility and operator-readable mirror rather than the lock/idempotency authority
+- control-plane status/result reads and canonical protected/shared deploy records come from that backend, keyed by `deploy_run_id` and submission identity
+- JSON submissions and snapshots under `<records-root>/control-plane/` and deploy-record mirrors under `<records-root>/runs/` remain the compatibility and operator-readable mirror rather than the queue/lock/record authority
 - isolated fixture tests and explicitly local harnesses may use an explicit `pgmem://...` backend URL, but that harness is not the reviewed operator backend
 - provider, provisioner, and release-action modules still hold only vetted built-in execution adapters
 - `build-tools/deploy/lanes/` and `build-tools/deploy/policies/` remain repo-owned policy-definition locations rather than control-plane implementation code

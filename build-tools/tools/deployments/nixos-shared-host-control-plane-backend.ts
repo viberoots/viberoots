@@ -13,8 +13,16 @@ export {
   syncBackendSubmission,
 } from "./nixos-shared-host-control-plane-backend-state.ts";
 export {
-  acquireBackendControlPlaneLock,
   claimBackendQueuedSubmission,
+  startBackendSubmissionClaimLease,
+} from "./nixos-shared-host-control-plane-backend-queue.ts";
+export {
+  readBackendDeployRecordEnvelopeByDeployRunId,
+  readBackendDeployRecordEnvelopeBySubmissionId,
+  syncBackendDeployRecord,
+} from "./nixos-shared-host-control-plane-backend-records.ts";
+export {
+  acquireBackendControlPlaneLock,
   resolveBackendIdempotency,
   syncBackendRunAction,
 } from "./nixos-shared-host-control-plane-backend-locks.ts";
