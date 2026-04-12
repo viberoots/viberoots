@@ -6482,6 +6482,132 @@ work.
 
 ---
 
+## PR-49.1: Backend-only control-plane authority + mirror removal
+
+### Description
+
+I will remove the always-written operator-readable control-plane / deploy-record mirror so the
+reviewed authoritative backend becomes the only routine source of truth for protected/shared queue
+state, worker ownership, status/result reads, and canonical deploy records. Because there are no
+real users yet, this PR should optimize for the cleanest single-authority design rather than
+preserving backward compatibility with filesystem-based record paths.
+
+### Scope & Changes
+
+- Make the authoritative backend the first and only normal runtime persistence path for protected
+  / shared control-plane state:
+  - write submissions directly to the backend
+  - write execution snapshots directly to the backend
+  - write canonical protected/shared deploy records directly to the backend
+- Remove routine mirror writes to `<records-root>/control-plane/*.json` and
+  `<records-root>/runs/*.json` for protected/shared control-plane submissions, snapshots, and final
+  records.
+- Replace file-ingest and file-sync helpers with backend-native create/read/update APIs so the
+  backend no longer depends on local JSON files to ingest authoritative state.
+- Make the authoritative backend the normal read path for protected/shared control-plane state:
+  - read submit / status / result state directly from the backend
+  - read recovery state directly from the backend
+  - read replay / inspection source records directly from the backend
+  - update `deployment-control-plane-read.ts` so status and control-plane reads stop resolving
+    through on-disk submissions
+- Remove filesystem discovery from normal reviewed flows, including recovery, replay, admission,
+  and status/read resolution. No reviewed path should scan `<records-root>/runs`,
+  `<records-root>/control-plane/submissions`, or hidden mirror directories to rediscover
+  authoritative state.
+- Replace file-path-first contracts with backend-native identifiers in public and reviewed
+  interfaces:
+  - submission id
+  - `deploy_run_id`
+  - reviewed API or CLI export handle when a serialized artifact is explicitly requested
+- Remove `recordPath`, `resultRecordPath`, snapshot-path, and similar mirror-path semantics from
+  normal responses and reviewed contracts so filesystem mirrors are no longer part of the runtime
+  interface.
+- Keep JSON only as optional explicit export / inspect tooling generated from backend state on
+  demand, not as routine persistence or a second operator-facing runtime record authority.
+- Keep `<records-root>` only for artifacts that genuinely need host-local durable files, not for
+  control-plane authority, record discovery, or status/result resolution.
+- Update the local `pgmem://...` harness so deterministic tests still exercise the same
+  backend-native write, read, status, recovery, and record contracts without relying on mirrored
+  JSON files.
+
+### Tests (in this PR)
+
+- Add tests proving protected/shared control-plane submit / status / result flows work when the
+  backend is the only normal runtime store and no submission or deploy-record mirror files exist.
+- Add tests proving `deployment-control-plane-read.ts` resolves status and control-plane state from
+  the backend rather than from on-disk submissions.
+- Add tests proving recovery, replay, admission, and inspection flows use backend-native
+  identifiers and do not require directory scans or `<records-root>/runs/*.json` inputs.
+- Add tests proving long-running ownership, recovery, and finalization stay correct when routine
+  mirror writes are fully disabled.
+- Add negative tests proving reviewed code paths fail closed if a caller tries to rely on removed
+  mirror-only inputs such as `recordPath`, `resultRecordPath`, or snapshot-path contracts.
+
+### Docs (in this PR)
+
+- Update [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) to
+  state explicitly that protected/shared control-plane state is backend-only in normal operation
+  for both writes and reads.
+- Update [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) to
+  remove mirror-language and path-bearing contract fields that imply a second operator-facing
+  runtime record copy.
+- Update operator docs to describe the reviewed backend query, inspect, and export paths that
+  replace direct filesystem inspection for control-plane state.
+- Update
+  [nixos-shared-host-setup.md](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  and
+  [nixos-shared-host-technician-checklist.md](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-technician-checklist.md)
+  anywhere they still instruct operators to trust routine control-plane JSON files under
+  `<records-root>`.
+
+### Verification Commands
+
+- `buck2 test //...`
+- reviewed backend-only submit / status / result / replay / recovery flows introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment control-plane read/write contracts, operator tooling,
+  backend-native replay or inspect flows, docs, and deployment-domain tests.
+
+### Acceptance Criteria
+
+- Protected/shared control-plane queue state, worker ownership, status/result reads, and canonical
+  deploy records no longer depend on always-written JSON mirrors under `<records-root>`.
+- Reviewed replay, recovery, and operator-inspection flows work from authoritative backend state
+  and stable identifiers rather than mirror-path discovery.
+- Removed mirror paths fail closed when accidentally used as authoritative inputs.
+
+### Risks
+
+This removes a familiar operator inspection surface and changes record-location assumptions in
+replay, recovery, and inspection tooling, so incomplete migration could strand some reviewed
+workflows between backend-native and path-based contracts.
+
+### Mitigation
+
+Land backend-native inspect/export flows in the same PR, remove path-based fallbacks together, and
+keep deterministic `pgmem://...` coverage for submit, status, replay, and recovery paths with no
+filesystem mirror present.
+
+### Consequence of Not Implementing
+
+The control plane would keep paying the ambiguity cost of a second operator-visible copy of
+authoritative state even though the backend is already the intended truth source.
+
+### Downsides for Implementing
+
+Operators lose simple SSH-and-open-a-JSON-file inspection for protected/shared control-plane state
+unless the reviewed CLI or API export tooling is used instead.
+
+### Recommendation
+
+Implement immediately after PR-49 while the backend-authority migration is still fresh, so we can
+delete mirror-dependent contracts before any real users build habits or tooling around them.
+
+---
+
 ## PR-50: Service-only protected/shared client boundary closeout
 
 ### Description
