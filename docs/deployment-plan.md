@@ -32,6 +32,18 @@ Non-goals:
 - no untested functionality landing behind "we will test later"
 - no local-only shortcuts that contradict the shared-control-plane design for shared environments
 
+Verification command convention:
+
+- Prefer the repo wrappers for routine operator and developer flows:
+  - use `v` for the authoritative verify/test path
+  - use `b` for direct Buck subcommands such as `cquery`, `build`, and `targets`
+- If raw `buck2` is required instead of the wrappers, run it from `nix develop` or an equivalent
+  repo shell and pass the target platform explicitly:
+  - `buck2 test --target-platforms prelude//platforms:default //...`
+  - `buck2 cquery --target-platforms prelude//platforms:default //projects/deployments/...`
+- Older plan entries that say `buck2 test //...` should be read as the wrapper form `v`, or the
+  explicit raw Buck form above when a direct Buck invocation is specifically needed.
+
 Completion criteria:
 
 - `mini` shared-dev static webapps work end to end with tested provisioning, publish, ingress, and
@@ -101,8 +113,8 @@ keep the later control-plane and host realization work deterministic.
 
 ### Verification Commands
 
-- `buck2 test //...`
-- `buck2 cquery //projects/deployments/...`
+- `v`
+- `b cquery //projects/deployments/...`
 
 ### Expected Regression Scope
 
@@ -194,7 +206,7 @@ and nginx routing generation, but stops short of the artifact publisher.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - host-generation evaluation command for the `nixos-shared-host` module as introduced in this PR
 
 ### Expected Regression Scope
@@ -284,7 +296,7 @@ hostname under `*.apps.kilty.io`.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - the first end-to-end shared-dev deploy command sequence introduced in this PR
 
 ### Expected Regression Scope
@@ -367,7 +379,7 @@ identity, artifact identity, lifecycle state, and outcome using the repository's
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - any record-inspection CLI or fixture verification command introduced in this PR
 
 ### Expected Regression Scope
@@ -547,7 +559,7 @@ Nix configuration cannot be updated through a reviewed managed path.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - install dry-run command for a fixture host root introduced in this PR
 - uninstall dry-run command for a fixture host root introduced in this PR
 
@@ -646,7 +658,7 @@ test taxonomy and the narrow ownership boundary that later selector logic can tr
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - deployment label inspection commands introduced in this PR
 
 ### Expected Regression Scope
@@ -741,7 +753,7 @@ the current full build-system behavior.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - deployment-impact inspection or explain commands introduced in this PR
 
 ### Expected Regression Scope
@@ -839,7 +851,7 @@ shared-path impact still broadens immediately to the current full build-system b
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - deployment-aware `v --explain-selection` or equivalent verify commands introduced in this PR
 
 ### Expected Regression Scope
@@ -945,7 +957,7 @@ shared-control-plane design.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - the deploy dry-run / plan commands introduced in this PR
 
 ### Expected Regression Scope
@@ -1044,7 +1056,7 @@ CI to shell into `mini` manually.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - the remote deploy commands introduced in this PR
 
 ### Expected Regression Scope
@@ -1142,7 +1154,7 @@ for `mini` while still staying intentionally outside the later shared-control-pl
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - the remote host-apply commands introduced in this PR
 
 ### Expected Regression Scope
@@ -1237,7 +1249,7 @@ flow for CI without redefining it as the final shared deployment model.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - the Jenkins-oriented direct deploy commands introduced in this PR
 
 ### Expected Regression Scope
@@ -1323,7 +1335,7 @@ refinements.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - the shared-control-plane submission command sequence introduced in this PR
 
 ### Expected Regression Scope
@@ -1400,7 +1412,7 @@ re-run shared deployments from recorded artifact identity rather than ambient lo
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - artifact-resolution or replay-inspection commands introduced in this PR
 
 ### Expected Regression Scope
@@ -1479,7 +1491,7 @@ operator flows: retry, exact-artifact publish-only, and same-deployment rollback
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - retry, rollback, and publish-only command flows introduced in this PR
 
 ### Expected Regression Scope
@@ -1578,7 +1590,7 @@ execution coverage without reducing the reviewed behavior surface.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - retry, rollback, and replay command flows introduced in PR-7
 
 ### Expected Regression Scope
@@ -1661,7 +1673,7 @@ deployment design requires for protected/shared deployments.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - admission and lane-policy inspection commands introduced in this PR
 
 ### Expected Regression Scope
@@ -1745,7 +1757,7 @@ Pages in the same deployment system rather than only on `mini`.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - Cloudflare Pages deploy verification commands introduced in this PR
 
 ### Expected Regression Scope
@@ -1834,7 +1846,7 @@ through `staging` and `prod` using the repository's default `same_artifact` mode
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - Pleomino promotion command flows introduced in this PR
 
 ### Expected Regression Scope
@@ -1911,7 +1923,7 @@ promotion support for all compatible lanes using the repository's default `same_
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - promotion command flows introduced in this PR
 
 ### Expected Regression Scope
@@ -1985,7 +1997,7 @@ audited cleanup semantics, consistent with the main design.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - preview publish and cleanup commands introduced in this PR
 
 ### Expected Regression Scope
@@ -2071,7 +2083,7 @@ classification behavior.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - deployment verify-scope inspection and selection-explain commands touched in this PR
 
 ### Expected Regression Scope
@@ -2153,7 +2165,7 @@ turn repo changes into auditable per-deployment runs without inventing a second 
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - changed-based submission commands introduced in this PR
 
 ### Expected Regression Scope
@@ -2224,7 +2236,7 @@ the system can model larger deployments without drifting into ad hoc component o
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - multi-component deploy verification commands introduced in this PR
 
 ### Expected Regression Scope
@@ -2291,7 +2303,7 @@ that require distinct admitted artifacts per stage without weakening the shared-
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - rebuild-per-stage promotion commands introduced in this PR
 
 ### Expected Regression Scope
@@ -2374,7 +2386,7 @@ referenced by label rather than being pulled into new centralized registries.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - any release-action or migration verification commands introduced in this PR
 
 ### Expected Regression Scope
@@ -2559,7 +2571,7 @@ advisory metadata.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - approval/admission inspection and verification commands introduced in this PR
 
 ### Expected Regression Scope
@@ -2719,7 +2731,7 @@ machine-readable rejection codes, idempotent submission, first-class lifecycle s
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - submit/status/run-action command flows introduced in this PR
 
 ### Expected Regression Scope
@@ -2823,7 +2835,7 @@ rollback, and promotion for the reviewed ordered-best-effort static-webapp slice
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - multi-component replay and promotion command flows introduced in this PR
 
 ### Expected Regression Scope
@@ -2940,7 +2952,7 @@ semantics.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - Cloudflare rollback and retire/migrate-target command flows introduced in this PR
 
 ### Expected Regression Scope
@@ -3087,7 +3099,7 @@ infrastructure mutation cannot hide inside an ordinary routine deploy.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - infra-affecting provisioner plan/diff command flows introduced in this PR
 
 ### Expected Regression Scope
@@ -3203,7 +3215,7 @@ and recovery-objective posture for the protected/shared control plane itself.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - backup, restore-test, and retention inspection flows introduced in this PR
 
 ### Expected Regression Scope
@@ -3320,7 +3332,7 @@ fail-closed, auditable, and reconciled back into authoritative records.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - recovery, cancellation-reconciliation, and break-glass flows introduced in this PR
 
 ### Expected Regression Scope
@@ -3441,7 +3453,7 @@ payloads.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - observability, audit-event, and redaction verification flows introduced in this PR
 
 ### Expected Regression Scope
@@ -3562,7 +3574,7 @@ progressive modes fail-closed unless a reviewed provider capability entry explic
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - progressive-rollout submit, resume, abort, and status flows introduced in this PR
 
 ### Expected Regression Scope
@@ -3675,7 +3687,7 @@ authority by accident.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - bootstrap and deployment-authority recovery flows introduced in this PR
 
 ### Expected Regression Scope
@@ -3865,7 +3877,7 @@ while also closing the remaining repo-level preview-policy and preview-identity 
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - `deploy --list`
 - `deploy <deployment-id> --validate-only`
 - `deploy <deployment-id> --provision-only`
@@ -4016,7 +4028,7 @@ behavior.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - shared queue and status inspection flows introduced in this PR
 
 ### Expected Regression Scope
@@ -4146,7 +4158,7 @@ behavior and protected/shared built-in `release_actions` support declarations.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - resolve and metadata inspection flows introduced in this PR
 
 ### Expected Regression Scope
@@ -4241,7 +4253,7 @@ static hosting.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - `deploy <deployment-id>` flows introduced for the `s3-static` slice
 
 ### Expected Regression Scope
@@ -4340,7 +4352,7 @@ support, and the first real shared-platform deployment slice such as a shared ob
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - Kubernetes service and shared-platform deploy flows introduced in this PR
 
 ### Expected Regression Scope
@@ -4436,7 +4448,7 @@ target-identity, and replay guarantees used elsewhere in the design.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - host-based SSR deploy flows introduced in this PR
 
 ### Expected Regression Scope
@@ -4534,7 +4546,7 @@ reviewed record shape for store-distributed releases.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - App Store Connect mobile release flows introduced in this PR
 
 ### Expected Regression Scope
@@ -4634,7 +4646,7 @@ release state.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - Google Play mobile release flows introduced in this PR
 
 ### Expected Regression Scope
@@ -4742,7 +4754,7 @@ pass before protected/shared mutation is admitted.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - admission, attestation, and supply-chain verification flows introduced in this PR
 
 ### Expected Regression Scope
@@ -4846,7 +4858,7 @@ operator-visible results and records.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - smoke-policy and result-inspection flows introduced in this PR
 
 ### Expected Regression Scope
@@ -4953,7 +4965,7 @@ credentials during protected/shared mutation.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - secret-contract and credential-lifecycle inspection flows introduced in this PR
 
 ### Expected Regression Scope
@@ -5077,7 +5089,7 @@ in records and status.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - lifecycle retry and smoke-budget inspection flows introduced in this PR
 
 ### Expected Regression Scope
@@ -5177,7 +5189,7 @@ surface that prove protected/shared lane branches are actually safe sources of p
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - lane-governance and branch-protection verification flows introduced in this PR
 
 ### Expected Regression Scope
@@ -5319,7 +5331,7 @@ compatibility guarantees that the design expects operators and future tooling to
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - record-schema and replay-compatibility inspection flows introduced in this PR
 
 ### Expected Regression Scope
@@ -5430,7 +5442,7 @@ fail-closed and explicit instead of silently skipping declared failure-path acti
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - release-action replay and failure-path inspection flows introduced in this PR
 
 ### Expected Regression Scope
@@ -5539,7 +5551,7 @@ type strings or partial per-provider fields.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - provider replay-compatibility inspection flows introduced in this PR
 
 ### Expected Regression Scope
@@ -5665,7 +5677,7 @@ provider families.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - repo-level `deploy --validate-only` and `deploy --provision-only` inspection flows introduced in
   this PR
 
@@ -5774,7 +5786,7 @@ contracts already established by earlier PRs.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - deployment-domain compliance or size-check commands introduced in this PR
 - representative deployment-domain Buck targets covering the refactored areas
 
@@ -5925,7 +5937,7 @@ component, runtime, and rollout semantics for that promotion family.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - promotion compatibility and end-to-end promotion flows introduced or updated in this PR
 
 ### Expected Regression Scope
@@ -6051,7 +6063,7 @@ not as a second public operator input surface that can bypass authoritative Buck
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - deploy front-door contract / extraction / e2e flows updated in this PR
 
 ### Expected Regression Scope
@@ -6187,7 +6199,7 @@ protected/shared behavior onto the architecture the design says operators should
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - reviewed control-plane API / worker / backend integration flows introduced in this PR
 
 ### Expected Regression Scope
@@ -6314,7 +6326,7 @@ into a complete operator workflow.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - approval service / pending-approval advancement flows introduced in this PR
 
 ### Expected Regression Scope
@@ -6429,7 +6441,7 @@ results are no longer sourced from local JSON mirrors as the authority.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - reviewed backend claim / recovery / deploy-record authority flows introduced in this PR
 
 ### Expected Regression Scope
@@ -6562,7 +6574,7 @@ preserving backward compatibility with filesystem-based record paths.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - reviewed backend-only submit / status / result / replay / recovery flows introduced in this PR
 
 ### Expected Regression Scope
@@ -6669,7 +6681,7 @@ missing.
 
 ### Verification Commands
 
-- `buck2 test //...`
+- `v`
 - reviewed service-only client / wrapper submission flows introduced in this PR
 
 ### Expected Regression Scope

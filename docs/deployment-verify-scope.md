@@ -19,7 +19,14 @@ The shared zx-test loader stays in `build-tools/tools/tests/defs.bzl` and the th
 `build-tools/tools/tests/deployments/deployment_domain_taxonomy.bzl`, so routine deployment test
 additions or renames do not touch the shared loader path.
 
-Inspect the reviewed deployment suite with Buck:
+Inspect the reviewed deployment suite with the repo wrapper:
+
+```bash
+b cquery \
+  'attrfilter(labels, "domain:deployment", //...)'
+```
+
+If you need raw `buck2` instead of the wrapper, use:
 
 ```bash
 buck2 cquery --target-platforms prelude//platforms:default \
