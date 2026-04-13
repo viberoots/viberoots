@@ -1,9 +1,10 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
-import path from "node:path";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { submitNixosSharedHostControlPlaneViaService } from "./nixos-shared-host-control-plane-client.ts";
+import {
+  readNixosSharedHostControlPlaneRecordViaService,
+  submitNixosSharedHostControlPlaneViaService,
+} from "./nixos-shared-host-control-plane-client.ts";
 import {
   NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
   type NixosSharedHostControlPlaneSubmitRequest,
@@ -16,7 +17,6 @@ export type NixosSharedHostServiceFrontDoorResponse =
       kind: "result";
       result: {
         record: any;
-        recordPath: string;
       };
     }
   | {
@@ -24,19 +24,25 @@ export type NixosSharedHostServiceFrontDoorResponse =
       status: DeploymentControlPlaneStatus;
     };
 
-async function finalizeServiceResponse(status: DeploymentControlPlaneStatus) {
-  if (!status.resultRecordPath) {
+async function finalizeServiceResponse(
+  controlPlaneUrl: string,
+  controlPlaneToken: string | undefined,
+  status: DeploymentControlPlaneStatus,
+) {
+  if (!status.deployRunId) {
     return {
       kind: "status" as const,
       status,
     };
   }
-  const recordPath = path.resolve(status.resultRecordPath);
   return {
     kind: "result" as const,
     result: {
-      record: JSON.parse(await fsp.readFile(recordPath, "utf8")),
-      recordPath,
+      record: await readNixosSharedHostControlPlaneRecordViaService({
+        controlPlaneUrl,
+        ...(controlPlaneToken ? { token: controlPlaneToken } : {}),
+        deployRunId: status.deployRunId,
+      }),
     },
   };
 }
@@ -81,5 +87,5 @@ export async function runNixosSharedHostDirectServiceMutation(opts: {
     token: opts.controlPlaneToken,
     request,
   });
-  return await finalizeServiceResponse(final);
+  return await finalizeServiceResponse(opts.controlPlaneUrl, opts.controlPlaneToken, final);
 }

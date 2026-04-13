@@ -40,6 +40,7 @@ export type PrepareNixosSharedHostControlPlaneRunOpts = {
   operationKind: NixosSharedHostControlPlaneOperationKind;
   deployment: NixosSharedHostDeployment;
   paths: NixosSharedHostControlPlanePaths;
+  backendDatabaseUrl?: string;
   submissionId?: string;
   dedupe: DeploymentControlPlaneRequestDedupe;
   requestedBy?: NixosSharedHostControlPlaneSubmission["requestedBy"];
@@ -87,6 +88,7 @@ export async function prepareNixosSharedHostControlPlaneRun(
     await evaluateNixosSharedHostControlPlaneAdmission({
       workspaceRoot: opts.workspaceRoot,
       recordsRoot: opts.paths.recordsRoot,
+      ...(opts.backendDatabaseUrl ? { backendDatabaseUrl: opts.backendDatabaseUrl } : {}),
       deployment: opts.deployment,
       snapshot,
       source: opts.source,

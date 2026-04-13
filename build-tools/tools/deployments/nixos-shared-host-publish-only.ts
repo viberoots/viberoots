@@ -27,6 +27,7 @@ type PublishOnlyRunOpts = {
   paths: NixosSharedHostControlPlanePaths;
   sourceRunId: string;
   rollback: boolean;
+  backendDatabaseUrl?: string;
   submissionId?: string;
   dedupe?: DeploymentControlPlaneRequestDedupe;
   requestedBy?: { principalId: string; displayName?: string };
@@ -46,11 +47,22 @@ function sharedSubmitOpts(opts: PublishOnlyRunOpts) {
   };
 }
 
+function requireBackendDatabaseUrl(value?: string): string {
+  const resolved = value || String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
+  if (!resolved) {
+    throw new Error(
+      "shared replay source lookup requires backendDatabaseUrl or BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL",
+    );
+  }
+  return resolved;
+}
+
 export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOpts) {
   if (opts.rollback) {
     const replay = await resolveNixosSharedHostReplaySelection({
       deployment: opts.deployment,
       recordsRoot: opts.paths.recordsRoot,
+      backendDatabaseUrl: requireBackendDatabaseUrl(opts.backendDatabaseUrl),
       sourceRunId: opts.sourceRunId,
       rollback: true,
     });
@@ -70,7 +82,6 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOp
       artifactLineageId: replay.artifactLineageId,
       source: {
         record: replay.sourceRecord,
-        recordPath: replay.recordPath,
         replaySnapshot: replay.sourceReplaySnapshot,
         replaySnapshotPath: replay.replaySnapshotPath,
       },
@@ -82,11 +93,13 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOp
     workspaceRoot: opts.workspaceRoot,
     recordsRoot: opts.paths.recordsRoot,
     sourceRunId: opts.sourceRunId,
+    backendDatabaseUrl: opts.backendDatabaseUrl,
   });
   if (source.record.deploymentId === opts.deployment.deploymentId) {
     const replay = await resolveNixosSharedHostReplaySelection({
       deployment: opts.deployment,
       recordsRoot: opts.paths.recordsRoot,
+      backendDatabaseUrl: requireBackendDatabaseUrl(opts.backendDatabaseUrl),
       sourceRunId: opts.sourceRunId,
       rollback: false,
     });
@@ -106,7 +119,6 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOp
       artifactLineageId: replay.artifactLineageId,
       source: {
         record: replay.sourceRecord,
-        recordPath: replay.recordPath,
         replaySnapshot: replay.sourceReplaySnapshot,
         replaySnapshotPath: replay.replaySnapshotPath,
       },
@@ -120,6 +132,7 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOp
       deployment: opts.deployment,
       recordsRoot: opts.paths.recordsRoot,
       sourceRunId: opts.sourceRunId,
+      backendDatabaseUrl: opts.backendDatabaseUrl,
     });
     if (promotion.sourceRecord.provider !== "nixos-shared-host") {
       throw new Error(
@@ -143,7 +156,6 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOp
         promotion.sourceRecord.artifactLineageId || sourceReplaySnapshot.artifactIdentity,
       source: {
         record: promotion.sourceRecord,
-        recordPath: promotion.sourceRecordPath,
         replaySnapshot: sourceReplaySnapshot,
         replaySnapshotPath: promotion.sourceReplaySnapshotPath,
       },
@@ -156,6 +168,7 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOp
     deployment: opts.deployment,
     recordsRoot: opts.paths.recordsRoot,
     sourceRunId: opts.sourceRunId,
+    backendDatabaseUrl: opts.backendDatabaseUrl,
   });
   return await submitNixosSharedHostControlPlaneRun({
     workspaceRoot: opts.workspaceRoot,
@@ -168,7 +181,6 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOp
     artifactLineageId: promotion.artifactLineageId,
     source: {
       record: promotion.sourceRecord,
-      recordPath: promotion.sourceRecordPath,
       replaySnapshot: promotion.sourceReplaySnapshot,
       replaySnapshotPath: promotion.sourceReplaySnapshotPath,
     },

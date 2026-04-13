@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import {
   ensureNixosSharedHostStageBranch,
@@ -25,6 +26,10 @@ test("nixos-shared-host publish-only rejects ambiguous replay selectors and impl
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const recordsRoot = path.join(tmp, "records");
+    const commandEnv = {
+      ...process.env,
+      BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
+    };
     await writeArtifact(artifactDir, "v1");
     await writeArtifact(otherArtifactDir, "v2");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
@@ -39,6 +44,7 @@ test("nixos-shared-host publish-only rejects ambiguous replay selectors and impl
     try {
       const first = await $({
         cwd: tmp,
+        env: commandEnv,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const firstSummary = JSON.parse(String(first.stdout));
       await assert.rejects(
@@ -73,6 +79,10 @@ test("nixos-shared-host publish-only retry reuses the stored exact artifact from
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const recordsRoot = path.join(tmp, "records");
+    const commandEnv = {
+      ...process.env,
+      BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
+    };
     await writeArtifact(artifactDir, "v1");
     await writeArtifact(wrongRoot, "wrong");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
@@ -105,6 +115,7 @@ test("nixos-shared-host publish-only retry reuses the stored exact artifact from
       await fsp.rm(artifactDir, { recursive: true, force: true });
       const retry = await $({
         cwd: tmp,
+        env: commandEnv,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --source-run-id ${failedRecord.deployRunId} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(goodServer.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(retry.stdout));
       assert.equal(summary.operationKind, "retry");
@@ -135,6 +146,10 @@ test("nixos-shared-host publish-only can republish a retained exact artifact wit
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const recordsRoot = path.join(tmp, "records");
+    const commandEnv = {
+      ...process.env,
+      BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
+    };
     await writeArtifact(artifactDir, "v1");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
@@ -148,11 +163,13 @@ test("nixos-shared-host publish-only can republish a retained exact artifact wit
     try {
       const first = await $({
         cwd: tmp,
+        env: commandEnv,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const firstSummary = JSON.parse(String(first.stdout));
       await fsp.rm(artifactDir, { recursive: true, force: true });
       const republish = await $({
         cwd: tmp,
+        env: commandEnv,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --source-run-id ${firstSummary.deployRunId} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(republish.stdout));
       assert.equal(summary.operationKind, "retry");

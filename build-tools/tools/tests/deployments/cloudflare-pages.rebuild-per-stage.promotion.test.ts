@@ -9,8 +9,8 @@ import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wran
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
 import {
-  nixosSharedHostAdmissionPolicyFixture,
   ensureNixosSharedHostStageBranch,
+  nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostLanePolicyFixture,
 } from "./nixos-shared-host.fixture.ts";
 

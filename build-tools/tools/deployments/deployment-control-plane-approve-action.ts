@@ -9,6 +9,7 @@ import type {
   DeploymentAdmissionEvidence,
   DeploymentPrincipal,
 } from "./deployment-admission-evidence.ts";
+import { approvalSourceSelection } from "./deployment-control-plane-approve-source.ts";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
 import {
   approvalEvidenceFromGrant,
@@ -49,7 +50,7 @@ type SnapshotLike = {
   admissionEvidence?: DeploymentAdmissionEvidence;
   action?: {
     artifactLineageId?: string;
-    sourceRecordPath?: string;
+    parentRunId?: string;
     sourceReplaySnapshotPath?: string;
   };
   paths: { recordsRoot: string };
@@ -118,23 +119,10 @@ function rejection(opts: {
   };
 }
 
-async function sourceSelection(snapshot: SnapshotLike) {
-  if (!snapshot.action?.sourceRecordPath) return undefined;
-  const record = await readControlPlaneJson<any>(snapshot.action.sourceRecordPath);
-  if (!snapshot.action.sourceReplaySnapshotPath) {
-    return { record, recordPath: snapshot.action.sourceRecordPath };
-  }
-  return {
-    record,
-    recordPath: snapshot.action.sourceRecordPath,
-    replaySnapshotPath: snapshot.action.sourceReplaySnapshotPath,
-    replaySnapshot: await readControlPlaneJson<any>(snapshot.action.sourceReplaySnapshotPath),
-  };
-}
-
 export async function approvePendingSubmission(opts: {
   workspaceRoot: string;
   recordsRoot: string;
+  backendDatabaseUrl?: string;
   submissionPath: string;
   submission: SubmissionLike;
   actionId: string;
@@ -181,7 +169,11 @@ export async function approvePendingSubmission(opts: {
     summary: pending,
     ...(opts.approval?.expiresAt ? { expiresAt: opts.approval.expiresAt } : {}),
   });
-  const source = await sourceSelection(snapshot);
+  const source = await approvalSourceSelection({
+    workspaceRoot: opts.workspaceRoot,
+    snapshot,
+    backendDatabaseUrl: opts.backendDatabaseUrl,
+  });
   const admissionEvidence = mergeAdmissionEvidence(
     snapshot.admissionEvidence,
     approvalEvidenceFromGrant({
@@ -194,6 +186,7 @@ export async function approvePendingSubmission(opts: {
     await evaluateNixosSharedHostControlPlaneAdmission({
       workspaceRoot: opts.workspaceRoot,
       recordsRoot: opts.recordsRoot,
+      backendDatabaseUrl: opts.backendDatabaseUrl,
       deployment: snapshot.deployment,
       snapshot,
       ...(snapshot.action?.artifactLineageId

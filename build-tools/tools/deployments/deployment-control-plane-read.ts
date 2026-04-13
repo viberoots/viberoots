@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract.ts";
 import { statusFromSubmission } from "./deployment-control-plane-status.ts";
 import {
-  readControlPlaneJson,
-  submissionPathFor,
-} from "./nixos-shared-host-control-plane-store.ts";
+  readBackendSubmissionByDeployRunId,
+  readBackendSubmissionBySubmissionId,
+} from "./nixos-shared-host-control-plane-backend.ts";
+import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
 
 type SubmissionRecord = {
   submissionId: string;
@@ -92,67 +92,33 @@ type SubmissionRecord = {
   };
 };
 
-async function submissionPathFromRecord(recordPath: string): Promise<string> {
-  const record = JSON.parse(await fsp.readFile(recordPath, "utf8")) as {
-    controlPlane?: { submissionPath?: string };
-  };
-  const submissionPath = record.controlPlane?.submissionPath;
-  if (!submissionPath) {
-    throw new Error(`deploy record is missing controlPlane.submissionPath: ${recordPath}`);
-  }
-  return path.resolve(submissionPath);
-}
-
-async function submissionPathFromDeployRunId(
-  recordsRoot: string,
-  deployRunId: string,
-): Promise<string> {
-  const runsPath = path.join(path.resolve(recordsRoot), "runs", `${deployRunId}.json`);
-  try {
-    return await submissionPathFromRecord(runsPath);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") throw error;
-  }
-  const submissionsRoot = path.join(path.resolve(recordsRoot), "control-plane", "submissions");
-  for (const entry of await fsp.readdir(submissionsRoot)) {
-    if (!entry.endsWith(".json")) continue;
-    const submissionPath = path.join(submissionsRoot, entry);
-    const submission = JSON.parse(await fsp.readFile(submissionPath, "utf8")) as SubmissionRecord;
-    if (submission.deployRunId === deployRunId) return submissionPath;
-  }
-  throw Object.assign(new Error(`no submission found for deploy run ${deployRunId}`), {
-    code: "ENOENT",
-  });
-}
-
-async function resolveSubmissionPath(opts: {
-  recordsRoot?: string;
-  submissionId?: string;
-  submissionPath?: string;
-  recordPath?: string;
-  deployRunId?: string;
-}): Promise<string> {
-  if (opts.submissionPath) return path.resolve(opts.submissionPath);
-  if (opts.recordPath) return await submissionPathFromRecord(path.resolve(opts.recordPath));
-  if (opts.recordsRoot && opts.deployRunId) {
-    return await submissionPathFromDeployRunId(opts.recordsRoot, opts.deployRunId);
-  }
-  if (opts.recordsRoot && opts.submissionId) {
-    return submissionPathFor(opts.recordsRoot, opts.submissionId);
-  }
-  throw new Error(
-    "status lookup requires --submission-path, --record-path, --records-root with --submission-id, or --records-root with --deploy-run-id",
-  );
-}
-
 export async function readDeploymentControlPlaneStatus(opts: {
+  backendDatabaseUrl?: string;
   recordsRoot?: string;
   submissionId?: string;
   submissionPath?: string;
-  recordPath?: string;
   deployRunId?: string;
 }) {
-  const filePath = await resolveSubmissionPath(opts);
-  const submission = await readControlPlaneJson<SubmissionRecord>(filePath);
-  return statusFromSubmission(submission);
+  if (opts.submissionPath) {
+    const submission = await readControlPlaneJson<SubmissionRecord>(
+      path.resolve(opts.submissionPath),
+    );
+    return statusFromSubmission(submission);
+  }
+  if (opts.backendDatabaseUrl && (opts.submissionId || opts.deployRunId)) {
+    const backend = {
+      recordsRoot: path.resolve(opts.recordsRoot || process.cwd()),
+      databaseUrl: opts.backendDatabaseUrl,
+    };
+    const submission = opts.submissionId
+      ? await readBackendSubmissionBySubmissionId(backend, opts.submissionId)
+      : await readBackendSubmissionByDeployRunId(backend, String(opts.deployRunId));
+    if (!submission) {
+      throw Object.assign(new Error("submission not found"), { code: "ENOENT" });
+    }
+    return statusFromSubmission(submission as SubmissionRecord);
+  }
+  throw new Error(
+    "status lookup requires --submission-path or backend-native --submission-id/--deploy-run-id with --control-plane-database-url",
+  );
 }

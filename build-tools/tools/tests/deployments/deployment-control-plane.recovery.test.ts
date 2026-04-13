@@ -5,6 +5,10 @@ import path from "node:path";
 import { test } from "node:test";
 import { reconcileNixosSharedHostRecoveredSubmission } from "../../deployments/nixos-shared-host-recovery.ts";
 import {
+  localHarnessControlPlaneDatabaseUrl,
+  syncBackendDeployRecord,
+} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
+import {
   createNixosSharedHostDeployRecord,
   writeNixosSharedHostDeployRecord,
 } from "../../deployments/nixos-shared-host-records.ts";
@@ -19,6 +23,10 @@ async function writeSubmission(filePath: string, value: Record<string, unknown>)
 test("recovery converges to the existing authoritative record and preserves cancellation facts", async () => {
   await runInTemp("deployment-control-plane-recovery-converges", async (tmp) => {
     const recordsRoot = path.join(tmp, "records");
+    const backend = {
+      recordsRoot,
+      databaseUrl: localHarnessControlPlaneDatabaseUrl(recordsRoot),
+    };
     const submissionPath = path.join(recordsRoot, "control-plane", "submissions", "cp-1.json");
     const deployment = nixosSharedHostDeploymentFixture();
     await writeSubmission(submissionPath, {
@@ -56,10 +64,12 @@ test("recovery converges to the existing authoritative record and preserves canc
       },
     });
     const recordPath = await writeNixosSharedHostDeployRecord(recordsRoot, record);
+    await syncBackendDeployRecord(backend, recordPath);
     const recovered = await reconcileNixosSharedHostRecoveredSubmission({
       submissionPath,
       recordsRoot,
       recoveredBy: { principalId: "user:recovery" },
+      backend,
     });
     assert.equal(recovered.lifecycleState, "finished");
     assert.equal(recovered.deployRunId, "deploy-1");

@@ -4,6 +4,10 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import {
+  localHarnessControlPlaneDatabaseUrl,
+  syncBackendDeployRecord,
+} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
+import {
   readNixosSharedHostReplaySnapshot,
   resolveNixosSharedHostReplaySelection,
 } from "../../deployments/nixos-shared-host-replay.ts";
@@ -91,6 +95,7 @@ test("nixos-shared-host replay fails closed when stored runner provenance no lon
     const artifactDir = path.join(tmp, "artifact");
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     await writeArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({
@@ -126,10 +131,15 @@ test("nixos-shared-host replay fails closed when stored runner provenance no lon
       const record = JSON.parse(await fsp.readFile(result.recordPath, "utf8"));
       record.runnerIdentities.publisher = "nixos-shared-host-static-webapp@legacy";
       await fsp.writeFile(result.recordPath, JSON.stringify(record, null, 2) + "\n", "utf8");
+      await syncBackendDeployRecord(
+        { recordsRoot, databaseUrl: backendDatabaseUrl },
+        result.recordPath,
+      );
       await assert.rejects(
         resolveNixosSharedHostReplaySelection({
           deployment,
           recordsRoot,
+          backendDatabaseUrl,
           sourceRunId: result.record.deployRunId,
           rollback: false,
         }),
@@ -147,6 +157,7 @@ test("nixos-shared-host replay fails closed when a source snapshot omits the rec
     const artifactDir = path.join(tmp, "artifact");
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     await writeArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({
@@ -210,6 +221,10 @@ test("nixos-shared-host replay fails closed when a source snapshot omits the rec
         JSON.stringify(replaySnapshot, null, 2) + "\n",
         "utf8",
       );
+      await syncBackendDeployRecord(
+        { recordsRoot, databaseUrl: backendDatabaseUrl },
+        result.recordPath,
+      );
       await assert.rejects(
         resolveNixosSharedHostReplaySelection({
           deployment: {
@@ -217,6 +232,7 @@ test("nixos-shared-host replay fails closed when a source snapshot omits the rec
             releaseActions: replaySnapshot.deployment.releaseActions,
           },
           recordsRoot,
+          backendDatabaseUrl,
           sourceRunId: result.record.deployRunId,
           rollback: false,
         }),

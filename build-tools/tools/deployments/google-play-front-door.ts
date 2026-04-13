@@ -6,6 +6,7 @@ import { resolveArtifactDirForCli } from "./deployment-cli-resolve.ts";
 import { summarizeDeploymentResult } from "./deployment-execution.ts";
 import type { GooglePlayDeployment } from "./contract.ts";
 import { invalidatingTargetException } from "./deployment-target-exceptions.ts";
+import { syncBackendDeployRecordsFromRunMirrors } from "./nixos-shared-host-control-plane-backend.ts";
 import { resolveCrossDeploymentPromotionSelection } from "./deployment-promotion.ts";
 import { resolveGooglePlayReplaySource } from "./google-play-replay.ts";
 import { submitGooglePlayDeploy } from "./google-play-deploy.ts";
@@ -64,6 +65,10 @@ export async function runGooglePlayDeployFrontDoor(opts: {
       path.join(opts.workspaceRoot, ".local", "deployments", "google-play", "records"),
     ),
   );
+  const controlPlaneDatabaseUrl =
+    getFlagStr("control-plane-database-url", "").trim() ||
+    String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim() ||
+    undefined;
   if (!opts.publishOnly) {
     const result = await submitGooglePlayDeploy({
       workspaceRoot: opts.workspaceRoot,
@@ -145,11 +150,18 @@ export async function runGooglePlayDeployFrontDoor(opts: {
           ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
         })
       : await (async () => {
+          if (controlPlaneDatabaseUrl) {
+            await syncBackendDeployRecordsFromRunMirrors({
+              recordsRoot,
+              databaseUrl: controlPlaneDatabaseUrl,
+            });
+          }
           const promotion = await resolveCrossDeploymentPromotionSelection({
             workspaceRoot: opts.workspaceRoot,
             deployment: opts.deployment,
             recordsRoot,
             sourceRunId: opts.sourceRunId,
+            ...(controlPlaneDatabaseUrl ? { backendDatabaseUrl: controlPlaneDatabaseUrl } : {}),
           });
           return await submitGooglePlayExactArtifactRun({
             workspaceRoot: opts.workspaceRoot,

@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  localHarnessControlPlaneDatabaseUrl,
+  syncBackendDeployRecord,
+} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloudflare-pages-control-plane.ts";
 import { resolveCloudflarePagesPromotionSelection } from "../../deployments/cloudflare-pages-promotion.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
@@ -59,7 +63,12 @@ function fakeCloudflareEnv(fake: Awaited<ReturnType<typeof installFakeCloudflare
   };
 }
 
-async function createSuccessfulDevRun(tmp: string, $: any, recordsRoot: string): Promise<string> {
+async function createSuccessfulDevRun(
+  tmp: string,
+  $: any,
+  recordsRoot: string,
+  backendDatabaseUrl: string,
+): Promise<string> {
   const deployment = pleominoDevDeployment();
   const deploymentJson = path.join(tmp, "pleomino-dev.json");
   const artifactDir = path.join(tmp, "artifact");
@@ -79,7 +88,12 @@ async function createSuccessfulDevRun(tmp: string, $: any, recordsRoot: string):
     const run = await $({
       cwd: tmp,
     })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
-    return JSON.parse(String(run.stdout)).deployRunId;
+    const summary = JSON.parse(String(run.stdout));
+    await syncBackendDeployRecord(
+      { recordsRoot, databaseUrl: backendDatabaseUrl },
+      summary.recordPath,
+    );
+    return summary.deployRunId;
   } finally {
     await server.close();
   }
@@ -88,7 +102,8 @@ async function createSuccessfulDevRun(tmp: string, $: any, recordsRoot: string):
 test("promotion rejects source runs from an incompatible current lane policy", async () => {
   await runInTemp("cloudflare-pages-promotion-lane-mismatch", async (tmp, $) => {
     const recordsRoot = path.join(tmp, "records");
-    const sourceRunId = await createSuccessfulDevRun(tmp, $, recordsRoot);
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
+    const sourceRunId = await createSuccessfulDevRun(tmp, $, recordsRoot, backendDatabaseUrl);
     const incompatibleTarget = cloudflarePagesDeploymentFixture({
       lanePolicy: {
         ...cloudflarePagesDeploymentFixture().lanePolicy,
@@ -102,6 +117,7 @@ test("promotion rejects source runs from an incompatible current lane policy", a
         deployment: incompatibleTarget,
         recordsRoot,
         sourceRunId,
+        backendDatabaseUrl,
       }),
       /lanePolicyFingerprint mismatch/,
     );
@@ -111,13 +127,14 @@ test("promotion rejects source runs from an incompatible current lane policy", a
 test("promotion rejects retained source runs that no longer match the current promotable target state", async () => {
   await runInTemp("cloudflare-pages-promotion-eligibility-drift", async (tmp, $) => {
     const recordsRoot = path.join(tmp, "records");
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     const source = pleominoDevDeployment();
     const staging = cloudflarePagesDeploymentFixture({
       lanePolicy: source.lanePolicy,
       lanePolicyRef: source.lanePolicyRef,
     });
     await ensureNixosSharedHostStageBranch(tmp, $, staging);
-    const sourceRunId = await createSuccessfulDevRun(tmp, $, recordsRoot);
+    const sourceRunId = await createSuccessfulDevRun(tmp, $, recordsRoot, backendDatabaseUrl);
     await $({ cwd: tmp, stdio: "pipe" })`git config user.email test@example.com`;
     await $({ cwd: tmp, stdio: "pipe" })`git config user.name Test`;
     await $({ cwd: tmp, stdio: "pipe" })`git commit --allow-empty -m drift`;
@@ -131,6 +148,7 @@ test("promotion rejects retained source runs that no longer match the current pr
         deployment: staging,
         recordsRoot,
         sourceRunId,
+        backendDatabaseUrl,
       }),
       /no longer matches current promotable target state/,
     );

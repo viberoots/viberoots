@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  localHarnessControlPlaneDatabaseUrl,
+  syncBackendDeployRecord,
+} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
 import { resolveNixosSharedHostReplaySelection } from "../../deployments/nixos-shared-host-replay.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
@@ -39,6 +43,7 @@ test("replay fails closed when an active migration exception invalidates the rec
     const artifactDir = path.join(tmp, "artifact");
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     await writeArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, sourceDeployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
@@ -71,10 +76,15 @@ test("replay fails closed when an active migration exception invalidates the rec
           rejectUnauthorized: false,
         },
       });
+      await syncBackendDeployRecord(
+        { recordsRoot, databaseUrl: backendDatabaseUrl },
+        result.recordPath,
+      );
       await assert.rejects(
         resolveNixosSharedHostReplaySelection({
           deployment: currentDeployment,
           recordsRoot,
+          backendDatabaseUrl,
           sourceRunId: result.record.deployRunId,
           rollback: false,
         }),

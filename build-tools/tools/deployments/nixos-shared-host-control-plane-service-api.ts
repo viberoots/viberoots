@@ -16,6 +16,8 @@ import type {
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 import {
   enqueueBackendSubmission,
+  readBackendDeployRecordByDeployRunId,
+  readBackendDeployRecordBySubmissionId,
   readBackendSubmissionByDeployRunId,
   readBackendSubmissionBySubmissionId,
   readBackendSubmissionEnvelopeByDeployRunId,
@@ -26,6 +28,11 @@ import {
   syncBackendSubmission,
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend.ts";
+import {
+  materializeBackendControlPlaneFiles,
+  persistMaterializedSubmission,
+  removeMirrorFile,
+} from "./nixos-shared-host-control-plane-backend-materialize.ts";
 import {
   NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
   type NixosSharedHostControlPlaneSubmitRequest,
@@ -45,6 +52,17 @@ export type ServiceRunActionRequest = DeploymentControlPlaneRunActionRequest & {
   requestedBy?: DeploymentPrincipal;
   authorization?: DeploymentControlPlaneAuthorization;
 };
+
+async function syncAndRemoveMirrors(opts: {
+  backend: NixosSharedHostControlPlaneBackendTarget;
+  submissionPath: string;
+  executionSnapshotPath: string;
+}) {
+  await syncBackendSnapshot(opts.backend, opts.executionSnapshotPath);
+  await syncBackendSubmission(opts.backend, opts.submissionPath);
+  await removeMirrorFile(opts.submissionPath);
+  await removeMirrorFile(opts.executionSnapshotPath);
+}
 
 export async function handleControlPlaneSubmit(
   request: NixosSharedHostControlPlaneSubmitRequest,
@@ -89,6 +107,7 @@ export async function handleControlPlaneSubmit(
       operationKind: request.operationKind,
       deployment: request.deployment,
       paths: opts.paths,
+      backendDatabaseUrl: opts.backend.databaseUrl,
       submissionId: request.submissionId,
       dedupe: {
         mode: dedupe.mode,
@@ -114,8 +133,11 @@ export async function handleControlPlaneSubmit(
       ...(request.source ? { source: request.source } : {}),
       ...(request.admissionEvidence ? { admissionEvidence: request.admissionEvidence } : {}),
     });
-    await syncBackendSnapshot(opts.backend, prepared.executionSnapshotPath);
-    await syncBackendSubmission(opts.backend, prepared.submissionPath);
+    await syncAndRemoveMirrors({
+      backend: opts.backend,
+      submissionPath: prepared.submissionPath,
+      executionSnapshotPath: prepared.executionSnapshotPath,
+    });
     await enqueueBackendSubmission(
       opts.backend,
       prepared.submission.submissionId,
@@ -124,8 +146,11 @@ export async function handleControlPlaneSubmit(
     return submitResponseFromSubmission(prepared.submission as any);
   } catch (error) {
     if (!(error as any)?.submissionPath || !(error as any)?.executionSnapshotPath) throw error;
-    await syncBackendSnapshot(opts.backend, (error as any).executionSnapshotPath);
-    await syncBackendSubmission(opts.backend, (error as any).submissionPath);
+    await syncAndRemoveMirrors({
+      backend: opts.backend,
+      submissionPath: (error as any).submissionPath,
+      executionSnapshotPath: (error as any).executionSnapshotPath,
+    });
     return submitResponseFromSubmission((error as any).submission);
   }
 }
@@ -140,8 +165,12 @@ export async function handleControlPlaneRunAction(
       ? await readBackendSubmissionEnvelopeByDeployRunId(opts.backend, request.deployRunId)
       : null;
   if (!envelope) throw Object.assign(new Error("submission not found"), { statusCode: 404 });
+  const materialized = await materializeBackendControlPlaneFiles(
+    opts.backend,
+    String((envelope.submission as any).submissionId),
+  );
   const snapshot = await readControlPlaneJson<NixosSharedHostControlPlaneSnapshot>(
-    envelope.submission.executionSnapshotPath,
+    materialized.executionSnapshotPath,
   );
   const authorization = request.authorization
     ? authorizeControlPlaneRunAction({
@@ -150,32 +179,42 @@ export async function handleControlPlaneRunAction(
         authorization: request.authorization,
       })
     : undefined;
-  const response = await submitDeploymentControlPlaneRunAction({
-    workspaceRoot: opts.workspaceRoot,
-    recordsRoot: opts.backend.recordsRoot,
-    submissionPath: envelope.submissionPath,
-    action: request.action,
-    idempotencyKey: request.idempotencyKey || request.actionId,
-    ...(request.requestedBy || request.authorization?.requestedBy
-      ? { requestedBy: request.requestedBy || request.authorization?.requestedBy }
-      : {}),
-    ...(request.approval ? { approval: request.approval } : {}),
-  });
-  await syncBackendSubmission(opts.backend, envelope.submissionPath);
-  if (
-    request.action === "approve" &&
-    ["queued", "waiting_for_lock"].includes(response.lifecycleState)
-  ) {
-    await enqueueBackendSubmission(opts.backend, response.submissionId, response.submittedAt);
+  try {
+    const response = await submitDeploymentControlPlaneRunAction({
+      workspaceRoot: opts.workspaceRoot,
+      recordsRoot: opts.backend.recordsRoot,
+      backendDatabaseUrl: opts.backend.databaseUrl,
+      submissionPath: materialized.submissionPath,
+      action: request.action,
+      idempotencyKey: request.idempotencyKey || request.actionId,
+      ...(request.requestedBy || request.authorization?.requestedBy
+        ? { requestedBy: request.requestedBy || request.authorization?.requestedBy }
+        : {}),
+      ...(request.approval ? { approval: request.approval } : {}),
+    });
+    await persistMaterializedSubmission({
+      backend: opts.backend,
+      submissionPath: materialized.submissionPath,
+      submissionRef: materialized.submissionRef,
+      executionSnapshotRef: materialized.executionSnapshotRef,
+    });
+    if (
+      request.action === "approve" &&
+      ["queued", "waiting_for_lock"].includes(response.lifecycleState)
+    ) {
+      await enqueueBackendSubmission(opts.backend, response.submissionId, response.submittedAt);
+    }
+    await syncBackendRunAction(
+      opts.backend,
+      runActionRequestPathFor(opts.backend.recordsRoot, response.actionId),
+    );
+    return {
+      ...response,
+      ...(authorization ? { authorization } : {}),
+    };
+  } finally {
+    await materialized.cleanup();
   }
-  await syncBackendRunAction(
-    opts.backend,
-    runActionRequestPathFor(opts.backend.recordsRoot, response.actionId),
-  );
-  return {
-    ...response,
-    ...(authorization ? { authorization } : {}),
-  };
 }
 
 export async function readControlPlaneStatus(
@@ -191,4 +230,18 @@ export async function readControlPlaneStatus(
       ? await readBackendSubmissionByDeployRunId(backend, opts.deployRunId)
       : null;
   return submission ? statusFromSubmission(submission as any) : null;
+}
+
+export async function readControlPlaneRecord(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  opts: {
+    submissionId?: string;
+    deployRunId?: string;
+  },
+) {
+  return opts.submissionId
+    ? await readBackendDeployRecordBySubmissionId(backend, opts.submissionId)
+    : opts.deployRunId
+      ? await readBackendDeployRecordByDeployRunId(backend, opts.deployRunId)
+      : null;
 }

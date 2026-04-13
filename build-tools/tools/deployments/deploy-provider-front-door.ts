@@ -12,8 +12,10 @@ import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-c
 import { maybeHandleNixosSharedHostBootstrapCli } from "./nixos-shared-host-bootstrap-cli.ts";
 import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door.ts";
 import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
-import { submitNixosSharedHostPublishOnlyRun } from "./nixos-shared-host-publish-only.ts";
-import { submitNixosSharedHostProvisionOnlyRun } from "./nixos-shared-host-provision-only.ts";
+import {
+  runNixosSharedHostProvisionOnlyFrontDoor,
+  runNixosSharedHostPublishOnlyFrontDoor,
+} from "./nixos-shared-host-direct-source-front-door.ts";
 
 export async function runNixosSharedHostDeployFrontDoor(opts: {
   workspaceRoot: string;
@@ -63,6 +65,10 @@ export async function runNixosSharedHostDeployFrontDoor(opts: {
   const controlPlaneToken =
     getFlagStr("control-plane-token", "").trim() ||
     String(process.env.BNX_DEPLOY_CONTROL_PLANE_TOKEN || "").trim() ||
+    undefined;
+  const controlPlaneDatabaseUrl =
+    getFlagStr("control-plane-database-url", "").trim() ||
+    String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim() ||
     undefined;
   const paths = {
     statePath: path.resolve(getFlagStr("state", path.join(hostRoot, "platform-state.json"))),
@@ -127,71 +133,34 @@ export async function runNixosSharedHostDeployFrontDoor(opts: {
         ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
       })
     : opts.provisionOnly
-      ? await runProvisionOnly(opts, paths)
+      ? await runNixosSharedHostProvisionOnlyFrontDoor({
+          workspaceRoot: opts.workspaceRoot,
+          deployment: opts.deployment,
+          paths,
+          sourceRunId: opts.sourceRunId,
+          artifactDirFlag: opts.artifactDirFlag,
+          ...(controlPlaneDatabaseUrl ? { backendDatabaseUrl: controlPlaneDatabaseUrl } : {}),
+          ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
+          ...(opts.smokeConnectOverride
+            ? { smokeConnectOverride: opts.smokeConnectOverride as any }
+            : {}),
+        })
       : opts.publishOnly
-        ? await runPublishOnly(opts, paths)
+        ? await runNixosSharedHostPublishOnlyFrontDoor({
+            workspaceRoot: opts.workspaceRoot,
+            deployment: opts.deployment,
+            paths,
+            sourceRunId: opts.sourceRunId,
+            artifactDirFlag: opts.artifactDirFlag,
+            rollback: opts.rollback,
+            ...(controlPlaneDatabaseUrl ? { backendDatabaseUrl: controlPlaneDatabaseUrl } : {}),
+            ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
+            ...(opts.smokeConnectOverride
+              ? { smokeConnectOverride: opts.smokeConnectOverride as any }
+              : {}),
+          })
         : await runDeploy(opts, paths);
   printDeployJson(summarizeDeploymentResult(result));
-}
-
-async function runProvisionOnly(
-  opts: Parameters<typeof runNixosSharedHostDeployFrontDoor>[0],
-  paths: {
-    statePath: string;
-    hostRoot: string;
-    recordsRoot: string;
-    hostConfigPath?: string;
-  },
-) {
-  if (opts.artifactDirFlag) {
-    throw new Error(
-      "nixos-shared-host --provision-only must not use --artifact-dir; default metadata-only runs do not load artifacts, and immutable reuse must be selected with --source-run-id",
-    );
-  }
-  return await submitNixosSharedHostProvisionOnlyRun({
-    workspaceRoot: opts.workspaceRoot,
-    deployment: opts.deployment,
-    paths,
-    sourceRunId: opts.sourceRunId,
-    ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
-    ...(opts.smokeConnectOverride
-      ? { smokeConnectOverride: opts.smokeConnectOverride as any }
-      : {}),
-  });
-}
-
-async function runPublishOnly(
-  opts: Parameters<typeof runNixosSharedHostDeployFrontDoor>[0],
-  paths: {
-    statePath: string;
-    hostRoot: string;
-    recordsRoot: string;
-    hostConfigPath?: string;
-  },
-) {
-  if (!opts.sourceRunId) {
-    throw new Error(
-      opts.rollback
-        ? "shared rollback requires --source-run-id"
-        : "shared --publish-only requires --source-run-id to select an admitted run",
-    );
-  }
-  if (opts.artifactDirFlag) {
-    throw new Error(
-      "shared --publish-only must not use --artifact-dir; replay the admitted exact artifact with --source-run-id",
-    );
-  }
-  return await submitNixosSharedHostPublishOnlyRun({
-    workspaceRoot: opts.workspaceRoot,
-    deployment: opts.deployment,
-    paths,
-    sourceRunId: opts.sourceRunId,
-    rollback: opts.rollback,
-    ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
-    ...(opts.smokeConnectOverride
-      ? { smokeConnectOverride: opts.smokeConnectOverride as any }
-      : {}),
-  });
 }
 
 async function runDeploy(

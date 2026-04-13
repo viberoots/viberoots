@@ -1,6 +1,4 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
-import path from "node:path";
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 import { readBackendDeployRecordEnvelopeBySubmissionId } from "./nixos-shared-host-control-plane-backend.ts";
 import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-contract.ts";
@@ -10,10 +8,6 @@ import {
   writeControlPlaneJson,
 } from "./nixos-shared-host-control-plane-store.ts";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
-
-function runsDir(recordsRoot: string): string {
-  return path.join(path.resolve(recordsRoot), "runs");
-}
 
 function currentStepFor(
   submission: Pick<NixosSharedHostControlPlaneSubmission, "execution">,
@@ -30,7 +24,7 @@ function terminalizationPathFor(
 }
 
 async function maybeFindRecordForSubmission(
-  recordsRoot: string,
+  _recordsRoot: string,
   submissionId: string,
   backend?: NixosSharedHostControlPlaneBackendTarget,
 ): Promise<{ record: NixosSharedHostDeployRecord; recordPath: string } | undefined> {
@@ -46,17 +40,6 @@ async function maybeFindRecordForSubmission(
       };
     }
   }
-  try {
-    const entries = await fsp.readdir(runsDir(recordsRoot));
-    for (const entry of entries) {
-      if (!entry.endsWith(".json")) continue;
-      const recordPath = path.join(runsDir(recordsRoot), entry);
-      const record = JSON.parse(
-        await fsp.readFile(recordPath, "utf8"),
-      ) as NixosSharedHostDeployRecord;
-      if (record.controlPlane?.submissionId === submissionId) return { record, recordPath };
-    }
-  } catch {}
   return undefined;
 }
 

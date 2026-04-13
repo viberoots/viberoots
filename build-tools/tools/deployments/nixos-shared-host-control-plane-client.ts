@@ -35,6 +35,18 @@ export async function readNixosSharedHostControlPlaneStatusViaService(opts: {
   );
 }
 
+export async function readNixosSharedHostControlPlaneRecordViaService(opts: {
+  controlPlaneUrl: string;
+  token?: string;
+  submissionId?: string;
+  deployRunId?: string;
+}) {
+  const url = new URL("/api/v1/records", opts.controlPlaneUrl);
+  if (opts.submissionId) url.searchParams.set("submissionId", opts.submissionId);
+  if (opts.deployRunId) url.searchParams.set("deployRunId", opts.deployRunId);
+  return await readJson<any>(await fetch(url, { headers: { ...authHeaders(opts.token) } }));
+}
+
 export async function submitNixosSharedHostControlPlaneViaService(opts: {
   controlPlaneUrl: string;
   token?: string;

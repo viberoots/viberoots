@@ -37,11 +37,14 @@ async function markQueueDone(
   );
 }
 
-export async function syncBackendSubmission(
+export async function writeBackendSubmissionDoc(
   backend: NixosSharedHostControlPlaneBackendTarget,
-  submissionPath: string,
+  doc: SubmissionDoc,
+  refs: {
+    submissionPath: string;
+    executionSnapshotPath: string;
+  },
 ) {
-  const doc = await readJson<SubmissionDoc>(submissionPath);
   const now = new Date().toISOString();
   await queryBackend(
     backend,
@@ -60,8 +63,8 @@ export async function syncBackendSubmission(
       updated_at = EXCLUDED.updated_at`,
     [
       doc.submissionId,
-      submissionPath,
-      doc.executionSnapshotPath,
+      refs.submissionPath,
+      refs.executionSnapshotPath,
       doc.lockScope,
       doc.lifecycleState,
       doc.deployRunId || null,
@@ -76,11 +79,22 @@ export async function syncBackendSubmission(
   return doc;
 }
 
-export async function syncBackendSnapshot(
+export async function syncBackendSubmission(
   backend: NixosSharedHostControlPlaneBackendTarget,
+  submissionPath: string,
+) {
+  const doc = await readJson<SubmissionDoc>(submissionPath);
+  return await writeBackendSubmissionDoc(backend, doc, {
+    submissionPath,
+    executionSnapshotPath: doc.executionSnapshotPath,
+  });
+}
+
+export async function writeBackendSnapshotDoc(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  doc: SnapshotDoc,
   executionSnapshotPath: string,
 ) {
-  const doc = await readJson<SnapshotDoc>(executionSnapshotPath);
   const now = new Date().toISOString();
   await queryBackend(
     backend,
@@ -94,6 +108,14 @@ export async function syncBackendSnapshot(
     [doc.submissionId, executionSnapshotPath, JSON.stringify(doc), now],
   );
   return doc;
+}
+
+export async function syncBackendSnapshot(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  executionSnapshotPath: string,
+) {
+  const doc = await readJson<SnapshotDoc>(executionSnapshotPath);
+  return await writeBackendSnapshotDoc(backend, doc, executionSnapshotPath);
 }
 
 export async function enqueueBackendSubmission(
@@ -142,6 +164,25 @@ export async function readBackendSubmissionByDeployRunId(
     )
   ).rows[0];
   return row?.document_json ? decodeBackendJson(row.document_json) : null;
+}
+
+export async function readBackendSnapshotBySubmissionId(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  submissionId: string,
+) {
+  const row = (
+    await queryBackend<{ execution_snapshot_path?: string; document_json?: unknown }>(
+      backend,
+      "SELECT execution_snapshot_path, document_json FROM snapshots WHERE submission_id = $1",
+      [submissionId],
+    )
+  ).rows[0];
+  return row?.execution_snapshot_path && row.document_json
+    ? {
+        executionSnapshotPath: row.execution_snapshot_path,
+        snapshot: decodeBackendJson(row.document_json),
+      }
+    : null;
 }
 
 export async function readBackendSubmissionEnvelopeBySubmissionId(

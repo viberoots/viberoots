@@ -2,19 +2,20 @@
 import {
   claimBackendQueuedSubmission,
   acquireBackendControlPlaneLock,
+  writeBackendDeployRecordDoc,
+  writeBackendSubmissionDoc,
   startBackendSubmissionClaimLease,
-  syncBackendDeployRecord,
-  syncBackendSnapshot,
-  syncBackendSubmission,
 } from "./nixos-shared-host-control-plane-backend.ts";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
+import {
+  materializeBackendControlPlaneFiles,
+  persistMaterializedSubmission,
+  removeMirrorFile,
+} from "./nixos-shared-host-control-plane-backend-materialize.ts";
 import { executeSubmittedNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-submit-helpers.ts";
-import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
 import { reconcileNixosSharedHostRecoveredSubmission } from "./nixos-shared-host-recovery.ts";
-import type {
-  NixosSharedHostControlPlaneSnapshot,
-  NixosSharedHostControlPlaneSubmission,
-} from "./nixos-shared-host-control-plane-contract.ts";
+import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
+import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-contract.ts";
 import { nixosSharedHostLockScopes } from "./nixos-shared-host-components.ts";
 
 function sleep(ms: number) {
@@ -66,36 +67,53 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
     workerId: opts.workerId,
     claimToken: claimed.claimToken,
   });
-  await syncBackendSnapshot(backend, claimed.executionSnapshotPath);
+  const materialized = await materializeBackendControlPlaneFiles(backend, claimed.submissionId);
   const submission = await readControlPlaneJson<NixosSharedHostControlPlaneSubmission>(
-    claimed.submissionPath,
+    materialized.submissionPath,
   );
-  const snapshot = await readControlPlaneJson<NixosSharedHostControlPlaneSnapshot>(
-    claimed.executionSnapshotPath,
-  );
+  const snapshot = await readControlPlaneJson<any>(materialized.executionSnapshotPath);
   try {
     if (["running", "cancelling"].includes(claimed.lifecycleState)) {
       await reconcileNixosSharedHostRecoveredSubmission({
-        submissionPath: claimed.submissionPath,
+        submissionPath: materialized.submissionPath,
         recordsRoot: opts.recordsRoot,
         backend,
       });
-      await syncBackendSubmission(backend, claimed.submissionPath);
+      await persistMaterializedSubmission({
+        backend,
+        submissionPath: materialized.submissionPath,
+        submissionRef: materialized.submissionRef,
+        executionSnapshotRef: materialized.executionSnapshotRef,
+      });
       return true;
     }
     await executeSubmittedNixosSharedHostControlPlaneRun({
       submission,
-      submissionPath: claimed.submissionPath,
-      executionSnapshotPath: claimed.executionSnapshotPath,
+      submissionPath: materialized.submissionPath,
+      executionSnapshotPath: materialized.executionSnapshotPath,
       snapshot,
       workspaceRoot: opts.workspaceRoot,
       deployRunId: submission.deployRunId || `deploy-${claimed.submissionId}`,
       recordsRoot: opts.recordsRoot,
+      backendDatabaseUrl: opts.backendDatabaseUrl,
       operationKind: snapshot.operationKind,
       deployment: snapshot.deployment,
-      persistSubmission: async (submissionPath) =>
-        await syncBackendSubmission(backend, submissionPath),
-      persistRecord: async (recordPath) => await syncBackendDeployRecord(backend, recordPath),
+      persistSubmission: async (updatedSubmission) =>
+        await writeBackendSubmissionDoc(
+          backend,
+          {
+            ...updatedSubmission,
+            executionSnapshotPath: materialized.executionSnapshotRef,
+          },
+          {
+            submissionPath: materialized.submissionRef,
+            executionSnapshotPath: materialized.executionSnapshotRef,
+          },
+        ),
+      persistRecord: async (record, recordPath) => {
+        await writeBackendDeployRecordDoc(backend, record, recordPath);
+        await removeMirrorFile(recordPath);
+      },
       assertCurrentAuthority: async () => await claimLease.assertCurrentAuthority(),
       recoverSubmission: async (args) =>
         await reconcileNixosSharedHostRecoveredSubmission({
@@ -111,7 +129,13 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
     });
   } finally {
     await claimLease.stop();
-    await syncBackendSubmission(backend, claimed.submissionPath);
+    await persistMaterializedSubmission({
+      backend,
+      submissionPath: materialized.submissionPath,
+      submissionRef: materialized.submissionRef,
+      executionSnapshotRef: materialized.executionSnapshotRef,
+    });
+    await materialized.cleanup();
   }
   return true;
 }

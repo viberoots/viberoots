@@ -13,7 +13,9 @@ design has been explicitly updated first.
 Current reviewed shared-host implementation note:
 
 - For the current `nixos-shared-host` shared-control-plane path, `build-tools/tools/bin/deploy --control-plane-url <url>` acts as the thin repo-level client, `build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts` is the reviewed submit/status API process, `build-tools/tools/deployments/nixos-shared-host-control-plane-worker.ts` is the reviewed worker-loop process, and Postgres configured via `--control-plane-database-url <postgres-url>` or `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL` is the authoritative queue/lock/idempotency/worker-ownership/deploy-record backend.
-- JSON submissions and snapshots under `<records-root>/control-plane/` and deploy-record mirrors under `<records-root>/runs/` remain the compatibility and operator-readable mirror; explicit `pgmem://...` backend URLs are reserved for isolated fixture tests and local harnesses, not the reviewed operator path.
+- Normal reviewed `nixos-shared-host` control-plane writes and reads are backend-only: submissions, snapshots, queue state, worker ownership, status/result state, recovery state, and canonical protected/shared deploy records live in Postgres rather than in routine `<records-root>/control-plane/*.json` or `<records-root>/runs/*.json` mirrors.
+- Reviewed operator inspection/export flows must resolve protected/shared control-plane state by backend-native identifiers (`submission_id`, `deploy_run_id`) through the service surfaces such as `GET /api/v1/status` and `GET /api/v1/records`, not by reading filesystem mirror paths.
+- Explicit `pgmem://...` backend URLs remain valid for isolated fixture tests and local harnesses; those harnesses should exercise the same backend-native contracts rather than rely on durable submission or deploy-record mirror files.
 
 - `TARGETS` is the authoritative source of deployment metadata.
 - Every concrete deployment lives at `projects/deployments/<deployment-id>/` and exposes a canonical `:deploy` target.
@@ -99,6 +101,7 @@ Current reviewed shared-host implementation note:
 - Protected/shared mutating submit requests must be idempotent at the control-plane request layer through one explicit stable submission id or idempotency key that survives client retries.
 - Reusing the same protected/shared submission id with the same normalized request payload must resolve to the same accepted run or same rejection result; reusing it with different payload contents must fail closed with an explicit idempotency-conflict result.
 - The shared control-plane submit API must return one stable reviewed submit-response contract that includes `deploy_run_id` when a run exists, dedupe outcome, initial lifecycle state, and one machine-readable closed rejection code when the request is not accepted.
+- Reviewed protected/shared submit, status, and run-action responses must carry backend-native identifiers and lifecycle state, not routine `submissionPath`, `resultRecordPath`, `recordPath`, `executionSnapshotPath`, or similar filesystem-mirror fields.
 - First-class protected/shared run actions on existing runs, such as progressive-rollout `resume`, must use their own reviewed versioned request/response contract rather than an ad hoc side channel.
 - Protected/shared run-action requests must be idempotent at the control-plane request layer through one explicit stable submission id or idempotency key that survives client retries.
 - Reusing the same protected/shared run-action submission id with the same normalized action payload must resolve to the same accepted continuation result or same rejection result; reusing it with different payload contents must fail closed with an explicit idempotency-conflict result.

@@ -5,7 +5,7 @@ import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-
 export async function recoverControlPlaneSubmission(opts: {
   submissionPath: string;
   recordsRoot: string;
-  persistSubmission?: (submissionPath: string) => Promise<void>;
+  persistSubmission?: (submission: NixosSharedHostControlPlaneSubmission) => Promise<void>;
   recoverSubmission?: (args: {
     submissionPath: string;
     recordsRoot: string;
@@ -20,7 +20,7 @@ export async function recoverControlPlaneSubmission(opts: {
         submissionPath: opts.submissionPath,
         recordsRoot: opts.recordsRoot,
       });
-  await opts.persistSubmission?.(opts.submissionPath);
+  await opts.persistSubmission?.(recovered);
   return recovered;
 }
 

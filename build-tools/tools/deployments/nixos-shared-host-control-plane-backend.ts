@@ -5,21 +5,29 @@ export {
 } from "./nixos-shared-host-control-plane-backend-db.ts";
 export {
   enqueueBackendSubmission,
+  readBackendSnapshotBySubmissionId,
   readBackendSubmissionByDeployRunId,
   readBackendSubmissionBySubmissionId,
   readBackendSubmissionEnvelopeByDeployRunId,
   readBackendSubmissionEnvelopeBySubmissionId,
   syncBackendSnapshot,
   syncBackendSubmission,
+  writeBackendSnapshotDoc,
+  writeBackendSubmissionDoc,
 } from "./nixos-shared-host-control-plane-backend-state.ts";
 export {
   claimBackendQueuedSubmission,
   startBackendSubmissionClaimLease,
 } from "./nixos-shared-host-control-plane-backend-queue.ts";
 export {
+  readBackendDeployRecordByDeployRunId,
+  readBackendDeployRecordBySubmissionId,
   readBackendDeployRecordEnvelopeByDeployRunId,
+  readBackendLatestDeployRecordEnvelopeByDeploymentId,
   readBackendDeployRecordEnvelopeBySubmissionId,
+  syncBackendDeployRecordsFromRunMirrors,
   syncBackendDeployRecord,
+  writeBackendDeployRecordDoc,
 } from "./nixos-shared-host-control-plane-backend-records.ts";
 export {
   acquireBackendControlPlaneLock,

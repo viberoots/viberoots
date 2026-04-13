@@ -3,85 +3,22 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  localHarnessControlPlaneDatabaseUrl,
+  syncBackendDeployRecord,
+} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
 import { submitNixosSharedHostPublishOnlyRun } from "../../deployments/nixos-shared-host-publish-only.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
-import { deploymentReleaseActionFixture } from "./deployment-metadata.fixture.ts";
-import {
-  ensureNixosSharedHostStageBranch,
-  nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
-async function writeArtifact(root: string, marker = "demoapp"): Promise<void> {
-  await fsp.mkdir(root, { recursive: true });
-  await fsp.writeFile(path.join(root, "index.html"), `<html>${marker}</html>\n`, "utf8");
-  await fsp.writeFile(path.join(root, "healthz"), "ok\n", "utf8");
-}
-async function releaseActionMarkers(recordsRoot: string, deployRunId: string): Promise<string[]> {
-  return (await fsp.readdir(path.join(recordsRoot, "release-actions", deployRunId))).sort();
-}
-async function readLatestRunRecord(recordsRoot: string) {
-  const [recordName] = (await fsp.readdir(path.join(recordsRoot, "runs"))).sort().slice(-1);
-  return JSON.parse(await fsp.readFile(path.join(recordsRoot, "runs", recordName), "utf8"));
-}
-
-function releaseActionDeployment() {
-  return nixosSharedHostDeploymentFixture({
-    releaseActions: [
-      deploymentReleaseActionFixture({
-        ref: "//projects/deployments/demoapp-shared:success_marker",
-        type: "post_publish_verification",
-        phase: "post_smoke",
-        runCondition: "success_only",
-        requiredSecretRequirementNames: [],
-        requiredRuntimeConfigRequirementNames: [],
-        duplicateSafety: {},
-        operationKeys: {},
-      }),
-      deploymentReleaseActionFixture({
-        ref: "//projects/deployments/demoapp-shared:failure_marker",
-        type: "post_publish_verification",
-        phase: "post_smoke",
-        runCondition: "failure_only",
-        requiredSecretRequirementNames: [],
-        requiredRuntimeConfigRequirementNames: [],
-        duplicateSafety: {},
-        operationKeys: {},
-      }),
-      deploymentReleaseActionFixture({
-        ref: "//projects/deployments/demoapp-shared:always_marker",
-        type: "post_publish_verification",
-        phase: "post_smoke",
-        runCondition: "always",
-        requiredSecretRequirementNames: [],
-        requiredRuntimeConfigRequirementNames: [],
-        duplicateSafety: {},
-        operationKeys: {},
-      }),
-      deploymentReleaseActionFixture({
-        ref: "//projects/deployments/demoapp-shared:publish_failure_cleanup",
-        type: "post_publish_verification",
-        phase: "post_publish_pre_smoke",
-        runCondition: "failure_only",
-        requiredSecretRequirementNames: [],
-        requiredRuntimeConfigRequirementNames: [],
-        duplicateSafety: {},
-        operationKeys: {},
-      }),
-      deploymentReleaseActionFixture({
-        ref: "//projects/deployments/demoapp-shared:publish_always_marker",
-        type: "post_publish_verification",
-        phase: "post_publish_pre_smoke",
-        runCondition: "always",
-        requiredSecretRequirementNames: [],
-        requiredRuntimeConfigRequirementNames: [],
-        duplicateSafety: {},
-        operationKeys: {},
-      }),
-    ],
-  });
-}
+import {
+  readLatestRunRecord,
+  releaseActionDeployment,
+  releaseActionMarkers,
+} from "./nixos-shared-host.release-actions.helpers.ts";
 
 test("nixos-shared-host success path skips failure_only release actions", async () => {
   await runInTemp("nixos-shared-host-release-actions-success-path", async (tmp, $) => {
@@ -89,7 +26,7 @@ test("nixos-shared-host success path skips failure_only release actions", async 
     const artifactDir = path.join(tmp, "artifact");
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
-    await writeArtifact(artifactDir);
+    await writeDemoArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
@@ -135,7 +72,8 @@ test("nixos-shared-host publish failure runs failure_only release actions and ke
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const recordsRoot = path.join(tmp, "records");
-    await writeArtifact(artifactDir);
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
+    await writeDemoArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const sourceServer = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
@@ -159,6 +97,10 @@ test("nixos-shared-host publish failure runs failure_only release actions and ke
           rejectUnauthorized: false,
         },
       });
+      await syncBackendDeployRecord(
+        { recordsRoot, databaseUrl: backendDatabaseUrl },
+        source.recordPath,
+      );
       await fsp.rm(hostRoot, { recursive: true, force: true });
       await assert.rejects(
         submitNixosSharedHostPublishOnlyRun({
@@ -166,6 +108,7 @@ test("nixos-shared-host publish failure runs failure_only release actions and ke
           deployment,
           sourceRunId: source.record.deployRunId,
           rollback: false,
+          backendDatabaseUrl,
           paths: { statePath, hostRoot, recordsRoot },
           admissionEvidence: deploymentAdmissionEvidenceFixture({
             deployment,
@@ -201,8 +144,8 @@ test("nixos-shared-host smoke failure runs failure_only post_smoke actions and p
     const wrongRoot = path.join(tmp, "wrong-root");
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
-    await writeArtifact(artifactDir, "expected");
-    await writeArtifact(wrongRoot, "wrong");
+    await writeDemoArtifact(artifactDir, "expected");
+    await writeDemoArtifact(wrongRoot, "wrong");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, fixedRoot: wrongRoot });
     try {

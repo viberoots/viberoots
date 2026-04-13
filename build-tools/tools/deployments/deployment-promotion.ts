@@ -1,25 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
-import path from "node:path";
 import type { DeploymentTarget } from "./contract.ts";
 import { requiredDeploymentStageBranch } from "./contract.ts";
 import {
-  resolveAppStoreConnectReplaySource,
-  type AppStoreConnectReplaySnapshot,
-} from "./app-store-connect-replay.ts";
-import {
-  resolveGooglePlayReplaySource,
-  type GooglePlayReplaySnapshot,
-} from "./google-play-replay.ts";
-import {
-  resolveCloudflarePagesReplaySource,
-  type CloudflarePagesReplaySnapshot,
-} from "./cloudflare-pages-replay.ts";
-import {
-  nixosSharedHostReplayArtifactIdentity,
-  resolveNixosSharedHostReplaySource,
+  resolveDeploymentPromotionSource,
+  resolveDeploymentPromotionSourceRecordPath,
   type NixosSharedHostReplaySnapshot,
-} from "./nixos-shared-host-replay.ts";
+} from "./deployment-promotion-source.ts";
 import { normalizeSingleComponentArtifactInput } from "./nixos-shared-host-single-component-artifact-input.ts";
 import {
   exactArtifactPromotionErrors,
@@ -36,15 +22,8 @@ export type {
   CrossDeploymentPromotionSourceSelection,
   DeploymentPromotionSource,
 } from "./deployment-promotion-types.ts";
-
-async function pathExists(filePath: string): Promise<boolean> {
-  try {
-    await fsp.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
+export { resolveDeploymentPromotionSource } from "./deployment-promotion-source.ts";
+export { resolveDeploymentPromotionSourceRecordPath } from "./deployment-promotion-source.ts";
 
 async function gitStdout(workspaceRoot: string, args: string[]): Promise<string> {
   const out = await $({ cwd: workspaceRoot, stdio: "pipe" })`git ${args}`.nothrow();
@@ -52,83 +31,6 @@ async function gitStdout(workspaceRoot: string, args: string[]): Promise<string>
     throw new Error(`git ${args.join(" ")} failed in ${workspaceRoot}`);
   }
   return String((out as any).stdout || "").trim();
-}
-
-function defaultRecordsRoots(workspaceRoot: string, recordsRoot: string): string[] {
-  return Array.from(
-    new Set([
-      path.resolve(recordsRoot),
-      path.join(workspaceRoot, ".local", "deployments", "nixos-shared-host", "records"),
-      path.join(workspaceRoot, ".local", "deployments", "cloudflare-pages", "records"),
-      path.join(workspaceRoot, ".local", "deployments", "app-store-connect", "records"),
-      path.join(workspaceRoot, ".local", "deployments", "google-play", "records"),
-    ]),
-  );
-}
-
-async function resolvePromotionSourceByPath(
-  recordPath: string,
-): Promise<DeploymentPromotionSource> {
-  const raw = JSON.parse(await fsp.readFile(recordPath, "utf8")) as { provider?: string };
-  if (raw.provider === "nixos-shared-host") {
-    const source = await resolveNixosSharedHostReplaySource({ recordPath });
-    return {
-      record: source.record,
-      recordPath: source.recordPath,
-      replaySnapshot: source.replaySnapshot,
-      replaySnapshotPath: source.record.replaySnapshotPath || "",
-      ...(source.replaySnapshot.publishInput.kind === "exact-artifact"
-        ? { artifact: source.replaySnapshot.publishInput.artifact }
-        : {}),
-      artifactIdentity: nixosSharedHostReplayArtifactIdentity(source.replaySnapshot),
-    };
-  }
-  if (raw.provider === "app-store-connect") {
-    const source = await resolveAppStoreConnectReplaySource({ recordPath });
-    return {
-      record: source.record,
-      recordPath: source.recordPath,
-      replaySnapshot: source.replaySnapshot,
-      replaySnapshotPath: source.record.replaySnapshotPath || "",
-      artifactIdentity: source.replaySnapshot.artifact.identity,
-      artifact: source.replaySnapshot.artifact,
-    };
-  }
-  if (raw.provider === "google-play") {
-    const source = await resolveGooglePlayReplaySource({ recordPath });
-    return {
-      record: source.record,
-      recordPath: source.recordPath,
-      replaySnapshot: source.replaySnapshot,
-      replaySnapshotPath: source.record.replaySnapshotPath || "",
-      artifactIdentity: source.replaySnapshot.artifact.identity,
-      artifact: source.replaySnapshot.artifact,
-    };
-  }
-  if (raw.provider === "cloudflare-pages") {
-    const source = await resolveCloudflarePagesReplaySource({ recordPath });
-    return {
-      record: source.record,
-      recordPath: source.recordPath,
-      replaySnapshot: source.replaySnapshot,
-      replaySnapshotPath: source.record.replaySnapshotPath || "",
-      artifactIdentity: source.replaySnapshot.artifact.identity,
-      artifact: source.replaySnapshot.artifact,
-    };
-  }
-  throw new Error(`unsupported promotion source record: ${recordPath}`);
-}
-
-export async function resolveDeploymentPromotionSource(opts: {
-  workspaceRoot: string;
-  recordsRoot: string;
-  sourceRunId: string;
-}): Promise<DeploymentPromotionSource> {
-  for (const root of defaultRecordsRoots(opts.workspaceRoot, opts.recordsRoot)) {
-    const recordPath = path.join(root, "runs", `${opts.sourceRunId}.json`);
-    if (await pathExists(recordPath)) return await resolvePromotionSourceByPath(recordPath);
-  }
-  throw new Error(`promotion source run not found: ${opts.sourceRunId}`);
 }
 
 async function eligibilityErrors(
@@ -159,6 +61,7 @@ export async function resolveCrossDeploymentPromotionSourceSelection<
   deployment: TDeployment;
   recordsRoot: string;
   sourceRunId: string;
+  backendDatabaseUrl?: string;
 }): Promise<CrossDeploymentPromotionSourceSelection<TDeployment>> {
   const source = await resolveDeploymentPromotionSource(opts);
   const errors = [
@@ -174,7 +77,6 @@ ${errors.join("\n")}`);
     deployment: opts.deployment,
     parentRunId: source.record.deployRunId,
     releaseLineageId: source.record.releaseLineageId || source.record.deployRunId,
-    sourceRecordPath: source.recordPath,
     sourceReplaySnapshotPath: source.replaySnapshotPath,
     sourceRecord: source.record,
     sourceReplaySnapshot: source.replaySnapshot,
@@ -188,6 +90,7 @@ export async function resolveCrossDeploymentPromotionSelection<
   deployment: TDeployment;
   recordsRoot: string;
   sourceRunId: string;
+  backendDatabaseUrl?: string;
 }): Promise<CrossDeploymentPromotionSelection<TDeployment>> {
   const selection = await resolveCrossDeploymentPromotionSourceSelection(opts);
   const errors = exactArtifactPromotionErrors(selection.deployment);

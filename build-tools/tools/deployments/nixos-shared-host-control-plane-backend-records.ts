@@ -1,4 +1,6 @@
 #!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 import {
   decodeBackendJson,
   queryBackend,
@@ -11,11 +13,11 @@ type DeployRecordDoc = {
   controlPlane?: { submissionId?: string };
 };
 
-export async function syncBackendDeployRecord(
+export async function writeBackendDeployRecordDoc(
   backend: NixosSharedHostControlPlaneBackendTarget,
+  doc: DeployRecordDoc,
   recordPath: string,
 ) {
-  const doc = await readJson<DeployRecordDoc>(recordPath);
   const submissionId = doc.controlPlane?.submissionId;
   if (!doc.deployRunId || !submissionId) {
     throw new Error(
@@ -37,16 +39,81 @@ export async function syncBackendDeployRecord(
   return doc;
 }
 
+export async function syncBackendDeployRecord(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  recordPath: string,
+) {
+  const doc = await readJson<DeployRecordDoc>(recordPath);
+  return await writeBackendDeployRecordDoc(backend, doc, recordPath);
+}
+
+export async function syncBackendDeployRecordsFromRunMirrors(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+) {
+  const runsDir = path.join(path.resolve(backend.recordsRoot), "runs");
+  let names: string[] = [];
+  try {
+    names = (await fsp.readdir(runsDir)).filter((name) => name.endsWith(".json")).sort();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw error;
+  }
+  for (const name of names) {
+    await syncBackendDeployRecord(backend, path.join(runsDir, name));
+  }
+}
+
 async function readRecordRow(
   backend: NixosSharedHostControlPlaneBackendTarget,
   whereSql: string,
   param: string,
 ) {
   return (
-    await queryBackend<{ record_path?: string; document_json?: unknown }>(
+    await queryBackend<{ record_path?: string; document_json?: unknown; updated_at?: string }>(
       backend,
-      `SELECT record_path, document_json FROM deploy_records WHERE ${whereSql}`,
+      `SELECT record_path, document_json, updated_at FROM deploy_records WHERE ${whereSql}`,
       [param],
+    )
+  ).rows[0];
+}
+
+async function readLatestRecordRowByDeploymentId(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  opts: {
+    deploymentId: string;
+    finalOutcome?: string;
+    runClassification?: string;
+    excludeDeployRunId?: string;
+    requireReplaySnapshotPath?: boolean;
+  },
+) {
+  const conditions = [`document_json->>'deploymentId' = $1`];
+  const params: string[] = [opts.deploymentId];
+  if (opts.finalOutcome) {
+    params.push(opts.finalOutcome);
+    conditions.push(`document_json->>'finalOutcome' = $${params.length}`);
+  }
+  if (opts.runClassification) {
+    params.push(opts.runClassification);
+    conditions.push(`document_json->>'runClassification' = $${params.length}`);
+  }
+  if (opts.excludeDeployRunId) {
+    params.push(opts.excludeDeployRunId);
+    conditions.push(`deploy_run_id <> $${params.length}`);
+  }
+  if (opts.requireReplaySnapshotPath) {
+    conditions.push(`COALESCE(document_json->>'replaySnapshotPath', '') <> ''`);
+  }
+  return (
+    await queryBackend<{ record_path?: string; document_json?: unknown; updated_at?: string }>(
+      backend,
+      `SELECT record_path, document_json
+            , updated_at
+       FROM deploy_records
+       WHERE ${conditions.join(" AND ")}
+       ORDER BY updated_at DESC
+       LIMIT 1`,
+      params,
     )
   ).rows[0];
 }
@@ -59,6 +126,7 @@ export async function readBackendDeployRecordEnvelopeByDeployRunId(
   return row?.record_path && row.document_json
     ? {
         recordPath: row.record_path,
+        updatedAt: row.updated_at || "",
         record: decodeBackendJson(row.document_json),
       }
     : null;
@@ -72,6 +140,43 @@ export async function readBackendDeployRecordEnvelopeBySubmissionId(
   return row?.record_path && row.document_json
     ? {
         recordPath: row.record_path,
+        updatedAt: row.updated_at || "",
+        record: decodeBackendJson(row.document_json),
+      }
+    : null;
+}
+
+export async function readBackendDeployRecordByDeployRunId(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  deployRunId: string,
+) {
+  return (await readBackendDeployRecordEnvelopeByDeployRunId(backend, deployRunId))?.record || null;
+}
+
+export async function readBackendDeployRecordBySubmissionId(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  submissionId: string,
+) {
+  return (
+    (await readBackendDeployRecordEnvelopeBySubmissionId(backend, submissionId))?.record || null
+  );
+}
+
+export async function readBackendLatestDeployRecordEnvelopeByDeploymentId(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  opts: {
+    deploymentId: string;
+    finalOutcome?: string;
+    runClassification?: string;
+    excludeDeployRunId?: string;
+    requireReplaySnapshotPath?: boolean;
+  },
+) {
+  const row = await readLatestRecordRowByDeploymentId(backend, opts);
+  return row?.record_path && row.document_json
+    ? {
+        recordPath: row.record_path,
+        updatedAt: row.updated_at || "",
         record: decodeBackendJson(row.document_json),
       }
     : null;

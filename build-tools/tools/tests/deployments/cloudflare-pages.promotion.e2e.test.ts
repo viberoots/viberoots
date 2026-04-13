@@ -3,93 +3,26 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  localHarnessControlPlaneDatabaseUrl,
+  syncBackendDeployRecord,
+} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { resolveCloudflarePagesPromotionSelection } from "../../deployments/cloudflare-pages-promotion.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
+import {
+  fakeCloudflareEnv,
+  pleominoDevDeployment,
+  pleominoProdDeployment,
+  writeDeploymentJson,
+  writeWranglerConfig,
+} from "./cloudflare-pages.promotion.helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
-import {
-  ensureNixosSharedHostStageBranch,
-  nixosSharedHostAdmissionPolicyFixture,
-  nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
-
-async function writeArtifact(root: string, html: string): Promise<void> {
-  await fsp.mkdir(root, { recursive: true });
-  await fsp.writeFile(path.join(root, "index.html"), html, "utf8");
-  await fsp.writeFile(path.join(root, "healthz"), "ok\n", "utf8");
-}
-
-async function writeDeploymentJson(filePath: string, deployment: unknown) {
-  await fsp.writeFile(filePath, JSON.stringify(deployment, null, 2) + "\n", "utf8");
-}
-
-async function writeWranglerConfig(root: string) {
-  await fsp.mkdir(path.dirname(root), { recursive: true });
-  await fsp.writeFile(root, '{\n  "compatibility_date": "2026-03-18"\n}\n', "utf8");
-}
-
-function pleominoDevDeployment() {
-  const lanePolicy = {
-    ...cloudflarePagesDeploymentFixture().lanePolicy,
-    promotionCompatibility: {
-      crossProviderPromotionEdges: ["dev->staging"],
-    },
-  };
-  return nixosSharedHostDeploymentFixture({
-    deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino-dev:deploy",
-    lanePolicy,
-    lanePolicyRef: lanePolicy.ref,
-    component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
-    runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
-  });
-}
-
-function pleominoProdDeployment() {
-  const lanePolicy = {
-    ...cloudflarePagesDeploymentFixture().lanePolicy,
-    promotionCompatibility: {
-      crossProviderPromotionEdges: ["dev->staging"],
-    },
-  };
-  const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
-    ref: "//projects/deployments/pleomino-shared:prod_release",
-    name: "prod_release",
-    allowedRefs: ["env/pleomino/prod"],
-    requiredChecks: [],
-    fingerprint: "sha256:admission-pleomino-prod",
-  });
-  return cloudflarePagesDeploymentFixture({
-    deploymentId: "pleomino-prod",
-    label: "//projects/deployments/pleomino-prod:deploy",
-    lanePolicy,
-    lanePolicyRef: lanePolicy.ref,
-    protectionClass: "production_facing",
-    environmentStage: "prod",
-    admissionPolicyRef: admissionPolicy.ref,
-    admissionPolicy,
-    providerTarget: {
-      account: "web-platform-prod",
-      project: "pleomino-prod-pages",
-      id: "pleomino-prod-pages",
-      canonicalUrl: "https://pleomino-prod-pages.pages.dev/",
-      providerTargetIdentity: "cloudflare-pages:web-platform-prod/pleomino-prod-pages",
-    },
-  });
-}
-
-function fakeCloudflareEnv(fake: Awaited<ReturnType<typeof installFakeCloudflarePagesWrangler>>) {
-  return {
-    ...process.env,
-    PATH: `${fake.binDir}:${process.env.PATH || ""}`,
-    BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT: fake.publishRoot,
-    BNX_CLOUDFLARE_FAKE_WRANGLER_LOG: fake.logPath,
-    BNX_CLOUDFLARE_PAGES_WRANGLER_BIN: path.join(fake.binDir, "wrangler"),
-  };
-}
 
 test("cloudflare-pages allows reviewed cross-provider same-artifact promotion only on declared edges", async () => {
   await runInTemp("cloudflare-pages-promotion-e2e", async (tmp, $) => {
@@ -101,13 +34,14 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
     const prod = pleominoProdDeployment();
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     const devJson = path.join(tmp, "pleomino-dev.json");
     const stagingJson = path.join(tmp, "pleomino-staging.json");
     const prodJson = path.join(tmp, "pleomino-prod.json");
-    await writeArtifact(artifactDir, "<html>pleomino release</html>\n");
+    await writeDemoArtifact(artifactDir, "pleomino release");
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
@@ -142,11 +76,16 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
         cwd: tmp,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${devJson} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
+      await syncBackendDeployRecord(
+        { recordsRoot, databaseUrl: backendDatabaseUrl },
+        devSummary.recordPath,
+      );
       const stagingPromotion = await resolveCloudflarePagesPromotionSelection({
         workspaceRoot: tmp,
         deployment: staging,
         recordsRoot,
         sourceRunId: devSummary.deployRunId,
+        backendDatabaseUrl,
       });
       assert.equal(stagingPromotion.operationKind, "promotion");
       assert.equal(stagingPromotion.parentRunId, devSummary.deployRunId);
@@ -156,6 +95,7 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
           deployment: prod,
           recordsRoot,
           sourceRunId: devSummary.deployRunId,
+          backendDatabaseUrl,
         }),
         /promotion edge is not allowed by the current lane policy/,
       );
@@ -176,11 +116,12 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
     });
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     const devJson = path.join(tmp, "pleomino-dev.json");
-    await writeArtifact(artifactDir, "<html>expected</html>\n");
+    await writeDemoArtifact(artifactDir, "expected");
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
@@ -195,10 +136,7 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
     });
     const devServer = await startNixosSharedHostPublicServer({ deployment: dev, hostRoot });
     const wrongPublishRoot = path.join(tmp, "wrong-public");
-    await writeArtifact(
-      path.join(wrongPublishRoot, staging.providerTarget.project),
-      "<html>wrong</html>\n",
-    );
+    await writeDemoArtifact(path.join(wrongPublishRoot, staging.providerTarget.project), "wrong");
     const stagingServer = await startCloudflarePagesPublicServer({
       deployment: staging,
       publishRoot: wrongPublishRoot,
@@ -211,11 +149,16 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
         cwd: tmp,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${devJson} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
+      await syncBackendDeployRecord(
+        { recordsRoot, databaseUrl: backendDatabaseUrl },
+        devSummary.recordPath,
+      );
       const promotion = await resolveCloudflarePagesPromotionSelection({
         workspaceRoot: tmp,
         deployment: staging,
         recordsRoot,
         sourceRunId: devSummary.deployRunId,
+        backendDatabaseUrl,
       });
       assert.equal(promotion.operationKind, "promotion");
       const records = await Promise.all(

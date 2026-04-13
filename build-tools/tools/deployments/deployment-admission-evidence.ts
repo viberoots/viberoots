@@ -94,7 +94,8 @@ export type DeploymentAdmissionApprovalFact = {
 export type DeploymentPrerequisiteFact = {
   deploymentId: string;
   mode: DeploymentPrerequisiteMode;
-  sourceRecordPath: string;
+  sourceDeployRunId: string;
+  sourceRecordPath?: string;
   checkedAt?: string;
   healthEvidenceRef?: string;
 };

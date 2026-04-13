@@ -18,6 +18,7 @@ import {
   type DeploymentPrerequisiteFact,
 } from "./deployment-admission-evidence.ts";
 import { evaluateLaneGovernanceFact } from "./deployment-admission-governance.ts";
+import { resolveAllDeployments } from "./deployment-query.ts";
 import {
   latestSuccessfulDeploymentRecord,
   sourceAdmissionChecks,
@@ -44,7 +45,7 @@ type AdmittedContextLike = {
 function sourceRevisionFor(
   admittedContext: AdmittedContextLike,
   sourceRecord?: DeploymentRunRecordLike,
-): string {
+) {
   const replayRevision = (sourceRecord as any)?.admittedContext?.source?.sourceRevision;
   return typeof replayRevision === "string" && replayRevision.trim()
     ? replayRevision.trim()
@@ -83,18 +84,42 @@ function requiredCheckFacts(opts: {
   });
 }
 
+const prerequisiteProviderMaps = new Map<string, Promise<Map<string, string>>>();
+
+async function prerequisiteProvidersForWorkspace(workspaceRoot: string) {
+  let hit = prerequisiteProviderMaps.get(workspaceRoot);
+  if (!hit) {
+    hit = resolveAllDeployments(workspaceRoot)
+      .then(
+        (deployments) =>
+          new Map(deployments.map((deployment) => [deployment.deploymentId, deployment.provider])),
+      )
+      .catch(() => new Map<string, string>());
+    prerequisiteProviderMaps.set(workspaceRoot, hit);
+  }
+  return await hit;
+}
+
 async function prerequisiteFacts(opts: {
   workspaceRoot: string;
   recordsRoot: string;
   deployment: DeploymentTarget;
+  backendDatabaseUrl?: string;
+  prerequisiteProvidersByDeploymentId?: Record<string, string>;
   evidence?: DeploymentAdmissionEvidence;
 }): Promise<DeploymentPrerequisiteFact[]> {
   const facts: DeploymentPrerequisiteFact[] = [];
+  const providerMap = await prerequisiteProvidersForWorkspace(opts.workspaceRoot);
   for (const prerequisite of opts.deployment.prerequisites) {
+    const prerequisiteProvider =
+      opts.prerequisiteProvidersByDeploymentId?.[prerequisite.deploymentId] ||
+      providerMap.get(prerequisite.deploymentId);
     const hit = await latestSuccessfulDeploymentRecord({
       workspaceRoot: opts.workspaceRoot,
       recordsRoot: opts.recordsRoot,
       deploymentId: prerequisite.deploymentId,
+      ...(prerequisiteProvider ? { provider: prerequisiteProvider } : {}),
+      backendDatabaseUrl: opts.backendDatabaseUrl,
     });
     if (!hit) {
       throw new DeploymentAdmissionError(
@@ -121,7 +146,8 @@ async function prerequisiteFacts(opts: {
       facts.push({
         deploymentId: prerequisite.deploymentId,
         mode: prerequisite.mode,
-        sourceRecordPath: hit.recordPath,
+        sourceDeployRunId: hit.sourceDeployRunId,
+        ...(hit.recordPath ? { sourceRecordPath: hit.recordPath } : {}),
         checkedAt: health.checkedAt,
         ...(health.evidenceRef ? { healthEvidenceRef: health.evidenceRef } : {}),
       });
@@ -130,7 +156,8 @@ async function prerequisiteFacts(opts: {
     facts.push({
       deploymentId: prerequisite.deploymentId,
       mode: prerequisite.mode,
-      sourceRecordPath: hit.recordPath,
+      sourceDeployRunId: hit.sourceDeployRunId,
+      ...(hit.recordPath ? { sourceRecordPath: hit.recordPath } : {}),
     });
   }
   return facts;
@@ -140,6 +167,8 @@ export async function evaluateDeploymentAdmission(opts: {
   workspaceRoot: string;
   recordsRoot: string;
   deployment: DeploymentTarget;
+  backendDatabaseUrl?: string;
+  prerequisiteProvidersByDeploymentId?: Record<string, string>;
   operationKind: DeploymentAdmissionOperationKind;
   admittedContext: AdmittedContextLike;
   sourceRecord?: DeploymentRunRecordLike;
@@ -206,6 +235,8 @@ export async function evaluateDeploymentAdmission(opts: {
       workspaceRoot: opts.workspaceRoot,
       recordsRoot: opts.recordsRoot,
       deployment: opts.deployment,
+      backendDatabaseUrl: opts.backendDatabaseUrl,
+      prerequisiteProvidersByDeploymentId: opts.prerequisiteProvidersByDeploymentId,
       evidence: opts.evidence,
     }),
     laneGovernance: evaluateLaneGovernanceFact({

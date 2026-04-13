@@ -31,7 +31,6 @@ export type DeploymentPromotionSourceReplaySnapshot =
 
 export type DeploymentPromotionSource = {
   record: DeploymentPromotionSourceRecord;
-  recordPath: string;
   replaySnapshot: DeploymentPromotionSourceReplaySnapshot;
   replaySnapshotPath: string;
   artifact?: PromotionArtifact;
@@ -45,7 +44,6 @@ export type CrossDeploymentPromotionSelection<TDeployment extends DeploymentTarg
   parentRunId: string;
   releaseLineageId: string;
   artifactLineageId: string;
-  sourceRecordPath: string;
   sourceReplaySnapshotPath: string;
   sourceRecord: DeploymentPromotionSourceRecord;
   sourceReplaySnapshot: DeploymentPromotionSourceReplaySnapshot;

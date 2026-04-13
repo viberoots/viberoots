@@ -6,6 +6,7 @@ import { resolveArtifactDirForCli } from "./deployment-cli-resolve.ts";
 import { summarizeDeploymentResult } from "./deployment-execution.ts";
 import type { AppStoreConnectDeployment } from "./contract.ts";
 import { invalidatingTargetException } from "./deployment-target-exceptions.ts";
+import { syncBackendDeployRecordsFromRunMirrors } from "./nixos-shared-host-control-plane-backend.ts";
 import { resolveCrossDeploymentPromotionSelection } from "./deployment-promotion.ts";
 import { resolveAppStoreConnectReplaySource } from "./app-store-connect-replay.ts";
 import { submitAppStoreConnectDeploy } from "./app-store-connect-deploy.ts";
@@ -64,6 +65,10 @@ export async function runAppStoreConnectDeployFrontDoor(opts: {
       path.join(opts.workspaceRoot, ".local", "deployments", "app-store-connect", "records"),
     ),
   );
+  const controlPlaneDatabaseUrl =
+    getFlagStr("control-plane-database-url", "").trim() ||
+    String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim() ||
+    undefined;
   if (!opts.publishOnly) {
     const result = await submitAppStoreConnectDeploy({
       workspaceRoot: opts.workspaceRoot,
@@ -145,11 +150,18 @@ ${errors.join("\n")}`);
           ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
         })
       : await (async () => {
+          if (controlPlaneDatabaseUrl) {
+            await syncBackendDeployRecordsFromRunMirrors({
+              recordsRoot,
+              databaseUrl: controlPlaneDatabaseUrl,
+            });
+          }
           const promotion = await resolveCrossDeploymentPromotionSelection({
             workspaceRoot: opts.workspaceRoot,
             deployment: opts.deployment,
             recordsRoot,
             sourceRunId: opts.sourceRunId,
+            ...(controlPlaneDatabaseUrl ? { backendDatabaseUrl: controlPlaneDatabaseUrl } : {}),
           });
           return await submitAppStoreConnectExactArtifactRun({
             workspaceRoot: opts.workspaceRoot,

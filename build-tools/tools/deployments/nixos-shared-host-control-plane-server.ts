@@ -4,6 +4,7 @@ import { URL } from "node:url";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
 import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
 import {
+  readControlPlaneRecord,
   handleControlPlaneRunAction,
   handleControlPlaneSubmit,
   readControlPlaneStatus,
@@ -74,6 +75,20 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
           return;
         }
         writeJson(response, 200, submission);
+        return;
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/records") {
+        const submissionId = url.searchParams.get("submissionId") || "";
+        const deployRunId = url.searchParams.get("deployRunId") || "";
+        const record = await readControlPlaneRecord(backend, {
+          ...(submissionId ? { submissionId } : {}),
+          ...(deployRunId ? { deployRunId } : {}),
+        });
+        if (!record) {
+          writeJson(response, 404, { error: "record not found" });
+          return;
+        }
+        writeJson(response, 200, record);
         return;
       }
       if (request.method === "POST" && url.pathname === "/api/v1/run-actions") {

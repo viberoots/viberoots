@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  localHarnessControlPlaneDatabaseUrl,
+  syncBackendDeployRecord,
+} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
 import { createNixosSharedHostPlatformState } from "../../deployments/nixos-shared-host-platform.ts";
 import { resolveNixosSharedHostReplaySelection } from "../../deployments/nixos-shared-host-replay.ts";
@@ -111,6 +115,7 @@ test("shared control plane rejects replay when the current lane policy no longer
       hostRoot: path.join(tmp, "host"),
       recordsRoot: path.join(tmp, "records"),
     };
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(paths.recordsRoot);
     await writeDemoArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot: paths.hostRoot });
@@ -124,9 +129,14 @@ test("shared control plane rejects replay when the current lane policy no longer
         admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
         smokeConnectOverride: smokeConnectOverride(server.port),
       });
+      await syncBackendDeployRecord(
+        { recordsRoot: paths.recordsRoot, databaseUrl: backendDatabaseUrl },
+        initial.recordPath,
+      );
       const replay = await resolveNixosSharedHostReplaySelection({
         deployment,
         recordsRoot: paths.recordsRoot,
+        backendDatabaseUrl,
         sourceRunId: initial.record.deployRunId,
         rollback: false,
       });

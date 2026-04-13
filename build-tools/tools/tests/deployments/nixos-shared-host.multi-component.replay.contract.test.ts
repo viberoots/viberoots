@@ -2,43 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { requireNixosSharedHostReplayComponentState } from "../../deployments/nixos-shared-host-replay.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
-
-function multiComponentDeployment() {
-  const frontendTarget = nixosSharedHostDeploymentFixture().components[0]!.providerTarget;
-  return nixosSharedHostDeploymentFixture({
-    components: [
-      {
-        id: "frontend",
-        kind: "static-webapp",
-        target: "//projects/apps/demoapp:app",
-        runtime: { appName: "demoapp", containerPort: 3000, healthPath: "/healthz" },
-        providerTarget: frontendTarget,
-      },
-      {
-        id: "api",
-        kind: "static-webapp",
-        target: "//projects/apps/demoapi:app",
-        runtime: { appName: "demoapi", containerPort: 3001, healthPath: "/healthz" },
-        providerTarget: {
-          ...frontendTarget,
-          appName: "demoapi",
-          hostname: "demoapi.apps.kilty.io",
-          containerName: "demoapi",
-          deploymentTargetIdentity: "nixos-shared-host:default:demoapi",
-          sharedDevTargetIdentity: "nixos-shared-host:default:demoapi",
-          appNames: ["demoapi"],
-        },
-      },
-    ],
-    rolloutPolicy: {
-      mode: "ordered_best_effort",
-      abort: "stop_on_first_failure",
-      smoke: "final_only",
-      steps: ["frontend", "api"],
-    },
-  });
-}
+import { multiComponentDeployment } from "./nixos-shared-host.multi-component.fixture.ts";
 
 function componentArtifacts() {
   return [
@@ -78,9 +42,10 @@ test("nixos-shared-host multi-component replay requires recorded per-component r
 });
 
 test("nixos-shared-host multi-component replay rejects per-component artifact drift", () => {
+  const deployment = multiComponentDeployment();
   assert.throws(
     () =>
-      requireNixosSharedHostReplayComponentState(multiComponentDeployment(), {
+      requireNixosSharedHostReplayComponentState(deployment, {
         publishInput: {
           kind: "component-artifacts",
           compositeArtifactIdentity: "nixos-shared-host-release:123",
@@ -89,13 +54,15 @@ test("nixos-shared-host multi-component replay rejects per-component artifact dr
         componentResults: [
           {
             componentId: "frontend",
-            providerTargetIdentity: "nixos-shared-host:default:demoapp",
+            providerTargetIdentity:
+              deployment.components[0]!.providerTarget.deploymentTargetIdentity,
             artifactIdentity: "static-webapp:frontend",
             finalOutcome: "succeeded",
           },
           {
             componentId: "api",
-            providerTargetIdentity: "nixos-shared-host:default:demoapi",
+            providerTargetIdentity:
+              deployment.components[1]!.providerTarget.deploymentTargetIdentity,
             artifactIdentity: "static-webapp:wrong",
             finalOutcome: "succeeded",
           },

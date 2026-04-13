@@ -73,6 +73,7 @@ function nextLifecycleState(lifecycleState: string, action: DeploymentControlPla
 export async function submitDeploymentControlPlaneRunAction(opts: {
   workspaceRoot?: string;
   recordsRoot: string;
+  backendDatabaseUrl?: string;
   submissionPath: string;
   action: DeploymentControlPlaneRunAction;
   idempotencyKey?: string;
@@ -128,6 +129,7 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
     const approved = await approvePendingSubmission({
       workspaceRoot: opts.workspaceRoot,
       recordsRoot: opts.recordsRoot,
+      backendDatabaseUrl: opts.backendDatabaseUrl,
       submissionPath: opts.submissionPath,
       submission,
       actionId,

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import {
   NIXOS_SHARED_HOST_REPLAY_SNAPSHOT_SCHEMA,
   resolveNixosSharedHostReplaySource,
@@ -14,24 +14,12 @@ import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
+import { writeSsrArtifact } from "./nixos-shared-host.control-plane.helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
-
-async function writeArtifact(root: string): Promise<void> {
-  await fsp.mkdir(root, { recursive: true });
-  await fsp.writeFile(path.join(root, "index.html"), "<html>demoapp</html>\n", "utf8");
-  await fsp.writeFile(path.join(root, "healthz"), "ok\n", "utf8");
-}
-
-async function writeSsrArtifact(root: string): Promise<void> {
-  await fsp.mkdir(path.join(root, "dist", "server"), { recursive: true });
-  await fsp.mkdir(path.join(root, "dist", "client"), { recursive: true });
-  await fsp.writeFile(
-    path.join(root, "dist", "server", "index.js"),
-    "import http from 'node:http';\nhttp.createServer((req,res)=>res.end('ok')).listen(Number(process.env.PORT||3000), process.env.HOST || '127.0.0.1');\n",
-    "utf8",
-  );
-  await fsp.writeFile(path.join(root, "dist", "client", "index.html"), "<html>ok</html>\n", "utf8");
-}
+import {
+  submitReplaySourceRun,
+  writeReplayArtifact,
+} from "./nixos-shared-host.replay.rollback-eligibility.helpers.ts";
 
 test("nixos-shared-host replay snapshots preserve exact artifact refs and admitted deployment inputs", async () => {
   await runInTemp("nixos-shared-host-replay-contract", async (tmp, $) => {
@@ -41,7 +29,8 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
     const artifactDir = path.join(tmp, "artifact");
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
-    await writeArtifact(artifactDir);
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
+    await writeReplayArtifact(artifactDir, "demoapp");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
@@ -56,16 +45,12 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
       fixedRoot: artifactDir,
     });
     try {
-      const result = await submitNixosSharedHostControlPlaneRun({
+      const result = await submitReplaySourceRun({
         workspaceRoot: tmp,
         operationKind: "deploy",
         deployment,
         artifactDir,
-        paths: {
-          statePath: path.join(tmp, "platform-state.json"),
-          hostRoot,
-          recordsRoot,
-        },
+        paths: { statePath: path.join(tmp, "platform-state.json"), hostRoot, recordsRoot },
         admissionEvidence,
         smokeConnectOverride: {
           protocol: "https:",
@@ -73,8 +58,13 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
           port: server.port,
           rejectUnauthorized: false,
         },
+        backendDatabaseUrl,
       });
-      const replay = await resolveNixosSharedHostReplaySource({ recordPath: result.recordPath });
+      const replay = await resolveNixosSharedHostReplaySource({
+        recordsRoot,
+        backendDatabaseUrl,
+        deployRunId: result.record.deployRunId,
+      });
       assert.equal(replay.replaySnapshot.schemaVersion, NIXOS_SHARED_HOST_REPLAY_SNAPSHOT_SCHEMA);
       assert.equal(
         replay.replaySnapshot.providerTargetIdentity,
@@ -132,7 +122,9 @@ test("nixos-shared-host replay resolution fails closed when the stored exact art
     });
     const artifactDir = path.join(tmp, "artifact");
     const hostRoot = path.join(tmp, "host");
-    await writeArtifact(artifactDir);
+    const recordsRoot = path.join(tmp, "records");
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
+    await writeReplayArtifact(artifactDir, "demoapp");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
@@ -147,16 +139,12 @@ test("nixos-shared-host replay resolution fails closed when the stored exact art
       fixedRoot: artifactDir,
     });
     try {
-      const result = await submitNixosSharedHostControlPlaneRun({
+      const result = await submitReplaySourceRun({
         workspaceRoot: tmp,
         operationKind: "deploy",
         deployment,
         artifactDir,
-        paths: {
-          statePath: path.join(tmp, "platform-state.json"),
-          hostRoot,
-          recordsRoot: path.join(tmp, "records"),
-        },
+        paths: { statePath: path.join(tmp, "platform-state.json"), hostRoot, recordsRoot },
         admissionEvidence,
         smokeConnectOverride: {
           protocol: "https:",
@@ -164,14 +152,23 @@ test("nixos-shared-host replay resolution fails closed when the stored exact art
           port: server.port,
           rejectUnauthorized: false,
         },
+        backendDatabaseUrl,
       });
-      const replay = await resolveNixosSharedHostReplaySource({ recordPath: result.recordPath });
+      const replay = await resolveNixosSharedHostReplaySource({
+        recordsRoot,
+        backendDatabaseUrl,
+        deployRunId: result.record.deployRunId,
+      });
       await fsp.rm(Object.values(replay.componentArtifactDirs)[0]!, {
         recursive: true,
         force: true,
       });
       await assert.rejects(
-        resolveNixosSharedHostReplaySource({ recordPath: result.recordPath }),
+        resolveNixosSharedHostReplaySource({
+          recordsRoot,
+          backendDatabaseUrl,
+          deployRunId: result.record.deployRunId,
+        }),
         /recorded exact artifact is unavailable/,
       );
     } finally {
@@ -204,7 +201,8 @@ test("nixos-shared-host replay snapshots preserve SSR runtime-contract provenanc
     const artifactDir = path.join(tmp, "artifact");
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
-    await writeSsrArtifact(artifactDir);
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
+    await writeSsrArtifact(artifactDir, "<html>ok</html>\n");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
@@ -219,24 +217,25 @@ test("nixos-shared-host replay snapshots preserve SSR runtime-contract provenanc
       fixedRoot: artifactDir,
     });
     try {
-      const result = await submitNixosSharedHostControlPlaneRun({
+      const result = await submitReplaySourceRun({
         workspaceRoot: tmp,
         operationKind: "deploy",
         deployment,
         artifactDir,
-        paths: {
-          statePath: path.join(tmp, "platform-state.json"),
-          hostRoot,
-          recordsRoot,
-        },
+        paths: { statePath: path.join(tmp, "platform-state.json"), hostRoot, recordsRoot },
         admissionEvidence,
         smokeConnectOverride: {
           protocol: "http:",
           hostname: "127.0.0.1",
           port: server.port,
         },
+        backendDatabaseUrl,
       });
-      const replay = await resolveNixosSharedHostReplaySource({ recordPath: result.recordPath });
+      const replay = await resolveNixosSharedHostReplaySource({
+        recordsRoot,
+        backendDatabaseUrl,
+        deployRunId: result.record.deployRunId,
+      });
       assert.equal(
         (replay.replaySnapshot.deployment.components[0] as any).runtime.runtimeContract.framework,
         "vite",

@@ -83,6 +83,8 @@ export async function inspectProtectedSharedRetention(opts: {
   protectionClass: ProtectedDeploymentClass;
   deployRunId: string;
   recordPath: string;
+  recordUpdatedAt?: string;
+  requireRecordPathInBundle?: boolean;
   replaySnapshotPath: string;
   replayCreatedAt?: string;
   artifacts: ArtifactLike[];
@@ -96,7 +98,7 @@ export async function inspectProtectedSharedRetention(opts: {
   const failures: string[] = [];
   const missingPaths: string[] = [];
   const bundlePaths = uniqueStrings([
-    opts.recordPath,
+    opts.requireRecordPathInBundle === false ? "" : opts.recordPath,
     opts.replaySnapshotPath,
     ...opts.replayBundlePaths,
     ...requiredEvidencePaths(opts.evidence),
@@ -126,9 +128,11 @@ export async function inspectProtectedSharedRetention(opts: {
       `required retained artifact window expired for ${opts.deployRunId} at ${artifactRetentionDeadline}`,
     );
   }
-  const recordStat = await fsp.stat(opts.recordPath);
+  const recordRetentionAnchor = opts.recordUpdatedAt
+    ? Date.parse(opts.recordUpdatedAt)
+    : (await fsp.stat(opts.recordPath)).mtimeMs;
   const recordRetentionDeadline = new Date(
-    recordStat.mtimeMs + policy.minimumRecordRetentionDays * 24 * 60 * 60 * 1000,
+    recordRetentionAnchor + policy.minimumRecordRetentionDays * 24 * 60 * 60 * 1000,
   ).toISOString();
   const recordWindowExpired = now.toISOString() > recordRetentionDeadline;
   if (!recordWindowExpired) {
@@ -168,6 +172,8 @@ export async function assertProtectedSharedReplayUsable(opts: {
   protectionClass: ProtectedDeploymentClass;
   deployRunId: string;
   recordPath: string;
+  recordUpdatedAt?: string;
+  requireRecordPathInBundle?: boolean;
   replaySnapshotPath: string;
   replayCreatedAt?: string;
   artifacts: ArtifactLike[];
@@ -187,6 +193,8 @@ export async function assertProtectedSharedDeletionAllowed(opts: {
   protectionClass: ProtectedDeploymentClass;
   deployRunId: string;
   recordPath: string;
+  recordUpdatedAt?: string;
+  requireRecordPathInBundle?: boolean;
   replaySnapshotPath: string;
   replayCreatedAt?: string;
   artifacts: ArtifactLike[];

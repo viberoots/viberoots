@@ -6,6 +6,7 @@ import { printDeployJson } from "./deploy-front-door.ts";
 import { runCloudflarePagesCli } from "./cloudflare-pages-cli.ts";
 import { summarizeDeploymentResult } from "./deployment-execution.ts";
 import { resolveArtifactDirForCli } from "./deployment-cli-resolve.ts";
+import { syncBackendDeployRecordsFromRunMirrors } from "./nixos-shared-host-control-plane-backend.ts";
 import { submitCloudflarePagesTargetTransition } from "./cloudflare-pages-target-transition.ts";
 
 export async function runCloudflareDeployFrontDoor(opts: {
@@ -43,6 +44,20 @@ export async function runCloudflareDeployFrontDoor(opts: {
       path.join(opts.workspaceRoot, ".local", "deployments", "cloudflare-pages", "records"),
     ),
   );
+  const controlPlaneDatabaseUrl =
+    getFlagStr("control-plane-database-url", "").trim() ||
+    String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim() ||
+    undefined;
+  const backendDatabaseUrl =
+    opts.sourceRunId && controlPlaneDatabaseUrl
+      ? await (async () => {
+          await syncBackendDeployRecordsFromRunMirrors({
+            recordsRoot,
+            databaseUrl: controlPlaneDatabaseUrl,
+          });
+          return controlPlaneDatabaseUrl;
+        })()
+      : controlPlaneDatabaseUrl;
   if (opts.retireTarget || opts.migrateTarget) {
     if (!opts.targetExceptionRef)
       throw new Error("--retire-target/--migrate-target requires --target-exception-ref");
@@ -74,6 +89,7 @@ export async function runCloudflareDeployFrontDoor(opts: {
     artifactDirFlag: opts.artifactDirFlag,
     resolvedArtifactDir,
     recordsRoot,
+    ...(backendDatabaseUrl ? { backendDatabaseUrl } : {}),
     publishOnly: opts.publishOnly,
     rollback: opts.rollback,
     preview: opts.preview,

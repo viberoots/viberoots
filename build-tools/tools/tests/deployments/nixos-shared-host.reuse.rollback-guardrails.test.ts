@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import {
@@ -29,6 +30,10 @@ test("nixos-shared-host rollback fails closed for a successful retry source run"
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const recordsRoot = path.join(tmp, "records");
+    const commandEnv = {
+      ...process.env,
+      BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
+    };
     await writeArtifact(artifactDir, "v1");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
@@ -42,14 +47,17 @@ test("nixos-shared-host rollback fails closed for a successful retry source run"
     try {
       const first = await $({
         cwd: tmp,
+        env: commandEnv,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const firstSummary = JSON.parse(String(first.stdout));
       const retry = await $({
         cwd: tmp,
+        env: commandEnv,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --source-run-id ${firstSummary.deployRunId} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const retrySummary = JSON.parse(String(retry.stdout));
       const rollback = await $({
         cwd: tmp,
+        env: commandEnv,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --source-run-id ${retrySummary.deployRunId} --rollback --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`.nothrow();
       assert.notEqual(rollback.exitCode, 0);
       assert.match(String(rollback.stderr), /rollback source run is not eligible/);

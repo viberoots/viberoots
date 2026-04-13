@@ -7,6 +7,7 @@ import {
   claimBackendQueuedSubmission,
   enqueueBackendSubmission,
   localHarnessControlPlaneDatabaseUrl,
+  readBackendDeployRecordByDeployRunId,
   readBackendDeployRecordEnvelopeByDeployRunId,
   readBackendDeployRecordEnvelopeBySubmissionId,
   startBackendSubmissionClaimLease,
@@ -15,6 +16,7 @@ import {
   syncBackendSubmission,
 } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { readControlPlaneStatus } from "../../deployments/nixos-shared-host-control-plane-service-api.ts";
+import { readDeploymentControlPlaneStatus } from "../../deployments/deployment-control-plane-read.ts";
 import { reconcileNixosSharedHostRecoveredSubmission } from "../../deployments/nixos-shared-host-recovery.ts";
 import {
   createNixosSharedHostDeployRecord,
@@ -158,6 +160,7 @@ test("backend deploy records stay readable by deploy_run_id and submission_id wh
     const recordPath = await writeNixosSharedHostDeployRecord(recordsRoot, record);
     await syncBackendDeployRecord(backend, recordPath);
     await fsp.rm(recordPath);
+    await fsp.rm(submissionPath);
     const byRunId = await readBackendDeployRecordEnvelopeByDeployRunId(backend, "deploy-record");
     const bySubmissionId = await readBackendDeployRecordEnvelopeBySubmissionId(
       backend,
@@ -169,7 +172,18 @@ test("backend deploy records stay readable by deploy_run_id and submission_id wh
     const status = await readControlPlaneStatus(backend, { deployRunId: "deploy-record" });
     assert.equal(status?.lifecycleState, "running");
     assert.equal(status?.finalOutcome, "succeeded");
-    assert.equal(status?.resultRecordPath, recordPath);
+    assert.equal((status as any)?.resultRecordPath, undefined);
+    const backendStatus = await readDeploymentControlPlaneStatus({
+      recordsRoot,
+      deployRunId: "deploy-record",
+      backendDatabaseUrl: backend.databaseUrl,
+    });
+    assert.equal(backendStatus.lifecycleState, "running");
+    assert.equal(backendStatus.deployRunId, "deploy-record");
+    assert.equal(
+      ((await readBackendDeployRecordByDeployRunId(backend, "deploy-record")) as any)?.deployRunId,
+      "deploy-record",
+    );
   });
 });
 

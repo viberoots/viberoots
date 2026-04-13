@@ -1,62 +1,24 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator.ts";
-import { providerTargetIdentityFor } from "../../deployments/contract.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
+import {
+  admittedContextFixture,
+  writeCloudflarePrerequisiteRecord,
+  writeSuccessfulPrerequisiteRecord,
+} from "./deployment-admission.prerequisites.helpers.ts";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
-
-function admittedContextFixture(deployment: ReturnType<typeof nixosSharedHostDeploymentFixture>) {
-  return {
-    source: {
-      sourceRevision: "rev-source-123",
-      artifactIdentity: "artifact-123",
-    },
-    targetEnvironment: {
-      providerTargetIdentity: providerTargetIdentityFor(deployment),
-    },
-  };
-}
-
-async function writeSuccessfulPrerequisiteRecord(
-  tmp: string,
-  deploymentId: string,
-  options: Partial<{ publicUrl: string; healthUrl: string }> = {},
-) {
-  const recordPath = path.join(
-    tmp,
-    ".local",
-    "deployments",
-    "nixos-shared-host",
-    "records",
-    "runs",
-    `${deploymentId}-success.json`,
-  );
-  await fsp.mkdir(path.dirname(recordPath), { recursive: true });
-  await fsp.writeFile(
-    recordPath,
-    JSON.stringify(
-      {
-        schemaVersion: "deploy-record@2026-04-04",
-        deployRunId: `${deploymentId}-run`,
-        deploymentId,
-        finalOutcome: "succeeded",
-        ...(options.publicUrl ? { publicUrl: options.publicUrl } : {}),
-        ...(options.healthUrl ? { healthUrl: options.healthUrl } : {}),
-      },
-      null,
-      2,
-    ) + "\n",
-    "utf8",
-  );
-}
 
 test("ordering_only prerequisites require a prior successful run and health_gated requires fresh health evidence", async () => {
   await runInTemp("deployment-admission-prereqs", async (tmp) => {
-    await writeSuccessfulPrerequisiteRecord(tmp, "demoapp-dev", {
+    const recordsRoot = path.join(tmp, ".local", "deployments", "nixos-shared-host", "records");
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
+    await writeSuccessfulPrerequisiteRecord(tmp, backendDatabaseUrl, "demoapp-dev", {
       publicUrl: "https://demoapp.apps.kilty.io/",
       healthUrl: "https://demoapp.apps.kilty.io/healthz",
     });
@@ -65,8 +27,10 @@ test("ordering_only prerequisites require a prior successful run and health_gate
     });
     const orderingEval = await evaluateDeploymentAdmission({
       workspaceRoot: tmp,
-      recordsRoot: path.join(tmp, ".local", "deployments", "nixos-shared-host", "records"),
+      recordsRoot,
       deployment: orderingOnly,
+      backendDatabaseUrl,
+      prerequisiteProvidersByDeploymentId: { "demoapp-dev": "nixos-shared-host" },
       operationKind: "deploy",
       admittedContext: admittedContextFixture(orderingOnly),
       evidence: deploymentAdmissionEvidenceFixture({
@@ -82,8 +46,10 @@ test("ordering_only prerequisites require a prior successful run and health_gate
     await assert.rejects(
       evaluateDeploymentAdmission({
         workspaceRoot: tmp,
-        recordsRoot: path.join(tmp, ".local", "deployments", "nixos-shared-host", "records"),
+        recordsRoot,
         deployment: healthGated,
+        backendDatabaseUrl,
+        prerequisiteProvidersByDeploymentId: { "demoapp-dev": "nixos-shared-host" },
         operationKind: "deploy",
         admittedContext: admittedContextFixture(healthGated),
         evidence: deploymentAdmissionEvidenceFixture({
@@ -102,14 +68,79 @@ test("ordering_only prerequisites require a prior successful run and health_gate
     });
     const healthEval = await evaluateDeploymentAdmission({
       workspaceRoot: tmp,
-      recordsRoot: path.join(tmp, ".local", "deployments", "nixos-shared-host", "records"),
+      recordsRoot,
       deployment: healthGated,
+      backendDatabaseUrl,
+      prerequisiteProvidersByDeploymentId: { "demoapp-dev": "nixos-shared-host" },
       operationKind: "deploy",
       admittedContext: admittedContextFixture(healthGated),
       evidence: healthEvidence,
     });
     assert.equal(healthEval.prerequisites[0]?.mode, "health_gated");
     assert.equal(healthEval.prerequisites[0]?.healthEvidenceRef, "health://demoapp-dev");
+  });
+});
+
+test("prerequisite routing follows the prerequisite provider for mixed-provider deployments", async () => {
+  await runInTemp("deployment-admission-prereq-provider-routing", async (tmp) => {
+    const sharedRecordsRoot = path.join(
+      tmp,
+      ".local",
+      "deployments",
+      "nixos-shared-host",
+      "records",
+    );
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(sharedRecordsRoot);
+    await writeSuccessfulPrerequisiteRecord(tmp, backendDatabaseUrl, "shared-prereq", {
+      publicUrl: "https://shared-prereq.apps.kilty.io/",
+    });
+    await writeCloudflarePrerequisiteRecord(tmp, "pages-prereq", {
+      publicUrl: "https://pages-prereq.pages.dev/",
+    });
+
+    const cloudflareTarget = cloudflarePagesDeploymentFixture({
+      deploymentId: "target-pages",
+      prerequisites: [{ deploymentId: "shared-prereq", mode: "ordering_only" }],
+    });
+    const cloudflareEval = await evaluateDeploymentAdmission({
+      workspaceRoot: tmp,
+      recordsRoot: sharedRecordsRoot,
+      deployment: cloudflareTarget,
+      backendDatabaseUrl,
+      prerequisiteProvidersByDeploymentId: { "shared-prereq": "nixos-shared-host" },
+      operationKind: "deploy",
+      admittedContext: admittedContextFixture(cloudflareTarget),
+      evidence: deploymentAdmissionEvidenceFixture({
+        deployment: cloudflareTarget,
+        operationKind: "deploy",
+        sourceRevision: "rev-source-123",
+      }),
+    });
+    assert.equal(cloudflareEval.prerequisites[0]?.sourceDeployRunId, "shared-prereq-run");
+    assert.equal(cloudflareEval.prerequisites[0]?.sourceRecordPath, undefined);
+
+    const sharedTarget = nixosSharedHostDeploymentFixture({
+      prerequisites: [{ deploymentId: "pages-prereq", mode: "ordering_only" }],
+    });
+    const sharedEval = await evaluateDeploymentAdmission({
+      workspaceRoot: tmp,
+      recordsRoot: sharedRecordsRoot,
+      deployment: sharedTarget,
+      backendDatabaseUrl,
+      prerequisiteProvidersByDeploymentId: { "pages-prereq": "cloudflare-pages" },
+      operationKind: "deploy",
+      admittedContext: admittedContextFixture(sharedTarget),
+      evidence: deploymentAdmissionEvidenceFixture({
+        deployment: sharedTarget,
+        operationKind: "deploy",
+        sourceRevision: "rev-source-123",
+      }),
+    });
+    assert.equal(sharedEval.prerequisites[0]?.sourceDeployRunId, "pages-prereq-run");
+    assert.match(
+      String(sharedEval.prerequisites[0]?.sourceRecordPath),
+      /cloudflare-pages\/records\/runs/,
+    );
   });
 });
 

@@ -1,6 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import {
+  readBackendLatestDeployRecordEnvelopeByDeploymentId,
+  type NixosSharedHostControlPlaneBackendTarget,
+} from "./nixos-shared-host-control-plane-backend.ts";
 import type {
   DeploymentAdmissionApprovalFact,
   DeploymentAdmissionCheckFact,
@@ -59,7 +63,50 @@ export async function latestSuccessfulDeploymentRecord(opts: {
   workspaceRoot: string;
   recordsRoot: string;
   deploymentId: string;
-}): Promise<{ record: DeploymentRunRecordLike; recordPath: string } | undefined> {
+  provider?: string;
+  backendDatabaseUrl?: string;
+}): Promise<
+  { record: DeploymentRunRecordLike; sourceDeployRunId: string; recordPath?: string } | undefined
+> {
+  const sharedHostBackendDatabaseUrl =
+    opts.backendDatabaseUrl ||
+    String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
+  if (opts.provider === "nixos-shared-host") {
+    if (!sharedHostBackendDatabaseUrl) {
+      throw new Error(
+        "shared admission lookup requires backendDatabaseUrl for backend-only record reads",
+      );
+    }
+    const backend: NixosSharedHostControlPlaneBackendTarget = {
+      recordsRoot: path.resolve(opts.recordsRoot),
+      databaseUrl: sharedHostBackendDatabaseUrl,
+    };
+    const hit = await readBackendLatestDeployRecordEnvelopeByDeploymentId(backend, {
+      deploymentId: opts.deploymentId,
+      finalOutcome: "succeeded",
+    });
+    if (!hit) return undefined;
+    return {
+      record: hit.record as DeploymentRunRecordLike,
+      sourceDeployRunId: String((hit.record as DeploymentRunRecordLike).deployRunId),
+    };
+  }
+  if (!opts.provider && sharedHostBackendDatabaseUrl) {
+    const backend: NixosSharedHostControlPlaneBackendTarget = {
+      recordsRoot: path.resolve(opts.recordsRoot),
+      databaseUrl: sharedHostBackendDatabaseUrl,
+    };
+    const hit = await readBackendLatestDeployRecordEnvelopeByDeploymentId(backend, {
+      deploymentId: opts.deploymentId,
+      finalOutcome: "succeeded",
+    });
+    if (hit) {
+      return {
+        record: hit.record as DeploymentRunRecordLike,
+        sourceDeployRunId: String((hit.record as DeploymentRunRecordLike).deployRunId),
+      };
+    }
+  }
   const hits: Array<{ record: DeploymentRunRecordLike; recordPath: string; mtimeMs: number }> = [];
   for (const root of defaultDeploymentRecordRoots(opts.workspaceRoot, opts.recordsRoot)) {
     for (const recordPath of await runRecordPaths(root)) {
@@ -75,7 +122,14 @@ export async function latestSuccessfulDeploymentRecord(opts: {
       hits.push({ record, recordPath, mtimeMs: stat?.mtimeMs || 0 });
     }
   }
-  return hits.sort((left, right) => right.mtimeMs - left.mtimeMs)[0];
+  const latest = hits.sort((left, right) => right.mtimeMs - left.mtimeMs)[0];
+  return latest
+    ? {
+        record: latest.record,
+        sourceDeployRunId: latest.record.deployRunId,
+        recordPath: latest.recordPath,
+      }
+    : undefined;
 }
 
 export function sourceAdmissionChecks(

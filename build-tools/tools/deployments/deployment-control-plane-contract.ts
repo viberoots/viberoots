@@ -162,10 +162,8 @@ export type DeploymentControlPlaneResponseBase = {
   lockScope: string;
   lifecycleState: DeploymentControlPlaneLifecycleState;
   terminationReason: DeploymentControlPlaneTerminationReason;
-  executionSnapshotPath: string;
   workerId?: string;
   deployRunId?: string;
-  resultRecordPath?: string;
   finalOutcome?: string;
   progressiveRollout?: NixosSharedHostProgressiveRollout;
   dedupe: DeploymentControlPlaneRequestDedupe;

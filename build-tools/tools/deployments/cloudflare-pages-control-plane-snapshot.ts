@@ -20,7 +20,7 @@ import {
 
 export type CloudflarePagesPromotionSourceSelection = {
   record: DeploymentRunRecordLike;
-  recordPath: string;
+  recordPath?: string;
   replaySnapshotPath: string;
 };
 
@@ -95,7 +95,7 @@ export async function createCloudflarePagesControlPlaneSnapshot(
       ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
       ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
       ...(opts.artifactLineageId ? { artifactLineageId: opts.artifactLineageId } : {}),
-      ...(opts.source ? { sourceRecordPath: opts.source.recordPath } : {}),
+      ...(opts.source?.recordPath ? { sourceRecordPath: opts.source.recordPath } : {}),
       ...(opts.source ? { sourceReplaySnapshotPath: opts.source.replaySnapshotPath } : {}),
     },
     ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),

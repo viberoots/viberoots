@@ -152,6 +152,7 @@ test("nixos-shared-host allows reviewed cross-provider same-artifact promotion o
       });
       assert.equal(promotion.operationKind, "promotion");
       assert.equal(promotion.parentRunId, sourceSummary.deployRunId);
+      assert.equal("sourceRecordPath" in promotion, false);
     } finally {
       await sourceServer.close();
       await targetServer.close();

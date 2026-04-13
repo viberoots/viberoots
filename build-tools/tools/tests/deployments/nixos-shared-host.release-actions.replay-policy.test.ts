@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import {
@@ -85,7 +86,11 @@ test("rollback replay fails when the recorded release-action policy forbids roll
       },
     });
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
-    const commandEnv = { ...process.env, BNX_DEPLOYMENT_VAULT_FIXTURE_PATH: fixturePath };
+    const commandEnv = {
+      ...process.env,
+      BNX_DEPLOYMENT_VAULT_FIXTURE_PATH: fixturePath,
+      BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
+    };
     try {
       const first = await $({
         cwd: tmp,

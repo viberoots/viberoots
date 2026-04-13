@@ -30,12 +30,13 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
   workspaceRoot: string;
   deployRunId: string;
   recordsRoot: string;
+  backendDatabaseUrl?: string;
   operationKind: string;
   deployment: any;
   onLockAcquired?: () => Promise<void> | void;
   gateEvaluator?: NixosSharedHostGateEvaluator;
-  persistSubmission?: (submissionPath: string) => Promise<void>;
-  persistRecord?: (recordPath: string) => Promise<void>;
+  persistSubmission?: (submission: NixosSharedHostControlPlaneSubmission) => Promise<void>;
+  persistRecord?: (record: NixosSharedHostDeployRecord, recordPath: string) => Promise<void>;
   assertCurrentAuthority?: () => Promise<void>;
   recoverSubmission?: (args: {
     submissionPath: string;
@@ -49,7 +50,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
 }) {
   const writeSubmission = async (value: NixosSharedHostControlPlaneSubmission) => {
     await writeControlPlaneJson(opts.submissionPath, value);
-    await opts.persistSubmission?.(opts.submissionPath);
+    await opts.persistSubmission?.(value);
   };
   let lock: Awaited<ReturnType<typeof acquireNixosSharedHostControlPlaneLocks>> | undefined;
   try {
@@ -113,6 +114,8 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
           workspaceRoot: opts.workspaceRoot,
           deployment: opts.snapshot.deployment,
           admittedContext: opts.snapshot.admittedContext,
+          recordsRoot: opts.recordsRoot,
+          ...(opts.backendDatabaseUrl ? { backendDatabaseUrl: opts.backendDatabaseUrl } : {}),
         });
       }
     } catch (error) {
@@ -161,7 +164,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
       progressiveRollout: submission.progressiveRollout || opts.snapshot.progressiveRollout,
       ...(opts.gateEvaluator ? { gateEvaluator: opts.gateEvaluator } : {}),
     });
-    await opts.persistRecord?.(result.recordPath);
+    await opts.persistRecord?.(result.record, result.recordPath);
     const latestCompleted = await readControlPlaneJson<NixosSharedHostControlPlaneSubmission>(
       opts.submissionPath,
     );
@@ -216,7 +219,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
       });
     }
     if ((error as any)?.recordPath) {
-      await opts.persistRecord?.((error as any).recordPath);
+      await opts.persistRecord?.((error as any).record, (error as any).recordPath);
       const finalized = finalizeSubmissionFromRecordedError(submission, opts.deployRunId, error);
       await writeSubmission(finalized);
       throw Object.assign(error instanceof Error ? error : new Error(String(error)), {

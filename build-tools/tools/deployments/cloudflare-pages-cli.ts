@@ -19,6 +19,7 @@ export async function runCloudflarePagesCli(opts: {
   artifactDirFlag: string;
   resolvedArtifactDir?: string;
   recordsRoot: string;
+  backendDatabaseUrl?: string;
   publishOnly: boolean;
   rollback: boolean;
   preview: boolean;
@@ -69,6 +70,7 @@ export async function runCloudflarePagesCli(opts: {
       deployment: opts.deployment,
       recordsRoot: opts.recordsRoot,
       sourceRunId: opts.sourceRunId,
+      backendDatabaseUrl: opts.backendDatabaseUrl,
     });
     return await submitCloudflarePagesControlPlaneDeploy({
       workspaceRoot: opts.workspaceRoot,
@@ -119,6 +121,7 @@ export async function runCloudflarePagesCli(opts: {
       deployment: opts.deployment,
       recordsRoot: opts.recordsRoot,
       sourceRunId: opts.sourceRunId,
+      backendDatabaseUrl: opts.backendDatabaseUrl,
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
       ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
     });
@@ -136,6 +139,7 @@ export async function runCloudflarePagesCli(opts: {
         })(),
       recordsRoot: opts.recordsRoot,
       sourceRunId: opts.sourceRunId,
+      backendDatabaseUrl: opts.backendDatabaseUrl,
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
       ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
     });

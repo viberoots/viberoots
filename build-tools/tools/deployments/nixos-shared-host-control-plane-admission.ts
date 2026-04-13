@@ -32,6 +32,7 @@ function destructivePlanError(
 export async function evaluateNixosSharedHostControlPlaneAdmission(opts: {
   workspaceRoot: string;
   recordsRoot: string;
+  backendDatabaseUrl?: string;
   deployment: NixosSharedHostControlPlaneSnapshot["deployment"];
   snapshot: NixosSharedHostControlPlaneSnapshot;
   source?: NixosSharedHostControlPlaneSourceSelection;
@@ -47,6 +48,7 @@ export async function evaluateNixosSharedHostControlPlaneAdmission(opts: {
       workspaceRoot: opts.workspaceRoot,
       recordsRoot: opts.recordsRoot,
       deployment: opts.deployment,
+      backendDatabaseUrl: opts.backendDatabaseUrl,
       operationKind: opts.snapshot.operationKind,
       admittedContext: opts.snapshot.admittedContext,
       sourceRecord: opts.source?.record as any,

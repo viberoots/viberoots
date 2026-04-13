@@ -10,6 +10,7 @@ import {
 import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract.ts";
 import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence.ts";
 import type { DeploymentRunRecordLike } from "./deployment-admission-records.ts";
+import { readBackendDeployRecordByDeployRunId } from "./nixos-shared-host-control-plane-backend.ts";
 
 type RevalidationContext = {
   targetEnvironment?: {
@@ -33,6 +34,20 @@ async function readRecord(recordPath: string): Promise<DeploymentRunRecordLike |
   } catch {
     return null;
   }
+}
+
+async function readSharedBackendRecord(opts: {
+  recordsRoot: string;
+  backendDatabaseUrl: string;
+  deployRunId: string;
+}): Promise<DeploymentRunRecordLike | null> {
+  return (await readBackendDeployRecordByDeployRunId(
+    {
+      recordsRoot: opts.recordsRoot,
+      databaseUrl: opts.backendDatabaseUrl,
+    },
+    opts.deployRunId,
+  )) as DeploymentRunRecordLike | null;
 }
 
 async function fetchHealthy(url: string): Promise<boolean> {
@@ -69,6 +84,8 @@ export async function revalidateControlPlaneAdmission(opts: {
   workspaceRoot: string;
   deployment: DeploymentTarget;
   admittedContext: RevalidationContext;
+  recordsRoot?: string;
+  backendDatabaseUrl?: string;
 }): Promise<void> {
   const evaluation = requirePolicyEvaluation(opts.admittedContext);
   const targetRef =
@@ -116,7 +133,16 @@ export async function revalidateControlPlaneAdmission(opts: {
   }
   for (const prerequisite of evaluation.prerequisites) {
     if (prerequisite.mode !== "health_gated") continue;
-    const record = await readRecord(prerequisite.sourceRecordPath);
+    const record =
+      prerequisite.sourceDeployRunId && opts.recordsRoot && opts.backendDatabaseUrl
+        ? await readSharedBackendRecord({
+            recordsRoot: opts.recordsRoot,
+            backendDatabaseUrl: opts.backendDatabaseUrl,
+            deployRunId: prerequisite.sourceDeployRunId,
+          })
+        : prerequisite.sourceRecordPath
+          ? await readRecord(prerequisite.sourceRecordPath)
+          : null;
     const url = record?.healthUrl || record?.publicUrl;
     if (!url || !(await fetchHealthy(url))) {
       throw new DeploymentAdmissionError(

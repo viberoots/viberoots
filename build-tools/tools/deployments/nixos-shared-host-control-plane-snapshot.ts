@@ -41,7 +41,6 @@ import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidenc
 
 export type NixosSharedHostControlPlaneSourceSelection = {
   record: NixosSharedHostDeployRecord | { deployRunId: string; deploymentId: string };
-  recordPath?: string;
   replaySnapshotPath?: string;
   replaySnapshot?: NixosSharedHostReplaySnapshot;
 };
@@ -218,7 +217,6 @@ export async function createNixosSharedHostControlPlaneSnapshot(
             ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
             ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
             ...(opts.artifactLineageId ? { artifactLineageId: opts.artifactLineageId } : {}),
-            ...(opts.source?.recordPath ? { sourceRecordPath: opts.source.recordPath } : {}),
             ...(opts.source?.replaySnapshotPath
               ? { sourceReplaySnapshotPath: opts.source.replaySnapshotPath }
               : {}),

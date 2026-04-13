@@ -3,19 +3,56 @@ import type { CloudflarePagesDeployment } from "./contract.ts";
 import {
   resolveCrossDeploymentPromotionSelection,
   resolveCrossDeploymentPromotionSourceSelection,
+  resolveDeploymentPromotionSourceRecordPath,
   type CrossDeploymentPromotionSelection,
+  type CrossDeploymentPromotionSourceSelection,
 } from "./deployment-promotion.ts";
 import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-control-plane.ts";
 import type { CloudflarePagesSmokeConnectOverride } from "./cloudflare-pages-control-plane-contract.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
+
+export type CloudflarePagesPromotionSelection =
+  CrossDeploymentPromotionSelection<CloudflarePagesDeployment> & {
+    sourceRecordPath?: string;
+  };
+
+type CloudflarePagesPromotionSourceSelection =
+  CrossDeploymentPromotionSourceSelection<CloudflarePagesDeployment> & {
+    sourceRecordPath?: string;
+  };
 
 export async function resolveCloudflarePagesPromotionSelection(opts: {
   workspaceRoot: string;
   deployment: CloudflarePagesDeployment;
   recordsRoot: string;
   sourceRunId: string;
-}): Promise<CrossDeploymentPromotionSelection<CloudflarePagesDeployment>> {
-  return await resolveCrossDeploymentPromotionSelection(opts);
+  backendDatabaseUrl?: string;
+}): Promise<CloudflarePagesPromotionSelection> {
+  const [promotion, source] = await Promise.all([
+    resolveCrossDeploymentPromotionSelection(opts),
+    resolveDeploymentPromotionSourceRecordPath(opts),
+  ]);
+  return {
+    ...promotion,
+    ...(source ? { sourceRecordPath: source } : {}),
+  };
+}
+
+async function resolveCloudflarePagesPromotionSourceSelection(opts: {
+  workspaceRoot: string;
+  deployment: CloudflarePagesDeployment;
+  recordsRoot: string;
+  sourceRunId: string;
+  backendDatabaseUrl?: string;
+}): Promise<CloudflarePagesPromotionSourceSelection> {
+  const [promotion, source] = await Promise.all([
+    resolveCrossDeploymentPromotionSourceSelection(opts),
+    resolveDeploymentPromotionSourceRecordPath(opts),
+  ]);
+  return {
+    ...promotion,
+    ...(source ? { sourceRecordPath: source } : {}),
+  };
 }
 
 export async function submitCloudflarePagesRebuildPerStagePromotion(opts: {
@@ -24,6 +61,7 @@ export async function submitCloudflarePagesRebuildPerStagePromotion(opts: {
   artifactDir: string;
   recordsRoot: string;
   sourceRunId: string;
+  backendDatabaseUrl?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: CloudflarePagesSmokeConnectOverride;
 }) {
@@ -32,7 +70,7 @@ export async function submitCloudflarePagesRebuildPerStagePromotion(opts: {
       `cloudflare-pages source-run promotion without --publish-only requires artifact_reuse_mode rebuild_per_stage, got ${opts.deployment.lanePolicy.artifactReuseMode}`,
     );
   }
-  const promotion = await resolveCrossDeploymentPromotionSourceSelection(opts);
+  const promotion = await resolveCloudflarePagesPromotionSourceSelection(opts);
   return await submitCloudflarePagesControlPlaneDeploy({
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.deployment,

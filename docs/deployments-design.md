@@ -1127,7 +1127,8 @@ How to read this map:
 - the current reviewed `nixos-shared-host` worker-loop entrypoint is `build-tools/tools/deployments/nixos-shared-host-control-plane-worker.ts`
 - the current reviewed `nixos-shared-host` authoritative backend is Postgres, configured for the service and worker via `--control-plane-database-url` / `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL`
 - control-plane status/result reads and canonical protected/shared deploy records come from that backend, keyed by `deploy_run_id` and submission identity
-- JSON submissions and snapshots under `<records-root>/control-plane/` and deploy-record mirrors under `<records-root>/runs/` remain the compatibility and operator-readable mirror rather than the queue/lock/record authority
+- reviewed control-plane status/result inspection should resolve by backend-native identifiers through the service surfaces such as `GET /api/v1/status` and `GET /api/v1/records`
+- routine JSON submissions/snapshots under `<records-root>/control-plane/` and protected/shared deploy-record files under `<records-root>/runs/` are no longer the normal operator-readable authority path
 - isolated fixture tests and explicitly local harnesses may use an explicit `pgmem://...` backend URL, but that harness is not the reviewed operator backend
 - provider, provisioner, and release-action modules still hold only vetted built-in execution adapters
 - `build-tools/deploy/lanes/` and `build-tools/deploy/policies/` remain repo-owned policy-definition locations rather than control-plane implementation code

@@ -3,13 +3,11 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
-import {
-  ensureNixosSharedHostStageBranch,
-  nixosSharedHostAdmissionPolicyFixture,
-  nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+import { multiComponentDeployment } from "./nixos-shared-host.multi-component.fixture.ts";
 import {
   componentArtifactFlag,
   liveIndexPath,
@@ -19,87 +17,16 @@ import {
 } from "./nixos-shared-host.reuse.e2e.helpers.ts";
 import { startStaticWebappHttpsMultiServer } from "./static-webapp.https-server.ts";
 
-function multiComponentDeployment(
-  environmentStage: "dev" | "staging" = "dev",
-  namePrefix = "demo",
-) {
-  const admissionPolicy =
-    environmentStage === "staging"
-      ? nixosSharedHostAdmissionPolicyFixture({
-          ref: `//projects/deployments/${namePrefix}-shared:staging_release`,
-          name: "staging_release",
-          allowedRefs: ["env/pleomino/staging"],
-          requiredChecks: [],
-          fingerprint: `sha256:admission-${namePrefix}-staging`,
-        })
-      : nixosSharedHostAdmissionPolicyFixture({
-          allowedRefs: ["env/pleomino/dev"],
-          requiredChecks: [],
-          fingerprint: `sha256:admission-${namePrefix}-dev`,
-        });
-  return nixosSharedHostDeploymentFixture({
-    deploymentId: `${namePrefix}-stack-${environmentStage}`,
-    label: `//projects/deployments/${namePrefix}-stack-${environmentStage}:deploy`,
-    environmentStage,
-    admissionPolicyRef: admissionPolicy.ref,
-    admissionPolicy,
-    components: [
-      {
-        id: "frontend",
-        kind: "static-webapp",
-        target: "//projects/apps/demoapp:app",
-        runtime: {
-          appName: `${namePrefix}-frontend-${environmentStage}`,
-          containerPort: 3000,
-          healthPath: "/healthz",
-        },
-        providerTarget: {
-          host: "nixos-shared-host",
-          targetGroup: "default",
-          appNames: [`${namePrefix}-frontend-${environmentStage}`],
-          deploymentTargetIdentity: `nixos-shared-host:default:${namePrefix}-frontend-${environmentStage}`,
-          appName: `${namePrefix}-frontend-${environmentStage}`,
-          hostname: `${namePrefix}-frontend-${environmentStage}.apps.kilty.io`,
-          containerName: `${namePrefix}-frontend-${environmentStage}`,
-          sharedDevTargetIdentity: `nixos-shared-host:default:${namePrefix}-frontend-${environmentStage}`,
-        },
-      },
-      {
-        id: "api",
-        kind: "static-webapp",
-        target: "//projects/apps/demoapi:app",
-        runtime: {
-          appName: `${namePrefix}-api-${environmentStage}`,
-          containerPort: 3001,
-          healthPath: "/healthz",
-        },
-        providerTarget: {
-          host: "nixos-shared-host",
-          targetGroup: "default",
-          appNames: [`${namePrefix}-api-${environmentStage}`],
-          deploymentTargetIdentity: `nixos-shared-host:default:${namePrefix}-api-${environmentStage}`,
-          appName: `${namePrefix}-api-${environmentStage}`,
-          hostname: `${namePrefix}-api-${environmentStage}.apps.kilty.io`,
-          containerName: `${namePrefix}-api-${environmentStage}`,
-          sharedDevTargetIdentity: `nixos-shared-host:default:${namePrefix}-api-${environmentStage}`,
-        },
-      },
-    ],
-    rolloutPolicy: {
-      mode: "ordered_best_effort",
-      abort: "stop_on_first_failure",
-      smoke: "final_only",
-      steps: ["frontend", "api"],
-    },
-  });
-}
-
 test("nixos-shared-host multi-component retry reuses a live proven component and republishes the failed one", async () => {
   await runInTemp("nixos-shared-host-multi-component-retry", async (tmp, $) => {
     const deployment = multiComponentDeployment();
     const deploymentJson = path.join(tmp, "deployment.json");
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
+    const commandEnv = {
+      ...process.env,
+      BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
+    };
     const frontendArtifact = path.join(tmp, "artifacts", "frontend");
     const apiArtifact = path.join(tmp, "artifacts", "api");
     await writeArtifact(frontendArtifact, "frontend-v1");
@@ -127,6 +54,7 @@ test("nixos-shared-host multi-component retry reuses a live proven component and
     try {
       const failed = await $({
         cwd: tmp,
+        env: commandEnv,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendArtifact, api: apiArtifact })} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`.nothrow();
       assert.notEqual(failed.exitCode, 0);
       const [failedRecordName] = (await fsp.readdir(path.join(recordsRoot, "runs"))).sort();
@@ -143,6 +71,7 @@ test("nixos-shared-host multi-component retry reuses a live proven component and
       await fsp.rm(apiArtifact, { recursive: true, force: true });
       const retry = await $({
         cwd: tmp,
+        env: commandEnv,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --source-run-id ${failedRecord.deployRunId} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(retry.stdout));
       assert.equal(summary.operationKind, "retry");
@@ -180,6 +109,10 @@ test("nixos-shared-host multi-component rollback replays recorded per-component 
     const deploymentJson = path.join(tmp, "deployment.json");
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
+    const commandEnv = {
+      ...process.env,
+      BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
+    };
     const frontendV1 = path.join(tmp, "artifacts", "frontend-v1");
     const apiV1 = path.join(tmp, "artifacts", "api-v1");
     const frontendV2 = path.join(tmp, "artifacts", "frontend-v2");
@@ -208,14 +141,17 @@ test("nixos-shared-host multi-component rollback replays recorded per-component 
     try {
       const first = await $({
         cwd: tmp,
+        env: commandEnv,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendV1, api: apiV1 })} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const firstSummary = JSON.parse(String(first.stdout));
       await $({
         cwd: tmp,
+        env: commandEnv,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendV2, api: apiV2 })} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       await fsp.rm(path.join(tmp, "artifacts"), { recursive: true, force: true });
       const rollback = await $({
         cwd: tmp,
+        env: commandEnv,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --source-run-id ${firstSummary.deployRunId} --rollback --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(rollback.stdout));
       assert.equal(summary.operationKind, "rollback");

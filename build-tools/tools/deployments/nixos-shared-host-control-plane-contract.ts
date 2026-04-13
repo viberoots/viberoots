@@ -74,7 +74,6 @@ export type NixosSharedHostControlPlaneSnapshot = {
         parentRunId?: string;
         releaseLineageId?: string;
         artifactLineageId?: string;
-        sourceRecordPath?: string;
         sourceReplaySnapshotPath?: string;
         recordedComponentResults?: NixosSharedHostComponentResult[];
       }

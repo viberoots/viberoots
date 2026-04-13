@@ -1,7 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { invalidatingTargetException } from "./deployment-target-exceptions.ts";
+import {
+  readBackendLatestDeployRecordEnvelopeByDeploymentId,
+  type NixosSharedHostControlPlaneBackendTarget,
+} from "./nixos-shared-host-control-plane-backend.ts";
 import { rollbackCompatibilityErrors } from "./nixos-shared-host-release-actions.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
@@ -13,10 +15,7 @@ import {
   readNixosSharedHostReplaySnapshot,
   type NixosSharedHostReplaySnapshot,
 } from "./nixos-shared-host-replay.ts";
-import {
-  readNixosSharedHostDeployRecord,
-  type NixosSharedHostDeployRecord,
-} from "./nixos-shared-host-records.ts";
+import { type NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
 
 function replayMismatch(field: string, expected: string, actual: string): string {
   return `${field} mismatch: current=${expected} source=${actual}`;
@@ -85,46 +84,24 @@ export function rollbackSourceEligibilityErrors(record: NixosSharedHostDeployRec
   return errors;
 }
 
-function parseRecordTimestamp(recordPath: string): number {
-  const match = path.basename(recordPath).match(/^[^-]+-(\d+)-/);
-  return match ? Number(match[1]) : 0;
-}
-
 export async function latestSuccessfulNormalReplaySnapshot(opts: {
-  recordsRoot: string;
+  backend: NixosSharedHostControlPlaneBackendTarget;
   deploymentId: string;
   excludeRunId: string;
 }): Promise<NixosSharedHostReplaySnapshot | undefined> {
-  const runsDir = path.join(path.resolve(opts.recordsRoot), "runs");
-  const entries = await fsp.readdir(runsDir).catch(() => []);
-  const candidates = await Promise.all(
-    entries
-      .filter((entry) => entry.endsWith(".json"))
-      .map(async (entry) => {
-        const recordPath = path.join(runsDir, entry);
-        const record = await readNixosSharedHostDeployRecord(recordPath);
-        return { record, recordPath };
-      }),
-  );
-  const latest = candidates
-    .filter(
-      ({ record }) =>
-        record.deployRunId !== opts.excludeRunId &&
-        record.deploymentId === opts.deploymentId &&
-        record.runClassification === "deploy" &&
-        record.finalOutcome === "succeeded" &&
-        !!record.replaySnapshotPath,
-    )
-    .sort(
-      (left, right) =>
-        parseRecordTimestamp(right.recordPath) - parseRecordTimestamp(left.recordPath),
-    )[0];
+  const latest = await readBackendLatestDeployRecordEnvelopeByDeploymentId(opts.backend, {
+    deploymentId: opts.deploymentId,
+    finalOutcome: "succeeded",
+    runClassification: "deploy",
+    excludeDeployRunId: opts.excludeRunId,
+    requireReplaySnapshotPath: true,
+  });
   if (!latest?.record.replaySnapshotPath) return undefined;
   return await readNixosSharedHostReplaySnapshot(latest.record.replaySnapshotPath);
 }
 
 export async function liveRollbackCompatibilityErrors(opts: {
-  recordsRoot: string;
+  backend: NixosSharedHostControlPlaneBackendTarget;
   deploymentId: string;
   sourceRunId: string;
 }): Promise<string[]> {

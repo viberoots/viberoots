@@ -1,13 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA } from "../../deployments/deployment-control-plane-contract.ts";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-shared-host-control-plane-snapshot.ts";
 import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
 import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop.ts";
-import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../deployments/nixos-shared-host-control-plane-api-contract.ts";
 import { resolveDeploymentFromTarget } from "../../deployments/deployment-query.ts";
 import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture.ts";
 import {
@@ -20,48 +18,15 @@ import {
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
 import {
+  postCancelRunAction,
+  readRecord,
+  readStatus,
   smokeConnectOverride,
+  submitServiceRequest,
   waitFor,
   writeDemoArtifact,
 } from "./nixos-shared-host.control-plane.helpers.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
-
-async function readJson<T>(response: Response): Promise<T> {
-  const body = await response.text();
-  assert.equal(response.ok, true, body);
-  return JSON.parse(body) as T;
-}
-
-async function submitServiceRequest(opts: {
-  url: string;
-  deployment: any;
-  artifactDir: string;
-  admissionEvidence?: unknown;
-  smokeConnectOverride?: unknown;
-}) {
-  return await readJson<any>(
-    await fetch(new URL("/api/v1/submissions", opts.url), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
-        submissionId: createNixosSharedHostSubmissionId(),
-        submittedAt: new Date().toISOString(),
-        deployment: opts.deployment,
-        operationKind: "deploy",
-        artifactDir: opts.artifactDir,
-        ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
-        ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
-      }),
-    }),
-  );
-}
-
-async function readStatus(url: string, submissionId: string) {
-  const requestUrl = new URL("/api/v1/status", url);
-  requestUrl.searchParams.set("submissionId", submissionId);
-  return await readJson<any>(await fetch(requestUrl));
-}
 
 test("control-plane service persists queued submissions across restart and a separate worker later executes them", async () => {
   await runInTemp("nixos-shared-host-control-plane-service-queue", async (tmp, $) => {
@@ -92,6 +57,29 @@ test("control-plane service persists queued submissions across restart and a sep
         smokeConnectOverride: smokeConnectOverride(server.port),
       });
       assert.equal(submitted.lifecycleState, "waiting_for_lock");
+      await fsp
+        .access(path.join(paths.recordsRoot, "control-plane", "submissions"))
+        .catch(() => {});
+      await assert.rejects(
+        fsp.access(
+          path.join(
+            paths.recordsRoot,
+            "control-plane",
+            "submissions",
+            `${submitted.submissionId}.json`,
+          ),
+        ),
+      );
+      await assert.rejects(
+        fsp.access(
+          path.join(
+            paths.recordsRoot,
+            "control-plane",
+            "snapshots",
+            `${submitted.submissionId}.json`,
+          ),
+        ),
+      );
       const beforeRestart = await readStatus(controlPlane.url, submitted.submissionId);
       assert.equal(beforeRestart.lifecycleState, "waiting_for_lock");
       await controlPlane.close();
@@ -114,7 +102,11 @@ test("control-plane service persists queued submissions across restart and a sep
             return status.lifecycleState === "finished" ? status : null;
           }, "timed out waiting for service worker completion");
           assert.equal(finished.finalOutcome, "succeeded");
-          assert.ok(finished.resultRecordPath);
+          const record = await readRecord(restarted.url, finished.deployRunId);
+          assert.equal(record.deployRunId, finished.deployRunId);
+          await assert.rejects(
+            fsp.access(path.join(paths.recordsRoot, "runs", `${finished.deployRunId}.json`)),
+          );
         } finally {
           await worker.close();
         }
@@ -151,20 +143,7 @@ test("control-plane run-action API cancels a queued submission and keeps the sta
         artifactDir,
         admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
       });
-      const cancelled = await readJson<any>(
-        await fetch(new URL("/api/v1/run-actions", controlPlane.url), {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            schemaVersion: DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA,
-            actionId: "cancel-queued-1",
-            submittedAt: new Date().toISOString(),
-            submissionId: submitted.submissionId,
-            action: "cancel",
-            idempotencyKey: "cancel-queued-1",
-          }),
-        }),
-      );
+      const cancelled = await postCancelRunAction(controlPlane.url, submitted.submissionId);
       assert.equal(cancelled.lifecycleState, "cancelled");
       await controlPlane.close();
       const restarted = await startNixosSharedHostControlPlaneServer({

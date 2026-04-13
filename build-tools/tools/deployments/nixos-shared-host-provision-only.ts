@@ -17,6 +17,7 @@ type ProvisionOnlyRunOpts = {
   deployment: NixosSharedHostDeployment;
   paths: NixosSharedHostControlPlanePaths;
   sourceRunId: string;
+  backendDatabaseUrl?: string;
   submissionId?: string;
   dedupe?: DeploymentControlPlaneRequestDedupe;
   requestedBy?: { principalId: string; displayName?: string };
@@ -36,6 +37,16 @@ function sharedSubmitOpts(opts: ProvisionOnlyRunOpts) {
   };
 }
 
+function requireBackendDatabaseUrl(value?: string): string {
+  const resolved = value || String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
+  if (!resolved) {
+    throw new Error(
+      "shared replay source lookup requires backendDatabaseUrl or BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL",
+    );
+  }
+  return resolved;
+}
+
 export async function submitNixosSharedHostProvisionOnlyRun(opts: ProvisionOnlyRunOpts) {
   if (!opts.sourceRunId) {
     return await submitNixosSharedHostControlPlaneRun({
@@ -50,6 +61,7 @@ export async function submitNixosSharedHostProvisionOnlyRun(opts: ProvisionOnlyR
   const replay = await resolveNixosSharedHostReplaySelection({
     deployment: opts.deployment,
     recordsRoot: opts.paths.recordsRoot,
+    backendDatabaseUrl: requireBackendDatabaseUrl(opts.backendDatabaseUrl),
     sourceRunId: opts.sourceRunId,
     rollback: false,
   });
@@ -65,7 +77,6 @@ export async function submitNixosSharedHostProvisionOnlyRun(opts: ProvisionOnlyR
     artifactLineageId: replay.artifactLineageId,
     source: {
       record: replay.sourceRecord,
-      recordPath: replay.recordPath,
       replaySnapshot: replay.sourceReplaySnapshot,
       replaySnapshotPath: replay.replaySnapshotPath,
     },

@@ -2,11 +2,43 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA } from "../../deployments/deployment-control-plane-contract.ts";
+import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../deployments/nixos-shared-host-control-plane-api-contract.ts";
+import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-shared-host-control-plane-snapshot.ts";
 
 export async function writeDemoArtifact(root: string, body = "demoapp"): Promise<void> {
   await fsp.mkdir(root, { recursive: true });
   await fsp.writeFile(path.join(root, "index.html"), `<html>${body}</html>\n`, "utf8");
   await fsp.writeFile(path.join(root, "healthz"), "ok\n", "utf8");
+}
+
+export async function writeSsrArtifact(
+  root: string,
+  body = "<html>demoapp-ssr</html>\n",
+): Promise<void> {
+  await fsp.mkdir(path.join(root, "dist", "server"), { recursive: true });
+  await fsp.mkdir(path.join(root, "dist", "client"), { recursive: true });
+  await fsp.writeFile(
+    path.join(root, "dist", "server", "index.js"),
+    [
+      "import http from 'node:http';",
+      "import fs from 'node:fs';",
+      "import path from 'node:path';",
+      "import { fileURLToPath } from 'node:url';",
+      "const __dirname = path.dirname(fileURLToPath(import.meta.url));",
+      "const port = Number(process.env.PORT || '3000');",
+      "const clientRoot = path.join(__dirname, '..', 'client');",
+      "const server = http.createServer((req, res) => {",
+      "  if (req.url === '/healthz') { res.writeHead(200); res.end('ok\\n'); return; }",
+      "  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });",
+      "  res.end(fs.readFileSync(path.join(clientRoot, 'index.html'), 'utf8'));",
+      "});",
+      "server.listen(port, process.env.HOST || '127.0.0.1');",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await fsp.writeFile(path.join(root, "dist", "client", "index.html"), body, "utf8");
 }
 
 export async function withEnvOverrides<T>(
@@ -87,4 +119,64 @@ export async function assertFrozenSnapshotExecution(result: any): Promise<void> 
   assert.ok(result.record.controlPlane);
   assert.equal(result.record.controlPlane.submissionId, result.submission.submissionId);
   assert.equal(result.record.controlPlane.executionSnapshotPath, result.executionSnapshotPath);
+}
+
+export async function readJson<T>(response: Response): Promise<T> {
+  const body = await response.text();
+  assert.equal(response.ok, true, body);
+  return JSON.parse(body) as T;
+}
+
+export async function submitServiceRequest(opts: {
+  url: string;
+  deployment: any;
+  artifactDir: string;
+  admissionEvidence?: unknown;
+  smokeConnectOverride?: unknown;
+}) {
+  return await readJson<any>(
+    await fetch(new URL("/api/v1/submissions", opts.url), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
+        submissionId: createNixosSharedHostSubmissionId(),
+        submittedAt: new Date().toISOString(),
+        deployment: opts.deployment,
+        operationKind: "deploy",
+        artifactDir: opts.artifactDir,
+        ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
+        ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
+      }),
+    }),
+  );
+}
+
+export async function postCancelRunAction(url: string, submissionId: string) {
+  return await readJson<any>(
+    await fetch(new URL("/api/v1/run-actions", url), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        schemaVersion: DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA,
+        actionId: "cancel-queued-1",
+        submittedAt: new Date().toISOString(),
+        submissionId,
+        action: "cancel",
+        idempotencyKey: "cancel-queued-1",
+      }),
+    }),
+  );
+}
+
+export async function readStatus(url: string, submissionId: string) {
+  const requestUrl = new URL("/api/v1/status", url);
+  requestUrl.searchParams.set("submissionId", submissionId);
+  return await readJson<any>(await fetch(requestUrl));
+}
+
+export async function readRecord(url: string, deployRunId: string) {
+  const requestUrl = new URL("/api/v1/records", url);
+  requestUrl.searchParams.set("deployRunId", deployRunId);
+  return await readJson<any>(await fetch(requestUrl));
 }

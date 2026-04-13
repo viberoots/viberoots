@@ -46,7 +46,7 @@ export type DeploymentExecutionResult = {
     controlPlane?: unknown;
     deployBatchId?: string;
   };
-  recordPath: string;
+  recordPath?: string;
 };
 
 function defaultNixosHostRoot(workspaceRoot: string): string {
@@ -198,7 +198,7 @@ export function summarizeDeploymentResult(result: DeploymentExecutionResult) {
       ? { executionPolicy: (result.record as any).executionPolicy }
       : {}),
     publicUrl: result.record.publicUrl,
-    recordPath: result.recordPath,
+    ...(result.recordPath ? { recordPath: result.recordPath } : {}),
     ...(result.record.controlPlane ? { controlPlane: result.record.controlPlane } : {}),
   };
 }

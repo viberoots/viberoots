@@ -136,7 +136,10 @@ test("abort finishes a paused progressive rollout with an aborted record", async
       });
       assert.equal(aborted.finalOutcome, "aborted");
       assert.equal(aborted.progressiveRollout?.state, "aborted");
-      const record = JSON.parse(await fsp.readFile(aborted.resultRecordPath!, "utf8"));
+      assert.ok(aborted.deployRunId);
+      const record = JSON.parse(
+        await fsp.readFile(path.join(recordsRoot, "runs", `${aborted.deployRunId}.json`), "utf8"),
+      );
       assert.equal(record.finalOutcome, "aborted");
       assert.equal(record.progressiveRollout.state, "aborted");
     } finally {
@@ -212,19 +215,12 @@ test("newer runs are rejected while a progressive rollout is paused", async () =
       );
       const status = await readDeploymentControlPlaneStatus({
         recordsRoot,
-        deployRunId: (
-          await readDeploymentControlPlaneStatus({
-            recordsRoot,
-            submissionPath: path.join(
-              recordsRoot,
-              "control-plane",
-              "submissions",
-              (
-                await fsp.readdir(path.join(recordsRoot, "control-plane", "submissions"))
-              ).sort()[0]!,
-            ),
-          })
-        ).deployRunId,
+        submissionPath: path.join(
+          recordsRoot,
+          "control-plane",
+          "submissions",
+          (await fsp.readdir(path.join(recordsRoot, "control-plane", "submissions"))).sort()[0]!,
+        ),
       });
       assert.equal(status.progressiveRollout?.state, "paused");
     } finally {

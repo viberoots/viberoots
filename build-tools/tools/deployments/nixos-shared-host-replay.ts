@@ -1,20 +1,19 @@
 #!/usr/bin/env zx-wrapper
-import path from "node:path";
 import { requireNixosSharedHostAdmittedArtifactPath } from "./nixos-shared-host-artifacts.ts";
 import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention.ts";
+import {
+  readBackendDeployRecordEnvelopeByDeployRunId,
+  type NixosSharedHostControlPlaneBackendTarget,
+} from "./nixos-shared-host-control-plane-backend.ts";
 import {
   liveRollbackCompatibilityErrors,
   replayRunnerCompatibilityErrors,
   rollbackSourceEligibilityErrors,
   sameDeploymentReplayErrors,
 } from "./nixos-shared-host-replay-guardrails.ts";
-import {
-  deployRecordPathFor,
-  readNixosSharedHostDeployRecord,
-  type NixosSharedHostDeployRecord,
-} from "./nixos-shared-host-records.ts";
+import { type NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
 import {
   nixosSharedHostReplayArtifactIdentity,
   readNixosSharedHostReplaySnapshot,
@@ -43,25 +42,32 @@ wrong run classification: ${record.runClassification}`);
 }
 
 export async function resolveNixosSharedHostReplaySource(opts: {
-  recordPath?: string;
-  recordsRoot?: string;
+  recordsRoot: string;
+  backendDatabaseUrl: string;
   deployRunId?: string;
 }) {
-  if (!opts.recordPath && (!opts.recordsRoot || !opts.deployRunId)) {
-    throw new Error(
-      "resolve replay source requires --record-path or --records-root plus --deploy-run-id",
-    );
+  if (!opts.deployRunId) {
+    throw new Error("resolve replay source requires --deploy-run-id");
   }
-  const recordPath = opts.recordPath
-    ? path.resolve(opts.recordPath)
-    : deployRecordPathFor(String(opts.recordsRoot || ""), String(opts.deployRunId || ""));
-  const record = await readNixosSharedHostDeployRecord(recordPath);
+  const backend: NixosSharedHostControlPlaneBackendTarget = {
+    recordsRoot: opts.recordsRoot,
+    databaseUrl: opts.backendDatabaseUrl,
+  };
+  const envelope = await readBackendDeployRecordEnvelopeByDeployRunId(backend, opts.deployRunId);
+  if (!envelope) {
+    throw Object.assign(new Error(`deploy record not found for ${opts.deployRunId}`), {
+      code: "ENOENT",
+    });
+  }
+  const record = envelope.record as NixosSharedHostDeployRecord;
   const replaySnapshotPath = requireReplaySnapshotPath(record);
   const replaySnapshot = await readNixosSharedHostReplaySnapshot(replaySnapshotPath);
   await assertProtectedSharedReplayUsable({
     protectionClass: "shared_nonprod",
     deployRunId: record.deployRunId,
-    recordPath,
+    recordPath: envelope.recordPath,
+    recordUpdatedAt: envelope.updatedAt,
+    requireRecordPathInBundle: false,
     replaySnapshotPath,
     replayCreatedAt: replaySnapshot.createdAt,
     artifacts:
@@ -85,12 +91,12 @@ export async function resolveNixosSharedHostReplaySource(opts: {
         ]),
       ),
     );
-    return { record, recordPath, replaySnapshot, componentArtifactDirs };
+    return { record, replaySnapshot, componentArtifactDirs };
   }
   const artifactDir = await requireNixosSharedHostAdmittedArtifactPath(
     replaySnapshot.publishInput.artifact,
   );
-  return { record, recordPath, replaySnapshot, artifactDir };
+  return { record, replaySnapshot, artifactDir };
 }
 
 function componentIds(values: Array<{ componentId: string }>): string {
@@ -143,11 +149,13 @@ export function requireNixosSharedHostReplayComponentState(
 export async function resolveNixosSharedHostReplaySelection(opts: {
   deployment: NixosSharedHostDeployment;
   recordsRoot: string;
+  backendDatabaseUrl: string;
   sourceRunId: string;
   rollback: boolean;
 }) {
   const source = await resolveNixosSharedHostReplaySource({
     recordsRoot: opts.recordsRoot,
+    backendDatabaseUrl: opts.backendDatabaseUrl,
     deployRunId: opts.sourceRunId,
   });
   const errors = sameDeploymentReplayErrors(opts.deployment, source.replaySnapshot.deployment);
@@ -175,7 +183,10 @@ ${rollbackErrors.join("\n")}`);
   }
   const liveCompatibilityErrors = opts.rollback
     ? await liveRollbackCompatibilityErrors({
-        recordsRoot: opts.recordsRoot,
+        backend: {
+          recordsRoot: opts.recordsRoot,
+          databaseUrl: opts.backendDatabaseUrl,
+        },
         deploymentId: opts.deployment.deploymentId,
         sourceRunId: source.record.deployRunId,
       })
@@ -202,7 +213,6 @@ ${liveCompatibilityErrors.join("\n")}`);
     artifactLineageId:
       source.record.artifactLineageId ||
       nixosSharedHostReplayArtifactIdentity(source.replaySnapshot),
-    recordPath: source.recordPath,
     replaySnapshotPath: requireReplaySnapshotPath(source.record),
     sourceRecord: source.record,
     sourceReplaySnapshot: source.replaySnapshot,
