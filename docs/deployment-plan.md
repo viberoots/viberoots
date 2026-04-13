@@ -6730,6 +6730,122 @@ owns durable worker claims, status/result reads, and deploy-record persistence.
 
 ---
 
+## PR-51: Provider-capability registry closeout + generated doc parity
+
+### Description
+
+I will close the remaining provider-capability contract gap by making the reviewed built-in
+provider-capability registry complete, typed, DRY, and fail-closed instead of leaving part of the
+normative contract only in documentation prose. This PR makes one reviewed source of truth cover
+the built-in provider capability surface and ensures the code, tests, and docs stay synchronized.
+
+### Scope & Changes
+
+- Expand the code-side provider-capability model so it can represent the full reviewed capability
+  contract currently described in
+  [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md),
+  including fields such as:
+  - canonical target identity / lock-key posture
+  - preview support and cleanup posture
+  - smoke / release-health posture
+  - retry / idempotency posture
+  - provisioner support posture
+  - protected/shared eligibility posture
+- Keep the implementation within methodology and SoC guardrails by splitting the provider-capability
+  registry into small reviewed modules rather than growing one oversized monolithic file:
+  - shared type / helper module
+  - one small capability entry module per built-in provider family
+  - one thin reviewed aggregation / lookup layer
+- Adopt the DRY source-of-truth model for provider capabilities:
+  - code-side reviewed capability entries become the authoritative structured source
+  - the provider-capabilities doc is generated or rendered from that reviewed source rather than
+    being hand-maintained prose for values that the runtime also needs to know
+- Keep prose-only rationale or explanatory notes in the docs where useful, but move normative
+  contract facts into the structured reviewed source so docs and runtime do not drift.
+- Add fail-closed generation / sync behavior so any reviewed capability change that is not reflected
+  in the rendered doc output is rejected by tests or tooling.
+- Preserve the existing public provider-capability API shape where possible for consumers that only
+  need the narrower helper subset today, while extending the typed internal contract to carry the
+  full reviewed capability surface.
+
+### Tests (in this PR)
+
+- Replace the current spot-check provider-capability tests with fail-closed contract tests proving:
+  - every reviewed built-in provider in docs exists in the structured code registry
+  - every required capability field is present for every reviewed built-in provider
+  - rendered provider-capability doc output matches the structured registry exactly for normative
+    contract values
+  - no extra reviewed provider appears in code without a corresponding reviewed doc entry
+- Add tests proving the split provider-capability modules still produce one deterministic reviewed
+  registry and do not regress existing lookup helpers.
+- Add negative tests proving generation / parity checks fail closed when:
+  - a required field is omitted from a provider capability entry
+  - docs drift from the structured registry
+  - a new provider is added without the required reviewed capability data
+- Add tests proving the capability-rendering path is deterministic and stable across repeated runs.
+
+### Docs (in this PR)
+
+- Update
+  [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+  so its normative provider entries are rendered from or explicitly locked to the reviewed
+  structured capability registry rather than duplicated by hand.
+- Document the reviewed DRY source-of-truth rule for built-in provider capabilities:
+  - structured capability entries own normative contract values
+  - docs may add rationale and examples, but must not redefine those values independently
+- Update any companion deployment docs that describe how provider capability support is reviewed so
+  they point at the new authoritative capability-registry boundary.
+
+### Verification Commands
+
+- `v`
+- provider-capability generation / parity verification commands introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-domain provider-capability registry code, deployment-domain
+  tests, and provider-capability docs. Under the deployment-only verify policy, default `v` / CI
+  can run the reviewed deployment suite rather than the full non-deployment build-system verify
+  scope.
+
+### Acceptance Criteria
+
+- The repo has one reviewed structured provider-capability source of truth for all built-in
+  providers.
+- Every required reviewed capability field is represented in code for every built-in provider
+  currently in policy.
+- The normative provider-capabilities doc stays in deterministic sync with that structured source.
+- Tests fail closed on missing fields, undocumented providers, or doc/runtime drift.
+
+### Risks
+
+Turning a prose-heavy normative registry into a structured reviewed source can accidentally lose
+important explanatory context, or can create churn if generation boundaries are vague.
+
+### Mitigation
+
+Keep the structured capability layer limited to normative contract facts, keep explanatory prose in
+the doc where it adds value, and make the rendering / parity boundary explicit and deterministic.
+
+### Consequence of Not Implementing
+
+The deployment plan would continue to overstate closure of the provider-capability contract while a
+meaningful part of that reviewed registry remains duplicated between docs and runtime with only
+partial test coverage.
+
+### Downsides for Implementing
+
+This adds one more reviewed generation / parity surface and may require modest refactoring of
+current capability helpers to consume the richer typed registry.
+
+### Recommendation
+
+Implement after PR-50 as the final closeout for the remaining provider-capability doc/runtime drift
+so the deployment plan can be signed off as both implemented and reviewably synchronized.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -6786,6 +6902,9 @@ owns durable worker claims, status/result reads, and deploy-record persistence.
     remove the remaining protected/shared peer-mutator client paths so every reviewed same-host,
     remote-profile, and Jenkins caller routes through one central control-plane authority backed by
     authoritative Postgres records.
+21. PR-51: close the remaining provider-capability registry gap by making the reviewed built-in
+    provider capability surface complete, structured, DRY, and deterministically synchronized with
+    the normative provider-capabilities documentation.
 
 ## Companion Docs
 
