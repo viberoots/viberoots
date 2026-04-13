@@ -166,7 +166,9 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json \
   --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime \
   --remote-records-root /var/lib/bucknix/nixos-shared-host/records \
-  --ssh-mode ssh
+  --ssh-mode ssh \
+  --control-plane-url http://127.0.0.1:7780 \
+  --control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN
 ```
 
 This writes the local client manifest under:
@@ -174,7 +176,9 @@ This writes the local client manifest under:
 - `.local/deployments/nixos-shared-host/clients/mini.json`
 
 Use the same reviewed values on Jenkins; the wrapper later adds only the local
-artifact directory plus SSH credentials.
+artifact directory plus SSH credentials. The reviewed client profile now
+records both the SSH transport contract and the control-plane service endpoint
+plus token-env binding used for protected/shared submission.
 
 ### 6. Review the first remote plan
 
@@ -186,7 +190,8 @@ direnv exec . build-tools/tools/bin/deploy \
 ```
 
 Review that the resolved destination, repo path, state path, runtime root, and
-records root all point at the `mini` install you just created.
+records root all point at the `mini` install you just created, and that the
+`serviceClient` block names the reviewed control-plane URL and token env.
 
 ### 7. Run the current reviewed remote flow
 
@@ -196,8 +201,7 @@ From a dev machine:
 direnv exec . build-tools/tools/bin/deploy \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
-  --artifact-dir ./dist \
-  --apply-host
+  --artifact-dir ./dist
 ```
 
 From Jenkins:
@@ -211,9 +215,13 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
   --ssh-known-hosts "$JENKINS_KNOWN_HOSTS"
 ```
 
-For both paths, `--apply-host` and `--apply-host-dry-run` stay explicit.
-Ambient defaults still skip host apply. The rest of this document is reference
-detail for those same server and client workflows.
+For both paths, the reviewed profile supplies the service endpoint and auth env,
+while the wrapper/CLI still uses SSH only for artifact staging and remote
+preflight. Admission, locking, orchestration, run-action handling, and final
+deploy-record authority stay behind the central control-plane service. The
+service-only remote-profile and Jenkins wrappers do not accept
+`--apply-host`, `--apply-host-dry-run`, or `--control-plane-url` on the deploy
+command line.
 
 ## What The Installer Manages
 
@@ -738,6 +746,14 @@ deploy records keyed by `deploy_run_id` and submission id. The operator-readable
 control-plane mirror still lands under:
 
 - `<records-root>/control-plane/submissions/*.json`
+
+The reviewed same-host client now fails closed when service configuration is
+missing or unhealthy:
+
+- missing `--control-plane-url` (or `BNX_DEPLOY_CONTROL_PLANE_URL`) is rejected
+- a token-protected service without `BNX_DEPLOY_CONTROL_PLANE_TOKEN` returns
+  `unauthorized`
+- an unreachable service exits non-zero with `control-plane service unavailable`
 - `<records-root>/control-plane/snapshots/*.json`
 
 The deploy record written under `<records-root>/runs/*.json` is now a mirror of
@@ -764,13 +780,16 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
 ```
 
 The current Jenkins and remote-profile wrappers still use the reviewed SSH-based
-remote execution path. They do not accept `--control-plane-url` yet.
+remote transport for artifact staging and remote preflight, but the mutation
+itself is submitted through the central control plane. They do not accept
+`--control-plane-url` on the wrapper CLI because that endpoint and any required
+token env come from the reviewed client profile.
 
 Minimum Jenkins contract:
 
 - `--profile`
-  - selects the reviewed remote destination and remote repo/state/runtime/
-    records roots
+  - selects the reviewed remote destination, remote repo/state/runtime/records
+    roots, and the control-plane service endpoint/auth contract
 - `--artifact-dir`
   - must point at an already-built local artifact directory
 - `--ssh-identity-file`
@@ -778,8 +797,6 @@ Minimum Jenkins contract:
 - `--ssh-known-hosts`
   - required known-hosts file; the wrapper forces strict host-key checking and
     batch mode so CI stays non-interactive
-- `--apply-host` or `--apply-host-dry-run`
-  - optional and explicit; host apply is never implicit
 
 Remote checkout expectations:
 
@@ -790,7 +807,7 @@ Remote checkout expectations:
   - `flake.nix`
   - `build-tools/tools/bin/deploy`
 
-Concrete Pleomino `dev` to `mini` example with explicit host apply:
+Concrete Pleomino `dev` to `mini` example:
 
 ```bash
 direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
@@ -798,8 +815,7 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
   --profile mini \
   --artifact-dir "$WORKSPACE/projects/apps/pleomino/dist" \
   --ssh-identity-file "$JENKINS_SSH_IDENTITY" \
-  --ssh-known-hosts "$JENKINS_KNOWN_HOSTS" \
-  --apply-host
+  --ssh-known-hosts "$JENKINS_KNOWN_HOSTS"
 ```
 
 Plan-only preflight for Jenkins:
@@ -818,7 +834,8 @@ The wrapper always emits JSON on stdout. Success output includes:
 
 - the reviewed Jenkins contract summary
 - the resolved remote plan
-- the remote execution result, including the remote record path
+- the remote execution result, including authoritative control-plane submission
+  and result information
 
 Failure output is also JSON and exits non-zero so Jenkins can parse the error
 without scraping stderr.

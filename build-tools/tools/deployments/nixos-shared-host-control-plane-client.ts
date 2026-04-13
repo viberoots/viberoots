@@ -13,10 +13,27 @@ function authHeaders(token?: string) {
   return token ? { authorization: `Bearer ${token}` } : {};
 }
 
-async function readJson<T>(response: Response): Promise<T> {
+function responseErrorMessage(body: string, status: number): string {
+  const trimmed = body.trim();
+  if (!trimmed) return `request failed: ${status}`;
+  try {
+    const parsed = JSON.parse(trimmed) as { error?: unknown };
+    if (typeof parsed.error === "string" && parsed.error.trim()) return parsed.error.trim();
+  } catch {}
+  return trimmed;
+}
+
+async function readJson<T>(request: Promise<Response>): Promise<T> {
+  let response: Response;
+  try {
+    response = await request;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`control-plane service unavailable: ${message}`);
+  }
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(body || `request failed: ${response.status}`);
+    throw new Error(responseErrorMessage(body, response.status));
   }
   return (await response.json()) as T;
 }
@@ -31,7 +48,7 @@ export async function readNixosSharedHostControlPlaneStatusViaService(opts: {
   if (opts.submissionId) url.searchParams.set("submissionId", opts.submissionId);
   if (opts.deployRunId) url.searchParams.set("deployRunId", opts.deployRunId);
   return await readJson<DeploymentControlPlaneStatus>(
-    await fetch(url, { headers: { ...authHeaders(opts.token) } }),
+    fetch(url, { headers: { ...authHeaders(opts.token) } }),
   );
 }
 
@@ -44,7 +61,7 @@ export async function readNixosSharedHostControlPlaneRecordViaService(opts: {
   const url = new URL("/api/v1/records", opts.controlPlaneUrl);
   if (opts.submissionId) url.searchParams.set("submissionId", opts.submissionId);
   if (opts.deployRunId) url.searchParams.set("deployRunId", opts.deployRunId);
-  return await readJson<any>(await fetch(url, { headers: { ...authHeaders(opts.token) } }));
+  return await readJson<any>(fetch(url, { headers: { ...authHeaders(opts.token) } }));
 }
 
 export async function submitNixosSharedHostControlPlaneViaService(opts: {
@@ -55,7 +72,7 @@ export async function submitNixosSharedHostControlPlaneViaService(opts: {
   timeoutMs?: number;
 }) {
   const initial = await readJson<DeploymentControlPlaneSubmitResponse>(
-    await fetch(new URL("/api/v1/submissions", opts.controlPlaneUrl), {
+    fetch(new URL("/api/v1/submissions", opts.controlPlaneUrl), {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -91,7 +108,7 @@ export async function submitNixosSharedHostControlPlaneRunActionViaService(opts:
   request: DeploymentControlPlaneRunActionRequest;
 }) {
   return await readJson<DeploymentControlPlaneRunActionResponse>(
-    await fetch(new URL("/api/v1/run-actions", opts.controlPlaneUrl), {
+    fetch(new URL("/api/v1/run-actions", opts.controlPlaneUrl), {
       method: "POST",
       headers: {
         "content-type": "application/json",

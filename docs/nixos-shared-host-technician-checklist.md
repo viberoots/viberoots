@@ -198,5 +198,9 @@ direnv exec . build-tools/tools/bin/deploy \
   --control-plane-url http://127.0.0.1:7780
 ```
 
-Remote-profile and Jenkins wrapper flows still use the reviewed SSH path and do
-not accept `--control-plane-url` yet.
+Remote-profile and Jenkins wrapper flows still use the reviewed SSH transport
+for artifact staging and remote preflight, but they submit the protected/shared
+mutation through the control-plane service endpoint recorded in the reviewed
+client profile. They do not accept `--control-plane-url` on the wrapper CLI;
+confirm the selected profile already carries the correct service endpoint and
+token-env configuration before proceeding.

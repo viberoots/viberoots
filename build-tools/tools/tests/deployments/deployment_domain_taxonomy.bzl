@@ -128,6 +128,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/nixos-shared-host.replay.provenance.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.replay.retention.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.replay.rollback-eligibility.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.service-only.fail-closed.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.target-exceptions.replay.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.reuse.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.rollback.e2e.test.ts": True,
