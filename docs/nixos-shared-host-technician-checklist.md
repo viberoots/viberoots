@@ -13,8 +13,15 @@ Current reviewed scope for this checklist:
 
 - host/provider family: `nixos-shared-host`
 - example shared host: `mini`
-- component kind: `static-webapp`
+- component kinds:
+  - `static-webapp`
+  - `ssr-webapp` for the reviewed single-component host slice
 - protection class: `shared_nonprod`
+
+This checklist still uses the current Pleomino static deployment as the
+concrete example, but the same server install, client-profile install, and
+control-plane bring-up also support the reviewed single-component
+`ssr-webapp` slice.
 
 ## Before You Start
 

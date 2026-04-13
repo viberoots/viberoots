@@ -60,6 +60,32 @@ Expected behavior:
 - publish runs through the built-in `aws-s3-sync` path against the authoritative bucket identity
 - built-in smoke validates the canonical distribution or bucket website URL after publish
 
+## 2.2. Managed `nixos-shared-host` SSR Deploy
+
+Situation:
+
+- deployment: `demoapp-dev`
+- protection class: `shared_nonprod`
+- provider: `nixos-shared-host`
+- component kind: `ssr-webapp`
+- publisher: `nixos-shared-host-ssr-webapp`
+- runtime contract: `node-dist-server-v1`
+
+Expected behavior:
+
+- the operator submits `deploy demoapp-dev`
+- the control plane admits one immutable SSR artifact plus the reviewed runtime
+  contract
+- host realization preserves the canonical shared-host target identity from
+  deployment metadata rather than inferring it from provider-local state
+- publish stages the SSR artifact, activates the reviewed Node runtime, and
+  keeps nginx routing pointed at the admitted host target
+- built-in smoke validates `https://${appName}.apps.kilty.io/` and any
+  declared `healthPath` against the admitted SSR runtime instead of treating
+  the artifact like a static asset tree
+- records and replay snapshots preserve the SSR runtime-contract provenance
+  needed for later retry, rollback, and promotion-safety checks
+
 ## 3. Same-Deployment Rollback
 
 Situation:

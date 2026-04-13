@@ -16,9 +16,16 @@ default path for `mini`.
 Current implemented scope:
 
 - provider family: `nixos-shared-host`
-- component kind: `static-webapp`
+- component kinds:
+  - `static-webapp`
+  - `ssr-webapp` for the reviewed single-component host slice
 - protection class: `shared_nonprod`
-- canonical example deployment: `//projects/deployments/pleomino-dev:deploy`
+- canonical example deployment in this guide: `//projects/deployments/pleomino-dev:deploy`
+
+The install and control-plane workflow in this guide applies to both reviewed
+hosted webapp slices. The concrete command examples below use the current
+static Pleomino deployment, but the same host install and remote-profile flow
+also backs the reviewed single-component `ssr-webapp` path.
 
 The install workflow is now centered on:
 
