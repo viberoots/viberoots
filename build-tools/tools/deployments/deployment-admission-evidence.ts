@@ -95,7 +95,8 @@ export type DeploymentPrerequisiteFact = {
   deploymentId: string;
   mode: DeploymentPrerequisiteMode;
   sourceDeployRunId: string;
-  sourceRecordPath?: string;
+  publicUrl?: string;
+  healthUrl?: string;
   checkedAt?: string;
   healthEvidenceRef?: string;
 };

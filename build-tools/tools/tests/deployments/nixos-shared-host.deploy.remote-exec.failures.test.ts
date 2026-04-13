@@ -1,25 +1,51 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
+import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
+import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import {
-  listRunRecords,
+  installClientProfile,
   prepareRemoteExecFixture,
   remoteExecEnv,
   REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
 } from "./nixos-shared-host.deploy.remote-exec.helpers.ts";
+import { readRecord, waitFor } from "./nixos-shared-host.control-plane.helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 test("remote deploy fails closed on artifact staging failure and remote transport failure", async () => {
   await runInTemp("nixos-shared-host-remote-stage-failure", async (tmp, $) => {
-    const { env, artifactDir, admissionEvidencePath, profileRoot } = await prepareRemoteExecFixture(
-      {
-        tmp,
-        $,
-        artifactFiles: { "index.html": "<html>fail</html>\n", healthz: "ok\n" },
+    const {
+      env,
+      artifactDir,
+      admissionEvidencePath,
+      profileRoot,
+      remoteRuntimeRoot,
+      remoteRecordsRoot,
+      remoteStatePath,
+    } = await prepareRemoteExecFixture({
+      tmp,
+      $,
+      artifactFiles: { "index.html": "<html>fail</html>\n", healthz: "ok\n" },
+    });
+    const controlPlane = await startNixosSharedHostControlPlaneServer({
+      workspaceRoot: tmp,
+      paths: {
+        statePath: remoteStatePath,
+        hostRoot: remoteRuntimeRoot,
+        recordsRoot: remoteRecordsRoot,
       },
+      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+    });
+    await installClientProfile(
+      $,
+      profileRoot,
+      tmp,
+      remoteStatePath,
+      remoteRuntimeRoot,
+      remoteRecordsRoot,
+      controlPlane.url,
     );
     const stageFailure = await $({
       cwd: tmp,
@@ -33,6 +59,7 @@ test("remote deploy fails closed on artifact staging failure and remote transpor
     })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
     assert.notEqual(transportFailure.exitCode, 0);
     assert.match(String(transportFailure.stderr), /fake ssh transport failure/);
+    await controlPlane.close();
   });
 });
 
@@ -46,30 +73,60 @@ test("remote deploy propagates remote deploy failures and still writes reviewed 
       profileRoot,
       remoteRuntimeRoot,
       remoteRecordsRoot,
+      remoteStatePath,
     } = await prepareRemoteExecFixture({
       tmp,
       $,
       artifactFiles: { "index.html": "<html>no-health</html>\n" },
+    });
+    const controlPlane = await startNixosSharedHostControlPlaneServer({
+      workspaceRoot: tmp,
+      paths: {
+        statePath: remoteStatePath,
+        hostRoot: remoteRuntimeRoot,
+        recordsRoot: remoteRecordsRoot,
+      },
+      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+    });
+    const worker = startNixosSharedHostControlPlaneWorkerLoop({
+      workspaceRoot: tmp,
+      recordsRoot: remoteRecordsRoot,
+      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
     });
     const server = await startNixosSharedHostPublicServer({
       deployment,
       hostRoot: remoteRuntimeRoot,
     });
     try {
+      await installClientProfile(
+        $,
+        profileRoot,
+        tmp,
+        remoteStatePath,
+        remoteRuntimeRoot,
+        remoteRecordsRoot,
+        controlPlane.url,
+      );
       const result = await $({
         cwd: tmp,
         env: remoteExecEnv(env),
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`.nothrow();
       assert.notEqual(result.exitCode, 0);
-      assert.match(String(result.stderr), /remote deploy failed/);
+      assert.match(String(result.stderr), /remote service submission/);
       assert.match(String(result.stderr), /smoke expected 200/);
-      const [recordName] = await listRunRecords(remoteRecordsRoot);
-      assert.ok(recordName);
-      const record = JSON.parse(
-        await fsp.readFile(path.join(remoteRecordsRoot, "runs", recordName), "utf8"),
-      );
+      const deployRunId = String(result.stderr).match(/deployRunId=([A-Za-z0-9-]+)/)?.[1];
+      assert.ok(deployRunId);
+      const record = await waitFor(async () => {
+        try {
+          return await readRecord(controlPlane.url, deployRunId);
+        } catch {
+          return null;
+        }
+      }, "timed out waiting for remote reviewed failure record");
       assert.equal(record.finalOutcome, "smoke_failed_after_publish");
     } finally {
+      await worker.close();
+      await controlPlane.close();
       await server.close();
     }
   });

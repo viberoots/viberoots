@@ -5,7 +5,10 @@ import path from "node:path";
 import { test } from "node:test";
 import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloudflare-pages-control-plane.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import {
+  cloudflarePagesDeploymentFixture,
+  installCloudflarePagesTargets,
+} from "./cloudflare-pages.fixture.ts";
 import {
   reviewedLaneAdmissionEvidenceFixture,
   writeReviewedLaneAdmissionEvidenceJson,
@@ -39,12 +42,13 @@ test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", 
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
+    await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson,
+      deploymentLabel: deployment.label,
       deployment,
     });
     const server = await startCloudflarePagesPublicServer({
@@ -62,7 +66,7 @@ test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", 
           BNX_CLOUDFLARE_FAKE_WRANGLER_LOG: fake.logPath,
           BNX_CLOUDFLARE_PAGES_WRANGLER_BIN: path.join(fake.binDir, "wrangler"),
         },
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.operationKind, "deploy");
       assert.equal(summary.runClassification, "deploy");
@@ -109,6 +113,7 @@ test("cloudflare-pages smoke failure blocks success after publish", async () => 
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
+    await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const server = await startCloudflarePagesPublicServer({
       deployment,
@@ -168,12 +173,13 @@ test("cloudflare-pages smoke retries transient readiness failures within the sha
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
+    await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson,
+      deploymentLabel: deployment.label,
       deployment,
     });
     let requests = 0;
@@ -199,7 +205,7 @@ test("cloudflare-pages smoke retries transient readiness failures within the sha
           BNX_CLOUDFLARE_FAKE_WRANGLER_LOG: fake.logPath,
           BNX_CLOUDFLARE_PAGES_WRANGLER_BIN: path.join(fake.binDir, "wrangler"),
         },
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.finalOutcome, "succeeded");
       assert.equal(summary.executionPolicy.smokeBudget.totalBudgetMs, 1000);

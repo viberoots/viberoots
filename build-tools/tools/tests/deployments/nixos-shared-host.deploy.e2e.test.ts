@@ -3,10 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import {
-  localHarnessControlPlaneDatabaseUrl,
-  syncBackendDeployRecord,
-} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { inspectNixosSharedHostAdmission } from "../../deployments/nixos-shared-host-admission-inspect.ts";
 import { inspectNixosSharedHostReplay } from "../../deployments/nixos-shared-host-replay-inspect.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
@@ -15,7 +12,12 @@ import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
-import { writeDemoArtifact, writeSsrArtifact } from "./nixos-shared-host.control-plane.helpers.ts";
+import {
+  readRecord,
+  startControlPlaneHarness,
+  writeDemoArtifact,
+  writeSsrArtifact,
+} from "./nixos-shared-host.control-plane.helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow end to end", async () => {
@@ -27,6 +29,8 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
     const artifactDir = path.join(tmp, "artifact");
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
+    const statePath = path.join(tmp, "platform-state.json");
+    const hostConfigPath = path.join(tmp, "rendered-host.json");
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     await writeDemoArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
@@ -35,24 +39,31 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
       tmp,
       $,
       deployment,
-      deploymentJson,
+      deploymentLabel: deployment.label,
     });
     const server = await startNixosSharedHostPublicServer({
       deployment,
       hostRoot,
       fixedRoot: artifactDir,
     });
+    const harness = await startControlPlaneHarness({
+      workspaceRoot: tmp,
+      hostRoot,
+      statePath,
+      recordsRoot,
+      hostConfigPath,
+    });
     try {
       const result = await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --host-config-out ${path.join(tmp, "rendered-host.json")} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.operationKind, "deploy");
       assert.equal(summary.runClassification, "deploy");
       assert.equal(summary.finalOutcome, "succeeded");
       assert.equal(summary.publicUrl, "https://demoapp.apps.kilty.io/");
       assert.equal(summary.controlPlane.lockScope, "nixos-shared-host:default:demoapp");
-      const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
+      const record = await readRecord(harness.controlPlane.url, summary.deployRunId);
       assert.equal(record.schemaVersion, "deploy-record@2026-04-10");
       assert.equal(record.deployRunId, summary.deployRunId);
       assert.equal(record.runClassification, "deploy");
@@ -81,12 +92,6 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
       assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:demoapp");
       assert.equal(snapshot.action.publishBehavior, "deploy");
       assert.equal(snapshot.admittedContext.source.sourceRef, "env/pleomino/dev");
-      await syncBackendDeployRecord(
-        { recordsRoot, databaseUrl: backendDatabaseUrl },
-        summary.recordPath,
-      );
-      await fsp.rm(summary.recordPath, { force: true });
-      assert.equal(await fsp.stat(summary.recordPath).catch(() => null), null);
       await fsp.rm(artifactDir, { recursive: true, force: true });
       const replay = await inspectNixosSharedHostReplay({
         deployRunId: summary.deployRunId,
@@ -116,9 +121,10 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
       );
       assert.equal("recordPath" in admission, false);
       assert.equal("controlPlaneExecutionSnapshotPath" in admission, false);
-      const rendered = JSON.parse(await fsp.readFile(path.join(tmp, "rendered-host.json"), "utf8"));
+      const rendered = JSON.parse(await fsp.readFile(hostConfigPath, "utf8"));
       assert.ok(rendered.containers.demoapp);
     } finally {
+      await harness.close();
       await server.close();
     }
   });
@@ -148,6 +154,9 @@ test("nixos-shared-host deploy CLI completes the reviewed ssr-webapp flow end to
     const deploymentJson = path.join(tmp, "deployment.json");
     const artifactDir = path.join(tmp, "artifact");
     const hostRoot = path.join(tmp, "host");
+    const statePath = path.join(tmp, "platform-state.json");
+    const recordsRoot = path.join(tmp, "records");
+    const hostConfigPath = path.join(tmp, "rendered-host.json");
     await writeSsrArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
@@ -155,32 +164,40 @@ test("nixos-shared-host deploy CLI completes the reviewed ssr-webapp flow end to
       tmp,
       $,
       deployment,
-      deploymentJson,
+      deploymentLabel: deployment.label,
     });
     const server = await startNixosSharedHostPublicServer({
       deployment,
       hostRoot,
       fixedRoot: artifactDir,
     });
+    const harness = await startControlPlaneHarness({
+      workspaceRoot: tmp,
+      hostRoot,
+      statePath,
+      recordsRoot,
+      hostConfigPath,
+    });
     try {
       const result = await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${path.join(tmp, "records")} --host-config-out ${path.join(tmp, "rendered-host.json")} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.finalOutcome, "succeeded");
       assert.equal(summary.publicUrl, "https://demoapp.apps.kilty.io/");
-      const rendered = JSON.parse(await fsp.readFile(path.join(tmp, "rendered-host.json"), "utf8"));
+      const rendered = JSON.parse(await fsp.readFile(hostConfigPath, "utf8"));
       assert.equal(rendered.containers.demoapp.runtime, "ssr-webapp-host");
       assert.equal(
         rendered.containers.demoapp.serverEntry,
         "/srv/ssr-app/live/dist/server/index.js",
       );
-      const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
+      const record = await readRecord(harness.controlPlane.url, summary.deployRunId);
       assert.equal(record.publisherType, "nixos-shared-host-ssr-webapp");
       assert.equal(record.smokeRunnerType, "nixos-shared-host-ssr-webapp-smoke");
       assert.equal(record.componentResults[0].artifact.kind, "ssr-webapp");
       assert.equal(record.componentResults[0].artifactIdentity.startsWith("ssr-webapp:"), true);
     } finally {
+      await harness.close();
       await server.close();
     }
   });

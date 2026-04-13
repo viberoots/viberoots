@@ -11,6 +11,7 @@ import {
   nixosSharedHostLanePolicyFixture,
   nixosSharedHostLanePolicyNodeFixture,
 } from "./nixos-shared-host.fixture.ts";
+export { installKubernetesTargets } from "./deployment-targets.install.helpers.ts";
 
 export function kubernetesDeploymentFixture(
   overrides: Partial<KubernetesDeployment> = {},

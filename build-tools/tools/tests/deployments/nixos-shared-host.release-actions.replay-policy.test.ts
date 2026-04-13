@@ -10,6 +10,7 @@ import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
+import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers.ts";
 import {
   deploymentReleaseActionFixture,
   deploymentRequirementFixture,
@@ -53,6 +54,7 @@ test("rollback replay fails when the recorded release-action policy forbids roll
         deploymentReleaseActionFixture({
           ref: "//projects/deployments/demoapp-shared:post_publish_verification",
           type: "post_publish_verification",
+          phase: "post_publish_pre_smoke",
           dataCompatibility: "reversible",
           replayPolicy: {
             deploy_publish_slice: "skip",
@@ -60,6 +62,8 @@ test("rollback replay fails when the recorded release-action policy forbids roll
             rollback: "fail",
             promotion: "skip",
           },
+          requiredSecretRequirementNames: [],
+          requiredRuntimeConfigRequirementNames: [],
         }),
       ],
     });
@@ -75,7 +79,7 @@ test("rollback replay fails when the recorded release-action policy forbids roll
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson,
+      deploymentLabel: deployment.label,
       deployment,
     });
     await writeVaultFixture(fixturePath, {
@@ -84,6 +88,12 @@ test("rollback replay fails when the recorded release-action policy forbids roll
         allowedSteps: ["release_actions.pre_publish"],
         targetScopes: ["*"],
       },
+    });
+    const harness = await startControlPlaneHarness({
+      workspaceRoot: tmp,
+      hostRoot,
+      statePath,
+      recordsRoot,
     });
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     const commandEnv = {
@@ -95,15 +105,16 @@ test("rollback replay fails when the recorded release-action policy forbids roll
       const first = await $({
         cwd: tmp,
         env: commandEnv,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const firstSummary = JSON.parse(String(first.stdout));
       const rollback = await $({
         cwd: tmp,
         env: commandEnv,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --source-run-id ${firstSummary.deployRunId} --rollback --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`.nothrow();
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --publish-only --source-run-id ${firstSummary.deployRunId} --rollback --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`.nothrow();
       assert.notEqual(rollback.exitCode, 0);
       assert.match(String(rollback.stderr), /does not permit rollback replay/);
     } finally {
+      await harness.close();
       await server.close();
     }
   });

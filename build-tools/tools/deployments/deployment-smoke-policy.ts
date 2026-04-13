@@ -94,9 +94,14 @@ function isProtectedSmokeClass(protectionClass: string): boolean {
 }
 
 export function readDeploymentSmokePolicy(node: GraphNode): DeploymentSmokePolicy | undefined {
+  const smoke = readStringRecord(node, "smoke");
   const smokeException = parseSmokeException(readStringRecord(node, "smoke_exception"));
-  const runnerClass = String(node.smoke_runner_class || "").trim() as DeploymentDefaultSmokeClass;
-  const timeoutBudgetMs = parseSmokeTimeoutBudget(node.smoke_timeout_budget_ms);
+  const runnerClass = String(
+    node.smoke_runner_class || smoke.runner_class || "",
+  ).trim() as DeploymentDefaultSmokeClass;
+  const timeoutBudgetMs = parseSmokeTimeoutBudget(
+    node.smoke_timeout_budget_ms || smoke.timeout_budget_ms,
+  );
   if (!smokeException && !runnerClass && timeoutBudgetMs === undefined) return undefined;
   return {
     ...(smokeException ? { exception: smokeException } : {}),

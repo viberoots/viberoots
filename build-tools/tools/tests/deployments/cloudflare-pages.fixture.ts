@@ -14,6 +14,7 @@ import {
   nixosSharedHostLanePolicyFixture,
   nixosSharedHostLanePolicyNodeFixture,
 } from "./nixos-shared-host.fixture.ts";
+export { installCloudflarePagesTargets } from "./deployment-targets.install.helpers.ts";
 
 export function cloudflarePagesPreviewFixture(
   overrides: Partial<DeploymentPreviewPolicy> = {},

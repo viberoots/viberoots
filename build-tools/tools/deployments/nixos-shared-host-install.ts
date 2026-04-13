@@ -161,6 +161,8 @@ async function runClientInstall(repoRoot: string) {
     remoteRuntimeRoot: fromOptionalFlag("remote-runtime-root"),
     remoteRecordsRoot: fromOptionalFlag("remote-records-root"),
     sshMode: fromOptionalFlag("ssh-mode"),
+    controlPlaneUrl: fromOptionalFlag("control-plane-url"),
+    controlPlaneTokenEnv: fromOptionalFlag("control-plane-token-env"),
   });
   const promptInput = await maybePromptClientInstallInput(repoRoot, mergedInstallInput);
   const result = await installNixosSharedHostClient({
@@ -179,6 +181,8 @@ async function runClientInstall(repoRoot: string) {
       remoteRuntimeRoot: String(promptInput.remoteRuntimeRoot || ""),
       remoteRecordsRoot: String(promptInput.remoteRecordsRoot || ""),
       sshMode: String(promptInput.sshMode || ""),
+      controlPlaneUrl: String(promptInput.controlPlaneUrl || ""),
+      controlPlaneTokenEnv: String(promptInput.controlPlaneTokenEnv || "") || undefined,
     },
     dryRun: getFlagBool("dry-run"),
   });

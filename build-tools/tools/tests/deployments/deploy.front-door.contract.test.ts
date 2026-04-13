@@ -4,29 +4,24 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { resolveDeploymentFromTarget } from "../../deployments/deployment-query.ts";
-import { DEPLOYMENT_EXTRACTED_METADATA_SCHEMA } from "../../deployments/deployment-control-plane-contract.ts";
 import { listDeploymentsForCli } from "../../deployments/deploy-front-door.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import {
+  cloudflarePagesDeploymentFixture,
+  installCloudflarePagesTargets,
+} from "./cloudflare-pages.fixture.ts";
 import {
   writeTempCloudflareValidationWorkspace,
   writeTempListedDeploymentWorkspace,
 } from "./deploy.front-door.fixture.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
-import { kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
-import { s3StaticDeploymentFixture } from "./s3-static.fixture.ts";
+import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
+import { installS3StaticTargets, s3StaticDeploymentFixture } from "./s3-static.fixture.ts";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 
 async function writeDeploymentJson(filePath: string, deployment: unknown) {
   await fsp.writeFile(filePath, JSON.stringify(deployment, null, 2) + "\n", "utf8");
-}
-
-async function writeExtractedMetadataJson(filePath: string, deployment: unknown) {
-  await writeDeploymentJson(filePath, {
-    schemaVersion: DEPLOYMENT_EXTRACTED_METADATA_SCHEMA,
-    deployments: [deployment],
-  });
 }
 
 async function writeArtifact(root: string, html: string): Promise<void> {
@@ -160,16 +155,16 @@ test("deploy front door runs a cloudflare-pages deploy from Buck-backed metadata
   });
 });
 
-test("internal deploy entrypoint still accepts extracted metadata documents", async () => {
+test("internal deploy entrypoint preserves cloudflare-pages provider guardrails with Buck selection", async () => {
   await runInTemp("deploy-cloudflare-provision-only-guard", async (tmp, $) => {
-    const deploymentJson = path.join(tmp, "deployment.json");
-    await writeExtractedMetadataJson(deploymentJson, cloudflarePagesDeploymentFixture());
+    const deployment = cloudflarePagesDeploymentFixture();
+    await installCloudflarePagesTargets(tmp, [deployment]);
     await assert.rejects(
       async () =>
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --provision-only`,
+        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --provision-only`,
       /does not support --provision-only/,
     );
   });
@@ -177,14 +172,14 @@ test("internal deploy entrypoint still accepts extracted metadata documents", as
 
 test("internal deploy entrypoint preserves s3-static provider guardrails", async () => {
   await runInTemp("deploy-s3-static-provision-only-guard", async (tmp, $) => {
-    const deploymentJson = path.join(tmp, "deployment.json");
-    await writeDeploymentJson(deploymentJson, s3StaticDeploymentFixture());
+    const deployment = s3StaticDeploymentFixture();
+    await installS3StaticTargets(tmp, [deployment]);
     await assert.rejects(
       async () =>
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --provision-only`,
+        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --provision-only`,
       /provisions as part of deploy/,
     );
   });
@@ -192,14 +187,14 @@ test("internal deploy entrypoint preserves s3-static provider guardrails", async
 
 test("internal deploy entrypoint preserves kubernetes provider guardrails", async () => {
   await runInTemp("deploy-kubernetes-provision-only-guard", async (tmp, $) => {
-    const deploymentJson = path.join(tmp, "deployment.json");
-    await writeDeploymentJson(deploymentJson, kubernetesDeploymentFixture());
+    const deployment = kubernetesDeploymentFixture();
+    await installKubernetesTargets(tmp, [deployment]);
     await assert.rejects(
       async () =>
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --provision-only`,
+        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --provision-only`,
       /kubernetes initial slice provisions as part of deploy/,
     );
   });

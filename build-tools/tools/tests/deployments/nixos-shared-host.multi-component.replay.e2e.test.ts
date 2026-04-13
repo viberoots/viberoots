@@ -3,11 +3,17 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
 import { multiComponentDeployment } from "./nixos-shared-host.multi-component.fixture.ts";
+import {
+  readRecord,
+  readStatus,
+  startControlPlaneHarness,
+  submitServiceRequest,
+  waitFor,
+} from "./nixos-shared-host.control-plane.helpers.ts";
 import {
   componentArtifactFlag,
   liveIndexPath,
@@ -23,10 +29,7 @@ test("nixos-shared-host multi-component retry reuses a live proven component and
     const deploymentJson = path.join(tmp, "deployment.json");
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
-    const commandEnv = {
-      ...process.env,
-      BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
-    };
+    const statePath = path.join(tmp, "platform-state.json");
     const frontendArtifact = path.join(tmp, "artifacts", "frontend");
     const apiArtifact = path.join(tmp, "artifacts", "api");
     await writeArtifact(frontendArtifact, "frontend-v1");
@@ -36,7 +39,7 @@ test("nixos-shared-host multi-component retry reuses a live proven component and
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson,
+      deploymentLabel: deployment.label,
       deployment,
     });
     let serveFrontend = false;
@@ -51,16 +54,31 @@ test("nixos-shared-host multi-component retry reuses a live proven component and
       },
       tlsRoot: hostRoot,
     });
+    const harness = await startControlPlaneHarness({
+      workspaceRoot: tmp,
+      hostRoot,
+      statePath,
+      recordsRoot,
+    });
     try {
-      const failed = await $({
-        cwd: tmp,
-        env: commandEnv,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendArtifact, api: apiArtifact })} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`.nothrow();
-      assert.notEqual(failed.exitCode, 0);
-      const [failedRecordName] = (await fsp.readdir(path.join(recordsRoot, "runs"))).sort();
-      const failedRecord = JSON.parse(
-        await fsp.readFile(path.join(recordsRoot, "runs", failedRecordName!), "utf8"),
-      );
+      const submitted = await submitServiceRequest({
+        url: harness.controlPlane.url,
+        deployment,
+        artifactDirsByComponentId: { frontend: frontendArtifact, api: apiArtifact },
+        admissionEvidence: JSON.parse(await fsp.readFile(admissionEvidenceJson, "utf8")),
+        smokeConnectOverride: {
+          protocol: "https:",
+          hostname: "127.0.0.1",
+          port: server.port,
+          rejectUnauthorized: false,
+        },
+      });
+      const finished = await waitFor(async () => {
+        const current = await readStatus(harness.controlPlane.url, submitted.submissionId);
+        return current.lifecycleState === "finished" ? current : null;
+      }, "timed out waiting for multi-component retry seed failure");
+      assert.equal(finished.finalOutcome, "smoke_failed_after_publish");
+      const failedRecord = await readRecord(harness.controlPlane.url, finished.deployRunId);
       serveFrontend = true;
       await fsp.writeFile(
         liveIndexPath(hostRoot, deployment.components[1]!.runtime.appName),
@@ -71,11 +89,10 @@ test("nixos-shared-host multi-component retry reuses a live proven component and
       await fsp.rm(apiArtifact, { recursive: true, force: true });
       const retry = await $({
         cwd: tmp,
-        env: commandEnv,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --source-run-id ${failedRecord.deployRunId} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --publish-only --source-run-id ${failedRecord.deployRunId} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(retry.stdout));
       assert.equal(summary.operationKind, "retry");
-      const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
+      const record = await readRecord(harness.controlPlane.url, summary.deployRunId);
       const frontend = record.componentResults.find(
         (result: any) => result.componentId === "frontend",
       );
@@ -98,6 +115,7 @@ test("nixos-shared-host multi-component retry reuses a live proven component and
         /api-v1/,
       );
     } finally {
+      await harness.close();
       await server.close();
     }
   });
@@ -109,10 +127,7 @@ test("nixos-shared-host multi-component rollback replays recorded per-component 
     const deploymentJson = path.join(tmp, "deployment.json");
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
-    const commandEnv = {
-      ...process.env,
-      BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
-    };
+    const statePath = path.join(tmp, "platform-state.json");
     const frontendV1 = path.join(tmp, "artifacts", "frontend-v1");
     const apiV1 = path.join(tmp, "artifacts", "api-v1");
     const frontendV2 = path.join(tmp, "artifacts", "frontend-v2");
@@ -126,7 +141,7 @@ test("nixos-shared-host multi-component rollback replays recorded per-component 
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson,
+      deploymentLabel: deployment.label,
       deployment,
     });
     const server = await startStaticWebappHttpsMultiServer({
@@ -138,21 +153,24 @@ test("nixos-shared-host multi-component rollback replays recorded per-component 
       },
       tlsRoot: hostRoot,
     });
+    const harness = await startControlPlaneHarness({
+      workspaceRoot: tmp,
+      hostRoot,
+      statePath,
+      recordsRoot,
+    });
     try {
       const first = await $({
         cwd: tmp,
-        env: commandEnv,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendV1, api: apiV1 })} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendV1, api: apiV1 })} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const firstSummary = JSON.parse(String(first.stdout));
       await $({
         cwd: tmp,
-        env: commandEnv,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendV2, api: apiV2 })} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendV2, api: apiV2 })} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       await fsp.rm(path.join(tmp, "artifacts"), { recursive: true, force: true });
       const rollback = await $({
         cwd: tmp,
-        env: commandEnv,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --source-run-id ${firstSummary.deployRunId} --rollback --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --publish-only --source-run-id ${firstSummary.deployRunId} --rollback --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(rollback.stdout));
       assert.equal(summary.operationKind, "rollback");
       assert.match(
@@ -170,6 +188,7 @@ test("nixos-shared-host multi-component rollback replays recorded per-component 
         /api-v1/,
       );
     } finally {
+      await harness.close();
       await server.close();
     }
   });

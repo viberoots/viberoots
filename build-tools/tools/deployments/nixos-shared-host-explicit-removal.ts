@@ -23,13 +23,14 @@ export async function runNixosSharedHostExplicitRemoval(opts: {
   statePath: string;
   hostRoot: string;
   recordsRoot: string;
+  deployRunId?: string;
   deployBatchId?: string;
   hostConfigPath?: string;
   authority?: NixosSharedHostMutationAuthority;
   provisionerPlan?: import("./nixos-shared-host-provisioner-plan.ts").NixosSharedHostProvisionerPlanRef;
 }): Promise<{ record: NixosSharedHostDeployRecord; recordPath: string }> {
   const authority = requireNixosSharedHostControlPlaneAuthority(opts.deployment, opts.authority);
-  const runId = createNixosSharedHostDeployRunId("remove");
+  const runId = opts.deployRunId || createNixosSharedHostDeployRunId("remove");
   try {
     const current = await readNixosSharedHostPlatformStateOrEmpty(opts.statePath);
     const state = removeNixosSharedHostPlatformDeployment(current, opts.deployment.deploymentId);

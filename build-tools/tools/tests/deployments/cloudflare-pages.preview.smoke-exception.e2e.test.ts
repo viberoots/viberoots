@@ -10,6 +10,7 @@ import {
 import {
   cloudflarePagesDeploymentFixture,
   cloudflarePagesPreviewFixture,
+  installCloudflarePagesTargets,
 } from "./cloudflare-pages.fixture.ts";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
@@ -44,8 +45,7 @@ function fakeCloudflareEnv(fake: Awaited<ReturnType<typeof installFakeCloudflare
 async function runNormalDeploy(opts: {
   tmp: string;
   $: any;
-  deploymentJson: string;
-  deployment: unknown;
+  deployment: any;
   artifactDir: string;
   recordsRoot: string;
   serverPort: number;
@@ -54,13 +54,13 @@ async function runNormalDeploy(opts: {
   const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
     tmp: opts.tmp,
     $: opts.$,
-    deploymentJson: opts.deploymentJson,
-    deployment: opts.deployment as any,
+    deploymentLabel: opts.deployment.label,
+    deployment: opts.deployment,
   });
   const normalRun = await $({
     cwd: opts.tmp,
     env: fakeCloudflareEnv(opts.fake),
-  })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${opts.deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${opts.artifactDir} --records-root ${opts.recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(opts.serverPort)} --smoke-connect-protocol https:`;
+  })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${opts.deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${opts.artifactDir} --records-root ${opts.recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(opts.serverPort)} --smoke-connect-protocol https:`;
   return JSON.parse(String(normalRun.stdout));
 }
 
@@ -77,6 +77,7 @@ test("cloudflare-pages preview smoke remains blocking by default without an expl
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
+    await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const normalServer = await startCloudflarePagesPublicServer({
@@ -88,7 +89,6 @@ test("cloudflare-pages preview smoke remains blocking by default without an expl
       const normalSummary = await runNormalDeploy({
         tmp,
         $,
-        deploymentJson,
         deployment,
         artifactDir,
         recordsRoot,
@@ -98,7 +98,7 @@ test("cloudflare-pages preview smoke remains blocking by default without an expl
       const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
         tmp,
         $,
-        deploymentJson,
+        deploymentLabel: deployment.label,
         deployment,
       });
       await normalServer.close();
@@ -123,7 +123,7 @@ test("cloudflare-pages preview smoke remains blocking by default without an expl
             await $({
               cwd: tmp,
               env: fakeCloudflareEnv(fake),
-            })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --preview --source-run-id ${normalSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(previewServer.port)} --smoke-connect-protocol https:`,
+            })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --preview --source-run-id ${normalSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(previewServer.port)} --smoke-connect-protocol https:`,
           /smoke content mismatch/,
         );
         const runFiles = await fsp.readdir(path.join(recordsRoot, "runs"));
@@ -163,6 +163,7 @@ test("cloudflare-pages preview records nonblocking smoke failures only when depl
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
+    await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const normalServer = await startCloudflarePagesPublicServer({
@@ -174,7 +175,6 @@ test("cloudflare-pages preview records nonblocking smoke failures only when depl
       const normalSummary = await runNormalDeploy({
         tmp,
         $,
-        deploymentJson,
         deployment,
         artifactDir,
         recordsRoot,
@@ -184,7 +184,7 @@ test("cloudflare-pages preview records nonblocking smoke failures only when depl
       const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
         tmp,
         $,
-        deploymentJson,
+        deploymentLabel: deployment.label,
         deployment,
       });
       await normalServer.close();
@@ -207,7 +207,7 @@ test("cloudflare-pages preview records nonblocking smoke failures only when depl
         const previewRun = await $({
           cwd: tmp,
           env: fakeCloudflareEnv(fake),
-        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --preview --source-run-id ${normalSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(previewServer.port)} --smoke-connect-protocol https:`;
+        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --preview --source-run-id ${normalSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(previewServer.port)} --smoke-connect-protocol https:`;
         const previewSummary = JSON.parse(String(previewRun.stdout));
         assert.equal(previewSummary.finalOutcome, "succeeded");
         assert.equal(previewSummary.smokeOutcome, "failed_nonblocking");

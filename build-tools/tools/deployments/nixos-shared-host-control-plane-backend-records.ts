@@ -1,6 +1,4 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
-import path from "node:path";
 import {
   decodeBackendJson,
   queryBackend,
@@ -45,22 +43,6 @@ export async function syncBackendDeployRecord(
 ) {
   const doc = await readJson<DeployRecordDoc>(recordPath);
   return await writeBackendDeployRecordDoc(backend, doc, recordPath);
-}
-
-export async function syncBackendDeployRecordsFromRunMirrors(
-  backend: NixosSharedHostControlPlaneBackendTarget,
-) {
-  const runsDir = path.join(path.resolve(backend.recordsRoot), "runs");
-  let names: string[] = [];
-  try {
-    names = (await fsp.readdir(runsDir)).filter((name) => name.endsWith(".json")).sort();
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
-    throw error;
-  }
-  for (const name of names) {
-    await syncBackendDeployRecord(backend, path.join(runsDir, name));
-  }
 }
 
 async function readRecordRow(

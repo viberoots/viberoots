@@ -26,6 +26,22 @@ type ProvisionOnlyRunOpts = {
   smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;
 };
 
+export type ResolvedProvisionOnlySubmission = {
+  operationKind: "provision_only";
+  deployment: NixosSharedHostDeployment;
+  publishBehavior: "provision-only";
+  artifact?: any;
+  componentArtifacts?: any[];
+  parentRunId?: string;
+  releaseLineageId?: string;
+  artifactLineageId?: string;
+  source?: {
+    record: any;
+    replaySnapshot: any;
+    replaySnapshotPath: string;
+  };
+};
+
 function sharedSubmitOpts(opts: ProvisionOnlyRunOpts) {
   return {
     ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
@@ -48,15 +64,32 @@ function requireBackendDatabaseUrl(value?: string): string {
 }
 
 export async function submitNixosSharedHostProvisionOnlyRun(opts: ProvisionOnlyRunOpts) {
+  const resolved = await resolveNixosSharedHostProvisionOnlySubmission(opts);
+  return await submitNixosSharedHostControlPlaneRun({
+    workspaceRoot: opts.workspaceRoot,
+    operationKind: resolved.operationKind,
+    deployment: resolved.deployment,
+    ...(resolved.artifact ? { artifact: resolved.artifact } : {}),
+    ...(resolved.componentArtifacts ? { componentArtifacts: resolved.componentArtifacts } : {}),
+    publishBehavior: resolved.publishBehavior,
+    ...(resolved.parentRunId ? { parentRunId: resolved.parentRunId } : {}),
+    ...(resolved.releaseLineageId ? { releaseLineageId: resolved.releaseLineageId } : {}),
+    ...(resolved.artifactLineageId ? { artifactLineageId: resolved.artifactLineageId } : {}),
+    ...(resolved.source ? { source: resolved.source } : {}),
+    paths: opts.paths,
+    ...sharedSubmitOpts(opts),
+  });
+}
+
+export async function resolveNixosSharedHostProvisionOnlySubmission(
+  opts: ProvisionOnlyRunOpts,
+): Promise<ResolvedProvisionOnlySubmission> {
   if (!opts.sourceRunId) {
-    return await submitNixosSharedHostControlPlaneRun({
-      workspaceRoot: opts.workspaceRoot,
+    return {
       operationKind: "provision_only",
       deployment: opts.deployment,
       publishBehavior: "provision-only",
-      paths: opts.paths,
-      ...sharedSubmitOpts(opts),
-    });
+    };
   }
   const replay = await resolveNixosSharedHostReplaySelection({
     deployment: opts.deployment,
@@ -65,8 +98,7 @@ export async function submitNixosSharedHostProvisionOnlyRun(opts: ProvisionOnlyR
     sourceRunId: opts.sourceRunId,
     rollback: false,
   });
-  return await submitNixosSharedHostControlPlaneRun({
-    workspaceRoot: opts.workspaceRoot,
+  return {
     operationKind: "provision_only",
     deployment: replay.deployment,
     ...(replay.artifact ? { artifact: replay.artifact } : {}),
@@ -80,7 +112,5 @@ export async function submitNixosSharedHostProvisionOnlyRun(opts: ProvisionOnlyR
       replaySnapshot: replay.sourceReplaySnapshot,
       replaySnapshotPath: replay.replaySnapshotPath,
     },
-    paths: opts.paths,
-    ...sharedSubmitOpts(opts),
-  });
+  };
 }

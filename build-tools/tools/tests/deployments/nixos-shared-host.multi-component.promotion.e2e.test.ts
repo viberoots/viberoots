@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
@@ -12,6 +11,7 @@ import {
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
+import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers.ts";
 import { startStaticWebappHttpsMultiServer } from "./static-webapp.https-server.ts";
 
 async function writeArtifact(root: string, marker: string): Promise<void> {
@@ -44,12 +44,12 @@ function deploymentFor(environmentStage: "dev" | "staging", prefix: string) {
           ref: `//projects/deployments/${prefix}:staging_release`,
           name: "staging_release",
           allowedRefs: ["env/pleomino/staging"],
-          requiredChecks: [],
+          requiredChecks: ["deploy/pleomino-staging"],
           fingerprint: `sha256:${prefix}-staging`,
         })
       : nixosSharedHostAdmissionPolicyFixture({
           allowedRefs: ["env/pleomino/dev"],
-          requiredChecks: [],
+          requiredChecks: ["deploy/pleomino-dev"],
           fingerprint: `sha256:${prefix}-dev`,
         });
   return nixosSharedHostDeploymentFixture({
@@ -116,10 +116,7 @@ test("nixos-shared-host multi-component promotion reuses recorded per-component 
     const sourceJson = path.join(tmp, "source.json");
     const targetJson = path.join(tmp, "target.json");
     const recordsRoot = path.join(tmp, "records");
-    const commandEnv = {
-      ...process.env,
-      BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
-    };
+    const statePath = path.join(tmp, "platform-state.json");
     const hostRoot = path.join(tmp, "host");
     const bootstrapFrontend = path.join(tmp, "bootstrap", "frontend");
     const bootstrapApi = path.join(tmp, "bootstrap", "api");
@@ -136,14 +133,16 @@ test("nixos-shared-host multi-component promotion reuses recorded per-component 
     const sourceEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson: sourceJson,
+      deploymentLabel: source.label,
       deployment: source,
+      includeRequiredChecks: true,
     });
     const targetEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson: targetJson,
+      deploymentLabel: target.label,
       deployment: target,
+      includeRequiredChecks: true,
     });
     const server = await startStaticWebappHttpsMultiServer({
       hosts: {
@@ -170,21 +169,24 @@ test("nixos-shared-host multi-component promotion reuses recorded per-component 
       },
       tlsRoot: hostRoot,
     });
+    const harness = await startControlPlaneHarness({
+      workspaceRoot: tmp,
+      hostRoot,
+      statePath,
+      recordsRoot,
+    });
     try {
       await $({
         cwd: tmp,
-        env: commandEnv,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${targetJson} --admission-evidence-json ${targetEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: bootstrapFrontend, api: bootstrapApi })} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${target.label} --admission-evidence-json ${targetEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: bootstrapFrontend, api: bootstrapApi })} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const sourceRun = await $({
         cwd: tmp,
-        env: commandEnv,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${sourceJson} --admission-evidence-json ${sourceEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: sourceFrontend, api: sourceApi })} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${source.label} --admission-evidence-json ${sourceEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: sourceFrontend, api: sourceApi })} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const sourceSummary = JSON.parse(String(sourceRun.stdout));
       await fsp.rm(path.join(tmp, "source-artifacts"), { recursive: true, force: true });
       const promotion = await $({
         cwd: tmp,
-        env: commandEnv,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${targetJson} --admission-evidence-json ${targetEvidenceJson} --publish-only --source-run-id ${sourceSummary.deployRunId} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${target.label} --admission-evidence-json ${targetEvidenceJson} --publish-only --source-run-id ${sourceSummary.deployRunId} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(promotion.stdout));
       assert.equal(summary.operationKind, "promotion");
       assert.match(
@@ -196,6 +198,7 @@ test("nixos-shared-host multi-component promotion reuses recorded per-component 
         /promoted-api/,
       );
     } finally {
+      await harness.close();
       await server.close();
     }
   });

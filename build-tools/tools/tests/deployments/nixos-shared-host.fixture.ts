@@ -21,6 +21,7 @@ import type {
   DeploymentSupplyChainGatePolicy,
 } from "../../deployments/deployment-admission-supply-chain.ts";
 import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture.ts";
+export { installNixosSharedHostTargets } from "./deployment-targets.install.helpers.ts";
 
 export function nixosSharedHostSsrRuntimeContractFixture(
   overrides: Partial<NixosSharedHostSsrRuntimeContract> = {},

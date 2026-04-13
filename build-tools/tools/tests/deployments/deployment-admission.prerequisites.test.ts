@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator.ts";
+import { revalidateControlPlaneAdmission } from "../../deployments/deployment-control-plane-revalidation.ts";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
@@ -117,7 +118,11 @@ test("prerequisite routing follows the prerequisite provider for mixed-provider 
       }),
     });
     assert.equal(cloudflareEval.prerequisites[0]?.sourceDeployRunId, "shared-prereq-run");
-    assert.equal(cloudflareEval.prerequisites[0]?.sourceRecordPath, undefined);
+    assert.equal(
+      cloudflareEval.prerequisites[0]?.publicUrl,
+      "https://shared-prereq.apps.kilty.io/",
+    );
+    assert.equal(cloudflareEval.prerequisites[0]?.healthUrl, undefined);
 
     const sharedTarget = nixosSharedHostDeploymentFixture({
       prerequisites: [{ deploymentId: "pages-prereq", mode: "ordering_only" }],
@@ -137,10 +142,8 @@ test("prerequisite routing follows the prerequisite provider for mixed-provider 
       }),
     });
     assert.equal(sharedEval.prerequisites[0]?.sourceDeployRunId, "pages-prereq-run");
-    assert.match(
-      String(sharedEval.prerequisites[0]?.sourceRecordPath),
-      /cloudflare-pages\/records\/runs/,
-    );
+    assert.equal(sharedEval.prerequisites[0]?.publicUrl, "https://pages-prereq.pages.dev/");
+    assert.equal(sharedEval.prerequisites[0]?.healthUrl, undefined);
   });
 });
 
@@ -164,4 +167,48 @@ test("protected/shared admission rejects deployment-local executable hooks", asy
     }),
     /rejects non-built-in nixos-shared-host publisher/,
   );
+});
+
+test("shared control-plane revalidation fails closed when health-gated prerequisites lack backend authority", async () => {
+  await runInTemp("deployment-admission-prereq-revalidation", async (tmp) => {
+    const recordsRoot = path.join(tmp, ".local", "deployments", "nixos-shared-host", "records");
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
+    await writeSuccessfulPrerequisiteRecord(tmp, backendDatabaseUrl, "demoapp-dev", {
+      healthUrl: "https://demoapp.apps.kilty.io/healthz",
+    });
+    const deployment = nixosSharedHostDeploymentFixture({
+      prerequisites: [{ deploymentId: "demoapp-dev", mode: "health_gated" }],
+    });
+    await assert.rejects(
+      revalidateControlPlaneAdmission({
+        workspaceRoot: tmp,
+        recordsRoot,
+        deployment,
+        admittedContext: {
+          targetEnvironment: {
+            targetRef: "HEAD",
+          },
+          policyEvaluation: {
+            evaluatedAt: "2026-04-12T10:00:00.000Z",
+            requestedBy: { principalId: "app:deploy-bot" },
+            binding: {
+              payloadFingerprint: "sha256:payload",
+              targetIdentity: "target:demoapp",
+            },
+            requiredChecks: [],
+            requiredApprovals: [],
+            prerequisites: [
+              {
+                deploymentId: "demoapp-dev",
+                mode: "health_gated",
+                sourceDeployRunId: "demoapp-dev-run",
+              },
+            ],
+            supplyChainGates: [],
+          },
+        },
+      }),
+      /health_gated prerequisite no longer passes fresh revalidation: demoapp-dev/,
+    );
+  });
 });

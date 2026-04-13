@@ -9,6 +9,7 @@ import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
+import { readRecord, startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string): Promise<void> {
@@ -30,21 +31,27 @@ test("nixos-shared-host deploy CLI records explicit removal and cleans up the re
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson,
+      deploymentLabel: deployment.label,
       deployment,
+    });
+    const harness = await startControlPlaneHarness({
+      workspaceRoot: tmp,
+      hostRoot,
+      statePath,
+      recordsRoot,
     });
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
       await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const removal = await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --remove`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --control-plane-url ${harness.controlPlane.url} --remove`;
       const summary = JSON.parse(String(removal.stdout));
       assert.equal(summary.runClassification, "explicit_removal");
       assert.equal(summary.finalOutcome, "succeeded");
-      const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
+      const record = await readRecord(harness.controlPlane.url, summary.deployRunId);
       assert.equal(record.operationKind, "deploy");
       assert.equal(record.runClassification, "explicit_removal");
       assert.equal(record.finalOutcome, "succeeded");
@@ -61,6 +68,7 @@ test("nixos-shared-host deploy CLI records explicit removal and cleans up the re
       assert.deepEqual(state.deployments, []);
     } finally {
       await server.close();
+      await harness.close();
     }
   });
 });

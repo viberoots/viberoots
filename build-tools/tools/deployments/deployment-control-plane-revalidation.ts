@@ -1,6 +1,4 @@
 #!/usr/bin/env zx-wrapper
-import * as fs from "node:fs/promises";
-import path from "node:path";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
 import {
   approvalGrantIsValid,
@@ -26,14 +24,6 @@ async function gitStdout(workspaceRoot: string, args: string[]): Promise<string>
     throw new Error(`git ${args.join(" ")} failed in ${workspaceRoot}`);
   }
   return String((out as any).stdout || "").trim();
-}
-
-async function readRecord(recordPath: string): Promise<DeploymentRunRecordLike | null> {
-  try {
-    return JSON.parse(await fs.readFile(recordPath, "utf8")) as DeploymentRunRecordLike;
-  } catch {
-    return null;
-  }
 }
 
 async function readSharedBackendRecord(opts: {
@@ -133,17 +123,23 @@ export async function revalidateControlPlaneAdmission(opts: {
   }
   for (const prerequisite of evaluation.prerequisites) {
     if (prerequisite.mode !== "health_gated") continue;
-    const record =
-      prerequisite.sourceDeployRunId && opts.recordsRoot && opts.backendDatabaseUrl
-        ? await readSharedBackendRecord({
-            recordsRoot: opts.recordsRoot,
-            backendDatabaseUrl: opts.backendDatabaseUrl,
-            deployRunId: prerequisite.sourceDeployRunId,
-          })
-        : prerequisite.sourceRecordPath
-          ? await readRecord(prerequisite.sourceRecordPath)
-          : null;
-    const url = record?.healthUrl || record?.publicUrl;
+    const recordedUrl = prerequisite.healthUrl || prerequisite.publicUrl;
+    if (!recordedUrl) {
+      if (!prerequisite.sourceDeployRunId || !opts.recordsRoot || !opts.backendDatabaseUrl) {
+        throw new DeploymentAdmissionError(
+          "no_longer_admitted",
+          `health_gated prerequisite no longer passes fresh revalidation: ${prerequisite.deploymentId}`,
+        );
+      }
+    }
+    const record = recordedUrl
+      ? null
+      : await readSharedBackendRecord({
+          recordsRoot: opts.recordsRoot,
+          backendDatabaseUrl: opts.backendDatabaseUrl,
+          deployRunId: prerequisite.sourceDeployRunId,
+        });
+    const url = recordedUrl || record?.healthUrl || record?.publicUrl;
     if (!url || !(await fetchHealthy(url))) {
       throw new DeploymentAdmissionError(
         "no_longer_admitted",

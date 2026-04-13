@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { readGooglePlayDeployRecord } from "../../deployments/google-play-records.ts";
@@ -8,51 +7,17 @@ import { runInTemp } from "../lib/test-helpers.ts";
 import { googlePlayDeploymentFixture } from "./google-play.fixture.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import {
-  ensureNixosSharedHostStageBranch,
-  nixosSharedHostLanePolicyFixture,
-} from "./nixos-shared-host.fixture.ts";
-
-async function writeArtifact(filePath: string, contents: string) {
-  await fsp.mkdir(path.dirname(filePath), { recursive: true });
-  await fsp.writeFile(filePath, contents, "utf8");
-}
-
-async function writeConfig(
-  workspaceRoot: string,
-  deployment: ReturnType<typeof googlePlayDeploymentFixture>,
-) {
-  const packageDir = path.join(workspaceRoot, "projects", "deployments", deployment.deploymentId);
-  await fsp.mkdir(packageDir, { recursive: true });
-  await fsp.writeFile(
-    path.join(packageDir, "google-play.jsonc"),
-    JSON.stringify(
-      {
-        developer_account: deployment.providerTarget.developerAccount,
-        app: deployment.providerTarget.app,
-        package_name: deployment.providerTarget.packageName,
-        track: deployment.providerTarget.track,
-        signing_model: deployment.providerTarget.signingModel,
-      },
-      null,
-      2,
-    ) + "\n",
-    "utf8",
-  );
-}
-
-async function writeDeploymentJson(filePath: string, deployment: unknown) {
-  await fsp.writeFile(filePath, JSON.stringify(deployment, null, 2) + "\n", "utf8");
-}
+  googlePlayFakeEnv,
+  installGooglePlayTargets,
+  writeGooglePlayConfig,
+} from "./google-play.e2e.helpers.ts";
+import { mobileReviewedLanePolicy, writeMobileArtifact } from "./mobile-release.e2e.helpers.ts";
+import { writeDeploymentJson } from "./nixos-shared-host.reuse.e2e.helpers.ts";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
 
 test("google-play deploy and promotion preserve release-health evidence", async () => {
   await runInTemp("google-play-promotion", async (tmp, $) => {
-    const lanePolicy = nixosSharedHostLanePolicyFixture({
-      stageBranches: {
-        dev: "env/mobile/dev",
-        staging: "env/mobile/staging",
-        prod: "env/mobile/prod",
-      },
-    });
+    const lanePolicy = mobileReviewedLanePolicy();
     const dev = googlePlayDeploymentFixture({
       deploymentId: "demo-android-dev",
       label: "//projects/deployments/demo-android-dev:deploy",
@@ -92,9 +57,10 @@ test("google-play deploy and promotion preserve release-health evidence", async 
     const artifactPath = path.join(tmp, "artifacts", "demo.aab");
     const devJson = path.join(tmp, "dev.json");
     const stagingJson = path.join(tmp, "staging.json");
-    await writeArtifact(artifactPath, "signed-android-artifact-v1\n");
-    await writeConfig(tmp, dev);
-    await writeConfig(tmp, staging);
+    await writeMobileArtifact(artifactPath, "signed-android-artifact-v1\n");
+    await writeGooglePlayConfig(tmp, dev);
+    await writeGooglePlayConfig(tmp, staging);
+    await installGooglePlayTargets(tmp, [dev, staging]);
     await writeDeploymentJson(devJson, dev);
     await writeDeploymentJson(stagingJson, staging);
     await ensureNixosSharedHostStageBranch(tmp, $, dev);
@@ -102,28 +68,25 @@ test("google-play deploy and promotion preserve release-health evidence", async 
     const devEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson: devJson,
+      deploymentLabel: dev.label,
       deployment: dev,
     });
     const stagingEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson: stagingJson,
+      deploymentLabel: staging.label,
       deployment: staging,
     });
-    const env = {
-      ...process.env,
-      BNX_GOOGLE_PLAY_FAKE_STORE_ROOT: path.join(tmp, "fake-store"),
-    };
+    const env = googlePlayFakeEnv(tmp);
     const devRun = await $({
       cwd: tmp,
       env,
-    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${devJson} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactPath} --records-root ${recordsRoot}`;
+    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${dev.label} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactPath} --records-root ${recordsRoot}`;
     const devSummary = JSON.parse(String(devRun.stdout));
     const promotionRun = await $({
       cwd: tmp,
       env,
-    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --publish-only --source-run-id ${devSummary.deployRunId} --records-root ${recordsRoot}`;
+    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${staging.label} --admission-evidence-json ${stagingEvidenceJson} --publish-only --source-run-id ${devSummary.deployRunId} --records-root ${recordsRoot}`;
     const promotionSummary = JSON.parse(String(promotionRun.stdout));
     const promotionRecord = await readGooglePlayDeployRecord(promotionSummary.recordPath);
     assert.equal(promotionRecord.operationKind, "promotion");
@@ -141,13 +104,7 @@ test("google-play deploy and promotion preserve release-health evidence", async 
 
 test("google-play rollback reuses a prior successful exact artifact", async () => {
   await runInTemp("google-play-rollback", async (tmp, $) => {
-    const lanePolicy = nixosSharedHostLanePolicyFixture({
-      stageBranches: {
-        dev: "env/mobile/dev",
-        staging: "env/mobile/staging",
-        prod: "env/mobile/prod",
-      },
-    });
+    const lanePolicy = mobileReviewedLanePolicy();
     const staging = googlePlayDeploymentFixture({
       deploymentId: "demo-android-staging",
       label: "//projects/deployments/demo-android-staging:deploy",
@@ -168,42 +125,40 @@ test("google-play rollback reuses a prior successful exact artifact", async () =
     const artifactA = path.join(tmp, "artifacts", "a.aab");
     const artifactB = path.join(tmp, "artifacts", "b.aab");
     const stagingJson = path.join(tmp, "staging.json");
-    await writeArtifact(artifactA, "signed-android-artifact-a\n");
-    await writeArtifact(artifactB, "signed-android-artifact-b\n");
-    await writeConfig(tmp, staging);
+    await writeMobileArtifact(artifactA, "signed-android-artifact-a\n");
+    await writeMobileArtifact(artifactB, "signed-android-artifact-b\n");
+    await writeGooglePlayConfig(tmp, staging);
+    await installGooglePlayTargets(tmp, [staging]);
     await writeDeploymentJson(stagingJson, staging);
     await ensureNixosSharedHostStageBranch(tmp, $, staging);
     const stagingEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson: stagingJson,
+      deploymentLabel: staging.label,
       deployment: staging,
     });
-    const env = {
-      ...process.env,
-      BNX_GOOGLE_PLAY_FAKE_STORE_ROOT: path.join(tmp, "fake-store"),
-    };
+    const env = googlePlayFakeEnv(tmp);
     const runA = JSON.parse(
       String(
         (
           await $({
             cwd: tmp,
             env,
-          })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --artifact-dir ${artifactA} --records-root ${recordsRoot}`
+          })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${staging.label} --admission-evidence-json ${stagingEvidenceJson} --artifact-dir ${artifactA} --records-root ${recordsRoot}`
         ).stdout,
       ),
     );
     await $({
       cwd: tmp,
       env,
-    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --artifact-dir ${artifactB} --records-root ${recordsRoot}`;
+    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${staging.label} --admission-evidence-json ${stagingEvidenceJson} --artifact-dir ${artifactB} --records-root ${recordsRoot}`;
     const rollback = JSON.parse(
       String(
         (
           await $({
             cwd: tmp,
             env,
-          })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${stagingJson} --admission-evidence-json ${stagingEvidenceJson} --publish-only --rollback --source-run-id ${runA.deployRunId} --records-root ${recordsRoot}`
+          })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${staging.label} --admission-evidence-json ${stagingEvidenceJson} --publish-only --rollback --source-run-id ${runA.deployRunId} --records-root ${recordsRoot}`
         ).stdout,
       ),
     );

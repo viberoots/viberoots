@@ -6,8 +6,6 @@ import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidenc
 import {
   buildRemoteArtifactStageArgv,
   buildRemoteCleanupScript,
-  buildRemoteDeployScript,
-  buildRemoteHostApplyScript,
   buildRemoteRepoPreflightScript,
   buildRemoteSshArgv,
   buildRemoteStagePrepareScript,
@@ -18,7 +16,8 @@ import {
   type NixosSharedHostRemotePlan,
 } from "./nixos-shared-host-remote-target.ts";
 import { createNixosSharedHostDeployRunId } from "./nixos-shared-host-records.ts";
-import type { NixosSharedHostHostApplySummary } from "./nixos-shared-host-host-apply.ts";
+import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door.ts";
+import { resolveServiceTokenFromEnv } from "./nixos-shared-host-service-client-config.ts";
 
 const execFileAsync = promisify(execFile);
 const TRANSPORT_MAX_BUFFER = 10 * 1024 * 1024;
@@ -44,18 +43,13 @@ export type NixosSharedHostRemoteDeploySummary = {
   stagedArtifactPath: string;
   stagedArtifactCleanup: "removed" | "retained";
   retentionRequested: boolean;
-  remoteDeployResult: {
-    runId: string;
+  controlPlane: {
+    controlPlaneUrl: string;
+    submissionId: string;
+    lifecycleState: string;
     deployRunId: string;
-    runClassification: string;
     finalOutcome: string;
-    artifactIdentity?: string;
-    publicUrl?: string;
-    recordPath: string;
-  };
-  hostApply: {
-    selectedMode: NixosSharedHostRemotePlan["hostApply"]["selectedMode"];
-    result?: NixosSharedHostHostApplySummary;
+    record: any;
   };
 };
 
@@ -64,53 +58,6 @@ function commandFailure(step: string, result: CommandResult): Error {
     .filter(Boolean)
     .join("\n");
   return new Error(`${step}\n${details}`.trim());
-}
-
-function parseRemoteDeployResult(
-  stdout: string,
-): NixosSharedHostRemoteDeploySummary["remoteDeployResult"] {
-  const parsed = JSON.parse(stdout) as Partial<
-    NixosSharedHostRemoteDeploySummary["remoteDeployResult"]
-  >;
-  if (
-    typeof parsed.runId !== "string" ||
-    typeof parsed.deployRunId !== "string" ||
-    typeof parsed.runClassification !== "string" ||
-    typeof parsed.finalOutcome !== "string" ||
-    typeof parsed.recordPath !== "string"
-  ) {
-    throw new Error(`remote deploy returned invalid JSON summary: ${stdout.trim()}`);
-  }
-  return {
-    runId: parsed.runId,
-    deployRunId: parsed.deployRunId,
-    runClassification: parsed.runClassification,
-    finalOutcome: parsed.finalOutcome,
-    ...(typeof parsed.artifactIdentity === "string"
-      ? { artifactIdentity: parsed.artifactIdentity }
-      : {}),
-    ...(typeof parsed.publicUrl === "string" ? { publicUrl: parsed.publicUrl } : {}),
-    recordPath: parsed.recordPath,
-  };
-}
-
-function parseRemoteHostApplyResult(stdout: string): NixosSharedHostHostApplySummary {
-  const parsed = JSON.parse(stdout) as Partial<NixosSharedHostHostApplySummary>;
-  if (
-    (parsed.mode !== "switch" && parsed.mode !== "dry-run") ||
-    typeof parsed.applied !== "boolean" ||
-    !Array.isArray(parsed.command) ||
-    typeof parsed.configTopology !== "string" ||
-    typeof parsed.configRoot !== "string" ||
-    typeof parsed.managedRoot !== "string" ||
-    typeof parsed.statePath !== "string" ||
-    typeof parsed.runtimeRoot !== "string" ||
-    typeof parsed.recordsRoot !== "string" ||
-    parsed.wiringState !== "wired"
-  ) {
-    throw new Error(`remote host apply returned invalid JSON summary: ${stdout.trim()}`);
-  }
-  return parsed as NixosSharedHostHostApplySummary;
 }
 
 async function runCommand(argv: string[]): Promise<CommandResult> {
@@ -136,6 +83,39 @@ async function runCommand(argv: string[]): Promise<CommandResult> {
   }
 }
 
+function requireServiceRecord(
+  serviceResult: Awaited<ReturnType<typeof runNixosSharedHostDirectServiceMutation>>,
+) {
+  if (serviceResult.kind !== "result") {
+    throw new Error(
+      `remote service submission did not produce a terminal record (lifecycle=${serviceResult.status.lifecycleState})`,
+    );
+  }
+  return serviceResult.result.record;
+}
+
+function remoteServiceSubmissionError(error: unknown) {
+  const base = error instanceof Error ? error : new Error(String(error));
+  const record = (error as any)?.record;
+  const status = (error as any)?.status;
+  const refs = [
+    typeof status?.submissionId === "string" && status.submissionId
+      ? `submission=${status.submissionId}`
+      : null,
+    typeof record?.deployRunId === "string" && record.deployRunId
+      ? `deployRunId=${record.deployRunId}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return Object.assign(
+    new Error(`remote service submission failed: ${base.message}${refs ? ` (${refs})` : ""}`),
+    {
+      ...(error && typeof error === "object" ? error : {}),
+    },
+  );
+}
+
 export async function runNixosSharedHostRemoteDeploy(opts: {
   deployment: NixosSharedHostDeployment;
   plan: NixosSharedHostRemotePlan;
@@ -143,14 +123,12 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
   retainRemoteArtifact: boolean;
   admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: NixosSharedHostRemoteSmokeConnectOverride;
-  hostApply: NixosSharedHostRemotePlan["hostApply"];
 }): Promise<NixosSharedHostRemoteDeploySummary> {
   const executionId = createNixosSharedHostDeployRunId("remote");
   const stagedArtifactPath = createNixosSharedHostRemoteArtifactPath(opts.plan, executionId);
   let stagePrepared = false;
   let pendingError: Error | null = null;
-  let remoteDeployResult: NixosSharedHostRemoteDeploySummary["remoteDeployResult"] | null = null;
-  let hostApplyResult: NixosSharedHostHostApplySummary | undefined;
+  let controlPlane: NixosSharedHostRemoteDeploySummary["controlPlane"] | null = null;
   const preflight = await runCommand(
     buildRemoteSshArgv(opts.plan.destination, buildRemoteRepoPreflightScript(opts.plan)),
   );
@@ -175,36 +153,33 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
     if (stage.exitCode !== 0) {
       throw commandFailure("remote artifact staging failed", stage);
     }
-    const remoteDeploy = await runCommand(
-      buildRemoteSshArgv(
-        opts.plan.destination,
-        buildRemoteDeployScript({
-          plan: opts.plan,
-          deploymentLabel: opts.deployment.label,
-          remoteArtifactPath: stagedArtifactPath,
-          ...(opts.admissionEvidence
-            ? { admissionEvidenceJson: JSON.stringify(opts.admissionEvidence) }
-            : {}),
-          ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
-        }),
-      ),
+    const record = requireServiceRecord(
+      await runNixosSharedHostDirectServiceMutation({
+        controlPlaneUrl: opts.plan.serviceClient.controlPlaneUrl,
+        ...(opts.plan.serviceClient.controlPlaneTokenEnv
+          ? {
+              controlPlaneToken: resolveServiceTokenFromEnv(
+                opts.plan.serviceClient.controlPlaneTokenEnv,
+              ),
+            }
+          : {}),
+        deployment: opts.deployment,
+        operationKind: "deploy",
+        artifactDir: stagedArtifactPath,
+        ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
+        ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
+      }).catch((error) => {
+        throw remoteServiceSubmissionError(error);
+      }),
     );
-    if (remoteDeploy.exitCode !== 0) {
-      throw commandFailure("remote deploy failed", remoteDeploy);
-    }
-    remoteDeployResult = parseRemoteDeployResult(remoteDeploy.stdout);
-    if (opts.hostApply.selectedMode !== "skip") {
-      const remoteHostApply = await runCommand(
-        buildRemoteSshArgv(opts.plan.destination, buildRemoteHostApplyScript(opts.plan)),
-      );
-      if (remoteHostApply.exitCode !== 0) {
-        const applyError = commandFailure("remote host apply failed", remoteHostApply);
-        throw new Error(
-          `${applyError.message}\nremote deploy record: ${remoteDeployResult.recordPath}`.trim(),
-        );
-      }
-      hostApplyResult = parseRemoteHostApplyResult(remoteHostApply.stdout);
-    }
+    controlPlane = {
+      controlPlaneUrl: opts.plan.serviceClient.controlPlaneUrl,
+      submissionId: String(record.controlPlane?.submissionId || ""),
+      lifecycleState: "finished",
+      deployRunId: String(record.deployRunId || ""),
+      finalOutcome: String(record.finalOutcome || ""),
+      record,
+    };
   } catch (error) {
     pendingError = error instanceof Error ? error : new Error(String(error));
   } finally {
@@ -221,8 +196,8 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
     }
   }
   if (pendingError) throw pendingError;
-  if (!remoteDeployResult) {
-    throw new Error("remote deploy finished without a machine-readable summary");
+  if (!controlPlane) {
+    throw new Error("remote service submission finished without a machine-readable summary");
   }
   return {
     executionMode: "remote-profile",
@@ -239,10 +214,6 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
     stagedArtifactPath,
     stagedArtifactCleanup: opts.retainRemoteArtifact ? "retained" : "removed",
     retentionRequested: opts.retainRemoteArtifact,
-    remoteDeployResult,
-    hostApply: {
-      selectedMode: opts.hostApply.selectedMode,
-      ...(hostApplyResult ? { result: hostApplyResult } : {}),
-    },
+    controlPlane,
   };
 }

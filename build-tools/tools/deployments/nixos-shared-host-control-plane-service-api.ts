@@ -5,10 +5,7 @@ import {
 } from "./deployment-control-plane-authz.ts";
 import { fingerprintControlPlanePayload } from "./deployment-control-plane-idempotency.ts";
 import { submitDeploymentControlPlaneRunAction } from "./deployment-control-plane-run-action.ts";
-import {
-  statusFromSubmission,
-  submitResponseFromSubmission,
-} from "./deployment-control-plane-status.ts";
+import { submitResponseFromSubmission } from "./deployment-control-plane-status.ts";
 import type {
   DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneRunActionRequest,
@@ -16,9 +13,6 @@ import type {
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 import {
   enqueueBackendSubmission,
-  readBackendDeployRecordByDeployRunId,
-  readBackendDeployRecordBySubmissionId,
-  readBackendSubmissionByDeployRunId,
   readBackendSubmissionBySubmissionId,
   readBackendSubmissionEnvelopeByDeployRunId,
   readBackendSubmissionEnvelopeBySubmissionId,
@@ -46,6 +40,11 @@ import {
   readControlPlaneJson,
   runActionRequestPathFor,
 } from "./nixos-shared-host-control-plane-store.ts";
+import { resolveServiceSubmitRequest } from "./nixos-shared-host-control-plane-service-submit.ts";
+export {
+  readControlPlaneRecord,
+  readControlPlaneStatus,
+} from "./nixos-shared-host-control-plane-service-read.ts";
 
 export type ServiceRunActionRequest = DeploymentControlPlaneRunActionRequest & {
   deployRunId?: string;
@@ -94,44 +93,57 @@ export async function handleControlPlaneSubmit(
     }
     return submitResponseFromSubmission(existing as any);
   }
-  const authorization = request.authorization
+  const resolvedRequest = await resolveServiceSubmitRequest(request, opts);
+  const authorization = resolvedRequest.authorization
     ? authorizeControlPlaneSubmit({
-        deployment: request.deployment,
-        operationKind: request.operationKind,
-        authorization: request.authorization,
+        deployment: resolvedRequest.deployment,
+        operationKind: resolvedRequest.operationKind,
+        authorization: resolvedRequest.authorization,
       })
     : undefined;
   try {
     const prepared = await prepareNixosSharedHostControlPlaneRun({
       workspaceRoot: opts.workspaceRoot,
-      operationKind: request.operationKind,
-      deployment: request.deployment,
+      operationKind: resolvedRequest.operationKind,
+      deployment: resolvedRequest.deployment,
       paths: opts.paths,
       backendDatabaseUrl: opts.backend.databaseUrl,
-      submissionId: request.submissionId,
+      submissionId: resolvedRequest.submissionId,
       dedupe: {
         mode: dedupe.mode,
         requestFingerprint,
-        ...(request.idempotencyKey ? { idempotencyKey: request.idempotencyKey } : {}),
+        ...(resolvedRequest.idempotencyKey
+          ? { idempotencyKey: resolvedRequest.idempotencyKey }
+          : {}),
       },
-      requestedBy: request.requestedBy || request.admissionEvidence?.requestedBy,
+      requestedBy: resolvedRequest.requestedBy || resolvedRequest.admissionEvidence?.requestedBy,
       ...(authorization ? { authorization } : {}),
-      ...(request.deployBatchId ? { deployBatchId: request.deployBatchId } : {}),
-      ...(request.artifactDir ? { artifactDir: request.artifactDir } : {}),
-      ...(request.artifactDirsByComponentId
-        ? { artifactDirsByComponentId: request.artifactDirsByComponentId }
+      ...(resolvedRequest.deployBatchId ? { deployBatchId: resolvedRequest.deployBatchId } : {}),
+      ...(resolvedRequest.artifactDir ? { artifactDir: resolvedRequest.artifactDir } : {}),
+      ...(resolvedRequest.artifactDirsByComponentId
+        ? { artifactDirsByComponentId: resolvedRequest.artifactDirsByComponentId }
         : {}),
-      ...(request.artifact ? { artifact: request.artifact } : {}),
-      ...(request.componentArtifacts ? { componentArtifacts: request.componentArtifacts } : {}),
-      ...(request.publishBehavior ? { publishBehavior: request.publishBehavior } : {}),
-      ...(request.parentRunId ? { parentRunId: request.parentRunId } : {}),
-      ...(request.releaseLineageId ? { releaseLineageId: request.releaseLineageId } : {}),
-      ...(request.artifactLineageId ? { artifactLineageId: request.artifactLineageId } : {}),
-      ...(request.smokeConnectOverride
-        ? { smokeConnectOverride: request.smokeConnectOverride }
+      ...(resolvedRequest.artifact ? { artifact: resolvedRequest.artifact } : {}),
+      ...(resolvedRequest.componentArtifacts
+        ? { componentArtifacts: resolvedRequest.componentArtifacts }
         : {}),
-      ...(request.source ? { source: request.source } : {}),
-      ...(request.admissionEvidence ? { admissionEvidence: request.admissionEvidence } : {}),
+      ...(resolvedRequest.publishBehavior
+        ? { publishBehavior: resolvedRequest.publishBehavior }
+        : {}),
+      ...(resolvedRequest.parentRunId ? { parentRunId: resolvedRequest.parentRunId } : {}),
+      ...(resolvedRequest.releaseLineageId
+        ? { releaseLineageId: resolvedRequest.releaseLineageId }
+        : {}),
+      ...(resolvedRequest.artifactLineageId
+        ? { artifactLineageId: resolvedRequest.artifactLineageId }
+        : {}),
+      ...(resolvedRequest.smokeConnectOverride
+        ? { smokeConnectOverride: resolvedRequest.smokeConnectOverride }
+        : {}),
+      ...(resolvedRequest.source ? { source: resolvedRequest.source } : {}),
+      ...(resolvedRequest.admissionEvidence
+        ? { admissionEvidence: resolvedRequest.admissionEvidence }
+        : {}),
     });
     await syncAndRemoveMirrors({
       backend: opts.backend,
@@ -215,33 +227,4 @@ export async function handleControlPlaneRunAction(
   } finally {
     await materialized.cleanup();
   }
-}
-
-export async function readControlPlaneStatus(
-  backend: NixosSharedHostControlPlaneBackendTarget,
-  opts: {
-    submissionId?: string;
-    deployRunId?: string;
-  },
-) {
-  const submission = opts.submissionId
-    ? await readBackendSubmissionBySubmissionId(backend, opts.submissionId)
-    : opts.deployRunId
-      ? await readBackendSubmissionByDeployRunId(backend, opts.deployRunId)
-      : null;
-  return submission ? statusFromSubmission(submission as any) : null;
-}
-
-export async function readControlPlaneRecord(
-  backend: NixosSharedHostControlPlaneBackendTarget,
-  opts: {
-    submissionId?: string;
-    deployRunId?: string;
-  },
-) {
-  return opts.submissionId
-    ? await readBackendDeployRecordBySubmissionId(backend, opts.submissionId)
-    : opts.deployRunId
-      ? await readBackendDeployRecordByDeployRunId(backend, opts.deployRunId)
-      : null;
 }

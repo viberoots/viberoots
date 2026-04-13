@@ -4,7 +4,6 @@ import type {
   NixosSharedHostControlPlanePaths,
   NixosSharedHostSmokeConnectOverride,
 } from "./nixos-shared-host-control-plane-contract.ts";
-import { syncBackendDeployRecordsFromRunMirrors } from "./nixos-shared-host-control-plane-backend.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import { submitNixosSharedHostPublishOnlyRun } from "./nixos-shared-host-publish-only.ts";
 import { submitNixosSharedHostProvisionOnlyRun } from "./nixos-shared-host-provision-only.ts";
@@ -20,20 +19,13 @@ type SharedSourceFrontDoorOpts = {
   smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;
 };
 
-async function prepareDirectSharedHostSourceBackend(opts: {
-  recordsRoot: string;
-  backendDatabaseUrl?: string;
-}) {
-  if (!opts.backendDatabaseUrl) {
+async function requireDirectSharedHostSourceBackend(backendDatabaseUrl?: string) {
+  if (!backendDatabaseUrl) {
     throw new Error(
       "shared replay source lookup requires --control-plane-database-url or BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL",
     );
   }
-  await syncBackendDeployRecordsFromRunMirrors({
-    recordsRoot: opts.recordsRoot,
-    databaseUrl: opts.backendDatabaseUrl,
-  });
-  return opts.backendDatabaseUrl;
+  return backendDatabaseUrl;
 }
 
 export async function runNixosSharedHostProvisionOnlyFrontDoor(opts: SharedSourceFrontDoorOpts) {
@@ -43,10 +35,7 @@ export async function runNixosSharedHostProvisionOnlyFrontDoor(opts: SharedSourc
     );
   }
   const backendDatabaseUrl = opts.sourceRunId
-    ? await prepareDirectSharedHostSourceBackend({
-        recordsRoot: opts.paths.recordsRoot,
-        backendDatabaseUrl: opts.backendDatabaseUrl,
-      })
+    ? await requireDirectSharedHostSourceBackend(opts.backendDatabaseUrl)
     : undefined;
   return await submitNixosSharedHostProvisionOnlyRun({
     workspaceRoot: opts.workspaceRoot,
@@ -74,10 +63,7 @@ export async function runNixosSharedHostPublishOnlyFrontDoor(
       "shared --publish-only must not use --artifact-dir; replay the admitted exact artifact with --source-run-id",
     );
   }
-  const backendDatabaseUrl = await prepareDirectSharedHostSourceBackend({
-    recordsRoot: opts.paths.recordsRoot,
-    backendDatabaseUrl: opts.backendDatabaseUrl,
-  });
+  const backendDatabaseUrl = await requireDirectSharedHostSourceBackend(opts.backendDatabaseUrl);
   return await submitNixosSharedHostPublishOnlyRun({
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.deployment,

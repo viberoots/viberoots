@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
+import { readRecord, startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers.ts";
 import {
   ensureNixosSharedHostStageBranch,
+  installNixosSharedHostTargets,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
@@ -26,48 +27,49 @@ test("nixos-shared-host rollback restores a prior known-good exact artifact", as
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const recordsRoot = path.join(tmp, "records");
-    const commandEnv = {
-      ...process.env,
-      BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
-    };
     await writeArtifact(artifactV1, "v1");
     await writeArtifact(artifactV2, "v2");
+    await installNixosSharedHostTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const admissionEvidenceJson = await writeAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson,
+      deploymentLabel: deployment.label,
       deployment,
     });
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
+    const harness = await startControlPlaneHarness({
+      workspaceRoot: tmp,
+      hostRoot,
+      statePath,
+      recordsRoot,
+    });
     try {
       const first = await $({
         cwd: tmp,
-        env: commandEnv,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactV1} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactV1} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const firstSummary = JSON.parse(String(first.stdout));
       await $({
         cwd: tmp,
-        env: commandEnv,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactV2} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactV2} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       assert.match(await fsp.readFile(liveIndexPath(hostRoot, "demoapp"), "utf8"), /v2/);
       await fsp.rm(artifactV1, { recursive: true, force: true });
       await fsp.rm(artifactV2, { recursive: true, force: true });
       const rollback = await $({
         cwd: tmp,
-        env: commandEnv,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --source-run-id ${firstSummary.deployRunId} --rollback --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --publish-only --source-run-id ${firstSummary.deployRunId} --rollback --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(rollback.stdout));
       assert.equal(summary.operationKind, "rollback");
       assert.equal(summary.runClassification, "rollback");
       assert.equal(summary.parentRunId, firstSummary.deployRunId);
-      const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
+      const record = await readRecord(harness.controlPlane.url, summary.deployRunId);
       assert.equal(record.parentRunId, firstSummary.deployRunId);
       assert.equal(record.artifact.identity, firstSummary.artifactIdentity);
       assert.equal(record.artifactLineageId, firstSummary.artifactIdentity);
       assert.match(await fsp.readFile(liveIndexPath(hostRoot, "demoapp"), "utf8"), /v1/);
     } finally {
+      await harness.close();
       await server.close();
     }
   });

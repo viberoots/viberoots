@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
+import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
 import { summarizeDeploymentResult } from "./deployment-execution.ts";
 import {
   resolveArtifactDirForCli,
@@ -10,8 +10,8 @@ import { printDeployJson } from "./deploy-front-door.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
 import { maybeHandleNixosSharedHostBootstrapCli } from "./nixos-shared-host-bootstrap-cli.ts";
-import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door.ts";
 import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
+import { runProtectedNixosSharedHostDeployFrontDoor } from "./nixos-shared-host-protected-front-door.ts";
 import {
   runNixosSharedHostProvisionOnlyFrontDoor,
   runNixosSharedHostPublishOnlyFrontDoor,
@@ -59,13 +59,7 @@ export async function runNixosSharedHostDeployFrontDoor(opts: {
     ),
   );
   const hostConfigPath = getFlagStr("host-config-out", "").trim();
-  const controlPlaneUrl =
-    getFlagStr("control-plane-url", "").trim() ||
-    String(process.env.BNX_DEPLOY_CONTROL_PLANE_URL || "").trim();
-  const controlPlaneToken =
-    getFlagStr("control-plane-token", "").trim() ||
-    String(process.env.BNX_DEPLOY_CONTROL_PLANE_TOKEN || "").trim() ||
-    undefined;
+  const protectedShared = opts.deployment.protectionClass !== "local_only";
   const controlPlaneDatabaseUrl =
     getFlagStr("control-plane-database-url", "").trim() ||
     String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim() ||
@@ -88,39 +82,25 @@ export async function runNixosSharedHostDeployFrontDoor(opts: {
     printDeployJson(bootstrapResult.value);
     return;
   }
-  if (controlPlaneUrl && !opts.publishOnly && !opts.provisionOnly) {
-    const serviceResult = remove
-      ? await runNixosSharedHostDirectServiceMutation({
-          controlPlaneUrl,
-          ...(controlPlaneToken ? { controlPlaneToken } : {}),
-          deployment: opts.deployment,
-          operationKind: "explicit_removal",
-          ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
-        })
-      : await runNixosSharedHostDirectServiceMutation({
-          controlPlaneUrl,
-          ...(controlPlaneToken ? { controlPlaneToken } : {}),
-          deployment: opts.deployment,
-          operationKind: "deploy",
-          ...(isMultiComponentNixosSharedHostDeployment(opts.deployment)
-            ? {
-                artifactDirsByComponentId: await resolveComponentArtifactDirsForCli(
-                  opts.workspaceRoot,
-                  opts.deployment,
-                ),
-              }
-            : {
-                artifactDir: await resolveArtifactDirForCli(opts.workspaceRoot, opts.deployment),
-              }),
-          ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
-          ...(opts.smokeConnectOverride
-            ? { smokeConnectOverride: opts.smokeConnectOverride as any }
-            : {}),
-        });
+  if (protectedShared) {
     printDeployJson(
-      serviceResult.kind === "result"
-        ? summarizeDeploymentResult(serviceResult.result as any)
-        : serviceResult.status,
+      await runProtectedNixosSharedHostDeployFrontDoor({
+        workspaceRoot: opts.workspaceRoot,
+        deployment: opts.deployment,
+        publishOnly: opts.publishOnly,
+        provisionOnly: opts.provisionOnly,
+        remove,
+        rollback: opts.rollback,
+        sourceRunId: opts.sourceRunId,
+        artifactDirFlag: opts.artifactDirFlag,
+        admissionEvidence: opts.admissionEvidence,
+        smokeConnectOverride: opts.smokeConnectOverride,
+        controlPlaneUrl:
+          getFlagStr("control-plane-url", "").trim() ||
+          String(process.env.BNX_DEPLOY_CONTROL_PLANE_URL || "").trim(),
+        controlPlaneToken: getFlagStr("control-plane-token", "").trim() || undefined,
+        hasFlag,
+      }),
     );
     return;
   }

@@ -10,6 +10,13 @@ import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
+import {
+  readRecord,
+  readStatus,
+  startControlPlaneHarness,
+  submitServiceRequest,
+  waitFor,
+} from "./nixos-shared-host.control-plane.helpers.ts";
 import { startStaticWebappHttpsMultiServer } from "./static-webapp.https-server.ts";
 
 async function writeArtifact(root: string, name: string): Promise<void> {
@@ -73,6 +80,8 @@ test("nixos-shared-host multi-component deploy publishes components in rollout o
     const deploymentJson = path.join(tmp, "deployment.json");
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
+    const statePath = path.join(tmp, "platform-state.json");
+    const hostConfigPath = path.join(tmp, "rendered-host.json");
     const frontendArtifact = path.join(tmp, "artifacts", "frontend");
     const apiArtifact = path.join(tmp, "artifacts", "api");
     await writeArtifact(frontendArtifact, "frontend");
@@ -82,7 +91,7 @@ test("nixos-shared-host multi-component deploy publishes components in rollout o
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson,
+      deploymentLabel: deployment.label,
       deployment,
     });
     const server = await startStaticWebappHttpsMultiServer({
@@ -94,17 +103,24 @@ test("nixos-shared-host multi-component deploy publishes components in rollout o
       },
       tlsRoot: hostRoot,
     });
+    const harness = await startControlPlaneHarness({
+      workspaceRoot: tmp,
+      hostRoot,
+      statePath,
+      recordsRoot,
+      hostConfigPath,
+    });
     try {
       const result = await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendArtifact, api: apiArtifact })} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot} --host-config-out ${path.join(tmp, "rendered-host.json")} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendArtifact, api: apiArtifact })} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.finalOutcome, "succeeded");
       assert.deepEqual(
         summary.componentResults.map((component: { componentId: string }) => component.componentId),
         ["frontend", "api"],
       );
-      const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
+      const record = await readRecord(harness.controlPlane.url, summary.deployRunId);
       assert.equal(record.providerTargetIdentity, "nixos-shared-host:default:{demoapi,demoapp}");
       assert.deepEqual(
         record.componentResults.map((component: { componentId: string; finalOutcome: string }) => ({
@@ -116,10 +132,11 @@ test("nixos-shared-host multi-component deploy publishes components in rollout o
           { componentId: "api", finalOutcome: "succeeded" },
         ],
       );
-      const rendered = JSON.parse(await fsp.readFile(path.join(tmp, "rendered-host.json"), "utf8"));
+      const rendered = JSON.parse(await fsp.readFile(hostConfigPath, "utf8"));
       assert.ok(rendered.containers.demoapp);
       assert.ok(rendered.containers.demoapi);
     } finally {
+      await harness.close();
       await server.close();
     }
   });
@@ -174,6 +191,7 @@ test("nixos-shared-host multi-component deploy stops after the first publish fai
     const deploymentJson = path.join(tmp, "deployment.json");
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
+    const statePath = path.join(tmp, "platform-state.json");
     const frontendArtifact = path.join(tmp, "artifacts", "frontend");
     const apiArtifact = path.join(tmp, "artifacts", "api");
     await writeArtifact(frontendArtifact, "frontend");
@@ -183,15 +201,26 @@ test("nixos-shared-host multi-component deploy stops after the first publish fai
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson,
+      deploymentLabel: deployment.label,
       deployment,
     });
-    const result = await $({
-      cwd: tmp,
-    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendArtifact, api: apiArtifact })} --host-root ${hostRoot} --state ${path.join(tmp, "platform-state.json")} --records-root ${recordsRoot}`.nothrow();
-    assert.notEqual((result as any).exitCode, 0);
-    const runs = await fsp.readdir(path.join(recordsRoot, "runs"));
-    const record = JSON.parse(await fsp.readFile(path.join(recordsRoot, "runs", runs[0]!), "utf8"));
+    const harness = await startControlPlaneHarness({
+      workspaceRoot: tmp,
+      hostRoot,
+      statePath,
+      recordsRoot,
+    });
+    const submitted = await submitServiceRequest({
+      url: harness.controlPlane.url,
+      deployment,
+      artifactDirsByComponentId: { frontend: frontendArtifact, api: apiArtifact },
+      admissionEvidence: JSON.parse(await fsp.readFile(admissionEvidenceJson, "utf8")),
+    });
+    const status = await waitFor(async () => {
+      const current = await readStatus(harness.controlPlane.url, submitted.submissionId);
+      return current.lifecycleState === "finished" ? current : null;
+    }, "timed out waiting for multi-component failure result");
+    const record = await readRecord(harness.controlPlane.url, status.deployRunId);
     assert.equal(record.finalOutcome, "publish_failed");
     assert.deepEqual(
       record.componentResults.map((component: { componentId: string; finalOutcome: string }) => ({
@@ -203,5 +232,6 @@ test("nixos-shared-host multi-component deploy stops after the first publish fai
         { componentId: "api", finalOutcome: "publish_failed" },
       ],
     );
+    await harness.close();
   });
 });

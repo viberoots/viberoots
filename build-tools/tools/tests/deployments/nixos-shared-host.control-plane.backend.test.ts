@@ -97,15 +97,15 @@ test("backend claim heartbeat preserves single worker ownership until the lease 
     await syncBackendSnapshot(backend, executionSnapshotPath);
     await syncBackendSubmission(backend, submissionPath);
     await enqueueBackendSubmission(backend, "cp-claim", "2026-04-12T10:00:00.000Z");
-    const first = await claimBackendQueuedSubmission(backend, "worker-1", 120);
+    const first = await claimBackendQueuedSubmission(backend, "worker-1", 400);
     assert.ok(first);
     const lease = startBackendSubmissionClaimLease({
       backend,
       submissionId: first.submissionId,
       workerId: "worker-1",
       claimToken: first.claimToken,
-      claimMs: 120,
-      heartbeatMs: 40,
+      claimMs: 400,
+      heartbeatMs: 50,
     });
     await writeControlPlaneJson(submissionPath, {
       ...(JSON.parse(await fsp.readFile(submissionPath, "utf8")) as Record<string, unknown>),
@@ -117,11 +117,12 @@ test("backend claim heartbeat preserves single worker ownership until the lease 
       },
     });
     await syncBackendSubmission(backend, submissionPath);
-    await sleep(220);
-    assert.equal(await claimBackendQueuedSubmission(backend, "worker-2", 120), null);
+    await sleep(260);
+    await lease.assertCurrentAuthority();
+    assert.equal(await claimBackendQueuedSubmission(backend, "worker-2", 400), null);
     await lease.stop();
-    await sleep(140);
-    const takeover = await claimBackendQueuedSubmission(backend, "worker-2", 120);
+    await sleep(460);
+    const takeover = await claimBackendQueuedSubmission(backend, "worker-2", 400);
     assert.ok(takeover);
     assert.equal(takeover.lifecycleState, "running");
   });

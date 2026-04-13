@@ -2,6 +2,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as fsp from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import fg from "fast-glob";
 import {
   DEPLOYMENT_DOMAIN_FILES_SCOPE,
@@ -21,14 +23,18 @@ export {
   type FileSizeScope,
 };
 
+const execFileAsync = promisify(execFile);
+
 function normalizeRelPath(p: string): string {
   return p.replaceAll("\\", "/").replace(/^\.\/+/, "");
 }
 
 async function listTrackedFilesFromRoot(root: string): Promise<string[]> {
-  const $root = $({ cwd: root });
   try {
-    const { stdout } = await $root`git ls-files -z`;
+    const { stdout } = await execFileAsync("git", ["ls-files", "-z"], {
+      cwd: root,
+      encoding: "utf8",
+    });
     return String(stdout || "")
       .split("\0")
       .filter(Boolean)
@@ -68,9 +74,15 @@ async function listTrackedFilesFromRoot(root: string): Promise<string[]> {
 }
 
 async function listChangedFilesFromRoot(root: string): Promise<string[]> {
-  const $root = $({ cwd: root });
   try {
-    const { stdout } = await $root`git diff --name-only --diff-filter=AMR HEAD -z`;
+    const { stdout } = await execFileAsync(
+      "git",
+      ["diff", "--name-only", "--diff-filter=AMR", "HEAD", "-z"],
+      {
+        cwd: root,
+        encoding: "utf8",
+      },
+    );
     const changed = String(stdout || "")
       .split("\0")
       .filter(Boolean);

@@ -16,7 +16,8 @@ function requireFlag(name: string): string {
 async function main() {
   const workspaceRoot = process.cwd();
   const deployment = await resolveDeploymentForCli(workspaceRoot, requireFlag, {
-    allowDeploymentJson: true,
+    deploymentJsonErrorMessage:
+      "lane governance verification requires --deployment <label>; --deployment-json is not accepted",
   });
   if (deployment.protectionClass === "local_only") {
     throw new Error("lane governance verification only applies to protected/shared deployments");

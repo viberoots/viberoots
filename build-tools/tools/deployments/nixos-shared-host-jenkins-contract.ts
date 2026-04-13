@@ -44,8 +44,19 @@ export function createJenkinsEnvelope(ctx: JenkinsContext, plan?: NixosSharedHos
         identityFile: ctx.sshIdentityFile,
         knownHostsFile: ctx.sshKnownHostsFile,
       },
+      serviceSubmission: {
+        mode: "control-plane-service",
+        ...(plan
+          ? {
+              controlPlaneUrl: plan.serviceClient.controlPlaneUrl,
+              ...(plan.serviceClient.controlPlaneTokenEnv
+                ? { controlPlaneTokenEnv: plan.serviceClient.controlPlaneTokenEnv }
+                : {}),
+            }
+          : {}),
+      },
       hostApply: {
-        explicitOptInRequired: true,
+        supported: false,
         requestedMode: ctx.requestedHostApplyMode,
       },
       ...(plan

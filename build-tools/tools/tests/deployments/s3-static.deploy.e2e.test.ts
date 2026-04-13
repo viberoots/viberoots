@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
-import { s3StaticDeploymentFixture } from "./s3-static.fixture.ts";
+import { installS3StaticTargets, s3StaticDeploymentFixture } from "./s3-static.fixture.ts";
 import { installFakeS3StaticAwsCli } from "./s3-static.fake-aws.ts";
 import { startS3StaticPublicServer } from "./s3-static.public-server.ts";
 import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
@@ -24,6 +24,7 @@ test("s3-static deploy CLI completes the static-webapp flow end to end", async (
     const recordsRoot = path.join(tmp, "records");
     const fake = await installFakeS3StaticAwsCli(tmp);
     await writeArtifact(artifactDir, "<html>pleomino s3 staging</html>\n");
+    await installS3StaticTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
     await fsp.mkdir(path.join(tmp, "projects", "deployments", "pleomino-staging-s3"), {
       recursive: true,
@@ -37,7 +38,7 @@ test("s3-static deploy CLI completes the static-webapp flow end to end", async (
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson,
+      deploymentLabel: deployment.label,
       deployment,
     });
     const server = await startS3StaticPublicServer({
@@ -55,7 +56,7 @@ test("s3-static deploy CLI completes the static-webapp flow end to end", async (
           BNX_S3_STATIC_FAKE_AWS_LOG: fake.logPath,
           BNX_S3_STATIC_AWS_BIN: path.join(fake.binDir, "aws"),
         },
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.finalOutcome, "succeeded");
       assert.equal(summary.publicUrl, "https://staging.example.test/");
@@ -80,6 +81,7 @@ test("s3-static fails closed on ambiguous publish results", async () => {
     const recordsRoot = path.join(tmp, "records");
     const fake = await installFakeS3StaticAwsCli(tmp);
     await writeArtifact(artifactDir, "<html>ambiguous</html>\n");
+    await installS3StaticTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
     await fsp.mkdir(path.join(tmp, "projects", "deployments", "pleomino-staging-s3"), {
       recursive: true,

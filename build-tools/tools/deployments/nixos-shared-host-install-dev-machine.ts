@@ -16,6 +16,8 @@ export type ClientInput = {
   remoteRuntimeRoot: string;
   remoteRecordsRoot: string;
   sshMode: string;
+  controlPlaneUrl: string;
+  controlPlaneTokenEnv?: string;
 };
 
 function isNonEmptyString(value: unknown): value is string {
@@ -34,6 +36,10 @@ function parseClientManifest(raw: unknown, source: string): NixosSharedHostClien
     !isNonEmptyString(parsed.remoteRuntimeRoot) ||
     !isNonEmptyString(parsed.remoteRecordsRoot) ||
     !isNonEmptyString(parsed.sshMode) ||
+    !isNonEmptyString(parsed.serviceClient?.controlPlaneUrl) ||
+    ("controlPlaneTokenEnv" in (parsed.serviceClient || {}) &&
+      parsed.serviceClient?.controlPlaneTokenEnv !== undefined &&
+      !isNonEmptyString(parsed.serviceClient?.controlPlaneTokenEnv)) ||
     !Array.isArray(parsed.localManagedPaths) ||
     parsed.localManagedPaths.some((entry) => typeof entry !== "string")
   ) {
@@ -87,6 +93,12 @@ export function createClientManifest(input: ClientInput & { toolFingerprint: str
       remoteRuntimeRoot: requireValue("remoteRuntimeRoot", input.remoteRuntimeRoot),
       remoteRecordsRoot: requireValue("remoteRecordsRoot", input.remoteRecordsRoot),
       sshMode: requireValue("sshMode", input.sshMode),
+      serviceClient: {
+        controlPlaneUrl: requireValue("controlPlaneUrl", input.controlPlaneUrl),
+        ...(input.controlPlaneTokenEnv?.trim()
+          ? { controlPlaneTokenEnv: input.controlPlaneTokenEnv.trim() }
+          : {}),
+      },
       localManagedPaths: [],
     },
   };

@@ -4,7 +4,10 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import {
+  installNixosSharedHostTargets,
+  nixosSharedHostDeploymentFixture,
+} from "./nixos-shared-host.fixture.ts";
 
 async function writeJson(filePath: string, value: unknown) {
   await fsp.mkdir(path.dirname(filePath), { recursive: true });
@@ -14,10 +17,9 @@ async function writeJson(filePath: string, value: unknown) {
 test("lane-governance verify command rejects branch-protection drift and emits verified facts", async () => {
   await runInTemp("lane-governance-verify", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture();
-    const deploymentJson = path.join(tmp, "deployment.json");
+    await installNixosSharedHostTargets(tmp, [deployment]);
     const validSnapshot = path.join(tmp, "scm-policy.json");
     const invalidSnapshot = path.join(tmp, "scm-policy-invalid.json");
-    await writeJson(deploymentJson, deployment);
     await writeJson(validSnapshot, {
       scmBackend: deployment.lanePolicy.governance.scmBackend,
       repository: deployment.lanePolicy.governance.repository,
@@ -33,7 +35,7 @@ test("lane-governance verify command rejects branch-protection drift and emits v
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`zx-wrapper build-tools/tools/deployments/deployment-lane-governance-verify.ts --deployment-json ${deploymentJson} --scm-policy-json ${validSnapshot}`;
+    })`zx-wrapper build-tools/tools/deployments/deployment-lane-governance-verify.ts --deployment ${deployment.label} --scm-policy-json ${validSnapshot}`;
     const verified = JSON.parse(String(result.stdout));
     assert.equal(verified.governanceRef, deployment.lanePolicy.governanceRef);
     assert.equal(verified.branchProtections[2].stage, "prod");
@@ -42,7 +44,7 @@ test("lane-governance verify command rejects branch-protection drift and emits v
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deployment-lane-governance-verify.ts --deployment-json ${deploymentJson} --scm-policy-json ${invalidSnapshot}`,
+        })`zx-wrapper build-tools/tools/deployments/deployment-lane-governance-verify.ts --deployment ${deployment.label} --scm-policy-json ${invalidSnapshot}`,
       /missing required protected branch/,
     );
   });

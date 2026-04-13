@@ -9,6 +9,7 @@ import {
 } from "./nixos-shared-host-control-plane-backend.ts";
 import {
   liveRollbackCompatibilityErrors,
+  recordedReplayPolicyErrors,
   replayRunnerCompatibilityErrors,
   rollbackSourceEligibilityErrors,
   sameDeploymentReplayErrors,
@@ -172,6 +173,14 @@ export async function resolveNixosSharedHostReplaySelection(opts: {
   ) {
     errors.push("recorded replay snapshot is missing the release-action plan required for replay");
   }
+  const recordedReleaseActions =
+    source.replaySnapshot.releaseActionPlan || source.replaySnapshot.deployment.releaseActions;
+  errors.push(
+    ...recordedReplayPolicyErrors({
+      operationKind: opts.rollback ? "rollback" : "retry",
+      releaseActions: recordedReleaseActions,
+    }),
+  );
   if (errors.length > 0) {
     throw new Error(`shared replay source is not compatible with the current deployment:
 ${errors.join("\n")}`);

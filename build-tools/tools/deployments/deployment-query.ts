@@ -2,6 +2,13 @@
 import { nodesFromCqueryJson } from "../buck/exporter/cquery/nodes.ts";
 import { normalizeTargetLabel } from "../lib/labels.ts";
 import { componentTargetsFor, extractDeployments, type DeploymentTarget } from "./contract.ts";
+import {
+  deploymentBuckEnv,
+  deploymentIsolationArgs,
+  normalizeQueryTarget,
+  queryComponentLabels,
+  queryLabelList,
+} from "./deployment-query-helpers.ts";
 
 const DEPLOYMENT_CQUERY_ATTRS = [
   "name",
@@ -30,11 +37,33 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "smoke_exception",
   "smoke_runner_class",
   "smoke_timeout_budget_ms",
+  "preview",
   "prerequisites",
   "secret_requirements",
   "runtime_config_requirements",
   "release_actions",
   "target_exceptions",
+  "type",
+  "phase",
+  "run_condition",
+  "abort_behavior",
+  "data_compatibility",
+  "replay_policy",
+  "duplicate_safety",
+  "operation_keys",
+  "required_secret_requirements",
+  "required_runtime_config_requirements",
+  "exception_id",
+  "exception_kind",
+  "affected_deployments",
+  "old_provider_target_identity",
+  "new_provider_target_identity",
+  "shared_lock_scope",
+  "approval_evidence",
+  "effective_at",
+  "expires_at",
+  "completion_signal",
+  "reconciliation_owner",
   "governance_policy",
   "scm_backend",
   "repository",
@@ -53,50 +82,6 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "labels",
 ];
 
-function deploymentBuckEnv(): NodeJS.ProcessEnv {
-  return {
-    ...process.env,
-    HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
-    SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
-  };
-}
-
-function deploymentIsolationArgs(): string[] {
-  if (process.env.BUCK_NO_ISOLATION === "1") return [];
-  const isolationDir = String(
-    process.env.BUCK_ISOLATION_DIR ||
-      process.env.BUCK_ISOLATION_DIR_EXPORTER ||
-      process.env.BUCK_NESTED_ISO ||
-      "",
-  ).trim();
-  return isolationDir ? ["--isolation-dir", isolationDir] : [];
-}
-
-const CONFIG_SUFFIX = /\s+\([^)]*\)$/;
-
-function normalizeQueryTarget(target: string): string {
-  const clean = String(target || "")
-    .trim()
-    .replace(CONFIG_SUFFIX, "");
-  return clean.startsWith("root//") ? clean.slice("root".length) : clean;
-}
-
-function queryLabelList(node: Record<string, unknown>, key: string): string[] {
-  const value = node[key];
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((entry) =>
-      typeof entry === "string"
-        ? normalizeTargetLabel(entry)
-        : entry &&
-            typeof entry === "object" &&
-            typeof (entry as { label?: unknown }).label === "string"
-          ? normalizeTargetLabel(String((entry as { label: string }).label))
-          : "",
-    )
-    .filter(Boolean);
-}
-
 function relatedLabelsForNodes(
   nodes: ReturnType<typeof nodesFromCqueryJson>,
   excluded: string[],
@@ -107,6 +92,7 @@ function relatedLabelsForNodes(
       nodes.flatMap((node) =>
         [
           normalizeTargetLabel(String((node as any).component || "")),
+          ...queryComponentLabels(node as Record<string, unknown>),
           normalizeTargetLabel(String((node as any).lane_policy || "")),
           normalizeTargetLabel(String((node as any).governance_policy || "")),
           normalizeTargetLabel(String((node as any).admission_policy || "")),
@@ -155,6 +141,7 @@ export async function resolveDeploymentFromTarget(
   if (!deploymentNode) throw new Error(`deployment target not found: ${deploymentTarget}`);
   const extraLabels = [
     normalizeTargetLabel(String((deploymentNode as any).component || "")),
+    ...queryComponentLabels(deploymentNode as Record<string, unknown>),
     normalizeTargetLabel(String((deploymentNode as any).lane_policy || "")),
     normalizeTargetLabel(String((deploymentNode as any).governance_policy || "")),
     normalizeTargetLabel(String((deploymentNode as any).admission_policy || "")),
@@ -165,6 +152,30 @@ export async function resolveDeploymentFromTarget(
     extraLabels.length > 0
       ? await queryDeploymentNodesExpanded(workspaceRoot, [deploymentTarget, ...extraLabels])
       : initialNodes;
+  try {
+    return await resolveDeploymentFromNodes(workspaceRoot, deploymentTarget, nodes, extraLabels);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error || "");
+    if (
+      !message.includes('unknown prerequisite deployment_id "') &&
+      !message.includes(": component target ") &&
+      !message.includes(" does not exist")
+    ) {
+      throw error;
+    }
+    const allDeployments = await resolveAllDeployments(workspaceRoot);
+    const hit = allDeployments.find((deployment) => deployment.label === deploymentTarget);
+    if (!hit) throw error;
+    return hit;
+  }
+}
+
+async function resolveDeploymentFromNodes(
+  workspaceRoot: string,
+  deploymentTarget: string,
+  nodes: ReturnType<typeof nodesFromCqueryJson>,
+  extraLabels: string[],
+): Promise<DeploymentTarget> {
   const extracted = extractDeployments(nodes);
   if (extracted.errors.length > 0) throw new Error(extracted.errors.join("\n"));
   const hit = extracted.deployments.find((deployment) => deployment.label === deploymentTarget);

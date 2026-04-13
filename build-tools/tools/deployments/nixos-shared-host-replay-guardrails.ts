@@ -4,7 +4,11 @@ import {
   readBackendLatestDeployRecordEnvelopeByDeploymentId,
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend.ts";
-import { rollbackCompatibilityErrors } from "./nixos-shared-host-release-actions.ts";
+import {
+  assertNixosSharedHostReleaseActionPhaseReplayAllowed,
+  rollbackCompatibilityErrors,
+} from "./nixos-shared-host-release-actions.ts";
+import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
 import {
@@ -81,6 +85,25 @@ export function rollbackSourceEligibilityErrors(record: NixosSharedHostDeployRec
     errors.push(`wrong run classification: ${record.runClassification}`);
   }
   if (record.publishMode !== "normal") errors.push(`wrong publish mode: ${record.publishMode}`);
+  return errors;
+}
+
+export function recordedReplayPolicyErrors(opts: {
+  operationKind: "retry" | "rollback";
+  releaseActions: DeploymentReleaseAction[];
+}): string[] {
+  const errors: string[] = [];
+  for (const phase of ["pre_publish", "post_publish_pre_smoke", "post_smoke"] as const) {
+    try {
+      assertNixosSharedHostReleaseActionPhaseReplayAllowed({
+        operationKind: opts.operationKind,
+        phase,
+        releaseActions: opts.releaseActions,
+      });
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
   return errors;
 }
 

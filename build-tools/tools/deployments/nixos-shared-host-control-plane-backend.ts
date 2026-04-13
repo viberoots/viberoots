@@ -25,7 +25,6 @@ export {
   readBackendDeployRecordEnvelopeByDeployRunId,
   readBackendLatestDeployRecordEnvelopeByDeploymentId,
   readBackendDeployRecordEnvelopeBySubmissionId,
-  syncBackendDeployRecordsFromRunMirrors,
   syncBackendDeployRecord,
   writeBackendDeployRecordDoc,
 } from "./nixos-shared-host-control-plane-backend-records.ts";

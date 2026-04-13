@@ -13,7 +13,9 @@ import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostDeploymentFixture,
+  nixosSharedHostLanePolicyFixture,
 } from "./nixos-shared-host.fixture.ts";
+import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
@@ -32,12 +34,19 @@ async function writeWranglerConfig(filePath: string): Promise<void> {
 }
 
 function cloudflareDevDeployment() {
-  const lanePolicy = {
-    ...cloudflarePagesDeploymentFixture().lanePolicy,
+  const lanePolicy = nixosSharedHostLanePolicyFixture({
+    governance: {
+      ...cloudflarePagesDeploymentFixture().lanePolicy.governance,
+      branchProtections:
+        cloudflarePagesDeploymentFixture().lanePolicy.governance.branchProtections.map((entry) => ({
+          ...entry,
+          requiredChecks: entry.stage === "prod" ? ["deploy/pleomino-prod"] : [],
+        })),
+    },
     promotionCompatibility: {
       crossProviderPromotionEdges: ["dev->staging"],
     },
-  };
+  });
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
     requiredChecks: [],
   });
@@ -59,13 +68,7 @@ function cloudflareDevDeployment() {
   });
 }
 
-function nixosStagingDeployment() {
-  const lanePolicy = {
-    ...cloudflarePagesDeploymentFixture().lanePolicy,
-    promotionCompatibility: {
-      crossProviderPromotionEdges: ["dev->staging"],
-    },
-  };
+function nixosStagingDeployment(lanePolicy = cloudflareDevDeployment().lanePolicy) {
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
     ref: "//projects/deployments/pleomino-shared:staging_release",
     name: "staging_release",
@@ -99,7 +102,7 @@ function fakeCloudflareEnv(fake: Awaited<ReturnType<typeof installFakeCloudflare
 test("nixos-shared-host allows reviewed cross-provider same-artifact promotion on declared edges", async () => {
   await runInTemp("nixos-shared-host-promotion-e2e", async (tmp, $) => {
     const source = cloudflareDevDeployment();
-    const target = nixosStagingDeployment();
+    const target = nixosStagingDeployment(source.lanePolicy);
     const artifactDir = path.join(tmp, "artifact");
     const bootstrapArtifactDir = path.join(tmp, "bootstrap-artifact");
     const recordsRoot = path.join(tmp, "records");
@@ -120,13 +123,13 @@ test("nixos-shared-host allows reviewed cross-provider same-artifact promotion o
     const sourceEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson: sourceJson,
+      deploymentLabel: source.label,
       deployment: source,
     });
     const targetEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson: targetJson,
+      deploymentLabel: target.label,
       deployment: target,
     });
     const sourceServer = await startCloudflarePagesPublicServer({
@@ -135,14 +138,20 @@ test("nixos-shared-host allows reviewed cross-provider same-artifact promotion o
       tlsRoot: tmp,
     });
     const targetServer = await startNixosSharedHostPublicServer({ deployment: target, hostRoot });
+    const harness = await startControlPlaneHarness({
+      workspaceRoot: tmp,
+      hostRoot,
+      statePath,
+      recordsRoot,
+    });
     try {
       await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${targetJson} --admission-evidence-json ${targetEvidenceJson} --artifact-dir ${bootstrapArtifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(targetServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${target.label} --admission-evidence-json ${targetEvidenceJson} --artifact-dir ${bootstrapArtifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(targetServer.port)} --smoke-connect-protocol https:`;
       const sourceRun = await $({
         cwd: tmp,
         env: fakeCloudflareEnv(fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${sourceJson} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${source.label} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
       const sourceSummary = JSON.parse(String(sourceRun.stdout));
       const promotion = await resolveCrossDeploymentPromotionSelection({
         workspaceRoot: tmp,
@@ -154,6 +163,7 @@ test("nixos-shared-host allows reviewed cross-provider same-artifact promotion o
       assert.equal(promotion.parentRunId, sourceSummary.deployRunId);
       assert.equal("sourceRecordPath" in promotion, false);
     } finally {
+      await harness.close();
       await sourceServer.close();
       await targetServer.close();
     }
@@ -163,7 +173,7 @@ test("nixos-shared-host allows reviewed cross-provider same-artifact promotion o
 test("nixos-shared-host promotion rejects retained source runs that drift out of lane eligibility", async () => {
   await runInTemp("nixos-shared-host-promotion-drift", async (tmp, $) => {
     const source = cloudflareDevDeployment();
-    const target = nixosStagingDeployment();
+    const target = nixosStagingDeployment(source.lanePolicy);
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
@@ -178,7 +188,7 @@ test("nixos-shared-host promotion rejects retained source runs that drift out of
     const sourceEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson: sourceJson,
+      deploymentLabel: source.label,
       deployment: source,
     });
     const sourceServer = await startCloudflarePagesPublicServer({
@@ -190,7 +200,7 @@ test("nixos-shared-host promotion rejects retained source runs that drift out of
       const sourceRun = await $({
         cwd: tmp,
         env: fakeCloudflareEnv(fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${sourceJson} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${source.label} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
       const sourceSummary = JSON.parse(String(sourceRun.stdout));
       await $({ cwd: tmp, stdio: "pipe" })`git config user.email test@example.com`;
       await $({ cwd: tmp, stdio: "pipe" })`git config user.name Test`;

@@ -70,6 +70,8 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
           remoteRuntimeRoot: "/var/lib/bucknix/nixos-shared-host/runtime",
           remoteRecordsRoot: "/var/lib/bucknix/nixos-shared-host/records",
           sshMode: "ssh",
+          controlPlaneUrl: "http://127.0.0.1:7780",
+          controlPlaneTokenEnv: "BNX_DEPLOY_CONTROL_PLANE_TOKEN",
         };
       },
     },
@@ -82,6 +84,7 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
     "remoteRuntimeRoot",
     "remoteRecordsRoot",
     "sshMode",
+    "controlPlaneUrl",
   ]);
   assert.deepEqual(capturedRules?.defaults, {
     profileName: "default",
@@ -90,12 +93,15 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
     remoteRuntimeRoot: "/var/lib/bucknix/nixos-shared-host/runtime",
     remoteRecordsRoot: "/var/lib/bucknix/nixos-shared-host/records",
     sshMode: "ssh",
+    controlPlaneUrl: "http://127.0.0.1:7780",
+    controlPlaneTokenEnv: "BNX_DEPLOY_CONTROL_PLANE_TOKEN",
   });
   assert.deepEqual(capturedRules?.defaultTemplates, {
     destination: "${profileName}",
   });
   assert.deepEqual(capturedInput, {});
   assert.equal(result.remoteRepoPath, "/srv/common");
+  assert.equal(result.controlPlaneUrl, "http://127.0.0.1:7780");
 });
 
 test("nixos-shared-host prompt helper applies declarative defaults without prompting when not interactive", async () => {

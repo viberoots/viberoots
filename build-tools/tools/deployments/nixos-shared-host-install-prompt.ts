@@ -39,6 +39,8 @@ export type ClientPromptInput = {
   remoteRuntimeRoot?: string;
   remoteRecordsRoot?: string;
   sshMode?: string;
+  controlPlaneUrl?: string;
+  controlPlaneTokenEnv?: string;
 };
 
 function defaultRemoteRepoPath(_repoRoot: string): string {
@@ -116,6 +118,8 @@ function clientPromptRules(repoRoot: string): JsonPromptRuleSet {
       "remoteRuntimeRoot",
       "remoteRecordsRoot",
       "sshMode",
+      "controlPlaneUrl",
+      "controlPlaneTokenEnv",
     ],
     labels: {
       profileName: "Profile name",
@@ -125,6 +129,8 @@ function clientPromptRules(repoRoot: string): JsonPromptRuleSet {
       remoteRuntimeRoot: "Remote runtime root",
       remoteRecordsRoot: "Remote records root",
       sshMode: "SSH mode",
+      controlPlaneUrl: "Control-plane URL",
+      controlPlaneTokenEnv: "Control-plane token env",
     },
     required: [
       "profileName",
@@ -134,6 +140,7 @@ function clientPromptRules(repoRoot: string): JsonPromptRuleSet {
       "remoteRuntimeRoot",
       "remoteRecordsRoot",
       "sshMode",
+      "controlPlaneUrl",
     ],
     defaults: {
       profileName: "default",
@@ -142,6 +149,8 @@ function clientPromptRules(repoRoot: string): JsonPromptRuleSet {
       remoteRuntimeRoot: defaultRuntimeRoot(),
       remoteRecordsRoot: defaultRecordsRoot(),
       sshMode: "ssh",
+      controlPlaneUrl: "http://127.0.0.1:7780",
+      controlPlaneTokenEnv: "BNX_DEPLOY_CONTROL_PLANE_TOKEN",
     },
     defaultTemplates: {
       destination: "${profileName}",

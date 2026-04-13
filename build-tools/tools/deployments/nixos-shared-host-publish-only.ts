@@ -36,6 +36,22 @@ type PublishOnlyRunOpts = {
   smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;
 };
 
+export type ResolvedPublishOnlySubmission = {
+  operationKind: "promotion" | "retry" | "rollback";
+  deployment: NixosSharedHostDeployment;
+  artifact?: any;
+  componentArtifacts?: any[];
+  publishBehavior: "publish-only";
+  parentRunId: string;
+  releaseLineageId?: string;
+  artifactLineageId?: string;
+  source: {
+    record: any;
+    replaySnapshot: any;
+    replaySnapshotPath: string;
+  };
+};
+
 function sharedSubmitOpts(opts: PublishOnlyRunOpts) {
   return {
     ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
@@ -58,6 +74,26 @@ function requireBackendDatabaseUrl(value?: string): string {
 }
 
 export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOpts) {
+  const resolved = await resolveNixosSharedHostPublishOnlySubmission(opts);
+  return await submitNixosSharedHostControlPlaneRun({
+    workspaceRoot: opts.workspaceRoot,
+    operationKind: resolved.operationKind,
+    deployment: resolved.deployment,
+    ...(resolved.artifact ? { artifact: resolved.artifact } : {}),
+    ...(resolved.componentArtifacts ? { componentArtifacts: resolved.componentArtifacts } : {}),
+    publishBehavior: resolved.publishBehavior,
+    parentRunId: resolved.parentRunId,
+    ...(resolved.releaseLineageId ? { releaseLineageId: resolved.releaseLineageId } : {}),
+    ...(resolved.artifactLineageId ? { artifactLineageId: resolved.artifactLineageId } : {}),
+    source: resolved.source,
+    paths: opts.paths,
+    ...sharedSubmitOpts(opts),
+  });
+}
+
+export async function resolveNixosSharedHostPublishOnlySubmission(
+  opts: PublishOnlyRunOpts,
+): Promise<ResolvedPublishOnlySubmission> {
   if (opts.rollback) {
     const replay = await resolveNixosSharedHostReplaySelection({
       deployment: opts.deployment,
@@ -66,8 +102,7 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOp
       sourceRunId: opts.sourceRunId,
       rollback: true,
     });
-    return await submitNixosSharedHostControlPlaneRun({
-      workspaceRoot: opts.workspaceRoot,
+    return {
       operationKind: replay.operationKind,
       deployment: replay.deployment,
       ...(replay.artifact ? { artifact: replay.artifact } : {}),
@@ -85,9 +120,7 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOp
         replaySnapshot: replay.sourceReplaySnapshot,
         replaySnapshotPath: replay.replaySnapshotPath,
       },
-      paths: opts.paths,
-      ...sharedSubmitOpts(opts),
-    });
+    };
   }
   const source = await resolveDeploymentPromotionSource({
     workspaceRoot: opts.workspaceRoot,
@@ -103,8 +136,7 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOp
       sourceRunId: opts.sourceRunId,
       rollback: false,
     });
-    return await submitNixosSharedHostControlPlaneRun({
-      workspaceRoot: opts.workspaceRoot,
+    return {
       operationKind: replay.operationKind,
       deployment: replay.deployment,
       ...(replay.artifact ? { artifact: replay.artifact } : {}),
@@ -122,9 +154,7 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOp
         replaySnapshot: replay.sourceReplaySnapshot,
         replaySnapshotPath: replay.replaySnapshotPath,
       },
-      paths: opts.paths,
-      ...sharedSubmitOpts(opts),
-    });
+    };
   }
   if (opts.deployment.components.length > 1) {
     const promotion = await resolveCrossDeploymentPromotionSourceSelection({
@@ -144,8 +174,7 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOp
       opts.deployment,
       sourceReplaySnapshot,
     );
-    return await submitNixosSharedHostControlPlaneRun({
-      workspaceRoot: opts.workspaceRoot,
+    return {
       operationKind: promotion.operationKind,
       deployment: promotion.deployment,
       componentArtifacts: replayState.componentArtifacts,
@@ -159,9 +188,7 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOp
         replaySnapshot: sourceReplaySnapshot,
         replaySnapshotPath: promotion.sourceReplaySnapshotPath,
       },
-      paths: opts.paths,
-      ...sharedSubmitOpts(opts),
-    });
+    };
   }
   const promotion = await resolveCrossDeploymentPromotionSelection({
     workspaceRoot: opts.workspaceRoot,
@@ -170,8 +197,7 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOp
     sourceRunId: opts.sourceRunId,
     backendDatabaseUrl: opts.backendDatabaseUrl,
   });
-  return await submitNixosSharedHostControlPlaneRun({
-    workspaceRoot: opts.workspaceRoot,
+  return {
     operationKind: promotion.operationKind,
     deployment: promotion.deployment,
     artifact: promotion.artifact,
@@ -184,7 +210,5 @@ export async function submitNixosSharedHostPublishOnlyRun(opts: PublishOnlyRunOp
       replaySnapshot: promotion.sourceReplaySnapshot,
       replaySnapshotPath: promotion.sourceReplaySnapshotPath,
     },
-    paths: opts.paths,
-    ...sharedSubmitOpts(opts),
-  });
+  };
 }

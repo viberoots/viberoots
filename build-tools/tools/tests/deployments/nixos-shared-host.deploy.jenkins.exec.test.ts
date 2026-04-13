@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
+import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
+import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop.ts";
 import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
@@ -10,7 +13,6 @@ import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts
 import { installFakeRemoteTransport } from "./nixos-shared-host.remote-transport.fake.ts";
 import {
   installClientProfile,
-  installManagedRemoteHost,
   installReviewedPleominoTargets,
   pleominoDeploymentFixture,
   prepareReviewedRemoteHostPaths,
@@ -19,7 +21,7 @@ import {
   writeJenkinsAuthFiles,
 } from "./nixos-shared-host.jenkins.fixture.ts";
 
-test("jenkins wrapper stages the Pleomino artifact, runs remote deploy, optionally applies the host, and emits stable JSON", async () => {
+test("jenkins wrapper stages the Pleomino artifact, submits through the control plane, and emits stable JSON", async () => {
   await runInTemp("nixos-shared-host-jenkins-exec", async (tmp, $) => {
     const deployment = pleominoDeploymentFixture();
     const { env } = await installFakeRemoteTransport(tmp);
@@ -28,13 +30,26 @@ test("jenkins wrapper stages the Pleomino artifact, runs remote deploy, optional
     const remoteRuntimeRoot = path.join(tmp, "remote-runtime");
     const remoteRecordsRoot = path.join(tmp, "remote-records");
     const remoteStatePath = path.join(tmp, "remote-state", "platform-state.json");
-    const rebuildLog = path.join(tmp, "nixos-rebuild.log");
     await installReviewedPleominoTargets(tmp);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await prepareReviewedRemoteHostPaths({
       remoteStatePath,
       remoteRuntimeRoot,
       remoteRecordsRoot,
+    });
+    const controlPlane = await startNixosSharedHostControlPlaneServer({
+      workspaceRoot: tmp,
+      paths: {
+        statePath: remoteStatePath,
+        hostRoot: remoteRuntimeRoot,
+        recordsRoot: remoteRecordsRoot,
+      },
+      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+    });
+    const worker = startNixosSharedHostControlPlaneWorkerLoop({
+      workspaceRoot: tmp,
+      recordsRoot: remoteRecordsRoot,
+      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
     });
     await writeArtifact(artifactDir, { "index.html": "<html>jenkins</html>\n", healthz: "ok\n" });
     await installClientProfile(
@@ -44,10 +59,10 @@ test("jenkins wrapper stages the Pleomino artifact, runs remote deploy, optional
       remoteStatePath,
       remoteRuntimeRoot,
       remoteRecordsRoot,
+      controlPlane.url,
     );
     const { admissionEvidencePath } = await writeReviewedPleominoAdmissionEvidence(tmp, $);
     const auth = await writeJenkinsAuthFiles(tmp);
-    const fixture = await installManagedRemoteHost($, tmp);
     const server = await startNixosSharedHostPublicServer({
       deployment,
       hostRoot: remoteRuntimeRoot,
@@ -57,23 +72,17 @@ test("jenkins wrapper stages the Pleomino artifact, runs remote deploy, optional
         cwd: tmp,
         env: {
           ...env,
-          FAKE_NIXOS_REBUILD_LOG: rebuildLog,
           IN_NIX_SHELL: "1",
-          NIXOS_SHARED_HOST_SERVER_ROOT: fixture.hostRoot,
         },
-      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --apply-host --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.ok, true);
       assert.equal(summary.schemaVersion, "nixos-shared-host-jenkins-deploy@1");
       assert.equal(summary.remotePlan.destination, "mini");
       assert.equal(summary.jenkinsContract.transport.identityFile, auth.identityFile);
       assert.equal(summary.jenkinsContract.transport.knownHostsFile, auth.knownHostsFile);
-      assert.equal(summary.remoteExecution.remoteDeployResult.finalOutcome, "succeeded");
-      assert.equal(summary.remoteExecution.hostApply.selectedMode, "switch");
-      assert.equal(summary.remoteExecution.hostApply.result.applied, true);
-      const record = JSON.parse(
-        await fsp.readFile(summary.remoteExecution.remoteDeployResult.recordPath, "utf8"),
-      );
+      assert.equal(summary.remoteExecution.controlPlane.finalOutcome, "succeeded");
+      const record = summary.remoteExecution.controlPlane.record;
       assert.equal(record.controlPlane.lockScope, "nixos-shared-host:default:pleomino");
       const snapshot = JSON.parse(
         await fsp.readFile(record.controlPlane.executionSnapshotPath, "utf8"),
@@ -85,8 +94,9 @@ test("jenkins wrapper stages the Pleomino artifact, runs remote deploy, optional
         "srv/static-app/live/index.html",
       );
       assert.equal(await fsp.readFile(liveIndex, "utf8"), "<html>jenkins</html>\n");
-      assert.match(await fsp.readFile(rebuildLog, "utf8"), /switch/);
     } finally {
+      await worker.close();
+      await controlPlane.close();
       await server.close();
     }
   });

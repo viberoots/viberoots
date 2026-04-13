@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { newDb } from "pg-mem";
-import { Pool } from "pg";
+import pg from "pg";
 
 export type NixosSharedHostControlPlaneBackendTarget = {
   recordsRoot: string;
@@ -33,6 +33,7 @@ type BackendPool = BackendQueryable & {
 
 const LOCAL_BACKEND_URL_PREFIX = "pgmem://";
 const backendPools = new Map<string, Promise<BackendPool>>();
+const Pool = pg.Pool;
 
 function isLocalHarnessDatabaseUrl(databaseUrl: string): boolean {
   return databaseUrl.startsWith(LOCAL_BACKEND_URL_PREFIX);

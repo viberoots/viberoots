@@ -9,8 +9,9 @@ export async function installClientProfile(
   remoteStatePath: string,
   remoteRuntimeRoot: string,
   remoteRecordsRoot: string,
+  controlPlaneUrl: string = "http://127.0.0.1:65535",
 ): Promise<void> {
-  await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path ${remoteRepoPath} --remote-state-path ${remoteStatePath} --remote-runtime-root ${remoteRuntimeRoot} --remote-records-root ${remoteRecordsRoot} --ssh-mode ssh`;
+  await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path ${remoteRepoPath} --remote-state-path ${remoteStatePath} --remote-runtime-root ${remoteRuntimeRoot} --remote-records-root ${remoteRecordsRoot} --ssh-mode ssh --control-plane-url ${controlPlaneUrl}`;
 }
 
 export async function installReviewedPleominoTargets(tmp: string): Promise<void> {

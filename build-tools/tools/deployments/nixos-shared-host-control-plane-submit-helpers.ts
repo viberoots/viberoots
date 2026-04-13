@@ -26,6 +26,8 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
   submission: NixosSharedHostControlPlaneSubmission;
   submissionPath: string;
   executionSnapshotPath: string;
+  recordSubmissionPath?: string;
+  recordExecutionSnapshotPath?: string;
   snapshot: NixosSharedHostControlPlaneSnapshot;
   workspaceRoot: string;
   deployRunId: string;
@@ -158,6 +160,10 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
     const result = await runNixosSharedHostControlPlaneWorker({
       submissionPath: opts.submissionPath,
       executionSnapshotPath: opts.executionSnapshotPath,
+      ...(opts.recordSubmissionPath ? { recordSubmissionPath: opts.recordSubmissionPath } : {}),
+      ...(opts.recordExecutionSnapshotPath
+        ? { recordExecutionSnapshotPath: opts.recordExecutionSnapshotPath }
+        : {}),
       workerId,
       ...(lock?.fencingToken ? { fencingToken: lock.fencingToken } : {}),
       deployRunId: opts.deployRunId,
@@ -178,7 +184,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
           })
         : {
             ...submission,
-            deployRunId: opts.deployRunId,
+            deployRunId: result.record.deployRunId,
             completedAt: new Date().toISOString(),
             lifecycleState: "finished" as const,
             resultRecordPath: result.recordPath,

@@ -60,6 +60,10 @@ export type NixosSharedHostClientManifest = {
   remoteRuntimeRoot: string;
   remoteRecordsRoot: string;
   sshMode: string;
+  serviceClient: {
+    controlPlaneUrl: string;
+    controlPlaneTokenEnv?: string;
+  };
   localManagedPaths: string[];
 };
 

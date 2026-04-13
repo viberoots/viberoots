@@ -5,9 +5,8 @@ import { runDeployCli } from "./deploy-cli.ts";
 async function main() {
   await runDeployCli({
     workspaceRoot: await findRepoRoot(process.cwd()),
-    allowDeploymentJson: true,
     deploymentJsonErrorMessage:
-      "internal deploy entrypoint accepts --deployment-json; use build-tools/tools/deployments/deploy.ts for Buck-authoritative public runs",
+      "internal deploy entrypoint requires --deployment <label>; --deployment-json is no longer accepted",
   });
 }
 

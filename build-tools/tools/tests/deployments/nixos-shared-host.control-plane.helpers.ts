@@ -3,8 +3,11 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA } from "../../deployments/deployment-control-plane-contract.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../deployments/nixos-shared-host-control-plane-api-contract.ts";
+import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
 import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-shared-host-control-plane-snapshot.ts";
+import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop.ts";
 
 export async function writeDemoArtifact(root: string, body = "demoapp"): Promise<void> {
   await fsp.mkdir(root, { recursive: true });
@@ -93,6 +96,42 @@ export function smokeConnectOverride(port: number) {
   };
 }
 
+export async function startControlPlaneHarness(opts: {
+  workspaceRoot: string;
+  hostRoot: string;
+  statePath?: string;
+  recordsRoot?: string;
+  hostConfigPath?: string;
+}) {
+  const paths = {
+    statePath: opts.statePath || path.join(opts.workspaceRoot, "platform-state.json"),
+    hostRoot: opts.hostRoot,
+    recordsRoot: opts.recordsRoot || path.join(opts.workspaceRoot, "records"),
+    ...(opts.hostConfigPath ? { hostConfigPath: opts.hostConfigPath } : {}),
+  };
+  const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(paths.recordsRoot);
+  const controlPlane = await startNixosSharedHostControlPlaneServer({
+    workspaceRoot: opts.workspaceRoot,
+    paths,
+    backendDatabaseUrl,
+  });
+  const worker = startNixosSharedHostControlPlaneWorkerLoop({
+    workspaceRoot: opts.workspaceRoot,
+    recordsRoot: paths.recordsRoot,
+    backendDatabaseUrl,
+  });
+  return {
+    paths,
+    backendDatabaseUrl,
+    controlPlane,
+    worker,
+    close: async () => {
+      await worker.close();
+      await controlPlane.close();
+    },
+  };
+}
+
 export async function assertFrozenSnapshotExecution(result: any): Promise<void> {
   const snapshot = JSON.parse(await fsp.readFile(result.executionSnapshotPath, "utf8"));
   assert.equal(snapshot.deploymentId, "demoapp-dev");
@@ -130,7 +169,8 @@ export async function readJson<T>(response: Response): Promise<T> {
 export async function submitServiceRequest(opts: {
   url: string;
   deployment: any;
-  artifactDir: string;
+  artifactDir?: string;
+  artifactDirsByComponentId?: Record<string, string>;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
 }) {
@@ -144,7 +184,10 @@ export async function submitServiceRequest(opts: {
         submittedAt: new Date().toISOString(),
         deployment: opts.deployment,
         operationKind: "deploy",
-        artifactDir: opts.artifactDir,
+        ...(opts.artifactDir ? { artifactDir: opts.artifactDir } : {}),
+        ...(opts.artifactDirsByComponentId
+          ? { artifactDirsByComponentId: opts.artifactDirsByComponentId }
+          : {}),
         ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
         ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
       }),

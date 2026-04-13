@@ -16,6 +16,7 @@ import {
   installReviewedPleominoTargets,
   prepareReviewedRemoteHostPaths,
 } from "./nixos-shared-host.remote-exec.install.helpers.ts";
+export { installClientProfile } from "./nixos-shared-host.remote-exec.install.helpers.ts";
 
 export const REVIEWED_PLEOMINO_DEPLOYMENT_LABEL = "//projects/deployments/pleomino-dev:deploy";
 
@@ -101,7 +102,6 @@ export async function prepareRemoteExecFixture(opts: {
   const { env } = await installFakeRemoteTransport(opts.tmp);
   const artifactDir = path.join(opts.tmp, "artifact");
   const profileRoot = path.join(opts.tmp, "profiles");
-  const admissionEvidencePath = path.join(opts.tmp, "admission-evidence.json");
   const remoteRuntimeRoot = path.join(opts.tmp, "remote-runtime");
   const remoteRecordsRoot = path.join(opts.tmp, "remote-records");
   const remoteStatePath = path.join(opts.tmp, "remote-state", "platform-state.json");
@@ -118,10 +118,10 @@ export async function prepareRemoteExecFixture(opts: {
   });
   await writeArtifact(artifactDir, opts.artifactFiles);
   await fsp.writeFile(deploymentJsonPath, JSON.stringify(deployment, null, 2) + "\n", "utf8");
-  await writeReviewedLaneAdmissionEvidenceJson({
+  const admissionEvidencePath = await writeReviewedLaneAdmissionEvidenceJson({
     tmp: opts.tmp,
     $: opts.$,
-    deploymentJson: deploymentJsonPath,
+    deploymentLabel: deployment.label,
     deployment,
   });
   await installClientProfile(

@@ -2,12 +2,29 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import {
+  CLOUDFLARE_PAGES_PROVIDER,
+  KUBERNETES_PROVIDER,
+  NIXOS_SHARED_HOST_PROVIDER,
+  S3_STATIC_PROVIDER,
+  type CloudflarePagesDeployment,
+  type KubernetesDeployment,
+  type NixosSharedHostDeployment,
+  type S3StaticDeployment,
+} from "../../deployments/contract.ts";
+import {
   DEPLOYMENT_LANE_GOVERNANCE_RULE,
   type DeploymentLaneGovernance,
   type DeploymentScmBackend,
 } from "../../deployments/deployment-lane-governance.ts";
+import { resolveDeploymentFromTarget } from "../../deployments/deployment-query.ts";
 import type { DeploymentAdmissionEvidence } from "../../deployments/deployment-admission-evidence.ts";
 import type { GraphNode } from "../../lib/graph.ts";
+import {
+  installCloudflarePagesTargets,
+  installKubernetesTargets,
+  installNixosSharedHostTargets,
+  installS3StaticTargets,
+} from "./deployment-targets.install.helpers.ts";
 
 export function nixosSharedHostLaneGovernanceFixture(
   overrides: Partial<DeploymentLaneGovernance> = {},
@@ -102,18 +119,23 @@ export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
       requiredChecks: string[];
     };
     environmentStage: string;
+    label: string;
     lanePolicy: {
       stageBranches: Record<string, string>;
       governance: DeploymentLaneGovernance;
     };
+    provider?: string;
   };
-  deploymentJson?: string;
   deploymentLabel?: string;
   requestedBy?: string;
   includeRequiredChecks?: boolean;
 }): Promise<string> {
-  const snapshotPath = path.join(opts.tmp, "scm-policy.json");
-  const evidencePath = path.join(opts.tmp, "admission-evidence.json");
+  const deploymentLabel = opts.deploymentLabel || opts.deployment.label;
+  const fileSuffix = deploymentLabel.replace(/[^a-zA-Z0-9_-]+/g, "_");
+  const snapshotPath = path.join(opts.tmp, `scm-policy-${fileSuffix}.json`);
+  const evidencePath = path.join(opts.tmp, `admission-evidence-${fileSuffix}.json`);
+  await ensureReviewedDeploymentTargetsInstalled(opts.tmp, opts.deployment);
+  const resolvedDeployment = await resolveDeploymentFromTarget(opts.tmp, deploymentLabel);
   const sourceRef = opts.deployment.lanePolicy.stageBranches[opts.deployment.environmentStage];
   const sourceRevision = opts.includeRequiredChecks
     ? String(
@@ -125,22 +147,14 @@ export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
         ).stdout,
       ).trim()
     : "";
-  const selectorArgs = opts.deploymentLabel
-    ? ["--deployment", opts.deploymentLabel]
-    : opts.deploymentJson
-      ? ["--deployment-json", opts.deploymentJson]
-      : (() => {
-          throw new Error(
-            "writeReviewedLaneAdmissionEvidenceJson requires deploymentLabel or deploymentJson",
-          );
-        })();
+  const selectorArgs = ["--deployment", opts.deploymentLabel || opts.deployment.label];
   await fsp.writeFile(
     snapshotPath,
     JSON.stringify(
       {
-        scmBackend: opts.deployment.lanePolicy.governance.scmBackend,
-        repository: opts.deployment.lanePolicy.governance.repository,
-        branchProtections: opts.deployment.lanePolicy.governance.branchProtections,
+        scmBackend: resolvedDeployment.lanePolicy.governance.scmBackend,
+        repository: resolvedDeployment.lanePolicy.governance.repository,
+        branchProtections: resolvedDeployment.lanePolicy.governance.branchProtections,
       },
       null,
       2,
@@ -175,4 +189,43 @@ export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
     "utf8",
   );
   return evidencePath;
+}
+
+type ReviewedFixtureDeployment =
+  | CloudflarePagesDeployment
+  | KubernetesDeployment
+  | NixosSharedHostDeployment
+  | S3StaticDeployment;
+
+async function ensureReviewedDeploymentTargetsInstalled(
+  workspaceRoot: string,
+  deployment: { label: string; provider?: string },
+): Promise<void> {
+  const targetsPath = path.join(
+    workspaceRoot,
+    deployment.label.replace(/^\/\//, "").split(":")[0] || "",
+    "TARGETS",
+  );
+  try {
+    await fsp.access(targetsPath);
+    return;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  switch (deployment.provider) {
+    case NIXOS_SHARED_HOST_PROVIDER:
+      await installNixosSharedHostTargets(workspaceRoot, [deployment as NixosSharedHostDeployment]);
+      return;
+    case CLOUDFLARE_PAGES_PROVIDER:
+      await installCloudflarePagesTargets(workspaceRoot, [deployment as CloudflarePagesDeployment]);
+      return;
+    case S3_STATIC_PROVIDER:
+      await installS3StaticTargets(workspaceRoot, [deployment as S3StaticDeployment]);
+      return;
+    case KUBERNETES_PROVIDER:
+      await installKubernetesTargets(workspaceRoot, [deployment as KubernetesDeployment]);
+      return;
+    default:
+      return;
+  }
 }

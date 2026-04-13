@@ -4,12 +4,14 @@ import { URL } from "node:url";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
 import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
 import {
-  readControlPlaneRecord,
   handleControlPlaneRunAction,
   handleControlPlaneSubmit,
-  readControlPlaneStatus,
   type ServiceRunActionRequest,
 } from "./nixos-shared-host-control-plane-service-api.ts";
+import {
+  readControlPlaneRecord,
+  readControlPlaneStatus,
+} from "./nixos-shared-host-control-plane-service-read.ts";
 
 async function readJsonBody<T>(request: http.IncomingMessage): Promise<T> {
   const chunks: Buffer[] = [];

@@ -17,8 +17,9 @@ export async function writeDeploymentJson(filePath: string, deployment: unknown)
 export async function writeAdmissionEvidenceJson(opts: {
   tmp: string;
   $: any;
-  deploymentJson: string;
-  deployment: unknown;
+  deployment: {
+    label: string;
+  };
 }): Promise<string> {
   return await writeReviewedLaneAdmissionEvidenceJson(opts);
 }

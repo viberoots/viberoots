@@ -3,9 +3,13 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
+import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
+import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop.ts";
 import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import {
+  installClientProfile,
   prepareRemoteExecFixture,
   remoteExecEnv,
   REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
@@ -22,16 +26,40 @@ test("remote deploy stages the artifact, runs deploy remotely, writes remote rec
       profileRoot,
       remoteRuntimeRoot,
       remoteRecordsRoot,
+      remoteStatePath,
     } = await prepareRemoteExecFixture({
       tmp,
       $,
       artifactFiles: { "index.html": "<html>pleomino</html>\n", healthz: "ok\n" },
+    });
+    const controlPlane = await startNixosSharedHostControlPlaneServer({
+      workspaceRoot: tmp,
+      paths: {
+        statePath: remoteStatePath,
+        hostRoot: remoteRuntimeRoot,
+        recordsRoot: remoteRecordsRoot,
+      },
+      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+    });
+    const worker = startNixosSharedHostControlPlaneWorkerLoop({
+      workspaceRoot: tmp,
+      recordsRoot: remoteRecordsRoot,
+      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
     });
     const server = await startNixosSharedHostPublicServer({
       deployment,
       hostRoot: remoteRuntimeRoot,
     });
     try {
+      await installClientProfile(
+        $,
+        profileRoot,
+        tmp,
+        remoteStatePath,
+        remoteRuntimeRoot,
+        remoteRecordsRoot,
+        controlPlane.url,
+      );
       const result = await $({
         cwd: tmp,
         env: remoteExecEnv(env),
@@ -40,10 +68,9 @@ test("remote deploy stages the artifact, runs deploy remotely, writes remote rec
       assert.equal(summary.executionMode, "remote-profile");
       assert.equal(summary.stagedArtifactCleanup, "removed");
       assert.equal(summary.retentionRequested, false);
-      assert.equal(summary.remoteDeployResult.finalOutcome, "succeeded");
-      assert.equal(summary.remoteDeployResult.publicUrl, "https://pleomino.apps.kilty.io/");
+      assert.equal(summary.controlPlane.finalOutcome, "succeeded");
       assert.equal(summary.remoteRecordsRoot, remoteRecordsRoot);
-      const record = JSON.parse(await fsp.readFile(summary.remoteDeployResult.recordPath, "utf8"));
+      const record = summary.controlPlane.record;
       assert.equal(record.finalOutcome, "succeeded");
       assert.equal(record.controlPlane.lockScope, "nixos-shared-host:default:pleomino");
       const snapshot = JSON.parse(
@@ -58,6 +85,8 @@ test("remote deploy stages the artifact, runs deploy remotely, writes remote rec
       assert.equal(await fsp.readFile(liveIndex, "utf8"), "<html>pleomino</html>\n");
       await assert.rejects(fsp.access(summary.stagedArtifactPath));
     } finally {
+      await worker.close();
+      await controlPlane.close();
       await server.close();
     }
   });
@@ -65,17 +94,48 @@ test("remote deploy stages the artifact, runs deploy remotely, writes remote rec
 
 test("remote deploy retains the staged artifact when retention is requested explicitly", async () => {
   await runInTemp("nixos-shared-host-remote-retain", async (tmp, $) => {
-    const { deployment, env, artifactDir, admissionEvidencePath, profileRoot, remoteRuntimeRoot } =
-      await prepareRemoteExecFixture({
-        tmp,
-        $,
-        artifactFiles: { "index.html": "<html>retain</html>\n", healthz: "ok\n" },
-      });
+    const {
+      deployment,
+      env,
+      artifactDir,
+      admissionEvidencePath,
+      profileRoot,
+      remoteRuntimeRoot,
+      remoteRecordsRoot,
+      remoteStatePath,
+    } = await prepareRemoteExecFixture({
+      tmp,
+      $,
+      artifactFiles: { "index.html": "<html>retain</html>\n", healthz: "ok\n" },
+    });
+    const controlPlane = await startNixosSharedHostControlPlaneServer({
+      workspaceRoot: tmp,
+      paths: {
+        statePath: remoteStatePath,
+        hostRoot: remoteRuntimeRoot,
+        recordsRoot: remoteRecordsRoot,
+      },
+      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+    });
+    const worker = startNixosSharedHostControlPlaneWorkerLoop({
+      workspaceRoot: tmp,
+      recordsRoot: remoteRecordsRoot,
+      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+    });
     const server = await startNixosSharedHostPublicServer({
       deployment,
       hostRoot: remoteRuntimeRoot,
     });
     try {
+      await installClientProfile(
+        $,
+        profileRoot,
+        tmp,
+        remoteStatePath,
+        remoteRuntimeRoot,
+        remoteRecordsRoot,
+        controlPlane.url,
+      );
       const result = await $({
         cwd: tmp,
         env: remoteExecEnv(env),
@@ -88,6 +148,8 @@ test("remote deploy retains the staged artifact when retention is requested expl
         "<html>retain</html>\n",
       );
     } finally {
+      await worker.close();
+      await controlPlane.close();
       await server.close();
     }
   });

@@ -9,7 +9,7 @@ import {
 type EvidenceLike = {
   requiredChecks?: Array<{ recordRef?: string }>;
   requiredApprovals?: Array<{ recordRef?: string }>;
-  prerequisites?: Array<{ sourceRecordPath?: string; healthEvidenceRef?: string }>;
+  prerequisites?: Array<{ healthEvidenceRef?: string }>;
   attestation?: { recordRef?: string };
   sbom?: { recordRef?: string };
   supplyChainGates?: Array<{ recordRef?: string }>;
@@ -70,7 +70,6 @@ function requiredEvidencePaths(evidence?: EvidenceLike): string[] {
   return uniqueStrings([
     ...(evidence.requiredChecks || []).map((entry) => entry.recordRef || ""),
     ...(evidence.requiredApprovals || []).map((entry) => entry.recordRef || ""),
-    ...(evidence.prerequisites || []).map((entry) => entry.sourceRecordPath || ""),
     ...(evidence.prerequisites || []).map((entry) => entry.healthEvidenceRef || ""),
     evidence.laneGovernance?.recordRef || "",
     evidence.attestation?.recordRef || "",

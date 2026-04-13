@@ -31,18 +31,14 @@ function requireFlag(name: string): string {
   return value;
 }
 
-function ensurePublicSourceOfTruth(opts: {
-  allowDeploymentJson: boolean;
-  deploymentJsonErrorMessage: string;
-}) {
-  if (!opts.allowDeploymentJson && hasFlag("deployment-json")) {
+function ensurePublicSourceOfTruth(opts: { deploymentJsonErrorMessage: string }) {
+  if (hasFlag("deployment-json")) {
     throw new Error(opts.deploymentJsonErrorMessage);
   }
 }
 
 export async function runDeployCli(opts: {
   workspaceRoot: string;
-  allowDeploymentJson: boolean;
   deploymentJsonErrorMessage: string;
 }) {
   ensurePublicSourceOfTruth(opts);
@@ -68,7 +64,6 @@ export async function runDeployCli(opts: {
     return;
   }
   const deployment = await resolveDeploymentForCli(opts.workspaceRoot, requireFlag, {
-    allowDeploymentJson: opts.allowDeploymentJson,
     deploymentJsonErrorMessage: opts.deploymentJsonErrorMessage,
   });
   const remove = getFlagBool("remove");

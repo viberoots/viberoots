@@ -3,22 +3,24 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import {
-  localHarnessControlPlaneDatabaseUrl,
-  syncBackendDeployRecord,
-} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloudflare-pages-control-plane.ts";
 import { resolveCloudflarePagesPromotionSelection } from "../../deployments/cloudflare-pages-promotion.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import {
+  cloudflarePagesDeploymentFixture,
+  installCloudflarePagesTargets,
+} from "./cloudflare-pages.fixture.ts";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import {
   ensureNixosSharedHostStageBranch,
+  installNixosSharedHostTargets,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
+import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
@@ -67,7 +69,7 @@ async function createSuccessfulDevRun(
   tmp: string,
   $: any,
   recordsRoot: string,
-  backendDatabaseUrl: string,
+  _backendDatabaseUrl: string,
 ): Promise<string> {
   const deployment = pleominoDevDeployment();
   const deploymentJson = path.join(tmp, "pleomino-dev.json");
@@ -75,26 +77,30 @@ async function createSuccessfulDevRun(
   const hostRoot = path.join(tmp, "host");
   const statePath = path.join(tmp, "platform-state.json");
   await writeArtifact(artifactDir, "<html>source</html>\n");
+  await installNixosSharedHostTargets(tmp, [deployment]);
   await ensureNixosSharedHostStageBranch(tmp, $, deployment);
   await writeDeploymentJson(deploymentJson, deployment);
   const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
     tmp,
     $,
-    deploymentJson,
+    deploymentLabel: deployment.label,
     deployment,
+  });
+  const harness = await startControlPlaneHarness({
+    workspaceRoot: tmp,
+    hostRoot,
+    statePath,
+    recordsRoot,
   });
   const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
   try {
     const run = await $({
       cwd: tmp,
-    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
     const summary = JSON.parse(String(run.stdout));
-    await syncBackendDeployRecord(
-      { recordsRoot, databaseUrl: backendDatabaseUrl },
-      summary.recordPath,
-    );
     return summary.deployRunId;
   } finally {
+    await harness.close();
     await server.close();
   }
 }
@@ -110,6 +116,7 @@ test("promotion rejects source runs from an incompatible current lane policy", a
         fingerprint: "sha256:lane-other",
       },
     });
+    await installCloudflarePagesTargets(tmp, [incompatibleTarget]);
     await ensureNixosSharedHostStageBranch(tmp, $, incompatibleTarget);
     await assert.rejects(
       resolveCloudflarePagesPromotionSelection({
@@ -133,6 +140,7 @@ test("promotion rejects retained source runs that no longer match the current pr
       lanePolicy: source.lanePolicy,
       lanePolicyRef: source.lanePolicyRef,
     });
+    await installCloudflarePagesTargets(tmp, [staging]);
     await ensureNixosSharedHostStageBranch(tmp, $, staging);
     const sourceRunId = await createSuccessfulDevRun(tmp, $, recordsRoot, backendDatabaseUrl);
     await $({ cwd: tmp, stdio: "pipe" })`git config user.email test@example.com`;
@@ -165,6 +173,7 @@ test("promotion rejects attempts to reuse one deployment id instead of promoting
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
+    await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const server = await startCloudflarePagesPublicServer({
       deployment,

@@ -69,6 +69,7 @@ function collectSmokeConnectOverride() {
     protocol: smokeConnectProtocol === "http:" ? ("http:" as const) : ("https:" as const),
     hostname: smokeConnectHost,
     port: smokeConnectPort,
+    rejectUnauthorized: false,
   };
 }
 
@@ -96,6 +97,15 @@ function collectHostApplySelection(): {
     remoteManagedRoot,
     hasOverrides,
   };
+}
+
+function assertServiceOnlyRemoteProfileHostFlags(
+  hostApply: ReturnType<typeof collectHostApplySelection>,
+) {
+  if (hostApply.selectedMode === "skip" && !hostApply.hasOverrides) return;
+  throw new Error(
+    "service-only remote profiles do not support --apply-host, --apply-host-dry-run, --remote-config-root, or --remote-managed-root",
+  );
 }
 
 async function resolveLocalArtifactDir(
@@ -143,6 +153,7 @@ export async function maybeRunNixosSharedHostRemoteProfile(opts: {
   const retainRemoteArtifact = getFlagBool("retain-remote-artifact");
   const smokeConnectOverride = collectSmokeConnectOverride();
   const hostApply = collectHostApplySelection();
+  assertServiceOnlyRemoteProfileHostFlags(hostApply);
   if (!profileName) {
     if (
       profileRequested ||
@@ -155,9 +166,6 @@ export async function maybeRunNixosSharedHostRemoteProfile(opts: {
     }
     if (planMode) throw new Error("--plan/--dry-run requires --profile <name>");
     return false;
-  }
-  if (hostApply.selectedMode === "skip" && hostApply.hasOverrides) {
-    throw new Error("--remote-config-root/--remote-managed-root require --apply-host");
   }
   const conflicts = collectProfileModeConflicts();
   if (conflicts.length > 0) {
@@ -178,7 +186,7 @@ export async function maybeRunNixosSharedHostRemoteProfile(opts: {
   }
   if (hasFlag("deployment-json")) {
     throw new Error(
-      "remote profile execution requires --deployment <label>; --deployment-json is plan-only for this reviewed path",
+      "remote profile execution requires --deployment <label>; --deployment-json is not accepted",
     );
   }
   console.log(
@@ -190,7 +198,6 @@ export async function maybeRunNixosSharedHostRemoteProfile(opts: {
         retainRemoteArtifact,
         ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
         ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
-        hostApply: plan.hostApply,
       }),
       null,
       2,

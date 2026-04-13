@@ -12,6 +12,7 @@ import {
   nixosSharedHostLanePolicyFixture,
   nixosSharedHostLanePolicyNodeFixture,
 } from "./nixos-shared-host.fixture.ts";
+export { installS3StaticTargets } from "./deployment-targets.install.helpers.ts";
 
 export function s3StaticDeploymentFixture(
   overrides: Partial<S3StaticDeployment> = {},

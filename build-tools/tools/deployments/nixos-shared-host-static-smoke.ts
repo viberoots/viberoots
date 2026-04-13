@@ -18,6 +18,11 @@ export type NixosSharedHostStaticSmokeResult = {
 
 const SMOKE_REQUEST_TIMEOUT_MS = 5_000;
 
+function previewBody(value: string): string {
+  const singleLine = value.replace(/\s+/g, " ").trim();
+  return singleLine.length > 120 ? `${singleLine.slice(0, 120)}...` : singleLine;
+}
+
 function requestForUrl(rawUrl: string, connect?: SmokeConnectOverride): Promise<SmokeResponse> {
   const url = new URL(rawUrl);
   const transportProtocol = connect?.protocol || url.protocol;
@@ -73,7 +78,9 @@ export async function smokeNixosSharedHostStaticWebapp(opts: {
   const expectedIndex = await fsp.readFile(opts.indexPath, "utf8");
   const publicResponse = await expectStatus200(publicUrl, opts.connectOverride);
   if (publicResponse.body !== expectedIndex) {
-    throw new Error(`smoke content mismatch at ${publicUrl}`);
+    throw new Error(
+      `smoke content mismatch at ${publicUrl} (expected=${JSON.stringify(previewBody(expectedIndex))} actual=${JSON.stringify(previewBody(publicResponse.body))})`,
+    );
   }
   if (!opts.healthPath) return { publicUrl };
   const healthUrl = new URL(opts.healthPath, publicRoot).toString();

@@ -5,7 +5,10 @@ import path from "node:path";
 import { test } from "node:test";
 import { cloudflarePagesPublishedPath } from "../../deployments/cloudflare-pages-preview.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import {
+  cloudflarePagesDeploymentFixture,
+  installCloudflarePagesTargets,
+} from "./cloudflare-pages.fixture.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
@@ -48,12 +51,13 @@ test("cloudflare-pages rollback re-publishes a prior admitted exact artifact", a
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
+    await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson,
+      deploymentLabel: deployment.label,
       deployment,
     });
     const server = await startCloudflarePagesPublicServer({
@@ -65,16 +69,16 @@ test("cloudflare-pages rollback re-publishes a prior admitted exact artifact", a
       const firstRun = await $({
         cwd: tmp,
         env: fakeCloudflareEnv(fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactA} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactA} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const firstSummary = JSON.parse(String(firstRun.stdout));
       await $({
         cwd: tmp,
         env: fakeCloudflareEnv(fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactB} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactB} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const rollbackRun = await $({
         cwd: tmp,
         env: fakeCloudflareEnv(fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${deploymentJson} --admission-evidence-json ${admissionEvidenceJson} --publish-only --rollback --source-run-id ${firstSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --publish-only --rollback --source-run-id ${firstSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const rollbackSummary = JSON.parse(String(rollbackRun.stdout));
       assert.equal(rollbackSummary.operationKind, "rollback");
       assert.equal(rollbackSummary.runClassification, "rollback");

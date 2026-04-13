@@ -23,6 +23,7 @@ test("jenkins wrapper emits a stable machine-readable preflight plan", async () 
       "/var/lib/bucknix/nixos-shared-host/platform-state.json",
       "/var/lib/bucknix/nixos-shared-host/runtime",
       "/var/lib/bucknix/nixos-shared-host/records",
+      "http://127.0.0.1:7780",
     );
     const auth = await writeJenkinsAuthFiles(tmp);
     const result = await $({
@@ -38,6 +39,7 @@ test("jenkins wrapper emits a stable machine-readable preflight plan", async () 
     assert.equal(summary.jenkinsContract.transport.nonInteractive, true);
     assert.equal(summary.jenkinsContract.transport.identityFile, auth.identityFile);
     assert.equal(summary.jenkinsContract.transport.knownHostsFile, auth.knownHostsFile);
+    assert.equal(summary.jenkinsContract.serviceSubmission.mode, "control-plane-service");
   });
 });
 
@@ -52,6 +54,7 @@ test("jenkins wrapper fails closed on missing artifact input and still emits JSO
       "/var/lib/bucknix/nixos-shared-host/platform-state.json",
       "/var/lib/bucknix/nixos-shared-host/runtime",
       "/var/lib/bucknix/nixos-shared-host/records",
+      "http://127.0.0.1:7780",
     );
     const auth = await writeJenkinsAuthFiles(tmp);
     const result = await $({
@@ -78,6 +81,7 @@ test("jenkins wrapper fails closed on missing reviewed SSH host metadata", async
       "/var/lib/bucknix/nixos-shared-host/platform-state.json",
       "/var/lib/bucknix/nixos-shared-host/runtime",
       "/var/lib/bucknix/nixos-shared-host/records",
+      "http://127.0.0.1:7780",
     );
     const auth = await writeJenkinsAuthFiles(tmp);
     const result = await $({
@@ -104,6 +108,7 @@ test("jenkins wrapper rejects incompatible host-apply flags", async () => {
       "/var/lib/bucknix/nixos-shared-host/platform-state.json",
       "/var/lib/bucknix/nixos-shared-host/runtime",
       "/var/lib/bucknix/nixos-shared-host/records",
+      "http://127.0.0.1:7780",
     );
     const auth = await writeJenkinsAuthFiles(tmp);
     const result = await $({
@@ -130,6 +135,7 @@ test("jenkins wrapper rejects unsupported local control-plane flags", async () =
       "/var/lib/bucknix/nixos-shared-host/platform-state.json",
       "/var/lib/bucknix/nixos-shared-host/runtime",
       "/var/lib/bucknix/nixos-shared-host/records",
+      "http://127.0.0.1:7780",
     );
     const auth = await writeJenkinsAuthFiles(tmp);
     const result = await $({
@@ -141,5 +147,33 @@ test("jenkins wrapper rejects unsupported local control-plane flags", async () =
     assert.equal(failure.ok, false);
     assert.equal(failure.error.code, "unsupported_flag");
     assert.match(failure.error.message, /--control-plane-url/);
+  });
+});
+
+test("jenkins wrapper rejects legacy host apply flags in service-only mode", async () => {
+  await runInTemp("nixos-shared-host-jenkins-host-apply", async (tmp, $) => {
+    const artifactDir = path.join(tmp, "artifact");
+    const profileRoot = path.join(tmp, "profiles");
+    await installReviewedPleominoTargets(tmp);
+    await writeArtifact(artifactDir, { "index.html": "<html>host-apply</html>\n" });
+    await installClientProfile(
+      $,
+      profileRoot,
+      "/srv/common",
+      "/var/lib/bucknix/nixos-shared-host/platform-state.json",
+      "/var/lib/bucknix/nixos-shared-host/runtime",
+      "/var/lib/bucknix/nixos-shared-host/records",
+      "http://127.0.0.1:7780",
+    );
+    const auth = await writeJenkinsAuthFiles(tmp);
+    const result = await $({
+      cwd: tmp,
+      env: { ...process.env, IN_NIX_SHELL: "1" },
+    })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --apply-host`.nothrow();
+    assert.notEqual(result.exitCode, 0);
+    const failure = JSON.parse(String(result.stdout));
+    assert.equal(failure.ok, false);
+    assert.equal(failure.error.code, "unsupported_flag");
+    assert.match(failure.error.message, /service-only Jenkins wrapper/);
   });
 });

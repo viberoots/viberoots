@@ -3,13 +3,12 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import {
-  localHarnessControlPlaneDatabaseUrl,
-  syncBackendDeployRecord,
-} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { resolveCloudflarePagesPromotionSelection } from "../../deployments/cloudflare-pages-promotion.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import {
+  cloudflarePagesDeploymentFixture,
+  installCloudflarePagesTargets,
+} from "./cloudflare-pages.fixture.ts";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
 import {
   fakeCloudflareEnv,
@@ -20,8 +19,14 @@ import {
 } from "./cloudflare-pages.promotion.helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
-import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers.ts";
+import {
+  ensureNixosSharedHostStageBranch,
+  installNixosSharedHostTargets,
+} from "./nixos-shared-host.fixture.ts";
+import {
+  startControlPlaneHarness,
+  writeDemoArtifact,
+} from "./nixos-shared-host.control-plane.helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 test("cloudflare-pages allows reviewed cross-provider same-artifact promotion only on declared edges", async () => {
@@ -34,7 +39,6 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
     const prod = pleominoProdDeployment();
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
-    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
@@ -48,6 +52,8 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-prod", "wrangler.jsonc"),
     );
+    await installNixosSharedHostTargets(tmp, [dev]);
+    await installCloudflarePagesTargets(tmp, [staging, prod]);
     await ensureNixosSharedHostStageBranch(tmp, $, dev);
     await ensureNixosSharedHostStageBranch(tmp, $, staging);
     await ensureNixosSharedHostStageBranch(tmp, $, prod);
@@ -57,8 +63,14 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
     const devEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson: devJson,
+      deploymentLabel: dev.label,
       deployment: dev,
+    });
+    const harness = await startControlPlaneHarness({
+      workspaceRoot: tmp,
+      hostRoot,
+      statePath,
+      recordsRoot,
     });
     const devServer = await startNixosSharedHostPublicServer({ deployment: dev, hostRoot });
     const stagingServer = await startCloudflarePagesPublicServer({
@@ -74,18 +86,14 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
     try {
       const devRun = await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${devJson} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${dev.label} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
-      await syncBackendDeployRecord(
-        { recordsRoot, databaseUrl: backendDatabaseUrl },
-        devSummary.recordPath,
-      );
       const stagingPromotion = await resolveCloudflarePagesPromotionSelection({
         workspaceRoot: tmp,
         deployment: staging,
         recordsRoot,
         sourceRunId: devSummary.deployRunId,
-        backendDatabaseUrl,
+        backendDatabaseUrl: harness.backendDatabaseUrl,
       });
       assert.equal(stagingPromotion.operationKind, "promotion");
       assert.equal(stagingPromotion.parentRunId, devSummary.deployRunId);
@@ -95,11 +103,12 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
           deployment: prod,
           recordsRoot,
           sourceRunId: devSummary.deployRunId,
-          backendDatabaseUrl,
+          backendDatabaseUrl: harness.backendDatabaseUrl,
         }),
         /promotion edge is not allowed by the current lane policy/,
       );
     } finally {
+      await harness.close();
       await devServer.close();
       await stagingServer.close();
       await prodServer.close();
@@ -116,7 +125,6 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
     });
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
-    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
@@ -125,14 +133,22 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
+    await installNixosSharedHostTargets(tmp, [dev]);
+    await installCloudflarePagesTargets(tmp, [staging]);
     await ensureNixosSharedHostStageBranch(tmp, $, dev);
     await ensureNixosSharedHostStageBranch(tmp, $, staging);
     await writeDeploymentJson(devJson, dev);
     const devEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
-      deploymentJson: devJson,
+      deploymentLabel: dev.label,
       deployment: dev,
+    });
+    const harness = await startControlPlaneHarness({
+      workspaceRoot: tmp,
+      hostRoot,
+      statePath,
+      recordsRoot,
     });
     const devServer = await startNixosSharedHostPublicServer({ deployment: dev, hostRoot });
     const wrongPublishRoot = path.join(tmp, "wrong-public");
@@ -147,18 +163,14 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
     try {
       const devRun = await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment-json ${devJson} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --host-root ${hostRoot} --state ${statePath} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${dev.label} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
-      await syncBackendDeployRecord(
-        { recordsRoot, databaseUrl: backendDatabaseUrl },
-        devSummary.recordPath,
-      );
       const promotion = await resolveCloudflarePagesPromotionSelection({
         workspaceRoot: tmp,
         deployment: staging,
         recordsRoot,
         sourceRunId: devSummary.deployRunId,
-        backendDatabaseUrl,
+        backendDatabaseUrl: harness.backendDatabaseUrl,
       });
       assert.equal(promotion.operationKind, "promotion");
       const records = await Promise.all(
@@ -171,6 +183,7 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
       const failedPromotion = records.find((record) => record.operationKind === "promotion");
       assert.equal(failedPromotion, undefined);
     } finally {
+      await harness.close();
       process.env.PATH = originalEnv.PATH || "";
       delete process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT;
       delete process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_LOG;

@@ -61,6 +61,12 @@ function selectedHostApplyMode(): HostApplyMode {
       "--apply-host and --apply-host-dry-run cannot be combined",
     );
   }
+  if (applyHost || dryRun) {
+    throw new JenkinsDeployError(
+      "unsupported_flag",
+      "service-only Jenkins wrapper does not support --apply-host or --apply-host-dry-run",
+    );
+  }
   return dryRun ? "dry-run" : applyHost ? "switch" : "skip";
 }
 
@@ -158,11 +164,6 @@ function childArgs(ctx: JenkinsContext): string[] {
     "--artifact-dir",
     ctx.artifactDir,
     ...(hasFlag("profile-root") ? ["--profile-root", requireFlagValue("profile-root")] : []),
-    ...(ctx.requestedHostApplyMode === "switch"
-      ? ["--apply-host"]
-      : ctx.requestedHostApplyMode === "dry-run"
-        ? ["--apply-host-dry-run"]
-        : []),
     ...(getFlagBool("retain-remote-artifact") ? ["--retain-remote-artifact"] : []),
     ...smokeOverrideArgs(),
   ];

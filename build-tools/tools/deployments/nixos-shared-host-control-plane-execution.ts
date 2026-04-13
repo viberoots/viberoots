@@ -13,6 +13,8 @@ import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts
 export async function runNixosSharedHostControlPlaneWorker(opts: {
   submissionPath: string;
   executionSnapshotPath: string;
+  recordSubmissionPath?: string;
+  recordExecutionSnapshotPath?: string;
   workerId: string;
   fencingToken?: string;
   deployRunId?: string;
@@ -25,11 +27,11 @@ export async function runNixosSharedHostControlPlaneWorker(opts: {
   const authority = {
     kind: "control-plane-worker" as const,
     submissionId: snapshot.submissionId,
-    submissionPath: opts.submissionPath,
+    submissionPath: opts.recordSubmissionPath || opts.submissionPath,
     workerId: opts.workerId,
     lockScope: snapshot.lockScope,
     ...(opts.fencingToken ? { fencingToken: opts.fencingToken } : {}),
-    executionSnapshotPath: opts.executionSnapshotPath,
+    executionSnapshotPath: opts.recordExecutionSnapshotPath || opts.executionSnapshotPath,
   };
   return snapshot.action.kind === "deploy"
     ? await runNixosSharedHostStaticDeploy({
@@ -83,6 +85,7 @@ export async function runNixosSharedHostControlPlaneWorker(opts: {
         statePath: snapshot.paths.statePath,
         hostRoot: snapshot.paths.hostRoot,
         recordsRoot: snapshot.paths.recordsRoot,
+        ...(opts.deployRunId ? { deployRunId: opts.deployRunId } : {}),
         ...(snapshot.deployBatchId ? { deployBatchId: snapshot.deployBatchId } : {}),
         ...(snapshot.provisionerPlan ? { provisionerPlan: snapshot.provisionerPlan } : {}),
         ...(snapshot.paths.hostConfigPath ? { hostConfigPath: snapshot.paths.hostConfigPath } : {}),

@@ -10,6 +10,7 @@ export type NixosSharedHostRemoteSmokeConnectOverride = {
   protocol: "http:" | "https:";
   hostname: string;
   port: number;
+  rejectUnauthorized?: boolean;
 };
 
 function commandArgs(args: Array<[string, string]>): string {

@@ -1,5 +1,4 @@
 #!/usr/bin/env zx-wrapper
-import * as fs from "node:fs/promises";
 import path from "node:path";
 import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
 import { resolveSelectedTargetLabel } from "../dev/target-label-resolver.ts";
@@ -11,37 +10,19 @@ import {
   buildArtifactDirsByComponentId,
   parseComponentArtifactDirs,
 } from "./deployment-component-artifact-dirs.ts";
-import { DEPLOYMENT_EXTRACTED_METADATA_SCHEMA } from "./deployment-control-plane-contract.ts";
-
-async function readDeploymentFromJson(filePath: string): Promise<DeploymentTarget> {
-  const parsed = JSON.parse(await fs.readFile(filePath, "utf8"));
-  if (
-    parsed?.schemaVersion === DEPLOYMENT_EXTRACTED_METADATA_SCHEMA &&
-    Array.isArray(parsed?.deployments) &&
-    parsed.deployments.length === 1
-  ) {
-    return parsed.deployments[0] as DeploymentTarget;
-  }
-  return parsed as DeploymentTarget;
-}
 
 export async function resolveDeploymentForCli(
   workspaceRoot: string,
   requireFlag: (name: string) => string,
   opts: {
-    allowDeploymentJson?: boolean;
     deploymentJsonErrorMessage?: string;
   } = {},
 ): Promise<DeploymentTarget> {
-  const deploymentJson = getFlagStr("deployment-json", "").trim();
-  if (deploymentJson) {
-    if (!opts.allowDeploymentJson) {
-      throw new Error(
-        opts.deploymentJsonErrorMessage ||
-          "--deployment-json is internal/test-only; use --deployment <label>",
-      );
-    }
-    return await readDeploymentFromJson(deploymentJson);
+  if (getFlagStr("deployment-json", "").trim()) {
+    throw new Error(
+      opts.deploymentJsonErrorMessage ||
+        "--deployment-json is not supported; use --deployment <label>",
+    );
   }
   const deploymentTarget = await resolveSelectedTargetLabel(
     workspaceRoot,
