@@ -160,6 +160,54 @@ Minimum operator review before approval:
 - `status.approval.provisionerPlanFingerprint` matches the reviewed plan when
   infra-affecting provisioning is in scope
 
+One reviewed service-path approval flow:
+
+```bash
+curl -fsS \
+  -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
+  "http://127.0.0.1:7780/api/v1/status?deployRunId=$DEPLOY_RUN_ID"
+```
+
+Capture the returned `submissionId`, `approval.payloadFingerprint`,
+`approval.targetIdentity`, and `approval.provisionerPlanFingerprint` before
+granting approval. Then approve that same frozen run:
+
+```bash
+curl -fsS \
+  -X POST \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
+  "http://127.0.0.1:7780/api/v1/run-actions" \
+  -d @- <<'JSON'
+{
+  "schemaVersion": "deployment-control-plane-run-action-request@1",
+  "actionId": "approve-2026-04-14T00:00:00Z",
+  "submittedAt": "2026-04-14T00:00:00Z",
+  "submissionId": "submission-from-status",
+  "action": "approve",
+  "approval": {
+    "approvalId": "ticket-123",
+    "expectedPayloadFingerprint": "sha256:payload-from-status",
+    "expectedTargetIdentity": "nixos-shared-host:shared-nonprod:demoapp-dev",
+    "expectedProvisionerPlanFingerprint": "sha256:plan-from-status"
+  }
+}
+JSON
+```
+
+The reviewed approval-grant path advances the existing run instead of creating
+or resubmitting a second deploy. The response must keep the same
+`deploy_run_id` and advance the existing run out of `pending_approval`.
+
+Fail closed on these cases:
+
+- `approval_no_longer_valid`: the payload fingerprint or provisioner-plan
+  fingerprint is stale; re-review status before taking any new action
+- `unauthorized`: the caller lacks approval rights or attempted self-approval;
+  do not bypass this by resubmitting the deploy
+- `no_longer_admitted`: the frozen run is no longer eligible to continue; stop
+  and investigate rather than creating a replacement run blindly
+
 ### 5. Install a client profile on your dev machine or Jenkins worker
 
 From a repo checkout on the machine that will run deploys:

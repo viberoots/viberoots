@@ -104,6 +104,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/nixos-shared-host.install.dry-run-and-status.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.install.host-modes.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.install.manifest.contract.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.operator-docs.contract.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.install.prompt.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.install.reinstall.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.platform-state.full-reconcile.test.ts": True,

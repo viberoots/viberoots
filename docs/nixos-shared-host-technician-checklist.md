@@ -149,7 +149,9 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json \
   --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime \
   --remote-records-root /var/lib/bucknix/nixos-shared-host/records \
-  --ssh-mode ssh
+  --ssh-mode ssh \
+  --control-plane-url http://127.0.0.1:7780 \
+  --control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN
 ```
 
 The installed local client manifest should be:
@@ -167,6 +169,41 @@ Completion criteria:
 - the `mini` profile is listed
 - the profile points at `/srv/common`
 - the profile points at the reviewed remote state, runtime, and records paths
+- the profile persists the reviewed service endpoint and token-env binding for
+  protected/shared submission
+
+## Approval Grant SOP
+
+If a reviewed protected/shared run enters `lifecycleState = pending_approval`,
+do not resubmit the deploy. Approve the existing run on the same `deploy_run_id`.
+
+Minimum review before approval:
+
+- `status.approval.state = pending`
+- `status.approval.payloadFingerprint` matches the reviewed payload
+- `status.approval.targetIdentity` matches the intended target
+- `status.approval.provisionerPlanFingerprint` still matches when provisioning is in scope
+
+One reviewed approval request shape posts to `/api/v1/run-actions` with
+`"action": "approve"`, the existing `submissionId`, and approval bindings for
+`expectedPayloadFingerprint`, `expectedTargetIdentity`, and `expectedProvisionerPlanFingerprint`.
+
+```bash
+curl -fsS -X POST \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
+  "http://127.0.0.1:7780/api/v1/run-actions" \
+  -d '{"schemaVersion":"deployment-control-plane-run-action-request@1","actionId":"approve-2026-04-14T00:00:00Z","submittedAt":"2026-04-14T00:00:00Z","submissionId":"submission-from-status","action":"approve","approval":{"approvalId":"ticket-123","expectedPayloadFingerprint":"sha256:payload-from-status","expectedTargetIdentity":"nixos-shared-host:shared-nonprod:demoapp-dev","expectedProvisionerPlanFingerprint":"sha256:plan-from-status"}}'
+```
+
+Completion criteria:
+
+- the approval response keeps the same `deploy_run_id`
+- the run advances from `pending_approval` on that existing run instead of creating a replacement submission
+- operators know `approval_no_longer_valid` means stale payload or plan
+  fingerprints
+- operators know `unauthorized` covers missing approval rights and self-approval
+  rejection
 
 ## Final Technician Handoff Check
 
