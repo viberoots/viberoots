@@ -18,9 +18,9 @@ test("nixos-shared-host durable records persist canonical provider-target identi
     artifactLineageId: "static-webapp:abc123",
     deployBatchId: "batch-123",
     admittedContext: {
-      lanePolicyRef: "//test-workspace/deployments/pleomino-shared:lane",
+      lanePolicyRef: "//projects/deployments/pleomino-shared:lane",
       lanePolicyFingerprint: "sha256:lane-pleomino",
-      admissionPolicyRef: "//test-workspace/deployments/pleomino-shared:dev_release",
+      admissionPolicyRef: "//projects/deployments/pleomino-shared:dev_release",
       admissionPolicyFingerprint: "sha256:admission-pleomino-dev",
       environmentStage: "dev",
       source: {

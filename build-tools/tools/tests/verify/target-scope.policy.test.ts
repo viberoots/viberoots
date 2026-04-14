@@ -4,12 +4,9 @@ import { test } from "node:test";
 import { isNonBuildSystemOnlyVerifyTargets } from "../../dev/verify/target-scope.ts";
 
 test("non-build-system scope detection", () => {
-  assert.equal(isNonBuildSystemOnlyVerifyTargets(["//test-workspace/apps/my-app/..."]), true);
+  assert.equal(isNonBuildSystemOnlyVerifyTargets(["//projects/apps/my-app/..."]), true);
   assert.equal(
-    isNonBuildSystemOnlyVerifyTargets([
-      "//test-workspace/apps/my-app:unit",
-      "//test-workspace/libs/demo:unit",
-    ]),
+    isNonBuildSystemOnlyVerifyTargets(["//projects/apps/my-app:unit", "//projects/libs/demo:unit"]),
     true,
   );
   assert.equal(isNonBuildSystemOnlyVerifyTargets(["//..."]), false);

@@ -201,7 +201,7 @@ test("protected/shared routine admission rejects destructive built-in release ac
   const deployment = nixosSharedHostDeploymentFixture({
     releaseActions: [
       {
-        ref: "//test-workspace/deployments/demoapp-shared:db_migration",
+        ref: "//projects/deployments/demoapp-shared:db_migration",
         type: "schema_migration",
         phase: "pre_publish",
         runCondition: "success_only",

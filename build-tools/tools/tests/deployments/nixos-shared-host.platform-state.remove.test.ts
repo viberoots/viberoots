@@ -12,8 +12,8 @@ test("nixos-shared-host platform state explicit removal deletes only the named d
     nixosSharedHostDeploymentFixture(),
     nixosSharedHostDeploymentFixture({
       deploymentId: "other-dev",
-      label: "//test-workspace/deployments/other-dev:deploy",
-      component: { kind: "static-webapp", target: "//test-workspace/apps/other:app" },
+      label: "//projects/deployments/other-dev:deploy",
+      component: { kind: "static-webapp", target: "//projects/apps/other:app" },
       runtime: { appName: "other", containerPort: 4000 },
     }),
   ]);

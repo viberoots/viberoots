@@ -6,7 +6,7 @@ import { shouldPrepareVerifySeedForRequestedTargets } from "../../dev/verify/see
 test("verify seed build policy defaults to full-suite only", () => {
   assert.equal(shouldPrepareVerifySeedForRequestedTargets(["//..."], {}), true);
   assert.equal(
-    shouldPrepareVerifySeedForRequestedTargets(["//test-workspace/apps/my-app/..."], {}),
+    shouldPrepareVerifySeedForRequestedTargets(["//projects/apps/my-app/..."], {}),
     false,
   );
   assert.equal(
@@ -17,7 +17,7 @@ test("verify seed build policy defaults to full-suite only", () => {
 
 test("verify seed policy honors override mode", () => {
   assert.equal(
-    shouldPrepareVerifySeedForRequestedTargets(["//test-workspace/apps/my-app/..."], {
+    shouldPrepareVerifySeedForRequestedTargets(["//projects/apps/my-app/..."], {
       BNX_VERIFY_SEED_MODE: "always",
     }),
     true,

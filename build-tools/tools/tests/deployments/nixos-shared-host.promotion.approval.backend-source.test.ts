@@ -34,7 +34,7 @@ function sourceDeployment() {
   const lanePolicy = promotionLanePolicy();
   return nixosSharedHostDeploymentFixture({
     deploymentId: "demoapp-dev-shared",
-    label: "//test-workspace/deployments/demoapp-dev-shared:deploy",
+    label: "//projects/deployments/demoapp-dev-shared:deploy",
     lanePolicyRef: lanePolicy.ref,
     lanePolicy,
     environmentStage: "dev",
@@ -49,7 +49,7 @@ function sourceDeployment() {
 function targetDeployment() {
   const lanePolicy = promotionLanePolicy();
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
-    ref: "//test-workspace/deployments/demoapp-shared:staging_release",
+    ref: "//projects/deployments/demoapp-shared:staging_release",
     name: "staging_release",
     allowedRefs: ["env/pleomino/staging"],
     requiredChecks: [],
@@ -58,7 +58,7 @@ function targetDeployment() {
   });
   return nixosSharedHostDeploymentFixture({
     deploymentId: "demoapp-staging-shared",
-    label: "//test-workspace/deployments/demoapp-staging-shared:deploy",
+    label: "//projects/deployments/demoapp-staging-shared:deploy",
     lanePolicyRef: lanePolicy.ref,
     lanePolicy,
     environmentStage: "staging",

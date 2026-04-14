@@ -149,7 +149,7 @@ test("prerequisite routing follows the prerequisite provider for mixed-provider 
 
 test("protected/shared admission rejects deployment-local executable hooks", async () => {
   const deployment = nixosSharedHostDeploymentFixture({
-    publisher: { type: "test-workspace/deployments/demoapp:deploy.ts" },
+    publisher: { type: "projects/deployments/demoapp:deploy.ts" },
   });
   await assert.rejects(
     evaluateDeploymentAdmission({

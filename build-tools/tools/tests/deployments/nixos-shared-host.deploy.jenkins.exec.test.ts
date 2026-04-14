@@ -74,7 +74,7 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
           ...env,
           IN_NIX_SHELL: "1",
         },
-      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //test-workspace/deployments/pleomino-dev:deploy --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.ok, true);
       assert.equal(summary.schemaVersion, "nixos-shared-host-jenkins-deploy@1");
@@ -87,7 +87,7 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
       const snapshot = JSON.parse(
         await fsp.readFile(record.controlPlane.executionSnapshotPath, "utf8"),
       );
-      assert.equal(snapshot.deploymentLabel, "//test-workspace/deployments/pleomino-dev:deploy");
+      assert.equal(snapshot.deploymentLabel, "//projects/deployments/pleomino-dev:deploy");
       assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:pleomino");
       const liveIndex = path.join(
         nixosSharedHostContainerRoot(remoteRuntimeRoot, deployment.providerTarget.containerName),

@@ -1,0 +1,28 @@
+load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")
+
+cloudflare_pages_static_webapp_deployment(
+    name = "deploy",
+    component = "//projects/apps/pleomino:app",
+    account = "web-platform-staging",
+    project = "pleomino-staging-pages",
+    lane_policy = "//projects/deployments/pleomino-shared:lane",
+    environment_stage = "staging",
+    admission_policy = "//projects/deployments/pleomino-shared:staging_release",
+    protection_class = "shared_nonprod",
+    secret_requirements = [],
+    runtime_config_requirements = [],
+    prerequisites = [
+        {
+            "deployment_id": "pleomino-dev",
+            "mode": "ordering_only",
+        },
+    ],
+    preview = {
+        "target_derivation": "provider_managed_source_run",
+        "isolation_class": "isolated",
+        "identity_selector": "source_run",
+        "cleanup_ttl": "7d",
+        "smoke_target": "preview_url",
+        "lock_scope": "shared",
+    },
+)

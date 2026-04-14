@@ -20,7 +20,7 @@ export function kubernetesDeploymentFixture(
   const admissionPolicy =
     overrides.admissionPolicy ||
     nixosSharedHostAdmissionPolicyFixture({
-      ref: "//test-workspace/deployments/platform-shared:prod_release",
+      ref: "//projects/deployments/platform-shared:prod_release",
       name: "prod_release",
       allowedRefs: ["env/pleomino/prod"],
       requiredChecks: [],
@@ -36,7 +36,7 @@ export function kubernetesDeploymentFixture(
   };
   return {
     deploymentId: overrides.deploymentId || "shared-observability-prod",
-    label: overrides.label || "//test-workspace/deployments/shared-observability-prod:deploy",
+    label: overrides.label || "//projects/deployments/shared-observability-prod:deploy",
     name: overrides.name || "deploy",
     provider: KUBERNETES_PROVIDER,
     protectionClass: overrides.protectionClass || "production_facing",
@@ -53,13 +53,13 @@ export function kubernetesDeploymentFixture(
     ...(overrides.rolloutPolicy ? { rolloutPolicy: overrides.rolloutPolicy } : {}),
     component: overrides.component || {
       kind: "service",
-      target: "//test-workspace/apps/api:image",
+      target: "//projects/apps/api:image",
     },
     components: overrides.components || [
       {
         id: "api",
         kind: "service",
-        target: "//test-workspace/apps/api:image",
+        target: "//projects/apps/api:image",
       },
     ],
     publisher: overrides.publisher || { type: "helm-release", config: "helm/values.yaml" },
@@ -72,7 +72,7 @@ export function kubernetesAdmissionPolicyNodeFixture(
   overrides: Partial<GraphNode> = {},
 ): GraphNode {
   return nixosSharedHostAdmissionPolicyNodeFixture({
-    name: "//test-workspace/deployments/platform-shared:prod_release",
+    name: "//projects/deployments/platform-shared:prod_release",
     allowed_refs: ["env/pleomino/prod"],
     required_checks: ["deploy/shared-observability-prod"],
     ...overrides,

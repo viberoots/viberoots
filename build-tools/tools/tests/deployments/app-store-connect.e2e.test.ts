@@ -20,7 +20,7 @@ test("app-store-connect deploy and promotion preserve release-health evidence", 
     const lanePolicy = mobileReviewedLanePolicy();
     const dev = appStoreConnectDeploymentFixture({
       deploymentId: "demo-ios-dev",
-      label: "//test-workspace/deployments/demo-ios-dev:deploy",
+      label: "//projects/deployments/demo-ios-dev:deploy",
       lanePolicy,
       providerTarget: {
         issuer: "ios-platform",
@@ -35,7 +35,7 @@ test("app-store-connect deploy and promotion preserve release-health evidence", 
     });
     const staging = appStoreConnectDeploymentFixture({
       deploymentId: "demo-ios-staging",
-      label: "//test-workspace/deployments/demo-ios-staging:deploy",
+      label: "//projects/deployments/demo-ios-staging:deploy",
       environmentStage: "staging",
       lanePolicy,
       providerTarget: {
@@ -102,7 +102,7 @@ test("app-store-connect rollback reuses a prior successful exact artifact", asyn
     const lanePolicy = mobileReviewedLanePolicy();
     const staging = appStoreConnectDeploymentFixture({
       deploymentId: "demo-ios-staging",
-      label: "//test-workspace/deployments/demo-ios-staging:deploy",
+      label: "//projects/deployments/demo-ios-staging:deploy",
       environmentStage: "staging",
       lanePolicy,
       admissionPolicy: undefined,

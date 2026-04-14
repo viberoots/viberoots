@@ -62,7 +62,7 @@ test("observability views keep referenced artifacts secret-safe by exposing refe
     await writeJson(runPath, {
       deployRunId: "deploy-1",
       deploymentId: "deploy-redacted",
-      deploymentLabel: "//test-workspace/deployments/redacted:deploy",
+      deploymentLabel: "//projects/deployments/redacted:deploy",
       providerTargetIdentity: "target-redacted",
       finalOutcome: "publish_failed",
       failedStep: "publish",

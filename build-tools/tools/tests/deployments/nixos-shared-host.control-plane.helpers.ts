@@ -135,7 +135,7 @@ export async function startControlPlaneHarness(opts: {
 export async function assertFrozenSnapshotExecution(result: any): Promise<void> {
   const snapshot = JSON.parse(await fsp.readFile(result.executionSnapshotPath, "utf8"));
   assert.equal(snapshot.deploymentId, "demoapp-dev");
-  assert.equal(snapshot.deploymentLabel, "//test-workspace/deployments/demoapp-dev:deploy");
+  assert.equal(snapshot.deploymentLabel, "//projects/deployments/demoapp-dev:deploy");
   assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:demoapp");
   assert.equal(snapshot.action.publishInput.kind, "exact-artifact");
   assert.equal(snapshot.provisionerPlan?.mutationClass, "non_destructive");

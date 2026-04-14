@@ -41,7 +41,7 @@ function deploymentFor(environmentStage: "dev" | "staging", prefix: string) {
   const admissionPolicy =
     environmentStage === "staging"
       ? nixosSharedHostAdmissionPolicyFixture({
-          ref: `//test-workspace/deployments/${prefix}:staging_release`,
+          ref: `//projects/deployments/${prefix}:staging_release`,
           name: "staging_release",
           allowedRefs: ["env/pleomino/staging"],
           requiredChecks: ["deploy/pleomino-staging"],
@@ -54,7 +54,7 @@ function deploymentFor(environmentStage: "dev" | "staging", prefix: string) {
         });
   return nixosSharedHostDeploymentFixture({
     deploymentId: `${prefix}-${environmentStage}`,
-    label: `//test-workspace/deployments/${prefix}-${environmentStage}:deploy`,
+    label: `//projects/deployments/${prefix}-${environmentStage}:deploy`,
     environmentStage,
     admissionPolicyRef: admissionPolicy.ref,
     admissionPolicy,
@@ -62,7 +62,7 @@ function deploymentFor(environmentStage: "dev" | "staging", prefix: string) {
       {
         id: "frontend",
         kind: "static-webapp",
-        target: "//test-workspace/apps/pleomino:app",
+        target: "//projects/apps/pleomino:app",
         runtime: {
           appName: `${prefix}-frontend-${environmentStage}`,
           containerPort: 3000,
@@ -82,7 +82,7 @@ function deploymentFor(environmentStage: "dev" | "staging", prefix: string) {
       {
         id: "api",
         kind: "static-webapp",
-        target: "//test-workspace/apps/pleomino-api:app",
+        target: "//projects/apps/pleomino-api:app",
         runtime: {
           appName: `${prefix}-api-${environmentStage}`,
           containerPort: 3001,

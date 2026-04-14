@@ -29,7 +29,7 @@ export async function installGooglePlayTargets(
 ): Promise<void> {
   await installMobileSharedTargets({
     workspaceRoot,
-    appTargetLabel: "//test-workspace/apps/demo-android:release",
+    appTargetLabel: "//projects/apps/demo-android:release",
     appArtifactName: "release.aab",
     appArtifactMarker: "demo-android",
     deployments,
@@ -38,7 +38,7 @@ export async function installGooglePlayTargets(
     deployments.map(async (deployment) => {
       const deployTargetsPath = path.join(
         workspaceRoot,
-        "test-workspace",
+        "projects",
         "deployments",
         deployment.deploymentId,
         "TARGETS",
@@ -52,7 +52,7 @@ export async function installGooglePlayTargets(
           "deployment_target(",
           `    name = ${JSON.stringify(labelName(deployment.label))},`,
           '    provider = "google-play",',
-          '    component = "//test-workspace/apps/demo-android:release",',
+          '    component = "//projects/apps/demo-android:release",',
           '    component_kind = "mobile-app",',
           '    publisher = "google-play-mobile-release",',
           '    publisher_config = "google-play.jsonc",',
@@ -60,7 +60,7 @@ export async function installGooglePlayTargets(
           `    lane_policy = ${JSON.stringify(deployment.lanePolicyRef)},`,
           `    environment_stage = ${JSON.stringify(deployment.environmentStage)},`,
           `    admission_policy = ${JSON.stringify(deployment.admissionPolicyRef)},`,
-          '    components = [{"id": "default", "kind": "mobile-app", "target": "//test-workspace/apps/demo-android:release"}],',
+          '    components = [{"id": "default", "kind": "mobile-app", "target": "//projects/apps/demo-android:release"}],',
           ...renderRolloutPolicyLines(deployment.rolloutPolicy),
           "    provider_target = {",
           `        "developer_account": ${JSON.stringify(deployment.providerTarget.developerAccount)},`,

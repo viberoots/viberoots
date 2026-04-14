@@ -15,7 +15,7 @@ function componentNode(label: string): GraphNode {
 
 test("validation rejects unsupported mobile rollout and provider target shape", () => {
   const { errors } = extractAppStoreConnectDeployments([
-    componentNode("//test-workspace/apps/demo-ios:release"),
+    componentNode("//projects/apps/demo-ios:release"),
     appStoreConnectLanePolicyNodeFixture(),
     appStoreConnectAdmissionPolicyNodeFixture(),
     appStoreConnectDeploymentNodeFixture({
@@ -42,7 +42,7 @@ test("validation rejects unsupported mobile rollout and provider target shape", 
 
 test("validation rejects non-mobile component kinds for app-store-connect", () => {
   const { errors } = extractAppStoreConnectDeployments([
-    componentNode("//test-workspace/apps/demo-ios:release"),
+    componentNode("//projects/apps/demo-ios:release"),
     appStoreConnectLanePolicyNodeFixture(),
     appStoreConnectAdmissionPolicyNodeFixture(),
     appStoreConnectDeploymentNodeFixture({ component_kind: "static-webapp" }),

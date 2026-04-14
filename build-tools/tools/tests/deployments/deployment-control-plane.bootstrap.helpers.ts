@@ -16,7 +16,7 @@ export async function writeBootstrapArtifact(root: string, body: string) {
 export function bootstrapDeploymentFixture() {
   return nixosSharedHostDeploymentFixture({
     deploymentId: "deploy-system-dev",
-    label: "//test-workspace/deployments/deploy-system-dev:deploy",
+    label: "//projects/deployments/deploy-system-dev:deploy",
     runtime: {
       ...nixosSharedHostDeploymentFixture().runtime,
       appName: "deploy-system",

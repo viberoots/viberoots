@@ -14,17 +14,11 @@ import { runInTemp } from "../lib/test-helpers.ts";
 
 test("nixos-shared-host deployment extraction reads canonical metadata from TARGETS via cquery", async () => {
   await runInTemp("deployment-cquery-extraction", async (tmp, _$) => {
-    const appTargetsPath = path.join(tmp, "test-workspace", "apps", "demoapp", "TARGETS");
-    const deployTargetsPath = path.join(
-      tmp,
-      "test-workspace",
-      "deployments",
-      "demoapp-dev",
-      "TARGETS",
-    );
+    const appTargetsPath = path.join(tmp, "projects", "apps", "demoapp", "TARGETS");
+    const deployTargetsPath = path.join(tmp, "projects", "deployments", "demoapp-dev", "TARGETS");
     const sharedTargetsPath = path.join(
       tmp,
-      "test-workspace",
+      "projects",
       "deployments",
       "pleomino-shared",
       "TARGETS",
@@ -39,10 +33,10 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
         "",
         "nixos_shared_host_static_webapp_deployment(",
         '    name = "deploy",',
-        '    component = "//test-workspace/apps/demoapp:app",',
-        '    lane_policy = "//test-workspace/deployments/pleomino-shared:lane",',
+        '    component = "//projects/apps/demoapp:app",',
+        '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
         '    environment_stage = "dev",',
-        '    admission_policy = "//test-workspace/deployments/pleomino-shared:dev_release",',
+        '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",',
         "    secret_requirements = [],",
         "    runtime_config_requirements = [],",
         '    app_name = "demoapp",',
@@ -54,24 +48,21 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
     );
 
     const nodes = await runDeploymentCquery(tmp, _$, "deployment-cquery", [
-      "//test-workspace/deployments/demoapp-dev:deploy",
-      "//test-workspace/apps/demoapp:app",
-      "//test-workspace/deployments/pleomino-shared:lane",
-      "//test-workspace/deployments/pleomino-shared:lane_governance",
-      "//test-workspace/deployments/pleomino-shared:dev_release",
+      "//projects/deployments/demoapp-dev:deploy",
+      "//projects/apps/demoapp:app",
+      "//projects/deployments/pleomino-shared:lane",
+      "//projects/deployments/pleomino-shared:lane_governance",
+      "//projects/deployments/pleomino-shared:dev_release",
     ]);
     const { deployments, errors } = extractNixosSharedHostDeployments(nodes);
     assert.deepEqual(errors, []);
     assert.equal(deployments.length, 1);
-    assert.equal(deployments[0]?.label, "//test-workspace/deployments/demoapp-dev:deploy");
+    assert.equal(deployments[0]?.label, "//projects/deployments/demoapp-dev:deploy");
     assert.equal(deployments[0]?.name, "deploy");
-    assert.equal(
-      deployments[0]?.lanePolicyRef,
-      "//test-workspace/deployments/pleomino-shared:lane",
-    );
+    assert.equal(deployments[0]?.lanePolicyRef, "//projects/deployments/pleomino-shared:lane");
     assert.equal(
       deployments[0]?.admissionPolicyRef,
-      "//test-workspace/deployments/pleomino-shared:dev_release",
+      "//projects/deployments/pleomino-shared:dev_release",
     );
     assert.equal(deployments[0]?.environmentStage, "dev");
     assert.equal(deployments[0]?.runtime.appName, "demoapp");
@@ -87,18 +78,18 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
 
 test("nixos-shared-host multi-component extraction reads rollout policy and component metadata", async () => {
   await runInTemp("deployment-cquery-multi-component", async (tmp, _$) => {
-    const appTargetsPath = path.join(tmp, "test-workspace", "apps", "demoapp", "TARGETS");
-    const apiTargetsPath = path.join(tmp, "test-workspace", "apps", "demoapi", "TARGETS");
+    const appTargetsPath = path.join(tmp, "projects", "apps", "demoapp", "TARGETS");
+    const apiTargetsPath = path.join(tmp, "projects", "apps", "demoapi", "TARGETS");
     const deployTargetsPath = path.join(
       tmp,
-      "test-workspace",
+      "projects",
       "deployments",
       "demo-stack-dev",
       "TARGETS",
     );
     const sharedTargetsPath = path.join(
       tmp,
-      "test-workspace",
+      "projects",
       "deployments",
       "pleomino-shared",
       "TARGETS",
@@ -118,14 +109,14 @@ test("nixos-shared-host multi-component extraction reads rollout policy and comp
         "",
         "nixos_shared_host_multi_static_webapp_deployment(",
         '    name = "deploy",',
-        '    lane_policy = "//test-workspace/deployments/pleomino-shared:lane",',
+        '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
         '    environment_stage = "dev",',
-        '    admission_policy = "//test-workspace/deployments/pleomino-shared:dev_release",',
+        '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",',
         "    secret_requirements = [],",
         "    runtime_config_requirements = [],",
         "    components = [",
-        '        {"id": "frontend", "target": "//test-workspace/apps/demoapp:app", "app_name": "demoapp", "container_port": 3000},',
-        '        {"id": "api", "target": "//test-workspace/apps/demoapi:api", "app_name": "demoapi", "container_port": 3001},',
+        '        {"id": "frontend", "target": "//projects/apps/demoapp:app", "app_name": "demoapp", "container_port": 3000},',
+        '        {"id": "api", "target": "//projects/apps/demoapi:api", "app_name": "demoapi", "container_port": 3001},',
         "    ],",
         '    rollout_policy = {"mode": "ordered_best_effort", "abort": "stop_on_first_failure", "smoke": "final_only", "steps": ["frontend", "api"]},',
         ")",
@@ -135,12 +126,12 @@ test("nixos-shared-host multi-component extraction reads rollout policy and comp
     );
 
     const nodes = await runDeploymentCquery(tmp, _$, "deployment-cquery-multi", [
-      "//test-workspace/deployments/demo-stack-dev:deploy",
-      "//test-workspace/apps/demoapp:app",
-      "//test-workspace/apps/demoapi:api",
-      "//test-workspace/deployments/pleomino-shared:lane",
-      "//test-workspace/deployments/pleomino-shared:lane_governance",
-      "//test-workspace/deployments/pleomino-shared:dev_release",
+      "//projects/deployments/demo-stack-dev:deploy",
+      "//projects/apps/demoapp:app",
+      "//projects/apps/demoapi:api",
+      "//projects/deployments/pleomino-shared:lane",
+      "//projects/deployments/pleomino-shared:lane_governance",
+      "//projects/deployments/pleomino-shared:dev_release",
     ]);
     const { deployments, errors } = extractNixosSharedHostDeployments(nodes);
     assert.deepEqual(errors, []);

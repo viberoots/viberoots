@@ -23,12 +23,12 @@ function deploymentNode(name: string, component: string, deploymentId: string): 
     publisher: "wrangler-pages",
     publisher_config: "wrangler.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//test-workspace/deployments/pleomino-shared:lane",
+    lane_policy: "//projects/deployments/pleomino-shared:lane",
     environment_stage: "staging",
-    admission_policy: "//test-workspace/deployments/pleomino-shared:staging_release",
+    admission_policy: "//projects/deployments/pleomino-shared:staging_release",
     secret_requirements: [],
     runtime_config_requirements: [],
-    target_exceptions: ["//test-workspace/deployments/demoapp-shared:alias_window"],
+    target_exceptions: ["//projects/deployments/demoapp-shared:alias_window"],
     provider_target: {
       account: "web-platform-staging",
       project: "demoapp-pages",
@@ -40,8 +40,8 @@ function deploymentNode(name: string, component: string, deploymentId: string): 
 
 test("validation allows reviewed alias windows for shared cloudflare target identity transitions", () => {
   const nodes: GraphNode[] = [
-    staticWebappComponent("//test-workspace/apps/demoapp:app"),
-    staticWebappComponent("//test-workspace/apps/demoapp-next:app"),
+    staticWebappComponent("//projects/apps/demoapp:app"),
+    staticWebappComponent("//projects/apps/demoapp-next:app"),
     cloudflarePagesLaneGovernanceNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
@@ -51,13 +51,13 @@ test("validation allows reviewed alias windows for shared cloudflare target iden
       shared_lock_scope: "cloudflare-pages:web-platform-staging/demoapp-pages",
     }),
     deploymentNode(
-      "//test-workspace/deployments/demoapp-staging:deploy",
-      "//test-workspace/apps/demoapp:app",
+      "//projects/deployments/demoapp-staging:deploy",
+      "//projects/apps/demoapp:app",
       "demoapp-staging",
     ),
     deploymentNode(
-      "//test-workspace/deployments/demoapp-next-staging:deploy",
-      "//test-workspace/apps/demoapp-next:app",
+      "//projects/deployments/demoapp-next-staging:deploy",
+      "//projects/apps/demoapp-next:app",
       "demoapp-next-staging",
     ),
   ];

@@ -52,7 +52,7 @@ test("rollback replay fails when the recorded release-action policy forbids roll
       ],
       releaseActions: [
         deploymentReleaseActionFixture({
-          ref: "//test-workspace/deployments/demoapp-shared:post_publish_verification",
+          ref: "//projects/deployments/demoapp-shared:post_publish_verification",
           type: "post_publish_verification",
           phase: "post_publish_pre_smoke",
           dataCompatibility: "reversible",

@@ -26,7 +26,7 @@ test("failure-path release-action replay honors rerun and skip dispositions", as
       executionPath: "failure",
       releaseActions: [
         deploymentReleaseActionFixture({
-          ref: "//test-workspace/deployments/demoapp-shared:rerun_failure_cleanup",
+          ref: "//projects/deployments/demoapp-shared:rerun_failure_cleanup",
           phase: "post_publish_pre_smoke",
           runCondition: "failure_only",
           replayPolicy: {
@@ -41,7 +41,7 @@ test("failure-path release-action replay honors rerun and skip dispositions", as
           requiredRuntimeConfigRequirementNames: [],
         }),
         deploymentReleaseActionFixture({
-          ref: "//test-workspace/deployments/demoapp-shared:skip_failure_cleanup",
+          ref: "//projects/deployments/demoapp-shared:skip_failure_cleanup",
           phase: "post_publish_pre_smoke",
           runCondition: "failure_only",
           replayPolicy: {
@@ -77,7 +77,7 @@ test("failure-path release-action replay fails closed when rerun is not authoriz
         executionPath: "failure",
         releaseActions: [
           deploymentReleaseActionFixture({
-            ref: "//test-workspace/deployments/demoapp-shared:blocked_failure_cleanup",
+            ref: "//projects/deployments/demoapp-shared:blocked_failure_cleanup",
             phase: "post_publish_pre_smoke",
             runCondition: "failure_only",
             replayPolicy: {

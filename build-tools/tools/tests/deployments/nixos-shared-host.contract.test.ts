@@ -35,21 +35,21 @@ test("deriveNixosSharedHostProviderTarget normalizes hostname, container name, a
 
 test("extractNixosSharedHostDeployments defaults protection_class to shared_nonprod", () => {
   const nodes: GraphNode[] = [
-    staticWebappComponent("//test-workspace/apps/demoapp:app"),
+    staticWebappComponent("//projects/apps/demoapp:app"),
     nixosSharedHostLaneGovernanceNodeFixture(),
     nixosSharedHostLanePolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture(),
     {
-      name: "//test-workspace/deployments/demoapp-dev:deploy",
+      name: "//projects/deployments/demoapp-dev:deploy",
       provider: "nixos-shared-host",
-      component: "//test-workspace/apps/demoapp:app",
+      component: "//projects/apps/demoapp:app",
       component_kind: "static-webapp",
       publisher: "nixos-shared-host-static-webapp",
       provisioner: "nixos-shared-host-manifest",
       protection_class: "",
-      lane_policy: "//test-workspace/deployments/pleomino-shared:lane",
+      lane_policy: "//projects/deployments/pleomino-shared:lane",
       environment_stage: "dev",
-      admission_policy: "//test-workspace/deployments/pleomino-shared:dev_release",
+      admission_policy: "//projects/deployments/pleomino-shared:dev_release",
       secret_requirements: [],
       runtime_config_requirements: [],
       app_name: "demoapp",
@@ -63,7 +63,7 @@ test("extractNixosSharedHostDeployments defaults protection_class to shared_nonp
   assert.deepEqual(errors, []);
   assert.equal(deployments.length, 1);
   assert.equal(deployments[0]?.protectionClass, "shared_nonprod");
-  assert.equal(deployments[0]?.lanePolicyRef, "//test-workspace/deployments/pleomino-shared:lane");
+  assert.equal(deployments[0]?.lanePolicyRef, "//projects/deployments/pleomino-shared:lane");
   assert.equal(deployments[0]?.environmentStage, "dev");
   assert.equal(deployments[0]?.providerTarget.hostname, "demoapp.apps.kilty.io");
   assert.deepEqual(deployments[0]?.prerequisites, []);
@@ -71,43 +71,43 @@ test("extractNixosSharedHostDeployments defaults protection_class to shared_nonp
 
 test("extractNixosSharedHostDeployments preserves valid prerequisite metadata", () => {
   const nodes: GraphNode[] = [
-    staticWebappComponent("//test-workspace/apps/demoapp:app"),
+    staticWebappComponent("//projects/apps/demoapp:app"),
     nixosSharedHostLaneGovernanceNodeFixture(),
     nixosSharedHostLanePolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture({
-      name: "//test-workspace/deployments/pleomino-shared:staging_release",
+      name: "//projects/deployments/pleomino-shared:staging_release",
       allowed_refs: ["env/pleomino/staging"],
       required_checks: ["deploy/pleomino-staging"],
       artifact_attestation_mode: "recorded_exact_artifact",
     }),
     {
-      name: "//test-workspace/deployments/demoapp-dev:deploy",
+      name: "//projects/deployments/demoapp-dev:deploy",
       provider: "nixos-shared-host",
-      component: "//test-workspace/apps/demoapp:app",
+      component: "//projects/apps/demoapp:app",
       component_kind: "static-webapp",
       publisher: "nixos-shared-host-static-webapp",
       provisioner: "nixos-shared-host-manifest",
       protection_class: "",
-      lane_policy: "//test-workspace/deployments/pleomino-shared:lane",
+      lane_policy: "//projects/deployments/pleomino-shared:lane",
       environment_stage: "dev",
-      admission_policy: "//test-workspace/deployments/pleomino-shared:dev_release",
+      admission_policy: "//projects/deployments/pleomino-shared:dev_release",
       secret_requirements: [],
       runtime_config_requirements: [],
       app_name: "demoapp",
       container_port: 3000,
     },
     {
-      name: "//test-workspace/deployments/demoapp-staging:deploy",
+      name: "//projects/deployments/demoapp-staging:deploy",
       provider: "nixos-shared-host",
-      component: "//test-workspace/apps/demoapp:app",
+      component: "//projects/apps/demoapp:app",
       component_kind: "static-webapp",
       publisher: "nixos-shared-host-static-webapp",
       provisioner: "nixos-shared-host-manifest",
       protection_class: "",
-      lane_policy: "//test-workspace/deployments/pleomino-shared:lane",
+      lane_policy: "//projects/deployments/pleomino-shared:lane",
       environment_stage: "staging",
-      admission_policy: "//test-workspace/deployments/pleomino-shared:staging_release",
+      admission_policy: "//projects/deployments/pleomino-shared:staging_release",
       secret_requirements: [],
       runtime_config_requirements: [],
       app_name: "demoapp-staging",
@@ -126,21 +126,21 @@ test("extractNixosSharedHostDeployments preserves valid prerequisite metadata", 
 
 test("extractNixosSharedHostDeployments preserves bootstrap policy metadata", () => {
   const nodes: GraphNode[] = [
-    staticWebappComponent("//test-workspace/apps/demoapp:app"),
+    staticWebappComponent("//projects/apps/demoapp:app"),
     nixosSharedHostLaneGovernanceNodeFixture(),
     nixosSharedHostLanePolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture(),
     {
-      name: "//test-workspace/deployments/deploy-system-dev:deploy",
+      name: "//projects/deployments/deploy-system-dev:deploy",
       provider: "nixos-shared-host",
-      component: "//test-workspace/apps/demoapp:app",
+      component: "//projects/apps/demoapp:app",
       component_kind: "static-webapp",
       publisher: "nixos-shared-host-static-webapp",
       provisioner: "nixos-shared-host-manifest",
       protection_class: "shared_nonprod",
-      lane_policy: "//test-workspace/deployments/pleomino-shared:lane",
+      lane_policy: "//projects/deployments/pleomino-shared:lane",
       environment_stage: "dev",
-      admission_policy: "//test-workspace/deployments/pleomino-shared:dev_release",
+      admission_policy: "//projects/deployments/pleomino-shared:dev_release",
       bootstrap: {
         scope: "deployment_authority",
         allow_first_install: "true",

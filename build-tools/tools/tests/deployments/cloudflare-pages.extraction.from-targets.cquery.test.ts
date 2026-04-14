@@ -47,17 +47,17 @@ const ATTRS = [
 
 test("cloudflare-pages deployment extraction reads canonical metadata from TARGETS via cquery", async () => {
   await runInTemp("cloudflare-pages-cquery-extraction", async (tmp, _$) => {
-    const appTargetsPath = path.join(tmp, "test-workspace", "apps", "pleomino", "TARGETS");
+    const appTargetsPath = path.join(tmp, "projects", "apps", "pleomino", "TARGETS");
     const deployTargetsPath = path.join(
       tmp,
-      "test-workspace",
+      "projects",
       "deployments",
       "pleomino-staging",
       "TARGETS",
     );
     const sharedTargetsPath = path.join(
       tmp,
-      "test-workspace",
+      "projects",
       "deployments",
       "pleomino-shared",
       "TARGETS",
@@ -125,12 +125,12 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
         "",
         "cloudflare_pages_static_webapp_deployment(",
         '    name = "deploy",',
-        '    component = "//test-workspace/apps/pleomino:app",',
+        '    component = "//projects/apps/pleomino:app",',
         '    account = "web-platform-staging",',
         '    project = "pleomino-staging-pages",',
-        '    lane_policy = "//test-workspace/deployments/pleomino-shared:lane",',
+        '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
         '    environment_stage = "staging",',
-        '    admission_policy = "//test-workspace/deployments/pleomino-shared:staging_release",',
+        '    admission_policy = "//projects/deployments/pleomino-shared:staging_release",',
         "    secret_requirements = [],",
         "    runtime_config_requirements = [],",
         "    preview = {",
@@ -149,7 +149,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
 
     const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
     const query =
-      "set(//test-workspace/deployments/pleomino-staging:deploy //test-workspace/apps/pleomino:app //test-workspace/deployments/pleomino-shared:lane //test-workspace/deployments/pleomino-shared:lane_governance //test-workspace/deployments/pleomino-shared:staging_release)";
+      "set(//projects/deployments/pleomino-staging:deploy //projects/apps/pleomino:app //projects/deployments/pleomino-shared:lane //projects/deployments/pleomino-shared:lane_governance //projects/deployments/pleomino-shared:staging_release)";
     const cquery = await _$({
       cwd: tmp,
       stdio: "pipe",
@@ -163,7 +163,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
     const { deployments, errors } = extractCloudflarePagesDeployments(nodesFromCqueryJson(merged));
     assert.deepEqual(errors, []);
     assert.equal(deployments.length, 1);
-    assert.equal(deployments[0]?.label, "//test-workspace/deployments/pleomino-staging:deploy");
+    assert.equal(deployments[0]?.label, "//projects/deployments/pleomino-staging:deploy");
     assert.equal(deployments[0]?.publisher.config, "wrangler.jsonc");
     assert.equal(deployments[0]?.providerTarget.account, "web-platform-staging");
     assert.equal(deployments[0]?.providerTarget.project, "pleomino-staging-pages");

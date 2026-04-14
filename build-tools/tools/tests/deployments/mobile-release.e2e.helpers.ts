@@ -22,7 +22,7 @@ export async function writePublisherConfig(
   fileName: string,
   config: unknown,
 ): Promise<void> {
-  const packageDir = path.join(workspaceRoot, "test-workspace", "deployments", deploymentId);
+  const packageDir = path.join(workspaceRoot, "projects", "deployments", deploymentId);
   await fsp.mkdir(packageDir, { recursive: true });
   await fsp.writeFile(
     path.join(packageDir, fileName),

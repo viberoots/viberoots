@@ -35,12 +35,12 @@ test("nixos-shared-host multi-component deploy publishes components in rollout o
   await runInTemp("nixos-shared-host-multi-component", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture({
       deploymentId: "demo-stack-dev",
-      label: "//test-workspace/deployments/demo-stack-dev:deploy",
+      label: "//projects/deployments/demo-stack-dev:deploy",
       components: [
         {
           id: "frontend",
           kind: "static-webapp",
-          target: "//test-workspace/apps/demoapp:app",
+          target: "//projects/apps/demoapp:app",
           runtime: { appName: "demoapp", containerPort: 3000, healthPath: "/healthz" },
           providerTarget: {
             host: "nixos-shared-host",
@@ -56,7 +56,7 @@ test("nixos-shared-host multi-component deploy publishes components in rollout o
         {
           id: "api",
           kind: "static-webapp",
-          target: "//test-workspace/apps/demoapi:app",
+          target: "//projects/apps/demoapi:app",
           runtime: { appName: "demoapi", containerPort: 3001, healthPath: "/healthz" },
           providerTarget: {
             host: "nixos-shared-host",
@@ -146,12 +146,12 @@ test("nixos-shared-host multi-component deploy stops after the first publish fai
   await runInTemp("nixos-shared-host-multi-component-failure", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture({
       deploymentId: "demo-stack-dev",
-      label: "//test-workspace/deployments/demo-stack-dev:deploy",
+      label: "//projects/deployments/demo-stack-dev:deploy",
       components: [
         {
           id: "frontend",
           kind: "static-webapp",
-          target: "//test-workspace/apps/demoapp:app",
+          target: "//projects/apps/demoapp:app",
           runtime: { appName: "demoapp", containerPort: 3000, healthPath: "/healthz" },
           providerTarget: {
             host: "nixos-shared-host",
@@ -167,7 +167,7 @@ test("nixos-shared-host multi-component deploy stops after the first publish fai
         {
           id: "api",
           kind: "static-webapp",
-          target: "//test-workspace/apps/demoapi:app",
+          target: "//projects/apps/demoapi:app",
           runtime: { appName: "demoapi", containerPort: 3001, healthPath: "/healthz" },
           providerTarget: {
             host: "nixos-shared-host",

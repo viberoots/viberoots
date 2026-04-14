@@ -15,21 +15,9 @@ export async function installClientProfile(
 }
 
 export async function installReviewedPleominoTargets(tmp: string): Promise<void> {
-  const appTargetsPath = path.join(tmp, "test-workspace", "apps", "pleomino", "TARGETS");
-  const deployTargetsPath = path.join(
-    tmp,
-    "test-workspace",
-    "deployments",
-    "pleomino-dev",
-    "TARGETS",
-  );
-  const sharedTargetsPath = path.join(
-    tmp,
-    "test-workspace",
-    "deployments",
-    "pleomino-shared",
-    "TARGETS",
-  );
+  const appTargetsPath = path.join(tmp, "projects", "apps", "pleomino", "TARGETS");
+  const deployTargetsPath = path.join(tmp, "projects", "deployments", "pleomino-dev", "TARGETS");
+  const sharedTargetsPath = path.join(tmp, "projects", "deployments", "pleomino-shared", "TARGETS");
   await fsp.mkdir(path.dirname(appTargetsPath), { recursive: true });
   await fsp.mkdir(path.dirname(deployTargetsPath), { recursive: true });
   await fsp.mkdir(path.dirname(sharedTargetsPath), { recursive: true });
@@ -92,10 +80,10 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
       "",
       "nixos_shared_host_static_webapp_deployment(",
       '    name = "deploy",',
-      '    component = "//test-workspace/apps/pleomino:app",',
-      '    lane_policy = "//test-workspace/deployments/pleomino-shared:lane",',
+      '    component = "//projects/apps/pleomino:app",',
+      '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
       '    environment_stage = "dev",',
-      '    admission_policy = "//test-workspace/deployments/pleomino-shared:dev_release",',
+      '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",',
       '    app_name = "pleomino",',
       "    container_port = 3000,",
       '    health_path = "/healthz",',

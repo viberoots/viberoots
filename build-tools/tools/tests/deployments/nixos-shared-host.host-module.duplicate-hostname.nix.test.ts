@@ -17,8 +17,8 @@ test("nixos-shared-host Nix module fails closed on duplicate hostnames", async (
           nixosSharedHostDeploymentFixture(),
           nixosSharedHostDeploymentFixture({
             deploymentId: "other-dev",
-            label: "//test-workspace/deployments/other-dev:deploy",
-            component: { kind: "static-webapp", target: "//test-workspace/apps/other:app" },
+            label: "//projects/deployments/other-dev:deploy",
+            component: { kind: "static-webapp", target: "//projects/apps/other:app" },
             runtime: { appName: "other", containerPort: 4000 },
             providerTarget: {
               host: "nixos-shared-host",

@@ -26,11 +26,11 @@ test("s3-static deploy CLI completes the static-webapp flow end to end", async (
     await writeArtifact(artifactDir, "<html>pleomino s3 staging</html>\n");
     await installS3StaticTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
-    await fsp.mkdir(path.join(tmp, "test-workspace", "deployments", "pleomino-staging-s3"), {
+    await fsp.mkdir(path.join(tmp, "projects", "deployments", "pleomino-staging-s3"), {
       recursive: true,
     });
     await fsp.writeFile(
-      path.join(tmp, "test-workspace", "deployments", "pleomino-staging-s3", "aws-s3-sync.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino-staging-s3", "aws-s3-sync.jsonc"),
       '{\n  "delete": true,\n  "distribution": "staging.example.test"\n}\n',
       "utf8",
     );
@@ -83,11 +83,11 @@ test("s3-static fails closed on ambiguous publish results", async () => {
     await writeArtifact(artifactDir, "<html>ambiguous</html>\n");
     await installS3StaticTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
-    await fsp.mkdir(path.join(tmp, "test-workspace", "deployments", "pleomino-staging-s3"), {
+    await fsp.mkdir(path.join(tmp, "projects", "deployments", "pleomino-staging-s3"), {
       recursive: true,
     });
     await fsp.writeFile(
-      path.join(tmp, "test-workspace", "deployments", "pleomino-staging-s3", "aws-s3-sync.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino-staging-s3", "aws-s3-sync.jsonc"),
       "{}\n",
       "utf8",
     );

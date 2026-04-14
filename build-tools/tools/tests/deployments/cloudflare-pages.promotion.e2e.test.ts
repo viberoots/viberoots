@@ -47,10 +47,10 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
     const prodJson = path.join(tmp, "pleomino-prod.json");
     await writeDemoArtifact(artifactDir, "pleomino release");
     await writeWranglerConfig(
-      path.join(tmp, "test-workspace", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await writeWranglerConfig(
-      path.join(tmp, "test-workspace", "deployments", "pleomino-prod", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino-prod", "wrangler.jsonc"),
     );
     await installNixosSharedHostTargets(tmp, [dev]);
     await installCloudflarePagesTargets(tmp, [staging, prod]);
@@ -131,7 +131,7 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
     const devJson = path.join(tmp, "pleomino-dev.json");
     await writeDemoArtifact(artifactDir, "expected");
     await writeWranglerConfig(
-      path.join(tmp, "test-workspace", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installNixosSharedHostTargets(tmp, [dev]);
     await installCloudflarePagesTargets(tmp, [staging]);

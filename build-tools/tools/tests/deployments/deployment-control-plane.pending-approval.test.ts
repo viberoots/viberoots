@@ -100,7 +100,7 @@ test("resume fails closed for current non-resumable submissions", async () => {
           submittedAt: "2026-04-06T12:00:00.000Z",
           operationKind: "deploy",
           deploymentId: "demoapp-dev",
-          deploymentLabel: "//test-workspace/deployments/demoapp-dev:deploy",
+          deploymentLabel: "//projects/deployments/demoapp-dev:deploy",
           providerTargetIdentity: "nixos-shared-host:default:demoapp",
           lockScope: "nixos-shared-host:default:demoapp",
           executionSnapshotPath: "/tmp/execution-snapshot.json",

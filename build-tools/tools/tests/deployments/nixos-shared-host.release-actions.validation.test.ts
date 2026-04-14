@@ -19,19 +19,19 @@ function staticWebappComponent(label: string): GraphNode {
 
 function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
   return {
-    name: "//test-workspace/deployments/demoapp-dev:deploy",
+    name: "//projects/deployments/demoapp-dev:deploy",
     provider: "nixos-shared-host",
-    component: "//test-workspace/apps/demoapp:app",
+    component: "//projects/apps/demoapp:app",
     component_kind: "static-webapp",
     publisher: "nixos-shared-host-static-webapp",
     provisioner: "nixos-shared-host-manifest",
     protection_class: "shared_nonprod",
-    lane_policy: "//test-workspace/deployments/pleomino-shared:lane",
+    lane_policy: "//projects/deployments/pleomino-shared:lane",
     environment_stage: "dev",
-    admission_policy: "//test-workspace/deployments/pleomino-shared:dev_release",
+    admission_policy: "//projects/deployments/pleomino-shared:dev_release",
     secret_requirements: [],
     runtime_config_requirements: [],
-    release_actions: ["//test-workspace/deployments/demoapp-shared:db_migration"],
+    release_actions: ["//projects/deployments/demoapp-shared:db_migration"],
     app_name: "demoapp",
     container_port: 3000,
     ...overrides,
@@ -40,7 +40,7 @@ function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
 
 function baseNodes(overrides: Partial<GraphNode> = {}): GraphNode[] {
   return [
-    staticWebappComponent("//test-workspace/apps/demoapp:app"),
+    staticWebappComponent("//projects/apps/demoapp:app"),
     nixosSharedHostLaneGovernanceNodeFixture(),
     nixosSharedHostLanePolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture(),

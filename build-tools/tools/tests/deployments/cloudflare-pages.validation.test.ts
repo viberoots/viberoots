@@ -19,16 +19,16 @@ function staticWebappComponent(label: string): GraphNode {
 
 function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
   return {
-    name: "//test-workspace/deployments/pleomino-staging:deploy",
+    name: "//projects/deployments/pleomino-staging:deploy",
     provider: "cloudflare-pages",
-    component: "//test-workspace/apps/pleomino:app",
+    component: "//projects/apps/pleomino:app",
     component_kind: "static-webapp",
     publisher: "wrangler-pages",
     publisher_config: "wrangler.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//test-workspace/deployments/pleomino-shared:lane",
+    lane_policy: "//projects/deployments/pleomino-shared:lane",
     environment_stage: "staging",
-    admission_policy: "//test-workspace/deployments/pleomino-shared:staging_release",
+    admission_policy: "//projects/deployments/pleomino-shared:staging_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: {
@@ -50,13 +50,13 @@ function policyNodes(): GraphNode[] {
 
 test("validation rejects duplicate cloudflare provider target identity collisions", () => {
   const nodes: GraphNode[] = [
-    staticWebappComponent("//test-workspace/apps/pleomino:app"),
-    staticWebappComponent("//test-workspace/apps/other:app"),
+    staticWebappComponent("//projects/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/other:app"),
     ...policyNodes(),
     deploymentNode(),
     deploymentNode({
-      name: "//test-workspace/deployments/other-staging:deploy",
-      component: "//test-workspace/apps/other:app",
+      name: "//projects/deployments/other-staging:deploy",
+      component: "//projects/apps/other:app",
     }),
   ];
   const { errors } = extractCloudflarePagesDeployments(nodes);
@@ -65,7 +65,7 @@ test("validation rejects duplicate cloudflare provider target identity collision
 
 test("validation rejects missing publisher_config", () => {
   const { errors } = extractCloudflarePagesDeployments([
-    staticWebappComponent("//test-workspace/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/pleomino:app"),
     ...policyNodes(),
     deploymentNode({ publisher_config: "" }),
   ]);
@@ -74,7 +74,7 @@ test("validation rejects missing publisher_config", () => {
 
 test("validation rejects unsupported cloudflare publisher", () => {
   const { errors } = extractCloudflarePagesDeployments([
-    staticWebappComponent("//test-workspace/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/pleomino:app"),
     ...policyNodes(),
     deploymentNode({ publisher: "other-publisher" }),
   ]);
@@ -83,7 +83,7 @@ test("validation rejects unsupported cloudflare publisher", () => {
 
 test("validation rejects unsupported protection_class for cloudflare-pages", () => {
   const { errors } = extractCloudflarePagesDeployments([
-    staticWebappComponent("//test-workspace/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/pleomino:app"),
     ...policyNodes(),
     deploymentNode({ protection_class: "local_only" }),
   ]);
@@ -96,7 +96,7 @@ test("validation rejects unsupported protection_class for cloudflare-pages", () 
 
 test("validation rejects preview metadata that reuses the normal live target", () => {
   const { errors } = extractCloudflarePagesDeployments([
-    staticWebappComponent("//test-workspace/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/pleomino:app"),
     ...policyNodes(),
     deploymentNode({
       preview: {
@@ -113,7 +113,7 @@ test("validation rejects preview metadata that reuses the normal live target", (
 
 test("validation rejects cloudflare preview metadata that does not use source-run identity", () => {
   const { errors } = extractCloudflarePagesDeployments([
-    staticWebappComponent("//test-workspace/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/pleomino:app"),
     ...policyNodes(),
     deploymentNode({
       preview: {
@@ -130,13 +130,13 @@ test("validation rejects cloudflare preview metadata that does not use source-ru
 
 test("validation rejects multi-component cloudflare-pages deployments", () => {
   const { errors } = extractCloudflarePagesDeployments([
-    staticWebappComponent("//test-workspace/apps/pleomino:app"),
-    staticWebappComponent("//test-workspace/apps/other:app"),
+    staticWebappComponent("//projects/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/other:app"),
     ...policyNodes(),
     deploymentNode({
       components: [
-        { id: "primary", kind: "static-webapp", target: "//test-workspace/apps/pleomino:app" },
-        { id: "secondary", kind: "static-webapp", target: "//test-workspace/apps/other:app" },
+        { id: "primary", kind: "static-webapp", target: "//projects/apps/pleomino:app" },
+        { id: "secondary", kind: "static-webapp", target: "//projects/apps/other:app" },
       ],
     }),
   ]);
@@ -146,7 +146,7 @@ test("validation rejects multi-component cloudflare-pages deployments", () => {
 test("validation rejects reviewed non-static kinds until cloudflare-pages declares capability support", () => {
   for (const kind of REVIEWED_NON_STATIC_COMPONENT_KINDS) {
     const { errors } = extractCloudflarePagesDeployments([
-      { name: "//test-workspace/apps/pleomino:app", labels: ["kind:app", "webapp:ssr"] },
+      { name: "//projects/apps/pleomino:app", labels: ["kind:app", "webapp:ssr"] },
       ...policyNodes(),
       deploymentNode({ component_kind: kind }),
     ]);

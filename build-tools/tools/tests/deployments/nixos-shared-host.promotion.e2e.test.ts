@@ -52,7 +52,7 @@ function cloudflareDevDeployment() {
   });
   return cloudflarePagesDeploymentFixture({
     deploymentId: "pleomino-dev-pages",
-    label: "//test-workspace/deployments/pleomino-dev-pages:deploy",
+    label: "//projects/deployments/pleomino-dev-pages:deploy",
     lanePolicy,
     lanePolicyRef: lanePolicy.ref,
     environmentStage: "dev",
@@ -70,7 +70,7 @@ function cloudflareDevDeployment() {
 
 function nixosStagingDeployment(lanePolicy = cloudflareDevDeployment().lanePolicy) {
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
-    ref: "//test-workspace/deployments/pleomino-shared:staging_release",
+    ref: "//projects/deployments/pleomino-shared:staging_release",
     name: "staging_release",
     allowedRefs: ["env/pleomino/staging"],
     requiredChecks: [],
@@ -78,13 +78,13 @@ function nixosStagingDeployment(lanePolicy = cloudflareDevDeployment().lanePolic
   });
   return nixosSharedHostDeploymentFixture({
     deploymentId: "pleomino-staging-host",
-    label: "//test-workspace/deployments/pleomino-staging-host:deploy",
+    label: "//projects/deployments/pleomino-staging-host:deploy",
     lanePolicy,
     lanePolicyRef: lanePolicy.ref,
     environmentStage: "staging",
     admissionPolicyRef: admissionPolicy.ref,
     admissionPolicy,
-    component: { kind: "static-webapp", target: "//test-workspace/apps/pleomino:app" },
+    component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
     runtime: { appName: "pleomino-staging", containerPort: 3000, healthPath: "/healthz" },
   });
 }
@@ -114,7 +114,7 @@ test("nixos-shared-host allows reviewed cross-provider same-artifact promotion o
     await writeArtifact(artifactDir, "<html>promoted release</html>\n");
     await writeArtifact(bootstrapArtifactDir, "<html>bootstrap</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "test-workspace", "deployments", "pleomino-dev-pages", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino-dev-pages", "wrangler.jsonc"),
     );
     await ensureNixosSharedHostStageBranch(tmp, $, source);
     await ensureNixosSharedHostStageBranch(tmp, $, target);
@@ -180,7 +180,7 @@ test("nixos-shared-host promotion rejects retained source runs that drift out of
     const sourceJson = path.join(tmp, "pleomino-dev-pages.json");
     await writeArtifact(artifactDir, "<html>eligible source</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "test-workspace", "deployments", "pleomino-dev-pages", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino-dev-pages", "wrangler.jsonc"),
     );
     await ensureNixosSharedHostStageBranch(tmp, $, source);
     await ensureNixosSharedHostStageBranch(tmp, $, target);

@@ -180,7 +180,7 @@ test("nixos-shared-host replay resolution fails closed when the stored exact art
 test("nixos-shared-host replay snapshots preserve SSR runtime-contract provenance", async () => {
   await runInTemp("nixos-shared-host-replay-ssr-contract", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture({
-      component: { kind: "ssr-webapp", target: "//test-workspace/apps/demoapp:app" },
+      component: { kind: "ssr-webapp", target: "//projects/apps/demoapp:app" },
       publisher: { type: "nixos-shared-host-ssr-webapp" },
       runtime: {
         appName: "demoapp",

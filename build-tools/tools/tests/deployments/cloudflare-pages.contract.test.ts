@@ -38,26 +38,26 @@ test("deriveCloudflarePagesProviderTarget normalizes canonical url and lock iden
 
 test("extractCloudflarePagesDeployments reads provider target and publisher config", () => {
   const nodes: GraphNode[] = [
-    staticWebappComponent("//test-workspace/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/pleomino:app"),
     cloudflarePagesLaneGovernanceNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture({
-      name: "//test-workspace/deployments/pleomino-shared:dev_release",
+      name: "//projects/deployments/pleomino-shared:dev_release",
       allowed_refs: ["env/pleomino/dev"],
       required_checks: ["deploy/pleomino-dev"],
     }),
     {
-      name: "//test-workspace/deployments/pleomino-dev:deploy",
+      name: "//projects/deployments/pleomino-dev:deploy",
       provider: "cloudflare-pages",
-      component: "//test-workspace/apps/pleomino:app",
+      component: "//projects/apps/pleomino:app",
       component_kind: "static-webapp",
       publisher: "wrangler-pages",
       publisher_config: "wrangler.jsonc",
       protection_class: "shared_nonprod",
-      lane_policy: "//test-workspace/deployments/pleomino-shared:lane",
+      lane_policy: "//projects/deployments/pleomino-shared:lane",
       environment_stage: "dev",
-      admission_policy: "//test-workspace/deployments/pleomino-shared:dev_release",
+      admission_policy: "//projects/deployments/pleomino-shared:dev_release",
       secret_requirements: [],
       runtime_config_requirements: [],
       provider_target: {
@@ -66,16 +66,16 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
       },
     },
     {
-      name: "//test-workspace/deployments/pleomino-staging:deploy",
+      name: "//projects/deployments/pleomino-staging:deploy",
       provider: "cloudflare-pages",
-      component: "//test-workspace/apps/pleomino:app",
+      component: "//projects/apps/pleomino:app",
       component_kind: "static-webapp",
       publisher: "wrangler-pages",
       publisher_config: "wrangler.jsonc",
       protection_class: "shared_nonprod",
-      lane_policy: "//test-workspace/deployments/pleomino-shared:lane",
+      lane_policy: "//projects/deployments/pleomino-shared:lane",
       environment_stage: "staging",
-      admission_policy: "//test-workspace/deployments/pleomino-shared:staging_release",
+      admission_policy: "//projects/deployments/pleomino-shared:staging_release",
       secret_requirements: [],
       runtime_config_requirements: [],
       preview: {

@@ -88,7 +88,7 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
         await fsp.readFile(record.controlPlane.executionSnapshotPath, "utf8"),
       );
       assert.equal(snapshot.operationKind, "deploy");
-      assert.equal(snapshot.deploymentLabel, "//test-workspace/deployments/demoapp-dev:deploy");
+      assert.equal(snapshot.deploymentLabel, "//projects/deployments/demoapp-dev:deploy");
       assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:demoapp");
       assert.equal(snapshot.action.publishBehavior, "deploy");
       assert.equal(snapshot.admittedContext.source.sourceRef, "env/pleomino/dev");
@@ -133,7 +133,7 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
 test("nixos-shared-host deploy CLI completes the reviewed ssr-webapp flow end to end", async () => {
   await runInTemp("nixos-shared-host-ssr-e2e", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture({
-      component: { kind: "ssr-webapp", target: "//test-workspace/apps/demoapp:app" },
+      component: { kind: "ssr-webapp", target: "//projects/apps/demoapp:app" },
       publisher: { type: "nixos-shared-host-ssr-webapp" },
       runtime: {
         appName: "demoapp",
