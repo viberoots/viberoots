@@ -5,23 +5,13 @@ import * as fsp from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fg from "fast-glob";
-import {
-  DEPLOYMENT_DOMAIN_FILES_SCOPE,
-  SOURCE_FILES_SCOPE,
-  SSR_TEST_FILES_SCOPE,
-  type FileSizeScope,
-} from "./file-size-lint-scopes.ts";
+import { SOURCE_FILES_SCOPE, type FileSizeScope } from "./file-size-lint-scopes.ts";
 import { resolveSourceFileSizeExceptionPaths } from "./file-size-lint-exceptions.ts";
 import {
   parseFileSizeLintArgs,
   type FileSizeLintOptions as Options,
 } from "./file-size-lint-options.ts";
-export {
-  DEPLOYMENT_DOMAIN_FILES_SCOPE,
-  SOURCE_FILES_SCOPE,
-  SSR_TEST_FILES_SCOPE,
-  type FileSizeScope,
-};
+export { SOURCE_FILES_SCOPE, type FileSizeScope };
 
 const execFileAsync = promisify(execFile);
 
@@ -120,7 +110,7 @@ function sameList(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-function isSourceFileScope(scope: FileSizeScope): boolean {
+function isDefaultFileSizeScope(scope: FileSizeScope): boolean {
   return (
     sameList(scope.include, SOURCE_FILES_SCOPE.include) &&
     sameList(scope.exclude, SOURCE_FILES_SCOPE.exclude)
@@ -133,14 +123,14 @@ export async function findFileSizeOffenders(opts: Options): Promise<FileOffender
     ? await listChangedFilesFromRoot(root)
     : await listTrackedFilesFromRoot(root);
   const inScope = await listScopeMatches(root, opts.scope);
-  const projectExceptions = new Set(
-    isSourceFileScope(opts.scope) ? await resolveSourceFileSizeExceptionPaths(root) : [],
+  const ownerLocalExceptions = new Set(
+    isDefaultFileSizeScope(opts.scope) ? await resolveSourceFileSizeExceptionPaths(root) : [],
   );
 
   const offenders: FileOffender[] = [];
   for (const rel of base) {
     if (!inScope.has(rel)) continue;
-    if (!opts.allowKnown && projectExceptions.has(rel)) continue;
+    if (!opts.allowKnown && ownerLocalExceptions.has(rel)) continue;
     const abs = path.join(root, rel);
     const lines = await countLines(abs);
     if (lines > opts.threshold) offenders.push({ file: rel, lines });
@@ -166,7 +156,7 @@ async function runCli() {
   const opts = parseFileSizeLintArgs();
   const offenders = await findFileSizeOffenders(opts);
   if (offenders.length === 0) return;
-  const knownPaths = isSourceFileScope(opts.scope)
+  const knownPaths = isDefaultFileSizeScope(opts.scope)
     ? await resolveSourceFileSizeExceptionPaths(opts.root)
     : [];
   const { unknown, known } = opts.allowKnown

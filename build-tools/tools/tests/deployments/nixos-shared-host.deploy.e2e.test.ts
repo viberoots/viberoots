@@ -13,6 +13,7 @@ import {
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
 import {
+  readBackendSnapshot,
   readRecord,
   startControlPlaneHarness,
   writeDemoArtifact,
@@ -72,10 +73,8 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
       assert.equal(record.providerTargetIdentity, "nixos-shared-host:default:demoapp");
       assert.equal(record.controlPlane.submissionId, summary.controlPlane.submissionId);
       assert.equal(record.controlPlane.lockScope, "nixos-shared-host:default:demoapp");
-      assert.equal(
-        record.controlPlane.executionSnapshotPath,
-        summary.controlPlane.executionSnapshotPath,
-      );
+      assert.equal("executionSnapshotPath" in record.controlPlane, false);
+      assert.equal("executionSnapshotPath" in summary.controlPlane, false);
       assert.equal(record.admittedContext.source.sourceRef, "env/pleomino/dev");
       assert.equal(record.admittedContext.targetEnvironment.targetRef, "env/pleomino/dev");
       assert.equal(record.artifact.identity, summary.artifactIdentity);
@@ -84,8 +83,9 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
       assert.match(record.deploymentMetadataFingerprint, /^sha256:/);
       assert.match(record.replaySnapshotPath, /records\/replay\//);
       assert.equal(record.finalOutcome, "succeeded");
-      const snapshot = JSON.parse(
-        await fsp.readFile(record.controlPlane.executionSnapshotPath, "utf8"),
+      const snapshot = await readBackendSnapshot(
+        recordsRoot,
+        String(record.controlPlane.submissionId),
       );
       assert.equal(snapshot.operationKind, "deploy");
       assert.equal(snapshot.deploymentLabel, "//projects/deployments/demoapp-dev:deploy");

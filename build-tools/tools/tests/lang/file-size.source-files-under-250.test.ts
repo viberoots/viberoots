@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { findFileSizeOffenders, SOURCE_FILES_SCOPE } from "../../dev/file-size-lint";
 import { resolveSourceFileSizeExceptionPaths } from "../../dev/file-size-lint-exceptions.ts";
 
-test("source files remain under the 250 LOC methodology gate", async () => {
+test("repo-owned code files remain under the 250 LOC methodology gate", async () => {
   const root = (process.env.WORKSPACE_ROOT || process.cwd()).trim();
   assert.ok(root.length > 0, "WORKSPACE_ROOT is empty");
 
@@ -19,10 +19,11 @@ test("source files remain under the 250 LOC methodology gate", async () => {
       "**/*.py",
       "**/*.go",
       "**/*.rs",
+      "**/*.nix",
     ],
     exclude: [
       "**/dist/**",
-      "build-tools/tools/tests/**",
+      "build-tools/docs/**",
       "docs/**",
       "test-logs/**",
       "buck-out/**",
@@ -44,7 +45,4 @@ test("source files remain under the 250 LOC methodology gate", async () => {
   const offenderFiles = offenders.map((o) => o.file).sort();
   const known = await resolveSourceFileSizeExceptionPaths(root);
   assert.deepEqual(offenderFiles, known);
-  assert.deepEqual(known, [
-    "projects/apps/pleomino/src/game/solver/static-interesting-solutions.ts",
-  ]);
 });

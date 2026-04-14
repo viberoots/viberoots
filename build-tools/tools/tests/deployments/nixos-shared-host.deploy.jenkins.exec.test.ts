@@ -20,6 +20,7 @@ import {
   writeReviewedPleominoAdmissionEvidence,
   writeJenkinsAuthFiles,
 } from "./nixos-shared-host.jenkins.fixture.ts";
+import { readBackendSnapshot } from "./nixos-shared-host.control-plane.helpers.ts";
 
 test("jenkins wrapper stages the Pleomino artifact, submits through the control plane, and emits stable JSON", async () => {
   await runInTemp("nixos-shared-host-jenkins-exec", async (tmp, $) => {
@@ -84,8 +85,9 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
       assert.equal(summary.remoteExecution.controlPlane.finalOutcome, "succeeded");
       const record = summary.remoteExecution.controlPlane.record;
       assert.equal(record.controlPlane.lockScope, "nixos-shared-host:default:pleomino");
-      const snapshot = JSON.parse(
-        await fsp.readFile(record.controlPlane.executionSnapshotPath, "utf8"),
+      const snapshot = await readBackendSnapshot(
+        remoteRecordsRoot,
+        String(record.controlPlane.submissionId),
       );
       assert.equal(snapshot.deploymentLabel, "//projects/deployments/pleomino-dev:deploy");
       assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:pleomino");

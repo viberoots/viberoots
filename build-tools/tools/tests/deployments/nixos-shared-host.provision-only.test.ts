@@ -5,7 +5,11 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
-import { readRecord, startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers.ts";
+import {
+  readBackendSnapshot,
+  readRecord,
+  startControlPlaneHarness,
+} from "./nixos-shared-host.control-plane.helpers.ts";
 import {
   ensureNixosSharedHostStageBranch,
   installNixosSharedHostTargets,
@@ -53,8 +57,9 @@ test("nixos-shared-host --provision-only writes state and records without publis
       assert.equal("publisherType" in record, false);
       const state = JSON.parse(await fsp.readFile(statePath, "utf8"));
       assert.equal(state.deployments[0].deploymentId, deployment.deploymentId);
-      const snapshot = JSON.parse(
-        await fsp.readFile(record.controlPlane.executionSnapshotPath, "utf8"),
+      const snapshot = await readBackendSnapshot(
+        recordsRoot,
+        String(record.controlPlane.submissionId),
       );
       assert.equal(snapshot.operationKind, "provision_only");
       assert.equal(snapshot.action.publishBehavior, "provision-only");

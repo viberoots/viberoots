@@ -1,9 +1,10 @@
 import path from "node:path";
 import * as fsp from "node:fs/promises";
 import fg from "fast-glob";
-import { DEFAULT_PROJECT_PREFIXES, normalizeRepoPath } from "../lib/project-graph.ts";
+import { normalizeRepoPath } from "../lib/project-graph.ts";
 
-export const PROJECT_METHODOLOGY_EXCEPTIONS_FILENAME = "methodology-exceptions.json";
+export const METHODOLOGY_EXCEPTIONS_FILENAME = "methodology-exceptions.json";
+export const PROJECT_METHODOLOGY_EXCEPTIONS_FILENAME = METHODOLOGY_EXCEPTIONS_FILENAME;
 
 type SourceFileSizeException = {
   path: string;
@@ -14,18 +15,25 @@ type ProjectMethodologyExceptions = {
   sourceFileSizeExceptions?: SourceFileSizeException[];
 };
 
-function projectExceptionManifestPatterns(): string[] {
-  return DEFAULT_PROJECT_PREFIXES.map(
-    (prefix) => `${prefix.slice(0, -1)}/*/${PROJECT_METHODOLOGY_EXCEPTIONS_FILENAME}`,
-  );
-}
+const EXCEPTION_MANIFEST_IGNORE = [
+  "buck-out/**",
+  "node_modules/**",
+  "coverage/**",
+  "prelude/**",
+  "docs/**",
+  "build-tools/docs/**",
+  "test-logs/**",
+];
 
-function resolveProjectScopedPath(manifestPath: string, filePath: string): string {
-  const projectRoot = path.posix.dirname(normalizeRepoPath(manifestPath));
-  const resolved = path.posix.normalize(`${projectRoot}/${normalizeRepoPath(filePath)}`);
-  if (!resolved.startsWith(`${projectRoot}/`)) {
+function resolveOwnerScopedPath(manifestPath: string, filePath: string): string {
+  const ownerRoot = path.posix.dirname(normalizeRepoPath(manifestPath));
+  if (!ownerRoot || ownerRoot === ".") {
+    throw new Error(`${manifestPath}: methodology-exceptions.json must not live at repo root`);
+  }
+  const resolved = path.posix.normalize(`${ownerRoot}/${normalizeRepoPath(filePath)}`);
+  if (!resolved.startsWith(`${ownerRoot}/`)) {
     throw new Error(
-      `${manifestPath}: sourceFileSizeExceptions.path must stay within the owning project`,
+      `${manifestPath}: sourceFileSizeExceptions.path must stay within the owning subtree`,
     );
   }
   return resolved;
@@ -44,11 +52,12 @@ async function readProjectMethodologyExceptions(
 }
 
 export async function resolveSourceFileSizeExceptionPaths(root: string): Promise<string[]> {
-  const manifests = await fg(projectExceptionManifestPatterns(), {
+  const manifests = await fg(`**/${METHODOLOGY_EXCEPTIONS_FILENAME}`, {
     cwd: root,
     onlyFiles: true,
     dot: false,
     followSymbolicLinks: false,
+    ignore: EXCEPTION_MANIFEST_IGNORE,
   });
   const resolved = new Set<string>();
 
@@ -71,7 +80,7 @@ export async function resolveSourceFileSizeExceptionPaths(root: string): Promise
           `${manifestPath}: each sourceFileSizeExceptions entry needs path and justification`,
         );
       }
-      resolved.add(resolveProjectScopedPath(manifestPath, entry.path));
+      resolved.add(resolveOwnerScopedPath(manifestPath, entry.path));
     }
   }
 

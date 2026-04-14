@@ -14,10 +14,11 @@ export const SOURCE_FILES_SCOPE: FileSizeScope = {
     "**/*.py",
     "**/*.go",
     "**/*.rs",
+    "**/*.nix",
   ],
   exclude: [
     "**/dist/**",
-    "build-tools/tools/tests/**",
+    "build-tools/docs/**",
     "docs/**",
     "test-logs/**",
     "buck-out/**",
@@ -25,24 +26,4 @@ export const SOURCE_FILES_SCOPE: FileSizeScope = {
     "node_modules/**",
     "coverage/**",
   ],
-};
-
-export const SSR_TEST_FILES_SCOPE: FileSizeScope = {
-  include: [
-    "build-tools/tools/tests/scaffolding/webapp-ssr*.test.ts",
-    "build-tools/tools/tests/dev/runnable-commands*.test.ts",
-  ],
-  exclude: ["buck-out/**", "node_modules/**", "coverage/**"],
-};
-
-export const DEPLOYMENT_DOMAIN_FILES_SCOPE: FileSizeScope = {
-  include: [
-    "build-tools/deployments/**/*.bzl",
-    "build-tools/tools/deployments/**/*.ts",
-    "build-tools/tools/deployments/**/*.bzl",
-    "build-tools/tools/deployments/**/*.nix",
-    "build-tools/tools/tests/deployments/**/*.ts",
-    "build-tools/tools/tests/deployments/**/*.bzl",
-  ],
-  exclude: ["buck-out/**", "node_modules/**", "coverage/**"],
 };

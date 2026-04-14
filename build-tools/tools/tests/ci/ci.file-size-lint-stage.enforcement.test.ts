@@ -18,6 +18,11 @@ test("ci run-stage wires strict file-size lint args without allow-known bypass",
     "expected file-size-lint stage to pass strict source-scope fail args",
   );
   assert.equal(
+    txt.includes("--scope=ssr-tests"),
+    false,
+    "expected file-size-lint stage to avoid legacy SSR-only scope wiring",
+  );
+  assert.equal(
     txt.includes("--allow-known"),
     false,
     "expected file-size-lint stage to avoid --allow-known bypass",

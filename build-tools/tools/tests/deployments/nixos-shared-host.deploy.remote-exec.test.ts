@@ -14,6 +14,7 @@ import {
   remoteExecEnv,
   REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
 } from "./nixos-shared-host.deploy.remote-exec.helpers.ts";
+import { readBackendSnapshot } from "./nixos-shared-host.control-plane.helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 test("remote deploy stages the artifact, runs deploy remotely, writes remote records, and cleans up by default", async () => {
@@ -73,8 +74,9 @@ test("remote deploy stages the artifact, runs deploy remotely, writes remote rec
       const record = summary.controlPlane.record;
       assert.equal(record.finalOutcome, "succeeded");
       assert.equal(record.controlPlane.lockScope, "nixos-shared-host:default:pleomino");
-      const snapshot = JSON.parse(
-        await fsp.readFile(record.controlPlane.executionSnapshotPath, "utf8"),
+      const snapshot = await readBackendSnapshot(
+        remoteRecordsRoot,
+        String(record.controlPlane.submissionId),
       );
       assert.equal(snapshot.deploymentLabel, REVIEWED_PLEOMINO_DEPLOYMENT_LABEL);
       assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:pleomino");

@@ -4,6 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { readDeploymentControlPlaneStatus } from "../../deployments/deployment-control-plane-read.ts";
 import { submitDeploymentControlPlaneRunAction } from "../../deployments/deployment-control-plane-run-action.ts";
+import { statusFromSubmission } from "../../deployments/deployment-control-plane-status.ts";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
 import { executeSubmittedNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane-submit-helpers.ts";
 import {
@@ -51,9 +52,7 @@ async function pendingApprovalRun(
     assert.fail("expected pending-approval submission");
   } catch (error: any) {
     return {
-      deployment,
       recordsRoot,
-      paths,
       submission: error.submission,
       submissionPath: String(error.submissionPath),
       executionSnapshotPath: String(error.executionSnapshotPath),
@@ -238,9 +237,13 @@ test("revoked approval fails closed before mutation begins", async () => {
         return true;
       },
     );
-    const status = await readDeploymentControlPlaneStatus({
-      submissionPath: pending.submissionPath,
-    });
+    await assert.rejects(
+      readDeploymentControlPlaneStatus({
+        submissionPath: pending.submissionPath,
+      }),
+      /no longer accepts --submission-path/,
+    );
+    const status = statusFromSubmission(await readControlPlaneJson<any>(pending.submissionPath));
     assert.equal(status.approval?.state, "no_longer_valid");
     assert.equal(status.terminationReason, "no_longer_admitted");
   });

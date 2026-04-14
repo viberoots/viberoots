@@ -9,7 +9,11 @@ import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
-import { readRecord, startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers.ts";
+import {
+  readBackendSnapshot,
+  readRecord,
+  startControlPlaneHarness,
+} from "./nixos-shared-host.control-plane.helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string): Promise<void> {
@@ -58,8 +62,9 @@ test("nixos-shared-host deploy CLI records explicit removal and cleans up the re
       assert.equal(record.providerTargetIdentity, "nixos-shared-host:default:demoapp");
       assert.equal(record.controlPlane.submissionId, summary.controlPlane.submissionId);
       assert.equal(record.controlPlane.lockScope, "nixos-shared-host:default:demoapp");
-      const snapshot = JSON.parse(
-        await fsp.readFile(record.controlPlane.executionSnapshotPath, "utf8"),
+      const snapshot = await readBackendSnapshot(
+        recordsRoot,
+        String(record.controlPlane.submissionId),
       );
       assert.equal(snapshot.action.kind, "explicit_removal");
       assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:demoapp");

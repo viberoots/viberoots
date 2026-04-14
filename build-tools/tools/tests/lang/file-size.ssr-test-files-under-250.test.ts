@@ -1,19 +1,24 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { findFileSizeOffenders, SSR_TEST_FILES_SCOPE } from "../../dev/file-size-lint";
+import { findFileSizeOffenders, SOURCE_FILES_SCOPE } from "../../dev/file-size-lint";
 
-test("SSR-focused test modules remain under the 250 LOC methodology gate", async () => {
+function isSsrFocusedTest(file: string): boolean {
+  return (
+    file.startsWith("build-tools/tools/tests/scaffolding/webapp-ssr") ||
+    file.startsWith("build-tools/tools/tests/dev/runnable-commands")
+  );
+}
+
+test("repo-owned file-size gate keeps SSR-focused test modules under 250 LOC", async () => {
   const root = (process.env.WORKSPACE_ROOT || process.cwd()).trim();
   assert.ok(root.length > 0, "WORKSPACE_ROOT is empty");
 
-  assert.deepEqual(SSR_TEST_FILES_SCOPE, {
-    include: [
-      "build-tools/tools/tests/scaffolding/webapp-ssr*.test.ts",
-      "build-tools/tools/tests/dev/runnable-commands*.test.ts",
-    ],
-    exclude: ["buck-out/**", "node_modules/**", "coverage/**"],
-  });
+  assert.equal(
+    SOURCE_FILES_SCOPE.exclude.includes("build-tools/tools/tests/**"),
+    false,
+    "expected repo-owned file-size scope to include build-tools test modules",
+  );
 
   const offenders = await findFileSizeOffenders({
     root,
@@ -21,7 +26,10 @@ test("SSR-focused test modules remain under the 250 LOC methodology gate", async
     threshold: 250,
     failOnOffenders: true,
     allowKnown: false,
-    scope: SSR_TEST_FILES_SCOPE,
+    scope: SOURCE_FILES_SCOPE,
   });
-  assert.deepEqual(offenders, []);
+  assert.deepEqual(
+    offenders.filter(({ file }) => isSsrFocusedTest(file)),
+    [],
+  );
 });

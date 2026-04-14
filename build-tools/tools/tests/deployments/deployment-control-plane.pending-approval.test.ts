@@ -5,7 +5,9 @@ import path from "node:path";
 import { test } from "node:test";
 import { readDeploymentControlPlaneStatus } from "../../deployments/deployment-control-plane-read.ts";
 import { submitDeploymentControlPlaneRunAction } from "../../deployments/deployment-control-plane-run-action.ts";
+import { statusFromSubmission } from "../../deployments/deployment-control-plane-status.ts";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
+import { readControlPlaneJson } from "../../deployments/nixos-shared-host-control-plane-store.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import {
   ensureNixosSharedHostStageBranch,
@@ -55,7 +57,11 @@ test("pending approval submissions are observable and cancel idempotently before
         return true;
       },
     );
-    const status = await readDeploymentControlPlaneStatus({ submissionPath });
+    await assert.rejects(
+      readDeploymentControlPlaneStatus({ submissionPath }),
+      /no longer accepts --submission-path/,
+    );
+    const status = statusFromSubmission(await readControlPlaneJson<any>(submissionPath));
     assert.equal(status.schemaVersion, "deployment-control-plane-status@1");
     assert.equal(status.lifecycleState, "pending_approval");
     assert.equal(status.pendingReasonCode, "approval_required");

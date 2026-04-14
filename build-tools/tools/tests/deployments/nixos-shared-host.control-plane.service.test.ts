@@ -104,8 +104,19 @@ test("control-plane service persists queued submissions across restart and a sep
           assert.equal(finished.finalOutcome, "succeeded");
           const record = await readRecord(restarted.url, finished.deployRunId);
           assert.equal(record.deployRunId, finished.deployRunId);
+          assert.equal("executionSnapshotPath" in record.controlPlane, false);
           await assert.rejects(
             fsp.access(path.join(paths.recordsRoot, "runs", `${finished.deployRunId}.json`)),
+          );
+          await assert.rejects(
+            fsp.access(
+              path.join(
+                paths.recordsRoot,
+                "control-plane",
+                "snapshots",
+                `${submitted.submissionId}.json`,
+              ),
+            ),
           );
         } finally {
           await worker.close();

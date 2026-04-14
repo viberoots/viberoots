@@ -749,10 +749,10 @@ For `shared_nonprod`, that command is now a thin client to the shared control
 plane. The authoritative queue/lock/idempotency state now lives in the
 configured Postgres database. That same backend is now the canonical store for
 claimed-running worker ownership, status/result reads, and protected/shared
-deploy records keyed by `deploy_run_id` and submission id. The operator-readable
-control-plane mirror still lands under:
-
-- `<records-root>/control-plane/submissions/*.json`
+deploy records keyed by `deploy_run_id` and submission id. Operators should use
+the reviewed service status/result and inspect/export surfaces keyed by those
+backend-native identifiers rather than reading routine control-plane or run JSON
+under `<records-root>`.
 
 The reviewed same-host client now fails closed when service configuration is
 missing or unhealthy:
@@ -761,11 +761,6 @@ missing or unhealthy:
 - a token-protected service without `BNX_DEPLOY_CONTROL_PLANE_TOKEN` returns
   `unauthorized`
 - an unreachable service exits non-zero with `control-plane service unavailable`
-- `<records-root>/control-plane/snapshots/*.json`
-
-The deploy record written under `<records-root>/runs/*.json` is now a mirror of
-the canonical backend record and still records the admitted control-plane
-submission id, lock scope, and execution-snapshot path for operator inspection.
 
 Then apply server config as usual:
 

@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA } from "../../deployments/deployment-control-plane-contract.ts";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
+import {
+  localHarnessControlPlaneDatabaseUrl,
+  readBackendSnapshotBySubmissionId,
+} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../deployments/nixos-shared-host-control-plane-api-contract.ts";
 import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
 import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-shared-host-control-plane-snapshot.ts";
@@ -157,7 +160,18 @@ export async function assertFrozenSnapshotExecution(result: any): Promise<void> 
   );
   assert.ok(result.record.controlPlane);
   assert.equal(result.record.controlPlane.submissionId, result.submission.submissionId);
-  assert.equal(result.record.controlPlane.executionSnapshotPath, result.executionSnapshotPath);
+}
+
+export async function readBackendSnapshot(recordsRoot: string, submissionId: string) {
+  const snapshot = await readBackendSnapshotBySubmissionId(
+    {
+      recordsRoot,
+      databaseUrl: localHarnessControlPlaneDatabaseUrl(recordsRoot),
+    },
+    submissionId,
+  );
+  assert.ok(snapshot);
+  return snapshot.snapshot;
 }
 
 export async function readJson<T>(response: Response): Promise<T> {

@@ -1,0 +1,28 @@
+{
+  "sourceFileSizeExceptions": [
+    {
+      "path": "flake/packages/node-webapp.nix",
+      "justification": "Legacy node-webapp package wiring remains coupled pending decomposition."
+    },
+    {
+      "path": "graph-generator.nix",
+      "justification": "Legacy planner entrypoint sketch remains checked in as one reviewed Nix file pending decomposition."
+    },
+    {
+      "path": "nixos-shared-host-module.nix",
+      "justification": "Legacy shared-host NixOS module pending decomposition."
+    },
+    {
+      "path": "node-modules/store.nix",
+      "justification": "Legacy pnpm store template keeps fixed and unfixed paths together pending decomposition."
+    },
+    {
+      "path": "planner/go.nix",
+      "justification": "Legacy Go planner entrypoint pending helper extraction."
+    },
+    {
+      "path": "templates/go.nix",
+      "justification": "Legacy Go template constructor pending decomposition."
+    }
+  ]
+}

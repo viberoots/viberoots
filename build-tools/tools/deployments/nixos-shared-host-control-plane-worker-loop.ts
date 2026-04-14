@@ -1,6 +1,4 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
-import path from "node:path";
 import {
   claimBackendQueuedSubmission,
   acquireBackendControlPlaneLock,
@@ -11,6 +9,7 @@ import {
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
 import {
   materializeBackendControlPlaneFiles,
+  persistMaterializedSnapshot,
   persistMaterializedSubmission,
   removeMirrorFile,
 } from "./nixos-shared-host-control-plane-backend-materialize.ts";
@@ -132,9 +131,12 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
         }),
     });
   } finally {
-    await fsp.mkdir(path.dirname(materialized.executionSnapshotRef), { recursive: true });
-    await fsp.copyFile(materialized.executionSnapshotPath, materialized.executionSnapshotRef);
     await claimLease.stop();
+    await persistMaterializedSnapshot({
+      backend,
+      executionSnapshotPath: materialized.executionSnapshotPath,
+      executionSnapshotRef: materialized.executionSnapshotRef,
+    });
     await persistMaterializedSubmission({
       backend,
       submissionPath: materialized.submissionPath,

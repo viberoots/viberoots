@@ -66,11 +66,9 @@ test("nixos-shared-host durable records persist canonical provider-target identi
   assert.deepEqual(record.providerTarget, record.effectiveRunTarget);
   assert.deepEqual(record.controlPlane, {
     submissionId: "cp-123",
-    submissionPath: "/tmp/control-plane/submissions/cp-123.json",
     workerId: "cp-123-worker",
     admission: "admitted",
     lockScope: "nixos-shared-host:shared-dev:demoapp",
-    executionSnapshotPath: "/tmp/control-plane/snapshots/cp-123.json",
   });
   assert.equal(record.artifact?.identity, "static-webapp:abc123");
   assert.equal(

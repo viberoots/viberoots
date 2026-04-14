@@ -6,11 +6,9 @@ export function recordAuthorityFields(authority?: NixosSharedHostMutationAuthori
     return {
       controlPlane: {
         submissionId: authority.submissionId,
-        submissionPath: authority.submissionPath,
         workerId: authority.workerId,
         admission: "admitted" as const,
         lockScope: authority.lockScope,
-        executionSnapshotPath: authority.executionSnapshotPath,
       },
     };
   }

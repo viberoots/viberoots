@@ -31,10 +31,10 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
   - canonical policy location: `TESTING.md` section `Coverage policy (canonical)`
 - Use Conventional Commits and real newlines in commit messages.
 - Keep files small and focused (≤ 250 lines ideally); split modules when needed.
-- Required CI stage wiring enforces the methodology file-size gate in strict mode (`file-size-lint` runs `--scope=source --fail=true` and `--scope=ssr-tests --fail=true` without `--allow-known` bypass flags).
-- If a generated source artifact needs a reviewed file-size exception, declare it in the owning project’s `methodology-exceptions.json` instead of adding shared build-system policy.
+- Required CI stage wiring enforces the methodology file-size gate in strict mode (`file-size-lint` runs `--scope=source --fail=true` without `--allow-known` bypass flags).
+- If an intentionally kept oversized artifact needs a reviewed file-size exception, declare it in the nearest owning-subtree `methodology-exceptions.json`; repo-root manifests are forbidden.
 - For SSR contract changes, add negative-path checks in the same PR: invalid/missing framework discriminator, missing `serverEntry`, missing `clientDir`, and SSR static-fallback prevention.
-- Keep touched SSR test modules decomposed and below the methodology limit by splitting helpers into focused files, and keep the strict SSR test-module gate (`--scope=ssr-tests`) green.
+- Keep touched test modules decomposed and below the methodology limit by splitting helpers into focused files, and keep the strict repo-owned file-size gate (`--scope=source`) green.
 - Maintain determinism and low cyclomatic complexity; prefer small, well-named functions.
 - Follow the tooling rules in `docs/handbook/tooling.md`:
   - Use `build-tools/tools/lib/cli.ts` for CLI parsing (no bespoke `process.argv` parsing).

@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { test } from "node:test";
-import { DEPLOYMENT_DOMAIN_FILES_SCOPE, findFileSizeOffenders } from "../../dev/file-size-lint.ts";
+import { SOURCE_FILES_SCOPE, findFileSizeOffenders } from "../../dev/file-size-lint.ts";
 
 async function withTempRoot<T>(fn: (root: string) => Promise<T>): Promise<T> {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "deployment-file-size-"));
@@ -48,7 +48,7 @@ async function runFileSizeLint(root: string): Promise<{ code: number | null; std
         "--root",
         root,
         "--scope",
-        "deployment-domain",
+        "source",
         "--fail=true",
       ],
       {
@@ -65,35 +65,34 @@ async function runFileSizeLint(root: string): Promise<{ code: number | null; std
   });
 }
 
-test("deployment-domain file-size scope stays explicit and deployment-owned", async () => {
-  assert.deepEqual(DEPLOYMENT_DOMAIN_FILES_SCOPE, {
-    include: [
-      "build-tools/deployments/**/*.bzl",
-      "build-tools/tools/deployments/**/*.ts",
-      "build-tools/tools/deployments/**/*.bzl",
-      "build-tools/tools/deployments/**/*.nix",
-      "build-tools/tools/tests/deployments/**/*.ts",
-      "build-tools/tools/tests/deployments/**/*.bzl",
-    ],
-    exclude: ["buck-out/**", "node_modules/**", "coverage/**"],
-  });
+function isDeploymentOwnedFile(file: string): boolean {
+  return (
+    file.startsWith("build-tools/deployments/") ||
+    file.startsWith("build-tools/tools/deployments/") ||
+    file.startsWith("build-tools/tools/tests/deployments/")
+  );
+}
 
+test("repo-owned file-size gate keeps deployment-owned files under the methodology limit", async () => {
   const offenders = await findFileSizeOffenders({
     root: process.cwd(),
     changedOnly: false,
     threshold: 250,
     failOnOffenders: true,
     allowKnown: false,
-    scope: DEPLOYMENT_DOMAIN_FILES_SCOPE,
+    scope: SOURCE_FILES_SCOPE,
   });
-  assert.deepEqual(offenders, []);
+  assert.deepEqual(
+    offenders.filter(({ file }) => isDeploymentOwnedFile(file)),
+    [],
+  );
 });
 
-test("deployment-domain file-size lint reports only deployment-owned offenders with line counts", async () => {
+test("repo-owned file-size lint reports deployment-owned offenders with line counts", async () => {
   await withTempRoot(async (root) => {
     const offenderPath = "build-tools/tools/tests/deployments/demo.offender.test.ts";
     await writeLines(root, offenderPath, 251);
-    await writeLines(root, "projects/apps/demo/src/ignored.ts", 400);
+    await writeLines(root, "docs/ignored.ts", 400);
     await initTrackedFixture(root);
 
     const offenders = await findFileSizeOffenders({
@@ -102,7 +101,7 @@ test("deployment-domain file-size lint reports only deployment-owned offenders w
       threshold: 250,
       failOnOffenders: true,
       allowKnown: false,
-      scope: DEPLOYMENT_DOMAIN_FILES_SCOPE,
+      scope: SOURCE_FILES_SCOPE,
     });
 
     assert.deepEqual(offenders, [{ file: offenderPath, lines: 251 }]);

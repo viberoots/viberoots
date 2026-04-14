@@ -60,6 +60,7 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
         },
         backendDatabaseUrl,
       });
+      await fsp.rm(result.executionSnapshotPath, { force: true });
       const replay = await resolveNixosSharedHostReplaySource({
         recordsRoot,
         backendDatabaseUrl,

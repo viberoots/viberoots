@@ -78,7 +78,6 @@ export async function resolveNixosSharedHostReplaySource(opts: {
     replayBundlePaths: [
       replaySnapshot.platformStateSnapshotPath,
       replaySnapshot.hostConfigSnapshotPath,
-      replaySnapshot.controlPlaneExecutionSnapshotPath || "",
       replaySnapshot.provisionerPlan?.artifactPath || "",
     ],
     evidence: replaySnapshot.admittedContext.policyEvaluation,

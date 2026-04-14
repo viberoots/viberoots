@@ -142,7 +142,6 @@ async function main() {
     case "file-size-lint": {
       const target = path.resolve("build-tools/tools/dev/file-size-lint.ts");
       await runTool(target, ["--scope=source", "--fail=true"]);
-      await runTool(target, ["--scope=ssr-tests", "--fail=true"]);
       break;
     }
     case "nix-build-graph-generator":

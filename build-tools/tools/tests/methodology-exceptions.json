@@ -1,0 +1,68 @@
+{
+  "sourceFileSizeExceptions": [
+    {
+      "path": "cpp/cpp.macros.cpp-common.parity.test.ts",
+      "justification": "Legacy C++ macro parity contract kept as one reviewed comparison test pending decomposition."
+    },
+    {
+      "path": "dev/verify.temp-repo-buck-cleanup.scoped.test.ts",
+      "justification": "Legacy scoped verify temp-repo cleanup contract pending a focused split."
+    },
+    {
+      "path": "lib/buck-daemon-reaper.ts",
+      "justification": "Shared Buck daemon cleanup helper for temp-repo tests pending decomposition."
+    },
+    {
+      "path": "lib/test-helpers/run-in-temp.ts",
+      "justification": "Shared temp-repo harness pending extraction into smaller focused helpers."
+    },
+    {
+      "path": "nix/node-modules.per-importer.attr.test.ts",
+      "justification": "Legacy per-importer Nix attribute coverage pending scenario-level decomposition."
+    },
+    {
+      "path": "node/node.wasm-inline-module.instantiate.test.ts",
+      "justification": "Legacy wasm inline-module integration coverage pending a narrower split."
+    },
+    {
+      "path": "scaffolding/go-cli.simple-patched-uuid.runtime.test.ts",
+      "justification": "Legacy scaffolding runtime patch coverage pending decomposition."
+    },
+    {
+      "path": "scaffolding/go-cli.thirdparty-runtime.patched-transitive-uuid.test.ts",
+      "justification": "Legacy third-party transitive runtime patch coverage pending decomposition."
+    },
+    {
+      "path": "scaffolding/go-cli.thirdparty-runtime.patched-uuid.test.ts",
+      "justification": "Legacy third-party runtime patch coverage pending decomposition."
+    },
+    {
+      "path": "scaffolding/template-conventions.metadata.cquery.test.ts",
+      "justification": "Legacy template metadata cquery contract pending scenario-level decomposition."
+    },
+    {
+      "path": "scaffolding/webapp.dev-server.running.test.ts",
+      "justification": "Legacy dev-server running contract pending a focused split."
+    },
+    {
+      "path": "scaffolding/webapp.multi-module.manifest.contract.test.ts",
+      "justification": "Legacy multi-module manifest contract pending decomposition."
+    },
+    {
+      "path": "scaffolding/webapp.phase3-runtime-consistency-policy.contract.test.ts",
+      "justification": "Legacy phase-3 runtime consistency policy contract pending decomposition."
+    },
+    {
+      "path": "template_conventions.bzl",
+      "justification": "Template safety-floor ownership table remains centralized pending a smaller data split."
+    },
+    {
+      "path": "ts-cpp-go-wasm/backend-toggle.build-and-load.test.ts",
+      "justification": "Legacy cross-language backend-toggle integration coverage pending scenario split."
+    },
+    {
+      "path": "ts-cpp-go-wasm/packaging.conditional-exports.test.ts",
+      "justification": "Legacy packaging conditional-exports integration coverage pending decomposition."
+    }
+  ]
+}

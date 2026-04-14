@@ -124,19 +124,24 @@ suite, union scope, or full build-system scope ran.
 
 ## Deployment-domain methodology guardrail
 
-PR-44 adds a deployment-owned file-size guardrail for the reviewed deployment domain:
+PR-44 started the deployment-owned file-size closeout, and the current contract keeps those files
+inside the repo-wide owner-local methodology gate:
 
-- command: `node build-tools/tools/dev/file-size-lint.ts --scope=deployment-domain --fail=true`
-- scope:
+- command: `zx-wrapper build-tools/tools/dev/file-size-lint.ts --scope=source --fail=true`
+- deployment-owned files under:
   - `build-tools/deployments/**`
   - `build-tools/tools/deployments/**`
   - `build-tools/tools/tests/deployments/**`
+    are covered automatically by that repo-wide scope
 - failure contract:
   - fail closed when a reviewed deployment-owned file exceeds 250 lines
   - report the offending relative path and measured line count
+  - do not rely on a shared deployment-only allowlist or scope registry
 
-When this guardrail fails, the expected fix is to split the oversized deployment-owned file into
-smaller focused modules instead of adding a scope-specific exception.
+When this guardrail fails, the expected fix is still to split the oversized deployment-owned file
+into smaller focused modules instead of adding shared verify wiring. If a checked-in generated
+artifact truly needs an exception, it must live in an owner-local `methodology-exceptions.json`
+below the owning subtree.
 
 ## Historical non-goals for PR-4.5.2
 

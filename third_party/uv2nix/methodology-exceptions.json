@@ -1,0 +1,8 @@
+{
+  "sourceFileSizeExceptions": [
+    {
+      "path": "flake.nix",
+      "justification": "Pinned local uv2nix shim remains vendored as one reviewed upstream-derived file."
+    }
+  ]
+}

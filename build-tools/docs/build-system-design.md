@@ -742,9 +742,12 @@ changes that do not touch build-system paths.
     existing build-system scope and emits `mode: "fallback-build-system-scope"` with an explicit
     `reason`.
 - Methodology file-size exception contract:
-  - source-file exceptions are declared per project, not in a shared repo-wide allowlist
-  - the file-size gate reads `methodology-exceptions.json` from each project root and only exempts
-    the listed project-owned source files
+  - file-size exceptions are declared in owner-local `methodology-exceptions.json` files, not in a
+    shared repo-wide allowlist
+  - repo-root `methodology-exceptions.json` is forbidden; each manifest may exempt only files within
+    its own subtree
+  - the file-size gate reads those owner-local manifests and exempts only the listed owner-owned
+    files
   - required verify/CI gates remain strict (`--scope=source --fail=true`) because the exception
     contract is part of the policy, not a runtime bypass flag
 

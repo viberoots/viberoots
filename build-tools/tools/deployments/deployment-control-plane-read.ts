@@ -6,7 +6,6 @@ import {
   readBackendSubmissionByDeployRunId,
   readBackendSubmissionBySubmissionId,
 } from "./nixos-shared-host-control-plane-backend.ts";
-import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
 
 type SubmissionRecord = {
   submissionId: string;
@@ -100,10 +99,9 @@ export async function readDeploymentControlPlaneStatus(opts: {
   deployRunId?: string;
 }) {
   if (opts.submissionPath) {
-    const submission = await readControlPlaneJson<SubmissionRecord>(
-      path.resolve(opts.submissionPath),
+    throw new Error(
+      "status lookup no longer accepts --submission-path; use backend-native --submission-id/--deploy-run-id with --control-plane-database-url",
     );
-    return statusFromSubmission(submission);
   }
   if (opts.backendDatabaseUrl && (opts.submissionId || opts.deployRunId)) {
     const backend = {
@@ -119,6 +117,6 @@ export async function readDeploymentControlPlaneStatus(opts: {
     return statusFromSubmission(submission as SubmissionRecord);
   }
   throw new Error(
-    "status lookup requires --submission-path or backend-native --submission-id/--deploy-run-id with --control-plane-database-url",
+    "status lookup requires backend-native --submission-id/--deploy-run-id with --control-plane-database-url",
   );
 }

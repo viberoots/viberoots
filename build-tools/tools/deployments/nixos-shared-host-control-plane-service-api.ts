@@ -18,14 +18,12 @@ import {
   readBackendSubmissionEnvelopeBySubmissionId,
   resolveBackendIdempotency,
   syncBackendRunAction,
-  syncBackendSnapshot,
-  syncBackendSubmission,
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend.ts";
 import {
   materializeBackendControlPlaneFiles,
+  persistMaterializedSnapshot,
   persistMaterializedSubmission,
-  removeMirrorFile,
 } from "./nixos-shared-host-control-plane-backend-materialize.ts";
 import {
   NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
@@ -35,7 +33,7 @@ import type {
   NixosSharedHostControlPlanePaths,
   NixosSharedHostControlPlaneSnapshot,
 } from "./nixos-shared-host-control-plane-contract.ts";
-import { prepareNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-prepare.ts";
+import { prepareBackendNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-backend-prepare.ts";
 import {
   readControlPlaneJson,
   runActionRequestPathFor,
@@ -51,17 +49,6 @@ export type ServiceRunActionRequest = DeploymentControlPlaneRunActionRequest & {
   requestedBy?: DeploymentPrincipal;
   authorization?: DeploymentControlPlaneAuthorization;
 };
-
-async function syncAndRemoveMirrors(opts: {
-  backend: NixosSharedHostControlPlaneBackendTarget;
-  submissionPath: string;
-  executionSnapshotPath: string;
-}) {
-  await syncBackendSnapshot(opts.backend, opts.executionSnapshotPath);
-  await syncBackendSubmission(opts.backend, opts.submissionPath);
-  await removeMirrorFile(opts.submissionPath);
-  await removeMirrorFile(opts.executionSnapshotPath);
-}
 
 export async function handleControlPlaneSubmit(
   request: NixosSharedHostControlPlaneSubmitRequest,
@@ -102,12 +89,12 @@ export async function handleControlPlaneSubmit(
       })
     : undefined;
   try {
-    const prepared = await prepareNixosSharedHostControlPlaneRun({
+    const prepared = await prepareBackendNixosSharedHostControlPlaneRun({
       workspaceRoot: opts.workspaceRoot,
       operationKind: resolvedRequest.operationKind,
       deployment: resolvedRequest.deployment,
       paths: opts.paths,
-      backendDatabaseUrl: opts.backend.databaseUrl,
+      backend: opts.backend,
       submissionId: resolvedRequest.submissionId,
       dedupe: {
         mode: dedupe.mode,
@@ -145,11 +132,6 @@ export async function handleControlPlaneSubmit(
         ? { admissionEvidence: resolvedRequest.admissionEvidence }
         : {}),
     });
-    await syncAndRemoveMirrors({
-      backend: opts.backend,
-      submissionPath: prepared.submissionPath,
-      executionSnapshotPath: prepared.executionSnapshotPath,
-    });
     await enqueueBackendSubmission(
       opts.backend,
       prepared.submission.submissionId,
@@ -157,12 +139,7 @@ export async function handleControlPlaneSubmit(
     );
     return submitResponseFromSubmission(prepared.submission as any);
   } catch (error) {
-    if (!(error as any)?.submissionPath || !(error as any)?.executionSnapshotPath) throw error;
-    await syncAndRemoveMirrors({
-      backend: opts.backend,
-      submissionPath: (error as any).submissionPath,
-      executionSnapshotPath: (error as any).executionSnapshotPath,
-    });
+    if (!(error as any)?.submission) throw error;
     return submitResponseFromSubmission((error as any).submission);
   }
 }
@@ -225,6 +202,11 @@ export async function handleControlPlaneRunAction(
       ...(authorization ? { authorization } : {}),
     };
   } finally {
+    await persistMaterializedSnapshot({
+      backend: opts.backend,
+      executionSnapshotPath: materialized.executionSnapshotPath,
+      executionSnapshotRef: materialized.executionSnapshotRef,
+    });
     await materialized.cleanup();
   }
 }

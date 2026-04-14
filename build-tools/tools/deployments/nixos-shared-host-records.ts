@@ -73,11 +73,9 @@ export type NixosSharedHostDeployRecord = {
   providerTargetIdentity: string;
   controlPlane?: {
     submissionId: string;
-    submissionPath: string;
     workerId: string;
     admission: "admitted";
     lockScope: string;
-    executionSnapshotPath: string;
   };
   breakGlass?: {
     incidentRef: string;

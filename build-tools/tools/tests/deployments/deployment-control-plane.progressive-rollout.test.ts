@@ -5,7 +5,9 @@ import path from "node:path";
 import { test } from "node:test";
 import { readDeploymentControlPlaneStatus } from "../../deployments/deployment-control-plane-read.ts";
 import { submitDeploymentControlPlaneRunAction } from "../../deployments/deployment-control-plane-run-action.ts";
+import { statusFromSubmission } from "../../deployments/deployment-control-plane-status.ts";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
+import { readControlPlaneJson } from "../../deployments/nixos-shared-host-control-plane-store.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
 import {
@@ -213,15 +215,20 @@ test("newer runs are rejected while a progressive rollout is paused", async () =
           return true;
         },
       );
-      const status = await readDeploymentControlPlaneStatus({
+      const submissionPath = path.join(
         recordsRoot,
-        submissionPath: path.join(
+        "control-plane",
+        "submissions",
+        (await fsp.readdir(path.join(recordsRoot, "control-plane", "submissions"))).sort()[0]!,
+      );
+      await assert.rejects(
+        readDeploymentControlPlaneStatus({
           recordsRoot,
-          "control-plane",
-          "submissions",
-          (await fsp.readdir(path.join(recordsRoot, "control-plane", "submissions"))).sort()[0]!,
-        ),
-      });
+          submissionPath,
+        }),
+        /no longer accepts --submission-path/,
+      );
+      const status = statusFromSubmission(await readControlPlaneJson<any>(submissionPath));
       assert.equal(status.progressiveRollout?.state, "paused");
     } finally {
       await server.close();

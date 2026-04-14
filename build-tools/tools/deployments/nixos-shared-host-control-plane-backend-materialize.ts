@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   readBackendSnapshotBySubmissionId,
   readBackendSubmissionEnvelopeBySubmissionId,
+  writeBackendSnapshotDoc,
   writeBackendSubmissionDoc,
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend.ts";
@@ -73,4 +74,15 @@ export async function persistMaterializedSubmission(opts: {
       executionSnapshotPath: opts.executionSnapshotRef,
     },
   );
+}
+
+export async function persistMaterializedSnapshot(opts: {
+  backend: NixosSharedHostControlPlaneBackendTarget;
+  executionSnapshotPath: string;
+  executionSnapshotRef: string;
+}) {
+  const snapshot = await readControlPlaneJson<NixosSharedHostControlPlaneSnapshot>(
+    opts.executionSnapshotPath,
+  );
+  await writeBackendSnapshotDoc(opts.backend, snapshot, opts.executionSnapshotRef);
 }

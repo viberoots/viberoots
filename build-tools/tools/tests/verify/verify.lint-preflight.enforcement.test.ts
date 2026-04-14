@@ -41,9 +41,10 @@ test("verify includes a bounded lint preflight (enforcement)", async () => {
     txt.includes("--scope=source") && txt.includes("--fail=true"),
     "expected verify preflight to pass strict source file-size args",
   );
-  assert.ok(
-    txt.includes("--scope=ssr-tests") && txt.includes("--fail=true"),
-    "expected verify preflight to pass strict SSR test-module file-size args",
+  assert.equal(
+    txt.includes("--scope=ssr-tests"),
+    false,
+    "expected verify preflight to avoid legacy SSR-only file-size scope wiring",
   );
   assert.ok(
     txt.includes("--starlark-api") &&

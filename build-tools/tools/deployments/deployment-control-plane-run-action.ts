@@ -11,7 +11,10 @@ import {
   resolveRunActionIdempotency,
   fingerprintControlPlanePayload,
 } from "./deployment-control-plane-idempotency.ts";
-import { runActionResponseFromSubmission } from "./deployment-control-plane-status.ts";
+import {
+  runActionResponseFromSubmission,
+  statusFromSubmission,
+} from "./deployment-control-plane-status.ts";
 import {
   abortPausedProgressiveRun,
   resumePausedProgressiveRun,
@@ -21,8 +24,6 @@ import {
   runActionRequestPathFor,
   writeControlPlaneJson,
 } from "./nixos-shared-host-control-plane-store.ts";
-import { readDeploymentControlPlaneStatus } from "./deployment-control-plane-read.ts";
-
 type SubmissionRecord = {
   submissionId: string;
   executionSnapshotPath: string;
@@ -106,7 +107,7 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
     ...(opts.approval ? { approval: opts.approval } : {}),
   });
   if (dedupe.mode === "reused" && submission.latestAction?.actionId === actionId) {
-    const status = await readDeploymentControlPlaneStatus({ submissionPath: opts.submissionPath });
+    const status = statusFromSubmission(submission as any);
     return runActionResponseFromSubmission(
       {
         ...status,
@@ -143,7 +144,7 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
       ...(opts.approval ? { approval: opts.approval } : {}),
     });
     await writeControlPlaneJson(opts.submissionPath, approved);
-    const status = await readDeploymentControlPlaneStatus({ submissionPath: opts.submissionPath });
+    const status = statusFromSubmission(approved as any);
     return runActionResponseFromSubmission(status, actionId, opts.action);
   }
   const next = nextLifecycleState(submission.lifecycleState, opts.action);
@@ -161,7 +162,9 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
         ...(opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : {}),
       },
     });
-    const status = await readDeploymentControlPlaneStatus({ submissionPath: opts.submissionPath });
+    const status = statusFromSubmission(
+      await readControlPlaneJson<SubmissionRecord>(opts.submissionPath),
+    );
     return runActionResponseFromSubmission(status, actionId, opts.action);
   }
   const updated = {
@@ -216,6 +219,8 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
       updated,
     });
   }
-  const status = await readDeploymentControlPlaneStatus({ submissionPath: opts.submissionPath });
+  const status = statusFromSubmission(
+    await readControlPlaneJson<SubmissionRecord>(opts.submissionPath),
+  );
   return runActionResponseFromSubmission(status, actionId, opts.action);
 }
