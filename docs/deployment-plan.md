@@ -6846,6 +6846,259 @@ so the deployment plan can be signed off as both implemented and reviewably sync
 
 ---
 
+## PR-52: Backend-native protected/shared control-plane contract parity + mirror-path removal closeout
+
+### Description
+
+I will close the remaining backend-only authority gap left after the first mirror-removal pass by
+removing the last normal-path dependence on filesystem-backed control-plane submission/snapshot
+ingest, status lookup by mirror path, and mirror-path-bearing runtime contracts for reviewed
+protected/shared flows. This PR is the backend-native contract closeout: the authoritative backend
+becomes the only normal reviewed source for protected/shared submit, status, replay-source, and
+record resolution, while JSON materialization remains available only for explicit export, fixture,
+or restore-test scenarios.
+
+### Scope & Changes
+
+- Replace the remaining shared-host control-plane file-ingest flow with backend-native create/update
+  behavior so reviewed protected/shared submit / run-action / finalize paths no longer need to sync
+  authoritative submission or snapshot state from on-disk JSON before deleting it.
+- Remove the normal reviewed `submissionPath` / submission-file fallback from shared protected/shared
+  status-reading helpers and require backend-native identifiers and backend/service configuration for
+  normal status reads.
+- Remove mirror-path-first semantics from reviewed protected/shared machine-readable runtime
+  contracts where they still persist, including fields such as:
+  - `submissionPath`
+  - `executionSnapshotPath`
+  - `recordPath`
+  - `resultRecordPath`
+- Keep any remaining path-bearing values only where they are explicitly scoped to:
+  - isolated fixture harnesses
+  - explicit export / inspect tooling
+  - restore / resilience testing artifacts
+  - non-protected/shared provider-local record storage that is still intentionally file-backed
+- Make shared-host replay, promotion-source lookup, recovery, and inspect flows resolve authoritative
+  state by backend-native identifiers such as:
+  - `deploy_run_id`
+  - `submission_id`
+    rather than by scanning `<records-root>` or assuming a surviving run mirror exists.
+- Add fail-closed compatibility behavior for callers that still try to use removed mirror-only
+  lookup paths or mirror-path-bearing runtime contracts.
+- Keep the implementation within methodology guardrails by splitting any remaining mixed-responsibly
+  helpers as needed rather than growing one catch-all backend/mirror compatibility module.
+
+### Tests (in this PR)
+
+- Add backend-native submit / status / run-action tests proving reviewed protected/shared flows work
+  when no durable submission or snapshot mirror files exist under `<records-root>/control-plane`.
+- Add tests proving the shared protected/shared status path resolves by backend-native identifiers and
+  no longer accepts reviewed mirror-path-driven normal lookup.
+- Add replay / promotion-source / recovery tests proving shared-host source resolution still works
+  after the local run mirror under `<records-root>/runs/*.json` has been deleted.
+- Add negative tests proving removed mirror-only inputs and mirror-path-bearing runtime expectations
+  fail closed with actionable diagnostics.
+- Add contract tests proving reviewed protected/shared machine-readable responses no longer require
+  filesystem mirror fields in their normal runtime shape.
+
+### Docs (in this PR)
+
+- Update [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md),
+  [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md), and
+  [Deployment Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md) so the normal
+  protected/shared submit / status / result / replay surfaces are documented consistently as
+  backend-native and identifier-based rather than path-based.
+- Update
+  [nixos-shared-host-setup.md](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  and
+  [nixos-shared-host-technician-checklist.md](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-technician-checklist.md)
+  to remove guidance that treats `<records-root>/control-plane/*.json` or `<records-root>/runs/*.json`
+  as the normal reviewed operator surface.
+- Document the reviewed distinction between:
+  - backend-native runtime authority
+  - explicit export / inspect JSON
+  - fixture / restore-test materialization
+
+### Verification Commands
+
+- `v`
+- backend-native status / replay / inspect / export verification commands introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment control-plane read/write contracts, shared replay/recovery
+  helpers, machine-readable result surfaces, and deployment-domain tests/docs. Under the
+  deployment-only verify policy, default `v` / CI can run the reviewed deployment suite rather than
+  the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- Reviewed protected/shared submit / status / run-action / replay / recovery flows no longer depend
+  on routine submission, snapshot, or deploy-record mirrors under `<records-root>`.
+- Reviewed protected/shared runtime contracts no longer expose mirror-path fields as part of the
+  normal machine-readable interface.
+- Shared-host replay and promotion-source lookup continue to work from authoritative backend state
+  even when local run mirrors are absent.
+- Tests and operator docs describe the same backend-native authority model.
+
+### Risks
+
+This removes the last transitional bridge between backend-native authority and mirror-path-based
+runtime behavior, so incomplete cleanup could strand some reviewed helper flows between old and new
+contracts.
+
+### Mitigation
+
+Land backend-native resolution, fail-closed negative tests, and operator-doc cleanup together in
+the same PR, while keeping explicit export tooling available for inspection and restore testing.
+
+### Consequence of Not Implementing
+
+The deployment plan and short contract would continue to overstate backend-only closeout while the
+reviewed runtime still carries normal-path mirror ingestion, mirror-path lookup, and path-bearing
+response semantics.
+
+### Downsides for Implementing
+
+This removes familiar transitional escape hatches and may require small fixture/helper migrations
+where tests or tools still assume local mirror paths exist during normal reviewed flows.
+
+### Recommendation
+
+Implement immediately after PR-51 so later protected/shared provider routing work lands on one
+fully backend-native runtime contract instead of extending transitional mirror semantics further.
+
+---
+
+## PR-53: Cloudflare Pages protected/shared central service routing + control-plane parity closeout
+
+### Description
+
+I will close the remaining reviewed protected/shared execution-boundary gap for Cloudflare Pages by
+migrating its reviewed shared/prod mutation flows onto the same central control-plane service /
+worker / authoritative-backend architecture already required by the deployment contract. This PR
+stops treating reviewed Cloudflare Pages protected/shared deploys as local `recordsRoot` peer
+mutators and makes them true clients of the central protected/shared control plane, matching the
+reviewed architecture already used by the current shared-host service path.
+
+### Scope & Changes
+
+- Add reviewed central-service submission support for Cloudflare Pages protected/shared mutation so
+  the repo-level deploy front door no longer performs local file-backed control-plane execution for:
+  - normal deploy
+  - same-artifact promotion
+  - rebuild-per-stage promotion
+  - rollback
+  - preview publish
+  - preview cleanup
+  - reviewed target-transition workflows such as `retire-target` / `migrate-target`
+- Reuse one reviewed central authority for Cloudflare Pages protected/shared flows:
+  - admission / approval
+  - queueing and idempotency
+  - lock ownership / fencing
+  - worker execution
+  - authoritative status and result reads
+  - canonical deploy-record persistence
+- Remove normal-path Cloudflare Pages reliance on provider-local local-disk control-plane submission
+  helpers rooted only in `recordsRoot`.
+- Align Cloudflare Pages machine-readable submit / status / result behavior with the backend-native
+  protected/shared contract closed in PR-52 rather than returning local record-path-oriented
+  execution details.
+- Keep any remaining local-only Cloudflare helper paths limited to:
+  - isolated fixture harnesses
+  - explicit compatibility shims during migration
+  - non-protected/shared paths, if any remain intentionally local and reviewed
+- Preserve already-reviewed Cloudflare semantics during the routing migration, including:
+  - exact-artifact promotion behavior
+  - preview target derivation and cleanup policy
+  - smoke and public-target validation
+  - target-transition approval and exception handling
+
+### Tests (in this PR)
+
+- Add integration tests proving reviewed Cloudflare Pages protected/shared submit / status / result
+  flows go through the central service / worker / backend path rather than local peer mutation.
+- Add end-to-end Pleomino staging/prod tests proving the reviewed Cloudflare Pages path preserves:
+  - deploy
+  - promotion
+  - rollback
+  - preview publish / cleanup
+    through the central service boundary.
+- Add fail-closed tests for:
+  - missing service endpoint or auth configuration where the reviewed client path requires it
+  - service unavailable behavior
+  - unsupported mixed-mode local-plus-service flags
+  - callers that still expect local `recordsRoot` peer mutation for reviewed protected/shared flows
+- Add contract tests proving Cloudflare Pages protected/shared machine-readable outputs stay aligned
+  with the backend-native identifier-based control-plane contract rather than local path-bearing
+  summaries.
+
+### Docs (in this PR)
+
+- Update [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) and
+  [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) so reviewed
+  Cloudflare Pages protected/shared flows are documented as clients of the same central control
+  plane rather than as a provider-local special case.
+- Update
+  [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+  and any other companion docs that currently imply Cloudflare Pages protected/shared deploys use a
+  different reviewed control-plane boundary.
+- Document operator-visible migration guidance and fail-closed diagnostics for callers moving from
+  local `recordsRoot` execution to the central service/client path.
+
+### Verification Commands
+
+- `v`
+- reviewed Cloudflare Pages service-routed protected/shared verification commands introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment control-plane routing for Cloudflare Pages, repo front-door
+  client wiring, protected/shared machine-readable result surfaces, and deployment-domain
+  tests/docs. Under the deployment-only verify policy, default `v` / CI can run the reviewed
+  deployment suite rather than the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- Reviewed Cloudflare Pages `shared_nonprod` and `production_facing` mutation no longer bypasses
+  the central control-plane service / worker / backend authority.
+- Pleomino staging/prod Cloudflare Pages flows preserve their reviewed semantics while routing
+  through the central protected/shared service boundary.
+- Reviewed Cloudflare Pages protected/shared machine-readable outputs align with the backend-native
+  control-plane contract rather than local record-path-oriented execution details.
+- Tests and docs describe the same central-service architecture for Cloudflare Pages protected/shared
+  flows.
+
+### Risks
+
+This changes the reviewed execution boundary for an already-broad provider slice, so weak migration
+could break staging/prod operator flows or leave Cloudflare Pages split between two inconsistent
+protected/shared architectures.
+
+### Mitigation
+
+Land the service-routing migration with end-to-end staging/prod coverage, explicit fail-closed
+mixed-mode errors, and docs that clearly retire the older local peer-mutator model in the same PR.
+
+### Consequence of Not Implementing
+
+The deployment plan would continue to claim one reviewed protected/shared control-plane
+architecture while Cloudflare Pages staging/prod flows still bypass it through provider-local local
+execution.
+
+### Downsides for Implementing
+
+This adds central-service migration work to an already-featureful provider slice and may require
+CLI and test-harness adjustments where callers still assume local provider-specific execution.
+
+### Recommendation
+
+Implement after PR-52 so Cloudflare Pages service routing lands on the final backend-native
+protected/shared contract and the remaining execution-boundary gap closes in one pass.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -6905,6 +7158,11 @@ so the deployment plan can be signed off as both implemented and reviewably sync
 21. PR-51: close the remaining provider-capability registry gap by making the reviewed built-in
     provider capability surface complete, structured, DRY, and deterministically synchronized with
     the normative provider-capabilities documentation.
+22. PR-52: finish the backend-only protected/shared closeout by removing residual mirror ingestion,
+    mirror-path lookup, mirror-path-bearing runtime contracts, and stale operator guidance.
+23. PR-53: migrate reviewed Cloudflare Pages protected/shared flows onto the central
+    service / worker / backend boundary so staging/prod no longer bypass the shared control-plane
+    architecture through local provider-specific execution.
 
 ## Companion Docs
 
