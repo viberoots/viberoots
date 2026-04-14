@@ -7099,6 +7099,117 @@ protected/shared contract and the remaining execution-boundary gap closes in one
 
 ---
 
+## PR-54: Operator-doc parity closeout for service-routed client install and approval-grant workflows
+
+### Description
+
+I will close the remaining operator-documentation parity gaps identified after the protected/shared
+service-boundary and approval-flow work landed. This PR makes the reviewed operator setup and
+technician docs describe the same service-routed client-profile contract and same-run
+`pending_approval -> approve` workflow that the current implementation and tests already enforce.
+
+### Scope & Changes
+
+- Update the reviewed operator docs so the documented `nixos-shared-host` client install flow
+  matches the implemented client-profile contract, including:
+  - required `--control-plane-url`
+  - reviewed `--control-plane-token-env` usage for protected/shared submission
+  - the expectation that the installed client profile persists the service endpoint and auth-env
+    binding alongside the SSH transport details
+- Update the technician checklist so the short SOP path no longer implies that a remote profile can
+  be installed correctly without the reviewed service configuration required by the current
+  protected/shared client model.
+- Add explicit operator-facing approval-grant workflow guidance for runs that enter
+  `lifecycleState = pending_approval`, including:
+  - the reviewed inspection fields that must be checked before approval
+  - the same-run invariant that approval advances the existing `deploy_run_id` rather than creating
+    or resubmitting a new deploy
+  - the reviewed request shape / command example or equivalent operator procedure for invoking the
+    run-action approval path
+  - fail-closed guidance for stale payload fingerprints, stale provisioner-plan fingerprints, and
+    unauthorized/self-approval attempts
+- Align the setup guide, technician checklist, and any companion deployment-operator docs that
+  describe the same flows so they all present one reviewed service-only operator model.
+- Keep this PR documentation-led but still test-backed:
+  - no behavioral changes unless a tiny surface adjustment is required to make the documented
+    workflow exact
+  - if any such adjustment is needed, land it in the same PR with matching tests and docs
+
+### Tests (in this PR)
+
+- Add or extend doc-parity tests proving the reviewed operator docs mention the required
+  service-routed client install inputs:
+  - `--control-plane-url`
+  - `--control-plane-token-env` where the reviewed flow requires it
+- Add or extend doc-parity tests proving the operator docs describe the reviewed
+  `pending_approval` approval-grant path rather than only telling operators to "use the API"
+  abstractly.
+- Add focused contract tests, if needed, that lock down any small reviewed CLI or machine-readable
+  surface relied on by the updated docs so the examples cannot drift again.
+
+### Docs (in this PR)
+
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  with the exact reviewed client-install and approval-grant workflows.
+- Update
+  [NixOS Shared Host Technician Checklist](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-technician-checklist.md)
+  so the short-form SOP reflects the same service endpoint, token-env, and approval-grant
+  requirements as the full setup guide.
+- Update any related control-plane/operator docs that reference these flows so the repo presents one
+  consistent reviewed operator story for protected/shared `nixos-shared-host` mutation.
+
+### Verification Commands
+
+- `v`
+- reviewed doc-parity / operator-surface verification commands introduced in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-domain operator docs, doc-parity checks, and any minimal
+  deployment-owned helper or contract coverage needed to keep those docs exact. Under the
+  deployment-only verify policy, default `v` / CI can run the reviewed deployment suite rather than
+  the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- The documented `nixos-shared-host` client install workflow includes the same reviewed service
+  endpoint and auth-env requirements as the implemented client-profile contract.
+- The documented `pending_approval` operator workflow explains how to approve the existing run on
+  the same `deploy_run_id` using the reviewed approval-grant path.
+- Tests fail closed if these operator docs drift away from the reviewed service-routed client or
+  approval-grant contracts again.
+- Operator docs, tests, and the current reviewed runtime describe the same protected/shared
+  operator-facing workflow.
+
+### Risks
+
+Because this is a closeout PR, there is a temptation to "fix" the gap with prose that still leaves
+important request fields or fail-closed approval semantics implicit.
+
+### Mitigation
+
+Back the doc updates with explicit parity tests and keep the operator examples grounded in the
+reviewed client-install and run-action contract surfaces already implemented in the repo.
+
+### Consequence of Not Implementing
+
+The deployment plan could appear complete while the operator docs still under-document the current
+service-routed client contract and the reviewed approval-grant workflow required for real
+protected/shared operations.
+
+### Downsides for Implementing
+
+This adds one more closeout PR focused mostly on documentation parity and drift-prevention rather
+than new deployment behavior.
+
+### Recommendation
+
+Implement immediately after PR-53 so the final reviewed deployment plan closes with operator docs,
+tests, and runtime behavior in sync.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -7163,6 +7274,9 @@ protected/shared contract and the remaining execution-boundary gap closes in one
 23. PR-53: migrate reviewed Cloudflare Pages protected/shared flows onto the central
     service / worker / backend boundary so staging/prod no longer bypass the shared control-plane
     architecture through local provider-specific execution.
+24. PR-54: close the remaining operator-doc parity gaps so the reviewed setup/checklist guidance
+    matches the implemented service-routed client install contract and the same-run approval-grant
+    workflow for `pending_approval` runs.
 
 ## Companion Docs
 
