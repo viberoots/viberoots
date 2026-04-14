@@ -163,3 +163,35 @@ export async function readBackendLatestDeployRecordEnvelopeByDeploymentId(
       }
     : null;
 }
+
+export async function readBackendLatestCloudflarePagesPreviewRecordEnvelope(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  opts: {
+    deploymentId: string;
+    sourceRunId: string;
+  },
+) {
+  const row = (
+    await queryBackend<{ record_path?: string; document_json?: unknown; updated_at?: string }>(
+      backend,
+      `SELECT record_path, document_json, updated_at
+         FROM deploy_records
+        WHERE document_json->>'provider' = 'cloudflare-pages'
+          AND document_json->>'deploymentId' = $1
+          AND document_json->>'publishMode' = 'preview'
+          AND document_json->>'operationKind' <> 'preview_cleanup'
+          AND document_json->'previewIdentitySelector'->>'kind' = 'source_run'
+          AND document_json->'previewIdentitySelector'->>'sourceRunId' = $2
+        ORDER BY updated_at DESC
+        LIMIT 1`,
+      [opts.deploymentId, opts.sourceRunId],
+    )
+  ).rows[0];
+  return row?.record_path && row.document_json
+    ? {
+        recordPath: row.record_path,
+        updatedAt: row.updated_at || "",
+        record: decodeBackendJson(row.document_json),
+      }
+    : null;
+}

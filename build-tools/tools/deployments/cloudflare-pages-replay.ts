@@ -10,6 +10,10 @@ import {
   runnerIdentityCompatibilityErrors,
   type DeploymentRunnerIdentities,
 } from "./deployment-runner-identities.ts";
+import {
+  readBackendDeployRecordEnvelopeByDeployRunId,
+  type NixosSharedHostControlPlaneBackendTarget,
+} from "./nixos-shared-host-control-plane-backend.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
 import { requireAdmittedStaticWebappArtifactPath } from "./static-webapp-artifacts.ts";
@@ -116,10 +120,46 @@ function requireReplaySnapshotPath(record: CloudflarePagesDeployRecord): string 
   throw new Error(`deploy record is missing replaySnapshotPath: ${record.deployRunId}`);
 }
 
+type ReplayRecordSource = {
+  record: CloudflarePagesDeployRecord;
+  recordPath: string;
+  recordUpdatedAt?: string;
+  requireRecordPathInBundle?: false;
+};
+
+async function readLocalReplayRecord(recordPath: string): Promise<ReplayRecordSource> {
+  return {
+    record: await readCloudflarePagesDeployRecord(recordPath),
+    recordPath,
+  };
+}
+
+async function readBackendReplayRecord(opts: {
+  recordsRoot: string;
+  backendDatabaseUrl: string;
+  deployRunId: string;
+}): Promise<ReplayRecordSource | null> {
+  const backend: NixosSharedHostControlPlaneBackendTarget = {
+    recordsRoot: path.resolve(opts.recordsRoot),
+    databaseUrl: opts.backendDatabaseUrl,
+  };
+  const envelope = await readBackendDeployRecordEnvelopeByDeployRunId(backend, opts.deployRunId);
+  if (!envelope) return null;
+  const record = envelope.record as CloudflarePagesDeployRecord;
+  if (record.provider !== "cloudflare-pages") return null;
+  return {
+    record,
+    recordPath: envelope.recordPath,
+    recordUpdatedAt: envelope.updatedAt,
+    requireRecordPathInBundle: false,
+  };
+}
+
 export async function resolveCloudflarePagesReplaySource(opts: {
   recordPath?: string;
   recordsRoot?: string;
   deployRunId?: string;
+  backendDatabaseUrl?: string;
 }): Promise<{
   record: CloudflarePagesDeployRecord;
   recordPath: string;
@@ -131,10 +171,29 @@ export async function resolveCloudflarePagesReplaySource(opts: {
       "resolve replay source requires --record-path or --records-root plus --deploy-run-id",
     );
   }
-  const recordPath = opts.recordPath
-    ? path.resolve(opts.recordPath)
-    : deployRecordPathFor(String(opts.recordsRoot || ""), String(opts.deployRunId || ""));
-  const record = await readCloudflarePagesDeployRecord(recordPath);
+  const resolvedRecord = opts.recordPath
+    ? await readLocalReplayRecord(path.resolve(opts.recordPath))
+    : await (async () => {
+        const localRecordPath = deployRecordPathFor(
+          String(opts.recordsRoot || ""),
+          String(opts.deployRunId || ""),
+        );
+        try {
+          return await readLocalReplayRecord(localRecordPath);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") throw error;
+        }
+        if (opts.recordsRoot && opts.deployRunId && opts.backendDatabaseUrl) {
+          const backendRecord = await readBackendReplayRecord({
+            recordsRoot: opts.recordsRoot,
+            backendDatabaseUrl: opts.backendDatabaseUrl,
+            deployRunId: opts.deployRunId,
+          });
+          if (backendRecord) return backendRecord;
+        }
+        return await readLocalReplayRecord(localRecordPath);
+      })();
+  const { record, recordPath } = resolvedRecord;
   const replaySnapshotPath = requireReplaySnapshotPath(record);
   const replaySnapshot = await readCloudflarePagesReplaySnapshot(replaySnapshotPath);
   const expected = cloudflarePagesRunnerIdentities(replaySnapshot.deployment);
@@ -153,6 +212,10 @@ export async function resolveCloudflarePagesReplaySource(opts: {
       | "production_facing",
     deployRunId: record.deployRunId,
     recordPath,
+    ...(resolvedRecord.recordUpdatedAt ? { recordUpdatedAt: resolvedRecord.recordUpdatedAt } : {}),
+    ...(resolvedRecord.requireRecordPathInBundle === false
+      ? { requireRecordPathInBundle: false }
+      : {}),
     replaySnapshotPath,
     replayCreatedAt: replaySnapshot.createdAt,
     artifacts: [replaySnapshot.artifact],

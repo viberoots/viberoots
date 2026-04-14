@@ -90,7 +90,9 @@ export async function runCloudflarePagesStaticDeploy(opts: {
       artifact: opts.artifact,
       admittedContext: opts.admittedContext,
       providerConfigSnapshotPath: preparedConfig.renderedConfigPath,
-      controlPlaneExecutionSnapshotPath: authority.executionSnapshotPath,
+      ...(authority.recordExecutionSnapshotPath
+        ? { controlPlaneExecutionSnapshotPath: authority.recordExecutionSnapshotPath }
+        : {}),
     }));
     const published = await runWithAutomaticRetry({
       step: "publish",

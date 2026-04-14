@@ -1,16 +1,18 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
+import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
 import { printDeployJson } from "./deploy-front-door.ts";
 import { runCloudflarePagesCli } from "./cloudflare-pages-cli.ts";
 import { summarizeDeploymentResult } from "./deployment-execution.ts";
 import { resolveArtifactDirForCli } from "./deployment-cli-resolve.ts";
+import { runProtectedCloudflarePagesDeployFrontDoor } from "./cloudflare-pages-protected-front-door.ts";
 import { submitCloudflarePagesTargetTransition } from "./cloudflare-pages-target-transition.ts";
 
 export async function runCloudflareDeployFrontDoor(opts: {
   workspaceRoot: string;
   deployment: CloudflarePagesDeployment;
+  requireServiceForProtectedShared: boolean;
   publishOnly: boolean;
   preview: boolean;
   previewCleanup: boolean;
@@ -37,6 +39,35 @@ export async function runCloudflareDeployFrontDoor(opts: {
     throw new Error("cloudflare-pages deploys do not support --remove yet");
   if (opts.rollback && !opts.publishOnly)
     throw new Error("cloudflare-pages rollback requires --publish-only");
+  const controlPlaneUrl =
+    getFlagStr("control-plane-url", "").trim() ||
+    String(process.env.BNX_DEPLOY_CONTROL_PLANE_URL || "").trim();
+  if (
+    opts.deployment.protectionClass !== "local_only" &&
+    (opts.requireServiceForProtectedShared || !!controlPlaneUrl)
+  ) {
+    printDeployJson(
+      await runProtectedCloudflarePagesDeployFrontDoor({
+        workspaceRoot: opts.workspaceRoot,
+        deployment: opts.deployment,
+        publishOnly: opts.publishOnly,
+        preview: opts.preview,
+        previewCleanup: opts.previewCleanup,
+        rollback: opts.rollback,
+        retireTarget: opts.retireTarget,
+        migrateTarget: opts.migrateTarget,
+        targetExceptionRef: opts.targetExceptionRef,
+        sourceRunId: opts.sourceRunId,
+        cleanupReason: opts.cleanupReason,
+        admissionEvidence: opts.admissionEvidence,
+        smokeConnectOverride: opts.smokeConnectOverride,
+        controlPlaneUrl,
+        controlPlaneToken: getFlagStr("control-plane-token", "").trim() || undefined,
+        hasFlag,
+      }),
+    );
+    return;
+  }
   const recordsRoot = path.resolve(
     getFlagStr(
       "records-root",

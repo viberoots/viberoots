@@ -38,7 +38,7 @@ export async function resolveCloudflarePagesPromotionSelection(opts: {
   };
 }
 
-async function resolveCloudflarePagesPromotionSourceSelection(opts: {
+export async function resolveCloudflarePagesPromotionSourceSelection(opts: {
   workspaceRoot: string;
   deployment: CloudflarePagesDeployment;
   recordsRoot: string;

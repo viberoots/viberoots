@@ -148,6 +148,33 @@ async function resolveSharedHostPromotionSourceFromBackend(opts: {
   };
 }
 
+async function resolveCloudflarePagesPromotionSourceFromBackend(opts: {
+  recordsRoot: string;
+  backendDatabaseUrl: string;
+  sourceRunId: string;
+}): Promise<DeploymentPromotionSource | undefined> {
+  const backend: NixosSharedHostControlPlaneBackendTarget = {
+    recordsRoot: path.resolve(opts.recordsRoot),
+    databaseUrl: opts.backendDatabaseUrl,
+  };
+  const envelope = await readBackendDeployRecordEnvelopeByDeployRunId(backend, opts.sourceRunId);
+  if (!envelope || (envelope.record as { provider?: string }).provider !== "cloudflare-pages") {
+    return undefined;
+  }
+  const source = await resolveCloudflarePagesReplaySource({
+    recordsRoot: path.resolve(opts.recordsRoot),
+    backendDatabaseUrl: opts.backendDatabaseUrl,
+    deployRunId: opts.sourceRunId,
+  });
+  return {
+    record: source.record,
+    replaySnapshot: source.replaySnapshot,
+    replaySnapshotPath: source.record.replaySnapshotPath || "",
+    artifactIdentity: source.replaySnapshot.artifact.identity,
+    artifact: source.replaySnapshot.artifact,
+  };
+}
+
 export async function resolveDeploymentPromotionSourceRecordPath(opts: {
   workspaceRoot: string;
   recordsRoot: string;
@@ -158,12 +185,18 @@ export async function resolveDeploymentPromotionSourceRecordPath(opts: {
     opts.backendDatabaseUrl ||
     String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
   if (sharedHostBackendDatabaseUrl) {
-    const sharedHostSource = await resolveSharedHostPromotionSourceFromBackend({
-      recordsRoot: opts.recordsRoot,
-      backendDatabaseUrl: sharedHostBackendDatabaseUrl,
-      sourceRunId: opts.sourceRunId,
-    });
-    if (sharedHostSource) return undefined;
+    const backend: NixosSharedHostControlPlaneBackendTarget = {
+      recordsRoot: path.resolve(opts.recordsRoot),
+      databaseUrl: sharedHostBackendDatabaseUrl,
+    };
+    const backendRecord = await readBackendDeployRecordEnvelopeByDeployRunId(
+      backend,
+      opts.sourceRunId,
+    );
+    const backendProvider = (backendRecord?.record as { provider?: string } | undefined)?.provider;
+    if (backendProvider === "nixos-shared-host" || backendProvider === "cloudflare-pages") {
+      return undefined;
+    }
   }
   for (const root of defaultRecordsRoots(opts.workspaceRoot, opts.recordsRoot)) {
     const recordPath = path.join(root, "runs", `${opts.sourceRunId}.json`);
@@ -193,6 +226,12 @@ export async function resolveDeploymentPromotionSource(opts: {
       sourceRunId: opts.sourceRunId,
     });
     if (sharedHostSource) return sharedHostSource;
+    const cloudflareSource = await resolveCloudflarePagesPromotionSourceFromBackend({
+      recordsRoot: opts.recordsRoot,
+      backendDatabaseUrl: sharedHostBackendDatabaseUrl,
+      sourceRunId: opts.sourceRunId,
+    });
+    if (cloudflareSource) return cloudflareSource;
   }
   for (const root of defaultRecordsRoots(opts.workspaceRoot, opts.recordsRoot)) {
     const recordPath = path.join(root, "runs", `${opts.sourceRunId}.json`);

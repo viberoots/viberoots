@@ -5,6 +5,7 @@ import { runDeployCli } from "./deploy-cli.ts";
 async function main() {
   await runDeployCli({
     workspaceRoot: await findRepoRoot(process.cwd()),
+    publicFrontDoor: true,
     deploymentJsonErrorMessage:
       "public repo-level deploy requires --deployment <label>; --deployment-json is not an operator source of truth",
   });

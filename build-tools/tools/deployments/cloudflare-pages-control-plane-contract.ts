@@ -131,11 +131,12 @@ export type CloudflarePagesControlPlaneSubmission = {
 export type CloudflarePagesControlPlaneWorkerAuthority = {
   kind: "control-plane-worker";
   submissionId: string;
-  submissionPath: string;
   workerId: string;
   lockScope: string;
   fencingToken?: string;
   executionSnapshotPath: string;
+  submissionPath?: string;
+  recordExecutionSnapshotPath?: string;
 };
 
 export function requireCloudflarePagesControlPlaneAuthority(

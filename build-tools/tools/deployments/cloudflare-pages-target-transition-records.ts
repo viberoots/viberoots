@@ -31,10 +31,10 @@ export type CloudflarePagesTargetTransitionRecord = {
     | { kind: "migrated"; ownerDeploymentId: string; providerTargetIdentity: string };
   controlPlane: {
     submissionId: string;
-    submissionPath: string;
-    executionSnapshotPath: string;
     lockScope: string;
     workerId: string;
+    submissionPath?: string;
+    executionSnapshotPath?: string;
   };
 };
 

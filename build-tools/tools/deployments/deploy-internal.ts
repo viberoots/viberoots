@@ -5,6 +5,7 @@ import { runDeployCli } from "./deploy-cli.ts";
 async function main() {
   await runDeployCli({
     workspaceRoot: await findRepoRoot(process.cwd()),
+    publicFrontDoor: false,
     deploymentJsonErrorMessage:
       "internal deploy entrypoint requires --deployment <label>; --deployment-json is no longer accepted",
   });

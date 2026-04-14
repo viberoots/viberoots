@@ -13,6 +13,7 @@ import {
   persistMaterializedSubmission,
   removeMirrorFile,
 } from "./nixos-shared-host-control-plane-backend-materialize.ts";
+import { executeCloudflarePagesBackendSubmission } from "./cloudflare-pages-control-plane-backend-run.ts";
 import { executeSubmittedNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-submit-helpers.ts";
 import { reconcileNixosSharedHostRecoveredSubmission } from "./nixos-shared-host-recovery.ts";
 import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
@@ -74,6 +75,24 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
   );
   const snapshot = await readControlPlaneJson<any>(materialized.executionSnapshotPath);
   try {
+    if (snapshot?.deployment?.provider === "cloudflare-pages") {
+      if (["running", "cancelling"].includes(claimed.lifecycleState)) {
+        throw new Error(
+          `cloudflare-pages backend recovery is not supported for ${claimed.submissionId}`,
+        );
+      }
+      await executeCloudflarePagesBackendSubmission({
+        workspaceRoot: opts.workspaceRoot,
+        recordsRoot: opts.recordsRoot,
+        backend,
+        submissionPath: materialized.submissionPath,
+        submissionRef: materialized.submissionRef,
+        executionSnapshotPath: materialized.executionSnapshotPath,
+        executionSnapshotRef: materialized.executionSnapshotRef,
+        workerId: opts.workerId,
+      });
+      return true;
+    }
     if (["running", "cancelling"].includes(claimed.lifecycleState)) {
       await reconcileNixosSharedHostRecoveredSubmission({
         submissionPath: materialized.submissionPath,

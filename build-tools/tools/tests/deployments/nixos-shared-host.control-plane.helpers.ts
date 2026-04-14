@@ -122,6 +122,9 @@ export async function startControlPlaneHarness(opts: {
     workspaceRoot: opts.workspaceRoot,
     recordsRoot: paths.recordsRoot,
     backendDatabaseUrl,
+    onError: (error) => {
+      console.error("[control-plane-harness worker]", error);
+    },
   });
   return {
     paths,

@@ -23,11 +23,12 @@ import {
   isTargetExceptionActive,
 } from "./deployment-target-exceptions.ts";
 
-const SNAPSHOT_SCHEMA = "cloudflare-pages-target-transition-snapshot@1";
+export const CLOUDFLARE_PAGES_TARGET_TRANSITION_SNAPSHOT_SCHEMA =
+  "cloudflare-pages-target-transition-snapshot@1";
 
 export type CloudflarePagesTargetTransitionOperationKind = "retire_target" | "migrate_target";
 
-function approvalSatisfied(
+export function approvalSatisfied(
   exception: DeploymentTargetException,
   evidence?: DeploymentAdmissionEvidence,
 ): boolean {
@@ -64,7 +65,7 @@ function supersedingException(
   );
 }
 
-function requireTargetException(
+export function requireTargetException(
   deployment: CloudflarePagesDeployment,
   targetExceptionRef: string,
 ): DeploymentTargetException {
@@ -86,7 +87,7 @@ function requireTargetException(
   return exception;
 }
 
-function validateTransitionRequest(opts: {
+export function validateTransitionRequest(opts: {
   deployment: CloudflarePagesDeployment;
   operationKind: CloudflarePagesTargetTransitionOperationKind;
   exception: DeploymentTargetException;
@@ -139,7 +140,7 @@ export async function submitCloudflarePagesTargetTransition(opts: {
     opts.authorization?.requestedBy || opts.admissionEvidence?.requestedBy || defaultRequestedBy();
   const workerId = `${submissionId}-worker`;
   await writeControlPlaneJson(executionSnapshotPath, {
-    schemaVersion: SNAPSHOT_SCHEMA,
+    schemaVersion: CLOUDFLARE_PAGES_TARGET_TRANSITION_SNAPSHOT_SCHEMA,
     submissionId,
     submittedAt: new Date().toISOString(),
     operationKind: opts.operationKind,

@@ -86,10 +86,12 @@ export async function resolveCloudflarePagesRollbackSelection(opts: {
   deployment: CloudflarePagesDeployment;
   recordsRoot: string;
   sourceRunId: string;
+  backendDatabaseUrl?: string;
 }) {
   const source = await resolveCloudflarePagesReplaySource({
     recordsRoot: opts.recordsRoot,
     deployRunId: opts.sourceRunId,
+    ...(opts.backendDatabaseUrl ? { backendDatabaseUrl: opts.backendDatabaseUrl } : {}),
   });
   const errors = [
     ...sameDeploymentRollbackErrors(opts.deployment, source.replaySnapshot.deployment),

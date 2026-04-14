@@ -10,6 +10,10 @@ import {
   readCloudflarePagesDeployRecord,
   type CloudflarePagesDeployRecord,
 } from "./cloudflare-pages-records.ts";
+import {
+  readBackendLatestCloudflarePagesPreviewRecordEnvelope,
+  type NixosSharedHostControlPlaneBackendTarget,
+} from "./nixos-shared-host-control-plane-backend.ts";
 import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
 
 export type CloudflarePagesPreviewSourceSelection = {
@@ -83,10 +87,12 @@ export async function resolveCloudflarePagesPreviewSelection(opts: {
   deployment: CloudflarePagesDeployment;
   recordsRoot: string;
   sourceRunId: string;
+  backendDatabaseUrl?: string;
 }): Promise<CloudflarePagesPreviewSourceSelection> {
   const source = await resolveCloudflarePagesReplaySource({
     recordsRoot: opts.recordsRoot,
     deployRunId: opts.sourceRunId,
+    ...(opts.backendDatabaseUrl ? { backendDatabaseUrl: opts.backendDatabaseUrl } : {}),
   });
   const errors = [
     ...sameDeploymentPreviewErrors(opts.deployment, source.replaySnapshot.deployment),
@@ -110,11 +116,39 @@ ${errors.join("\n")}`);
   };
 }
 
+async function readBackendLatestPreviewRecord(opts: {
+  recordsRoot: string;
+  backendDatabaseUrl: string;
+  deploymentId: string;
+  sourceRunId: string;
+}): Promise<CloudflarePagesDeployRecord | undefined> {
+  const backend: NixosSharedHostControlPlaneBackendTarget = {
+    recordsRoot: path.resolve(opts.recordsRoot),
+    databaseUrl: opts.backendDatabaseUrl,
+  };
+  return (
+    await readBackendLatestCloudflarePagesPreviewRecordEnvelope(backend, {
+      deploymentId: opts.deploymentId,
+      sourceRunId: opts.sourceRunId,
+    })
+  )?.record as CloudflarePagesDeployRecord | undefined;
+}
+
 export async function findLatestCloudflarePagesPreviewRecord(opts: {
   recordsRoot: string;
   deployment: CloudflarePagesDeployment;
   sourceRunId: string;
+  backendDatabaseUrl?: string;
 }): Promise<CloudflarePagesDeployRecord | undefined> {
+  if (opts.backendDatabaseUrl) {
+    const backendRecord = await readBackendLatestPreviewRecord({
+      recordsRoot: opts.recordsRoot,
+      backendDatabaseUrl: opts.backendDatabaseUrl,
+      deploymentId: opts.deployment.deploymentId,
+      sourceRunId: opts.sourceRunId,
+    });
+    if (backendRecord) return backendRecord;
+  }
   const runsDir = path.join(path.resolve(opts.recordsRoot), "runs");
   if (!(await pathExists(runsDir))) return undefined;
   for (const name of (await fsp.readdir(runsDir)).sort().reverse()) {

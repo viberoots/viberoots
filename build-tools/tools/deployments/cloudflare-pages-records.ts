@@ -44,11 +44,11 @@ export type CloudflarePagesDeployRecord = {
   providerTargetIdentity: string;
   controlPlane?: {
     submissionId: string;
-    submissionPath: string;
     workerId: string;
     admission: "admitted";
     lockScope: string;
-    executionSnapshotPath: string;
+    submissionPath?: string;
+    executionSnapshotPath?: string;
   };
   deployBatchId?: string;
   parentRunId?: string;
@@ -138,11 +138,17 @@ export function createCloudflarePagesDeployRecord(
       ? {
           controlPlane: {
             submissionId: outcome.authority.submissionId,
-            submissionPath: outcome.authority.submissionPath,
             workerId: outcome.authority.workerId,
             admission: "admitted" as const,
             lockScope: outcome.authority.lockScope,
-            executionSnapshotPath: outcome.authority.executionSnapshotPath,
+            ...(outcome.authority.submissionPath
+              ? { submissionPath: outcome.authority.submissionPath }
+              : {}),
+            ...(outcome.authority.recordExecutionSnapshotPath
+              ? { executionSnapshotPath: outcome.authority.recordExecutionSnapshotPath }
+              : outcome.authority.executionSnapshotPath
+                ? { executionSnapshotPath: outcome.authority.executionSnapshotPath }
+                : {}),
           },
         }
       : {}),

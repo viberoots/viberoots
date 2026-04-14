@@ -6339,6 +6339,13 @@ Under the hood that may still mean:
 4. the control-plane publisher uploads that exact artifact to Cloudflare Pages
 5. control-plane smoke checks run unless an explicit reviewed `smoke.exception` changes the protected/shared smoke policy
 
+For reviewed `cloudflare-pages` `shared_nonprod` and `production_facing` paths, the public repo
+`deploy` front door is now only that thin client. Callers must provide the central service endpoint
+with `--control-plane-url` or `BNX_DEPLOY_CONTROL_PLANE_URL`, and the public path should reject
+mixed local execution flags such as `--records-root` or `--control-plane-database-url` instead of
+quietly falling back to provider-local peer mutation. Any remaining local `recordsRoot` helpers are
+for fixture/internal compatibility, not the reviewed public protected/shared boundary.
+
 The user should not need to think about that wiring.
 
 ## Implementation Handoff

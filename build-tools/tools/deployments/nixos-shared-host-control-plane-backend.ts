@@ -23,6 +23,7 @@ export {
   readBackendDeployRecordByDeployRunId,
   readBackendDeployRecordBySubmissionId,
   readBackendDeployRecordEnvelopeByDeployRunId,
+  readBackendLatestCloudflarePagesPreviewRecordEnvelope,
   readBackendLatestDeployRecordEnvelopeByDeploymentId,
   readBackendDeployRecordEnvelopeBySubmissionId,
   syncBackendDeployRecord,

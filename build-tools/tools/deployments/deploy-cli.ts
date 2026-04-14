@@ -39,6 +39,7 @@ function ensurePublicSourceOfTruth(opts: { deploymentJsonErrorMessage: string })
 
 export async function runDeployCli(opts: {
   workspaceRoot: string;
+  publicFrontDoor: boolean;
   deploymentJsonErrorMessage: string;
 }) {
   ensurePublicSourceOfTruth(opts);
@@ -135,6 +136,7 @@ export async function runDeployCli(opts: {
     await runCloudflareDeployFrontDoor({
       workspaceRoot: opts.workspaceRoot,
       deployment,
+      requireServiceForProtectedShared: opts.publicFrontDoor,
       publishOnly,
       preview,
       previewCleanup,
