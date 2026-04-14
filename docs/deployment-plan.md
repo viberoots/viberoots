@@ -7210,6 +7210,120 @@ tests, and runtime behavior in sync.
 
 ---
 
+## PR-55: Final deployment-owned methodology waiver removal + support-file guardrail parity closeout
+
+### Description
+
+I will close the remaining methodology and guardrail gap left after the earlier deployment-domain
+file-size closeout work: a deployment-owned support file still relies on an active size exception,
+and the deployment-domain size guardrail does not yet cover every reviewed deployment-owned support
+path that should fail closed under the same methodology rule. This PR removes that residual waiver,
+brings the remaining deployment-owned support file(s) into explicit compliance with the repository
+methodology, and extends the deployment-domain compliance guardrail so future deployment-owned
+support files cannot drift outside enforcement just because they live outside the three primary
+deployment source prefixes.
+
+### Scope & Changes
+
+- Audit the remaining deployment-owned methodology file-size exceptions and identify which entries,
+  if any, are still deployment-owned rather than general build-system or planner debt.
+- Split or otherwise refactor the remaining deployment-owned over-limit support file(s) so they
+  comply with the hard 250-line methodology boundary without changing the reviewed deployment
+  contract or operator-visible behavior.
+- Remove the deployment-owned file-size waiver(s) that become obsolete after that refactor.
+- Extend the reviewed deployment-domain size guardrail so it covers deployment-owned support files
+  that are part of the deployment implementation but currently sit outside the narrow path prefixes
+  enforced by the existing deployment-domain file-size test.
+- Keep the deployment-owned path contract explicit and fail closed:
+  - do not broaden the deployment-domain methodology guardrail to unrelated non-deployment Nix or
+    planner files
+  - do add the reviewed deployment-owned support paths that are part of the deployment system's
+    real implementation boundary
+- Add or tighten ownership/parity checks so the deployment-domain file-size guardrail and the
+  deployment-owned boundary cannot silently drift apart again.
+- Keep this PR behavior-preserving:
+  - no new deployment features
+  - no contract expansion
+  - no operator-workflow changes except any documentation clarifications required to describe the
+    refined support-file ownership boundary
+
+### Tests (in this PR)
+
+- Add or extend deployment-domain file-size compliance tests proving the reviewed deployment-owned
+  support-file set fails closed when any member exceeds the methodology limit.
+- Add regression tests proving the deployment-owned support-file guardrail includes the
+  refactored/reclassified support paths and still excludes unrelated non-deployment Nix/planner
+  files.
+- Add parity tests proving:
+  - deployment-owned file-size exceptions no longer contain residual deployment support files once
+    this PR lands
+  - the deployment-domain file-size guardrail and reviewed deployment-owned support-path contract
+    stay synchronized
+- Re-run representative deployment-domain regression coverage for the refactored support-file area
+  so the file split does not weaken behavior or test semantics.
+
+### Docs (in this PR)
+
+- Update this deployment plan so the methodology/guardrail closeout no longer implicitly assumes
+  deployment-owned support-file compliance that still depended on a waiver before this PR.
+- Document the reviewed deployment-owned support-file boundary that is now included in the
+  deployment-domain methodology guardrail.
+- Document contributor expectations for handling future deployment-owned support files that would
+  otherwise exceed the methodology file-size limit.
+
+### Verification Commands
+
+- `v`
+- deployment-domain file-size or ownership-parity verification commands introduced or tightened in
+  this PR
+- representative deployment-domain Buck targets covering the refactored support-file area
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-owned implementation/support files, deployment-domain
+  methodology guardrails, and deployment-domain tests. Under the deployment-only verify policy,
+  default `v` / CI can run the reviewed deployment suite rather than the full non-deployment
+  build-system verify scope.
+
+### Acceptance Criteria
+
+- No deployment-owned support file still relies on an active methodology file-size waiver.
+- Reviewed deployment-owned support files comply with the 250-line methodology limit.
+- The deployment-domain file-size guardrail fails closed for the full reviewed deployment-owned
+  implementation/support boundary rather than only the narrower primary source prefixes.
+- Tests and docs in this PR describe the same deployment-owned methodology/guardrail contract.
+
+### Risks
+
+Because the remaining gap sits at the edge between deployment-owned code and shared build-system
+support, it is easy to either leave the guardrail too narrow or over-broaden it into unrelated
+build-system files.
+
+### Mitigation
+
+Keep the deployment-owned support boundary explicit, test both positive and negative ownership
+cases, and remove the residual waiver only in the same PR that proves the refined guardrail covers
+the intended support-file set.
+
+### Consequence of Not Implementing
+
+The deployment plan would still overstate methodology completion by claiming full deployment-domain
+file-size closeout while a deployment-owned support file remains waived and outside the practical
+fail-closed guardrail boundary.
+
+### Downsides for Implementing
+
+This is another closeout-focused PR centered on ownership and compliance hygiene rather than new
+deployment features.
+
+### Recommendation
+
+Implement immediately after PR-54 so the final deployment plan closes with no residual
+deployment-owned methodology waiver or support-file guardrail ambiguity.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -7277,6 +7391,10 @@ tests, and runtime behavior in sync.
 24. PR-54: close the remaining operator-doc parity gaps so the reviewed setup/checklist guidance
     matches the implemented service-routed client install contract and the same-run approval-grant
     workflow for `pending_approval` runs.
+25. PR-55: remove the last deployment-owned methodology file-size waiver and extend the
+    deployment-domain size guardrail to the full reviewed deployment-owned support-file boundary so
+    the plan is closed against the methodology and fail-closed guardrail contract, not just the
+    functional deployment behavior.
 
 ## Companion Docs
 
