@@ -29,7 +29,7 @@ test("s3-static rejects provider config drift before publish begins", async () =
     });
     const configPath = path.join(
       tmp,
-      "projects",
+      "test-workspace",
       "deployments",
       "pleomino-staging-s3",
       "aws-s3-sync.jsonc",

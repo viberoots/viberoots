@@ -3,21 +3,18 @@ import { normalizeTargetLabel } from "../lib/labels.ts";
 
 const CONFIG_SUFFIX = /\s+\([^)]*\)$/;
 
-export function deploymentBuckEnv(): NodeJS.ProcessEnv {
+export function deploymentBuckEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   return {
-    ...process.env,
-    HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
-    SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
+    ...env,
+    HOME: env.BUCK2_REAL_HOME || env.HOME,
+    SSL_CERT_FILE: env.SSL_CERT_FILE || env.NIX_SSL_CERT_FILE,
   };
 }
 
-export function deploymentIsolationArgs(): string[] {
-  if (process.env.BUCK_NO_ISOLATION === "1") return [];
+export function deploymentIsolationArgs(env: NodeJS.ProcessEnv = process.env): string[] {
+  if (env.BUCK_NO_ISOLATION === "1") return [];
   const isolationDir = String(
-    process.env.BUCK_ISOLATION_DIR ||
-      process.env.BUCK_ISOLATION_DIR_EXPORTER ||
-      process.env.BUCK_NESTED_ISO ||
-      "",
+    env.BUCK_ISOLATION_DIR || env.BUCK_ISOLATION_DIR_EXPORTER || env.BUCK_NESTED_ISO || "",
   ).trim();
   return isolationDir ? ["--isolation-dir", isolationDir] : [];
 }

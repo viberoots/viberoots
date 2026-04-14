@@ -40,7 +40,7 @@ test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", 
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>pleomino staging</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "test-workspace", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
@@ -111,7 +111,7 @@ test("cloudflare-pages smoke failure blocks success after publish", async () => 
       "<html>wrong</html>\n",
     );
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "test-workspace", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
@@ -171,7 +171,7 @@ test("cloudflare-pages smoke retries transient readiness failures within the sha
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>retry-me</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "test-workspace", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);

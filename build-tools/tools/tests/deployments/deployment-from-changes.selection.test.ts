@@ -31,21 +31,21 @@ function pleominoDeployments() {
   return [
     nixosSharedHostDeploymentFixture({
       deploymentId: "pleomino-dev",
-      label: "//projects/deployments/pleomino-dev:deploy",
-      component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
+      label: "//test-workspace/deployments/pleomino-dev:deploy",
+      component: { kind: "static-webapp", target: "//test-workspace/apps/pleomino:app" },
       runtime: { appName: "pleomino", containerPort: 3000 },
       lanePolicy,
       prerequisites: [],
     }),
     cloudflarePagesDeploymentFixture({
       deploymentId: "pleomino-staging",
-      label: "//projects/deployments/pleomino-staging:deploy",
+      label: "//test-workspace/deployments/pleomino-staging:deploy",
       lanePolicy,
       prerequisites: [{ deploymentId: "pleomino-dev", mode: "ordering_only" }],
     }),
     cloudflarePagesDeploymentFixture({
       deploymentId: "pleomino-prod",
-      label: "//projects/deployments/pleomino-prod:deploy",
+      label: "//test-workspace/deployments/pleomino-prod:deploy",
       environmentStage: "prod",
       providerTarget: {
         account: "web-platform-prod",
@@ -55,10 +55,10 @@ function pleominoDeployments() {
         providerTargetIdentity: "cloudflare-pages:web-platform-prod/pleomino-prod-pages",
       },
       lanePolicy,
-      admissionPolicyRef: "//projects/deployments/pleomino-shared:prod_release",
+      admissionPolicyRef: "//test-workspace/deployments/pleomino-shared:prod_release",
       admissionPolicy: {
         ...cloudflarePagesDeploymentFixture().admissionPolicy,
-        ref: "//projects/deployments/pleomino-shared:prod_release",
+        ref: "//test-workspace/deployments/pleomino-shared:prod_release",
         name: "prod_release",
         allowedRefs: ["env/pleomino/prod"],
       },
@@ -97,12 +97,12 @@ function sandboxDeployments() {
 test("from-changes selects deployments whose component project is in the impacted Buck closure", async () => {
   await withTempRoot(async (tmp) => {
     await writeGraph(tmp, [
-      { name: "//projects/apps/pleomino:app", deps: ["//projects/libs/shared-ui:lib"] },
-      { name: "//projects/libs/shared-ui:lib", deps: [] },
+      { name: "//test-workspace/apps/pleomino:app", deps: ["//test-workspace/libs/shared-ui:lib"] },
+      { name: "//test-workspace/libs/shared-ui:lib", deps: [] },
     ]);
     const plan = await resolveDeploymentsFromChanges({
       workspaceRoot: tmp,
-      changedPaths: ["projects/libs/shared-ui/src/index.ts"],
+      changedPaths: ["test-workspace/libs/shared-ui/src/index.ts"],
       deployments: pleominoDeployments(),
     });
 
@@ -116,10 +116,10 @@ test("from-changes selects deployments whose component project is in the impacte
 
 test("from-changes widens only one direct prerequisite edge from changed deployment metadata", async () => {
   await withTempRoot(async (tmp) => {
-    await writeGraph(tmp, [{ name: "//projects/apps/pleomino:app", deps: [] }]);
+    await writeGraph(tmp, [{ name: "//test-workspace/apps/pleomino:app", deps: [] }]);
     const plan = await resolveDeploymentsFromChanges({
       workspaceRoot: tmp,
-      changedPaths: ["projects/deployments/pleomino-dev/TARGETS"],
+      changedPaths: ["test-workspace/deployments/pleomino-dev/TARGETS"],
       deployments: pleominoDeployments(),
     });
 

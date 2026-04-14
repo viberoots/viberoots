@@ -1,141 +1,26 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentRolloutMode } from "./deployment-rollout.ts";
-import { KUBERNETES_PROVIDER } from "./deployment-provider-targets.ts";
+import type { DeploymentComponentKind } from "./deployment-component-kinds.ts";
 import {
-  SERVICE_COMPONENT_KIND,
-  SSR_WEBAPP_COMPONENT_KIND,
-  STATIC_WEBAPP_COMPONENT_KIND,
-  THIRD_PARTY_SERVICE_COMPONENT_KIND,
-  type DeploymentComponentKind,
-} from "./deployment-component-kinds.ts";
+  REVIEWED_NON_STATIC_COMPONENT_KINDS,
+  REVIEWED_PROVIDER_CAPABILITIES,
+  REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER,
+  REVIEWED_PROVIDER_IDS,
+} from "./provider-capabilities/registry.ts";
 
-type ReleaseActionsCapability = {
-  supportsProtectedShared: boolean;
-  declaredTypes: string[];
-  routineAllowedTypes: string[];
+export type { DeploymentProviderCapability } from "./provider-capabilities/types.ts";
+export {
+  REVIEWED_NON_STATIC_COMPONENT_KINDS,
+  REVIEWED_PROVIDER_CAPABILITIES,
+  REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER,
+  REVIEWED_PROVIDER_IDS,
 };
 
-export type DeploymentProviderCapability = {
-  provider: string;
-  supportedComponentKinds: DeploymentComponentKind[];
-  multiComponentKinds: DeploymentComponentKind[];
-  supportedRolloutModes: DeploymentRolloutMode[];
-  defaultRolloutMode: DeploymentRolloutMode;
-  rolloutPolicyOmissionInPolicy: {
-    singleComponent: boolean;
-    multiComponent: boolean;
-  };
-  releaseActions: ReleaseActionsCapability;
-};
-
-const PROVIDER_CAPABILITIES: Record<string, DeploymentProviderCapability> = {
-  "app-store-connect": {
-    provider: "app-store-connect",
-    supportedComponentKinds: ["mobile-app"],
-    multiComponentKinds: [],
-    supportedRolloutModes: ["all_at_once", "store_staged"],
-    defaultRolloutMode: "all_at_once",
-    rolloutPolicyOmissionInPolicy: {
-      singleComponent: true,
-      multiComponent: false,
-    },
-    releaseActions: {
-      supportsProtectedShared: false,
-      declaredTypes: [],
-      routineAllowedTypes: [],
-    },
-  },
-  "google-play": {
-    provider: "google-play",
-    supportedComponentKinds: ["mobile-app"],
-    multiComponentKinds: [],
-    supportedRolloutModes: ["all_at_once", "store_staged"],
-    defaultRolloutMode: "all_at_once",
-    rolloutPolicyOmissionInPolicy: {
-      singleComponent: true,
-      multiComponent: false,
-    },
-    releaseActions: {
-      supportsProtectedShared: false,
-      declaredTypes: [],
-      routineAllowedTypes: [],
-    },
-  },
-  "nixos-shared-host": {
-    provider: "nixos-shared-host",
-    supportedComponentKinds: [STATIC_WEBAPP_COMPONENT_KIND, SSR_WEBAPP_COMPONENT_KIND],
-    multiComponentKinds: [STATIC_WEBAPP_COMPONENT_KIND],
-    supportedRolloutModes: ["all_at_once", "ordered_best_effort"],
-    defaultRolloutMode: "all_at_once",
-    rolloutPolicyOmissionInPolicy: {
-      singleComponent: true,
-      multiComponent: false,
-    },
-    releaseActions: {
-      supportsProtectedShared: true,
-      declaredTypes: ["cache_warmup", "post_publish_verification", "schema_migration"],
-      routineAllowedTypes: ["cache_warmup", "post_publish_verification"],
-    },
-  },
-  "cloudflare-pages": {
-    provider: "cloudflare-pages",
-    supportedComponentKinds: [STATIC_WEBAPP_COMPONENT_KIND],
-    multiComponentKinds: [],
-    supportedRolloutModes: ["all_at_once"],
-    defaultRolloutMode: "all_at_once",
-    rolloutPolicyOmissionInPolicy: {
-      singleComponent: true,
-      multiComponent: false,
-    },
-    releaseActions: {
-      supportsProtectedShared: false,
-      declaredTypes: [],
-      routineAllowedTypes: [],
-    },
-  },
-  "s3-static": {
-    provider: "s3-static",
-    supportedComponentKinds: [STATIC_WEBAPP_COMPONENT_KIND],
-    multiComponentKinds: [],
-    supportedRolloutModes: ["all_at_once"],
-    defaultRolloutMode: "all_at_once",
-    rolloutPolicyOmissionInPolicy: {
-      singleComponent: true,
-      multiComponent: false,
-    },
-    releaseActions: {
-      supportsProtectedShared: false,
-      declaredTypes: [],
-      routineAllowedTypes: [],
-    },
-  },
-  [KUBERNETES_PROVIDER]: {
-    provider: KUBERNETES_PROVIDER,
-    supportedComponentKinds: [SERVICE_COMPONENT_KIND, THIRD_PARTY_SERVICE_COMPONENT_KIND],
-    multiComponentKinds: [SERVICE_COMPONENT_KIND, THIRD_PARTY_SERVICE_COMPONENT_KIND],
-    supportedRolloutModes: ["all_at_once", "ordered_best_effort"],
-    defaultRolloutMode: "all_at_once",
-    rolloutPolicyOmissionInPolicy: {
-      singleComponent: true,
-      multiComponent: false,
-    },
-    releaseActions: {
-      supportsProtectedShared: false,
-      declaredTypes: [],
-      routineAllowedTypes: [],
-    },
-  },
-};
-
-export const REVIEWED_NON_STATIC_COMPONENT_KINDS: DeploymentComponentKind[] = [
-  SSR_WEBAPP_COMPONENT_KIND,
-  "mobile-app",
-  SERVICE_COMPONENT_KIND,
-  THIRD_PARTY_SERVICE_COMPONENT_KIND,
-];
-
-export function providerCapabilityFor(provider: string): DeploymentProviderCapability | undefined {
-  return PROVIDER_CAPABILITIES[provider];
+export function providerCapabilityFor(
+  provider: string,
+): (typeof REVIEWED_PROVIDER_CAPABILITIES)[number] | undefined {
+  return REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER[
+    provider as keyof typeof REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER
+  ] as (typeof REVIEWED_PROVIDER_CAPABILITIES)[number] | undefined;
 }
 
 export function providerSupportsComponentKind(provider: string, kind: string): boolean {

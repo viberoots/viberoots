@@ -50,7 +50,7 @@ test("shared control plane admits shared_nonprod deploys and executes from the f
         hooks: {
           afterSnapshotWritten: async () => {
             deployment.deploymentId = "tampered";
-            deployment.label = "//projects/deployments/tampered:deploy";
+            deployment.label = "//test-workspace/deployments/tampered:deploy";
             deployment.providerTarget.sharedDevTargetIdentity = "tampered-target";
             await fsp.rm(artifactDir, { recursive: true, force: true });
           },

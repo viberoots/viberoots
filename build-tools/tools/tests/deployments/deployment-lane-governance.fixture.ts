@@ -30,7 +30,7 @@ export function nixosSharedHostLaneGovernanceFixture(
   overrides: Partial<DeploymentLaneGovernance> = {},
 ): DeploymentLaneGovernance {
   return {
-    ref: overrides.ref || "//projects/deployments/pleomino-shared:lane_governance",
+    ref: overrides.ref || "//test-workspace/deployments/pleomino-shared:lane_governance",
     name: overrides.name || "lane_governance",
     scmBackend: (overrides.scmBackend || "github") as DeploymentScmBackend,
     repository: overrides.repository || "kiltyj/bucknix-fresh",

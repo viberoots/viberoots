@@ -20,7 +20,7 @@ test("google-play deploy and promotion preserve release-health evidence", async 
     const lanePolicy = mobileReviewedLanePolicy();
     const dev = googlePlayDeploymentFixture({
       deploymentId: "demo-android-dev",
-      label: "//projects/deployments/demo-android-dev:deploy",
+      label: "//test-workspace/deployments/demo-android-dev:deploy",
       lanePolicy,
       providerTarget: {
         developerAccount: "android-platform",
@@ -34,7 +34,7 @@ test("google-play deploy and promotion preserve release-health evidence", async 
     });
     const staging = googlePlayDeploymentFixture({
       deploymentId: "demo-android-staging",
-      label: "//projects/deployments/demo-android-staging:deploy",
+      label: "//test-workspace/deployments/demo-android-staging:deploy",
       environmentStage: "staging",
       lanePolicy,
       rolloutPolicy: {
@@ -107,7 +107,7 @@ test("google-play rollback reuses a prior successful exact artifact", async () =
     const lanePolicy = mobileReviewedLanePolicy();
     const staging = googlePlayDeploymentFixture({
       deploymentId: "demo-android-staging",
-      label: "//projects/deployments/demo-android-staging:deploy",
+      label: "//test-workspace/deployments/demo-android-staging:deploy",
       environmentStage: "staging",
       lanePolicy,
       admissionPolicy: undefined,

@@ -51,8 +51,8 @@ test("deployment verify scope keeps reviewed shared paths out of the deployment 
 test("deployment verify scope leaves unrelated paths unclassified", () => {
   const unrelatedPaths = [
     "docs/deployment-plan.md",
-    "projects/apps/pleomino/TARGETS",
-    "projects/deployments/pleomino-dev/TARGETS",
+    "test-workspace/apps/pleomino/TARGETS",
+    "test-workspace/deployments/pleomino-dev/TARGETS",
   ];
   for (const relPath of unrelatedPaths) {
     assert.equal(isReviewedDeploymentOwnedBuildSystemPath(relPath), false, relPath);

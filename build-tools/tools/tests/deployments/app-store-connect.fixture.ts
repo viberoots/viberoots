@@ -20,7 +20,7 @@ export function appStoreConnectDeploymentFixture(
   const admissionPolicy =
     overrides.admissionPolicy ||
     nixosSharedHostAdmissionPolicyFixture({
-      ref: `//projects/deployments/pleomino-shared:${environmentStage}_release`,
+      ref: `//test-workspace/deployments/pleomino-shared:${environmentStage}_release`,
       name: `${environmentStage}_release`,
       requiredChecks: [],
       allowedRefs: [`env/mobile/${environmentStage}`],
@@ -38,7 +38,7 @@ export function appStoreConnectDeploymentFixture(
   };
   return {
     deploymentId: overrides.deploymentId || "demo-ios-dev",
-    label: overrides.label || "//projects/deployments/demo-ios-dev:deploy",
+    label: overrides.label || "//test-workspace/deployments/demo-ios-dev:deploy",
     name: overrides.name || "deploy",
     provider: APP_STORE_CONNECT_PROVIDER,
     protectionClass: overrides.protectionClass || "shared_nonprod",
@@ -55,13 +55,13 @@ export function appStoreConnectDeploymentFixture(
     ...(overrides.rolloutPolicy ? { rolloutPolicy: overrides.rolloutPolicy } : {}),
     component: {
       kind: MOBILE_APP_COMPONENT_KIND,
-      target: overrides.component?.target || "//projects/apps/demo-ios:release",
+      target: overrides.component?.target || "//test-workspace/apps/demo-ios:release",
     },
     components: overrides.components || [
       {
         id: "default",
         kind: MOBILE_APP_COMPONENT_KIND,
-        target: overrides.component?.target || "//projects/apps/demo-ios:release",
+        target: overrides.component?.target || "//test-workspace/apps/demo-ios:release",
       },
     ],
     publisher: overrides.publisher || {
@@ -76,16 +76,16 @@ export function appStoreConnectDeploymentNodeFixture(
   overrides: Partial<GraphNode> = {},
 ): GraphNode {
   return {
-    name: "//projects/deployments/demo-ios-dev:deploy",
+    name: "//test-workspace/deployments/demo-ios-dev:deploy",
     provider: "app-store-connect",
-    component: "//projects/apps/demo-ios:release",
+    component: "//test-workspace/apps/demo-ios:release",
     component_kind: "mobile-app",
     publisher: "app-store-connect-mobile-release",
     publisher_config: "app-store-connect.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino-shared:lane",
+    lane_policy: "//test-workspace/deployments/pleomino-shared:lane",
     environment_stage: "dev",
-    admission_policy: "//projects/deployments/pleomino-shared:dev_release",
+    admission_policy: "//test-workspace/deployments/pleomino-shared:dev_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: {
@@ -104,7 +104,7 @@ export function appStoreConnectAdmissionPolicyNodeFixture(
   overrides: Partial<GraphNode> = {},
 ): GraphNode {
   return nixosSharedHostAdmissionPolicyNodeFixture({
-    name: "//projects/deployments/pleomino-shared:dev_release",
+    name: "//test-workspace/deployments/pleomino-shared:dev_release",
     allowed_refs: ["env/mobile/dev"],
     required_checks: [],
     ...overrides,

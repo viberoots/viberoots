@@ -21,7 +21,7 @@ const plan: NixosSharedHostRemotePlan = {
   planMode: true,
   remoteExecutionImplemented: true,
   deploymentId: "pleomino-dev",
-  deploymentLabel: "//projects/deployments/pleomino-dev:deploy",
+  deploymentLabel: "//test-workspace/deployments/pleomino-dev:deploy",
   profileName: "mini",
   destination: "mini",
   transportMode: "ssh",
@@ -53,7 +53,7 @@ test("remote SSH transport assembles reviewed preflight, staging, deploy, and cl
   const remoteArtifactPath = createNixosSharedHostRemoteArtifactPath(plan, "remote-123");
   assert.equal(
     remoteArtifactPath,
-    "/var/lib/bucknix/nixos-shared-host/runtime/.deploy-artifacts/projects-deployments-pleomino-dev-deploy/remote-123",
+    "/var/lib/bucknix/nixos-shared-host/runtime/.deploy-artifacts/test-workspace-deployments-pleomino-dev-deploy/remote-123",
   );
   const preflight = buildRemoteSshArgv(plan.destination, buildRemoteRepoPreflightScript(plan));
   assert.deepEqual(preflight.slice(0, 4), ["ssh", "mini", "bash", "-lc"]);
@@ -73,7 +73,7 @@ test("remote SSH transport assembles reviewed preflight, staging, deploy, and cl
     "-az",
     "--delete",
     "/tmp/local-artifact/",
-    "mini:/var/lib/bucknix/nixos-shared-host/runtime/.deploy-artifacts/projects-deployments-pleomino-dev-deploy/remote-123/",
+    "mini:/var/lib/bucknix/nixos-shared-host/runtime/.deploy-artifacts/test-workspace-deployments-pleomino-dev-deploy/remote-123/",
   ]);
   const deploy = buildRemoteSshArgv(
     plan.destination,

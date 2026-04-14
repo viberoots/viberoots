@@ -29,7 +29,7 @@ test("cloudflare-pages rejects wrangler config drift before publish begins", asy
     });
     const configPath = path.join(
       tmp,
-      "projects",
+      "test-workspace",
       "deployments",
       "pleomino-staging",
       "wrangler.jsonc",

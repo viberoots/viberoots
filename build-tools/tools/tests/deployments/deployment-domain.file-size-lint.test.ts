@@ -93,7 +93,7 @@ test("deployment-domain file-size lint reports only deployment-owned offenders w
   await withTempRoot(async (root) => {
     const offenderPath = "build-tools/tools/tests/deployments/demo.offender.test.ts";
     await writeLines(root, offenderPath, 251);
-    await writeLines(root, "projects/apps/demo/src/ignored.ts", 400);
+    await writeLines(root, "test-workspace/apps/demo/src/ignored.ts", 400);
     await initTrackedFixture(root);
 
     const offenders = await findFileSizeOffenders({

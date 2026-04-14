@@ -25,10 +25,10 @@ export function pleominoDevDeployment() {
   };
   return nixosSharedHostDeploymentFixture({
     deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino-dev:deploy",
+    label: "//test-workspace/deployments/pleomino-dev:deploy",
     lanePolicy,
     lanePolicyRef: lanePolicy.ref,
-    component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
+    component: { kind: "static-webapp", target: "//test-workspace/apps/pleomino:app" },
     runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
   });
 }
@@ -41,7 +41,7 @@ export function pleominoProdDeployment() {
     },
   };
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
-    ref: "//projects/deployments/pleomino-shared:prod_release",
+    ref: "//test-workspace/deployments/pleomino-shared:prod_release",
     name: "prod_release",
     allowedRefs: ["env/pleomino/prod"],
     requiredChecks: [],
@@ -49,7 +49,7 @@ export function pleominoProdDeployment() {
   });
   return cloudflarePagesDeploymentFixture({
     deploymentId: "pleomino-prod",
-    label: "//projects/deployments/pleomino-prod:deploy",
+    label: "//test-workspace/deployments/pleomino-prod:deploy",
     lanePolicy,
     lanePolicyRef: lanePolicy.ref,
     protectionClass: "production_facing",

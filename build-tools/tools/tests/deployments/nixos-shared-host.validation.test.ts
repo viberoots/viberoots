@@ -17,13 +17,13 @@ import {
 
 test("validation rejects duplicate app_name collisions", () => {
   const nodes: GraphNode[] = [
-    staticWebappComponent("//projects/apps/demoapp:app"),
-    staticWebappComponent("//projects/apps/other:app"),
+    staticWebappComponent("//test-workspace/apps/demoapp:app"),
+    staticWebappComponent("//test-workspace/apps/other:app"),
     ...policyNodes(),
     deploymentNode(),
     deploymentNode({
-      name: "//projects/deployments/other-dev:deploy",
-      component: "//projects/apps/other:app",
+      name: "//test-workspace/deployments/other-dev:deploy",
+      component: "//test-workspace/apps/other:app",
     }),
   ];
   const { errors } = extractNixosSharedHostDeployments(nodes);
@@ -32,7 +32,7 @@ test("validation rejects duplicate app_name collisions", () => {
 
 test("validation rejects missing container_port", () => {
   const { errors } = extractNixosSharedHostDeployments([
-    staticWebappComponent("//projects/apps/demoapp:app"),
+    staticWebappComponent("//test-workspace/apps/demoapp:app"),
     ...policyNodes(),
     deploymentNode({ container_port: 0 }),
   ]);
@@ -41,7 +41,7 @@ test("validation rejects missing container_port", () => {
 
 test("validation rejects invalid target_group", () => {
   const { errors } = extractNixosSharedHostDeployments([
-    staticWebappComponent("//projects/apps/demoapp:app"),
+    staticWebappComponent("//test-workspace/apps/demoapp:app"),
     ...policyNodes(),
     deploymentNode({ target_group: "group.a" }),
   ]);
@@ -50,7 +50,7 @@ test("validation rejects invalid target_group", () => {
 
 test("validation rejects protected/shared lane policy without governance metadata", () => {
   const { errors } = extractNixosSharedHostDeployments([
-    staticWebappComponent("//projects/apps/demoapp:app"),
+    staticWebappComponent("//test-workspace/apps/demoapp:app"),
     nixosSharedHostLanePolicyNodeFixture({ governance_policy: "" }),
     nixosSharedHostAdmissionPolicyNodeFixture(),
     deploymentNode(),
@@ -60,7 +60,7 @@ test("validation rejects protected/shared lane policy without governance metadat
 
 test("validation rejects unsupported component kinds for nixos-shared-host", () => {
   const { errors } = extractNixosSharedHostDeployments([
-    staticWebappComponent("//projects/apps/demoapp:app"),
+    staticWebappComponent("//test-workspace/apps/demoapp:app"),
     ...policyNodes(),
     deploymentNode({ component_kind: "http-service" }),
   ]);
@@ -71,22 +71,22 @@ test("validation rejects unsupported component kinds for nixos-shared-host", () 
 
 test("validation rejects protected multi-component shared-host deployments without rollout_policy", () => {
   const { errors } = extractNixosSharedHostDeployments([
-    staticWebappComponent("//projects/apps/demoapp:app"),
-    staticWebappComponent("//projects/apps/demoapi:app"),
+    staticWebappComponent("//test-workspace/apps/demoapp:app"),
+    staticWebappComponent("//test-workspace/apps/demoapi:app"),
     ...policyNodes(),
     deploymentNode({
       components: [
         {
           id: "frontend",
           kind: "static-webapp",
-          target: "//projects/apps/demoapp:app",
+          target: "//test-workspace/apps/demoapp:app",
           app_name: "demoapp",
           container_port: "3000",
         },
         {
           id: "api",
           kind: "static-webapp",
-          target: "//projects/apps/demoapi:app",
+          target: "//test-workspace/apps/demoapi:app",
           app_name: "demoapi",
           container_port: "3001",
         },
@@ -98,22 +98,22 @@ test("validation rejects protected multi-component shared-host deployments witho
 
 test("validation rejects multi-component shared-host rollout steps that omit a component", () => {
   const { errors } = extractNixosSharedHostDeployments([
-    staticWebappComponent("//projects/apps/demoapp:app"),
-    staticWebappComponent("//projects/apps/demoapi:app"),
+    staticWebappComponent("//test-workspace/apps/demoapp:app"),
+    staticWebappComponent("//test-workspace/apps/demoapi:app"),
     ...policyNodes(),
     deploymentNode({
       components: [
         {
           id: "frontend",
           kind: "static-webapp",
-          target: "//projects/apps/demoapp:app",
+          target: "//test-workspace/apps/demoapp:app",
           app_name: "demoapp",
           container_port: "3000",
         },
         {
           id: "api",
           kind: "static-webapp",
-          target: "//projects/apps/demoapi:app",
+          target: "//test-workspace/apps/demoapi:app",
           app_name: "demoapi",
           container_port: "3001",
         },
@@ -133,7 +133,7 @@ test("validation rejects multi-component shared-host rollout steps that omit a c
 
 test("validation rejects malformed bootstrap policy", () => {
   const { errors } = extractNixosSharedHostDeployments([
-    staticWebappComponent("//projects/apps/demoapp:app"),
+    staticWebappComponent("//test-workspace/apps/demoapp:app"),
     ...policyNodes(),
     deploymentNode({
       bootstrap: {
@@ -154,7 +154,7 @@ test("validation rejects reviewed non-static kinds until nixos-shared-host decla
     (entry) => entry !== "ssr-webapp",
   )) {
     const { errors } = extractNixosSharedHostDeployments([
-      staticWebappComponent("//projects/apps/demoapp:app"),
+      staticWebappComponent("//test-workspace/apps/demoapp:app"),
       ...policyNodes(),
       deploymentNode({ component_kind: kind }),
     ]);
@@ -167,7 +167,7 @@ test("validation rejects reviewed non-static kinds until nixos-shared-host decla
 
 test("validation accepts the reviewed single-component ssr-webapp slice", () => {
   const { deployments, errors } = extractNixosSharedHostDeployments([
-    ssrWebappComponent("//projects/apps/demoapp:app"),
+    ssrWebappComponent("//test-workspace/apps/demoapp:app"),
     ...policyNodes(),
     deploymentNode({
       component_kind: "ssr-webapp",
@@ -176,7 +176,7 @@ test("validation accepts the reviewed single-component ssr-webapp slice", () => 
         {
           id: "default",
           kind: "ssr-webapp",
-          target: "//projects/apps/demoapp:app",
+          target: "//test-workspace/apps/demoapp:app",
           app_name: "demoapp",
           container_port: "3000",
           health_path: "/healthz",
@@ -200,7 +200,7 @@ test("validation accepts the reviewed single-component ssr-webapp slice", () => 
 
 test("validation rejects reviewed host SSR slices with unsupported runtime-contract drift", () => {
   const { errors } = extractNixosSharedHostDeployments([
-    ssrWebappComponent("//projects/apps/demoapp:app"),
+    ssrWebappComponent("//test-workspace/apps/demoapp:app"),
     ...policyNodes(),
     deploymentNode({
       component_kind: "ssr-webapp",
@@ -209,7 +209,7 @@ test("validation rejects reviewed host SSR slices with unsupported runtime-contr
         {
           id: "default",
           kind: "ssr-webapp",
-          target: "//projects/apps/demoapp:app",
+          target: "//test-workspace/apps/demoapp:app",
           app_name: "demoapp",
           container_port: "3000",
           ssr_framework: "vite",

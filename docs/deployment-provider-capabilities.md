@@ -9,7 +9,11 @@ covering the fields below before it is considered in policy.
 
 Normative-source note:
 
-- this document is the authoritative reviewed registry for built-in provider capability support
+- reviewed built-in provider entries are rendered from the structured provider-capability registry in
+  `build-tools/tools/deployments/provider-capabilities/**`
+- those structured capability entries are the authoritative source for normative provider values
+- this document may add explanatory prose outside the rendered registry block, but must not redefine
+  reviewed provider values independently
 - [Deployment Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) may summarize provider support for onboarding, but this document owns the normative provider-capability contract
 
 ## Required Capability Fields
@@ -47,6 +51,8 @@ Normative-source note:
 - Does the provider support protected/shared built-in `release_actions`, and which action types are allowed?
 - Does the provider require package-local executable hooks, or can it stay inside the built-in registry model?
 
+<!-- BEGIN GENERATED PROVIDER CAPABILITIES -->
+
 ## Capability Entry: `nixos-shared-host`
 
 ### Identity
@@ -80,13 +86,14 @@ Normative-source note:
 ### Rollout Support
 
 - default rollout mode:
-  - `all_at_once` for single-component deployments
+  - `all_at_once`
 - rollout-policy omission posture:
   - omission is reviewed only for single-component deployments
-  - protected/shared multi-component deployments must declare `rollout_policy` explicitly even
-    when the intended behavior would otherwise match the provider default
+  - protected/shared multi-component deployments must declare `rollout_policy` explicitly even when the intended behavior would otherwise match the provider default
 - supported rollout modes:
-  - `all_at_once` for single-component deployments
+  - `all_at_once`
+  - `ordered_best_effort`
+- reviewed multi-component posture:
   - `ordered_best_effort` for the reviewed multi-component static-webapp slice, with:
     - explicit `rollout_policy`
     - `abort = "stop_on_first_failure"`
@@ -187,13 +194,9 @@ Normative-source note:
 - reviewed built-in provisioner reference for the initial slice:
   - `nixos-shared-host-manifest`
 - meaning:
-  - shared control-plane `deploy` and `explicit_removal` runs generate one reviewed provisioner
-    plan artifact from the frozen execution snapshot before the first mutating provider step
-  - the plan artifact fingerprint is bound into protected/shared admission evidence so approval and
-    later revalidation fail closed on plan drift
-  - routine `deploy` remains non-destructive by default; if the reviewed plan would delete or
-    replace an owned live target identity, the routine path is rejected and operators must use the
-    separate destructive workflow instead of piggybacking on ordinary deploy authority
+  - shared control-plane `deploy` and `explicit_removal` runs generate one reviewed provisioner plan artifact from the frozen execution snapshot before the first mutating provider step
+  - the plan artifact fingerprint is bound into protected/shared admission evidence so approval and later revalidation fail closed on plan drift
+  - routine `deploy` remains non-destructive by default; if the reviewed plan would delete or replace an owned live target identity, the routine path is rejected and operators must use the separate destructive workflow instead of piggybacking on ordinary deploy authority
   - reviewed deploy/control-plane workflows maintain one authoritative cumulative platform-state artifact for the selected `nixos-shared-host` target
   - scoped apply may create or update only the named deployment entries in that platform state
   - authoritative full reconcile may replace the full platform state
@@ -209,8 +212,7 @@ Normative-source note:
   - supported only for the reviewed built-in types:
     - `cache_warmup`
     - `post_publish_verification`
-  - reviewed built-in action types that must be rejected on the ordinary protected/shared deploy
-    path:
+  - reviewed built-in action types that must be rejected on the ordinary protected/shared deploy path:
     - `schema_migration`
   - replay follows the recorded per-action replay policy for `retry`, `rollback`, and `promotion`
   - package-local executable hooks remain out of policy
@@ -289,9 +291,7 @@ Normative-source note:
 - same-deployment `--publish-only` is reviewed as `retry`
 - same-deployment rollback is reviewed only for prior successful normal runs on the same canonical store target identity
 - cross-deployment promotion is reviewed only for exact-artifact reuse through the branch-backed lane contract
-- static-webapp exact-artifact promotion may cross reviewed providers only on lane edges that
-  explicitly opt in, and only when the source and target both resolve to the same reviewed static
-  artifact compatibility family
+- static-webapp exact-artifact promotion may cross reviewed providers only on lane edges that explicitly opt in, and only when the source and target both resolve to the same reviewed static artifact compatibility family
 
 ### Replay Snapshot Baseline
 
@@ -323,7 +323,7 @@ Normative-source note:
 ### Provisioner Support
 
 - deployment-owned provisioners for protected/shared mutation:
-  - not supported in the reviewed `app-store-connect` capability entry
+- not supported in the reviewed `app-store-connect` capability entry
 
 ### Built-In `release_actions` Support
 
@@ -434,7 +434,7 @@ Normative-source note:
 ### Provisioner Support
 
 - deployment-owned provisioners for protected/shared mutation:
-  - not supported in the reviewed `google-play` capability entry
+- not supported in the reviewed `google-play` capability entry
 
 ### Built-In `release_actions` Support
 
@@ -553,7 +553,7 @@ Normative-source note:
 ### Provisioner Support
 
 - deployment-owned provisioners for protected/shared mutation:
-  - not supported in the reviewed `cloudflare-pages` capability entry
+- not supported in the reviewed `cloudflare-pages` capability entry
 - implication:
   - protected/shared `cloudflare-pages` deployments should reject provisioner-managed infra mutation until a reviewed capability update defines allowed built-in provisioner types and their plan/diff contract
 
@@ -562,12 +562,9 @@ Normative-source note:
 - protected/shared built-in `release_actions`:
   - not supported in the reviewed `cloudflare-pages` capability entry
   - allowed built-in action types: none
-  - rejected built-in action types: all until a reviewed capability update explicitly allows
-    specific types and their replay expectations
-- implication:
-  - protected/shared `cloudflare-pages` deployments should reject `release_actions` until a
-    reviewed capability update explicitly allows specific built-in action types and their replay
-    expectations
+  - rejected built-in action types: all until a reviewed capability update explicitly allows specific types and their replay expectations
+  - implication:
+    - protected/shared `cloudflare-pages` deployments should reject `release_actions` until a reviewed capability update explicitly allows specific built-in action types and their replay expectations
 
 ### Protected/Shared Eligibility
 
@@ -730,10 +727,8 @@ Normative-source note:
 - checked-in provider config:
   - `helm/values.yaml` or equivalent release values remain provider-local publish configuration only
   - deployment metadata remains authoritative for cluster, namespace, and release identity; config drift must fail closed before publish
-  - the reviewed initial slice requires a provider-local `chart` entry and may declare `smoke_url`
-    plus optional `smoke_expect_contains` for service-health validation
-  - the rendered publish config injects the admitted per-component artifact paths and identities so
-    the release step consumes exact resolved inputs instead of ambient workspace state
+  - the reviewed initial slice requires a provider-local `chart` entry and may declare `smoke_url` plus optional `smoke_expect_contains` for service-health validation
+  - the rendered publish config injects the admitted per-component artifact paths and identities so the release step consumes exact resolved inputs instead of ambient workspace state
 
 ### Retry / Idempotency
 
@@ -757,8 +752,7 @@ Normative-source note:
 - meaning:
   - the normal deploy path may prepare namespace, ingress, storage, service-account, or related cluster wiring before publish
   - deployment metadata stays authoritative for target identity while the provisioner config stays provider-local
-  - the initial reviewed deploy flow records a provisioner plan artifact alongside publish records
-    when a built-in Kubernetes provisioner is declared
+  - the initial reviewed deploy flow records a provisioner plan artifact alongside publish records when a built-in Kubernetes provisioner is declared
 
 ### Built-In `release_actions` Support
 
@@ -770,6 +764,8 @@ Normative-source note:
 - in policy for protected/shared single-component service deployments
 - in policy for protected/shared reviewed multi-component service plus sidecar or shared-platform deployments only when the deployment declares the reviewed explicit rollout policy
 - protected/shared execution must stay inside vetted built-in publisher, provisioner, and service-health smoke code
+
+<!-- END GENERATED PROVIDER CAPABILITIES -->
 
 ## Adding Another Provider
 
@@ -783,12 +779,13 @@ Before adding a new built-in provider for protected/shared use:
 6. Define smoke/release-health rules.
 7. Define retry/idempotency rules.
 8. State whether partial publish state is observable.
-9. State whether the provider is approved for protected/shared use.
+9. Define provisioner and built-in `release_actions` posture.
+10. State whether the provider is approved for protected/shared use.
 
 Change-control rule:
 
-- a built-in adapter must not widen provider support beyond the reviewed capability entry in this document
-- when provider behavior changes materially, update this document first or in the same change
+- a built-in adapter must not widen provider support beyond the reviewed structured capability entry
+- when provider behavior changes materially, update the structured provider-capability registry and render this document in the same change
 
 ## Companion Docs
 

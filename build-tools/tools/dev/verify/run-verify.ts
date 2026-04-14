@@ -33,7 +33,7 @@ import {
   writeVerifyIsoMarker,
 } from "./process-control.ts";
 import { prepareVerifySeed, shouldPrepareVerifySeedForRequestedTargets } from "./seed.ts";
-import { isProjectsOnlyVerifyTargets } from "./target-scope.ts";
+import { isNonBuildSystemOnlyVerifyTargets } from "./target-scope.ts";
 import { ensureRepoLocalTmpRoot } from "./tmp-root.ts";
 import { runVerifyBuckPasses } from "./verify-passes.ts";
 import { computeZxTestNodeModulesOut } from "./zx-node-modules.ts";
@@ -54,12 +54,12 @@ export async function runVerify(): Promise<void> {
   }
   await runStartupCheck(root);
   process.chdir(root);
-  const projectsOnlyScope = isProjectsOnlyVerifyTargets(selection.targets);
+  const nonBuildSystemOnlyScope = isNonBuildSystemOnlyVerifyTargets(selection.targets);
   await runVerifyLintPreflight(root, zxInitPath, {
     lintFilters: selection.lintFilters,
-    includeBuildSystemPolicy: !projectsOnlyScope,
+    includeBuildSystemPolicy: !nonBuildSystemOnlyScope,
   });
-  if (!projectsOnlyScope) {
+  if (!nonBuildSystemOnlyScope) {
     await runNodeWithZx({
       cwd: root,
       script: path.join(root, "build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts"),
@@ -68,7 +68,7 @@ export async function runVerify(): Promise<void> {
     });
   } else {
     process.stderr.write(
-      "[verify] template-manifest check: skipped for projects-only verify scope\n",
+      "[verify] template-manifest check: skipped for non-build-system verify scope\n",
     );
   }
 

@@ -59,7 +59,7 @@ test("cloudflare-pages rebuild-per-stage promotion admits a new stage artifact b
     const stagingArtifactDir = path.join(tmp, "staging-artifact");
     await writeCloudflareArtifact(stagingArtifactDir, "<html>stage-specific build</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-rebuild-staging", "wrangler.jsonc"),
+      path.join(tmp, "test-workspace", "deployments", "pleomino-rebuild-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [sourceDeployment, staging]);
     await ensureNixosSharedHostStageBranch(tmp, $, sourceDeployment);

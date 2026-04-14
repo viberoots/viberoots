@@ -173,7 +173,7 @@ test("nixos-shared-host replay fails closed when a source snapshot omits the rec
           ...deployment,
           releaseActions: [
             {
-              ref: "//projects/deployments/demoapp-shared:post_publish_verification",
+              ref: "//test-workspace/deployments/demoapp-shared:post_publish_verification",
               type: "post_publish_verification",
               phase: "post_smoke",
               runCondition: "success_only",

@@ -15,7 +15,7 @@ function componentNode(label: string): GraphNode {
 
 test("validation rejects unsupported android rollout and provider target shape", () => {
   const { errors } = extractGooglePlayDeployments([
-    componentNode("//projects/apps/demo-android:release"),
+    componentNode("//test-workspace/apps/demo-android:release"),
     googlePlayLanePolicyNodeFixture(),
     googlePlayAdmissionPolicyNodeFixture(),
     googlePlayDeploymentNodeFixture({
@@ -44,7 +44,7 @@ test("validation rejects unsupported android rollout and provider target shape",
 
 test("validation rejects non-mobile component kinds for google-play", () => {
   const { errors } = extractGooglePlayDeployments([
-    componentNode("//projects/apps/demo-android:release"),
+    componentNode("//test-workspace/apps/demo-android:release"),
     googlePlayLanePolicyNodeFixture(),
     googlePlayAdmissionPolicyNodeFixture(),
     googlePlayDeploymentNodeFixture({ component_kind: "static-webapp" }),

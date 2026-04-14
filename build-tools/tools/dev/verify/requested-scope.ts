@@ -1,8 +1,10 @@
 import { collectChangedPaths } from "../../lib/build-system-test-scope.ts";
 import {
   type DeploymentImpactDiagnostics,
+  deploymentProjectPrefixesFromLabels,
   resolveDeploymentImpactSelection,
 } from "../../lib/deployment-impact-selector.ts";
+import { listDeploymentTargets } from "../../deployments/deployment-query.ts";
 import {
   DEPLOYMENT_SAFETY_FLOOR_TARGETS,
   queryDeploymentDomainTargets,
@@ -47,16 +49,11 @@ export type VerifyScopeDecision = Omit<
 type ResolveRequestedVerifyScopeDeps = {
   resolveTemplateScope: typeof resolveVerifyTemplateTestScope;
   collectChangedPaths: typeof collectChangedPaths;
+  listDeploymentTargets: typeof listDeploymentTargets;
   queryDeploymentDomainTargets: typeof queryDeploymentDomainTargets;
   resolveProjectImpactSelection: typeof resolveProjectImpactSelection;
   deploymentSafetyFloorTargets: readonly string[];
 };
-
-const DEFAULT_DEPLOYMENT_PROJECT_PREFIXES = [
-  "projects/apps/",
-  "projects/libs/",
-  "projects/deployments/",
-] as const;
 
 function parseDeploymentTestScopeMode(raw: string | undefined): VerifyDeploymentScopeMode {
   const v = String(raw || "auto")
@@ -99,7 +96,15 @@ function deploymentProjectTargets(
   baseDecision: VerifyTemplateScopeDecision,
   projectImpact: ProjectImpactSelectorResult,
 ): string[] {
-  return projectImpact.mode === "project-impact" ? projectImpact.targets : baseDecision.targets;
+  const baseProjectTargets =
+    baseDecision.selectorMode === "project-impact" ||
+    baseDecision.selectorMode === "project-closure"
+      ? baseDecision.targets
+      : [];
+  return toSortedUnique([
+    ...baseProjectTargets,
+    ...(projectImpact.mode === "project-impact" ? projectImpact.targets : []),
+  ]);
 }
 
 async function resolveDeploymentOverride(opts: {
@@ -113,7 +118,11 @@ async function resolveDeploymentOverride(opts: {
 
   const collectPaths = opts.deps?.collectChangedPaths || collectChangedPaths;
   const changedPaths = await collectPaths(opts.root, opts.env);
-  const impact = resolveDeploymentImpactSelection(changedPaths);
+  const resolveDeploymentLabels = opts.deps?.listDeploymentTargets || listDeploymentTargets;
+  const deploymentTargetLabels = await resolveDeploymentLabels(opts.root);
+  const impact = resolveDeploymentImpactSelection(changedPaths, {
+    deploymentTargetLabels,
+  });
   if (opts.requestedDeploymentMode === "always" && impact.mode !== "deployment-only") {
     guardDeploymentSelection(
       "BNX_DEPLOYMENT_TEST_SCOPE=always requires deployment-only changes",
@@ -140,10 +149,11 @@ async function resolveDeploymentOverride(opts: {
   if (impact.mode === "deployment-and-project-impact") {
     const resolveProjectImpact =
       opts.deps?.resolveProjectImpactSelection || resolveProjectImpactSelection;
+    const deploymentProjectPrefixes = deploymentProjectPrefixesFromLabels(deploymentTargetLabels);
     const projectImpact = await resolveProjectImpact({
       root: opts.root,
       changedPaths,
-      projectPrefixes: DEFAULT_DEPLOYMENT_PROJECT_PREFIXES,
+      projectPrefixes: deploymentProjectPrefixes,
     });
     projectImpactDiagnostics = projectImpact.diagnostics;
     projectTargets = deploymentProjectTargets(opts.baseDecision, projectImpact);

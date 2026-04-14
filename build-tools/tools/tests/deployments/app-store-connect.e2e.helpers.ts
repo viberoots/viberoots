@@ -27,7 +27,7 @@ export async function installAppStoreConnectTargets(
 ): Promise<void> {
   await installMobileSharedTargets({
     workspaceRoot,
-    appTargetLabel: "//projects/apps/demo-ios:release",
+    appTargetLabel: "//test-workspace/apps/demo-ios:release",
     appArtifactName: "release.ipa",
     appArtifactMarker: "demo-ios",
     deployments,
@@ -36,7 +36,7 @@ export async function installAppStoreConnectTargets(
     deployments.map(async (deployment) => {
       const deployTargetsPath = path.join(
         workspaceRoot,
-        "projects",
+        "test-workspace",
         "deployments",
         deployment.deploymentId,
         "TARGETS",
@@ -50,7 +50,7 @@ export async function installAppStoreConnectTargets(
           "deployment_target(",
           `    name = ${JSON.stringify(labelName(deployment.label))},`,
           '    provider = "app-store-connect",',
-          '    component = "//projects/apps/demo-ios:release",',
+          '    component = "//test-workspace/apps/demo-ios:release",',
           '    component_kind = "mobile-app",',
           '    publisher = "app-store-connect-mobile-release",',
           '    publisher_config = "app-store-connect.jsonc",',
@@ -58,7 +58,7 @@ export async function installAppStoreConnectTargets(
           `    lane_policy = ${JSON.stringify(deployment.lanePolicyRef)},`,
           `    environment_stage = ${JSON.stringify(deployment.environmentStage)},`,
           `    admission_policy = ${JSON.stringify(deployment.admissionPolicyRef)},`,
-          '    components = [{"id": "default", "kind": "mobile-app", "target": "//projects/apps/demo-ios:release"}],',
+          '    components = [{"id": "default", "kind": "mobile-app", "target": "//test-workspace/apps/demo-ios:release"}],',
           "    provider_target = {",
           `        "issuer": ${JSON.stringify(deployment.providerTarget.issuer)},`,
           `        "app": ${JSON.stringify(deployment.providerTarget.app)},`,

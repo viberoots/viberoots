@@ -14,18 +14,18 @@ function serviceComponent(label: string): GraphNode {
 
 function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
   return {
-    name: "//projects/deployments/api-prod:deploy",
+    name: "//test-workspace/deployments/api-prod:deploy",
     provider: "kubernetes",
-    component: "//projects/apps/api:image",
+    component: "//test-workspace/apps/api:image",
     component_kind: "service",
     publisher: "helm-release",
     publisher_config: "helm/values.yaml",
     provisioner: "cdktf-stack",
     provisioner_config: "cdktf/stack.json",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino-shared:lane",
+    lane_policy: "//test-workspace/deployments/pleomino-shared:lane",
     environment_stage: "staging",
-    admission_policy: "//projects/deployments/platform-shared:prod_release",
+    admission_policy: "//test-workspace/deployments/platform-shared:prod_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: {
@@ -43,7 +43,7 @@ function policyNodes(): GraphNode[] {
 
 test("validation rejects unsupported kubernetes publisher and provisioner drift", () => {
   const { errors } = extractKubernetesDeployments([
-    serviceComponent("//projects/apps/api:image"),
+    serviceComponent("//test-workspace/apps/api:image"),
     ...policyNodes(),
     deploymentNode({ publisher: "other", provisioner: "custom" }),
   ]);
@@ -53,7 +53,7 @@ test("validation rejects unsupported kubernetes publisher and provisioner drift"
 
 test("validation rejects unsupported component kinds for kubernetes", () => {
   const { errors } = extractKubernetesDeployments([
-    serviceComponent("//projects/apps/api:image"),
+    serviceComponent("//test-workspace/apps/api:image"),
     ...policyNodes(),
     deploymentNode({ component_kind: "static-webapp" }),
   ]);
@@ -64,16 +64,16 @@ test("validation rejects unsupported component kinds for kubernetes", () => {
 
 test("validation rejects protected multi-component kubernetes deployments without rollout_policy", () => {
   const { errors } = extractKubernetesDeployments([
-    serviceComponent("//projects/apps/api:image"),
-    serviceComponent("//projects/observability/otel-sidecar:image"),
+    serviceComponent("//test-workspace/apps/api:image"),
+    serviceComponent("//test-workspace/observability/otel-sidecar:image"),
     ...policyNodes(),
     deploymentNode({
       components: [
-        { id: "api", kind: "service", target: "//projects/apps/api:image" },
+        { id: "api", kind: "service", target: "//test-workspace/apps/api:image" },
         {
           id: "otel-sidecar",
           kind: "third-party-service",
-          target: "//projects/observability/otel-sidecar:image",
+          target: "//test-workspace/observability/otel-sidecar:image",
         },
       ],
       protection_class: "production_facing",
@@ -84,16 +84,16 @@ test("validation rejects protected multi-component kubernetes deployments withou
 
 test("validation rejects rollout steps that omit a kubernetes component", () => {
   const { errors } = extractKubernetesDeployments([
-    serviceComponent("//projects/apps/api:image"),
-    serviceComponent("//projects/observability/otel-sidecar:image"),
+    serviceComponent("//test-workspace/apps/api:image"),
+    serviceComponent("//test-workspace/observability/otel-sidecar:image"),
     ...policyNodes(),
     deploymentNode({
       components: [
-        { id: "api", kind: "service", target: "//projects/apps/api:image" },
+        { id: "api", kind: "service", target: "//test-workspace/apps/api:image" },
         {
           id: "otel-sidecar",
           kind: "third-party-service",
-          target: "//projects/observability/otel-sidecar:image",
+          target: "//test-workspace/observability/otel-sidecar:image",
         },
       ],
       rollout_policy: {

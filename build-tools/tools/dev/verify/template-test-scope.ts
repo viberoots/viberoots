@@ -16,6 +16,7 @@ import {
   resolveBuildSystemBuckTestScope,
 } from "../../lib/build-system-test-scope.ts";
 import { packagePathFromLabel } from "../../lib/labels.ts";
+import { isNonBuildSystemScopeRoot } from "../../lib/non-build-system-scope.ts";
 import { resolveProjectClosureVerifyScope } from "./project-closure-scope.ts";
 
 export type VerifyTemplateScopeMode = "auto" | "always" | "never";
@@ -71,7 +72,7 @@ function lintFiltersFromExplicitTargets(targets: string[]): string[] | null {
     const pkg =
       t.endsWith("/...") && !t.includes(":") ? t.slice(2, -"/...".length) : packagePathFromLabel(t);
     if (!pkg) return null;
-    if (!pkg.startsWith("projects/apps/") && !pkg.startsWith("projects/libs/")) return null;
+    if (!isNonBuildSystemScopeRoot(pkg)) return null;
     filters.add(`./${pkg}`);
   }
   return filters.size > 0 ? Array.from(filters).sort() : null;

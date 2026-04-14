@@ -28,7 +28,8 @@ test("node webapp: nix_node_test target passes when no tests present", async () 
     await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
     // Primary path: `scaf new` produces a real importer lockfile under the importer directory.
-    const lockfile = path.join(tmp, "projects", "apps", "demo-web", "pnpm-lock.yaml");
+    const importer = "projects/apps/demo-web";
+    const lockfile = path.join(tmp, importer, "pnpm-lock.yaml");
     try {
       await fsp.access(lockfile);
     } catch {
@@ -36,7 +37,8 @@ test("node webapp: nix_node_test target passes when no tests present", async () 
     }
     await $({
       stdio: "inherit",
-    })`NIX_PNPM_ALLOW_GENERATE=1 node build-tools/tools/dev/update-pnpm-hash.ts --lockfile apps/demo-web/pnpm-lock.yaml`;
+      env: { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" },
+    })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${path.join(importer, "pnpm-lock.yaml")}`;
 
     // Glue and provider mapping (export graph → providers → auto_map)
     await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;

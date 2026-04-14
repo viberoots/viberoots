@@ -33,6 +33,7 @@ test("deployment-only changes select deployment suite plus safety floor", async 
     deps: {
       resolveTemplateScope: async () => baseDecision(),
       collectChangedPaths: async () => ["build-tools/deployments/defs.bzl"],
+      listDeploymentTargets: async () => ["//test-workspace/deployments/pleomino-dev:deploy"],
       queryDeploymentDomainTargets: async () => [
         "//:deployment_domain_labels_cquery",
         "//:nixos_shared_host_contract",
@@ -63,29 +64,27 @@ test("deployment project changes select deployment and project-impact union", as
       resolveTemplateScope: async () =>
         baseDecision({
           selectorMode: "project-impact",
-          targets: ["//projects/apps/pleomino/..."],
+          targets: ["//test-workspace/apps/pleomino/..."],
           reason: "project-impact-targeted",
         }),
       collectChangedPaths: async () => [
-        "projects/apps/pleomino/src/index.ts",
-        "projects/deployments/pleomino-dev/TARGETS",
+        "test-workspace/apps/pleomino/src/index.ts",
+        "test-workspace/deployments/pleomino-dev/TARGETS",
       ],
+      listDeploymentTargets: async () => ["//test-workspace/deployments/pleomino-dev:deploy"],
       queryDeploymentDomainTargets: async () => ["//:deployment_domain_labels_cquery"],
       resolveProjectImpactSelection: async () => ({
         mode: "project-impact",
-        targets: ["//projects/apps/pleomino/...", "//projects/deployments/pleomino-dev/..."],
+        targets: ["//test-workspace/deployments/pleomino-dev/..."],
         diagnostics: {
           mode: "project-impact",
           changedPaths: [
-            "projects/apps/pleomino/src/index.ts",
-            "projects/deployments/pleomino-dev/TARGETS",
+            "test-workspace/apps/pleomino/src/index.ts",
+            "test-workspace/deployments/pleomino-dev/TARGETS",
           ],
-          changedProjects: ["projects/apps/pleomino", "projects/deployments/pleomino-dev"],
+          changedProjects: ["test-workspace/deployments/pleomino-dev"],
           dependentProjects: [],
-          selectedTargets: [
-            "//projects/apps/pleomino/...",
-            "//projects/deployments/pleomino-dev/...",
-          ],
+          selectedTargets: ["//test-workspace/deployments/pleomino-dev/..."],
           reason: "project-impact-selection",
         },
       }),
@@ -98,8 +97,8 @@ test("deployment project changes select deployment and project-impact union", as
   assert.deepEqual(result.selection.targets, [
     "//:deployment_domain_labels_cquery",
     "//:deployment_verify_scope_boundary",
-    "//projects/apps/pleomino/...",
-    "//projects/deployments/pleomino-dev/...",
+    "//test-workspace/apps/pleomino/...",
+    "//test-workspace/deployments/pleomino-dev/...",
   ]);
 });
 
@@ -112,6 +111,7 @@ test("mixed build-system deployment impact keeps the existing selection", async 
     deps: {
       resolveTemplateScope: async () => baseDecision(),
       collectChangedPaths: async () => ["build-tools/tools/dev/verify/run-verify.ts"],
+      listDeploymentTargets: async () => ["//test-workspace/deployments/pleomino-dev:deploy"],
       queryDeploymentDomainTargets: async () => {
         throw new Error("deployment query should not run in mixed-build-system mode");
       },
@@ -151,7 +151,8 @@ test("always mode fails unless the change is safely deployment-only", async () =
         env: { BNX_DEPLOYMENT_TEST_SCOPE: "always" },
         deps: {
           resolveTemplateScope: async () => baseDecision(),
-          collectChangedPaths: async () => ["projects/deployments/pleomino-dev/TARGETS"],
+          collectChangedPaths: async () => ["test-workspace/deployments/pleomino-dev/TARGETS"],
+          listDeploymentTargets: async () => ["//test-workspace/deployments/pleomino-dev:deploy"],
         },
       }),
     /BNX_DEPLOYMENT_TEST_SCOPE=always requires deployment-only changes/,
@@ -169,6 +170,7 @@ test("deployment selection fails fast when the deployment query resolves zero ta
         deps: {
           resolveTemplateScope: async () => baseDecision(),
           collectChangedPaths: async () => ["build-tools/deployments/defs.bzl"],
+          listDeploymentTargets: async () => ["//test-workspace/deployments/pleomino-dev:deploy"],
           queryDeploymentDomainTargets: async () => [],
         },
       }),
@@ -187,6 +189,7 @@ test("deployment selection fails fast when the safety floor is empty", async () 
         deps: {
           resolveTemplateScope: async () => baseDecision(),
           collectChangedPaths: async () => ["build-tools/deployments/defs.bzl"],
+          listDeploymentTargets: async () => ["//test-workspace/deployments/pleomino-dev:deploy"],
           queryDeploymentDomainTargets: async () => ["//:deployment_domain_labels_cquery"],
           deploymentSafetyFloorTargets: [],
         },

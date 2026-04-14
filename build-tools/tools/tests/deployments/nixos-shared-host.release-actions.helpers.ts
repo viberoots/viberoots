@@ -20,7 +20,7 @@ export function releaseActionDeployment() {
   return nixosSharedHostDeploymentFixture({
     releaseActions: [
       deploymentReleaseActionFixture({
-        ref: "//projects/deployments/demoapp-shared:success_marker",
+        ref: "//test-workspace/deployments/demoapp-shared:success_marker",
         type: "post_publish_verification",
         phase: "post_smoke",
         runCondition: "success_only",
@@ -30,7 +30,7 @@ export function releaseActionDeployment() {
         operationKeys: {},
       }),
       deploymentReleaseActionFixture({
-        ref: "//projects/deployments/demoapp-shared:failure_marker",
+        ref: "//test-workspace/deployments/demoapp-shared:failure_marker",
         type: "post_publish_verification",
         phase: "post_smoke",
         runCondition: "failure_only",
@@ -40,7 +40,7 @@ export function releaseActionDeployment() {
         operationKeys: {},
       }),
       deploymentReleaseActionFixture({
-        ref: "//projects/deployments/demoapp-shared:always_marker",
+        ref: "//test-workspace/deployments/demoapp-shared:always_marker",
         type: "post_publish_verification",
         phase: "post_smoke",
         runCondition: "always",
@@ -50,7 +50,7 @@ export function releaseActionDeployment() {
         operationKeys: {},
       }),
       deploymentReleaseActionFixture({
-        ref: "//projects/deployments/demoapp-shared:publish_failure_cleanup",
+        ref: "//test-workspace/deployments/demoapp-shared:publish_failure_cleanup",
         type: "post_publish_verification",
         phase: "post_publish_pre_smoke",
         runCondition: "failure_only",
@@ -60,7 +60,7 @@ export function releaseActionDeployment() {
         operationKeys: {},
       }),
       deploymentReleaseActionFixture({
-        ref: "//projects/deployments/demoapp-shared:publish_always_marker",
+        ref: "//test-workspace/deployments/demoapp-shared:publish_always_marker",
         type: "post_publish_verification",
         phase: "post_publish_pre_smoke",
         runCondition: "always",

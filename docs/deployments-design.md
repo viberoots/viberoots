@@ -15,7 +15,8 @@ This document defines the deployment model, not the current implementation statu
 Normative-source note:
 
 - [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) is the fail-closed normative source for shared operator and implementation guarantees across the deployment model
-- [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md) is the authoritative normative source for provider-specific support and constraints
+- the structured provider-capability registry under `build-tools/tools/deployments/provider-capabilities/**` is the authoritative source for reviewed provider-specific support and constraints
+- [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md) is the rendered normative doc view of that reviewed registry
 - this design doc explains rationale, structure, examples, and policy intent
 - when this document restates a cross-cutting contract rule for readability, the contract doc remains authoritative if wording ever drifts
 - when this document summarizes provider support for readability, the provider-capabilities doc remains authoritative if wording ever drifts

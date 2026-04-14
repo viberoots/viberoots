@@ -60,7 +60,7 @@ test("nixos-shared-host Nix module renders the reviewed SSR host runtime contrac
       JSON.stringify(
         createNixosSharedHostPlatformState([
           nixosSharedHostDeploymentFixture({
-            component: { kind: "ssr-webapp", target: "//projects/apps/demoapp:app" },
+            component: { kind: "ssr-webapp", target: "//test-workspace/apps/demoapp:app" },
             publisher: { type: "nixos-shared-host-ssr-webapp" },
             runtime: {
               appName: "demoapp",

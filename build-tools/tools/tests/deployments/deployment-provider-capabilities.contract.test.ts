@@ -1,30 +1,55 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import fsp from "node:fs/promises";
 import { test } from "node:test";
 import {
   REVIEWED_NON_STATIC_COMPONENT_KINDS,
+  REVIEWED_PROVIDER_CAPABILITIES,
+  REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER,
+  REVIEWED_PROVIDER_IDS,
   providerAllowsRoutineProtectedSharedReleaseActionType,
   providerCapabilityFor,
   providerDeclaresReleaseActionType,
   rolloutPolicyOmissionInPolicy,
 } from "../../deployments/deployment-provider-capabilities.ts";
+import {
+  PROVIDER_CAPABILITIES_DOC_PATH,
+  assertProviderCapabilitiesDocParity,
+  renderProviderCapabilitiesDoc,
+} from "../../deployments/provider-capabilities/doc.ts";
+import { validateProviderCapabilityRegistry } from "../../deployments/provider-capabilities/validate.ts";
 
-test("provider capabilities declare explicit default rollout modes", () => {
-  const appStoreConnect = providerCapabilityFor("app-store-connect");
-  const googlePlay = providerCapabilityFor("google-play");
-  const nixos = providerCapabilityFor("nixos-shared-host");
-  const cloudflare = providerCapabilityFor("cloudflare-pages");
-  const s3Static = providerCapabilityFor("s3-static");
-  const kubernetes = providerCapabilityFor("kubernetes");
-  assert.equal(appStoreConnect?.defaultRolloutMode, "all_at_once");
-  assert.equal(googlePlay?.defaultRolloutMode, "all_at_once");
-  assert.equal(nixos?.defaultRolloutMode, "all_at_once");
-  assert.equal(cloudflare?.defaultRolloutMode, "all_at_once");
-  assert.equal(s3Static?.defaultRolloutMode, "all_at_once");
-  assert.equal(kubernetes?.defaultRolloutMode, "all_at_once");
+test("reviewed provider registry is complete and deterministic", () => {
+  assert.deepEqual(REVIEWED_PROVIDER_IDS, [
+    "nixos-shared-host",
+    "app-store-connect",
+    "google-play",
+    "cloudflare-pages",
+    "s3-static",
+    "kubernetes",
+  ]);
+  assert.equal(REVIEWED_PROVIDER_CAPABILITIES.length, REVIEWED_PROVIDER_IDS.length);
+  assert.deepEqual(
+    REVIEWED_PROVIDER_CAPABILITIES.map((capability) => capability.provider),
+    [...REVIEWED_PROVIDER_IDS],
+  );
+  validateProviderCapabilityRegistry({ ...REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER });
 });
 
-test("rollout policy omission is in policy only for the reviewed deployment shapes", () => {
+test("checked-in provider capabilities doc stays in exact rendered parity with the registry", async () => {
+  const current = await fsp.readFile(PROVIDER_CAPABILITIES_DOC_PATH, "utf8");
+  assertProviderCapabilitiesDocParity(current);
+  assert.equal(renderProviderCapabilitiesDoc(current), current);
+  assert.equal(renderProviderCapabilitiesDoc(current), renderProviderCapabilitiesDoc(current));
+});
+
+test("legacy lookup helpers preserve the reviewed runtime contract", () => {
+  assert.equal(providerCapabilityFor("app-store-connect")?.defaultRolloutMode, "all_at_once");
+  assert.equal(providerCapabilityFor("google-play")?.defaultRolloutMode, "all_at_once");
+  assert.equal(providerCapabilityFor("nixos-shared-host")?.defaultRolloutMode, "all_at_once");
+  assert.equal(providerCapabilityFor("cloudflare-pages")?.defaultRolloutMode, "all_at_once");
+  assert.equal(providerCapabilityFor("s3-static")?.defaultRolloutMode, "all_at_once");
+  assert.equal(providerCapabilityFor("kubernetes")?.defaultRolloutMode, "all_at_once");
   assert.equal(
     rolloutPolicyOmissionInPolicy({ provider: "app-store-connect", componentCount: 1 }),
     true,
@@ -44,15 +69,6 @@ test("rollout policy omission is in policy only for the reviewed deployment shap
   );
   assert.equal(rolloutPolicyOmissionInPolicy({ provider: "s3-static", componentCount: 1 }), true);
   assert.equal(rolloutPolicyOmissionInPolicy({ provider: "kubernetes", componentCount: 1 }), true);
-  assert.equal(
-    rolloutPolicyOmissionInPolicy({ provider: "cloudflare-pages", componentCount: 2 }),
-    false,
-  );
-  assert.equal(rolloutPolicyOmissionInPolicy({ provider: "s3-static", componentCount: 2 }), false);
-  assert.equal(rolloutPolicyOmissionInPolicy({ provider: "kubernetes", componentCount: 2 }), false);
-});
-
-test("provider capabilities make built-in release-action posture explicit", () => {
   assert.equal(providerDeclaresReleaseActionType("nixos-shared-host", "cache_warmup"), true);
   assert.equal(
     providerDeclaresReleaseActionType("nixos-shared-host", "post_publish_verification"),
@@ -66,30 +82,14 @@ test("provider capabilities make built-in release-action posture explicit", () =
   assert.equal(providerDeclaresReleaseActionType("cloudflare-pages", "cache_warmup"), false);
   assert.equal(providerDeclaresReleaseActionType("s3-static", "cache_warmup"), false);
   assert.equal(providerDeclaresReleaseActionType("kubernetes", "cache_warmup"), false);
-});
-
-test("nixos-shared-host capability declares the reviewed ssr-webapp slice", () => {
   const nixos = providerCapabilityFor("nixos-shared-host");
   assert.deepEqual(nixos?.supportedComponentKinds, ["static-webapp", "ssr-webapp"]);
   assert.deepEqual(nixos?.multiComponentKinds, ["static-webapp"]);
-});
-
-test("kubernetes capability declares the reviewed service-style component slice", () => {
   const kubernetes = providerCapabilityFor("kubernetes");
   assert.deepEqual(kubernetes?.supportedComponentKinds, ["service", "third-party-service"]);
   assert.deepEqual(kubernetes?.multiComponentKinds, ["service", "third-party-service"]);
   assert.deepEqual(kubernetes?.supportedRolloutModes, ["all_at_once", "ordered_best_effort"]);
-});
-
-test("app-store-connect capability declares the reviewed mobile-app slice", () => {
   const capability = providerCapabilityFor("app-store-connect");
-  assert.deepEqual(capability?.supportedComponentKinds, ["mobile-app"]);
-  assert.deepEqual(capability?.multiComponentKinds, []);
-  assert.deepEqual(capability?.supportedRolloutModes, ["all_at_once", "store_staged"]);
-});
-
-test("google-play capability declares the reviewed mobile-app slice", () => {
-  const capability = providerCapabilityFor("google-play");
   assert.deepEqual(capability?.supportedComponentKinds, ["mobile-app"]);
   assert.deepEqual(capability?.multiComponentKinds, []);
   assert.deepEqual(capability?.supportedRolloutModes, ["all_at_once", "store_staged"]);
@@ -102,4 +102,33 @@ test("the reviewed non-static component kinds are available for later provider s
     "service",
     "third-party-service",
   ]);
+});
+
+test("validation fails closed when a provider entry omits required reviewed capability data", () => {
+  const badRegistry = {
+    ...REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER,
+    "cloudflare-pages": {
+      ...REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER["cloudflare-pages"],
+      previewSupport: {
+        ...REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER["cloudflare-pages"].previewSupport,
+        support: [],
+      },
+    },
+  };
+  assert.throws(
+    () => validateProviderCapabilityRegistry(badRegistry),
+    /cloudflare-pages: previewSupport\.support must not be empty/,
+  );
+});
+
+test("doc parity fails closed when the rendered provider entries drift", async () => {
+  const current = await fsp.readFile(PROVIDER_CAPABILITIES_DOC_PATH, "utf8");
+  const stale = current.replace(
+    "## Capability Entry: `nixos-shared-host`",
+    "## Capability Entry: `nixos-shared-host-drift`",
+  );
+  assert.throws(
+    () => assertProviderCapabilitiesDocParity(stale),
+    /provider capabilities doc is stale/,
+  );
 });

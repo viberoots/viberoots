@@ -75,7 +75,7 @@ test("cloudflare-pages preview smoke remains blocking by default without an expl
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>expected preview</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "test-workspace", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
@@ -161,7 +161,7 @@ test("cloudflare-pages preview records nonblocking smoke failures only when depl
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>expected preview</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "test-workspace", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);

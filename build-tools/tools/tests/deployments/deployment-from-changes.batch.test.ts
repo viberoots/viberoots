@@ -13,21 +13,21 @@ function planForBatch(): DeploymentFromChangesPlan {
   const lanePolicy = nixosSharedHostLanePolicyFixture();
   const dev = nixosSharedHostDeploymentFixture({
     deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino-dev:deploy",
-    component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
+    label: "//test-workspace/deployments/pleomino-dev:deploy",
+    component: { kind: "static-webapp", target: "//test-workspace/apps/pleomino:app" },
     runtime: { appName: "pleomino", containerPort: 3000 },
     lanePolicy,
     prerequisites: [],
   });
   const staging = cloudflarePagesDeploymentFixture({
     deploymentId: "pleomino-staging",
-    label: "//projects/deployments/pleomino-staging:deploy",
+    label: "//test-workspace/deployments/pleomino-staging:deploy",
     lanePolicy,
     prerequisites: [{ deploymentId: "pleomino-dev", mode: "ordering_only" }],
   });
   const prod = cloudflarePagesDeploymentFixture({
     deploymentId: "pleomino-prod",
-    label: "//projects/deployments/pleomino-prod:deploy",
+    label: "//test-workspace/deployments/pleomino-prod:deploy",
     environmentStage: "prod",
     lanePolicy,
     providerTarget: {
@@ -37,28 +37,28 @@ function planForBatch(): DeploymentFromChangesPlan {
       canonicalUrl: "https://pleomino-prod-pages.pages.dev/",
       providerTargetIdentity: "cloudflare-pages:web-platform-prod/pleomino-prod-pages",
     },
-    admissionPolicyRef: "//projects/deployments/pleomino-shared:prod_release",
+    admissionPolicyRef: "//test-workspace/deployments/pleomino-shared:prod_release",
     admissionPolicy: {
       ...cloudflarePagesDeploymentFixture().admissionPolicy,
-      ref: "//projects/deployments/pleomino-shared:prod_release",
+      ref: "//test-workspace/deployments/pleomino-shared:prod_release",
       name: "prod_release",
       allowedRefs: ["env/pleomino/prod"],
     },
     prerequisites: [{ deploymentId: "pleomino-staging", mode: "health_gated" }],
   });
   return {
-    changedPaths: ["projects/apps/pleomino/src/main.tsx"],
+    changedPaths: ["test-workspace/apps/pleomino/src/main.tsx"],
     directDeploymentIds: ["pleomino-dev", "pleomino-staging", "pleomino-prod"],
     selectedDeployments: [dev, staging, prod],
     reasonsByDeploymentId: {
       "pleomino-dev": [
-        { kind: "component-project", paths: [], projects: ["projects/apps/pleomino"] },
+        { kind: "component-project", paths: [], projects: ["test-workspace/apps/pleomino"] },
       ],
       "pleomino-staging": [
-        { kind: "component-project", paths: [], projects: ["projects/apps/pleomino"] },
+        { kind: "component-project", paths: [], projects: ["test-workspace/apps/pleomino"] },
       ],
       "pleomino-prod": [
-        { kind: "component-project", paths: [], projects: ["projects/apps/pleomino"] },
+        { kind: "component-project", paths: [], projects: ["test-workspace/apps/pleomino"] },
       ],
     },
   };

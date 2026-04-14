@@ -135,19 +135,19 @@ test("selection summary reports target selector counts rather than expanded test
 test("explicit project target scopes lint/prettier to that importer", async () => {
   const result = await resolveVerifyTemplateTestScope({
     root: process.cwd(),
-    requestedTargets: ["//projects/apps/my-app:app"],
+    requestedTargets: ["//workspace/apps/my-app:app"],
     env: {},
     deps: {
       resolveBuildScope: async () => ({
-        targets: ["//projects/apps/my-app:app"],
+        targets: ["//workspace/apps/my-app:app"],
         mode: "auto",
         hasBuildSystemChanges: false,
       }),
     },
   });
   assert.equal(result.selectorMode, "skipped");
-  assert.deepEqual(result.targets, ["//projects/apps/my-app:app"]);
-  assert.deepEqual(result.lintFilters, ["./projects/apps/my-app"]);
+  assert.deepEqual(result.targets, ["//workspace/apps/my-app:app"]);
+  assert.deepEqual(result.lintFilters, ["./workspace/apps/my-app"]);
 });
 
 test("always mode fails with actionable diagnostics when change-set is not template-only", async () => {

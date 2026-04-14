@@ -53,7 +53,7 @@ test("cloudflare-pages preview publish and explicit preview cleanup run end to e
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>pleomino preview</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "test-workspace", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);

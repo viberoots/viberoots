@@ -142,7 +142,7 @@ export async function runVerifyLintPreflight(
       await runVerifyNixGapsPolicyPreflight(root, zxInitPath);
     } else {
       process.stderr.write(
-        "[verify] nix-gaps policy preflight: skipped for projects-only verify scope\n",
+        "[verify] nix-gaps policy preflight: skipped for non-build-system verify scope\n",
       );
     }
     return;
@@ -209,10 +209,10 @@ export async function runVerifyLintPreflight(
     await runVerifyNixGapsPolicyPreflight(root, zxInitPath);
   } else {
     process.stderr.write(
-      "[verify] file-size preflight: skipped build-system file-size gates for projects-only verify scope\n",
+      "[verify] file-size preflight: skipped build-system file-size gates for non-build-system verify scope\n",
     );
     process.stderr.write(
-      "[verify] nix-gaps policy preflight: skipped for projects-only verify scope\n",
+      "[verify] nix-gaps policy preflight: skipped for non-build-system verify scope\n",
     );
   }
 }

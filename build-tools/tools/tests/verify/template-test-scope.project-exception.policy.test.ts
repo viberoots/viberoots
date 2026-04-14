@@ -10,7 +10,7 @@ test("project-local methodology exception changes stay on the project-impact ver
     env: {},
     deps: {
       resolveBuildScope: async () => ({
-        targets: ["//projects/..."],
+        targets: ["//workspace/..."],
         mode: "auto",
         hasBuildSystemChanges: false,
       }),

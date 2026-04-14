@@ -20,7 +20,7 @@ export function googlePlayDeploymentFixture(
   const admissionPolicy =
     overrides.admissionPolicy ||
     nixosSharedHostAdmissionPolicyFixture({
-      ref: `//projects/deployments/pleomino-shared:${environmentStage}_release`,
+      ref: `//test-workspace/deployments/pleomino-shared:${environmentStage}_release`,
       name: `${environmentStage}_release`,
       requiredChecks: [],
       allowedRefs: [`env/mobile/${environmentStage}`],
@@ -38,7 +38,7 @@ export function googlePlayDeploymentFixture(
   };
   return {
     deploymentId: overrides.deploymentId || "demo-android-dev",
-    label: overrides.label || "//projects/deployments/demo-android-dev:deploy",
+    label: overrides.label || "//test-workspace/deployments/demo-android-dev:deploy",
     name: overrides.name || "deploy",
     provider: GOOGLE_PLAY_PROVIDER,
     protectionClass: overrides.protectionClass || "shared_nonprod",
@@ -55,13 +55,13 @@ export function googlePlayDeploymentFixture(
     ...(overrides.rolloutPolicy ? { rolloutPolicy: overrides.rolloutPolicy } : {}),
     component: {
       kind: MOBILE_APP_COMPONENT_KIND,
-      target: overrides.component?.target || "//projects/apps/demo-android:release",
+      target: overrides.component?.target || "//test-workspace/apps/demo-android:release",
     },
     components: overrides.components || [
       {
         id: "default",
         kind: MOBILE_APP_COMPONENT_KIND,
-        target: overrides.component?.target || "//projects/apps/demo-android:release",
+        target: overrides.component?.target || "//test-workspace/apps/demo-android:release",
       },
     ],
     publisher: overrides.publisher || {
@@ -74,16 +74,16 @@ export function googlePlayDeploymentFixture(
 
 export function googlePlayDeploymentNodeFixture(overrides: Partial<GraphNode> = {}): GraphNode {
   return {
-    name: "//projects/deployments/demo-android-dev:deploy",
+    name: "//test-workspace/deployments/demo-android-dev:deploy",
     provider: "google-play",
-    component: "//projects/apps/demo-android:release",
+    component: "//test-workspace/apps/demo-android:release",
     component_kind: "mobile-app",
     publisher: "google-play-mobile-release",
     publisher_config: "google-play.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino-shared:lane",
+    lane_policy: "//test-workspace/deployments/pleomino-shared:lane",
     environment_stage: "dev",
-    admission_policy: "//projects/deployments/pleomino-shared:dev_release",
+    admission_policy: "//test-workspace/deployments/pleomino-shared:dev_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: {
@@ -102,7 +102,7 @@ export function googlePlayAdmissionPolicyNodeFixture(
   overrides: Partial<GraphNode> = {},
 ): GraphNode {
   return nixosSharedHostAdmissionPolicyNodeFixture({
-    name: "//projects/deployments/pleomino-shared:dev_release",
+    name: "//test-workspace/deployments/pleomino-shared:dev_release",
     allowed_refs: ["env/mobile/dev"],
     required_checks: [],
     ...overrides,

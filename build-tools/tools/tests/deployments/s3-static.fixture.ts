@@ -21,7 +21,7 @@ export function s3StaticDeploymentFixture(
   const admissionPolicy =
     overrides.admissionPolicy ||
     nixosSharedHostAdmissionPolicyFixture({
-      ref: "//projects/deployments/pleomino-shared:staging_release",
+      ref: "//test-workspace/deployments/pleomino-shared:staging_release",
       name: "staging_release",
       allowedRefs: ["env/pleomino/staging"],
       requiredChecks: [],
@@ -38,7 +38,7 @@ export function s3StaticDeploymentFixture(
   };
   return {
     deploymentId: overrides.deploymentId || "pleomino-staging-s3",
-    label: overrides.label || "//projects/deployments/pleomino-staging-s3:deploy",
+    label: overrides.label || "//test-workspace/deployments/pleomino-staging-s3:deploy",
     name: overrides.name || "deploy",
     provider: S3_STATIC_PROVIDER,
     protectionClass: overrides.protectionClass || "shared_nonprod",
@@ -56,13 +56,13 @@ export function s3StaticDeploymentFixture(
     ...(overrides.rolloutPolicy ? { rolloutPolicy: overrides.rolloutPolicy } : {}),
     component: {
       kind: STATIC_WEBAPP_COMPONENT,
-      target: overrides.component?.target || "//projects/apps/pleomino:app",
+      target: overrides.component?.target || "//test-workspace/apps/pleomino:app",
     },
     components: overrides.components || [
       {
         id: "default",
         kind: STATIC_WEBAPP_COMPONENT,
-        target: overrides.component?.target || "//projects/apps/pleomino:app",
+        target: overrides.component?.target || "//test-workspace/apps/pleomino:app",
       },
     ],
     publisher: overrides.publisher || { type: "aws-s3-sync", config: "aws-s3-sync.jsonc" },
@@ -73,7 +73,7 @@ export function s3StaticDeploymentFixture(
 
 export function s3StaticAdmissionPolicyNodeFixture(overrides: Partial<GraphNode> = {}): GraphNode {
   return nixosSharedHostAdmissionPolicyNodeFixture({
-    name: "//projects/deployments/pleomino-shared:staging_release",
+    name: "//test-workspace/deployments/pleomino-shared:staging_release",
     allowed_refs: ["env/pleomino/staging"],
     required_checks: ["deploy/pleomino-staging-s3"],
     ...overrides,

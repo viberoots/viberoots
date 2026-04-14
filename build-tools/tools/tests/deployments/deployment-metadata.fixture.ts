@@ -28,7 +28,7 @@ export function deploymentReleaseActionFixture(
   overrides: Partial<DeploymentReleaseAction> = {},
 ): DeploymentReleaseAction {
   return {
-    ref: overrides.ref || "//projects/deployments/demoapp-shared:db_migration",
+    ref: overrides.ref || "//test-workspace/deployments/demoapp-shared:db_migration",
     type: overrides.type || "schema_migration",
     phase: overrides.phase || "pre_publish",
     runCondition: overrides.runCondition || "success_only",
@@ -72,7 +72,7 @@ export function deploymentTargetExceptionFixture(
   overrides: Partial<DeploymentTargetException> = {},
 ): DeploymentTargetException {
   return {
-    ref: overrides.ref || "//projects/deployments/demoapp-shared:alias_window",
+    ref: overrides.ref || "//test-workspace/deployments/demoapp-shared:alias_window",
     exceptionId: overrides.exceptionId || "alias-window",
     exceptionKind: overrides.exceptionKind || "alias",
     affectedDeploymentIds: overrides.affectedDeploymentIds || ["demoapp-dev", "demoapp-next"],

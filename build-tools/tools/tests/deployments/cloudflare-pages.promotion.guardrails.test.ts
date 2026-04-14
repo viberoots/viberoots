@@ -47,10 +47,10 @@ function pleominoDevDeployment() {
   };
   return nixosSharedHostDeploymentFixture({
     deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino-dev:deploy",
+    label: "//test-workspace/deployments/pleomino-dev:deploy",
     lanePolicy,
     lanePolicyRef: lanePolicy.ref,
-    component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
+    component: { kind: "static-webapp", target: "//test-workspace/apps/pleomino:app" },
     runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
   });
 }
@@ -171,7 +171,7 @@ test("promotion rejects attempts to reuse one deployment id instead of promoting
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>staging source</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "test-workspace", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);

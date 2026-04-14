@@ -18,7 +18,7 @@ test("promotion compatibility rejects provider and publisher drift", () => {
   const target = nixosSharedHostDeploymentFixture({
     environmentStage: "staging",
     admissionPolicy: nixosSharedHostAdmissionPolicyFixture({
-      ref: "//projects/deployments/pleomino-shared:staging_release",
+      ref: "//test-workspace/deployments/pleomino-shared:staging_release",
       name: "staging_release",
       allowedRefs: ["env/pleomino/staging"],
       requiredChecks: [],
@@ -38,16 +38,16 @@ test("promotion compatibility allows reviewed cross-provider dev promotion on de
   };
   const sourceDeployment = nixosSharedHostDeploymentFixture({
     deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino-dev:deploy",
+    label: "//test-workspace/deployments/pleomino-dev:deploy",
     lanePolicy,
     lanePolicyRef: lanePolicy.ref,
-    component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
+    component: { kind: "static-webapp", target: "//test-workspace/apps/pleomino:app" },
     runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
   });
   const target = cloudflarePagesDeploymentFixture({
     lanePolicy,
     lanePolicyRef: lanePolicy.ref,
-    component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
+    component: { kind: "static-webapp", target: "//test-workspace/apps/pleomino:app" },
   });
   const errors = promotionCompatibilityErrors(target, sourceForDeployment(sourceDeployment));
   assert.deepEqual(errors, []);
@@ -81,7 +81,7 @@ test("promotion compatibility rejects provisioner drift inside one lane", () => 
   const target = nixosSharedHostDeploymentFixture({
     environmentStage: "staging",
     admissionPolicy: nixosSharedHostAdmissionPolicyFixture({
-      ref: "//projects/deployments/pleomino-shared:staging_release",
+      ref: "//test-workspace/deployments/pleomino-shared:staging_release",
       name: "staging_release",
       allowedRefs: ["env/pleomino/staging"],
       requiredChecks: [],
@@ -94,11 +94,11 @@ test("promotion compatibility rejects provisioner drift inside one lane", () => 
 
 test("promotion compatibility rejects SSR runtime-contract drift inside one lane", () => {
   const sourceDeployment = nixosSharedHostDeploymentFixture({
-    component: { kind: "ssr-webapp", target: "//projects/apps/demoapp:app" },
+    component: { kind: "ssr-webapp", target: "//test-workspace/apps/demoapp:app" },
   });
   const target = nixosSharedHostDeploymentFixture({
     environmentStage: "staging",
-    component: { kind: "ssr-webapp", target: "//projects/apps/demoapp:app" },
+    component: { kind: "ssr-webapp", target: "//test-workspace/apps/demoapp:app" },
     runtime: {
       ...sourceDeployment.runtime!,
       runtimeContract: {
@@ -107,7 +107,7 @@ test("promotion compatibility rejects SSR runtime-contract drift inside one lane
       },
     } as any,
     admissionPolicy: nixosSharedHostAdmissionPolicyFixture({
-      ref: "//projects/deployments/pleomino-shared:staging_release",
+      ref: "//test-workspace/deployments/pleomino-shared:staging_release",
       name: "staging_release",
       allowedRefs: ["env/pleomino/staging"],
       requiredChecks: [],
@@ -121,7 +121,7 @@ test("promotion compatibility rejects mobile signing-model drift", () => {
   const sourceDeployment = appStoreConnectDeploymentFixture();
   const target = appStoreConnectDeploymentFixture({
     deploymentId: "demo-ios-staging",
-    label: "//projects/deployments/demo-ios-staging:deploy",
+    label: "//test-workspace/deployments/demo-ios-staging:deploy",
     environmentStage: "staging",
     providerTarget: {
       ...sourceDeployment.providerTarget,
@@ -144,7 +144,7 @@ test("promotion compatibility rejects mobile signing-model drift", () => {
 test("promotion compatibility rejects mobile track regression", () => {
   const sourceDeployment = appStoreConnectDeploymentFixture({
     deploymentId: "demo-ios-staging",
-    label: "//projects/deployments/demo-ios-staging:deploy",
+    label: "//test-workspace/deployments/demo-ios-staging:deploy",
     environmentStage: "staging",
     providerTarget: {
       issuer: "ios-platform",
@@ -176,7 +176,7 @@ test("promotion compatibility rejects mobile track regression", () => {
 test("promotion compatibility rejects google-play rollout regression", () => {
   const sourceDeployment = googlePlayDeploymentFixture({
     deploymentId: "demo-android-staging",
-    label: "//projects/deployments/demo-android-staging:deploy",
+    label: "//test-workspace/deployments/demo-android-staging:deploy",
     environmentStage: "staging",
     rolloutPolicy: {
       mode: "store_staged",
@@ -212,7 +212,7 @@ test("promotion compatibility rejects google-play rollout regression", () => {
 test("promotion compatibility rejects google-play track regression", () => {
   const sourceDeployment = googlePlayDeploymentFixture({
     deploymentId: "demo-android-staging",
-    label: "//projects/deployments/demo-android-staging:deploy",
+    label: "//test-workspace/deployments/demo-android-staging:deploy",
     environmentStage: "staging",
     providerTarget: {
       developerAccount: "android-platform",

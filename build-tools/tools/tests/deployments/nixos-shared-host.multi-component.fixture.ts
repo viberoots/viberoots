@@ -11,7 +11,7 @@ export function multiComponentDeployment(
   const admissionPolicy =
     environmentStage === "staging"
       ? nixosSharedHostAdmissionPolicyFixture({
-          ref: `//projects/deployments/${namePrefix}-shared:staging_release`,
+          ref: `//test-workspace/deployments/${namePrefix}-shared:staging_release`,
           name: "staging_release",
           allowedRefs: ["env/pleomino/staging"],
           requiredChecks: [],
@@ -24,7 +24,7 @@ export function multiComponentDeployment(
         });
   return nixosSharedHostDeploymentFixture({
     deploymentId: `${namePrefix}-stack-${environmentStage}`,
-    label: `//projects/deployments/${namePrefix}-stack-${environmentStage}:deploy`,
+    label: `//test-workspace/deployments/${namePrefix}-stack-${environmentStage}:deploy`,
     environmentStage,
     admissionPolicyRef: admissionPolicy.ref,
     admissionPolicy,
@@ -32,7 +32,7 @@ export function multiComponentDeployment(
       {
         id: "frontend",
         kind: "static-webapp",
-        target: "//projects/apps/demoapp:app",
+        target: "//test-workspace/apps/demoapp:app",
         runtime: {
           appName: `${namePrefix}-frontend-${environmentStage}`,
           containerPort: 3000,
@@ -52,7 +52,7 @@ export function multiComponentDeployment(
       {
         id: "api",
         kind: "static-webapp",
-        target: "//projects/apps/demoapi:app",
+        target: "//test-workspace/apps/demoapi:app",
         runtime: {
           appName: `${namePrefix}-api-${environmentStage}`,
           containerPort: 3001,

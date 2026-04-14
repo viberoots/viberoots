@@ -37,7 +37,7 @@ export function cloudflarePagesDeploymentFixture(
   const admissionPolicy =
     overrides.admissionPolicy ||
     nixosSharedHostAdmissionPolicyFixture({
-      ref: "//projects/deployments/pleomino-shared:staging_release",
+      ref: "//test-workspace/deployments/pleomino-shared:staging_release",
       name: "staging_release",
       allowedRefs: ["env/pleomino/staging"],
       requiredChecks: [],
@@ -52,7 +52,7 @@ export function cloudflarePagesDeploymentFixture(
   };
   return {
     deploymentId: overrides.deploymentId || "pleomino-staging",
-    label: overrides.label || "//projects/deployments/pleomino-staging:deploy",
+    label: overrides.label || "//test-workspace/deployments/pleomino-staging:deploy",
     name: overrides.name || "deploy",
     provider: CLOUDFLARE_PAGES_PROVIDER,
     protectionClass: overrides.protectionClass || "shared_nonprod",
@@ -70,13 +70,13 @@ export function cloudflarePagesDeploymentFixture(
     ...(overrides.rolloutPolicy ? { rolloutPolicy: overrides.rolloutPolicy } : {}),
     component: {
       kind: STATIC_WEBAPP_COMPONENT,
-      target: overrides.component?.target || "//projects/apps/pleomino:app",
+      target: overrides.component?.target || "//test-workspace/apps/pleomino:app",
     },
     components: overrides.components || [
       {
         id: "default",
         kind: STATIC_WEBAPP_COMPONENT,
-        target: overrides.component?.target || "//projects/apps/pleomino:app",
+        target: overrides.component?.target || "//test-workspace/apps/pleomino:app",
       },
     ],
     ...(overrides.preview ? { preview: overrides.preview } : {}),
@@ -89,7 +89,7 @@ export function cloudflarePagesAdmissionPolicyNodeFixture(
   overrides: Partial<GraphNode> = {},
 ): GraphNode {
   return nixosSharedHostAdmissionPolicyNodeFixture({
-    name: "//projects/deployments/pleomino-shared:staging_release",
+    name: "//test-workspace/deployments/pleomino-shared:staging_release",
     allowed_refs: ["env/pleomino/staging"],
     required_checks: ["deploy/pleomino-staging"],
     ...overrides,

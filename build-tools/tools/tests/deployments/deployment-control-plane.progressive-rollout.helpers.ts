@@ -6,12 +6,12 @@ import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts
 export function progressiveFixture() {
   return nixosSharedHostDeploymentFixture({
     deploymentId: "demo-stack-dev",
-    label: "//projects/deployments/demo-stack-dev:deploy",
+    label: "//test-workspace/deployments/demo-stack-dev:deploy",
     components: [
       {
         id: "frontend",
         kind: "static-webapp",
-        target: "//projects/apps/demoapp:app",
+        target: "//test-workspace/apps/demoapp:app",
         runtime: { appName: "demoapp", containerPort: 3000, healthPath: "/healthz" },
         providerTarget: {
           host: "nixos-shared-host",
@@ -27,7 +27,7 @@ export function progressiveFixture() {
       {
         id: "api",
         kind: "static-webapp",
-        target: "//projects/apps/demoapi:app",
+        target: "//test-workspace/apps/demoapi:app",
         runtime: { appName: "demoapi", containerPort: 3001, healthPath: "/healthz" },
         providerTarget: {
           host: "nixos-shared-host",

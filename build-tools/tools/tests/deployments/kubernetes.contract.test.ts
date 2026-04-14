@@ -38,8 +38,8 @@ test("deriveKubernetesProviderTarget normalizes canonical target identity", () =
 
 test("extractKubernetesDeployments reads shared-platform provider target and rollout", () => {
   const nodes: GraphNode[] = [
-    serviceComponent("//projects/observability/otel-collector:image"),
-    serviceComponent("//projects/observability/metrics-agent:image"),
+    serviceComponent("//test-workspace/observability/otel-collector:image"),
+    serviceComponent("//test-workspace/observability/metrics-agent:image"),
     kubernetesLanePolicyNodeFixture(),
     nixosSharedHostLaneGovernanceNodeFixture({
       branch_protections: nixosSharedHostLaneGovernanceFixture({
@@ -80,18 +80,18 @@ test("extractKubernetesDeployments reads shared-platform provider target and rol
     }),
     kubernetesAdmissionPolicyNodeFixture(),
     {
-      name: "//projects/deployments/shared-observability-prod:deploy",
+      name: "//test-workspace/deployments/shared-observability-prod:deploy",
       provider: "kubernetes",
       components: [
         {
           id: "otel-collector",
           kind: "third-party-service",
-          target: "//projects/observability/otel-collector:image",
+          target: "//test-workspace/observability/otel-collector:image",
         },
         {
           id: "metrics-agent",
           kind: "third-party-service",
-          target: "//projects/observability/metrics-agent:image",
+          target: "//test-workspace/observability/metrics-agent:image",
         },
       ],
       publisher: "helm-release",
@@ -99,9 +99,9 @@ test("extractKubernetesDeployments reads shared-platform provider target and rol
       provisioner: "terraform-stack",
       provisioner_config: "terraform/main.tf.json",
       protection_class: "production_facing",
-      lane_policy: "//projects/deployments/pleomino-shared:lane",
+      lane_policy: "//test-workspace/deployments/pleomino-shared:lane",
       environment_stage: "prod",
-      admission_policy: "//projects/deployments/platform-shared:prod_release",
+      admission_policy: "//test-workspace/deployments/platform-shared:prod_release",
       secret_requirements: [],
       runtime_config_requirements: [],
       rollout_policy: {

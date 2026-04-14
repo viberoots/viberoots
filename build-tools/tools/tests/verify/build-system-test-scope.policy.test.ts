@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
 import {
   hasRelevantBuildSystemChanges,
@@ -8,6 +9,8 @@ import {
   isIgnoredBuildSystemScopePath,
   parseBuildSystemTestMode,
 } from "../../lib/build-system-test-scope.ts";
+import { resolveNonBuildSystemBuckTargets } from "../../lib/non-build-system-scope.ts";
+import { runInTemp } from "../lib/test-helpers.ts";
 
 test("build-system test scope mode parsing supports auto/always/never", () => {
   assert.equal(parseBuildSystemTestMode(undefined), "auto");
@@ -73,4 +76,21 @@ test("git helper probes use non-throwing zx calls", async () => {
   assert.equal(txt.includes("git rev-parse --verify --quiet ${ref}`.nothrow()"), true);
   assert.equal(txt.includes("git merge-base ${ref} HEAD`.nothrow()"), true);
   assert.equal(txt.includes("git status --porcelain=v1`.nothrow()"), true);
+});
+
+test("non-build-system target scope derives selectors from top-level workspace roots", async () => {
+  await runInTemp("build-system-scope-non-build-roots", async (tmp) => {
+    await fsp.mkdir(path.join(tmp, "workspace", "apps", "demo"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, "docs"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, "build-tools", "tools"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, "toolchains", "go"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
+
+    const targets = await resolveNonBuildSystemBuckTargets(tmp);
+    assert.equal(targets.includes("//workspace/..."), true);
+    assert.equal(targets.includes("//docs/..."), true);
+    assert.equal(targets.includes("//build-tools/..."), false);
+    assert.equal(targets.includes("//toolchains/..."), false);
+    assert.equal(targets.includes("//third_party/..."), false);
+  });
 });

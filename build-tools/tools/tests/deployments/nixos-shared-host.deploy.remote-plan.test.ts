@@ -34,7 +34,7 @@ test("deploy plan reads the reviewed remote profile deterministically", async ()
       planMode: true,
       remoteExecutionImplemented: true,
       deploymentId: "demoapp-dev",
-      deploymentLabel: "//projects/deployments/demoapp-dev:deploy",
+      deploymentLabel: "//test-workspace/deployments/demoapp-dev:deploy",
       profileName: "mini",
       destination: "mini",
       transportMode: "ssh",
@@ -50,7 +50,7 @@ test("deploy plan reads the reviewed remote profile deterministically", async ()
       },
       artifactSource: {
         kind: "component-dist",
-        componentTarget: "//projects/apps/demoapp:app",
+        componentTarget: "//test-workspace/apps/demoapp:app",
         outputSubdir: "dist",
         remoteTransportRequired: true,
       },

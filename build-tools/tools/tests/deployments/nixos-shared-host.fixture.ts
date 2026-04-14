@@ -46,7 +46,7 @@ export function nixosSharedHostLanePolicyFixture(
     | DeploymentLanePromotionCompatibility
     | undefined;
   return {
-    ref: overrides.ref || "//projects/deployments/pleomino-shared:lane",
+    ref: overrides.ref || "//test-workspace/deployments/pleomino-shared:lane",
     name: overrides.name || "lane",
     stages: overrides.stages || ["dev", "staging", "prod"],
     stageBranches: overrides.stageBranches || {
@@ -67,7 +67,7 @@ export function nixosSharedHostAdmissionPolicyFixture(
   overrides: Partial<DeploymentAdmissionPolicy> = {},
 ): DeploymentAdmissionPolicy {
   return {
-    ref: overrides.ref || "//projects/deployments/pleomino-shared:dev_release",
+    ref: overrides.ref || "//test-workspace/deployments/pleomino-shared:dev_release",
     name: overrides.name || "dev_release",
     allowedRefs: overrides.allowedRefs || ["env/pleomino/dev"],
     requiredChecks: overrides.requiredChecks || ["deploy/pleomino-dev"],
@@ -162,7 +162,7 @@ export function nixosSharedHostDeploymentFixture(
     {
       id: "default",
       kind: componentKind,
-      target: overrides.component?.target || "//projects/apps/demoapp:app",
+      target: overrides.component?.target || "//test-workspace/apps/demoapp:app",
       runtime: {
         appName,
         containerPort: overrides.runtime?.containerPort || 3000,
@@ -189,7 +189,7 @@ export function nixosSharedHostDeploymentFixture(
   };
   return {
     deploymentId: overrides.deploymentId || "demoapp-dev",
-    label: overrides.label || "//projects/deployments/demoapp-dev:deploy",
+    label: overrides.label || "//test-workspace/deployments/demoapp-dev:deploy",
     name: overrides.name || "deploy",
     provider: NIXOS_SHARED_HOST_PROVIDER,
     protectionClass: overrides.protectionClass || "shared_nonprod",
@@ -208,7 +208,8 @@ export function nixosSharedHostDeploymentFixture(
     ...(overrides.bootstrap ? { bootstrap: overrides.bootstrap } : {}),
     component: {
       kind: components[0]?.kind || componentKind,
-      target: components[0]?.target || overrides.component?.target || "//projects/apps/demoapp:app",
+      target:
+        components[0]?.target || overrides.component?.target || "//test-workspace/apps/demoapp:app",
     },
     components,
     publisher: overrides.publisher || { type: "nixos-shared-host-static-webapp" },

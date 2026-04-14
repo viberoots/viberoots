@@ -18,7 +18,8 @@ import {
 } from "./nixos-shared-host.remote-exec.install.helpers.ts";
 export { installClientProfile } from "./nixos-shared-host.remote-exec.install.helpers.ts";
 
-export const REVIEWED_PLEOMINO_DEPLOYMENT_LABEL = "//projects/deployments/pleomino-dev:deploy";
+export const REVIEWED_PLEOMINO_DEPLOYMENT_LABEL =
+  "//test-workspace/deployments/pleomino-dev:deploy";
 
 export type RemoteExecFixture = {
   deployment: NixosSharedHostDeployment;
@@ -35,7 +36,7 @@ export function pleominoDeploymentFixture(): NixosSharedHostDeployment {
   return nixosSharedHostDeploymentFixture({
     deploymentId: "pleomino-dev",
     label: REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
-    component: { target: "//projects/apps/pleomino:app" },
+    component: { target: "//test-workspace/apps/pleomino:app" },
     runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
     lanePolicy: nixosSharedHostLanePolicyFixture({
       governance: {

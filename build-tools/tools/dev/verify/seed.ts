@@ -6,7 +6,7 @@ import "zx/globals";
 import { writeIfChanged } from "../../lib/fs-helpers.ts";
 import { runManagedCommand } from "../../lib/managed-command.ts";
 import { shouldStageSeed, stageSeedStore } from "./seed-staging.ts";
-import { isProjectsOnlyVerifyTargets } from "./target-scope.ts";
+import { isNonBuildSystemOnlyVerifyTargets } from "./target-scope.ts";
 import { pidAlive } from "./seed-utils.ts";
 
 type SeedInfo = {
@@ -34,7 +34,7 @@ export function shouldPrepareVerifySeedForRequestedTargets(
   const mode = parseVerifySeedMode(env.BNX_VERIFY_SEED_MODE);
   if (mode === "always") return true;
   if (mode === "never") return false;
-  return !isProjectsOnlyVerifyTargets(effectiveTargets);
+  return !isNonBuildSystemOnlyVerifyTargets(effectiveTargets);
 }
 
 function seedRootDir(root: string): string {

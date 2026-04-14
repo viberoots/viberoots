@@ -1,5 +1,6 @@
 import process from "node:process";
 import "../dev/zx-init.mjs";
+import { resolveNonBuildSystemBuckTargets } from "./non-build-system-scope.ts";
 
 export type BuildSystemTestMode = "auto" | "always" | "never";
 
@@ -10,7 +11,6 @@ type ScopeDecision = {
 };
 
 const AUTO_TARGETS = ["//..."];
-const PROJECT_TARGETS = ["//projects/..."];
 const AUTO_SCOPE_IGNORED_BUILD_SYSTEM_PATHS = new Set([
   "build-tools/tools/nix/node-modules.hashes.json",
   "build-tools/tools/node/workspace-map.json",
@@ -217,12 +217,16 @@ export async function resolveBuildSystemBuckTestScope(opts: {
     return { targets: AUTO_TARGETS, mode, hasBuildSystemChanges: false };
   }
   if (mode === "never") {
-    return { targets: PROJECT_TARGETS, mode, hasBuildSystemChanges: false };
+    return {
+      targets: await resolveNonBuildSystemBuckTargets(opts.root),
+      mode,
+      hasBuildSystemChanges: false,
+    };
   }
 
   const changed = await hasBuildSystemChanges(opts.root, env);
   return {
-    targets: changed ? AUTO_TARGETS : PROJECT_TARGETS,
+    targets: changed ? AUTO_TARGETS : await resolveNonBuildSystemBuckTargets(opts.root),
     mode,
     hasBuildSystemChanges: changed,
   };

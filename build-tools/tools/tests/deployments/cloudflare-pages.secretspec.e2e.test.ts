@@ -54,7 +54,7 @@ test("cloudflare-pages deploy keeps secretspec-backed Vault values out of record
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>pleomino staging</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "test-workspace", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await writeVaultFixture(fixturePath, {
       "secret://deployments/pleomino/cloudflare_api_token": {
@@ -138,7 +138,7 @@ test("cloudflare-pages deploy fails closed when a required secretspec contract i
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>pleomino staging</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "test-workspace", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await writeVaultFixture(fixturePath, {});
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);

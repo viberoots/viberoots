@@ -19,8 +19,8 @@ test("nixos-shared-host apply preserves preexisting out-of-scope apps during par
         createNixosSharedHostPlatformState([
           nixosSharedHostDeploymentFixture({
             deploymentId: "other-dev",
-            label: "//projects/deployments/other-dev:deploy",
-            component: { kind: "static-webapp", target: "//projects/apps/other:app" },
+            label: "//test-workspace/deployments/other-dev:deploy",
+            component: { kind: "static-webapp", target: "//test-workspace/apps/other:app" },
             runtime: { appName: "other", containerPort: 4000 },
           }),
         ]),

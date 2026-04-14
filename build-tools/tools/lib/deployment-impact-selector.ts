@@ -1,5 +1,6 @@
 import { isBuildSystemPath, isIgnoredBuildSystemScopePath } from "./build-system-test-scope.ts";
 import { classifyReviewedBuildSystemVerifyPath } from "./deployment-verify-scope.ts";
+import { packagePathFromLabel } from "./labels.ts";
 import { normalizeRepoPath, projectFromRepoPath, toSortedUnique } from "./project-graph.ts";
 
 export type DeploymentImpactMode =
@@ -25,8 +26,6 @@ export type DeploymentImpactResult = {
   diagnostics: DeploymentImpactDiagnostics;
 };
 
-const DEPLOYMENT_PROJECT_PREFIXES = ["projects/deployments"] as const;
-
 function normalizeChangedPaths(changedPaths: string[]): string[] {
   return toSortedUnique(
     changedPaths
@@ -39,16 +38,40 @@ function normalizeChangedPaths(changedPaths: string[]): string[] {
   );
 }
 
-function collectDeploymentProjects(paths: string[]): string[] {
+function packageParentPrefix(packagePath: string): string {
+  const normalized = normalizeRepoPath(packagePath)
+    .replace(/^\.\/+/, "")
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "");
+  const lastSlash = normalized.lastIndexOf("/");
+  return lastSlash > 0 ? normalized.slice(0, lastSlash) : "";
+}
+
+export function deploymentProjectPrefixesFromLabels(labels: string[]): string[] {
+  return toSortedUnique(
+    labels.map((label) => packageParentPrefix(packagePathFromLabel(label))).filter(Boolean),
+  );
+}
+
+function collectDeploymentProjects(
+  paths: string[],
+  deploymentProjectPrefixes: readonly string[],
+): string[] {
   return toSortedUnique(
     paths
-      .map((relPath) => projectFromRepoPath(relPath, DEPLOYMENT_PROJECT_PREFIXES))
+      .map((relPath) => projectFromRepoPath(relPath, deploymentProjectPrefixes))
       .filter((project): project is string => !!project),
   );
 }
 
-export function isDeploymentProjectPath(relPath: string): boolean {
-  return projectFromRepoPath(relPath, DEPLOYMENT_PROJECT_PREFIXES) !== null;
+export function isDeploymentProjectPath(
+  relPath: string,
+  deploymentProjectPrefixes: readonly string[],
+): boolean {
+  return (
+    deploymentProjectPrefixes.length > 0 &&
+    projectFromRepoPath(relPath, deploymentProjectPrefixes) !== null
+  );
 }
 
 function mixedBuildSystemReason(diagnostics: {
@@ -61,8 +84,14 @@ function mixedBuildSystemReason(diagnostics: {
   return "shared-build-system-path-changed";
 }
 
-export function resolveDeploymentImpactSelection(changedPaths: string[]): DeploymentImpactResult {
+export function resolveDeploymentImpactSelection(
+  changedPaths: string[],
+  opts?: { deploymentTargetLabels?: readonly string[] },
+): DeploymentImpactResult {
   const normalizedChangedPaths = normalizeChangedPaths(changedPaths);
+  const deploymentProjectPrefixes = deploymentProjectPrefixesFromLabels([
+    ...(opts?.deploymentTargetLabels || []),
+  ]);
   const deploymentOwnedPaths: string[] = [];
   const deploymentProjectPaths: string[] = [];
   const sharedBuildSystemPaths: string[] = [];
@@ -76,7 +105,7 @@ export function resolveDeploymentImpactSelection(changedPaths: string[]): Deploy
       deploymentOwnedPaths.push(relPath);
       continue;
     }
-    if (isDeploymentProjectPath(relPath)) {
+    if (isDeploymentProjectPath(relPath, deploymentProjectPrefixes)) {
       deploymentProjectPaths.push(relPath);
       continue;
     }
@@ -90,7 +119,10 @@ export function resolveDeploymentImpactSelection(changedPaths: string[]): Deploy
     unknownBuildSystemPaths.push(relPath);
   }
 
-  const deploymentProjects = collectDeploymentProjects(deploymentProjectPaths);
+  const deploymentProjects = collectDeploymentProjects(
+    deploymentProjectPaths,
+    deploymentProjectPrefixes,
+  );
   const fullBuildSystemTriggerPaths = toSortedUnique([
     ...sharedBuildSystemPaths,
     ...unknownBuildSystemPaths,

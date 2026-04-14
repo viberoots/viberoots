@@ -107,10 +107,11 @@ function relatedLabelsForNodes(
 async function queryDeploymentNodesExpanded(
   workspaceRoot: string,
   labels: string[],
+  opts?: { env?: NodeJS.ProcessEnv },
 ): Promise<ReturnType<typeof nodesFromCqueryJson>> {
   const allLabels = Array.from(new Set(labels.map((label) => normalizeTargetLabel(label))));
   while (true) {
-    const nodes = await queryDeploymentNodes(workspaceRoot, allLabels);
+    const nodes = await queryDeploymentNodes(workspaceRoot, allLabels, opts);
     const extraLabels = relatedLabelsForNodes(nodes, allLabels);
     if (extraLabels.length === 0) return nodes;
     allLabels.push(...extraLabels);
@@ -120,6 +121,7 @@ async function queryDeploymentNodesExpanded(
 export async function queryDeploymentNodes(
   workspaceRoot: string,
   labels: string[],
+  opts?: { env?: NodeJS.ProcessEnv },
 ): Promise<ReturnType<typeof nodesFromCqueryJson>> {
   const normalizedLabels = Array.from(new Set(labels.map((label) => normalizeTargetLabel(label))));
   const attrFlags = DEPLOYMENT_CQUERY_ATTRS.flatMap((attr) => ["--output-attribute", attr]);
@@ -127,16 +129,17 @@ export async function queryDeploymentNodes(
   const { stdout } = await $({
     cwd: workspaceRoot,
     stdio: "pipe",
-    env: deploymentBuckEnv(),
-  })`buck2 ${deploymentIsolationArgs()} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
+    env: deploymentBuckEnv(opts?.env),
+  })`buck2 ${deploymentIsolationArgs(opts?.env)} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
   return nodesFromCqueryJson(JSON.parse(String(stdout || "{}")) as Record<string, any>);
 }
 
 export async function resolveDeploymentFromTarget(
   workspaceRoot: string,
   deploymentTarget: string,
+  opts?: { env?: NodeJS.ProcessEnv },
 ): Promise<DeploymentTarget> {
-  const initialNodes = await queryDeploymentNodes(workspaceRoot, [deploymentTarget]);
+  const initialNodes = await queryDeploymentNodes(workspaceRoot, [deploymentTarget], opts);
   const deploymentNode = initialNodes.find((node) => node.name === deploymentTarget);
   if (!deploymentNode) throw new Error(`deployment target not found: ${deploymentTarget}`);
   const extraLabels = [
@@ -150,10 +153,16 @@ export async function resolveDeploymentFromTarget(
   ].filter((label) => label && label !== deploymentTarget);
   const nodes =
     extraLabels.length > 0
-      ? await queryDeploymentNodesExpanded(workspaceRoot, [deploymentTarget, ...extraLabels])
+      ? await queryDeploymentNodesExpanded(workspaceRoot, [deploymentTarget, ...extraLabels], opts)
       : initialNodes;
   try {
-    return await resolveDeploymentFromNodes(workspaceRoot, deploymentTarget, nodes, extraLabels);
+    return await resolveDeploymentFromNodes(
+      workspaceRoot,
+      deploymentTarget,
+      nodes,
+      extraLabels,
+      opts,
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error || "");
     if (
@@ -175,6 +184,7 @@ async function resolveDeploymentFromNodes(
   deploymentTarget: string,
   nodes: ReturnType<typeof nodesFromCqueryJson>,
   extraLabels: string[],
+  opts?: { env?: NodeJS.ProcessEnv },
 ): Promise<DeploymentTarget> {
   const extracted = extractDeployments(nodes);
   if (extracted.errors.length > 0) throw new Error(extracted.errors.join("\n"));
@@ -185,11 +195,11 @@ async function resolveDeploymentFromNodes(
   );
   if (componentLabels.length === 0) return hit;
   const expanded = extractDeployments(
-    await queryDeploymentNodes(workspaceRoot, [
-      deploymentTarget,
-      ...extraLabels,
-      ...componentLabels,
-    ]),
+    await queryDeploymentNodes(
+      workspaceRoot,
+      [deploymentTarget, ...extraLabels, ...componentLabels],
+      opts,
+    ),
   );
   if (expanded.errors.length > 0) throw new Error(expanded.errors.join("\n"));
   const expandedHit = expanded.deployments.find(

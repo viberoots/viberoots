@@ -30,7 +30,7 @@ test("target transition records retirement and migration with reviewed exception
   await runInTemp("cloudflare-pages-target-transition-success", async (tmp) => {
     const recordsRoot = path.join(tmp, "records");
     const retirement = deploymentTargetExceptionFixture({
-      ref: "//projects/deployments/pleomino-staging:retire_window",
+      ref: "//test-workspace/deployments/pleomino-staging:retire_window",
       affectedDeploymentIds: ["pleomino-staging"],
       oldProviderTargetIdentity: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
       approvalEvidence: "approval://retire-window",
@@ -52,7 +52,7 @@ test("target transition records retirement and migration with reviewed exception
     assert.equal(retired.record.oldProviderTargetIdentity, retirement.oldProviderTargetIdentity);
     assert.equal(retired.record.resultingOwnershipState.kind, "retired");
     const migration = deploymentTargetExceptionFixture({
-      ref: "//projects/deployments/pleomino-next-staging:migrate_window",
+      ref: "//test-workspace/deployments/pleomino-next-staging:migrate_window",
       exceptionKind: "migration",
       affectedDeploymentIds: ["pleomino-staging", "pleomino-next-staging"],
       oldProviderTargetIdentity: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
@@ -62,7 +62,7 @@ test("target transition records retirement and migration with reviewed exception
     });
     const migratedDeployment = cloudflarePagesDeploymentFixture({
       deploymentId: "pleomino-next-staging",
-      label: "//projects/deployments/pleomino-next-staging:deploy",
+      label: "//test-workspace/deployments/pleomino-next-staging:deploy",
       providerTarget: {
         ...cloudflarePagesDeploymentFixture().providerTarget,
         project: "pleomino-next-pages",
@@ -97,20 +97,20 @@ test("target transition fails closed for missing, expired, or superseded excepti
   await runInTemp("cloudflare-pages-target-transition-fail-closed", async (tmp) => {
     const recordsRoot = path.join(tmp, "records");
     const expired = deploymentTargetExceptionFixture({
-      ref: "//projects/deployments/pleomino-staging:expired_window",
+      ref: "//test-workspace/deployments/pleomino-staging:expired_window",
       affectedDeploymentIds: ["pleomino-staging"],
       approvalEvidence: "approval://expired",
       effectiveAt: "2026-01-01T00:00:00.000Z",
       expiresAt: "2026-02-01T00:00:00.000Z",
     });
     const superseded = deploymentTargetExceptionFixture({
-      ref: "//projects/deployments/pleomino-staging:alias_window_old",
+      ref: "//test-workspace/deployments/pleomino-staging:alias_window_old",
       affectedDeploymentIds: ["pleomino-staging"],
       approvalEvidence: "approval://old",
       effectiveAt: "2026-01-01T00:00:00.000Z",
     });
     const newer = deploymentTargetExceptionFixture({
-      ref: "//projects/deployments/pleomino-staging:alias_window_new",
+      ref: "//test-workspace/deployments/pleomino-staging:alias_window_new",
       affectedDeploymentIds: ["pleomino-staging"],
       approvalEvidence: "approval://new",
       effectiveAt: "2026-03-01T00:00:00.000Z",
@@ -124,7 +124,7 @@ test("target transition fails closed for missing, expired, or superseded excepti
           deployment,
           recordsRoot,
           operationKind: "retire_target",
-          targetExceptionRef: "//projects/deployments/pleomino-staging:missing",
+          targetExceptionRef: "//test-workspace/deployments/pleomino-staging:missing",
           admissionEvidence: approvalEvidence(
             "approval://missing",
             deployment.deploymentId,
@@ -170,7 +170,7 @@ test("target transition requires operator authorization and reviewed approval ev
   await runInTemp("cloudflare-pages-target-transition-authz", async (tmp) => {
     const recordsRoot = path.join(tmp, "records");
     const exception = deploymentTargetExceptionFixture({
-      ref: "//projects/deployments/pleomino-staging:retire_window",
+      ref: "//test-workspace/deployments/pleomino-staging:retire_window",
       affectedDeploymentIds: ["pleomino-staging"],
       oldProviderTargetIdentity: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
       approvalEvidence: "approval://transition-ticket",

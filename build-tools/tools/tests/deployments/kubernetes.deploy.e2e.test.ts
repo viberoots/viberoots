@@ -18,7 +18,7 @@ async function writeServiceArtifact(root: string, content: string): Promise<void
 async function writeHelmValues(root: string, deploymentId: string, content: string): Promise<void> {
   const configPath = path.join(
     root,
-    "projects",
+    "test-workspace",
     "deployments",
     deploymentId,
     "helm",
@@ -93,11 +93,11 @@ test("kubernetes deploy preserves ordered multi-component publish state", async 
   await runInTemp("kubernetes-e2e-multi", async (tmp, $) => {
     const deployment = kubernetesDeploymentFixture({
       components: [
-        { id: "api", kind: "service", target: "//projects/apps/api:image" },
+        { id: "api", kind: "service", target: "//test-workspace/apps/api:image" },
         {
           id: "otel-sidecar",
           kind: "third-party-service",
-          target: "//projects/observability/otel-sidecar:image",
+          target: "//test-workspace/observability/otel-sidecar:image",
         },
       ],
       rolloutPolicy: {
