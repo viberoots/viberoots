@@ -83,3 +83,61 @@ export async function resolveInitialS3StaticAdmittedContext(opts: {
     },
   };
 }
+
+export async function resolvePromotionS3StaticAdmittedContext(opts: {
+  workspaceRoot: string;
+  deployment: S3StaticDeployment;
+  artifactIdentity: string;
+  sourceRecord: { deployRunId: string; deploymentId: string };
+}): Promise<S3StaticAdmittedContext> {
+  const admitted = await resolveInitialS3StaticAdmittedContext(opts);
+  return {
+    ...admitted,
+    source: {
+      mode: "stage_branch_head",
+      sourceRef: admitted.targetEnvironment.targetRef,
+      sourceRevision: admitted.targetEnvironment.targetRevision,
+      artifactIdentity: opts.artifactIdentity,
+      artifactTrustMode: opts.deployment.admissionPolicy.artifactAttestationMode,
+      sourceRunId: opts.sourceRecord.deployRunId,
+      sourceDeploymentId: opts.sourceRecord.deploymentId,
+    } as S3StaticAdmittedContext["source"] & {
+      sourceRunId: string;
+      sourceDeploymentId: string;
+    },
+  };
+}
+
+export async function resolveSourceRunS3StaticAdmittedContext(opts: {
+  workspaceRoot: string;
+  deployment: S3StaticDeployment;
+  artifactIdentity: string;
+  sourceRecord: {
+    deployRunId: string;
+    deploymentId: string;
+    admittedContext?: {
+      source?: {
+        sourceRef?: string;
+        sourceRevision?: string;
+      };
+    };
+  };
+}): Promise<S3StaticAdmittedContext> {
+  const admitted = await resolveInitialS3StaticAdmittedContext(opts);
+  return {
+    ...admitted,
+    source: {
+      mode: "stage_branch_head",
+      sourceRef: opts.sourceRecord.admittedContext?.source?.sourceRef || admitted.source.sourceRef,
+      sourceRevision:
+        opts.sourceRecord.admittedContext?.source?.sourceRevision || admitted.source.sourceRevision,
+      artifactIdentity: opts.artifactIdentity,
+      artifactTrustMode: opts.deployment.admissionPolicy.artifactAttestationMode,
+      sourceRunId: opts.sourceRecord.deployRunId,
+      sourceDeploymentId: opts.sourceRecord.deploymentId,
+    } as S3StaticAdmittedContext["source"] & {
+      sourceRunId: string;
+      sourceDeploymentId: string;
+    },
+  };
+}

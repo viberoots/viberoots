@@ -19,6 +19,7 @@ import {
   writeS3StaticDeployRecord,
   type S3StaticDeployRecord,
 } from "./s3-static-records.ts";
+import { writeS3StaticReplaySnapshot } from "./s3-static-replay.ts";
 import { smokeS3StaticWebapp } from "./s3-static-smoke.ts";
 import { writeS3StaticProvisionerPlan } from "./s3-static-provisioner-plan.ts";
 import { resolveInitialS3StaticAdmittedContext } from "./s3-static-admission.ts";
@@ -165,6 +166,14 @@ export async function submitS3StaticDeploy(opts: {
       ...(executionPolicy ? { executionPolicy } : {}),
       deploymentMetadataFingerprint,
       providerConfigFingerprint,
+      replaySnapshotPath: await writeS3StaticReplaySnapshot({
+        recordsRoot: opts.recordsRoot,
+        deployRunId,
+        deployment: opts.deployment,
+        artifact,
+        admittedContext,
+        providerConfigSnapshotPath: preparedConfig.renderedConfigPath,
+      }),
       publicUrl: smoke.publicUrl,
       ...(published.providerReleaseId ? { providerReleaseId: published.providerReleaseId } : {}),
     });

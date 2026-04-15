@@ -22,8 +22,8 @@ export const S3_STATIC_RECORD_SCHEMA = "deploy-record@2026-04-09";
 export type S3StaticDeployRecord = {
   schemaVersion: typeof S3_STATIC_RECORD_SCHEMA;
   deployRunId: string;
-  operationKind: "deploy";
-  runClassification: "deploy";
+  operationKind: "deploy" | "promotion" | "retry" | "rollback" | "provision_only";
+  runClassification: "deploy" | "promotion" | "retry" | "rollback" | "provision_only";
   lifecycleState: "finished";
   terminationReason: null;
   finalOutcome: "succeeded" | "publish_failed" | "smoke_failed_after_publish";
@@ -32,6 +32,17 @@ export type S3StaticDeployRecord = {
   provider: typeof S3_STATIC_PROVIDER;
   providerTarget: S3StaticDeployment["providerTarget"];
   providerTargetIdentity: string;
+  controlPlane?: {
+    submissionId: string;
+    workerId: string;
+    admission: "admitted";
+    lockScope: string;
+    submissionPath?: string;
+    executionSnapshotPath?: string;
+  };
+  parentRunId?: string;
+  releaseLineageId?: string;
+  artifactLineageId?: string;
   artifact?: { identity: string; storedArtifactPath?: string; provenancePath?: string };
   admittedContext: S3StaticAdmittedContext;
   runnerIdentities: DeploymentRunnerIdentities;
@@ -44,6 +55,7 @@ export type S3StaticDeployRecord = {
   provisionerPlan?: S3StaticProvisionerPlanRef;
   deploymentMetadataFingerprint?: string;
   providerConfigFingerprint?: string;
+  replaySnapshotPath?: string;
   publicUrl?: string;
   providerReleaseId?: string;
   failedStep?: "publish" | "smoke";

@@ -22,8 +22,8 @@ export const KUBERNETES_RECORD_SCHEMA = "deploy-record@2026-04-10";
 export type KubernetesDeployRecord = {
   schemaVersion: typeof KUBERNETES_RECORD_SCHEMA;
   deployRunId: string;
-  operationKind: "deploy";
-  runClassification: "deploy";
+  operationKind: "deploy" | "promotion" | "retry" | "rollback" | "provision_only";
+  runClassification: "deploy" | "promotion" | "retry" | "rollback" | "provision_only";
   lifecycleState: "finished";
   terminationReason: null;
   finalOutcome: "succeeded" | "publish_failed" | "smoke_failed_after_publish";
@@ -32,6 +32,17 @@ export type KubernetesDeployRecord = {
   provider: typeof KUBERNETES_PROVIDER;
   providerTarget: KubernetesDeployment["providerTarget"];
   providerTargetIdentity: string;
+  controlPlane?: {
+    submissionId: string;
+    workerId: string;
+    admission: "admitted";
+    lockScope: string;
+    submissionPath?: string;
+    executionSnapshotPath?: string;
+  };
+  parentRunId?: string;
+  releaseLineageId?: string;
+  artifactLineageId?: string;
   artifact?: { identity: string };
   componentArtifacts: Array<{ componentId: string; identity: string; storedArtifactPath: string }>;
   componentResults?: Array<{
@@ -51,6 +62,7 @@ export type KubernetesDeployRecord = {
   executionPolicy?: DeploymentExecutionPolicyFacts;
   deploymentMetadataFingerprint?: string;
   providerConfigFingerprint?: string;
+  replaySnapshotPath?: string;
   publicUrl?: string;
   providerReleaseId?: string;
   failedStep?: "publish" | "smoke";

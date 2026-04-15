@@ -1,0 +1,212 @@
+#!/usr/bin/env zx-wrapper
+import fs from "node:fs/promises";
+import type { S3StaticDeployment } from "./contract.ts";
+import { assertCrossDeploymentExactPromotionEligible } from "./deployment-provider-promotion.ts";
+import {
+  enqueueBackendSubmission,
+  writeBackendDeployRecordDoc,
+  writeBackendSnapshotDoc,
+  writeBackendSubmissionDoc,
+  acquireBackendControlPlaneLock,
+  type NixosSharedHostControlPlaneBackendTarget,
+} from "./nixos-shared-host-control-plane-backend.ts";
+import {
+  executionSnapshotPathFor,
+  submissionPathFor,
+  writeControlPlaneJson,
+} from "./nixos-shared-host-control-plane-store.ts";
+import { submitResponseFromSubmission } from "./deployment-control-plane-status.ts";
+import { submitS3StaticDeploy } from "./s3-static-deploy.ts";
+import { submitS3StaticExactArtifactRun } from "./s3-static-exact-run.ts";
+import { submitS3StaticProvisionOnly } from "./s3-static-provision-only.ts";
+import { resolveS3StaticReplaySource } from "./s3-static-replay.ts";
+
+export const S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA =
+  "s3-static-control-plane-submit-request@1";
+
+export type S3StaticControlPlaneSubmitRequest = {
+  schemaVersion: typeof S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA;
+  submissionId: string;
+  submittedAt: string;
+  deployment: S3StaticDeployment;
+  operationKind: "deploy" | "promotion" | "retry" | "rollback" | "provision_only";
+  artifactDir?: string;
+  sourceRunId?: string;
+  admissionEvidence?: unknown;
+  smokeConnectOverride?: unknown;
+};
+
+type Snapshot = {
+  schemaVersion: "s3-static-control-plane-snapshot@1";
+  submissionId: string;
+  submittedAt: string;
+  operationKind: S3StaticControlPlaneSubmitRequest["operationKind"];
+  deploymentId: string;
+  deploymentLabel: string;
+  providerTargetIdentity: string;
+  lockScope: string;
+  deployment: S3StaticDeployment;
+  workspaceRoot: string;
+  recordsRoot: string;
+  artifactDir?: string;
+  sourceRunId?: string;
+  admissionEvidence?: unknown;
+  smokeConnectOverride?: unknown;
+};
+
+export async function queueS3StaticControlPlaneSubmission(opts: {
+  workspaceRoot: string;
+  recordsRoot: string;
+  backend: NixosSharedHostControlPlaneBackendTarget;
+  request: S3StaticControlPlaneSubmitRequest;
+}) {
+  const snapshot: Snapshot = {
+    schemaVersion: "s3-static-control-plane-snapshot@1",
+    submissionId: opts.request.submissionId,
+    submittedAt: opts.request.submittedAt,
+    operationKind: opts.request.operationKind,
+    deploymentId: opts.request.deployment.deploymentId,
+    deploymentLabel: opts.request.deployment.label,
+    providerTargetIdentity: opts.request.deployment.providerTarget.providerTargetIdentity,
+    lockScope: opts.request.deployment.providerTarget.providerTargetIdentity,
+    deployment: opts.request.deployment,
+    workspaceRoot: opts.workspaceRoot,
+    recordsRoot: opts.recordsRoot,
+    ...(opts.request.artifactDir ? { artifactDir: opts.request.artifactDir } : {}),
+    ...(opts.request.sourceRunId ? { sourceRunId: opts.request.sourceRunId } : {}),
+    ...(opts.request.admissionEvidence
+      ? { admissionEvidence: opts.request.admissionEvidence }
+      : {}),
+    ...(opts.request.smokeConnectOverride
+      ? { smokeConnectOverride: opts.request.smokeConnectOverride }
+      : {}),
+  };
+  const refs = {
+    executionSnapshotPath: executionSnapshotPathFor(opts.recordsRoot, opts.request.submissionId),
+    submissionPath: submissionPathFor(opts.recordsRoot, opts.request.submissionId),
+  };
+  await writeBackendSnapshotDoc(opts.backend, snapshot as any, refs.executionSnapshotPath);
+  const submission = {
+    schemaVersion: "deployment-provider-control-plane-submission@1",
+    submissionId: opts.request.submissionId,
+    submittedAt: opts.request.submittedAt,
+    operationKind: opts.request.operationKind,
+    deploymentId: opts.request.deployment.deploymentId,
+    deploymentLabel: opts.request.deployment.label,
+    providerTargetIdentity: snapshot.providerTargetIdentity,
+    lockScope: snapshot.lockScope,
+    executionSnapshotPath: refs.executionSnapshotPath,
+    lifecycleState: "queued",
+    terminationReason: null,
+    dedupe: { mode: "created", requestFingerprint: `direct:${opts.request.submissionId}` },
+    admission: { decision: "admitted", reason: opts.request.deployment.protectionClass },
+  };
+  await writeBackendSubmissionDoc(opts.backend, submission as any, refs);
+  await enqueueBackendSubmission(opts.backend, opts.request.submissionId, opts.request.submittedAt);
+  return submitResponseFromSubmission(submission as any);
+}
+
+export async function executeS3StaticControlPlaneSubmission(opts: {
+  workspaceRoot: string;
+  recordsRoot: string;
+  backend: NixosSharedHostControlPlaneBackendTarget;
+  submissionPath: string;
+  submissionRef: string;
+  executionSnapshotPath: string;
+  executionSnapshotRef: string;
+  workerId: string;
+}) {
+  const persistSubmissionStatus = async (nextSubmission: Record<string, unknown>) => {
+    await writeControlPlaneJson(opts.submissionPath, nextSubmission);
+    await writeBackendSubmissionDoc(opts.backend, nextSubmission as any, {
+      submissionPath: opts.submissionRef,
+      executionSnapshotPath: opts.executionSnapshotRef,
+    });
+  };
+  const submission = JSON.parse(await fs.readFile(opts.submissionPath, "utf8"));
+  const snapshot = JSON.parse(await fs.readFile(opts.executionSnapshotPath, "utf8")) as Snapshot;
+  const lock = await acquireBackendControlPlaneLock(opts.backend, snapshot.lockScope);
+  try {
+    await persistSubmissionStatus({
+      ...submission,
+      lifecycleState: "running",
+      workerId: opts.workerId,
+    });
+    const result =
+      snapshot.operationKind === "deploy"
+        ? await submitS3StaticDeploy({
+            workspaceRoot: snapshot.workspaceRoot,
+            deployment: snapshot.deployment,
+            artifactDir: String(snapshot.artifactDir || ""),
+            recordsRoot: snapshot.recordsRoot,
+            ...(snapshot.admissionEvidence
+              ? { admissionEvidence: snapshot.admissionEvidence as any }
+              : {}),
+            ...(snapshot.smokeConnectOverride
+              ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }
+              : {}),
+          })
+        : snapshot.operationKind === "provision_only"
+          ? await submitS3StaticProvisionOnly({
+              workspaceRoot: snapshot.workspaceRoot,
+              deployment: snapshot.deployment,
+              recordsRoot: snapshot.recordsRoot,
+              ...(snapshot.admissionEvidence
+                ? { admissionEvidence: snapshot.admissionEvidence as any }
+                : {}),
+            })
+          : await (async () => {
+              const source = await resolveS3StaticReplaySource({
+                recordsRoot: snapshot.recordsRoot,
+                deployRunId: String(snapshot.sourceRunId || ""),
+              });
+              if (snapshot.operationKind === "promotion") {
+                await assertCrossDeploymentExactPromotionEligible({
+                  workspaceRoot: snapshot.workspaceRoot,
+                  deployment: snapshot.deployment,
+                  source,
+                });
+              }
+              return await submitS3StaticExactArtifactRun({
+                workspaceRoot: snapshot.workspaceRoot,
+                deployment: snapshot.deployment,
+                recordsRoot: snapshot.recordsRoot,
+                operationKind:
+                  snapshot.operationKind === "promotion" &&
+                  source.replaySnapshot.deployment.deploymentId === snapshot.deployment.deploymentId
+                    ? "retry"
+                    : snapshot.operationKind,
+                artifact: source.replaySnapshot.artifact,
+                sourceRecord: source.record,
+                parentRunId: source.record.deployRunId,
+                releaseLineageId: source.record.releaseLineageId || source.record.deployRunId,
+                artifactLineageId:
+                  source.record.artifactLineageId || source.replaySnapshot.artifact.identity,
+                ...(snapshot.admissionEvidence
+                  ? { admissionEvidence: snapshot.admissionEvidence as any }
+                  : {}),
+                ...(snapshot.smokeConnectOverride
+                  ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }
+                  : {}),
+              });
+            })();
+    result.record.controlPlane = {
+      submissionId: snapshot.submissionId,
+      workerId: opts.workerId,
+      admission: "admitted",
+      lockScope: snapshot.lockScope,
+    };
+    await writeBackendDeployRecordDoc(opts.backend, result.record, result.recordPath);
+    await persistSubmissionStatus({
+      ...submission,
+      lifecycleState: "finished",
+      completedAt: new Date().toISOString(),
+      workerId: opts.workerId,
+      deployRunId: result.record.deployRunId,
+      resultRecordPath: result.recordPath,
+      finalOutcome: result.record.finalOutcome,
+    });
+  } finally {
+    await lock.release();
+  }
+}

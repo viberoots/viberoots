@@ -83,3 +83,61 @@ export async function resolveInitialKubernetesAdmittedContext(opts: {
     },
   };
 }
+
+export async function resolvePromotionKubernetesAdmittedContext(opts: {
+  workspaceRoot: string;
+  deployment: KubernetesDeployment;
+  artifactIdentity: string;
+  sourceRecord: { deployRunId: string; deploymentId: string };
+}): Promise<KubernetesAdmittedContext> {
+  const admitted = await resolveInitialKubernetesAdmittedContext(opts);
+  return {
+    ...admitted,
+    source: {
+      mode: "stage_branch_head",
+      sourceRef: admitted.targetEnvironment.targetRef,
+      sourceRevision: admitted.targetEnvironment.targetRevision,
+      artifactIdentity: opts.artifactIdentity,
+      artifactTrustMode: opts.deployment.admissionPolicy.artifactAttestationMode,
+      sourceRunId: opts.sourceRecord.deployRunId,
+      sourceDeploymentId: opts.sourceRecord.deploymentId,
+    } as KubernetesAdmittedContext["source"] & {
+      sourceRunId: string;
+      sourceDeploymentId: string;
+    },
+  };
+}
+
+export async function resolveSourceRunKubernetesAdmittedContext(opts: {
+  workspaceRoot: string;
+  deployment: KubernetesDeployment;
+  artifactIdentity: string;
+  sourceRecord: {
+    deployRunId: string;
+    deploymentId: string;
+    admittedContext?: {
+      source?: {
+        sourceRef?: string;
+        sourceRevision?: string;
+      };
+    };
+  };
+}): Promise<KubernetesAdmittedContext> {
+  const admitted = await resolveInitialKubernetesAdmittedContext(opts);
+  return {
+    ...admitted,
+    source: {
+      mode: "stage_branch_head",
+      sourceRef: opts.sourceRecord.admittedContext?.source?.sourceRef || admitted.source.sourceRef,
+      sourceRevision:
+        opts.sourceRecord.admittedContext?.source?.sourceRevision || admitted.source.sourceRevision,
+      artifactIdentity: opts.artifactIdentity,
+      artifactTrustMode: opts.deployment.admissionPolicy.artifactAttestationMode,
+      sourceRunId: opts.sourceRecord.deployRunId,
+      sourceDeploymentId: opts.sourceRecord.deploymentId,
+    } as KubernetesAdmittedContext["source"] & {
+      sourceRunId: string;
+      sourceDeploymentId: string;
+    },
+  };
+}

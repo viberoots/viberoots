@@ -9,8 +9,13 @@ import {
 } from "./cloudflare-pages-control-plane-api-contract.ts";
 import { prepareBackendCloudflarePagesControlPlaneRun } from "./cloudflare-pages-control-plane-backend-prepare.ts";
 import { resolveCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit.ts";
+import { handleControlPlaneRunActionService } from "./deployment-control-plane-run-action-service.ts";
+import {
+  isDeploymentProviderServiceSubmitRequest,
+  queueDeploymentProviderControlPlaneSubmission,
+  type DeploymentProviderServiceSubmitRequest,
+} from "./deployment-provider-control-plane-submit.ts";
 import { fingerprintControlPlanePayload } from "./deployment-control-plane-idempotency.ts";
-import { submitDeploymentControlPlaneRunAction } from "./deployment-control-plane-run-action.ts";
 import { submitResponseFromSubmission } from "./deployment-control-plane-status.ts";
 import type {
   DeploymentControlPlaneAuthorization,
@@ -20,30 +25,15 @@ import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 import {
   enqueueBackendSubmission,
   readBackendSubmissionBySubmissionId,
-  readBackendSubmissionEnvelopeByDeployRunId,
-  readBackendSubmissionEnvelopeBySubmissionId,
   resolveBackendIdempotency,
-  syncBackendRunAction,
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend.ts";
-import {
-  materializeBackendControlPlaneFiles,
-  persistMaterializedSnapshot,
-  persistMaterializedSubmission,
-} from "./nixos-shared-host-control-plane-backend-materialize.ts";
 import {
   NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
   type NixosSharedHostControlPlaneSubmitRequest,
 } from "./nixos-shared-host-control-plane-api-contract.ts";
-import type {
-  NixosSharedHostControlPlanePaths,
-  NixosSharedHostControlPlaneSnapshot,
-} from "./nixos-shared-host-control-plane-contract.ts";
+import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
 import { prepareBackendNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-backend-prepare.ts";
-import {
-  readControlPlaneJson,
-  runActionRequestPathFor,
-} from "./nixos-shared-host-control-plane-store.ts";
 import { resolveServiceSubmitRequest } from "./nixos-shared-host-control-plane-service-submit.ts";
 export {
   readControlPlaneRecord,
@@ -55,8 +45,8 @@ export type ServiceRunActionRequest = DeploymentControlPlaneRunActionRequest & {
 
 type ServiceSubmitRequest =
   | NixosSharedHostControlPlaneSubmitRequest
-  | CloudflarePagesControlPlaneSubmitRequest;
-
+  | CloudflarePagesControlPlaneSubmitRequest
+  | DeploymentProviderServiceSubmitRequest;
 export async function handleControlPlaneSubmit(
   request: ServiceSubmitRequest,
   opts: {
@@ -67,9 +57,13 @@ export async function handleControlPlaneSubmit(
 ) {
   if (
     request.schemaVersion !== NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA &&
-    request.schemaVersion !== CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
+    request.schemaVersion !== CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA &&
+    !isDeploymentProviderServiceSubmitRequest(request)
   ) {
     throw new Error(`unsupported schema version: ${request.schemaVersion}`);
+  }
+  if (isDeploymentProviderServiceSubmitRequest(request)) {
+    return await queueDeploymentProviderControlPlaneSubmission(request, opts);
   }
   const requestFingerprint = fingerprintControlPlanePayload({
     ...request,
@@ -185,65 +179,5 @@ export async function handleControlPlaneRunAction(
   request: ServiceRunActionRequest,
   opts: { backend: NixosSharedHostControlPlaneBackendTarget; workspaceRoot: string },
 ) {
-  const envelope = request.submissionId
-    ? await readBackendSubmissionEnvelopeBySubmissionId(opts.backend, request.submissionId)
-    : request.deployRunId
-      ? await readBackendSubmissionEnvelopeByDeployRunId(opts.backend, request.deployRunId)
-      : null;
-  if (!envelope) throw Object.assign(new Error("submission not found"), { statusCode: 404 });
-  const materialized = await materializeBackendControlPlaneFiles(
-    opts.backend,
-    String((envelope.submission as any).submissionId),
-  );
-  const snapshot = await readControlPlaneJson<NixosSharedHostControlPlaneSnapshot>(
-    materialized.executionSnapshotPath,
-  );
-  const authorization = request.authorization
-    ? authorizeControlPlaneRunAction({
-        deployment: snapshot.deployment,
-        action: request.action,
-        authorization: request.authorization,
-      })
-    : undefined;
-  try {
-    const response = await submitDeploymentControlPlaneRunAction({
-      workspaceRoot: opts.workspaceRoot,
-      recordsRoot: opts.backend.recordsRoot,
-      backendDatabaseUrl: opts.backend.databaseUrl,
-      submissionPath: materialized.submissionPath,
-      action: request.action,
-      idempotencyKey: request.idempotencyKey || request.actionId,
-      ...(request.requestedBy || request.authorization?.requestedBy
-        ? { requestedBy: request.requestedBy || request.authorization?.requestedBy }
-        : {}),
-      ...(request.approval ? { approval: request.approval } : {}),
-    });
-    await persistMaterializedSubmission({
-      backend: opts.backend,
-      submissionPath: materialized.submissionPath,
-      submissionRef: materialized.submissionRef,
-      executionSnapshotRef: materialized.executionSnapshotRef,
-    });
-    if (
-      request.action === "approve" &&
-      ["queued", "waiting_for_lock"].includes(response.lifecycleState)
-    ) {
-      await enqueueBackendSubmission(opts.backend, response.submissionId, response.submittedAt);
-    }
-    await syncBackendRunAction(
-      opts.backend,
-      runActionRequestPathFor(opts.backend.recordsRoot, response.actionId),
-    );
-    return {
-      ...response,
-      ...(authorization ? { authorization } : {}),
-    };
-  } finally {
-    await persistMaterializedSnapshot({
-      backend: opts.backend,
-      executionSnapshotPath: materialized.executionSnapshotPath,
-      executionSnapshotRef: materialized.executionSnapshotRef,
-    });
-    await materialized.cleanup();
-  }
+  return await handleControlPlaneRunActionService(request, opts);
 }

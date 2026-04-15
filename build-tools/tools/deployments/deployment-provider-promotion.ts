@@ -1,0 +1,47 @@
+#!/usr/bin/env zx-wrapper
+import type { DeploymentTarget } from "./contract.ts";
+import { requiredDeploymentStageBranch } from "./contract.ts";
+import {
+  exactArtifactPromotionErrors,
+  promotionCompatibilityErrors,
+  sourcePromotionRevision,
+} from "./deployment-promotion-compatibility.ts";
+
+async function gitStdout(workspaceRoot: string, args: string[]): Promise<string> {
+  const out = await $({ cwd: workspaceRoot, stdio: "pipe" })`git ${args}`.nothrow();
+  if ((out as any).exitCode !== 0) {
+    throw new Error(`git ${args.join(" ")} failed in ${workspaceRoot}`);
+  }
+  return String((out as any).stdout || "").trim();
+}
+
+export async function assertCrossDeploymentExactPromotionEligible(opts: {
+  workspaceRoot: string;
+  deployment: DeploymentTarget;
+  source: {
+    record: { deployRunId: string };
+    replaySnapshot: {
+      admittedContext: { source: { sourceRevision: string } };
+      deployment: DeploymentTarget;
+    };
+  };
+}) {
+  const targetRef = requiredDeploymentStageBranch(opts.deployment);
+  const errors = [...promotionCompatibilityErrors(opts.deployment, opts.source)];
+  if (!opts.deployment.admissionPolicy.allowedRefs.includes(targetRef)) {
+    errors.push(
+      `deployment admission policy ${opts.deployment.admissionPolicyRef} does not allow source ref ${targetRef}`,
+    );
+  }
+  const targetRevision = await gitStdout(opts.workspaceRoot, ["rev-parse", targetRef]);
+  if (targetRevision !== sourcePromotionRevision(opts.source)) {
+    errors.push(
+      `source run no longer matches current promotable target state: ${opts.source.record.deployRunId}`,
+    );
+  }
+  errors.push(...exactArtifactPromotionErrors(opts.deployment));
+  if (errors.length > 0) {
+    throw new Error(`promotion source run is not eligible: ${opts.source.record.deployRunId}
+${errors.join("\n")}`);
+  }
+}

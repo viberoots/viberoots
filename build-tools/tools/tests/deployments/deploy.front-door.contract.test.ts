@@ -202,8 +202,8 @@ test("internal deploy entrypoint preserves cloudflare-pages provider guardrails 
   });
 });
 
-test("internal deploy entrypoint preserves s3-static provider guardrails", async () => {
-  await runInTemp("deploy-s3-static-provision-only-guard", async (tmp, $) => {
+test("internal deploy entrypoint requires source-run-id for s3-static publish-only reuse", async () => {
+  await runInTemp("deploy-s3-static-publish-only-guard", async (tmp, $) => {
     const deployment = s3StaticDeploymentFixture();
     await installS3StaticTargets(tmp, [deployment]);
     await assert.rejects(
@@ -211,14 +211,14 @@ test("internal deploy entrypoint preserves s3-static provider guardrails", async
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --provision-only`,
-      /provisions as part of deploy/,
+        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --publish-only`,
+      /s3-static --publish-only requires --source-run-id/,
     );
   });
 });
 
-test("internal deploy entrypoint preserves kubernetes provider guardrails", async () => {
-  await runInTemp("deploy-kubernetes-provision-only-guard", async (tmp, $) => {
+test("internal deploy entrypoint requires source-run-id for kubernetes publish-only reuse", async () => {
+  await runInTemp("deploy-kubernetes-publish-only-guard", async (tmp, $) => {
     const deployment = kubernetesDeploymentFixture();
     await installKubernetesTargets(tmp, [deployment]);
     await assert.rejects(
@@ -226,8 +226,8 @@ test("internal deploy entrypoint preserves kubernetes provider guardrails", asyn
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --provision-only`,
-      /kubernetes initial slice provisions as part of deploy/,
+        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --publish-only`,
+      /kubernetes --publish-only requires --source-run-id/,
     );
   });
 });

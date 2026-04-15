@@ -30,6 +30,7 @@ import {
   writeKubernetesDeployRecord,
   type KubernetesDeployRecord,
 } from "./kubernetes-records.ts";
+import { writeKubernetesReplaySnapshot } from "./kubernetes-replay.ts";
 import { smokeKubernetesRelease } from "./kubernetes-smoke.ts";
 import { writeKubernetesProvisionerPlan } from "./kubernetes-provisioner-plan.ts";
 
@@ -185,6 +186,19 @@ export async function submitKubernetesDeploy(opts: {
       executionPolicy,
       deploymentMetadataFingerprint,
       providerConfigFingerprint,
+      replaySnapshotPath: await writeKubernetesReplaySnapshot({
+        recordsRoot: opts.recordsRoot,
+        deployRunId,
+        deployment: opts.deployment,
+        artifactIdentity: compositeArtifactIdentity,
+        componentArtifacts: admittedArtifacts.map((artifact) => ({
+          componentId: artifact.componentId,
+          identity: artifact.identity,
+          storedArtifactPath: artifact.storedArtifactPath,
+        })),
+        admittedContext,
+        providerConfigSnapshotPath: preparedConfig.renderedConfigPath,
+      }),
       publicUrl: smoke.result.publicUrl,
       ...(providerReleaseId ? { providerReleaseId } : {}),
     });

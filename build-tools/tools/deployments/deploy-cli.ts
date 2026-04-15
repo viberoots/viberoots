@@ -122,6 +122,7 @@ export async function runDeployCli(opts: {
     await runS3StaticDeployFrontDoor({
       workspaceRoot: opts.workspaceRoot,
       deployment,
+      requireServiceForProtectedShared: opts.publicFrontDoor,
       publishOnly,
       provisionOnly,
       rollback,
@@ -129,6 +130,7 @@ export async function runDeployCli(opts: {
       artifactDirFlag,
       ...(admissionEvidence ? { admissionEvidence } : {}),
       ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
+      hasFlag,
     });
     return;
   }
@@ -181,6 +183,7 @@ export async function runDeployCli(opts: {
     await runKubernetesDeployFrontDoor({
       workspaceRoot: opts.workspaceRoot,
       deployment,
+      requireServiceForProtectedShared: opts.publicFrontDoor,
       publishOnly,
       provisionOnly,
       rollback,
@@ -188,6 +191,7 @@ export async function runDeployCli(opts: {
       artifactDirFlag,
       ...(admissionEvidence ? { admissionEvidence } : {}),
       ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
+      hasFlag,
     });
     return;
   }

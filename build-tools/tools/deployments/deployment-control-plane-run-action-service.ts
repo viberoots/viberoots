@@ -1,0 +1,85 @@
+#!/usr/bin/env zx-wrapper
+import { authorizeControlPlaneRunAction } from "./deployment-control-plane-authz.ts";
+import { submitDeploymentControlPlaneRunAction } from "./deployment-control-plane-run-action.ts";
+import {
+  enqueueBackendSubmission,
+  readBackendSubmissionEnvelopeByDeployRunId,
+  readBackendSubmissionEnvelopeBySubmissionId,
+  syncBackendRunAction,
+  type NixosSharedHostControlPlaneBackendTarget,
+} from "./nixos-shared-host-control-plane-backend.ts";
+import {
+  materializeBackendControlPlaneFiles,
+  persistMaterializedSnapshot,
+  persistMaterializedSubmission,
+} from "./nixos-shared-host-control-plane-backend-materialize.ts";
+import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-control-plane-contract.ts";
+import {
+  readControlPlaneJson,
+  runActionRequestPathFor,
+} from "./nixos-shared-host-control-plane-store.ts";
+import type { ServiceRunActionRequest } from "./nixos-shared-host-control-plane-service-api.ts";
+
+export async function handleControlPlaneRunActionService(
+  request: ServiceRunActionRequest,
+  opts: { backend: NixosSharedHostControlPlaneBackendTarget; workspaceRoot: string },
+) {
+  const envelope = request.submissionId
+    ? await readBackendSubmissionEnvelopeBySubmissionId(opts.backend, request.submissionId)
+    : request.deployRunId
+      ? await readBackendSubmissionEnvelopeByDeployRunId(opts.backend, request.deployRunId)
+      : null;
+  if (!envelope) throw Object.assign(new Error("submission not found"), { statusCode: 404 });
+  const materialized = await materializeBackendControlPlaneFiles(
+    opts.backend,
+    String((envelope.submission as any).submissionId),
+  );
+  const snapshot = await readControlPlaneJson<NixosSharedHostControlPlaneSnapshot>(
+    materialized.executionSnapshotPath,
+  );
+  const authorization = request.authorization
+    ? authorizeControlPlaneRunAction({
+        deployment: snapshot.deployment,
+        action: request.action,
+        authorization: request.authorization,
+      })
+    : undefined;
+  try {
+    const response = await submitDeploymentControlPlaneRunAction({
+      workspaceRoot: opts.workspaceRoot,
+      recordsRoot: opts.backend.recordsRoot,
+      backendDatabaseUrl: opts.backend.databaseUrl,
+      submissionPath: materialized.submissionPath,
+      action: request.action,
+      idempotencyKey: request.idempotencyKey || request.actionId,
+      ...(request.requestedBy || request.authorization?.requestedBy
+        ? { requestedBy: request.requestedBy || request.authorization?.requestedBy }
+        : {}),
+      ...(request.approval ? { approval: request.approval } : {}),
+    });
+    await persistMaterializedSubmission({
+      backend: opts.backend,
+      submissionPath: materialized.submissionPath,
+      submissionRef: materialized.submissionRef,
+      executionSnapshotRef: materialized.executionSnapshotRef,
+    });
+    if (
+      request.action === "approve" &&
+      ["queued", "waiting_for_lock"].includes(response.lifecycleState)
+    ) {
+      await enqueueBackendSubmission(opts.backend, response.submissionId, response.submittedAt);
+    }
+    await syncBackendRunAction(
+      opts.backend,
+      runActionRequestPathFor(opts.backend.recordsRoot, response.actionId),
+    );
+    return { ...response, ...(authorization ? { authorization } : {}) };
+  } finally {
+    await persistMaterializedSnapshot({
+      backend: opts.backend,
+      executionSnapshotPath: materialized.executionSnapshotPath,
+      executionSnapshotRef: materialized.executionSnapshotRef,
+    });
+    await materialized.cleanup();
+  }
+}

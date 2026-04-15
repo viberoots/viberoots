@@ -1,0 +1,71 @@
+#!/usr/bin/env zx-wrapper
+import type { DeploymentControlPlaneStatus } from "./deployment-control-plane-contract.ts";
+import {
+  readNixosSharedHostControlPlaneRecordViaService,
+  submitNixosSharedHostControlPlaneViaService,
+} from "./nixos-shared-host-control-plane-client.ts";
+
+const SERVICE_ONLY_LOCAL_FLAGS = ["records-root", "control-plane-database-url"] as const;
+
+export function rejectServiceOnlyLocalFlags(hasFlag: (flag: string) => boolean, provider: string) {
+  const conflicts = SERVICE_ONLY_LOCAL_FLAGS.filter((flag) => hasFlag(flag));
+  if (conflicts.length === 0) return;
+  throw new Error(
+    `service-only ${provider} deploy does not support ${conflicts.map((flag) => `--${flag}`).join(", ")}`,
+  );
+}
+
+async function readFinalizedRecord(opts: {
+  controlPlaneUrl: string;
+  controlPlaneToken?: string;
+  deployRunId: string;
+}) {
+  const deadline = Date.now() + 3_000;
+  while (true) {
+    try {
+      return await readNixosSharedHostControlPlaneRecordViaService({
+        controlPlaneUrl: opts.controlPlaneUrl,
+        ...(opts.controlPlaneToken ? { token: opts.controlPlaneToken } : {}),
+        deployRunId: opts.deployRunId,
+      });
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes("record not found")) throw error;
+      if (Date.now() >= deadline) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+}
+
+export async function finalizeProtectedFrontDoorSubmission(opts: {
+  controlPlaneUrl: string;
+  controlPlaneToken?: string;
+  request: any;
+}) {
+  const { final } = await submitNixosSharedHostControlPlaneViaService({
+    controlPlaneUrl: opts.controlPlaneUrl,
+    token: opts.controlPlaneToken,
+    request: opts.request,
+  });
+  if (!final.deployRunId) return final;
+  return await requireSucceededRecord({
+    controlPlaneUrl: opts.controlPlaneUrl,
+    ...(opts.controlPlaneToken ? { controlPlaneToken: opts.controlPlaneToken } : {}),
+    status: final,
+  });
+}
+
+async function requireSucceededRecord(opts: {
+  controlPlaneUrl: string;
+  controlPlaneToken?: string;
+  status: DeploymentControlPlaneStatus;
+}) {
+  const record = await readFinalizedRecord({
+    controlPlaneUrl: opts.controlPlaneUrl,
+    ...(opts.controlPlaneToken ? { controlPlaneToken: opts.controlPlaneToken } : {}),
+    deployRunId: String(opts.status.deployRunId || ""),
+  });
+  if (record.finalOutcome === "succeeded") return record;
+  throw new Error(
+    `shared control-plane mutation failed: ${String(record.error || record.smokeError || record.finalOutcome || "unknown")}`,
+  );
+}
