@@ -143,6 +143,52 @@ test("validation rejects multi-component cloudflare-pages deployments", () => {
   assert.ok(errors.some((entry) => entry.includes("does not support multi-component")));
 });
 
+test("validation rejects explicit rollout_policy for cloudflare-pages", () => {
+  const { errors } = extractCloudflarePagesDeployments([
+    staticWebappComponent("//projects/apps/pleomino:app"),
+    ...policyNodes(),
+    deploymentNode({
+      rollout_policy: {
+        mode: "all_at_once",
+        abort: "stop_on_first_failure",
+        smoke: "final_only",
+      },
+    }),
+  ]);
+  assert.ok(errors.some((entry) => entry.includes("does not support explicit rollout_policy")));
+});
+
+test("validation rejects deployment-owned provisioners for cloudflare-pages", () => {
+  const { errors } = extractCloudflarePagesDeployments([
+    staticWebappComponent("//projects/apps/pleomino:app"),
+    ...policyNodes(),
+    deploymentNode({
+      provisioner: "cdktf-stack",
+      provisioner_config: "cdktf/stack.json",
+    }),
+  ]);
+  assert.ok(
+    errors.some((entry) =>
+      entry.includes("deployment-owned provisioner is not supported for cloudflare-pages"),
+    ),
+  );
+});
+
+test("validation rejects protected/shared release_actions for cloudflare-pages", () => {
+  const { errors } = extractCloudflarePagesDeployments([
+    staticWebappComponent("//projects/apps/pleomino:app"),
+    ...policyNodes(),
+    deploymentNode({
+      release_actions: ["//projects/deployments/pleomino-staging:cache_warmup"],
+    }),
+  ]);
+  assert.ok(
+    errors.some((entry) =>
+      entry.includes("cloudflare-pages does not support protected/shared release_actions"),
+    ),
+  );
+});
+
 test("validation rejects reviewed non-static kinds until cloudflare-pages declares capability support", () => {
   for (const kind of REVIEWED_NON_STATIC_COMPONENT_KINDS) {
     const { errors } = extractCloudflarePagesDeployments([

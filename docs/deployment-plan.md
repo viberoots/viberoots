@@ -7573,6 +7573,123 @@ and design/front-door guidance in exact parity.
 
 ---
 
+## PR-58: Provider-capability/design summary parity + reviewed fail-closed coverage closeout
+
+### Description
+
+I will close the remaining review-identified gap where the deployment design's onboarding summary
+and the reviewed provider-capability/runtime surface no longer say the same thing. In the current
+state, the authoritative provider-capability registry and runtime validators correctly reject some
+shapes, but the design summary still presents stale provider inventory and stale Cloudflare Pages
+provisioner support. This PR makes the design summary exact to the reviewed capability registry and
+adds the missing fail-closed tests so future drift is caught immediately.
+
+### Scope & Changes
+
+- Audit the deployment design's provider summary and related onboarding summary sections against:
+  - the authoritative provider-capability registry
+  - the rendered provider-capabilities doc
+  - the reviewed runtime extraction and validation behavior
+- Update the design summary so it reflects the reviewed built-in provider surface exactly:
+  - include the full current reviewed provider set where the summary is intended to enumerate it
+  - remove any stale implication that protected/shared `cloudflare-pages` supports deployment-owned
+    provisioners
+  - keep the design's broader conceptual model language only where it is clearly labeled as model
+    scope rather than reviewed built-in provider support
+- Tighten the wording around capability-summary tables so readers can tell which statements are:
+  - abstract deployment-model possibilities
+  - reviewed built-in provider support in the current repository
+- Add fail-closed parity checks so design-summary claims cannot drift from the authoritative
+  provider-capability registry without a targeted update in the same PR.
+- Add the missing negative-path validation coverage for reviewed Cloudflare Pages constraints that
+  are already enforced in runtime code but not directly locked down in deployment-domain tests:
+  - explicit `rollout_policy` rejection
+  - deployment-owned protected/shared provisioner rejection
+  - protected/shared `release_actions` rejection
+- Keep this PR focused on reviewed parity and guardrails:
+  - do not widen provider support
+  - do not implement new provisioner or release-action behavior
+  - do not treat the broad final-model design as automatically implemented where the capability
+    registry still marks a narrower reviewed slice
+
+### Tests (in this PR)
+
+- Add or extend parity tests that fail closed when the provider summary in
+  [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) drifts from
+  the authoritative provider-capability registry or rendered provider-capabilities doc for the
+  reviewed onboarding-summary fields covered by that table.
+- Add targeted deployment-domain validation tests proving Cloudflare Pages rejects:
+  - multi-component plus explicit-rollout shapes outside the reviewed slice
+  - deployment-owned protected/shared provisioners
+  - protected/shared `release_actions`
+- Extend any existing provider-capability parity tests as needed so the reviewed provider inventory
+  and reviewed per-provider support posture remain deterministic across registry, docs, and runtime
+  validation.
+
+### Docs (in this PR)
+
+- Update [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) to make
+  its provider summary and related onboarding prose exact to the reviewed capability registry.
+- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md),
+  if needed, only where wording must be clarified to match the reviewed runtime and design-summary
+  contract more precisely.
+- Update this plan's closeout wording if needed so the plan does not imply that the broader design
+  model is already fully implemented when the reviewed provider slice is intentionally narrower.
+
+### Verification Commands
+
+- `v`
+- reviewed deployment-domain parity and validation targets introduced or tightened in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-domain docs, provider-capability parity tests, and
+  deployment-domain validation coverage. Under the deployment-only verify policy, default `v` / CI
+  can run the reviewed deployment suite rather than the full non-deployment build-system verify
+  scope.
+
+### Acceptance Criteria
+
+- The deployment design's provider summary no longer contradicts the authoritative
+  provider-capability registry or the reviewed runtime support posture.
+- Cloudflare Pages reviewed-slice constraints that are already enforced in runtime validation are
+  covered directly by deployment-domain tests and fail closed on drift.
+- The plan, design, provider-capabilities doc, and parity tests make it clear which shapes are part
+  of the repository's reviewed implementation today versus only part of the broader deployment
+  model.
+
+### Risks
+
+Because the design intentionally documents both the full model and the current reviewed slice, doc
+edits can accidentally over-narrow the design or, in the other direction, continue to present
+reviewed support as broader than the actual capability registry and runtime validators allow.
+
+### Mitigation
+
+Keep the conceptual model language where it helps architectural understanding, but back every
+reviewed provider-summary claim with parity tests tied to the authoritative capability registry and
+direct negative-path validation coverage.
+
+### Consequence of Not Implementing
+
+The repo would continue to present a partially contradictory deployment story: the runtime and
+capability registry would remain mostly correct, but the design summary would still misstate
+reviewed provider support and the missing negative-path tests would leave that drift easier to
+reintroduce.
+
+### Downsides for Implementing
+
+This is another closeout PR centered on parity, guardrails, and documentation exactness rather than
+new end-user deployment capability.
+
+### Recommendation
+
+Implement immediately after PR-57 so the deployment plan ends with one final reviewed parity pass
+covering the remaining provider-summary drift and its missing fail-closed tests.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -7650,6 +7767,9 @@ and design/front-door guidance in exact parity.
 27. PR-57: close the remaining deployment design / authoring / front-door drift so the reviewed
     docs, examples, and contract language exactly match the implemented `--deployment <label>`
     interface and provider-specific authoring surface.
+28. PR-58: close the remaining provider-capability/design-summary drift and add the missing
+    fail-closed deployment-domain tests that lock reviewed provider support posture to the
+    authoritative capability registry and runtime validation behavior.
 
 ## Companion Docs
 

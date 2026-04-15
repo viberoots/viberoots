@@ -13,6 +13,11 @@ import {
   rolloutPolicyOmissionInPolicy,
 } from "../../deployments/deployment-provider-capabilities.ts";
 import {
+  DEPLOYMENTS_DESIGN_DOC_PATH,
+  assertDeploymentsDesignDocParity,
+  renderDeploymentsDesignDoc,
+} from "../../deployments/design-summary-doc.ts";
+import {
   PROVIDER_CAPABILITIES_DOC_PATH,
   assertProviderCapabilitiesDocParity,
   renderProviderCapabilitiesDoc,
@@ -41,6 +46,13 @@ test("checked-in provider capabilities doc stays in exact rendered parity with t
   assertProviderCapabilitiesDocParity(current);
   assert.equal(renderProviderCapabilitiesDoc(current), current);
   assert.equal(renderProviderCapabilitiesDoc(current), renderProviderCapabilitiesDoc(current));
+});
+
+test("deployments design reviewed-provider summaries stay in exact rendered parity with the registry", async () => {
+  const current = await fsp.readFile(DEPLOYMENTS_DESIGN_DOC_PATH, "utf8");
+  assertDeploymentsDesignDocParity(current);
+  assert.equal(renderDeploymentsDesignDoc(current), current);
+  assert.equal(renderDeploymentsDesignDoc(current), renderDeploymentsDesignDoc(current));
 });
 
 test("legacy lookup helpers preserve the reviewed runtime contract", () => {
@@ -131,4 +143,13 @@ test("doc parity fails closed when the rendered provider entries drift", async (
     () => assertProviderCapabilitiesDocParity(stale),
     /provider capabilities doc is stale/,
   );
+});
+
+test("design-summary parity fails closed when the reviewed provider summaries drift", async () => {
+  const current = await fsp.readFile(DEPLOYMENTS_DESIGN_DOC_PATH, "utf8");
+  const stale = current.replace(
+    "reviewed only with explicit preview metadata",
+    "reviewed only with implicit preview metadata",
+  );
+  assert.throws(() => assertDeploymentsDesignDocParity(stale), /deployments design doc is stale/);
 });
