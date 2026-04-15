@@ -7324,6 +7324,255 @@ deployment-owned methodology waiver or support-file guardrail ambiguity.
 
 ---
 
+## PR-56: Protected/shared `s3-static` and `kubernetes` central control-plane + immutable-reuse parity closeout
+
+### Description
+
+I will close the remaining protected/shared provider-runtime gap identified in review: `s3-static`
+and `kubernetes` are already modeled as reviewed provider families and their capability entries say
+they are in policy for protected/shared use, but the current public front doors still execute them
+locally and the initial slices still stop short of the full protected/shared replay/control-plane
+contract. This PR routes reviewed protected/shared `s3-static` and `kubernetes` mutation through
+the shared control-plane architecture, adds the missing admitted-artifact / source-run reuse
+workflows required for the reviewed provider slices, and updates the provider-capability/runtime
+surfaces so these families match the same fail-closed protected/shared contract already expected by
+the deployment design and deployment contract.
+
+### Scope & Changes
+
+- Move protected/shared `s3-static` and `kubernetes` mutation off local direct-execution front-door
+  paths and onto the reviewed shared control-plane submit / worker / authoritative-record flow.
+- Keep `local_only` behavior explicit and separate:
+  - `local_only` may still use the local reviewed path when that remains in policy
+  - `shared_nonprod` and `production_facing` must act only as thin authenticated submitters to the
+    control-plane API for mutating runs
+- Add the missing immutable-reuse workflow support needed for the reviewed provider slices:
+  - exact-artifact `--publish-only` where the provider slice is intended to support delayed
+    publish or safe retry
+  - explicit same-deployment `--rollback` where the reviewed provider contract permits rollback
+  - explicit `--source-run-id` handling for protected/shared replay and promotion-safe source
+    selection
+  - reviewed `--provision-only` semantics where the provider capability or deployment contract says
+    infra-affecting mutation is in policy and must still bind to one admitted source revision plus
+    frozen execution snapshot
+- Freeze execution snapshots and authoritative protected/shared records for these providers using
+  the same backend-native control-plane identifiers and storage posture already required by the
+  deployment contract.
+- Extend provider-specific guarded-path validation so unsupported combinations still fail closed,
+  but reviewed protected/shared flows no longer fail simply because the provider remained on an
+  initial local-only execution path.
+- Update provider-capability entries, protected/shared eligibility notes, and any reviewed runtime
+  helpers so the documented support matrix matches the real implemented replay / promotion /
+  rollback / provision-only posture for these families.
+- Keep the implementation scoped to the reviewed built-in provider slices already present in the
+  repo:
+  - do not invent unreviewed preview semantics for providers whose capability entries still say
+    preview is not reviewed
+  - do not broaden providers beyond the component kinds, rollout modes, and provisioner contracts
+    already reviewed or explicitly added in this PR
+
+### Tests (in this PR)
+
+- Add protected/shared front-door contract tests proving public repo-level `s3-static` and
+  `kubernetes` mutation routes through the shared control-plane path instead of local direct
+  execution.
+- Add control-plane integration / e2e coverage for protected/shared `s3-static` and `kubernetes`
+  deploy flows using the authoritative backend-native submit/status/result contracts.
+- Add replay / immutable-reuse tests for the reviewed provider slices proving:
+  - `--publish-only` reuses an admitted immutable artifact instead of rebuilding implicitly
+  - `--rollback` requires the reviewed same-deployment source-run selection and fails closed when
+    the source run is out of policy
+  - `--provision-only`, when in policy for the reviewed slice, still binds to admitted source
+    evidence and frozen execution snapshots rather than behaving as an unbound mutable shortcut
+- Add provider-capability parity tests proving the generated normative capability docs stay in sync
+  with the newly reviewed protected/shared control-plane and replay posture for `s3-static` and
+  `kubernetes`.
+- Add regression tests proving protected/shared runs for these providers preserve backend-native
+  identifiers, authoritative records, canonical provider-target identity, and exact-artifact
+  lineage under the shared control-plane path.
+
+### Docs (in this PR)
+
+- Update [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) and
+  [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) where
+  necessary so provider examples and protected/shared control-plane language explicitly include the
+  now-reviewed `s3-static` and `kubernetes` service-routed execution path.
+- Update
+  [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+  to describe the implemented protected/shared replay / rollback / provision-only posture for these
+  providers and remove any stale "initial slice only" wording that this PR supersedes.
+- Update any operator or provider-family usage docs affected by the new control-plane path so the
+  repo presents one consistent reviewed story for protected/shared `s3-static` and `kubernetes`
+  mutation.
+
+### Verification Commands
+
+- `v`
+- reviewed protected/shared control-plane submission / status verification commands for `s3-static`
+  and `kubernetes` introduced in this PR
+- representative provider-family regression targets covering replay / rollback / provision-only
+  semantics for these slices
+
+### Expected Regression Scope
+
+- `mixed`
+- This PR changes deployment/build-system runtime code, provider-capability metadata/docs, and
+  deployment-domain tests. Under the current verify policy, default `v` / CI should run the full
+  reviewed build-system scope rather than narrowing to project-only selection.
+
+### Acceptance Criteria
+
+- Protected/shared `s3-static` and `kubernetes` mutating runs no longer bypass the shared
+  control-plane architecture.
+- The reviewed provider slices for these families support the protected/shared immutable-reuse and
+  execution-boundary flows they claim to support, and fail closed for flows that remain out of
+  policy.
+- Authoritative backend-native records and control-plane identifiers are preserved for these
+  providers just as they are for other reviewed protected/shared families.
+- Capability docs, tests, and runtime behavior describe the same protected/shared support posture
+  for `s3-static` and `kubernetes`.
+
+### Risks
+
+Because these providers already have working local reviewed slices, it is easy to preserve behavior
+by accidentally leaving a hidden peer-mutator path in place for protected/shared use, which would
+keep the architectural gap alive under a different entrypoint.
+
+### Mitigation
+
+Make the public protected/shared front doors fail closed unless they route through the shared
+control-plane path, and back the migration with end-to-end service-routed tests plus provider-
+capability parity checks.
+
+### Consequence of Not Implementing
+
+The repo would continue to claim these providers are reviewed for protected/shared policy while
+their real mutating execution still violates the deployment contract's central control-plane
+requirement and leaves replay/provision semantics narrower than the design promises.
+
+### Downsides for Implementing
+
+This is a broad provider-runtime closeout touching multiple front doors, capability entries, and
+control-plane integrations at once.
+
+### Recommendation
+
+Implement immediately after PR-55 so the remaining provider-family runtime gap is closed before the
+plan claims full end-state parity with the deployment design and contract.
+
+---
+
+## PR-57: Deployment design / authoring / front-door contract parity closeout
+
+### Description
+
+I will close the remaining design-document drift identified in review: the deployment design still
+describes the operator and authoring story in terms such as `deploy <deployment-id>` and
+`deployment(name = "deploy", ...)`, while the reviewed repo-level interface now resolves
+authoritative deployment metadata from Buck-backed selectors via `--deployment <label>` and the
+reviewed exported macro surface is provider-specific helpers plus `deployment_target`. This PR
+brings the design, plan, contract, and onboarding examples into exact parity with the implemented
+front-door and authoring contract so the repo no longer asks readers to infer outdated or
+non-existent interfaces.
+
+### Scope & Changes
+
+- Audit the deployment docs for stale or ambiguous interface wording around:
+  - `deploy <deployment-id>` versus the reviewed `--deployment <label>` front door
+  - generic `deployment(...)` examples versus the actual reviewed provider-specific macro surface
+    and `deployment_target` rule
+  - deployment-id identity versus Buck-label selector usage in operator workflows
+- Update the docs so they distinguish clearly between:
+  - deployment id as the conceptual identity of the release target
+  - canonical Buck label selection as the reviewed public repo-level operator input
+- Normalize authoring examples to the real reviewed macro surface:
+  - use provider-specific macros where those are the reviewed author entrypoint
+  - mention `deployment_target` only in implementation-facing sections where that lower-level rule
+    is actually relevant
+  - remove or rewrite any example that suggests an unimplemented generic `deployment(...)` macro
+- Update first-time authoring and operator walkthrough sections so validation and submission
+  examples match the reviewed CLI exactly.
+- Add lightweight compatibility wording where useful so the design can still discuss deployment ids
+  as a conceptual model without implying that bare deployment-id strings are the current reviewed
+  CLI input shape.
+- Keep this PR doc-and-contract focused:
+  - do not expand the runtime surface
+  - do not add new deploy aliases unless they are explicitly reviewed in this PR with tests and
+    contract updates
+  - prefer making the docs exact to the current reviewed interface rather than broadening the
+    interface to match stale prose
+
+### Tests (in this PR)
+
+- Add or extend deploy front-door contract tests that lock down the reviewed `--deployment <label>`
+  requirement and reject stale or unreviewed input shapes where necessary.
+- Add or extend authoring-surface / extraction tests proving the documented provider-specific macro
+  entrypoints remain the reviewed way to define deployment packages.
+- Add targeted doc-parity or rendered-surface tests, if needed, that fail closed when the reviewed
+  CLI or exported deployment authoring surface drifts away from the updated documentation examples.
+
+### Docs (in this PR)
+
+- Update [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) so its
+  operator-facing and author-facing examples match the implemented reviewed interface exactly.
+- Update [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) and
+  this deployment plan wherever stale wording still implies a bare deployment-id CLI or a generic
+  `deployment(...)` authoring macro.
+- Update any companion onboarding or scenario docs whose examples still reflect the older or more
+  abstract interface wording.
+
+### Verification Commands
+
+- `v`
+- reviewed deploy-front-door / doc-parity verification commands introduced or tightened in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-domain docs, front-door contract tests, and any small
+  deployment-owned parity helpers needed to keep those docs exact. Under the deployment-only verify
+  policy, default `v` / CI can run the reviewed deployment suite rather than the full non-
+  deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- The deployment design, contract, and plan all describe the same reviewed public deploy interface
+  and deployment authoring surface.
+- No reviewed onboarding/example section still suggests an unimplemented generic `deployment(...)`
+  macro or a bare `deploy <deployment-id>` operator contract when the real reviewed interface is
+  `--deployment <label>`.
+- Tests fail closed if the reviewed front-door or authoring surface drifts away from the updated
+  docs again.
+
+### Risks
+
+Because the design intentionally talks at both conceptual and operator levels, doc updates can
+accidentally over-correct and erase useful conceptual language instead of clarifying the difference
+between conceptual deployment identity and the concrete reviewed CLI input.
+
+### Mitigation
+
+Preserve deployment-id language where it explains the model, but make every operator example and
+authoring walkthrough use the exact reviewed interface and back that wording with parity tests.
+
+### Consequence of Not Implementing
+
+The repo would keep a confusing split where the runtime is mostly correct but the design and plan
+still direct readers toward outdated CLI and authoring shapes, undermining onboarding and making it
+harder to tell which deployment interfaces are actually reviewed.
+
+### Downsides for Implementing
+
+This is a closeout PR centered on contract and documentation exactness rather than new runtime
+capability.
+
+### Recommendation
+
+Implement immediately after PR-56 so the final deployment plan closes with both runtime behavior
+and design/front-door guidance in exact parity.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -7395,6 +7644,12 @@ deployment-owned methodology waiver or support-file guardrail ambiguity.
     deployment-domain size guardrail to the full reviewed deployment-owned support-file boundary so
     the plan is closed against the methodology and fail-closed guardrail contract, not just the
     functional deployment behavior.
+26. PR-56: move protected/shared `s3-static` and `kubernetes` mutation onto the shared
+    control-plane architecture and close the remaining immutable-reuse / replay / provision-only
+    parity gaps for those reviewed provider families.
+27. PR-57: close the remaining deployment design / authoring / front-door drift so the reviewed
+    docs, examples, and contract language exactly match the implemented `--deployment <label>`
+    interface and provider-specific authoring surface.
 
 ## Companion Docs
 
