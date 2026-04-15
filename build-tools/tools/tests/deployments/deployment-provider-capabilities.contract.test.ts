@@ -22,6 +22,7 @@ import {
   assertProviderCapabilitiesDocParity,
   renderProviderCapabilitiesDoc,
 } from "../../deployments/provider-capabilities/doc.ts";
+import { assertDeployTextUsesReviewedSelector } from "../../deployments/provider-capabilities/front-door-contract.ts";
 import { validateProviderCapabilityRegistry } from "../../deployments/provider-capabilities/validate.ts";
 
 test("reviewed provider registry is complete and deterministic", () => {
@@ -46,6 +47,14 @@ test("checked-in provider capabilities doc stays in exact rendered parity with t
   assertProviderCapabilitiesDocParity(current);
   assert.equal(renderProviderCapabilitiesDoc(current), current);
   assert.equal(renderProviderCapabilitiesDoc(current), renderProviderCapabilitiesDoc(current));
+  assert.doesNotThrow(() =>
+    assertDeployTextUsesReviewedSelector("provider capabilities doc", current),
+  );
+  assert.match(
+    current,
+    /deploy --deployment <label> --preview --source-run-id <deploy-run-id>/,
+    "provider capabilities doc must describe reviewed operator examples with --deployment <label>",
+  );
 });
 
 test("deployments design reviewed-provider summaries stay in exact rendered parity with the registry", async () => {
@@ -130,6 +139,42 @@ test("validation fails closed when a provider entry omits required reviewed capa
   assert.throws(
     () => validateProviderCapabilityRegistry(badRegistry),
     /cloudflare-pages: previewSupport\.support must not be empty/,
+  );
+});
+
+test("validation fails closed when provider operator examples drift from the reviewed front door", () => {
+  const badRegistry = {
+    ...REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER,
+    "cloudflare-pages": {
+      ...REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER["cloudflare-pages"],
+      previewSupport: {
+        ...REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER["cloudflare-pages"].previewSupport,
+        support: [
+          ...REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER[
+            "cloudflare-pages"
+          ].previewSupport.support.slice(0, 1),
+          {
+            text: "the current built-in operator contract uses `deploy <deployment> --preview --source-run-id <deploy-run-id>`",
+          },
+        ],
+      },
+    },
+  };
+  assert.throws(
+    () => validateProviderCapabilityRegistry(badRegistry),
+    /cloudflare-pages: capability\.previewSupport\.support\[1\]\.text deploy command must use the reviewed --deployment <label> selector/,
+  );
+});
+
+test("provider capabilities doc operator examples fail closed on stale deploy selectors", async () => {
+  const current = await fsp.readFile(PROVIDER_CAPABILITIES_DOC_PATH, "utf8");
+  const stale = current.replace(
+    "`deploy --deployment <label> --preview --source-run-id <deploy-run-id>`",
+    "`deploy <deployment> --preview --source-run-id <deploy-run-id>`",
+  );
+  assert.throws(
+    () => assertDeployTextUsesReviewedSelector("provider capabilities doc", stale),
+    /provider capabilities doc: text deploy command must use the reviewed --deployment <label> selector/,
   );
 });
 

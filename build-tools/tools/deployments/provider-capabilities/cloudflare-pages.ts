@@ -47,7 +47,7 @@ export const CLOUDFLARE_PAGES_PROVIDER_CAPABILITY: DeploymentProviderCapability 
     support: [
       bullet("supported only when the deployment explicitly opts in with `preview` metadata"),
       bullet(
-        "the current built-in operator contract uses `deploy <deployment> --preview --source-run-id <deploy-run-id>`",
+        "the current built-in operator contract uses `deploy --deployment <label> --preview --source-run-id <deploy-run-id>`",
       ),
     ],
     isolationModel: [
@@ -60,7 +60,7 @@ export const CLOUDFLARE_PAGES_PROVIDER_CAPABILITY: DeploymentProviderCapability 
         "provider-managed cleanup with a default TTL of `7d`; deployment metadata may override when needed",
       ),
       bullet(
-        "the current built-in explicit cleanup contract uses `deploy <deployment> --preview-cleanup --source-run-id <deploy-run-id>`",
+        "the current built-in explicit cleanup contract uses `deploy --deployment <label> --preview-cleanup --source-run-id <deploy-run-id>`",
       ),
     ],
     lockScopeDefault: [
@@ -108,7 +108,7 @@ export const CLOUDFLARE_PAGES_PROVIDER_CAPABILITY: DeploymentProviderCapability 
       "if the provider cannot prove idempotent retry semantics after an ambiguous result, the adapter must reconcile remote state before retrying",
     ),
     bullet(
-      "same-deployment rollback is supported only as exact-artifact reuse through `deploy <deployment> --publish-only --rollback --source-run-id <deploy-run-id>`",
+      "same-deployment rollback is supported only as exact-artifact reuse through `deploy --deployment <label> --publish-only --rollback --source-run-id <deploy-run-id>`",
     ),
     bullet(
       "rollback source selection is limited to prior successful normal live-target runs for the same deployment",
@@ -120,7 +120,7 @@ export const CLOUDFLARE_PAGES_PROVIDER_CAPABILITY: DeploymentProviderCapability 
   targetTransitionSupport: [
     bullet("reviewed retire/migrate-target support:", [
       bullet(
-        "supported only through the separate operator workflows `deploy <deployment> --retire-target --target-exception-ref <label>` and `deploy <deployment> --migrate-target --target-exception-ref <label>`",
+        "supported only through the separate operator workflows `deploy --deployment <label> --retire-target --target-exception-ref <label>` and `deploy --deployment <label> --migrate-target --target-exception-ref <label>`",
       ),
     ]),
     bullet("reviewed exception requirements:", [

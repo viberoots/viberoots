@@ -23,6 +23,10 @@ import {
   writeNixosSharedHostDeployRecord,
 } from "../../deployments/nixos-shared-host-records.ts";
 import { writeControlPlaneJson } from "../../deployments/nixos-shared-host-control-plane-store.ts";
+import {
+  readQueueClaimExpiry,
+  waitForClaimRenewal,
+} from "./nixos-shared-host.control-plane.backend.helpers.ts";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 
@@ -89,6 +93,7 @@ test("backend claim heartbeat preserves single worker ownership until the lease 
       recordsRoot,
       databaseUrl: localHarnessControlPlaneDatabaseUrl(recordsRoot),
     };
+    const claimMs = 1_200;
     const { executionSnapshotPath, submissionPath } = await writeSubmissionFixture({
       recordsRoot,
       submissionId: "cp-claim",
@@ -97,15 +102,17 @@ test("backend claim heartbeat preserves single worker ownership until the lease 
     await syncBackendSnapshot(backend, executionSnapshotPath);
     await syncBackendSubmission(backend, submissionPath);
     await enqueueBackendSubmission(backend, "cp-claim", "2026-04-12T10:00:00.000Z");
-    const first = await claimBackendQueuedSubmission(backend, "worker-1", 400);
+    const first = await claimBackendQueuedSubmission(backend, "worker-1", claimMs);
     assert.ok(first);
+    const initialExpiry = await readQueueClaimExpiry(backend, first.submissionId);
+    assert.ok(initialExpiry > Date.now());
     const lease = startBackendSubmissionClaimLease({
       backend,
       submissionId: first.submissionId,
       workerId: "worker-1",
       claimToken: first.claimToken,
-      claimMs: 400,
-      heartbeatMs: 50,
+      claimMs,
+      heartbeatMs: 100,
     });
     await writeControlPlaneJson(submissionPath, {
       ...(JSON.parse(await fsp.readFile(submissionPath, "utf8")) as Record<string, unknown>),
@@ -117,12 +124,13 @@ test("backend claim heartbeat preserves single worker ownership until the lease 
       },
     });
     await syncBackendSubmission(backend, submissionPath);
-    await sleep(260);
+    const renewedExpiry = await waitForClaimRenewal(backend, first.submissionId, initialExpiry);
     await lease.assertCurrentAuthority();
-    assert.equal(await claimBackendQueuedSubmission(backend, "worker-2", 400), null);
+    assert.ok(renewedExpiry > initialExpiry);
+    assert.equal(await claimBackendQueuedSubmission(backend, "worker-2", claimMs), null);
     await lease.stop();
-    await sleep(460);
-    const takeover = await claimBackendQueuedSubmission(backend, "worker-2", 400);
+    await sleep(claimMs + 100);
+    const takeover = await claimBackendQueuedSubmission(backend, "worker-2", claimMs);
     assert.ok(takeover);
     assert.equal(takeover.lifecycleState, "running");
   });

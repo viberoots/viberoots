@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR"
+  short_description: "Short PR workflow with smart defaults"
+  default_prompt: "Use $pr for the next PR item, or pass an explicit number like 4.5.1."

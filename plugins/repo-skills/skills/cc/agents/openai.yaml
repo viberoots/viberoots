@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commit Changes"
+  short_description: "Commit all local git changes immediately"
+  default_prompt: "Use $cc to commit all local changes immediately with a representative conventional commit message, assuming tests and validation are already complete."

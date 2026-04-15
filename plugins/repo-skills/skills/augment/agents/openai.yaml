@@ -1,0 +1,4 @@
+interface:
+  display_name: "Augment"
+  short_description: "Append PR plan sections for uncovered gaps"
+  default_prompt: "$augment"

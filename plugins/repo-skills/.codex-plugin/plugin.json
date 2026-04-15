@@ -1,0 +1,23 @@
+{
+  "name": "repo-skills",
+  "version": "0.2.2",
+  "description": "Repo-local planning and PR workflow skills for this clone.",
+  "license": "UNLICENSED",
+  "keywords": ["repo", "skills", "workflow"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Repo Skills",
+    "shortDescription": "Direct workflow skills for repo plans and PRs",
+    "longDescription": "Use the PR, Assess Plan, Assess Design, Augment, and Add Repo Skill workflows directly from the plugin. No activation step or copied personal skills are required.",
+    "developerName": "Repository",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": [
+      "Use PR for the next plan item in the current repo.",
+      "Use Add Repo Skill to add a new repo-local skill that follows the plugin conventions.",
+      "Use Assess Plan to compare a spec or plan against the current implementation.",
+      "Use Augment to append new PR sections to the shared plan document."
+    ],
+    "brandColor": "#1F6F8B"
+  }
+}

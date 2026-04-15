@@ -1,0 +1,4 @@
+interface:
+  display_name: "Investigate"
+  short_description: "Fix test failures from logs using current context"
+  default_prompt: "$investigate /path/to/test.log"

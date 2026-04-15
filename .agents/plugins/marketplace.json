@@ -1,0 +1,20 @@
+{
+  "name": "repo-plugins",
+  "interface": {
+    "displayName": "Repo Plugins"
+  },
+  "plugins": [
+    {
+      "name": "repo-skills",
+      "source": {
+        "source": "local",
+        "path": "./plugins/repo-skills"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { DEPLOYMENT_ROLLOUT_MODES } from "../deployment-rollout.ts";
+import { validateCapabilityFrontDoorContract } from "./front-door-contract.ts";
 import type { DeploymentProviderCapability, ProviderCapabilityBullet } from "./types.ts";
 
 function pushWhenEmpty(
@@ -240,5 +241,6 @@ export function validateCapability(
     }
     validateBullets(errors, provider, `additionalSections.${section.title}`, section.bullets);
   }
+  errors.push(...validateCapabilityFrontDoorContract(provider, capability));
   return errors;
 }

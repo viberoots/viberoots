@@ -1,0 +1,4 @@
+interface:
+  display_name: "Add Repo Skill"
+  short_description: "Add a repo-local plugin skill with repo conventions"
+  default_prompt: "Use Add Repo Skill to create a new repo-local plugin skill that follows the plugin-only and clone-local state conventions."

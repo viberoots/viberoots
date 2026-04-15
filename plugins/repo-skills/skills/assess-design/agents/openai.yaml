@@ -1,0 +1,4 @@
+interface:
+  display_name: "Assess Design"
+  short_description: "Assess a design spec with its own persisted default"
+  default_prompt: "Use $assess-design to review the saved design spec against the implementation, existing tests, methodology, and guardrails."

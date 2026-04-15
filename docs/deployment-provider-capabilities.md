@@ -490,12 +490,12 @@ Normative-source note:
 
 - preview support:
   - supported only when the deployment explicitly opts in with `preview` metadata
-  - the current built-in operator contract uses `deploy <deployment> --preview --source-run-id <deploy-run-id>`
+  - the current built-in operator contract uses `deploy --deployment <label> --preview --source-run-id <deploy-run-id>`
 - preview isolation model:
   - provider-managed isolated preview target derived deterministically from deployment metadata plus run context
 - preview cleanup default:
   - provider-managed cleanup with a default TTL of `7d`; deployment metadata may override when needed
-  - the current built-in explicit cleanup contract uses `deploy <deployment> --preview-cleanup --source-run-id <deploy-run-id>`
+  - the current built-in explicit cleanup contract uses `deploy --deployment <label> --preview-cleanup --source-run-id <deploy-run-id>`
 - preview lock-scope default:
   - preview shares the normal deployment lock by default
   - a separate preview lock scope is allowed only when the preview satisfies the stronger independent-execution isolation bar
@@ -529,14 +529,14 @@ Normative-source note:
 
 - publish retry may be allowed only for clearly transient network/provider failures
 - if the provider cannot prove idempotent retry semantics after an ambiguous result, the adapter must reconcile remote state before retrying
-- same-deployment rollback is supported only as exact-artifact reuse through `deploy <deployment> --publish-only --rollback --source-run-id <deploy-run-id>`
+- same-deployment rollback is supported only as exact-artifact reuse through `deploy --deployment <label> --publish-only --rollback --source-run-id <deploy-run-id>`
 - rollback source selection is limited to prior successful normal live-target runs for the same deployment
 - rollback fails closed when the retained exact artifact is unavailable or when the selected source run refers to preview rather than the normal live target
 
 ### Target Transition Support
 
 - reviewed retire/migrate-target support:
-  - supported only through the separate operator workflows `deploy <deployment> --retire-target --target-exception-ref <label>` and `deploy <deployment> --migrate-target --target-exception-ref <label>`
+  - supported only through the separate operator workflows `deploy --deployment <label> --retire-target --target-exception-ref <label>` and `deploy --deployment <label> --migrate-target --target-exception-ref <label>`
 - reviewed exception requirements:
   - the selected target exception must be active, must carry the reviewed shared lock scope, and must not be superseded
   - migration exceptions must define `new_provider_target_identity`
@@ -786,6 +786,7 @@ Change-control rule:
 
 - a built-in adapter must not widen provider support beyond the reviewed structured capability entry
 - when provider behavior changes materially, update the structured provider-capability registry and render this document in the same change
+- reviewed operator examples must keep the public repo-facing `deploy --deployment <label> ...` selector form; keep deployment-id wording conceptual only
 
 ## Companion Docs
 

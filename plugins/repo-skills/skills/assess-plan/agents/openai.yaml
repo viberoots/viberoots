@@ -1,0 +1,4 @@
+interface:
+  display_name: "Assess Plan"
+  short_description: "Assess the shared default plan or spec against implementation"
+  default_prompt: "Use $assess-plan to review the shared default spec or plan against the implementation, existing tests, methodology, and guardrails."
