@@ -3879,8 +3879,8 @@ while also closing the remaining repo-level preview-policy and preview-identity 
 
 - `v`
 - `deploy --list`
-- `deploy <deployment-id> --validate-only`
-- `deploy <deployment-id> --provision-only`
+- `deploy --deployment <label> --validate-only`
+- `deploy --deployment <label> --provision-only`
 
 ### Expected Regression Scope
 
@@ -4254,7 +4254,7 @@ static hosting.
 ### Verification Commands
 
 - `v`
-- `deploy <deployment-id>` flows introduced for the `s3-static` slice
+- `deploy --deployment <label>` flows introduced for the `s3-static` slice
 
 ### Expected Regression Scope
 

@@ -5,6 +5,12 @@ This document gives canonical policy scenarios for the deployment model.
 If two implementations would handle one of these scenarios differently, the design or companion
 contracts still need clarification.
 
+Operator-command note:
+
+- deployment ids such as `pleomino-prod` remain the conceptual identity of the release target
+- the reviewed public repo-level CLI selects that target with a Buck label such as
+  `--deployment //projects/deployments/pleomino-prod:deploy`
+
 ## 1. Protected/Shared Normal Deploy
 
 Situation:
@@ -16,7 +22,7 @@ Situation:
 
 Expected behavior:
 
-- the operator submits `deploy pleomino-prod`
+- the operator submits `deploy --deployment //projects/deployments/pleomino-prod:deploy`
 - the source-admission path determines the admissible revision
 - trusted CI builds and attests the artifact for that admitted revision
 - the control plane then admits the target-environment mutating run, freezes one execution snapshot, acquires the lock, publishes, runs smoke, and records the run
@@ -32,7 +38,7 @@ Situation:
 
 Expected behavior:
 
-- the operator submits `deploy pleomino-prod --publish-only --source-run-id <failed-run-id>`
+- the operator submits `deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <failed-run-id>`
 - the run is classified as `retry`
 - the control plane replays the recorded snapshot for the selected source run
 - no rebuild occurs
@@ -51,7 +57,7 @@ Situation:
 
 Expected behavior:
 
-- the operator submits `deploy pleomino-staging-s3`
+- the operator submits `deploy --deployment //projects/deployments/pleomino-staging-s3:deploy`
 - the control plane admits one exact static artifact for the reviewed stage branch
 - the deploy path materializes one reviewed non-destructive provisioner plan artifact for the
   bucket/CDN identity owned by deployment metadata
@@ -73,7 +79,7 @@ Situation:
 
 Expected behavior:
 
-- the operator submits `deploy demoapp-dev`
+- the operator submits `deploy --deployment //projects/deployments/demoapp-dev:deploy`
 - the control plane admits one immutable SSR artifact plus the reviewed runtime
   contract
 - host realization preserves the canonical shared-host target identity from
@@ -95,7 +101,7 @@ Situation:
 
 Expected behavior:
 
-- the operator submits `deploy pleomino-prod --publish-only --source-run-id <known-good-run-id> --rollback`
+- the operator submits `deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <known-good-run-id> --rollback`
 - the run is classified as `rollback`
 - the current branch/lane policy must authorize rollback
 - the selected rollback source run may be older than the current branch head
@@ -113,7 +119,7 @@ Situation:
 
 Expected behavior:
 
-- the operator submits `deploy pleomino-prod --publish-only --source-run-id <staging-run-id>`
+- the operator submits `deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <staging-run-id>`
 - the run is classified as `promotion`
 - the control plane validates lane compatibility and promotability
 - the source artifact identity is reused
@@ -129,7 +135,7 @@ Situation:
 
 Expected behavior:
 
-- the operator or automation submits `deploy pleomino-prod --preview --source-run-id <admitted-run-id>`
+- the operator or automation submits `deploy --deployment //projects/deployments/pleomino-prod:deploy --preview --source-run-id <admitted-run-id>`
 - preview is recorded as `publish_mode = preview`
 - for same-deployment preview publication, the default `operation_kind` remains `deploy`
 - unless the deployment's `admission_policy` explicitly defines a stricter preview posture, the preview run uses the same target-environment branch and required-check requirements as a normal protected/shared publish for `pleomino-prod`
@@ -138,7 +144,7 @@ Expected behavior:
 - the shared/protected preview selector is the admitted source run id, not an ambient branch or commit
 - the preview run may still share the normal deployment lock unless the preview also satisfies the stronger independent-execution isolation requirements for a separate preview lock scope
 - preview cleanup is a first-class audited `preview_cleanup` operation
-- explicit cleanup uses `deploy pleomino-prod --preview-cleanup --source-run-id <admitted-run-id>`
+- explicit cleanup uses `deploy --deployment //projects/deployments/pleomino-prod:deploy --preview-cleanup --source-run-id <admitted-run-id>`
 - preview cleanup acquires the effective lock scope for that preview, whether that is the shared normal lock or a separate isolated preview lock
 - preview cleanup records `publish_mode = preview`, the isolated preview target identity, and a cleanup reason such as TTL expiry or PR close
 
@@ -226,7 +232,7 @@ Situation:
 
 Expected behavior:
 
-- the operator submits `deploy pleomino-prod --provision-only --source-run-id <deploy-run-id>`
+- the operator submits `deploy --deployment //projects/deployments/pleomino-prod:deploy --provision-only --source-run-id <deploy-run-id>`
 - the control plane uses the admitted source-run context required by the provisioner
 - no rebuild occurs
 - publish and release actions do not run
@@ -240,7 +246,7 @@ Situation:
 Expected behavior:
 
 - the operator must not use `--publish-only` for this promotion, because the target stage requires a newly built admitted artifact
-- the reviewed operator path is `deploy pleomino-rebuild-staging --source-run-id <deploy-run-id> --artifact-dir <target-stage-artifact-dir>`
+- the reviewed operator path is `deploy --deployment //projects/deployments/pleomino-rebuild-staging:deploy --source-run-id <deploy-run-id> --artifact-dir <target-stage-artifact-dir>`
 - source-run selection identifies the admitted source revision being promoted
 - trusted CI builds a new stage-specific immutable artifact for the target stage
 - the control plane admits that target-stage artifact before publish
@@ -257,7 +263,7 @@ Situation:
 
 Expected behavior:
 
-- the operator submits `deploy pleomino-prod --publish-only --source-run-id <known-good-run-id> --rollback`
+- the operator submits `deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <known-good-run-id> --rollback`
 - the run is classified as `rollback`
 - the control plane requires fresh target-environment approval by default for that production rollback
 - approval from the original successful run is evidence for source quality, not authorization for the new mutation
@@ -285,7 +291,7 @@ Situation:
 
 Expected behavior:
 
-- the operator submits `deploy pleomino-prod --publish-only --source-run-id <known-good-run-id> --rollback`
+- the operator submits `deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <known-good-run-id> --rollback`
 - admission evaluates the recorded action posture before mutation
 - the rollback is rejected clearly unless the deployment declares another explicitly compatible rollback or repair path
 - the system does not assume that re-publishing the older artifact is safe once shared state has advanced

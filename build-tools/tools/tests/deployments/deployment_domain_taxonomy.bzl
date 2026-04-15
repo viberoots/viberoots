@@ -2,6 +2,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-domain.file-size-lint.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-domain.taxonomy-drift.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-docs.front-door-parity.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admission.lane-governance.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admission.policy.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admission.prerequisites.helpers.ts": False,

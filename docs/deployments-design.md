@@ -45,7 +45,7 @@ The key promise of this document is:
 - you can tell what belongs in a deployment package
 - you can tell which tool owns which part of the lifecycle
 - you can model a new deployment without guessing where concepts belong
-- you can understand what `deploy <deployment-id>` is expected to do end to end
+- you can understand what `deploy --deployment <label>` is expected to do end to end
 
 This document tries to answer three different questions at once:
 
@@ -512,7 +512,7 @@ sequenceDiagram
 
     participant PV3 as "Provider APIs"
 
-    Dev->>CLI3: deploy <deployment-id>
+    Dev->>CLI3: deploy --deployment //projects/deployments/pleomino-prod:deploy
     CLI3->>BX3: extract deployment metadata
     BX3->>VAL3: validate shape and policy references
     VAL3-->>CLI3: validated payload
@@ -1013,16 +1013,16 @@ I want one canonical deploy entrypoint for everything under `projects/deployment
 Examples:
 
 ```bash
-deploy pleomino-prod
-deploy pleomino-prod --preview --source-run-id <deploy-run-id>
-deploy pleomino-dev --preview --preview-branch <branch-name>
-deploy pleomino-dev --preview --preview-commit <commit-sha>
-deploy pleomino-prod --validate-only
-deploy pleomino-prod --provision-only
-deploy pleomino-prod --publish-only --source-run-id <deploy-run-id>
-deploy pleomino-prod --publish-only --source-run-id <deploy-run-id> --rollback
-deploy pleomino-dev --preview-cleanup --preview-branch <branch-name>
-deploy pleomino-dev --preview-cleanup --preview-commit <commit-sha>
+deploy --deployment //projects/deployments/pleomino-prod:deploy
+deploy --deployment //projects/deployments/pleomino-prod:deploy --preview --source-run-id <deploy-run-id>
+deploy --deployment //projects/deployments/pleomino-dev:deploy --preview --preview-branch <branch-name>
+deploy --deployment //projects/deployments/pleomino-dev:deploy --preview --preview-commit <commit-sha>
+deploy --deployment //projects/deployments/pleomino-prod:deploy --validate-only
+deploy --deployment //projects/deployments/pleomino-prod:deploy --provision-only
+deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <deploy-run-id>
+deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <deploy-run-id> --rollback
+deploy --deployment //projects/deployments/pleomino-dev:deploy --preview-cleanup --preview-branch <branch-name>
+deploy --deployment //projects/deployments/pleomino-dev:deploy --preview-cleanup --preview-commit <commit-sha>
 deploy --from-changes
 deploy --list
 ```
@@ -1040,15 +1040,14 @@ Entry-point clarification for protected/shared mutation:
 Suggested layout:
 
 ```text
-build-tools/tools/deploy/deploy.ts
-build-tools/tools/deploy/control-plane/
-build-tools/tools/deploy/shared/
-build-tools/tools/deploy/providers/cloudflare-pages.ts
-build-tools/tools/deploy/provisioners/cdktf.ts
-build-tools/tools/deploy/release-actions/
+build-tools/tools/deployments/deploy.ts
+build-tools/tools/deployments/provider-capabilities/
+build-tools/tools/deployments/cloudflare-pages-*.ts
+build-tools/tools/deployments/kubernetes-*.ts
+build-tools/tools/deployments/nixos-shared-host-*.ts
+build-tools/tools/deployments/s3-static-*.ts
 build-tools/tools/bin/deploy
-build-tools/deploy/lanes/
-build-tools/deploy/policies/
+projects/deployments/*/TARGETS
 ```
 
 Code-location map:
@@ -1082,14 +1081,14 @@ flowchart TB
     end
 
     subgraph RUNNERS["Built-in execution adapters"]
-        PROVIDERS["build-tools/tools/deploy/providers/*<br/>publisher, smoke, provider API adapters"]
-        PROVISIONERS["build-tools/tools/deploy/provisioners/*<br/>built-in provisioner runners"]
-        ACTIONS["build-tools/tools/deploy/release-actions/*<br/>built-in release-action runners"]
+        PROVIDERS["build-tools/tools/deployments/*provider*<br/>publisher, smoke, provider API adapters"]
+        PROVISIONERS["build-tools/tools/deployments/*provision*<br/>built-in provisioner runners"]
+        ACTIONS["build-tools/tools/deployments/*release-action*<br/>built-in release-action runners"]
     end
 
     subgraph POLICY["Repo-owned policy objects"]
-        LANES["build-tools/deploy/lanes/*<br/>lane_policy definitions"]
-        POLICIES["build-tools/deploy/policies/*<br/>admission_policy definitions"]
+        LANES["projects/deployments/*:lane<br/>lane_policy definitions"]
+        POLICIES["projects/deployments/*:*_release<br/>admission_policy definitions"]
     end
 
     ROOT --> BIN --> FRONT
@@ -1132,12 +1131,12 @@ How to read this map:
 - routine JSON submissions/snapshots under `<records-root>/control-plane/` and protected/shared deploy-record files under `<records-root>/runs/` are no longer the normal operator-readable authority path
 - isolated fixture tests and explicitly local harnesses may use an explicit `pgmem://...` backend URL, but that harness is not the reviewed operator backend
 - provider, provisioner, and release-action modules still hold only vetted built-in execution adapters
-- `build-tools/deploy/lanes/` and `build-tools/deploy/policies/` remain repo-owned policy-definition locations rather than control-plane implementation code
+- repo-owned `deployment_lane_policy(...)` and `deployment_admission_policy(...)` rules remain Buck-visible policy-definition objects, typically in shared deployment packages such as `//projects/deployments/pleomino-shared:lane`
 - exact filenames may evolve, but these directory boundaries should remain stable so the implementation matches the design's trust and ownership model
 
 CLI/front-door responsibilities:
 
-1. resolve a deployment id to a Buck deployment target
+1. resolve `--deployment <label>` to a Buck deployment target
 2. query Buck for deployment metadata
 3. validate provider and component rules
 4. for `local_only`, build referenced Buck targets and resolve concrete output paths directly
@@ -1322,7 +1321,7 @@ This distinction needs to stay explicit because it is one of the easiest places 
 So:
 
 - `pleomino-prod` and `pleomino-staging` are different deployments
-- `deploy pleomino-prod --preview --source-run-id <deploy-run-id>` is still operating on `pleomino-prod`
+- `deploy --deployment //projects/deployments/pleomino-prod:deploy --preview --source-run-id <deploy-run-id>` is still operating on `pleomino-prod`
 - preview should not silently invent a second deployment id or bypass the deployment package's validation rules
 - for `shared_nonprod` and `production_facing`, preview should not be used from unadmitted revisions or artifacts
 - for `shared_nonprod` and `production_facing`, `--preview` should require an explicit admitted source selector such as `--source-run-id <deploy-run-id>`
@@ -1375,7 +1374,7 @@ Protected/shared clarification:
 
 Good pattern:
 
-- user runs `deploy pleomino-prod`
+- user runs `deploy --deployment //projects/deployments/pleomino-prod:deploy`
 - the repo-level deploy tool resolves the deployment target
 - for `local_only` or isolated-preview flows, the repo-level deploy tool may delegate one step to a deployment-local script if needed
 - for `shared_nonprod` and `production_facing`, the normal path should stay within vetted built-in control-plane code plus declarative metadata and provider-native config
@@ -1496,7 +1495,7 @@ When you would use it:
 Local-only example:
 
 ```bash
-deploy pleomino-prod --validate-only
+deploy --deployment //projects/deployments/pleomino-prod:deploy --validate-only
 ```
 
 Plain-language version:
@@ -1524,12 +1523,12 @@ When you would use it:
 Example:
 
 ```bash
-deploy pleomino-prod --provision-only
+deploy --deployment //projects/deployments/pleomino-prod:deploy --provision-only
 ```
 
 If a reviewed protected/shared provisioner needs `immutable_resolved_inputs` rather than plain
 `metadata_only`, the operator contract should add an explicit admitted source-run selector such as
-`deploy pleomino-prod --provision-only --source-run-id <deploy-run-id>`.
+`deploy --deployment //projects/deployments/pleomino-prod:deploy --provision-only --source-run-id <deploy-run-id>`.
 
 Even in the default protected/shared `metadata_only` case, the control plane must still admit and record
 one concrete source revision for the provision-only run before mutation begins. The difference is that the
@@ -1578,7 +1577,7 @@ When you would use it:
 Example:
 
 ```bash
-deploy pleomino-prod --publish-only --source-run-id <deploy-run-id>
+deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <deploy-run-id>
 ```
 
 Plain-language version:
@@ -1680,43 +1679,29 @@ Protected/shared preview product stance:
 Concrete preview-enabled example:
 
 ```python
-deployment(
+cloudflare_pages_static_webapp_deployment(
     name = "deploy",
-    provider = "cloudflare-pages",
-    lane_policy = "//build-tools/deploy/lanes:pleomino",
-    provider_target = {
-        "project": "pleomino-prod-pages",
-        "account": "web-platform-prod",
-        "id": "pleomino-prod-pages",
-    },
+    component = "//projects/apps/pleomino:app",
+    account = "web-platform-prod",
+    project = "pleomino-prod-pages",
+    lane_policy = "//projects/deployments/pleomino-shared:lane",
     environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
+    admission_policy = "//projects/deployments/pleomino-shared:prod_release",
     protection_class = "production_facing",
     preview = {
-        "target_derivation": "run-scoped-provider-default",
-        "isolation_class": "provider-managed-isolated-preview",
+        "target_derivation": "provider_managed_source_run",
+        "isolation_class": "isolated",
+        "identity_selector": "source_run",
         "cleanup_ttl": "7d",
-        "smoke_policy_override": {
-            "use_preview_url": True,
-        },
-    },
-    components = [
-        {
-            "id": "web",
-            "kind": "static-webapp",
-            "target": "//projects/apps/pleomino:app",
-        },
-    ],
-    publisher = {
-        "type": "wrangler-pages",
-        "config": "wrangler.jsonc",
+        "smoke_target": "preview_url",
+        "lock_scope": "shared",
     },
     smoke = {
         "type": "http-smoke",
         "path": "/",
     },
-    secret_requirements = {},
-    runtime_config_requirements = {},
+    secret_requirements = [],
+    runtime_config_requirements = [],
 )
 ```
 
@@ -1740,22 +1725,22 @@ Preview lifecycle examples:
 
 - CI-managed preview of an already-admitted production artifact
   - CI or another automation trigger asks the shared control plane to select an already-admitted `pleomino-prod` run
-  - it runs `deploy pleomino-prod --preview --source-run-id <deploy-run-id>`
+  - it runs `deploy --deployment //projects/deployments/pleomino-prod:deploy --preview --source-run-id <deploy-run-id>`
   - the provider adapter derives an isolated target such as `preview-from-run-184`
   - smoke runs against the preview URL
   - when the preview expires, the control plane destroys that isolated target or asks the provider to expire it
 - Branch preview with provider-managed ephemeral target
-  - CI publishes a branch preview for a local-only or explicitly preview-safe deployment by running `deploy pleomino-dev --preview --preview-branch feature/new-nav`
+  - CI publishes a branch preview for a local-only or explicitly preview-safe deployment by running `deploy --deployment //projects/deployments/pleomino-dev:deploy --preview --preview-branch feature/new-nav`
   - the provider owns most of the lifecycle
   - the provider adapter derives the isolated preview target, URL, cleanup identity, and lock scope from that explicit branch selector
   - repo policy still requires that the preview target be isolated from the normal live target
 - Commit preview with provider-managed ephemeral target
-  - CI or a developer publishes a commit preview for a local-only or explicitly preview-safe deployment by running `deploy pleomino-dev --preview --preview-commit abc1234`
+  - CI or a developer publishes a commit preview for a local-only or explicitly preview-safe deployment by running `deploy --deployment //projects/deployments/pleomino-dev:deploy --preview --preview-commit abc1234`
   - the provider adapter derives the isolated preview target, URL, cleanup identity, and lock scope from that explicit commit selector
   - repo policy still requires that the preview target be isolated from the normal live target
 - Manual local preview to a personal isolated target
   - a developer may run preview locally only when the provider adapter supports a clearly isolated local or personal preview target
-  - the request should still use one canonical selector such as `deploy pleomino-dev --preview --preview-branch feature/new-nav`
+  - the request should still use one canonical selector such as `deploy --deployment //projects/deployments/pleomino-dev:deploy --preview --preview-branch feature/new-nav`
   - that preview must not mutate any shared deployment target
   - if isolation cannot be proven, local preview is out of policy
 
@@ -1792,9 +1777,9 @@ Preview cleanup contract:
 - preview cleanup should be modeled as its own audited operation kind:
   - `preview_cleanup`
 - the public operator surface should expose preview cleanup explicitly rather than hiding it behind provider-specific tooling or implicit TTL-only behavior
-  - example protected/shared cleanup: `deploy pleomino-prod --preview-cleanup --source-run-id <deploy-run-id>`
-  - example preview-safe local cleanup: `deploy pleomino-dev --preview-cleanup --preview-branch <branch-name>`
-  - example preview-safe local cleanup: `deploy pleomino-dev --preview-cleanup --preview-commit <commit-sha>`
+  - example protected/shared cleanup: `deploy --deployment //projects/deployments/pleomino-prod:deploy --preview-cleanup --source-run-id <deploy-run-id>`
+  - example preview-safe local cleanup: `deploy --deployment //projects/deployments/pleomino-dev:deploy --preview-cleanup --preview-branch <branch-name>`
+  - example preview-safe local cleanup: `deploy --deployment //projects/deployments/pleomino-dev:deploy --preview-cleanup --preview-commit <commit-sha>`
 - preview cleanup must record at least:
   - the deployment id
   - `publish_mode = preview`
@@ -1991,13 +1976,13 @@ Suppose `pleomino-prod` uses Cloudflare Pages.
 
 Typical uses:
 
-- `deploy pleomino-prod --validate-only`
+- `deploy --deployment //projects/deployments/pleomino-prod:deploy --validate-only`
   - verify that the deployment package, app target, and Wrangler config are wired correctly
-- `deploy pleomino-prod --provision-only`
+- `deploy --deployment //projects/deployments/pleomino-prod:deploy --provision-only`
   - create the Pages project and custom domain configuration if that is repo-owned
-- `deploy pleomino-prod --publish-only --source-run-id <deploy-run-id>`
+- `deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <deploy-run-id>`
   - publish one selected previously built immutable artifact to an already-existing Pages project
-- `deploy pleomino-prod`
+- `deploy --deployment //projects/deployments/pleomino-prod:deploy`
   - run the full lifecycle in order
 
 This is one of the main reasons the model separates:
@@ -2023,36 +2008,35 @@ Each deployment target should define:
 Suggested low-level rule shape:
 
 ```python
-deployment(
+deployment_target(
     name = "deploy",
     provider = "cloudflare-pages",
-    lane_policy = "//build-tools/deploy/lanes:pleomino",
+    component = "//projects/apps/pleomino:app",
+    component_kind = "static-webapp",
+    publisher = "wrangler-pages",
+    publisher_config = "wrangler.jsonc",
+    lane_policy = "//projects/deployments/pleomino-shared:lane",
     provider_target = {
         "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
         "id": "pleomino-prod-pages",
     },
     environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
+    admission_policy = "//projects/deployments/pleomino-shared:prod_release",
     protection_class = "production_facing",
     components = [
         {
-            "id": "web",
+            "id": "default",
             "kind": "static-webapp",
             "target": "//projects/apps/pleomino:app",
         },
     ],
-    provisioner = None,
-    publisher = {
-        "type": "wrangler-pages",
-        "config": "wrangler.jsonc",
-    },
     smoke = {
         "type": "http-smoke",
         "path": "/",
     },
-    secret_requirements = {},
-    runtime_config_requirements = {},
+    secret_requirements = [],
+    runtime_config_requirements = [],
 )
 ```
 
@@ -2170,7 +2154,7 @@ Policy evaluation order:
     - required for `shared_nonprod` and `production_facing`
     - should be an explicit reference to a centrally defined stable branch/check/approval policy object for that deployment
     - should be Buck-visible and repo-owned rather than an opaque free-form string
-    - should normally be represented as a Buck label or equivalent structured repo-owned policy reference, for example `//build-tools/deploy/policies:pleomino_prod_release`
+    - should normally be represented as a Buck label or equivalent structured repo-owned policy reference, for example `//projects/deployments/pleomino-shared:prod_release`
     - keeps the deploy rule authoritative for which admission policy applies, even if the policy definition itself lives outside the deployment package
   - `protection_class`
     - required
@@ -2600,9 +2584,15 @@ The examples below are intentionally simple and repetitive. The goal is to make 
 #### Example: Cloudflare Pages Project And Domain Are Repo-Owned
 
 ```python
-deployment(
+deployment_target(
     name = "deploy",
     provider = "cloudflare-pages",
+    component = "//projects/apps/pleomino:app",
+    component_kind = "static-webapp",
+    publisher = "wrangler-pages",
+    publisher_config = "wrangler.jsonc",
+    provisioner = "cdktf-stack",
+    provisioner_config = "cdktf/stack.json",
     provider_target = {
         "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
@@ -2611,25 +2601,17 @@ deployment(
     protection_class = "local_only",
     components = [
         {
-            "id": "web",
+            "id": "default",
             "kind": "static-webapp",
             "target": "//projects/apps/pleomino:app",
         },
     ],
-    provisioner = {
-        "type": "cdktf-stack",
-        "config": "cdktf/stack.json",
-    },
-    publisher = {
-        "type": "wrangler-pages",
-        "config": "wrangler.jsonc",
-    },
     smoke = {
         "type": "http-smoke",
         "path": "/",
     },
-    secret_requirements = {},
-    runtime_config_requirements = {},
+    secret_requirements = [],
+    runtime_config_requirements = [],
 )
 ```
 
@@ -2676,38 +2658,25 @@ Whether `s3-static` is available as a built-in provider entry is defined by the 
 provider-capabilities registry rather than by this example.
 
 ```python
-deployment(
+s3_static_webapp_deployment(
     name = "deploy",
-    provider = "s3-static",
-    provider_target = {
-        "id": "docs-site-prod",
-        "bucket": "docs-site-prod",
-    },
-    lane_policy = "//build-tools/deploy/lanes:docs-site",
-    admission_policy = "//build-tools/deploy/policies:docs_site_prod_release",
+    component = "//projects/apps/docs-site:app",
+    account = "docs-platform-prod",
+    bucket = "docs-site-prod",
+    region = "us-west-2",
+    distribution = "docs.example.test",
+    lane_policy = "//projects/deployments/docs-site-shared:lane",
+    admission_policy = "//projects/deployments/docs-site-shared:prod_release",
     environment_stage = "prod",
     protection_class = "production_facing",
-    components = [
-        {
-            "id": "web",
-            "kind": "static-webapp",
-            "target": "//projects/apps/docs-site:app",
-        },
-    ],
-    provisioner = {
-        "type": "terraform-stack",
-        "config": "terraform/main.tf.json",
-    },
-    publisher = {
-        "type": "aws-s3-sync",
-        "config": "publisher.json",
-    },
+    provisioner = "terraform-stack",
+    publisher_config = "publisher.json",
     smoke = {
         "type": "http-smoke",
         "path": "/",
     },
-    secret_requirements = {},
-    runtime_config_requirements = {},
+    secret_requirements = [],
+    runtime_config_requirements = [],
 )
 ```
 
@@ -2730,9 +2699,15 @@ Why you would want this:
 #### Example: Kubernetes Service With Namespace And Ingress Setup
 
 ```python
-deployment(
+deployment_target(
     name = "deploy",
     provider = "kubernetes",
+    component = "//projects/apps/api:image",
+    component_kind = "service",
+    publisher = "helm-release",
+    publisher_config = "helm/values.yaml",
+    provisioner = "cdktf-stack",
+    provisioner_config = "cdktf/stack.json",
     provider_target = {
         "id": "prod-us-west/api-prod/api",
         "cluster": "prod-us-west",
@@ -2747,20 +2722,12 @@ deployment(
             "target": "//projects/apps/api:image",
         },
     ],
-    provisioner = {
-        "type": "cdktf-stack",
-        "config": "cdktf/stack.json",
-    },
-    publisher = {
-        "type": "helm-release",
-        "config": "helm/values.yaml",
-    },
     smoke = {
         "type": "http-smoke",
         "path": "/healthz",
     },
-    secret_requirements = {},
-    runtime_config_requirements = {},
+    secret_requirements = [],
+    runtime_config_requirements = [],
 )
 ```
 
@@ -2783,17 +2750,23 @@ Whether `kubernetes` is available as a built-in provider entry is defined by the
 provider-capabilities registry rather than by this example.
 
 ```python
-deployment(
+deployment_target(
     name = "deploy",
     provider = "kubernetes",
+    component = "//projects/observability/otel-collector:image",
+    component_kind = "third-party-service",
+    publisher = "helm-release",
+    publisher_config = "helm/values.yaml",
+    provisioner = "terraform-stack",
+    provisioner_config = "terraform/main.tf.json",
     provider_target = {
         "id": "prod-us-west/shared-observability/otel-collector",
         "cluster": "prod-us-west",
         "namespace": "shared-observability",
         "release": "otel-collector",
     },
-    lane_policy = "//build-tools/deploy/lanes:shared-observability",
-    admission_policy = "//build-tools/deploy/policies:shared_observability_prod_release",
+    lane_policy = "//projects/deployments/shared-observability-shared:lane",
+    admission_policy = "//projects/deployments/shared-observability-shared:prod_release",
     environment_stage = "prod",
     protection_class = "production_facing",
     components = [
@@ -2803,20 +2776,12 @@ deployment(
             "target": "//projects/observability/otel-collector:image",
         },
     ],
-    provisioner = {
-        "type": "terraform-stack",
-        "config": "terraform/main.tf.json",
-    },
-    publisher = {
-        "type": "helm-release",
-        "config": "helm/values.yaml",
-    },
     smoke = {
         "type": "http-smoke",
         "path": "/ready",
     },
-    secret_requirements = {},
-    runtime_config_requirements = {},
+    secret_requirements = [],
+    runtime_config_requirements = [],
 )
 ```
 
@@ -2886,7 +2851,7 @@ This is one of the reasons `--publish-only` exists.
 If the deployment has a provisioner but you do not want to run provisioning on a particular release, you can use:
 
 ```bash
-deploy pleomino-prod --publish-only --source-run-id <deploy-run-id>
+deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <deploy-run-id>
 ```
 
 That is an operational choice for one run.
@@ -3252,20 +3217,22 @@ If yes:
 
 If no:
 
-- use the low-level `deployment(...)` primitive directly
+- use the low-level `deployment_target(...)` primitive directly
 
 ## New Deployment Happy Path
 
 If you are adding a new deployment for the first time, the shortest correct workflow should be:
 
 1. create `projects/deployments/<deployment-id>/`
-2. add a `TARGETS` file with a `deployment(name = "deploy", ...)`
+2. add a `TARGETS` file with a reviewed helper such as
+   `cloudflare_pages_static_webapp_deployment(name = "deploy", ...)` or, for implementation-facing cases,
+   `deployment_target(name = "deploy", ...)`
 3. point `components[*].target` at existing Buck build targets
 4. add provider config files such as `wrangler.jsonc` only when that provider needs them
 5. decide whether setup is repo-owned
 6. set `provisioner = None` if setup is external, or configure a real provisioner if setup is repo-owned
-7. run `deploy <deployment-id> --validate-only`
-8. if the deployment is `local_only`, run `deploy <deployment-id>` once validation passes
+7. run `deploy --deployment //projects/deployments/<deployment-id>:deploy --validate-only`
+8. if the deployment is `local_only`, run `deploy --deployment //projects/deployments/<deployment-id>:deploy` once validation passes
 9. if the deployment is `shared_nonprod` or `production_facing`, submit the mutating run to the shared control plane once validation passes
 
 What you should not have to do:
@@ -3295,37 +3262,23 @@ Ask these questions in order:
 ## Single-Component Example: Cloudflare Pages Static PWA
 
 ```python
-load("//build-tools/deploy:defs.bzl", "deployment")
+load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")
 
-deployment(
+cloudflare_pages_static_webapp_deployment(
     name = "deploy",
-    provider = "cloudflare-pages",
-    provider_target = {
-        "project": "pleomino-prod-pages",
-        "account": "web-platform-prod",
-        "id": "pleomino-prod-pages",
-    },
-    lane_policy = "//build-tools/deploy/lanes:pleomino",
+    component = "//projects/apps/pleomino:app",
+    account = "web-platform-prod",
+    project = "pleomino-prod-pages",
+    lane_policy = "//projects/deployments/pleomino-shared:lane",
     environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
+    admission_policy = "//projects/deployments/pleomino-shared:prod_release",
     protection_class = "production_facing",
-    components = [
-        {
-            "id": "web",
-            "kind": "static-webapp",
-            "target": "//projects/apps/pleomino:app",
-        },
-    ],
-    publisher = {
-        "type": "wrangler-pages",
-        "config": "wrangler.jsonc",
-    },
     smoke = {
         "type": "http-smoke",
         "path": "/",
     },
-    secret_requirements = {},
-    runtime_config_requirements = {},
+    secret_requirements = [],
+    runtime_config_requirements = [],
 )
 ```
 
@@ -3573,9 +3526,13 @@ Operational consequence:
 Example:
 
 ```python
-deployment(
+deployment_target(
     name = "deploy",
     provider = "custom-platform",
+    component = "//projects/apps/marketing-site:app",
+    component_kind = "static-webapp",
+    publisher = "custom-built-in",
+    publisher_config = "publisher.json",
     provider_target = {
         "id": "marketing-docs-prod",
     },
@@ -3584,8 +3541,8 @@ deployment(
         "mode": "ordered_best_effort",
         "abort": "stop_on_first_failure",
         "smoke": "final_only",
-        "steps": ["marketing", "docs"],
     },
+    rollout_steps = ["marketing", "docs"],
     components = [
         {
             "id": "marketing",
@@ -3598,16 +3555,12 @@ deployment(
             "target": "//projects/apps/docs-site:app",
         },
     ],
-    publisher = {
-        "type": "custom-built-in",
-        "config": "publisher.json",
-    },
     smoke = {
         "type": "http-smoke",
         "path": "/",
     },
-    secret_requirements = {},
-    runtime_config_requirements = {},
+    secret_requirements = [],
+    runtime_config_requirements = [],
 )
 ```
 
@@ -3956,41 +3909,27 @@ Exception representation policy:
 Example non-production smoke exception:
 
 ```python
-deployment(
+cloudflare_pages_static_webapp_deployment(
     name = "deploy",
-    provider = "cloudflare-pages",
-    provider_target = {
-        "project": "pleomino-dev-pages",
-        "account": "web-platform-dev",
-        "id": "pleomino-dev-pages",
-    },
-    lane_policy = "//build-tools/deploy/lanes:pleomino",
-    admission_policy = "//build-tools/deploy/policies:pleomino_dev_release",
+    component = "//projects/apps/pleomino:app",
+    account = "web-platform-dev",
+    project = "pleomino-dev-pages",
+    lane_policy = "//projects/deployments/pleomino-shared:lane",
+    admission_policy = "//projects/deployments/pleomino-shared:dev_release",
     environment_stage = "dev",
     protection_class = "shared_nonprod",
-    components = [
-        {
-            "id": "web",
-            "kind": "static-webapp",
-            "target": "//projects/apps/pleomino:app",
-        },
-    ],
-    publisher = {
-        "type": "wrangler-pages",
-        "config": "wrangler.jsonc",
-    },
     smoke = {
         "type": "http-smoke",
         "path": "/",
-        "exception": {
-            "owner": "web-platform",
-            "reason": "Shared nonprod preview host is intermittently recycled during daily fixture reseeding.",
-            "scope": "downgrade-to-nonblocking",
-            "review_by": "2026-04-30",
-        },
     },
-    secret_requirements = {},
-    runtime_config_requirements = {},
+    smoke_exception = {
+        "owner": "web-platform",
+        "reason": "Shared nonprod preview host is intermittently recycled during daily fixture reseeding.",
+        "scope": "downgrade-to-nonblocking",
+        "review_by": "2026-04-30",
+    },
+    secret_requirements = [],
+    runtime_config_requirements = [],
 )
 ```
 
@@ -4279,35 +4218,21 @@ Why this matters:
 Suppose `pleomino-prod` declares:
 
 ```python
-deployment(
+cloudflare_pages_static_webapp_deployment(
     name = "deploy",
-    provider = "cloudflare-pages",
-    lane_policy = "//build-tools/deploy/lanes:pleomino",
-    provider_target = {
-        "project": "pleomino-prod-pages",
-        "account": "web-platform-prod",
-        "id": "pleomino-prod-pages",
-    },
+    component = "//projects/apps/pleomino:app",
+    account = "web-platform-prod",
+    project = "pleomino-prod-pages",
+    lane_policy = "//projects/deployments/pleomino-shared:lane",
     environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
+    admission_policy = "//projects/deployments/pleomino-shared:prod_release",
     protection_class = "production_facing",
-    components = [
-        {
-            "id": "web",
-            "kind": "static-webapp",
-            "target": "//projects/apps/pleomino:app",
-        },
-    ],
-    publisher = {
-        "type": "wrangler-pages",
-        "config": "wrangler.jsonc",
-    },
     smoke = {
         "type": "http-smoke",
         "path": "/",
     },
-    secret_requirements = {},
-    runtime_config_requirements = {},
+    secret_requirements = [],
+    runtime_config_requirements = [],
 )
 ```
 
@@ -4318,9 +4243,9 @@ Normal lock-scope story:
 
 - canonical provider-target identity for this deployment is `provider = cloudflare-pages` plus `provider_target.account = web-platform-prod` and `provider_target.project = pleomino-prod-pages`
 - the derived shared-environment lock scope is therefore conceptually `cloudflare-pages:web-platform-prod/pleomino-prod-pages`
-- `deploy pleomino-prod`
-- `deploy pleomino-prod --publish-only --source-run-id <deploy-run-id>`
-- `deploy pleomino-prod --preview --source-run-id <deploy-run-id>`
+- `deploy --deployment //projects/deployments/pleomino-prod:deploy`
+- `deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <deploy-run-id>`
+- `deploy --deployment //projects/deployments/pleomino-prod:deploy --preview --source-run-id <deploy-run-id>`
 
 All three runs must contend on that same lock by default unless preview is explicitly configured to publish
 to a fully isolated preview target with a different canonical provider-target identity.
@@ -4797,25 +4722,11 @@ Minimum payload-completeness rule:
 Suppose deployment metadata says:
 
 ```python
-deployment(
+cloudflare_pages_static_webapp_deployment(
     name = "deploy",
-    provider = "cloudflare-pages",
-    provider_target = {
-        "project": "pleomino-prod-pages",
-        "account": "web-platform-prod",
-        "id": "pleomino-prod-pages",
-    },
-    publisher = {
-        "type": "wrangler-pages",
-        "config": "wrangler.jsonc",
-    },
-    components = [
-        {
-            "id": "web",
-            "kind": "static-webapp",
-            "target": "//projects/apps/pleomino:app",
-        },
-    ],
+    component = "//projects/apps/pleomino:app",
+    account = "web-platform-prod",
+    project = "pleomino-prod-pages",
 )
 ```
 
@@ -5375,9 +5286,9 @@ This example uses the canonical `operation_kind`, `lifecycle_state`, `terminatio
   "release_lineage_id": "pleomino/2026-03-19/abc1234",
   "artifact_lineage_id": "pleomino-web/2026-03-19/abc1234",
   "execution_snapshot_ref": "snap_2026_03_19_pleomino_prod_00017",
-  "lane_policy_ref": "//build-tools/deploy/lanes:pleomino",
+  "lane_policy_ref": "//projects/deployments/pleomino-shared:lane",
   "lane_policy_fingerprint": "sha256:lane-pleomino-v4",
-  "admission_policy_ref": "//build-tools/deploy/policies:pleomino_prod_release",
+  "admission_policy_ref": "//projects/deployments/pleomino-shared:prod_release",
   "admission_policy_fingerprint": "sha256:admission-pleomino-prod-v7",
   "approval_evidence": {
     "mode": "fresh",
@@ -5458,7 +5369,7 @@ Higher-level deployment helpers do make sense, but they should sit on top of the
 
 The right pattern is:
 
-- `deployment(...)` is the canonical low-level primitive
+- `deployment_target(...)` is the canonical low-level primitive
 - helpers reduce repetition for common shapes
 - helpers should keep important facts visible
 
@@ -5480,30 +5391,27 @@ This hides too much.
 Better abstraction:
 
 ```python
-cloudflare_static_pwa_deployment(
+cloudflare_pages_static_webapp_deployment(
     name = "deploy",
-    app_target = "//projects/apps/pleomino:app",
-    provider_target = {
-        "project": "pleomino-prod-pages",
-        "account": "web-platform-prod",
-        "id": "pleomino-prod-pages",
-    },
-    lane_policy = "//build-tools/deploy/lanes:pleomino",
+    component = "//projects/apps/pleomino:app",
+    account = "web-platform-prod",
+    project = "pleomino-prod-pages",
+    lane_policy = "//projects/deployments/pleomino-shared:lane",
     environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
+    admission_policy = "//projects/deployments/pleomino-shared:prod_release",
     protection_class = "production_facing",
-    wrangler_config = "wrangler.jsonc",
     smoke = {
         "type": "http-smoke",
         "path": "/",
     },
-    secret_requirements = {},
-    runtime_config_requirements = {},
+    secret_requirements = [],
+    runtime_config_requirements = [],
 )
 ```
 
 This is concise, but the important concepts remain visible, including the policy-critical
-target, environment-classification, smoke, and secret-contract fields required for protected/shared deployments.
+target, environment classification, smoke wiring, and secret/runtime-contract fields required for
+protected/shared deployments.
 
 ## Where Helpers Should Live
 
@@ -5520,25 +5428,30 @@ These should live in different places.
 
 Put helpers in `build-tools` when they are generic across many unrelated projects.
 
-Examples:
+Current reviewed examples from `//build-tools/deployments:defs.bzl`:
 
-- `deployment(...)`
-- `cloudflare_static_pwa_deployment(...)`
-- `single_component_deployment(...)`
+- `deployment_target(...)` for implementation-facing low-level wiring
+- `cloudflare_pages_static_webapp_deployment(...)`
+- `nixos_shared_host_static_webapp_deployment(...)`
+- `nixos_shared_host_ssr_webapp_deployment(...)`
+- `nixos_shared_host_multi_static_webapp_deployment(...)`
+- `s3_static_webapp_deployment(...)`
 
 Suggested layout:
 
 ```text
 build-tools/
-  deploy/
+  deployments/
     defs.bzl
-    cloudflare.bzl
-    static_webapp.bzl
+    metadata_rules.bzl
+    nixos_shared_host_defs.bzl
+    s3_defs.bzl
 ```
 
 ### System-Specific Or Product-Family Helpers
 
-Put helpers under `projects/` when they encode conventions owned by one system, team, or product family.
+Put helpers under `projects/` when they encode conventions owned by one system, team, or product
+family.
 
 Examples:
 
@@ -5573,7 +5486,8 @@ projects/
         defs.bzl
 ```
 
-If a helper is shared by multiple related deployments, I prefer a clearly shared path under `projects/` rather than burying it inside one app package.
+If a helper is shared by multiple related deployments, I prefer a clearly shared path under
+`projects/` rather than burying it inside one app package.
 
 Plain-language rule:
 
@@ -5593,7 +5507,7 @@ The cleanest long-term model is:
 Location:
 
 ```text
-build-tools/deploy/*
+build-tools/deployments/*
 ```
 
 Responsibilities:
@@ -5628,95 +5542,10 @@ Responsibilities:
 
 - represent one named deployment unit
 - own provider config files
-- call either the primitive or an appropriate helper in `TARGETS`
+- call either `deployment_target(...)` or a reviewed helper from `//build-tools/deployments:defs.bzl`
 
-This is the layering that keeps the build system powerful without forcing product-specific conventions into `build-tools`.
-
-## Example: Generic Helper In `build-tools`
-
-Suppose many unrelated projects need the same "one static app to Cloudflare Pages" pattern.
-
-That belongs in `build-tools`.
-
-```python
-load("//build-tools/deploy:defs.bzl", "deployment")
-
-def cloudflare_static_pwa_deployment(
-    name,
-    app_target,
-    provider_target,
-    wrangler_config,
-    protection_class,
-    lane_policy = None,
-    environment_stage = None,
-    admission_policy = None,
-    provisioner = None,
-    smoke = None,
-    secret_requirements = {},
-    runtime_config_requirements = {},
-):
-    if protection_class != "local_only":
-        if environment_stage == None:
-            fail("protected/shared deployments must set environment_stage")
-        if admission_policy == None:
-            fail("protected/shared deployments must set admission_policy")
-        if lane_policy == None:
-            fail("protected/shared deployments must set lane_policy")
-    deployment(
-        name = name,
-        provider = "cloudflare-pages",
-        provider_target = provider_target,
-        lane_policy = lane_policy,
-        environment_stage = environment_stage,
-        admission_policy = admission_policy,
-        protection_class = protection_class,
-        components = [
-            {
-                "id": "web",
-                "kind": "static-webapp",
-                "target": app_target,
-            },
-        ],
-        provisioner = provisioner,
-        publisher = {
-            "type": "wrangler-pages",
-            "config": wrangler_config,
-        },
-        smoke = smoke,
-        secret_requirements = secret_requirements,
-    )
-```
-
-This helper shape keeps the local-only callsite lightweight while making the protected/shared path safe
-by default: required protected/shared policy fields must be present, including an explicit
-authoritative `lane_policy` reference.
-
-Use in a deployment package:
-
-```python
-load("//build-tools/deploy:cloudflare.bzl", "cloudflare_static_pwa_deployment")
-
-cloudflare_static_pwa_deployment(
-    name = "deploy",
-    app_target = "//projects/apps/pleomino:app",
-    provider_target = {
-        "project": "pleomino-prod-pages",
-        "account": "web-platform-prod",
-        "id": "pleomino-prod-pages",
-    },
-    lane_policy = "//build-tools/deploy/lanes:pleomino",
-    environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
-    protection_class = "production_facing",
-    wrangler_config = "wrangler.jsonc",
-    smoke = {
-        "type": "http-smoke",
-        "path": "/",
-    },
-    secret_requirements = {},
-    runtime_config_requirements = {},
-)
-```
+This is the layering that keeps the build system powerful without forcing product-specific
+conventions into `build-tools`.
 
 ## Example: Project-Owned Helper Under `projects`
 
@@ -5736,39 +5565,37 @@ projects/
 Helper:
 
 ```python
-load("//build-tools/deploy:cloudflare.bzl", "cloudflare_static_pwa_deployment")
+load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")
 
 def puzzle_cloudflare_deployment(
-    name,
-    app_target,
-    provider_target,
-    wrangler_config,
-    protection_class,
-    lane_policy = None,
-    environment_stage = None,
-    admission_policy = None,
-    provisioner = None,
-    smoke = None,
-    secret_requirements = {},
-    runtime_config_requirements = {},
-):
-    cloudflare_static_pwa_deployment(
+        name,
+        component,
+        account,
+        project,
+        lane_policy,
+        environment_stage,
+        admission_policy,
+        protection_class = "production_facing",
+        smoke = None,
+        secret_requirements = [],
+        runtime_config_requirements = []):
+    cloudflare_pages_static_webapp_deployment(
         name = name,
-        app_target = app_target,
-        provider_target = provider_target,
-        wrangler_config = wrangler_config,
+        component = component,
+        account = account,
+        project = project,
         lane_policy = lane_policy,
         environment_stage = environment_stage,
         admission_policy = admission_policy,
         protection_class = protection_class,
-        provisioner = provisioner,
-        smoke = smoke,
+        smoke = smoke or {},
         secret_requirements = secret_requirements,
+        runtime_config_requirements = runtime_config_requirements,
     )
 ```
 
-This project-owned wrapper intentionally inherits the same protected/shared safety defaults instead of
-reintroducing looser optional behavior at the product-family layer.
+This project-owned wrapper intentionally inherits the same protected/shared safety defaults instead
+of reintroducing looser optional behavior at the product-family layer.
 
 Concrete deployment:
 
@@ -5777,23 +5604,19 @@ load("//projects/deployment-kits/puzzle-apps:defs.bzl", "puzzle_cloudflare_deplo
 
 puzzle_cloudflare_deployment(
     name = "deploy",
-    app_target = "//projects/apps/pleomino:app",
-    provider_target = {
-        "project": "pleomino-prod-pages",
-        "account": "web-platform-prod",
-        "id": "pleomino-prod-pages",
-    },
-    lane_policy = "//build-tools/deploy/lanes:pleomino",
+    component = "//projects/apps/pleomino:app",
+    account = "web-platform-prod",
+    project = "pleomino-prod-pages",
+    lane_policy = "//projects/deployments/pleomino-shared:lane",
     environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
+    admission_policy = "//projects/deployments/pleomino-shared:prod_release",
     protection_class = "production_facing",
-    wrangler_config = "wrangler.jsonc",
     smoke = {
         "type": "http-smoke",
         "path": "/",
     },
-    secret_requirements = {},
-    runtime_config_requirements = {},
+    secret_requirements = [],
+    runtime_config_requirements = [],
 )
 ```
 
@@ -5801,20 +5624,20 @@ puzzle_cloudflare_deployment(
 
 Suppose we want:
 
-- a generic Cloudflare Pages helper
-- a puzzle-specific wrapper
+- one reviewed Cloudflare Pages helper from `//build-tools/deployments:defs.bzl`
+- one puzzle-specific wrapper
 - one concrete Pleomino production deployment
 
-### Step 1: Generic Helper
+### Step 1: Provider Helper
 
-`build-tools/deploy/cloudflare.bzl` defines:
+`//build-tools/deployments:defs.bzl` exports:
 
-- `cloudflare_static_pwa_deployment(...)`
+- `cloudflare_pages_static_webapp_deployment(...)`
 
 It knows:
 
 - provider is `cloudflare-pages`
-- publisher is Wrangler
+- publisher is `wrangler-pages`
 - component kind should be `static-webapp`
 
 It does not know anything about Pleomino.
@@ -5827,7 +5650,7 @@ It does not know anything about Pleomino.
 
 It knows:
 
-- use the generic Cloudflare helper
+- use the reviewed Cloudflare Pages helper
 - apply puzzle-family conventions
 
 It does not know about one specific deployment id such as `pleomino-prod`.
@@ -5847,23 +5670,19 @@ load("//projects/deployment-kits/puzzle-apps:defs.bzl", "puzzle_cloudflare_deplo
 
 puzzle_cloudflare_deployment(
     name = "deploy",
-    app_target = "//projects/apps/pleomino:app",
-    provider_target = {
-        "project": "pleomino-prod-pages",
-        "account": "web-platform-prod",
-        "id": "pleomino-prod-pages",
-    },
-    lane_policy = "//build-tools/deploy/lanes:pleomino",
+    component = "//projects/apps/pleomino:app",
+    account = "web-platform-prod",
+    project = "pleomino-prod-pages",
+    lane_policy = "//projects/deployments/pleomino-shared:lane",
     environment_stage = "prod",
-    admission_policy = "//build-tools/deploy/policies:pleomino_prod_release",
+    admission_policy = "//projects/deployments/pleomino-shared:prod_release",
     protection_class = "production_facing",
-    wrangler_config = "wrangler.jsonc",
     smoke = {
         "type": "http-smoke",
         "path": "/",
     },
-    secret_requirements = {},
-    runtime_config_requirements = {},
+    secret_requirements = [],
+    runtime_config_requirements = [],
 )
 ```
 
@@ -5930,9 +5749,13 @@ This belongs in `components`.
 Example:
 
 ```python
-deployment(
+deployment_target(
     name = "deploy",
     provider = "kubernetes",
+    component = "//projects/apps/api:image",
+    component_kind = "service",
+    publisher = "helm-release",
+    publisher_config = "helm/values.yaml",
     provider_target = {
         "id": "prod-us-west/api-prod/api",
         "cluster": "prod-us-west",
@@ -5952,16 +5775,12 @@ deployment(
             "target": "//projects/observability/otel-sidecar:image",
         },
     ],
-    publisher = {
-        "type": "helm-release",
-        "config": "helm/values.yaml",
-    },
     smoke = {
         "type": "http-smoke",
         "path": "/ready",
     },
-    secret_requirements = {},
-    runtime_config_requirements = {},
+    secret_requirements = [],
+    runtime_config_requirements = [],
 )
 ```
 
@@ -5993,9 +5812,15 @@ This belongs in the `provisioner` layer.
 Example:
 
 ```python
-deployment(
+deployment_target(
     name = "deploy",
     provider = "cloudflare-pages",
+    component = "//projects/apps/pleomino:app",
+    component_kind = "static-webapp",
+    publisher = "wrangler-pages",
+    publisher_config = "wrangler.jsonc",
+    provisioner = "cdktf-stack",
+    provisioner_config = "cdktf/stack.json",
     provider_target = {
         "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
@@ -6009,20 +5834,12 @@ deployment(
             "target": "//projects/apps/pleomino:app",
         },
     ],
-    provisioner = {
-        "type": "cdktf-stack",
-        "config": "cdktf/stack.json",
-    },
-    publisher = {
-        "type": "wrangler-pages",
-        "config": "wrangler.jsonc",
-    },
     smoke = {
         "type": "http-smoke",
         "path": "/",
     },
-    secret_requirements = {},
-    runtime_config_requirements = {},
+    secret_requirements = [],
+    runtime_config_requirements = [],
 )
 ```
 
@@ -6233,11 +6050,15 @@ projects/
 Possible `shared-observability-prod/TARGETS`:
 
 ```python
-load("//build-tools/deploy:defs.bzl", "deployment")
+load("//build-tools/deployments:defs.bzl", "deployment_target")
 
-deployment(
+deployment_target(
     name = "deploy",
     provider = "kubernetes",
+    component = "//projects/observability/otel-collector:image",
+    component_kind = "third-party-service",
+    publisher = "helm-release",
+    publisher_config = "helm/values.yaml",
     provider_target = {
         "id": "prod-us-west/shared-observability/shared-observability",
         "cluster": "prod-us-west",
@@ -6257,16 +6078,12 @@ deployment(
             "target": "//projects/observability/metrics-agent:image",
         },
     ],
-    publisher = {
-        "type": "helm-release",
-        "config": "helm/values.yaml",
-    },
     smoke = {
         "type": "http-smoke",
         "path": "/ready",
     },
-    secret_requirements = {},
-    runtime_config_requirements = {},
+    secret_requirements = [],
+    runtime_config_requirements = [],
 )
 ```
 
@@ -6325,7 +6142,7 @@ That is the right shape for a complex but disciplined build system.
 For a static PWA, the final developer experience should be simple:
 
 ```bash
-deploy pleomino-prod
+deploy --deployment //projects/deployments/pleomino-prod:deploy
 ```
 
 For a `production_facing` deployment, that command should be read as the one public submission interface,
