@@ -86,7 +86,6 @@ export async function cleanupOrphanBuckDaemons(opts: {
   );
   const lines = await psLines(2000);
   const forks = parseForkservers(lines);
-
   let killed = 0;
   let candidates = 0;
   for (const f of forks) {
@@ -145,6 +144,7 @@ export async function cleanupRegisteredTempRepos(opts: {
   stateFile: string;
   log?: (line: string) => Promise<void>;
   maxKills?: number;
+  removeRoots?: boolean;
 }): Promise<{ roots: number; killed: number }> {
   const stateFile = String(opts.stateFile || "").trim();
   if (!stateFile) return { roots: 0, killed: 0 };
@@ -160,9 +160,7 @@ export async function cleanupRegisteredTempRepos(opts: {
   const uniqueRoots = Array.from(new Set(roots));
   if (uniqueRoots.length === 0) return { roots: 0, killed: 0 };
 
-  const lines = await psLines(2000);
-  let forks = parseForkservers(lines);
-
+  let forks = parseForkservers(await psLines(2000));
   let killed = 0;
   const maxKills = Math.max(0, opts.maxKills ?? 200);
   for (const root of uniqueRoots) {
@@ -186,7 +184,6 @@ export async function cleanupRegisteredTempRepos(opts: {
       if (!uniqueRoots.includes(absRepo)) continue;
       if (!(await pathExists(absRepo))) continue;
       matchedThisPass++;
-
       await buck2Kill(absRepo, iso, 5000);
       if (isPidAlive(f.pid)) {
         try {
@@ -242,6 +239,10 @@ export async function cleanupRegisteredTempRepos(opts: {
     maxKills: maxKills * 2,
   });
   killed += procRes.killed;
-
+  if (opts.removeRoots) {
+    for (const root of uniqueRoots) {
+      await fsp.rm(root, { recursive: true, force: true }).catch(() => {});
+    }
+  }
   return { roots: uniqueRoots.length, killed };
 }

@@ -169,6 +169,26 @@ export async function runVerify(): Promise<void> {
   let pgid = process.pid;
   let requestedExitCode: number | null = null;
   let shutdownPromise: Promise<void> | null = null;
+  let registeredTempRepoCleanupPromise: Promise<void> | null = null;
+  const cleanupRegisteredTempRepoState = async (): Promise<void> => {
+    if (!registeredTempRepoCleanupPromise) {
+      registeredTempRepoCleanupPromise = (async () => {
+        try {
+          const res = await cleanupRegisteredTempRepos({
+            stateFile,
+            log: async (line) => await appendVerifyLogLine(lock.logFile, line),
+            maxKills: 200,
+            removeRoots: true,
+          });
+          await appendVerifyLogLine(
+            lock.logFile,
+            `[verify] temp-repo buck cleanup: roots=${res.roots} killed=${res.killed}`,
+          );
+        } catch {}
+      })();
+    }
+    await registeredTempRepoCleanupPromise;
+  };
   const requestShutdown = (sig: NodeJS.Signals): Promise<void> => {
     requestedExitCode = sig === "SIGINT" ? 130 : 143;
     if (!shutdownPromise) {
@@ -179,6 +199,7 @@ export async function runVerify(): Promise<void> {
         }
         await killProcessGroup(pgid);
         await killBuckIsolation(root, iso);
+        await cleanupRegisteredTempRepoState();
       })();
     }
     return shutdownPromise;
@@ -203,17 +224,7 @@ export async function runVerify(): Promise<void> {
     },
   });
   if (shutdownPromise) await shutdownPromise;
-  try {
-    const res = await cleanupRegisteredTempRepos({
-      stateFile,
-      log: async (line) => await appendVerifyLogLine(lock.logFile, line),
-      maxKills: 200,
-    });
-    await appendVerifyLogLine(
-      lock.logFile,
-      `[verify] temp-repo buck cleanup: roots=${res.roots} killed=${res.killed}`,
-    );
-  } catch {}
+  await cleanupRegisteredTempRepoState();
 
   if (process.env.TEST_TIMING === "summary" && lock.logFile) {
     await runNodeWithZx({

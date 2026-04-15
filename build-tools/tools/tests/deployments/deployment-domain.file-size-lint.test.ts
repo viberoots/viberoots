@@ -7,7 +7,12 @@ import { spawn } from "node:child_process";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { test } from "node:test";
+import { resolveSourceFileSizeExceptionPaths } from "../../dev/file-size-lint-exceptions.ts";
 import { SOURCE_FILES_SCOPE, findFileSizeOffenders } from "../../dev/file-size-lint.ts";
+import {
+  isReviewedDeploymentOwnedBuildSystemPath,
+  REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS,
+} from "../../lib/deployment-verify-scope.ts";
 
 async function withTempRoot<T>(fn: (root: string) => Promise<T>): Promise<T> {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "deployment-file-size-"));
@@ -65,14 +70,6 @@ async function runFileSizeLint(root: string): Promise<{ code: number | null; std
   });
 }
 
-function isDeploymentOwnedFile(file: string): boolean {
-  return (
-    file.startsWith("build-tools/deployments/") ||
-    file.startsWith("build-tools/tools/deployments/") ||
-    file.startsWith("build-tools/tools/tests/deployments/")
-  );
-}
-
 test("repo-owned file-size gate keeps deployment-owned files under the methodology limit", async () => {
   const offenders = await findFileSizeOffenders({
     root: process.cwd(),
@@ -83,16 +80,16 @@ test("repo-owned file-size gate keeps deployment-owned files under the methodolo
     scope: SOURCE_FILES_SCOPE,
   });
   assert.deepEqual(
-    offenders.filter(({ file }) => isDeploymentOwnedFile(file)),
+    offenders.filter(({ file }) => isReviewedDeploymentOwnedBuildSystemPath(file)),
     [],
   );
 });
 
 test("repo-owned file-size lint reports deployment-owned offenders with line counts", async () => {
   await withTempRoot(async (root) => {
-    const offenderPath = "build-tools/tools/tests/deployments/demo.offender.test.ts";
+    const offenderPath = REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS[0];
     await writeLines(root, offenderPath, 251);
-    await writeLines(root, "docs/ignored.ts", 400);
+    await writeLines(root, "build-tools/tools/nix/unrelated.nix", 400);
     await initTrackedFixture(root);
 
     const offenders = await findFileSizeOffenders({
@@ -104,11 +101,22 @@ test("repo-owned file-size lint reports deployment-owned offenders with line cou
       scope: SOURCE_FILES_SCOPE,
     });
 
-    assert.deepEqual(offenders, [{ file: offenderPath, lines: 251 }]);
+    assert.deepEqual(
+      offenders.filter(({ file }) => isReviewedDeploymentOwnedBuildSystemPath(file)),
+      [{ file: offenderPath, lines: 251 }],
+    );
 
     const result = await runFileSizeLint(root);
     assert.notEqual(result.code, 0);
-    assert.match(result.stderr, /demo\.offender\.test\.ts/);
+    assert.match(result.stderr, new RegExp(offenderPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.match(result.stderr, /251 lines/);
   });
+});
+
+test("deployment-owned file-size exceptions no longer cover reviewed support paths", async () => {
+  const exceptions = await resolveSourceFileSizeExceptionPaths(process.cwd());
+  assert.deepEqual(
+    exceptions.filter((relPath) => isReviewedDeploymentOwnedBuildSystemPath(relPath)),
+    [],
+  );
 });

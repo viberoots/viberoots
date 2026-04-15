@@ -72,6 +72,16 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
   );
 
   const passes = planVerifyTargetPasses(targets);
+  const isolatedPassNames = passes
+    .filter((pass) => pass.name.startsWith("isolated:"))
+    .map((pass) => pass.name)
+    .sort();
+  assert.deepEqual(isolatedPassNames, [
+    "isolated://:scaffolding_webapp_ssr_next_dev_reload_wasm_producer",
+    "isolated://:scaffolding_webapp_ssr_vite_dev_reload_wasm_producer",
+    "isolated://:scaffolding_webapp_static_dev_reload_wasm_producer",
+    "isolated://projects/apps/pleomino:pr14_latency",
+  ]);
   const isolatedPass = passes.find(
     (pass) => pass.name === "isolated://projects/apps/pleomino:pr14_latency",
   );
@@ -88,9 +98,9 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
   );
   assert.deepEqual(summarizeVerifyTargetPlan({ targetLabels: targets, passes }), {
     expandedTargetCount: targets.length,
-    isolatedPassCount: 1,
-    isolatedTargetCount: 1,
+    isolatedPassCount: 4,
+    isolatedTargetCount: 4,
     sharedTargetCount: sharedPass?.targets.length ?? 0,
-    passCount: 2,
+    passCount: 5,
   });
 });

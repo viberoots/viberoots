@@ -249,3 +249,28 @@ test(
     }
   },
 );
+
+test(
+  "verify cleanup: removing registered temp repos only deletes owned roots",
+  { timeout: 30_000 },
+  async () => {
+    const ownedTmp = await fsp.mkdtemp(path.join(os.tmpdir(), "verify-owned-root-"));
+    const foreignTmp = await fsp.mkdtemp(path.join(os.tmpdir(), "verify-foreign-root-"));
+    const stateDir = await fsp.mkdtemp(path.join(os.tmpdir(), "buck-cleanup-state-"));
+    try {
+      await fsp.writeFile(path.join(ownedTmp, "owned.txt"), "owned\n", "utf8");
+      await fsp.writeFile(path.join(foreignTmp, "foreign.txt"), "foreign\n", "utf8");
+      const stateFile = path.join(stateDir, "state.txt");
+      await fsp.writeFile(stateFile, `${ownedTmp}\n`, "utf8");
+
+      await cleanupRegisteredTempRepos({ stateFile, maxKills: 10, removeRoots: true });
+
+      await assert.rejects(fsp.access(ownedTmp));
+      await fsp.access(foreignTmp);
+    } finally {
+      await fsp.rm(stateDir, { recursive: true, force: true }).catch(() => {});
+      await fsp.rm(ownedTmp, { recursive: true, force: true }).catch(() => {});
+      await fsp.rm(foreignTmp, { recursive: true, force: true }).catch(() => {});
+    }
+  },
+);

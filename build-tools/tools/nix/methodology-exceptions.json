@@ -9,10 +9,6 @@
       "justification": "Legacy planner entrypoint sketch remains checked in as one reviewed Nix file pending decomposition."
     },
     {
-      "path": "nixos-shared-host-module.nix",
-      "justification": "Legacy shared-host NixOS module pending decomposition."
-    },
-    {
       "path": "node-modules/store.nix",
       "justification": "Legacy pnpm store template keeps fixed and unfixed paths together pending decomposition."
     },

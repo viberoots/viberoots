@@ -66,7 +66,7 @@ const EXPECTATIONS: TemplateExpectation[] = [
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-static.dev-reload.wasm-producer.test.ts",
-    requiredLabels: ["template:ts/webapp-static", "template:contract"],
+    requiredLabels: ["template:ts/webapp-static", "template:contract", "verify:isolated"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-static/"],
   },
   {
@@ -87,7 +87,7 @@ const EXPECTATIONS: TemplateExpectation[] = [
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-reload.wasm-producer.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-next", "template:contract"],
+    requiredLabels: ["template:ts/webapp-ssr-next", "template:contract", "verify:isolated"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
   },
   {
@@ -112,7 +112,7 @@ const EXPECTATIONS: TemplateExpectation[] = [
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-reload.wasm-producer.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract"],
+    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],
   },
   {

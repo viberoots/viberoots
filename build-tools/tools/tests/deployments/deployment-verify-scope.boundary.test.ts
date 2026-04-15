@@ -1,11 +1,14 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
 import {
   classifyReviewedBuildSystemVerifyPath,
   isReviewedDeploymentOwnedBuildSystemPath,
   isReviewedDeploymentOwnedTestPath,
   isReviewedSharedBuildSystemPath,
+  REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS,
 } from "../../lib/deployment-verify-scope.ts";
 
 test("deployment verify scope marks reviewed deployment-owned paths explicitly", () => {
@@ -14,6 +17,7 @@ test("deployment verify scope marks reviewed deployment-owned paths explicitly",
     "build-tools/tools/deployments/deploy.ts",
     "build-tools/tools/tests/deployments/deployment_domain_taxonomy.bzl",
     "build-tools/tools/tests/deployments/nixos-shared-host.contract.test.ts",
+    ...REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS,
   ];
   for (const relPath of deploymentOwned) {
     assert.equal(isReviewedDeploymentOwnedBuildSystemPath(relPath), true, relPath);
@@ -50,6 +54,7 @@ test("deployment verify scope keeps reviewed shared paths out of the deployment 
 
 test("deployment verify scope leaves unrelated paths unclassified", () => {
   const unrelatedPaths = [
+    "build-tools/tools/nix/node-modules/store.nix",
     "docs/deployment-plan.md",
     "projects/apps/pleomino/TARGETS",
     "projects/deployments/pleomino-dev/TARGETS",
@@ -65,4 +70,15 @@ test("deployment verify scope leaves unrelated paths unclassified", () => {
     ),
     false,
   );
+});
+
+test("deployment verify scope docs enumerate the reviewed support paths exactly", async () => {
+  const doc = await fsp.readFile(
+    path.join(process.cwd(), "docs/deployment-verify-scope.md"),
+    "utf8",
+  );
+  for (const relPath of REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS) {
+    assert.match(doc, new RegExp(relPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+  assert.doesNotMatch(doc, /build-tools\/tools\/nix\/\*\*/);
 });

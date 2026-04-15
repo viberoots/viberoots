@@ -7,6 +7,11 @@ export const REVIEWED_DEPLOYMENT_OWNED_BUILD_SYSTEM_PREFIXES = [
   REVIEWED_DEPLOYMENT_TEST_AREA,
 ] as const;
 
+export const REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS = [
+  "build-tools/tools/nix/nixos-shared-host-module.nix",
+  "build-tools/tools/nix/nixos-shared-host-module-runtimes.nix",
+] as const;
+
 export const REVIEWED_SHARED_BUILD_SYSTEM_PREFIXES = [
   "build-tools/tools/buck/",
   "build-tools/tools/dev/",
@@ -44,7 +49,12 @@ export function isReviewedDeploymentOwnedTestPath(relPath: string): boolean {
 }
 
 export function isReviewedDeploymentOwnedBuildSystemPath(relPath: string): boolean {
-  return matchesPrefix(relPath, REVIEWED_DEPLOYMENT_OWNED_BUILD_SYSTEM_PREFIXES);
+  const p = normalizeRepoPath(relPath);
+  return (
+    REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS.includes(
+      p as (typeof REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS)[number],
+    ) || matchesPrefix(p, REVIEWED_DEPLOYMENT_OWNED_BUILD_SYSTEM_PREFIXES)
+  );
 }
 
 export function isReviewedSharedBuildSystemPath(relPath: string): boolean {

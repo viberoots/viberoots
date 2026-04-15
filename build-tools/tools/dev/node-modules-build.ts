@@ -126,13 +126,6 @@ async function readHashForLock(lockfileRel: string): Promise<string> {
     return "";
   }
 }
-async function isLockfileDirty(lockfileRel: string): Promise<boolean> {
-  const status = await $({
-    cwd: flakeRoot,
-    stdio: "pipe",
-  })`git status --porcelain -- ${lockfileRel}`.nothrow();
-  return Boolean(String(status.stdout || "").trim());
-}
 async function hasFreshVerifiedMarker(lockfileRel: string): Promise<boolean> {
   const importer = lockfileRel.includes("/")
     ? lockfileRel.slice(0, lockfileRel.lastIndexOf("/"))
@@ -154,8 +147,7 @@ async function hasFreshVerifiedMarker(lockfileRel: string): Promise<boolean> {
 async function ensurePnpmStoreHash(lockfileRel: string): Promise<void> {
   const current = await readHashForLock(lockfileRel);
   if (current && current !== placeholderDigest) {
-    const dirty = await isLockfileDirty(lockfileRel);
-    if (!dirty && (await hasFreshVerifiedMarker(lockfileRel))) return;
+    if (await hasFreshVerifiedMarker(lockfileRel)) return;
   }
   const update = await runPnpmHashUpdater(lockfileRel);
   if (update.exitCode !== 0) {

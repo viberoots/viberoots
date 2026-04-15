@@ -51,6 +51,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
     "build-tools/tools/tests/scaffolding/webapp-static.dev-reload.wasm-producer.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static"],
         "classification": "template:contract",
+        "extra_labels": ["verify:isolated"],
     },
     "build-tools/tools/tests/scaffolding/webapp-static.dev-multi-module-runtime-contract.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static"],
@@ -87,6 +88,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
     "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-reload.wasm-producer.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
         "classification": "template:contract",
+        "extra_labels": ["verify:isolated"],
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-runtime-consistency.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
@@ -115,6 +117,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
     "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-reload.wasm-producer.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
         "classification": "template:contract",
+        "extra_labels": ["verify:isolated"],
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-multi-module-runtime-contract.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
@@ -446,8 +449,10 @@ def template_convention_for_script(path):
     classification = c.get("classification")
     if classification != None and classification != "":
         labels.append(classification)
+    extra_labels = c.get("extra_labels", [])
+    labels = dedupe_preserve(labels + extra_labels)
     return {
-        "labels": dedupe_preserve(labels),
+        "labels": labels,
         "template_input_globs": dedupe_preserve([_template_glob_for_id(tid) for tid in template_ids]),
     }
 
