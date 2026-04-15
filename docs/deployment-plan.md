@@ -7690,6 +7690,111 @@ covering the remaining provider-summary drift and its missing fail-closed tests.
 
 ---
 
+## PR-59: Provider-capability operator-contract parity closeout for Buck-backed deployment selectors
+
+### Description
+
+I will close the remaining reviewed operator-contract drift still present inside the
+provider-capability source and rendered capability docs. The current repo-level deploy front door is
+reviewed around Buck-backed selectors such as `--deployment <label>`, but at least one reviewed
+provider capability entry still describes operator workflows using stale bare `deploy <deployment>`
+shapes, and the current parity coverage only proves the rendered doc matches the capability
+registry rather than proving either one matches the reviewed public deploy contract. This PR makes
+the provider-capability source, rendered capability docs, and parity guardrails exact to the
+reviewed front door so this stale wording cannot persist or reappear silently.
+
+### Scope & Changes
+
+- Audit the reviewed provider-capability source, generated capability doc, and any related
+  design-summary rendering helpers for stale operator examples that still imply a bare deployment id
+  CLI input instead of the reviewed Buck-backed selector contract.
+- Update affected provider-capability entries so reviewed operator examples use the exact public
+  front-door shape:
+  - `deploy --deployment <label> ...`
+  - keep deployment-id language only where it is clearly conceptual rather than presented as the
+    reviewed CLI input form
+- Regenerate or otherwise update the rendered provider-capabilities doc so its operator examples
+  stay in exact parity with the corrected capability source wording.
+- Tighten the parity guardrail so it fails closed not only when the rendered doc drifts from the
+  capability registry, but also when reviewed provider-facing operator examples drift from the
+  reviewed repo-level deploy contract.
+- Keep this PR narrowly scoped to parity and guardrails:
+  - no runtime deploy-behavior changes
+  - no provider-capability expansion
+  - no new front-door aliases
+
+### Tests (in this PR)
+
+- Add or extend provider-capability parity tests proving reviewed provider-facing operator examples
+  reject stale bare `deploy <deployment>` wording when the reviewed contract requires
+  `--deployment <label>`.
+- Add fail-closed coverage for the rendered provider-capabilities doc so regenerated content cannot
+  stay in parity with a stale source entry that still contradicts the reviewed public front door.
+- Add or tighten negative-path tests, if needed, proving the guardrail reports actionable drift when
+  a provider capability entry reintroduces outdated operator examples.
+
+### Docs (in this PR)
+
+- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+  so reviewed operator examples use the same Buck-backed selector contract as the public repo-level
+  deploy interface.
+- Update this deployment plan if needed so the closeout wording explicitly covers provider-capability
+  operator-contract parity in addition to the broader design/front-door parity work already planned.
+- Update any small contributor-facing generation or parity guidance comments associated with the
+  provider-capability rendering flow so future edits preserve the reviewed selector-based contract.
+
+### Verification Commands
+
+- `v`
+- reviewed provider-capability parity / doc-generation verification commands introduced or tightened
+  in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-domain capability metadata, rendered docs, and parity
+  guardrails. Under the deployment-only verify policy, default `v` / CI can run the reviewed
+  deployment suite rather than the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- No reviewed provider-capability entry or rendered capability-doc operator example still implies a
+  bare `deploy <deployment>` public contract where the reviewed interface requires
+  `--deployment <label>`.
+- The provider-capability source, rendered capability doc, and reviewed deploy-front-door contract
+  describe the same operator input shape.
+- Tests fail closed if stale operator wording is reintroduced in the reviewed provider-capability
+  surface.
+
+### Risks
+
+Because the capability registry is also the source for rendered documentation, it is easy to treat
+"registry and doc match each other" as sufficient even when both still drift from the reviewed
+public deploy contract.
+
+### Mitigation
+
+Make the parity tests compare reviewed provider-facing operator wording against the reviewed
+front-door contract directly, not only against another generated artifact.
+
+### Consequence of Not Implementing
+
+The repo would keep one small but real source of operator confusion: the public deploy contract
+would be reviewed around `--deployment <label>`, while the provider-capability surface could still
+teach outdated bare deployment-id invocation shapes.
+
+### Downsides for Implementing
+
+This is a narrow closeout PR focused on wording and guardrails rather than visible deployment
+capability.
+
+### Recommendation
+
+Implement immediately after PR-58 so the deployment plan ends with one final fail-closed parity pass
+covering the remaining provider-capability operator-contract drift.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -7770,6 +7875,9 @@ covering the remaining provider-summary drift and its missing fail-closed tests.
 28. PR-58: close the remaining provider-capability/design-summary drift and add the missing
     fail-closed deployment-domain tests that lock reviewed provider support posture to the
     authoritative capability registry and runtime validation behavior.
+29. PR-59: close the remaining provider-capability operator-example drift so the reviewed
+    capability source, rendered capability docs, and public deploy-front-door contract all use the
+    same Buck-backed `--deployment <label>` selector shape.
 
 ## Companion Docs
 
