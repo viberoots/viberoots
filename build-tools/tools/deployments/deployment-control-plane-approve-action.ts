@@ -216,7 +216,7 @@ export async function approvePendingSubmission(opts: {
     admission: { decision: "admitted" as const, reason: "shared_nonprod" as const },
     lifecycleState: "queued" as const,
     terminationReason: null,
-    approval: approvalSummaryFromGrant(grant, approvalRecordPath),
+    approval: approvalSummaryFromGrant(grant),
     latestAction: {
       actionId: opts.actionId,
       action: "approve" as const,

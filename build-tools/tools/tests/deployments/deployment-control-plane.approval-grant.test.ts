@@ -3,9 +3,8 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { readDeploymentControlPlaneStatus } from "../../deployments/deployment-control-plane-read.ts";
-import { submitDeploymentControlPlaneRunAction } from "../../deployments/deployment-control-plane-run-action.ts";
+import { approvalGrantPathFor } from "../../deployments/deployment-control-plane-approval.ts";
 import { statusFromSubmission } from "../../deployments/deployment-control-plane-status.ts";
-import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
 import { executeSubmittedNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane-submit-helpers.ts";
 import {
   readControlPlaneJson,
@@ -13,60 +12,13 @@ import {
 } from "../../deployments/nixos-shared-host-control-plane-store.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import {
-  ensureNixosSharedHostStageBranch,
-  nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
+  approvePendingRun,
+  pendingApprovalRun,
+  requiredApprovalDeployment,
+} from "./deployment-control-plane.approval-grant.helpers.ts";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
-import {
-  smokeConnectOverride,
-  writeDemoArtifact,
-} from "./nixos-shared-host.control-plane.helpers.ts";
+import { smokeConnectOverride } from "./nixos-shared-host.control-plane.helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
-
-async function pendingApprovalRun(
-  tmp: string,
-  $: any,
-  deployment: any,
-  smokeOverride?: { protocol: "http:" | "https:"; hostname: string; port: number },
-  admissionEvidence?: any,
-) {
-  const artifactDir = path.join(tmp, "artifact");
-  const recordsRoot = path.join(tmp, "records");
-  const paths = {
-    statePath: path.join(tmp, "platform-state.json"),
-    hostRoot: path.join(tmp, "host"),
-    recordsRoot,
-  };
-  await writeDemoArtifact(artifactDir);
-  await ensureNixosSharedHostStageBranch(tmp, $, deployment);
-  try {
-    await submitNixosSharedHostControlPlaneRun({
-      workspaceRoot: tmp,
-      operationKind: "deploy",
-      deployment,
-      artifactDir,
-      paths,
-      ...(smokeOverride ? { smokeConnectOverride: smokeOverride } : {}),
-      ...(admissionEvidence ? { admissionEvidence } : {}),
-    });
-    assert.fail("expected pending-approval submission");
-  } catch (error: any) {
-    return {
-      recordsRoot,
-      submission: error.submission,
-      submissionPath: String(error.submissionPath),
-      executionSnapshotPath: String(error.executionSnapshotPath),
-    };
-  }
-}
-
-const requiredApprovalDeployment = () =>
-  nixosSharedHostDeploymentFixture({
-    admissionPolicy: {
-      ...nixosSharedHostDeploymentFixture().admissionPolicy,
-      requiredApprovals: ["human/dev"],
-    },
-  });
 
 test("approve advances a pending run on the same deployRunId and executes that run", async () => {
   await runInTemp("deployment-control-plane-approval-grant", async (tmp, $) => {
@@ -86,11 +38,9 @@ test("approve advances a pending run on the same deployRunId and executes that r
       );
       assert.equal(pending.submission.approval?.state, "pending");
       assert.ok(pending.submission.deployRunId);
-      const approved = await submitDeploymentControlPlaneRunAction({
+      const approved = await approvePendingRun({
         workspaceRoot: tmp,
-        recordsRoot: pending.recordsRoot,
-        submissionPath: pending.submissionPath,
-        action: "approve",
+        pending,
         idempotencyKey: "approve-pending-1",
         requestedBy: { principalId: "user:reviewer" },
         approval: {
@@ -104,11 +54,9 @@ test("approve advances a pending run on the same deployRunId and executes that r
       assert.equal(approved.deployRunId, pending.submission.deployRunId);
       assert.equal(approved.approval?.state, "granted");
       assert.equal(approved.latestAction?.action, "approve");
-      const approvedAgain = await submitDeploymentControlPlaneRunAction({
+      const approvedAgain = await approvePendingRun({
         workspaceRoot: tmp,
-        recordsRoot: pending.recordsRoot,
-        submissionPath: pending.submissionPath,
-        action: "approve",
+        pending,
         idempotencyKey: "approve-pending-1",
         requestedBy: { principalId: "user:reviewer" },
         approval: {
@@ -157,11 +105,9 @@ test("approve rejects self-approval and stale payload bindings without mutating 
       undefined,
       reviewedLaneAdmissionEvidenceFixture({ deployment }),
     );
-    const selfApproved = await submitDeploymentControlPlaneRunAction({
+    const selfApproved = await approvePendingRun({
       workspaceRoot: tmp,
-      recordsRoot: pending.recordsRoot,
-      submissionPath: pending.submissionPath,
-      action: "approve",
+      pending,
       idempotencyKey: "self-approve-1",
       requestedBy: pending.submission.requestedBy,
       approval: {
@@ -170,11 +116,9 @@ test("approve rejects self-approval and stale payload bindings without mutating 
     });
     assert.equal(selfApproved.lifecycleState, "pending_approval");
     assert.equal(selfApproved.latestAction?.rejectionCode, "unauthorized");
-    const stale = await submitDeploymentControlPlaneRunAction({
+    const stale = await approvePendingRun({
       workspaceRoot: tmp,
-      recordsRoot: pending.recordsRoot,
-      submissionPath: pending.submissionPath,
-      action: "approve",
+      pending,
       idempotencyKey: "stale-approve-1",
       requestedBy: { principalId: "user:reviewer" },
       approval: {
@@ -196,11 +140,9 @@ test("revoked approval fails closed before mutation begins", async () => {
       undefined,
       reviewedLaneAdmissionEvidenceFixture({ deployment }),
     );
-    const approved = await submitDeploymentControlPlaneRunAction({
+    const approved = await approvePendingRun({
       workspaceRoot: tmp,
-      recordsRoot: pending.recordsRoot,
-      submissionPath: pending.submissionPath,
-      action: "approve",
+      pending,
       idempotencyKey: "approve-before-revoke-1",
       requestedBy: { principalId: "user:reviewer" },
       approval: {
@@ -222,8 +164,12 @@ test("revoked approval fails closed before mutation begins", async () => {
         operationKind: snapshot.operationKind,
         deployment: snapshot.deployment,
         onLockAcquired: async () => {
-          const record = await readControlPlaneJson<any>(approved.approval.approvalRecordPath);
-          await writeControlPlaneJson(approved.approval.approvalRecordPath, {
+          const approvalRecordPath = approvalGrantPathFor(
+            pending.recordsRoot,
+            String(approved.approval?.approvalId),
+          );
+          const record = await readControlPlaneJson<any>(approvalRecordPath);
+          await writeControlPlaneJson(approvalRecordPath, {
             ...record,
             status: "revoked",
           });

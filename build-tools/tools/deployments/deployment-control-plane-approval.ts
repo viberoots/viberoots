@@ -95,7 +95,6 @@ export function pendingApprovalSummaryFor(opts: {
 
 export function approvalSummaryFromGrant(
   record: DeploymentControlPlaneApprovalGrantRecord,
-  approvalRecordPath: string,
   state: DeploymentControlPlaneApprovalSummary["state"] = "granted",
 ): DeploymentControlPlaneApprovalSummary {
   return {
@@ -105,7 +104,6 @@ export function approvalSummaryFromGrant(
     targetIdentity: record.targetIdentity,
     grantedAt: record.grantedAt,
     approvalId: record.approvalId,
-    approvalRecordPath,
     approver: record.approver,
     ...(record.expiresAt ? { expiresAt: record.expiresAt } : {}),
     ...optionalSummaryFields(record),

@@ -107,7 +107,6 @@ export type DeploymentControlPlaneApprovalSummary = {
   grantedAt?: string;
   expiresAt?: string;
   approvalId?: string;
-  approvalRecordPath?: string;
   approver?: DeploymentPrincipal;
 };
 

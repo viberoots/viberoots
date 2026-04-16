@@ -110,7 +110,7 @@ export async function revalidateControlPlaneAdmission(opts: {
     if (
       !approvalGrantIsValid({
         record,
-        summary: approvalSummaryFromGrant(record, approval.recordRef),
+        summary: approvalSummaryFromGrant(record),
       }) ||
       record.payloadFingerprint !== evaluation.binding.payloadFingerprint ||
       record.targetIdentity !== evaluation.binding.targetIdentity

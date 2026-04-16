@@ -3,6 +3,7 @@ import {
   DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_RESPONSE_SCHEMA,
   DEPLOYMENT_CONTROL_PLANE_STATUS_SCHEMA,
   DEPLOYMENT_CONTROL_PLANE_SUBMIT_RESPONSE_SCHEMA,
+  type DeploymentControlPlaneApprovalSummary,
   type DeploymentControlPlaneResponseBase,
   type DeploymentControlPlaneRunAction,
   type DeploymentControlPlaneRunActionResponse,
@@ -11,6 +12,26 @@ import {
 } from "./deployment-control-plane-contract.ts";
 
 type SubmissionLike = DeploymentControlPlaneResponseBase;
+
+function toPublicApprovalSummary(
+  approval: DeploymentControlPlaneApprovalSummary,
+): DeploymentControlPlaneApprovalSummary {
+  return {
+    state: approval.state,
+    approvalNames: approval.approvalNames,
+    payloadFingerprint: approval.payloadFingerprint,
+    targetIdentity: approval.targetIdentity,
+    ...(approval.sourceRunId ? { sourceRunId: approval.sourceRunId } : {}),
+    ...(approval.artifactIdentity ? { artifactIdentity: approval.artifactIdentity } : {}),
+    ...(approval.provisionerPlanFingerprint
+      ? { provisionerPlanFingerprint: approval.provisionerPlanFingerprint }
+      : {}),
+    ...(approval.grantedAt ? { grantedAt: approval.grantedAt } : {}),
+    ...(approval.expiresAt ? { expiresAt: approval.expiresAt } : {}),
+    ...(approval.approvalId ? { approvalId: approval.approvalId } : {}),
+    ...(approval.approver ? { approver: approval.approver } : {}),
+  };
+}
 
 function toStatusBase(submission: SubmissionLike): DeploymentControlPlaneResponseBase {
   return {
@@ -33,7 +54,7 @@ function toStatusBase(submission: SubmissionLike): DeploymentControlPlaneRespons
     ...(submission.authorization ? { authorization: submission.authorization } : {}),
     ...(submission.rejectionCode ? { rejectionCode: submission.rejectionCode } : {}),
     ...(submission.pendingReasonCode ? { pendingReasonCode: submission.pendingReasonCode } : {}),
-    ...(submission.approval ? { approval: submission.approval } : {}),
+    ...(submission.approval ? { approval: toPublicApprovalSummary(submission.approval) } : {}),
     ...(submission.latestAction ? { latestAction: submission.latestAction } : {}),
   };
 }

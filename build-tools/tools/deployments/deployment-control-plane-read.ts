@@ -58,7 +58,6 @@ type SubmissionRecord = {
     grantedAt?: string;
     expiresAt?: string;
     approvalId?: string;
-    approvalRecordPath?: string;
     approver?: { principalId: string; displayName?: string };
   };
   latestAction?: {
