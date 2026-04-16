@@ -8386,6 +8386,147 @@ pass over provider-specific rollback-identity consistency.
 
 ---
 
+## PR-65: Operator-documentation parity closeout + clean usage-path split for `mini`
+
+### Description
+
+I will close the remaining operator-facing documentation gap left after the broader deployment and
+control-plane closeout: the reviewed `nixos-shared-host` setup/checklist docs are now supposed to
+describe the service-routed `mini` install and remote-profile flow, but the current canonical setup
+guide still contains stale service-only remote-profile instructions, stale client-install examples,
+and one mixed-audience path that sends operators through design- and contract-heavy material before
+they can complete the real install. This PR updates the canonical operator docs to match the
+implemented `mini` host workflow exactly and adds fail-closed coverage so the operator-facing usage
+path stays current without overwhelming readers with implementation detail.
+
+### Scope & Changes
+
+- Audit the reviewed operator-facing `nixos-shared-host` docs against the current implemented
+  service-routed `mini` workflow:
+  - server install on `mini`
+  - control-plane service and worker bring-up
+  - client-profile install on dev machines and Jenkins workers
+  - reviewed remote-profile deploy and plan flows
+  - same-run approval grant workflow for `pending_approval`
+- Update the canonical setup guide so it no longer documents stale service-only remote-profile
+  behavior:
+  - remove or rewrite any `--apply-host`, `--apply-host-dry-run`, or host-apply-override guidance
+    for service-only remote profiles
+  - remove stale filesystem-mirror-oriented remote summary language when the reviewed flow now
+    returns backend-native control-plane results
+  - make the reviewed `--control-plane-url` / token-env client-profile contract explicit wherever
+    the current install flow depends on it
+- Tighten the `mini` install and usage examples so the real-world operator path is explicit and
+  minimal:
+  - one reviewed default `mini` server install sequence
+  - one reviewed control-plane bring-up sequence
+  - one reviewed client-profile install command
+  - one reviewed remote plan command
+  - one reviewed remote deploy command
+  - one reviewed approval-grant example
+- Add one explicit operator-facing usage front door for the reviewed deployment docs so people can
+  start from examples, capabilities, and day-to-day workflows rather than from implementation or
+  normative design material.
+- Keep the audience split explicit:
+  - operator-facing usage docs focus on reviewed commands, examples, capabilities, and workflows
+  - design / contract / provider-capability docs remain the implementation and normative references
+- Keep the PR narrowly scoped to documentation parity and operator-doc structure:
+  - no deployment-behavior changes
+  - no new provider capabilities
+  - no expansion beyond the already implemented reviewed `mini` / `nixos-shared-host` flow
+
+### Tests (in this PR)
+
+- Extend the reviewed operator-doc parity coverage so the setup guide and technician checklist fail
+  closed when client-install examples drift from the current service-client contract:
+  - required `--control-plane-url`
+  - reviewed token-env binding when documented
+- Add fail-closed doc coverage proving service-only remote-profile docs do not reintroduce stale
+  `--apply-host`, `--apply-host-dry-run`, or remote host-apply override guidance for the reviewed
+  service-only path.
+- Add or extend doc-contract coverage proving reviewed remote-profile usage docs describe the
+  backend-native control-plane result shape rather than stale filesystem-mirror record-path
+  semantics.
+- Add or extend operator-entrypoint coverage proving the reviewed docs keep one clear usage-oriented
+  front door for `mini` install and daily workflow guidance while preserving links to the deeper
+  design and contract references.
+
+### Docs (in this PR)
+
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  so every reviewed `mini` install, client-profile, plan, deploy, and approval example matches the
+  current implemented service-routed workflow.
+- Update [NixOS Shared Host Technician Checklist](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-technician-checklist.md)
+  only as needed so it stays the short SOP version of that same reviewed workflow.
+- Add or update one explicit operator-facing deployment usage front door so the reviewed docs offer
+  a clean path centered on real-world examples, capabilities, and workflows instead of forcing most
+  readers through implementation-detail-heavy design material first.
+- Update companion deployment docs only as needed so the audience split is explicit: usage docs for
+  operators, design/contract/provider-capability docs for deeper reference and implementation
+  review.
+
+### Verification Commands
+
+- `v`
+- reviewed deployment-domain documentation parity / operator-doc contract verification commands
+  introduced or tightened in this PR
+- representative doc-contract targets proving:
+  - `mini` client-install examples remain aligned with the current service-client contract
+  - service-only remote-profile docs stay aligned with the implemented no-host-apply behavior
+  - the reviewed operator-facing usage front door stays present and current
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-domain operator docs, doc-parity guardrails, and
+  deployment-domain tests for the already implemented `mini` / `nixos-shared-host` workflow. Under
+  the deployment-only verify policy, default `v` / CI can run the reviewed deployment suite rather
+  than the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- The canonical `mini` install guidance is safe to hand to operators without sending them through a
+  stale service-only remote-profile path.
+- The setup guide and technician checklist both describe the current reviewed service-routed client
+  install and remote deploy flow, including the required control-plane service endpoint contract.
+- The reviewed operator-facing docs expose one clear usage-oriented entrypoint focused on real-world
+  examples, capabilities, and workflows rather than implementation detail first.
+- Deployment-domain doc-contract tests fail closed if stale host-apply guidance, stale client
+  install examples, or stale filesystem-mirror result language is reintroduced into the reviewed
+  operator docs.
+
+### Risks
+
+Because the implementation is now largely complete, it is easy for the canonical setup guide to
+retain stale examples from earlier remote-execution slices while the surrounding deployment system
+continues evolving, which creates documentation that looks authoritative but is not safe for real
+operators to follow.
+
+### Mitigation
+
+Tie the reviewed operator docs directly to the current service-client and remote-profile contracts,
+keep the operator-facing usage path explicit and minimal, and add fail-closed deployment-domain
+tests that reject the specific stale guidance patterns already found in review.
+
+### Consequence of Not Implementing
+
+The deployment plan would continue to overstate operator-readiness for the `mini` host path while
+the canonical setup guide still contains stale commands and the reviewed docs still lack one clean
+usage-oriented front door for operators and technicians.
+
+### Downsides for Implementing
+
+This is a documentation-and-guardrails closeout PR rather than new deployment capability, and it
+adds one more layer of reviewed doc-contract coverage that will need to evolve carefully as the
+operator workflow changes.
+
+### Recommendation
+
+Implement immediately after PR-64 so the deployment plan closes with the reviewed `mini` install
+path both implemented and safe to hand to operators.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -8483,6 +8624,9 @@ pass over provider-specific rollback-identity consistency.
 34. PR-64: close the remaining Kubernetes rollback-identity drift so the late-stage
     provider-capability parity helper actually fails closed on provider-specific rollback contract
     inconsistencies.
+35. PR-65: close the remaining operator-facing `mini` documentation gap so the reviewed setup,
+    checklist, and usage entrypoint all match the implemented service-routed install and remote
+    workflow without sending operators through stale or implementation-detail-heavy guidance.
 
 ## Companion Docs
 
