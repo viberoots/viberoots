@@ -54,9 +54,28 @@ export const S3_STATIC_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
     ],
   },
   retryIdempotency: [
-    bullet("exact-artifact retry is reviewed only when the prior attempt is clearly safe to rerun"),
-    bullet("ambiguous provider outcomes must fail closed rather than silently retrying"),
-    bullet("the initial slice does not define promotion, preview, or rollback workflows"),
+    bullet(
+      "shared `--publish-only` reuses only an admitted exact artifact selected with `--source-run-id`",
+    ),
+    bullet("same-deployment `--publish-only` is reviewed as `retry`"),
+    bullet(
+      "same-deployment rollback is reviewed only for prior successful normal runs on the same canonical live target identity",
+    ),
+    bullet(
+      "ambiguous provider outcomes must fail closed rather than silently retrying or rebuilding",
+    ),
+  ],
+  immutableReuseOperatorFlows: [
+    bullet("reviewed protected/shared exact-artifact reuse slice:", [
+      bullet(
+        "`deploy --deployment <label> --publish-only --source-run-id <deploy-run-id>` reuses the admitted exact artifact plus the recorded deployment snapshot",
+      ),
+      bullet("same-deployment rollback requires both `--publish-only` and `--rollback`"),
+      bullet(
+        "rollback source selection is limited to prior successful normal live-target runs for the same deployment",
+      ),
+      bullet("retry or rollback fails closed when the retained exact artifact is unavailable"),
+    ]),
   ],
   partialPublishObservability: [
     bullet("the adapter records:", [
@@ -80,7 +99,10 @@ export const S3_STATIC_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
       ),
     ]),
     bullet(
-      "`--provision-only` is not reviewed in the initial slice; provisioning is coupled to the first built-in deploy workflow",
+      "`--provision-only` is reviewed for protected/shared deployments through the control-plane service when the deployment declares one reviewed built-in provisioner",
+    ),
+    bullet(
+      "that provision-only path still binds one admitted source revision and one frozen execution snapshot before provider mutation",
     ),
   ],
   releaseActions: {
@@ -91,6 +113,9 @@ export const S3_STATIC_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
   },
   protectedSharedEligibility: [
     bullet("in policy for protected/shared single-component static-webapp deployments"),
+    bullet(
+      "protected/shared mutation, exact-artifact retry or rollback reuse, and reviewed `--provision-only` execution must route through the reviewed control-plane service / worker front door",
+    ),
     bullet(
       "protected/shared execution must stay inside vetted built-in publisher, provisioner, and smoke-runner code",
     ),

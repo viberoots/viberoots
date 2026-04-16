@@ -19,17 +19,17 @@ Keep the task-specific prompt short.
 
 Provide the PR identifier only when you want to pin one explicitly.
 
-Provide the plan document path only when it differs from the configured default in [references/defaults.md](references/defaults.md).
+Provide the plan document path only when it differs from the configured default in `references/defaults.local.md` when present, otherwise [references/defaults.md](references/defaults.md).
 
 Treat every invocation as a fresh start for implementation context. Do not rely on prior thread history, prior conversational decisions, or unstated remembered context. Rebuild context from the current prompt, the current repository state, the configured default plan document, and the docs read during this run.
 
-The only intentional carry-forward state is explicit persistent configuration, such as `default_plan_document` in [references/defaults.md](references/defaults.md).
+The only intentional carry-forward state is explicit persistent configuration, such as `default_plan_document` in `references/defaults.local.md` when present, otherwise [references/defaults.md](references/defaults.md).
 
-In this flattened `pr` skill, that carry-forward state also includes `last_pr_numeric_argument` in [references/defaults.md](references/defaults.md).
+In this flattened `pr` skill, that carry-forward state also includes `last_pr_numeric_argument` in `references/defaults.local.md` when present, otherwise [references/defaults.md](references/defaults.md).
 
 ## Resolve The PR Identifier
 
-Read [references/defaults.md](references/defaults.md) first.
+Read `references/defaults.local.md` when it exists; otherwise read [references/defaults.md](references/defaults.md).
 
 Resolve the PR identifier immediately, before reading repo docs or inspecting code:
 
@@ -49,7 +49,7 @@ python3 "$repo_root/plugins/repo-skills/skills/pr/scripts/resolve_pr_identifier.
 
 Use the printed identifier as the PR identifier for the current run.
 
-The helper script persists the resolved identifier back to [references/defaults.md](references/defaults.md), so the next bare `$pr` invocation advances from the most recently used numeric argument.
+The helper script persists the resolved identifier to `references/defaults.local.md`, bootstrapping that file from [references/defaults.md](references/defaults.md) when needed, so the next bare `$pr` invocation advances from the most recently used numeric argument.
 
 If no prior numeric PR identifier has been recorded yet, do not guess. Require one explicit numeric `$pr` invocation first so the default has a starting point.
 
@@ -61,7 +61,7 @@ Require:
 
 Default:
 
-- Plan document path: read `default_plan_document` from [references/defaults.md](references/defaults.md)
+- Plan document path: read `default_plan_document` from `references/defaults.local.md` when present, otherwise [references/defaults.md](references/defaults.md)
 
 Accept when provided:
 
@@ -77,7 +77,7 @@ If the current thread contains older task details that are not restated in the c
 
 Use the `default_plan_document` value from that file unless the prompt explicitly supplies another plan document path.
 
-If the prompt explicitly provides an alternate plan document path, persist it as the new default before continuing by running from anywhere inside the repo:
+If the prompt explicitly provides an alternate plan document path, persist it as the new clone-local default before continuing by running from anywhere inside the repo:
 
 ```bash
 repo_root="$(git rev-parse --show-toplevel)"
@@ -86,13 +86,13 @@ python3 "$repo_root/plugins/repo-skills/skills/pr/scripts/update_default_plan.py
 
 After updating the defaults file, use that explicit path for the current task and treat it as the new default for future `$pr`, `$augment`, and `$assess-plan` invocations.
 
-When the saved default plan document changes, that script also resets `last_pr_numeric_argument` to `0` in [references/defaults.md](references/defaults.md). That reset makes the next bare `$pr` invocation resolve to `1` unless the current prompt supplies an explicit numeric PR identifier first.
+When the saved default plan document changes, that script also resets `last_pr_numeric_argument` to `0` in `references/defaults.local.md`. That reset makes the next bare `$pr` invocation resolve to `1` unless the current prompt supplies an explicit numeric PR identifier first.
 
 After resolving the plan document path, the rest of this workflow carries forward the full original prompt contract from the prior split `pr` and `planned-pr-implementation` skills.
 
 ## Read Required Docs
 
-Read the supplied plan document, or the configured `default_plan_document` in [references/defaults.md](references/defaults.md) when no plan document is supplied, and, when present, also read these repository documents before coding:
+Read the supplied plan document, or the configured `default_plan_document` in `references/defaults.local.md` when present, otherwise [references/defaults.md](references/defaults.md), and, when present, also read these repository documents before coding:
 
 - `build-tools/docs/build-system-design.md`
 - `docs/handbook/getting-started-on-a-pr.md`

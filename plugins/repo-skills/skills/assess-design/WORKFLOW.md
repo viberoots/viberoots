@@ -13,7 +13,7 @@ Use an `assess-design`-specific persistent default document. Do not read from or
 
 ## Required Inputs
 
-Read [references/defaults.md](references/defaults.md) first.
+Read `references/defaults.local.md` when it exists; otherwise read [references/defaults.md](references/defaults.md) first.
 
 Use the `default_design_document` value from that file when the prompt does not provide a spec path.
 
@@ -36,7 +36,7 @@ Read these files for every assessment after resolving the target spec path:
 
 ### 1. Build the Requirement Checklist
 
-Resolve the target spec path from the prompt argument when present, otherwise from the `assess-design` default in `references/defaults.md`.
+Resolve the target spec path from the prompt argument when present, otherwise from the `assess-design` default in `references/defaults.local.md` when present, otherwise `references/defaults.md`.
 
 Extract concrete requirements from `[spec]` before judging the implementation.
 

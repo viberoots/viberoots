@@ -13,6 +13,7 @@ result
 # Local temp artifacts
 .tmp/
 .local/deployments/
+plugins/repo-skills/skills/**/references/*.local.md
 
 # macOS
 .DS_Store
@@ -20,6 +21,7 @@ result
 # Editors
 .vscode/
 .idea/
+__pycache__/
 
 # Generated glue (not committed per design)
 third_party/providers/TARGETS.auto

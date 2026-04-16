@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { providerCapabilityFor } from "../../deployments/deployment-provider-capabilities.ts";
+import { assertReviewedRuntimeParity } from "../../deployments/provider-capabilities/runtime-parity.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import {
@@ -139,6 +141,9 @@ test("public s3-static deploy routes deploy, provision-only, and rollback throug
           assert.equal(rollback.finalOutcome, "succeeded");
           const record = await readRecord(harness.controlPlane.url, second.deployRunId);
           assert.equal(record.provider, "s3-static");
+          const capability = providerCapabilityFor("s3-static");
+          assert.ok(capability);
+          assertReviewedRuntimeParity({ provider: "s3-static", capability });
         } finally {
           await harness.close();
         }

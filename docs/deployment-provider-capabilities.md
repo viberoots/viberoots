@@ -634,9 +634,18 @@ Normative-source note:
 
 ### Retry / Idempotency
 
-- exact-artifact retry is reviewed only when the prior attempt is clearly safe to rerun
-- ambiguous provider outcomes must fail closed rather than silently retrying
-- the initial slice does not define promotion, preview, or rollback workflows
+- shared `--publish-only` reuses only an admitted exact artifact selected with `--source-run-id`
+- same-deployment `--publish-only` is reviewed as `retry`
+- same-deployment rollback is reviewed only for prior successful normal runs on the same canonical live target identity
+- ambiguous provider outcomes must fail closed rather than silently retrying or rebuilding
+
+### Immutable-Reuse Operator Flows
+
+- reviewed protected/shared exact-artifact reuse slice:
+  - `deploy --deployment <label> --publish-only --source-run-id <deploy-run-id>` reuses the admitted exact artifact plus the recorded deployment snapshot
+  - same-deployment rollback requires both `--publish-only` and `--rollback`
+  - rollback source selection is limited to prior successful normal live-target runs for the same deployment
+  - retry or rollback fails closed when the retained exact artifact is unavailable
 
 ### Partial Publish Observability
 
@@ -654,7 +663,8 @@ Normative-source note:
 - meaning:
   - the normal deploy path may materialize one reviewed non-destructive plan artifact for bucket/CDN/DNS ownership before publish
   - the plan artifact fingerprint is available for protected/shared admission binding and operator review
-- `--provision-only` is not reviewed in the initial slice; provisioning is coupled to the first built-in deploy workflow
+- `--provision-only` is reviewed for protected/shared deployments through the control-plane service when the deployment declares one reviewed built-in provisioner
+- that provision-only path still binds one admitted source revision and one frozen execution snapshot before provider mutation
 
 ### Built-In `release_actions` Support
 
@@ -664,6 +674,7 @@ Normative-source note:
 ### Protected/Shared Eligibility
 
 - in policy for protected/shared single-component static-webapp deployments
+- protected/shared mutation, exact-artifact retry or rollback reuse, and reviewed `--provision-only` execution must route through the reviewed control-plane service / worker front door
 - protected/shared execution must stay inside vetted built-in publisher, provisioner, and smoke-runner code
 
 ## Capability Entry: `kubernetes`
@@ -732,9 +743,18 @@ Normative-source note:
 
 ### Retry / Idempotency
 
-- exact-artifact retry must reuse the same reviewed provider-target identity and release values fingerprint
-- ambiguous provider outcomes must fail closed rather than silently replaying Helm mutation
-- the initial slice does not define preview, rollback, or promotion workflows
+- shared `--publish-only` reuses only admitted exact component artifacts selected with `--source-run-id`
+- same-deployment `--publish-only` is reviewed as `retry`
+- same-deployment rollback is reviewed only for prior successful normal runs on the same canonical release target identity
+- ambiguous provider outcomes must fail closed rather than silently replaying Helm mutation or rebuilding
+
+### Immutable-Reuse Operator Flows
+
+- reviewed protected/shared exact-artifact reuse slice:
+  - `deploy --deployment <label> --publish-only --source-run-id <deploy-run-id>` reuses the recorded exact component artifacts plus the recorded deployment snapshot
+  - same-deployment rollback requires both `--publish-only` and `--rollback`
+  - rollback source selection is limited to prior successful normal live-target runs for the same deployment
+  - retry and rollback preserve the recorded release values fingerprint and per-component publish inputs instead of re-resolving ambient workspace state
 
 ### Partial Publish Observability
 
@@ -753,6 +773,8 @@ Normative-source note:
   - the normal deploy path may prepare namespace, ingress, storage, service-account, or related cluster wiring before publish
   - deployment metadata stays authoritative for target identity while the provisioner config stays provider-local
   - the initial reviewed deploy flow records a provisioner plan artifact alongside publish records when a built-in Kubernetes provisioner is declared
+- `--provision-only` is reviewed for protected/shared deployments through the control-plane service when the deployment declares one reviewed built-in provisioner
+- that provision-only path still binds one admitted source revision and one frozen execution snapshot before provider mutation
 
 ### Built-In `release_actions` Support
 
@@ -763,6 +785,7 @@ Normative-source note:
 
 - in policy for protected/shared single-component service deployments
 - in policy for protected/shared reviewed multi-component service plus sidecar or shared-platform deployments only when the deployment declares the reviewed explicit rollout policy
+- protected/shared mutation, exact-artifact retry or rollback reuse, and reviewed `--provision-only` execution must route through the reviewed control-plane service / worker front door
 - protected/shared execution must stay inside vetted built-in publisher, provisioner, and service-health smoke code
 
 <!-- END GENERATED PROVIDER CAPABILITIES -->

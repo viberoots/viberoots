@@ -71,12 +71,29 @@ export const KUBERNETES_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
   },
   retryIdempotency: [
     bullet(
-      "exact-artifact retry must reuse the same reviewed provider-target identity and release values fingerprint",
+      "shared `--publish-only` reuses only admitted exact component artifacts selected with `--source-run-id`",
+    ),
+    bullet("same-deployment `--publish-only` is reviewed as `retry`"),
+    bullet(
+      "same-deployment rollback is reviewed only for prior successful normal runs on the same canonical release target identity",
     ),
     bullet(
-      "ambiguous provider outcomes must fail closed rather than silently replaying Helm mutation",
+      "ambiguous provider outcomes must fail closed rather than silently replaying Helm mutation or rebuilding",
     ),
-    bullet("the initial slice does not define preview, rollback, or promotion workflows"),
+  ],
+  immutableReuseOperatorFlows: [
+    bullet("reviewed protected/shared exact-artifact reuse slice:", [
+      bullet(
+        "`deploy --deployment <label> --publish-only --source-run-id <deploy-run-id>` reuses the recorded exact component artifacts plus the recorded deployment snapshot",
+      ),
+      bullet("same-deployment rollback requires both `--publish-only` and `--rollback`"),
+      bullet(
+        "rollback source selection is limited to prior successful normal live-target runs for the same deployment",
+      ),
+      bullet(
+        "retry and rollback preserve the recorded release values fingerprint and per-component publish inputs instead of re-resolving ambient workspace state",
+      ),
+    ]),
   ],
   partialPublishObservability: [
     bullet("the adapter should preserve:", [
@@ -102,6 +119,12 @@ export const KUBERNETES_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
         "the initial reviewed deploy flow records a provisioner plan artifact alongside publish records when a built-in Kubernetes provisioner is declared",
       ),
     ]),
+    bullet(
+      "`--provision-only` is reviewed for protected/shared deployments through the control-plane service when the deployment declares one reviewed built-in provisioner",
+    ),
+    bullet(
+      "that provision-only path still binds one admitted source revision and one frozen execution snapshot before provider mutation",
+    ),
   ],
   releaseActions: {
     supportsProtectedShared: false,
@@ -115,6 +138,9 @@ export const KUBERNETES_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
     bullet("in policy for protected/shared single-component service deployments"),
     bullet(
       "in policy for protected/shared reviewed multi-component service plus sidecar or shared-platform deployments only when the deployment declares the reviewed explicit rollout policy",
+    ),
+    bullet(
+      "protected/shared mutation, exact-artifact retry or rollback reuse, and reviewed `--provision-only` execution must route through the reviewed control-plane service / worker front door",
     ),
     bullet(
       "protected/shared execution must stay inside vetted built-in publisher, provisioner, and service-health smoke code",

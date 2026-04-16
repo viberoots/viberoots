@@ -13,7 +13,7 @@ Treat the current thread context as the source of truth for the gaps that still 
 
 ## Resolve The Default Spec
 
-Read [../pr/references/defaults.md](../pr/references/defaults.md) first.
+Read `../pr/references/defaults.local.md` when it exists; otherwise read [../pr/references/defaults.md](../pr/references/defaults.md) first.
 
 Use the `default_plan_document` value from that file when the prompt does not provide a spec path.
 
@@ -28,7 +28,7 @@ After updating the defaults file, use that explicit path for the current task an
 
 ## Workflow
 
-1. Resolve the target spec path from the prompt argument when present, otherwise from the shared default in `../pr/references/defaults.md`.
+1. Resolve the target spec path from the prompt argument when present, otherwise from the shared default in `../pr/references/defaults.local.md` when present, otherwise `../pr/references/defaults.md`.
 2. Read the target document and inspect the existing PR numbering, section order, and formatting pattern.
 3. Use the current thread context to identify which previously noted gaps still need PR coverage.
 4. Add a single PR section when one section cleanly closes all remaining gaps. Otherwise add the minimum number of sections needed.

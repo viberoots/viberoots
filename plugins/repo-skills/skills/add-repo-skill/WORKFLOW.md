@@ -67,8 +67,8 @@ Keep all persistent state clone-local.
 
 Follow these rules:
 
-- Store persistent state under the owning skill directory, usually in `references/defaults.md`.
-- If several related skills share state, keep that state in one repo-local owning skill directory and reference it with relative links such as `../pr/references/defaults.md`.
+- Store checked-in default templates under the owning skill directory, usually in `references/defaults.md`, and keep mutable clone-local state in a gitignored sibling such as `references/defaults.local.md`.
+- If several related skills share state, keep that state in one repo-local owning skill directory and reference the local state file with relative links such as `../pr/references/defaults.local.md`, falling back to the checked-in template when the local file does not exist yet.
 - Do not store persistent state in `~/.codex/skills`, plugin cache folders, temp files under the home directory, or absolute per-user paths.
 - Do not hardcode `/Users/...` skill paths in instructions or scripts.
 - When a script needs a state file, resolve it relative to the script location, for example `SCRIPT_DIR.parent / "references" / "defaults.md"`.

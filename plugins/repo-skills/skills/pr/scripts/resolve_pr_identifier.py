@@ -9,7 +9,8 @@ from pathlib import Path
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DEFAULTS_PATH = SCRIPT_DIR.parent / "references" / "defaults.md"
+DEFAULTS_TEMPLATE_PATH = SCRIPT_DIR.parent / "references" / "defaults.md"
+DEFAULTS_PATH = SCRIPT_DIR.parent / "references" / "defaults.local.md"
 LAST_PR_LINE_PREFIX = "- `last_pr_numeric_argument`:"
 PR_IDENTIFIER_RE = re.compile(r"^\d+(?:\.\d+)*$")
 UNSET_VALUES = {"", "unset"}
@@ -30,7 +31,16 @@ def increment_identifier(value: str) -> str:
     return ".".join(str(part) for part in parts)
 
 
+def ensure_defaults_path(defaults_path: Path) -> Path:
+    if defaults_path.exists():
+        return defaults_path
+    defaults_path.parent.mkdir(parents=True, exist_ok=True)
+    defaults_path.write_text(DEFAULTS_TEMPLATE_PATH.read_text())
+    return defaults_path
+
+
 def read_last_identifier(defaults_path: Path) -> str | None:
+    defaults_path = ensure_defaults_path(defaults_path)
     for line in defaults_path.read_text().splitlines():
         if line.startswith(LAST_PR_LINE_PREFIX):
             raw_value = line.split("`")[-2].strip()
@@ -45,6 +55,7 @@ def write_last_identifier(defaults_path: Path, identifier: str) -> None:
     parse_identifier(identifier)
     replacement = f"{LAST_PR_LINE_PREFIX} `{identifier}`"
 
+    defaults_path = ensure_defaults_path(defaults_path)
     lines = defaults_path.read_text().splitlines()
     updated_lines = []
     replaced = False
@@ -90,7 +101,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--file",
         default=str(DEFAULTS_PATH),
-        help="Defaults markdown file to read and update",
+        help="Local defaults markdown file to read and update",
     )
     return parser.parse_args()
 

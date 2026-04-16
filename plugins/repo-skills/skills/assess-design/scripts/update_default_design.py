@@ -8,11 +8,21 @@ from pathlib import Path
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DEFAULTS_PATH = SCRIPT_DIR.parent / "references" / "defaults.md"
+DEFAULTS_TEMPLATE_PATH = SCRIPT_DIR.parent / "references" / "defaults.md"
+DEFAULTS_PATH = SCRIPT_DIR.parent / "references" / "defaults.local.md"
 DEFAULT_LINE_PREFIX = "- `default_design_document`:"
 
 
+def ensure_defaults_path(defaults_path: Path) -> Path:
+    if defaults_path.exists():
+        return defaults_path
+    defaults_path.parent.mkdir(parents=True, exist_ok=True)
+    defaults_path.write_text(DEFAULTS_TEMPLATE_PATH.read_text())
+    return defaults_path
+
+
 def update_defaults(defaults_path: Path, design_document: str) -> None:
+    defaults_path = ensure_defaults_path(defaults_path)
     content = defaults_path.read_text()
     replacement = f"{DEFAULT_LINE_PREFIX} `{design_document}`"
 
@@ -43,7 +53,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--file",
         default=str(DEFAULTS_PATH),
-        help="Defaults markdown file to update",
+        help="Local defaults markdown file to update",
     )
     return parser.parse_args()
 

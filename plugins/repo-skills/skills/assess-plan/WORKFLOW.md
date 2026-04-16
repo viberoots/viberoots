@@ -13,7 +13,7 @@ Use the same shared persistent default document as `$pr` and `$augment`.
 
 ## Required Inputs
 
-Read [../pr/references/defaults.md](../pr/references/defaults.md) first.
+Read `../pr/references/defaults.local.md` when it exists; otherwise read [../pr/references/defaults.md](../pr/references/defaults.md) first.
 
 Use the `default_plan_document` value from that file when the prompt does not provide a spec path.
 
@@ -36,7 +36,7 @@ Read these files for every assessment after resolving the target spec path:
 
 ### 1. Build the Requirement Checklist
 
-Resolve the target spec path from the prompt argument when present, otherwise from the shared default in `../pr/references/defaults.md`.
+Resolve the target spec path from the prompt argument when present, otherwise from the shared default in `../pr/references/defaults.local.md` when present, otherwise `../pr/references/defaults.md`.
 
 Extract concrete requirements from `[spec]` before judging the implementation.
 
