@@ -753,7 +753,7 @@ Normative-source note:
 - reviewed protected/shared exact-artifact reuse slice:
   - `deploy --deployment <label> --publish-only --source-run-id <deploy-run-id>` reuses the recorded exact component artifacts plus the recorded deployment snapshot
   - same-deployment rollback requires both `--publish-only` and `--rollback`
-  - rollback source selection is limited to prior successful normal live-target runs for the same deployment
+  - rollback source selection is limited to prior successful normal release-target runs for the same deployment
   - retry and rollback preserve the recorded release values fingerprint and per-component publish inputs instead of re-resolving ambient workspace state
 
 ### Partial Publish Observability

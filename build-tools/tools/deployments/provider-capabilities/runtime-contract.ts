@@ -60,6 +60,12 @@ function rollbackIdentityText(scope: RollbackIdentityScope): string {
     : "same-deployment rollback is reviewed only for prior successful normal runs on the same canonical release target identity";
 }
 
+function rollbackSourceSelectionText(scope: RollbackIdentityScope): string {
+  return scope === "canonical-live-target-identity"
+    ? "rollback source selection is limited to prior successful normal live-target runs for the same deployment"
+    : "rollback source selection is limited to prior successful normal release-target runs for the same deployment";
+}
+
 function immutableReuseText(guarantee: ImmutableReuseGuarantee): string {
   return guarantee === "retained-artifact-unavailable-fails-closed"
     ? "retry or rollback fails closed when the retained exact artifact is unavailable"
@@ -83,7 +89,7 @@ export function reviewedRuntimeParityExpectationsFromContract(
     ],
     immutableReuseOperatorFlows: [
       "same-deployment rollback requires both `--publish-only` and `--rollback`",
-      "rollback source selection is limited to prior successful normal live-target runs for the same deployment",
+      rollbackSourceSelectionText(contract.rollbackIdentityScope),
       immutableReuseText(contract.immutableReuseGuarantee),
     ],
     provisionerSupport: [

@@ -63,6 +63,39 @@ test("runtime parity guardrail fails closed when capability wording is stale but
   );
 });
 
+test("kubernetes parity guardrail rejects stale live-target rollback wording in immutable reuse flows", () => {
+  const capability = REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER.kubernetes;
+  assert.throws(
+    () =>
+      assertReviewedRuntimeParity({
+        provider: "kubernetes",
+        capability: {
+          ...capability,
+          immutableReuseOperatorFlows: [
+            {
+              text: "reviewed protected/shared exact-artifact reuse slice:",
+              children: [
+                {
+                  text: "`deploy --deployment <label> --publish-only --source-run-id <deploy-run-id>` reuses the recorded exact component artifacts plus the recorded deployment snapshot",
+                },
+                {
+                  text: "same-deployment rollback requires both `--publish-only` and `--rollback`",
+                },
+                {
+                  text: "rollback source selection is limited to prior successful normal live-target runs for the same deployment",
+                },
+                {
+                  text: "retry and rollback preserve the recorded release values fingerprint and per-component publish inputs instead of re-resolving ambient workspace state",
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    /kubernetes: immutableReuseOperatorFlows must describe reviewed runtime parity: rollback source selection is limited to prior successful normal release-target runs for the same deployment/,
+  );
+});
+
 test("s3-static parity assertions derive expectations from the shared runtime contract", () => {
   const runtimeContract = reviewedRuntimeContractFor("s3-static");
   assert.doesNotThrow(() =>
@@ -83,6 +116,35 @@ test("s3-static parity assertions derive expectations from the shared runtime co
         },
       }),
     /s3-static: retryIdempotency must describe reviewed runtime parity: shared `--publish-only` reuses only admitted exact component artifacts selected with `--source-run-id`/,
+  );
+  assert.throws(
+    () =>
+      assertReviewedRuntimeParity({
+        provider: "s3-static",
+        capability: {
+          ...REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER["s3-static"],
+          immutableReuseOperatorFlows: [
+            {
+              text: "reviewed protected/shared exact-artifact reuse slice:",
+              children: [
+                {
+                  text: "`deploy --deployment <label> --publish-only --source-run-id <deploy-run-id>` reuses the admitted exact artifact plus the recorded deployment snapshot",
+                },
+                {
+                  text: "same-deployment rollback requires both `--publish-only` and `--rollback`",
+                },
+                {
+                  text: "rollback source selection is limited to prior successful normal release-target runs for the same deployment",
+                },
+                {
+                  text: "retry or rollback fails closed when the retained exact artifact is unavailable",
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    /s3-static: immutableReuseOperatorFlows must describe reviewed runtime parity: rollback source selection is limited to prior successful normal live-target runs for the same deployment/,
   );
 });
 

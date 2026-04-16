@@ -88,7 +88,7 @@ export const KUBERNETES_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
       ),
       bullet("same-deployment rollback requires both `--publish-only` and `--rollback`"),
       bullet(
-        "rollback source selection is limited to prior successful normal live-target runs for the same deployment",
+        "rollback source selection is limited to prior successful normal release-target runs for the same deployment",
       ),
       bullet(
         "retry and rollback preserve the recorded release values fingerprint and per-component publish inputs instead of re-resolving ambient workspace state",
