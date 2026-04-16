@@ -1,44 +1,35 @@
 # NixOS Shared Host Technician Checklist
 
-This is the short technician SOP for setting up `mini` as the current reviewed
-`nixos-shared-host` server and installing the matching client profile on a dev
-machine or CI worker.
+This is the short technician checklist for the supported `mini` workflow.
 
-Use [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
-as the canonical reference when you need more background, alternate install
-modes, uninstall steps, or deploy-flow detail. This checklist is intentionally
-short and follows the recommended default path only.
+Use [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+for the operator-facing workflow and
+[NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+for the fuller install reference.
 
-Current reviewed scope for this checklist:
+Current supported scope:
 
-- host/provider family: `nixos-shared-host`
+- provider family: `nixos-shared-host`
 - example shared host: `mini`
 - component kinds:
   - `static-webapp`
   - `ssr-webapp` for the reviewed single-component host slice
 - protection class: `shared_nonprod`
 
-This checklist still uses the current Pleomino static deployment as the
-concrete example, but the same server install, client-profile install, and
-control-plane bring-up also support the reviewed single-component
-`ssr-webapp` slice.
-
 ## Before You Start
 
-Confirm these inputs before making changes:
+Confirm all of these before making changes:
 
 - `mini` is a NixOS machine
 - `/etc/nix/nix.conf` on `mini` already enables `nix-command` and `flakes`
-- the repo checkout that `mini` should use for reviewed remote deploys exists
-  at `/srv/common`
-- the authoritative NixOS config root on `mini` is `/etc/nixos`
-- the authoritative NixOS config entry on `mini` is
-  `/etc/nixos/configuration.nix`
-- each client machine that will run deploys has its own repo checkout
+- the reviewed repo checkout on `mini` exists at `/srv/common`
+- the authoritative config root on `mini` is `/etc/nixos`
+- the authoritative config entry on `mini` is `/etc/nixos/configuration.nix`
+- each dev machine or Jenkins worker that will run deploys has its own repo
+  checkout
 - client machines can reach `mini` over the reviewed SSH path
 
-If any of those assumptions are wrong, stop and escalate rather than inventing
-an alternate setup.
+If any input is wrong, stop and ask for help rather than inventing a new path.
 
 ## Server Setup On `mini`
 
@@ -54,7 +45,7 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --install-mode managed-manual-wire
 ```
 
-Expected managed assets:
+Expected files and directories:
 
 - `/etc/nixos/bucknix/nixos-shared-host/install-manifest.json`
 - `/etc/nixos/bucknix/nixos-shared-host/nixos-shared-host-managed.nix`
@@ -63,7 +54,7 @@ Expected managed assets:
 - `/var/lib/bucknix/nixos-shared-host/runtime`
 - `/var/lib/bucknix/nixos-shared-host/records`
 
-## Wire The Host Config
+## Wire And Verify The Host
 
 Add the managed anchor to `/etc/nixos/configuration.nix`:
 
@@ -74,19 +65,13 @@ imports = [
 ];
 ```
 
-If the host uses a flake-style config entry instead of a plain
-`configuration.nix`, add the same anchor path to the top-level
-`modules = [ ... ]` list.
-
 Apply the host config:
 
 ```bash
 sudo nixos-rebuild switch
 ```
 
-## Verify The Server
-
-Run:
+Then verify the install:
 
 ```bash
 cd /srv/common
@@ -100,13 +85,11 @@ Completion criteria:
 
 - `managed` is `true`
 - `wiringState` is `wired`
-- the managed paths listed above still exist
+- the managed paths still exist
 
-If `wiringState` is `missing` or `unknown`, stop and escalate.
+## Start The Deployment Service
 
-## Start The Control Plane
-
-Run on `mini` from `/srv/common` in two long-running shells or services:
+Run on `mini` from `/srv/common`:
 
 ```bash
 export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
@@ -124,21 +107,19 @@ direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control
   --control-plane-database-url "$BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL"
 ```
 
-Completion criteria:
+What success looks like:
 
-- the service reports a bound URL on stdout
-- the worker stays running without immediate error
-- both processes use the same reviewed Postgres URL from `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL`
-- operators know the reviewed Postgres backend is authoritative for claimed-running ownership, status/result reads, and protected/shared deploy records
-- operators use the reviewed service status/result and inspect/export surfaces keyed by `submission_id` or `deploy_run_id` for normal inspection rather than reading routine control-plane or run JSON under `<records-root>`
-- operators know that `pending_approval` runs are resumed with the reviewed
-  `approve` run action on the existing `deploy_run_id`, not by resubmitting the
-  deploy request
+- the service binds successfully
+- the worker stays running
+- both processes use the same Postgres URL
+- operators know that normal inspection stays on the service, keyed by
+  `submissionId` or `deployRunId`
+- operators know `pending_approval` runs are resumed with the `approve` action
+  on the existing `deploy_run_id`
 
 ## Client Setup
 
-Run from a repo checkout on each dev machine or CI worker that should target
-`mini`:
+Run from each dev machine or Jenkins worker:
 
 ```bash
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
@@ -154,65 +135,64 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN
 ```
 
-The installed local client manifest should be:
+The installed profile should be here:
 
 - `.local/deployments/nixos-shared-host/clients/mini.json`
 
-Optional verification:
+What success looks like:
 
-```bash
-direnv exec . build-tools/tools/bin/nixos-shared-host-install client list
-```
-
-Completion criteria:
-
-- the `mini` profile is listed
+- the `mini` profile is listed by `client list`
 - the profile points at `/srv/common`
 - the profile points at the reviewed remote state, runtime, and records paths
-- the profile persists the reviewed service endpoint and token-env binding for
-  protected/shared submission
+- the profile stores the deployment service endpoint and token-env binding
 
-## Approval Grant SOP
+## Approval SOP
 
-If a reviewed protected/shared run enters `lifecycleState = pending_approval`,
-do not resubmit the deploy. Approve the existing run on the same `deploy_run_id`.
+If a run enters `lifecycleState = pending_approval`, approve that same run
+instead of submitting a new one. First inspect the run:
 
-Minimum review before approval:
+```bash
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --status \
+  --deploy-run-id "$DEPLOY_RUN_ID"
+```
+
+Then approve it:
+
+```bash
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --approve \
+  --deploy-run-id "$DEPLOY_RUN_ID" \
+  --approval-id ticket-123 \
+  --requested-by-principal user:reviewer
+```
+
+Before approving, check at least:
 
 - `status.approval.state = pending`
 - `status.approval.payloadFingerprint` matches the reviewed payload
 - `status.approval.targetIdentity` matches the intended target
-- `status.approval.provisionerPlanFingerprint` still matches when provisioning is in scope
+- `status.approval.provisionerPlanFingerprint` still matches when provisioning
+  is in scope
 
-One reviewed approval request shape posts to `/api/v1/run-actions` with
-`"action": "approve"`, the existing `submissionId`, and approval bindings for
-`expectedPayloadFingerprint`, `expectedTargetIdentity`, and `expectedProvisionerPlanFingerprint`.
+The helper reads the current status first and copies those approval bindings
+for you.
 
-```bash
-curl -fsS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
-  "http://127.0.0.1:7780/api/v1/run-actions" \
-  -d '{"schemaVersion":"deployment-control-plane-run-action-request@1","actionId":"approve-2026-04-14T00:00:00Z","submittedAt":"2026-04-14T00:00:00Z","submissionId":"submission-from-status","action":"approve","approval":{"approvalId":"ticket-123","expectedPayloadFingerprint":"sha256:payload-from-status","expectedTargetIdentity":"nixos-shared-host:shared-nonprod:demoapp-dev","expectedProvisionerPlanFingerprint":"sha256:plan-from-status"}}'
-```
+Approval keeps the same `deploy_run_id`. If you get
+`approval_no_longer_valid` or `unauthorized`, stop and investigate.
 
-Completion criteria:
-
-- the approval response keeps the same `deploy_run_id`
-- the run advances from `pending_approval` on that existing run instead of creating a replacement submission
-- operators know `approval_no_longer_valid` means stale payload or plan
-  fingerprints
-- operators know `unauthorized` covers missing approval rights and self-approval
-  rejection
-
-## Final Technician Handoff Check
+## Final Handoff Check
 
 Before handing the system back:
 
 1. `server status` on `mini` reports `managed: true`
 2. `server status` on `mini` reports `wiringState: wired`
 3. each required client machine has a local `mini` profile installed
-4. each client machine can render the reviewed remote plan:
+4. each client machine can render the remote plan:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
@@ -221,30 +201,6 @@ direnv exec . build-tools/tools/bin/deploy \
   --plan
 ```
 
-The plan must resolve to:
-
-- destination `mini`
-- remote repo path `/srv/common`
-- remote state path `/var/lib/bucknix/nixos-shared-host/platform-state.json`
-- remote runtime root `/var/lib/bucknix/nixos-shared-host/runtime`
-- remote records root `/var/lib/bucknix/nixos-shared-host/records`
-
-If the plan shows different remote paths, stop and escalate.
-
-If an operator will run shared-host mutation directly on `mini`, also confirm
-the reviewed same-host service path works from the repo checkout that started
-the service, for example:
-
-```bash
-cd /srv/common
-direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
-  --control-plane-url http://127.0.0.1:7780
-```
-
-Remote-profile and Jenkins wrapper flows still use the reviewed SSH transport
-for artifact staging and remote preflight, but they submit the protected/shared
-mutation through the control-plane service endpoint recorded in the reviewed
-client profile. They do not accept `--control-plane-url` on the wrapper CLI;
-confirm the selected profile already carries the correct service endpoint and
-token-env configuration before proceeding.
+The remote-profile and Jenkins wrappers use the service endpoint from
+the installed client profile. They do not accept `--control-plane-url`,
+`--apply-host`, or `--apply-host-dry-run` on the wrapper CLI.

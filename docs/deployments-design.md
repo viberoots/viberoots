@@ -23,6 +23,7 @@ Normative-source note:
 
 Companion docs:
 
+- [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md)
 - [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
 - [Deployment Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md)
 - [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)

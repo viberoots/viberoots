@@ -28,6 +28,8 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-control-plane.retention.policy.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-secret-runtime.test.ts": True,
     "build-tools/tools/tests/deployments/deploy.front-door.contract.test.ts": True,
+    "build-tools/tools/tests/deployments/deploy.front-door.control-plane-operator.contract.test.ts": True,
+    "build-tools/tools/tests/deployments/deploy.front-door.provider-target-identity.contract.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-from-changes.batch.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-from-changes.selection.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-promotion-compatibility.test.ts": True,

@@ -4,7 +4,9 @@ import type {
   DeploymentControlPlaneRunActionRequest,
   DeploymentControlPlaneStatus,
   DeploymentControlPlaneSubmitResponse,
+  DeploymentControlPlaneAuthorization,
 } from "./deployment-control-plane-contract.ts";
+import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract.ts";
 
 const ACTIVE_LIFECYCLE_STATES = new Set(["queued", "waiting_for_lock", "running", "cancelling"]);
@@ -105,7 +107,11 @@ export async function submitNixosSharedHostControlPlaneViaService(opts: {
 export async function submitNixosSharedHostControlPlaneRunActionViaService(opts: {
   controlPlaneUrl: string;
   token?: string;
-  request: DeploymentControlPlaneRunActionRequest;
+  request: DeploymentControlPlaneRunActionRequest & {
+    deployRunId?: string;
+    requestedBy?: DeploymentPrincipal;
+    authorization?: DeploymentControlPlaneAuthorization;
+  };
 }) {
   return await readJson<DeploymentControlPlaneRunActionResponse>(
     fetch(new URL("/api/v1/run-actions", opts.controlPlaneUrl), {

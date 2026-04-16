@@ -16,9 +16,10 @@ shared deployment design for one provider family:
 
 It should be read together with:
 
+- [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  for the reviewed operator-facing usage path and day-to-day workflows
 - [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
-  for the canonical server/client install workflow and current operator
-  commands
+  for the canonical server/client install workflow and lifecycle reference
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
 - [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
 - [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)

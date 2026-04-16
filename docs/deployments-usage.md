@@ -1,0 +1,301 @@
+# Deployments Usage
+
+This is the main starting point for day-to-day deployment work.
+
+You do not need to know the implementation details of the deployment system to
+use this guide.
+
+Use this guide when you want the shortest path to the day-to-day workflows:
+
+- pick the right deployment target
+- run the reviewed repo-level `deploy` front door
+- choose the right operation mode for deploy, preview, retry, rollback,
+  promotion, provision-only, or target transition
+- understand which provider family docs to open next
+
+Use the deeper docs when needed:
+
+- [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
+  for model rationale, authoring structure, and policy intent
+- [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
+  for fail-closed shared operator and implementation guarantees
+- [Deployment And Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+  for the public CLI, control-plane, and `secretspec` helper surface
+- [Secrets Usage](/Users/kiltyj/Code/bucknix-fresh/docs/secrets-usage.md)
+  for declaring deployment secret requirements and understanding the Vault
+  workflow
+- [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+  for reviewed provider-specific support and constraints
+- [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md)
+  for canonical scenario-by-scenario expectations
+- [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  for the reviewed `mini` host workflow
+
+## Main Command
+
+The public repo-level entrypoint is:
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy
+```
+
+Use `--deployment <label>` to choose what you want to deploy.
+
+If you are new to this repo, you can think of the label as the deployment's
+unique name inside the repo. Example:
+
+- `//projects/deployments/pleomino-prod:deploy`
+
+## Plain-Language Glossary
+
+- deployment label: the unique name of a deployment in this repo
+- deploy run id: the ID of one previous deployment run; you use this when you
+  want to reuse or inspect an older run
+- preview: publish a temporary copy without replacing the normal live target
+- rollback: move one deployment back to an earlier successful version
+- promotion: take an earlier successful run and publish it to a different
+  deployment target, such as `staging` to `prod`
+- provision-only: create or update infrastructure without publishing a new app
+  version
+- provider family: the deployment backend for a target, such as
+  `nixos-shared-host`, `cloudflare-pages`, or `kubernetes`
+- pending approval: the system accepted the run, but it is waiting for a person
+  to approve it before it continues
+
+## Core Workflows
+
+Normal deploy:
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy
+```
+
+For a normal deploy, this is usually enough. The deployment definition tells
+the CLI which app target to build, and the CLI resolves the artifact from that
+target automatically.
+
+Use `--artifact-dir <dir>` only when you want to override that default and
+point at a specific local build output folder.
+
+Use this when:
+
+- you want to publish the latest version defined by the deployment target
+- you are not trying to reuse an earlier run
+- you want the standard repo-driven path
+
+Preview from an earlier accepted run:
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy \
+  --preview \
+  --source-run-id <deploy-run-id>
+```
+
+Use this when:
+
+- you want a temporary preview without replacing the normal live target
+- you want to inspect an earlier accepted run in isolation
+- you already know the `deploy-run-id` you want to preview
+
+Preview cleanup:
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy \
+  --preview-cleanup \
+  --source-run-id <deploy-run-id>
+```
+
+Use this when:
+
+- you are done with a preview deployment
+- you want to remove preview resources created from an earlier run
+
+Retry a previous run without rebuilding:
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy \
+  --publish-only \
+  --source-run-id <deploy-run-id>
+```
+
+Use this when:
+
+- the earlier run already built the right artifact
+- you want to try publishing that same artifact again
+- you do not want a new build
+
+Rollback one deployment to an earlier run:
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy \
+  --publish-only \
+  --source-run-id <deploy-run-id> \
+  --rollback
+```
+
+Use this when:
+
+- the current live version is bad
+- you want to restore a known good earlier run for the same deployment
+
+Promote an earlier run to a different deployment:
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy \
+  --publish-only \
+  --source-run-id <deploy-run-id>
+```
+
+Use this when:
+
+- one environment already has the build you want
+- you want to publish that earlier run to another deployment target
+- the target deployment's policy allows that promotion path
+
+Example:
+
+- run the command on `//projects/deployments/pleomino-prod:deploy`
+  with a `--source-run-id` that came from an earlier successful
+  `//projects/deployments/pleomino-staging:deploy` run
+
+Provision infrastructure only:
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy \
+  --provision-only \
+  --source-run-id <deploy-run-id>
+```
+
+Use this when:
+
+- you need an infrastructure change without publishing a new app version
+- you want the infrastructure step to stay tied to one earlier accepted run
+
+Target-transition workflows:
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy \
+  --retire-target \
+  --target-exception-ref <label>
+```
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy \
+  --migrate-target \
+  --target-exception-ref <label>
+```
+
+Use these when:
+
+- ownership of a target is changing
+- a target should stop being used
+- a reviewed exception object already exists for that change
+
+For promotion, run the command on the target deployment label and set
+`--source-run-id` to the earlier run you want to promote.
+
+Common example values:
+
+- deployment label:
+  `//projects/deployments/pleomino-prod:deploy`
+- source run id:
+  `deploy-run-2026-04-16-abc123`
+- target exception ref:
+  `//projects/deployments/pleomino-shared:retire_old_prod_target`
+
+If a run returns `pending_approval`, do not submit it again. Approve the
+existing run using the same `deploy_run_id`.
+
+For service-backed workflows, the `deploy` CLI also covers the common operator
+inspection commands so you do not need to hand-build HTTP requests:
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy \
+  --status \
+  --deploy-run-id <deploy-run-id> \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy \
+  --print-run-lock-scope \
+  --deploy-run-id <deploy-run-id> \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy \
+  --approve \
+  --deploy-run-id <deploy-run-id> \
+  --approval-id <ticket-or-review-ref> \
+  --requested-by-principal <reviewer-principal> \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+Use `--status` when you want the full run status JSON, `--print-run-lock-scope`
+when you only need the exact admitted target scope string, and `--approve`
+when the run is waiting for human approval.
+
+If you are using the reviewed `nixos-shared-host` client profile workflow, use
+`--profile mini` instead of `--control-plane-url`.
+
+## Which Backend Am I Using
+
+`nixos-shared-host`
+
+- good fit for static sites and the currently supported single-service SSR app
+  path
+- includes host setup, client setup, remote plan, remote deploy, Jenkins deploy,
+  and approval on a waiting run
+- start with [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+
+`cloudflare-pages`
+
+- good fit for static sites
+- supports preview, preview cleanup, retry, rollback, and promotion from the
+  main `deploy` command
+- use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+  for the exact supported behavior
+
+`s3-static`
+
+- good fit for static sites
+- supports infrastructure-aware static publishing, including provision-only flows
+- use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+  for the exact supported behavior
+
+`kubernetes`
+
+- good fit for services and third-party services
+- uses the same `deploy` command, with Kubernetes-specific rollout rules
+- use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+
+`app-store-connect`
+
+- good fit for iOS apps
+- use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+  for staged rollout and promotion rules
+
+`google-play`
+
+- good fit for Android apps
+- use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+  for staged rollout, promotion, and replay rules
+
+## When To Open Which Doc
+
+Open this guide first when you want the right command quickly.
+
+Open [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+when you need the exact support or restriction for one backend.
+
+Open [Deployment And Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+when you need the exact `deploy` flags, HTTP API shapes, or secrets examples.
+
+Open [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md)
+when you need canonical expected behavior for a concrete operation such as
+preview, retry, rollback, promotion, or provision-only.
+
+Open [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
+when you are creating a new deployment definition or need architecture
+background.

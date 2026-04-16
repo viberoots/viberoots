@@ -15,6 +15,9 @@ Normative-source note:
 - this document may add explanatory prose outside the rendered registry block, but must not redefine
   reviewed provider values independently
 - [Deployment Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) may summarize provider support for onboarding, but this document owns the normative provider-capability contract
+- [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md) is the reviewed
+  operator-facing front door for the day-to-day command surface that sits above
+  these provider-specific capability details
 
 ## Required Capability Fields
 

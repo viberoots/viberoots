@@ -13,6 +13,10 @@ export function printDeployJson(value: unknown) {
   console.log(JSON.stringify(value, null, 2));
 }
 
+export function printProviderTargetIdentityForCli(deployment: DeploymentTarget) {
+  console.log(providerTargetIdentityFor(deployment));
+}
+
 async function requireProviderNativeConfig(
   workspaceRoot: string,
   deployment: DeploymentTarget,

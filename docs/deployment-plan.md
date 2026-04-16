@@ -8527,6 +8527,161 @@ path both implemented and safe to hand to operators.
 
 ---
 
+## PR-66: Direct Vault runtime resolution + admitted secret-reference replay closeout
+
+### Description
+
+I will close the remaining secret-runtime design gap left after the initial `secretspec` / Vault
+slice. The current implementation enforces the reviewed secret lifecycle rules, but the
+protected/shared runtime still consumes an exported `deployment-vault-fixture@1` handoff file
+rather than reading Vault directly, and admission / replay still preserve mostly contract-level
+`secret_requirements` instead of one explicit admitted set of non-secret resolved secret
+references. This PR moves the reviewed production path to direct Vault-backed runtime resolution
+while preserving `secretspec` as the stable repo contract and making retry / rollback / promotion
+semantics explicit through admitted secret-reference snapshots rather than ambient backend state.
+
+### Scope & Changes
+
+- Keep `secretspec` as the authoritative repo-level secret contract for deployment inputs, but
+  extend the admitted protected/shared secret model so the runtime does not depend on an exported
+  fixture as the production handoff path.
+- Replace the current production-oriented fixture handoff with a reviewed direct Vault runtime
+  backend for protected/shared execution:
+  - the worker / runtime reads secret material from Vault at execution time
+  - the control plane and replay snapshots preserve only non-secret reference material
+  - the local / fixture-backed path remains available only for reviewed tests, local harnesses, and
+    explicit bootstrap-oriented workflows
+- Introduce one explicit admitted secret-reference shape that records the resolved non-secret
+  secret identities needed for deterministic protected/shared execution and replay, such as:
+  - backend kind
+  - contract id
+  - stable backend reference or selector identity
+  - immutable version / generation / lease selector when the backend provides one
+  - target-scope and lifecycle-step binding needed to prove least-privilege use
+- Update protected/shared admission so:
+  - initial deploys freeze the admitted secret-reference set before queueing / locking
+  - same-deployment `retry` and `rollback` reuse that recorded admitted reference set by default
+  - `promotion` resolves a new target-environment admitted reference set for the target deployment
+  - replay fails closed when the recorded admitted reference set can no longer be resolved exactly
+- Update replay snapshots, deploy records, and any required control-plane execution snapshots so
+  they preserve the reviewed non-secret admitted secret references rather than only contract ids,
+  while still never persisting secret values.
+- Keep the runtime credential-lifecycle rules explicit and backend-safe:
+  - least-privilege credentials remain step- and target-scope-bound
+  - renew / reacquire behavior remains explicit
+  - break-glass credentials remain segregated from the routine path
+  - required secret resolution still fails closed on expiry, revocation, or non-exact reference
+    drift
+- Keep the implementation boundary explicit:
+  - `TARGETS` and deployment metadata declare secret contracts
+  - admission resolves and freezes non-secret secret references
+  - runtime fetches secret values directly from Vault using that frozen reference set
+  - records / snapshots preserve references only, never values
+
+### Tests (in this PR)
+
+- Add or extend secret-runtime tests proving the reviewed production path reads secrets through the
+  direct Vault backend boundary rather than requiring `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH` for the
+  normal protected/shared path.
+- Add admitted-reference tests proving protected/shared admission freezes one explicit non-secret
+  secret-reference set and that same-deployment `retry` / `rollback` reuse that exact set while
+  `promotion` resolves a fresh target-environment set.
+- Add replay tests proving protected/shared replay and exact-artifact reuse fail closed when a
+  recorded admitted secret reference has been deleted, revoked, version-drifted, or otherwise
+  cannot be resolved exactly.
+- Add redaction / leakage tests proving direct Vault integration still never writes secret values
+  into Buck metadata, control-plane payloads, replay snapshots, deploy records, logs, or
+  operator-visible status surfaces.
+- Add fixture / local-harness tests proving the reviewed `deployment-vault-fixture@1` path remains
+  available for isolated local tests and explicit bootstrap-oriented workflows without becoming the
+  normal production dependency.
+- Add or extend end-to-end protected/shared provider tests covering at least one real secret-
+  consuming flow on the reviewed runtime path so the admitted-reference model is exercised by the
+  same deploy flows operators use, not only by isolated backend tests.
+
+### Docs (in this PR)
+
+- Update the deployment design / contract / secrets docs so they describe the final reviewed
+  secret-runtime model accurately:
+  - `secretspec` as the stable repo contract
+  - Vault as the initial production backend behind that contract
+  - admitted secret references as the replay / retry / rollback source of truth
+  - direct runtime Vault reads for normal protected/shared execution
+- Update operator-facing secrets docs and the Vault bootstrap runbook so they clearly distinguish:
+  - the normal production path
+  - the local / fixture-backed test path
+  - how retry / rollback / promotion interact with admitted secret references
+- Document the exact non-secret admitted secret-reference shape, what makes a reference stable
+  enough for replay, and which parts may or may not appear in durable records.
+
+### Verification Commands
+
+- `v`
+- secret-runtime, replay, and admitted-reference inspection flows introduced or tightened in this
+  PR
+- representative deployment-domain targets proving:
+  - direct Vault-backed protected/shared runtime resolution works on the reviewed path
+  - retry / rollback reuse exact admitted secret references
+  - promotion resolves new target-environment references
+  - secret values never leak into durable or operator-visible surfaces
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to touch deployment metadata contracts, admission snapshots, replay
+  snapshots, provider runtime helpers, Vault backend integration, secret-lifecycle behavior,
+  deployment-domain docs, and deployment-domain tests. Under the deployment-only verify policy,
+  default `v` / CI must still run the full build-system verify scope because this changes
+  cross-cutting protected/shared execution contracts rather than doc-only behavior.
+
+### Acceptance Criteria
+
+- The reviewed normal protected/shared runtime path reads secret material directly from Vault rather
+  than from an exported fixture file.
+- Protected/shared admission freezes one explicit non-secret admitted secret-reference set that is
+  reused by same-deployment `retry` / `rollback` and re-resolved for `promotion`.
+- Replay, exact-artifact reuse, and protected/shared execution fail closed when the recorded
+  admitted secret references cannot be resolved exactly or no longer satisfy the reviewed
+  least-privilege contract.
+- Secret values never cross into Buck metadata, checked-in files, control-plane payloads, replay
+  snapshots, deploy records, logs, or operator-visible status surfaces.
+- Docs and tests describe the same final secret-runtime model, including the boundary between the
+  production Vault path and the retained fixture-backed local/test path.
+
+### Risks
+
+This work cuts across admission, replay, runtime secret resolution, and provider execution, so it
+is easy to accidentally replace one transitional secret-source-of-truth problem with another if the
+boundary between declared contracts, admitted references, and runtime-fetched secret material is
+not kept extremely explicit.
+
+### Mitigation
+
+Keep `secretspec` as the only repo contract, make admitted secret references first-class and
+versioned, keep Vault behind the backend boundary, preserve the fixture path only for local/test
+workflows, and add fail-closed replay / redaction tests in the same PR.
+
+### Consequence of Not Implementing
+
+The deployment docs and runbooks would continue to describe a transitional model in which Vault is
+nominally the production source of truth but the reviewed runtime still depends on a file export,
+and retry / rollback would continue to rely on weaker contract-id-level replay semantics than the
+design calls for.
+
+### Downsides for Implementing
+
+This is a broad protected/shared execution slice that will touch several provider runtimes and
+snapshot contracts at once, and it will likely require careful migration of existing tests and
+local harnesses that currently assume the fixture-backed backend is the only runtime path.
+
+### Recommendation
+
+Implement next, immediately after PR-65, so the newly improved secrets usage and Vault bootstrap
+docs can converge on the final reviewed production model instead of continuing to carry a clearly
+transitional caveat.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -8627,6 +8782,9 @@ path both implemented and safe to hand to operators.
 35. PR-65: close the remaining operator-facing `mini` documentation gap so the reviewed setup,
     checklist, and usage entrypoint all match the implemented service-routed install and remote
     workflow without sending operators through stale or implementation-detail-heavy guidance.
+36. PR-66: close the remaining secret-runtime end-state gap by replacing the production
+    fixture-handoff model with direct Vault-backed runtime resolution and explicit admitted secret-
+    reference replay semantics for retry, rollback, and promotion.
 
 ## Companion Docs
 

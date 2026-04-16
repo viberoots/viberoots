@@ -1,0 +1,272 @@
+# NixOS Shared Host Usage
+
+This is the main day-to-day guide for deployments that go to `mini`.
+
+If you are new here: `mini` is the shared NixOS machine that receives these
+deployments.
+
+Use this guide when you want the shortest path to the current day-to-day
+workflow:
+
+- first-time bring-up on `mini`
+- reviewed remote plan and deploy commands
+- Jenkins usage
+- what to do when a run is waiting for approval
+- how to check status using the IDs returned by the deployment service
+
+Use the deeper references when needed:
+
+- [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md)
+  for the repo-wide reviewed deployment workflows across all provider families
+- [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  for install details, alternate install modes, status, and uninstall
+- [NixOS Shared Host Technician Checklist](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-technician-checklist.md)
+  for the short SOP handoff path
+- [Mini Shared-Dev Deployment Design](/Users/kiltyj/Code/bucknix-fresh/docs/mini-deployment.md)
+  for background on why `mini` is set up this way
+- [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
+  for the strict system rules behind these workflows
+
+Current supported scope:
+
+- provider family: `nixos-shared-host`
+- component kinds:
+  - `static-webapp`
+  - `ssr-webapp` for the reviewed single-component host slice
+- protection class: `shared_nonprod`
+- example deployment: `//projects/deployments/pleomino-dev:deploy`
+
+## Before You Start
+
+You only need this guide if:
+
+- your deployment target uses the `nixos-shared-host` backend
+- you are deploying to `mini`
+- you want the supported path for shared dev deployments
+
+## First-Time Bring-Up
+
+For a fresh `mini` install, follow this exact order:
+
+1. run the server install on `mini`
+2. wire `/etc/nixos/bucknix/nixos-shared-host/default.nix` into the
+   authoritative NixOS config and apply it with `sudo nixos-rebuild switch`
+3. start the deployment service and worker on `mini`
+4. install the client profile on each dev machine or Jenkins worker
+5. render a remote plan
+6. run the remote deploy flow
+
+Use the checklist for the short step-by-step path and the setup guide for the
+full command reference.
+
+## Reviewed Capabilities
+
+The current supported path includes:
+
+- server install on `mini`
+- starting the deployment service and worker on `mini`
+- installing a client profile on dev machines and Jenkins workers
+- remote plan and remote deploy through that client profile
+- Jenkins deploy through SSH plus a deployment-service submission
+- approval grant on an existing `pending_approval` run
+- normal status and record inspection through the deployment service, using
+  `submissionId` or `deployRunId`
+
+You do not need to read design docs, inspect internal JSON files, or pass
+deployment-service flags directly to the remote wrapper commands.
+
+## Install The Reviewed Client Profile
+
+Run this on each dev machine or Jenkins worker:
+
+```bash
+direnv exec . build-tools/tools/bin/nixos-shared-host-install \
+  client install \
+  --profile mini \
+  --destination mini \
+  --remote-repo-path /srv/common \
+  --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json \
+  --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime \
+  --remote-records-root /var/lib/bucknix/nixos-shared-host/records \
+  --ssh-mode ssh \
+  --control-plane-url http://127.0.0.1:7780 \
+  --control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN
+```
+
+A client profile is a local file that tells the deploy command how to reach
+`mini`.
+
+It stores:
+
+- the SSH details for talking to `mini`
+- the deployment service URL
+- the environment variable name that holds the service token
+
+What the install flags mean:
+
+- `--profile mini`
+  The local profile name. Use `mini` when this machine should talk to the
+  shared host named `mini`.
+- `--destination mini`
+  The human-readable destination name stored in the profile. In this workflow it
+  matches the host name.
+- `--remote-repo-path /srv/common`
+  The repo checkout on `mini` that remote deploy commands should use.
+- `--remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json`
+  The host state file used by the shared-host deployment backend.
+- `--remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime`
+  The root directory where runtime files are materialized on `mini`.
+- `--remote-records-root /var/lib/bucknix/nixos-shared-host/records`
+  The root directory where deployment records are stored on `mini`.
+- `--ssh-mode ssh`
+  Use normal SSH transport. This is the standard choice for the current
+  reviewed workflow.
+- `--control-plane-url http://127.0.0.1:7780`
+  The deployment service URL that the client profile should call.
+- `--control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN`
+  The environment variable name that holds the deployment service token on the
+  client machine or Jenkins worker.
+
+## Review The Remote Plan
+
+From a dev machine:
+
+```bash
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --plan
+```
+
+The plan output should show:
+
+- destination `mini`
+- remote repo path `/srv/common`
+- remote state path `/var/lib/bucknix/nixos-shared-host/platform-state.json`
+- remote runtime root `/var/lib/bucknix/nixos-shared-host/runtime`
+- remote records root `/var/lib/bucknix/nixos-shared-host/records`
+- a `serviceClient` block with the deployment service URL and token env
+
+## Run The Reviewed Remote Deploy
+
+From a dev machine, if `./dist` is your built app output folder:
+
+```bash
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --artifact-dir ./dist
+```
+
+`--artifact-dir ./dist` is optional here. It is only needed if you want to use
+that exact local build output folder.
+
+If you omit `--artifact-dir`, the deploy command uses the deployment target
+metadata to figure out which app target to build and where its artifact lives.
+
+Common example values:
+
+- `--artifact-dir ./dist`
+  Typical static-site build output on a dev machine.
+- `--artifact-dir "$WORKSPACE/projects/apps/pleomino/dist"`
+  Typical CI build output in Jenkins.
+
+From Jenkins:
+
+```bash
+direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --artifact-dir "$WORKSPACE/projects/apps/pleomino/dist" \
+  --ssh-identity-file "$JENKINS_SSH_IDENTITY" \
+  --ssh-known-hosts "$JENKINS_KNOWN_HOSTS"
+```
+
+The remote-profile and Jenkins commands use SSH for staging files and basic
+preflight work. The actual deployment request goes through the central
+deployment service recorded in the client profile.
+
+Do not pass `--control-plane-url`, `--apply-host`, or `--apply-host-dry-run`
+to those wrappers. They read that information from the installed profile.
+
+## Inspect Status And Results
+
+Use the `deploy` helper to check status through the installed client profile:
+
+```bash
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --status \
+  --deploy-run-id "$DEPLOY_RUN_ID"
+```
+
+The response gives you two important IDs:
+
+- `submissionId`: the request ID
+- `deploy_run_id`: the run ID
+
+Keep both. You will use them if you need to inspect the run again or approve
+it later.
+
+Example values:
+
+- `submissionId = submission-2026-04-16T12:00:00Z`
+- `deploy_run_id = deploy-run-2026-04-16-abc123`
+
+## Approve A `pending_approval` Run
+
+If the status output returns `lifecycleState = pending_approval`, the run is
+waiting for human approval. Review that same run first:
+
+```bash
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --status \
+  --deploy-run-id "$DEPLOY_RUN_ID"
+```
+
+Before approving, check at least:
+
+- `status.approval.state = pending`
+- `status.approval.payloadFingerprint` matches the reviewed payload
+- `status.approval.targetIdentity` matches the intended target
+- `status.approval.provisionerPlanFingerprint` still matches when provisioning
+  is in scope
+
+Example values you might see:
+
+- `status.approval.state = "pending"`
+- `status.approval.payloadFingerprint = "sha256:payload-from-status"`
+- `status.approval.targetIdentity = "nixos-shared-host:shared-nonprod:demoapp-dev"`
+- `status.approval.provisionerPlanFingerprint = "sha256:plan-from-status"`
+
+Then approve that same run:
+
+```bash
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --approve \
+  --deploy-run-id "$DEPLOY_RUN_ID" \
+  --approval-id ticket-123 \
+  --requested-by-principal user:reviewer
+```
+
+What the approval flags mean:
+
+- `--approval-id ticket-123`
+  The human review reference, such as a ticket, change request, or approval
+  record.
+- `--requested-by-principal user:reviewer`
+  The reviewer identity recorded on the approval action.
+
+The helper reads the current status first and copies the expected payload
+fingerprint, target identity, and provisioner-plan fingerprint automatically,
+so you do not need to build the JSON request by hand.
+
+Approval keeps the same `deploy_run_id` and continues the existing run. If you
+get `approval_no_longer_valid` or `unauthorized`, re-run `--status` on that
+same `deploy_run_id` and confirm the current approval fields before trying
+again.

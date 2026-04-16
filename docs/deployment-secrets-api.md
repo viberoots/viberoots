@@ -1,0 +1,820 @@
+# Deployment And Secrets API
+
+This is the comprehensive public API reference for the deployment and secrets
+tools.
+
+Most people should start with the usage guides. This document is mainly for:
+
+- people who need the exact CLI flags
+- people writing scripts or tooling against the HTTP API
+- people integrating with the secrets helpers in TypeScript
+
+Use this document when you need:
+
+- the public `deploy` CLI surface
+- the shared control-plane HTTP API and schema names
+- the TypeScript helpers for `secretspec` and Vault-backed secret resolution
+- short examples you can copy without reading the implementation first
+
+Open the usage guides first when you want the shortest operator path:
+
+- [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md)
+- [Secrets Usage](/Users/kiltyj/Code/bucknix-fresh/docs/secrets-usage.md)
+- [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+
+## Plain-Language Glossary
+
+- deployment service: the background HTTP service that accepts deployment
+  requests and reports status
+- worker: the background process that performs accepted deployment work
+- `submissionId`: the ID of the request you sent to the deployment service
+- `deployRunId`: the ID of the actual deployment run
+- `secretspec`: the stable repo-level way to name a secret dependency without
+  storing the secret value in the repo
+
+## What Is Public And Stable
+
+These are the public surfaces you can rely on:
+
+1. the repo-level `deploy` CLI in
+   [build-tools/tools/bin/deploy](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/bin/deploy)
+2. the shared deployment service endpoints implemented by
+   [nixos-shared-host-control-plane-server.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/nixos-shared-host-control-plane-server.ts)
+3. the shared request and response contracts in
+   [deployment-control-plane-contract.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-control-plane-contract.ts)
+4. the provider submit-request contracts in
+   [nixos-shared-host-control-plane-api-contract.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/nixos-shared-host-control-plane-api-contract.ts)
+   and
+   [cloudflare-pages-control-plane-api-contract.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/cloudflare-pages-control-plane-api-contract.ts)
+5. the `secretspec` helpers in
+   [deployment-secretspec.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-secretspec.ts),
+   [deployment-secret-runtime.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-secret-runtime.ts),
+   [deployment-secret-runtime-helpers.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-secret-runtime-helpers.ts),
+   and
+   [deployment-secret-vault.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-secret-vault.ts)
+
+## `deploy` CLI
+
+The main command-line entry point is:
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy
+```
+
+### Stable Selectors And Flags
+
+Required selector:
+
+- `--deployment <label>`: choose one deployment target, such as
+  `//projects/deployments/pleomino-prod:deploy`
+
+Common example values:
+
+- `//projects/deployments/pleomino-dev:deploy`
+  A shared dev deployment.
+- `//projects/deployments/pleomino-staging:deploy`
+  A staging deployment.
+- `//projects/deployments/pleomino-prod:deploy`
+  A production deployment.
+
+Discovery and validation:
+
+- `--list`: print the deployment targets the repo knows about
+- `--validate-only`: check one deployment without changing anything
+- `--print-target-identity`: print the canonical normal-flow target
+  identity for one deployment
+- `--from-changes`: choose one or more deployments based on changed files
+
+Mutation and replay:
+
+- `--artifact-dir <dir>`: optional override that tells the CLI to use a
+  specific built app folder from your machine
+- `--publish-only`: reuse an earlier accepted build instead of building again
+- `--provision-only`: change infrastructure without publishing a new app version
+- `--rollback`: tell the system you are restoring an earlier run
+- `--source-run-id <deploy-run-id>`: choose the earlier run you want to reuse
+
+Common example values and when to use them:
+
+- `--artifact-dir ./dist`
+  Typical local static-site build output.
+- `--artifact-dir "$WORKSPACE/projects/apps/pleomino/dist"`
+  Typical CI build output.
+- `--source-run-id deploy-run-2026-04-16-abc123`
+  Typical example of an earlier run ID returned by the service.
+- `--publish-only --source-run-id deploy-run-2026-04-16-abc123`
+  Use when you want to retry or promote an earlier run without rebuilding.
+- `--publish-only --rollback --source-run-id deploy-run-2026-04-16-abc123`
+  Use when you want to restore an earlier run for the same deployment.
+- `--provision-only --source-run-id deploy-run-2026-04-16-abc123`
+  Use when you want infrastructure-only work tied to one earlier accepted run.
+
+Preview and target transitions:
+
+- `--preview`: create a temporary preview from an earlier accepted run
+- `--preview-cleanup`: remove preview resources for one admitted source run
+- `--cleanup-reason <reason>`: explicit preview cleanup reason
+- `--retire-target`: stop using one target
+- `--migrate-target`: move one target to a new home
+- `--target-exception-ref <label>`: the exception object used by
+  `--retire-target` or `--migrate-target`
+
+Common example values:
+
+- `--cleanup-reason manual_cleanup`
+  Use when a person is intentionally removing a preview.
+- `--cleanup-reason ttl_expired`
+  Use when a preview is being removed because its lifetime ended.
+- `--target-exception-ref //projects/deployments/pleomino-shared:retire_old_prod_target`
+  Example of a checked-in exception object for target retirement.
+- `--target-exception-ref //projects/deployments/pleomino-shared:migrate_prod_pages_target`
+  Example of a checked-in exception object for target migration.
+
+Deployment-service routing:
+
+- `--control-plane-url <url>`: the deployment service URL
+- `--control-plane-token <token>`: optional bearer token for the service
+- `BNX_DEPLOY_CONTROL_PLANE_URL`: environment fallback for `--control-plane-url`
+- `BNX_DEPLOY_CONTROL_PLANE_TOKEN`: environment fallback used by reviewed
+  service clients
+
+Common example values:
+
+- `--control-plane-url http://127.0.0.1:7780`
+  Use when the service is running on the same machine.
+- `--control-plane-url http://mini:7780`
+  Use when the service is running on the host named `mini`.
+- `BNX_DEPLOY_CONTROL_PLANE_TOKEN=replace-me`
+  Example token environment variable for local or CI use.
+
+Service-process configuration:
+
+- `--control-plane-database-url <postgres-url>`: database URL for the
+  deployment service or worker
+- `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL`: environment fallback for backend
+  service processes and backend-native read helpers
+
+Common example values:
+
+- `postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl`
+  Typical local Postgres connection string for the deployment service.
+
+### CLI Examples
+
+List reviewed deployments:
+
+```bash
+deploy --list
+```
+
+Validate one deployment target:
+
+```bash
+deploy \
+  --deployment //projects/deployments/pleomino-prod:deploy \
+  --validate-only
+```
+
+Submit a normal deploy:
+
+```bash
+deploy \
+  --deployment //projects/deployments/pleomino-prod:deploy
+```
+
+For a normal deploy, the CLI can usually build and resolve the artifact from
+the deployment target metadata. Use `--artifact-dir` only when you want to
+override that and point at a specific local build output folder.
+
+Submit a preview from an admitted run:
+
+```bash
+deploy \
+  --deployment //projects/deployments/pleomino-prod:deploy \
+  --preview \
+  --source-run-id deploy-run-123
+```
+
+Replay an exact-artifact rollback:
+
+```bash
+deploy \
+  --deployment //projects/deployments/pleomino-prod:deploy \
+  --publish-only \
+  --rollback \
+  --source-run-id deploy-run-123
+```
+
+Use the deployment service path:
+
+```bash
+export BNX_DEPLOY_CONTROL_PLANE_URL='http://127.0.0.1:7780'
+export BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
+
+deploy \
+  --deployment //projects/deployments/pleomino-prod:deploy \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+Read the current status for one service-backed run:
+
+```bash
+deploy \
+  --deployment //projects/deployments/pleomino-prod:deploy \
+  --status \
+  --deploy-run-id deploy-run-123 \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+Print only the exact admitted target scope string:
+
+```bash
+deploy \
+  --deployment //projects/deployments/pleomino-prod:deploy \
+  --print-run-lock-scope \
+  --deploy-run-id deploy-run-123 \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+Approve an existing waiting run without building the JSON payload yourself:
+
+```bash
+deploy \
+  --deployment //projects/deployments/pleomino-prod:deploy \
+  --approve \
+  --deploy-run-id deploy-run-123 \
+  --approval-id ticket-123 \
+  --requested-by-principal user:reviewer \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+Operator helper flags:
+
+- `--status`: print the current status JSON for one service-backed run
+- `--record`: print the finalized provider record for one run
+- `--print-run-lock-scope`: print only the exact admitted `lockScope` value
+- `--approve`: approve a `pending_approval` run using the current status
+  bindings
+- `--cancel-run`, `--resume-run`, `--abort-run`: submit the corresponding
+  run-action through the same service path
+- `--submission-id <id>` or `--deploy-run-id <id>`: select the run you want to
+  inspect or act on
+- `--approval-id <ref>`: required with `--approve`; use a ticket, change
+  request, or similar review reference
+- `--requested-by-principal <principal>`: optional reviewer/operator identity
+  recorded on the run action
+
+For the reviewed `nixos-shared-host` client-profile workflow, replace
+`--control-plane-url ...` with `--profile mini`.
+
+Expand from changed files:
+
+```bash
+deploy --from-changes
+```
+
+## Deployment Service HTTP API
+
+The current service is started with:
+
+```bash
+export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
+
+zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts \
+  --control-plane-database-url "$BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL" \
+  --host 127.0.0.1 \
+  --port 7780 \
+  --token replace-me
+```
+
+The service returns JSON on all endpoints.
+
+### Endpoints
+
+`GET /healthz`
+
+- returns `{ "ok": true }`
+
+`POST /api/v1/submissions`
+
+- accepts one submit request
+- returns `deployment-control-plane-submit-response@1`
+
+`GET /api/v1/status?submissionId=<id>`
+`GET /api/v1/status?deployRunId=<id>`
+
+- returns `deployment-control-plane-status@1`
+
+`GET /api/v1/records?submissionId=<id>`
+`GET /api/v1/records?deployRunId=<id>`
+
+- returns the finalized provider record for that run
+
+`POST /api/v1/run-actions`
+
+- accepts one `deployment-control-plane-run-action-request@1`
+- returns `deployment-control-plane-run-action-response@1`
+
+### Schema Names
+
+The shared schema constants are exported from
+[deployment-control-plane-contract.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-control-plane-contract.ts):
+
+- `deployment-control-plane-submit-request@1`
+- `deployment-control-plane-submit-response@1`
+- `deployment-control-plane-status@1`
+- `deployment-control-plane-run-action-request@1`
+- `deployment-control-plane-run-action-response@1`
+- `deployment-control-plane-replay-selector@1`
+
+The current provider submit schemas are:
+
+- `nixos-shared-host-control-plane-submit-request@1`
+- `cloudflare-pages-control-plane-submit-request@1`
+
+### Common Status Fields
+
+The status and response contracts expose these fields:
+
+- `submissionId`
+- `deployRunId`
+- `deploymentId`
+- `deploymentLabel`
+- `operationKind`
+- `providerTargetIdentity`
+- `lockScope`
+- `lifecycleState`
+- `terminationReason`
+- `finalOutcome`
+- `dedupe`
+- `approval`
+- `latestAction`
+
+What they mean, with example values:
+
+- `submissionId`
+  The request ID. Example:
+  `submission-2026-04-16T12:00:00Z`
+- `deployRunId`
+  The deployment run ID. Example:
+  `deploy-run-2026-04-16-abc123`
+- `deploymentId`
+  The logical deployment name. Example:
+  `pleomino-prod`
+- `deploymentLabel`
+  The repo label for the deployment. Example:
+  `//projects/deployments/pleomino-prod:deploy`
+- `operationKind`
+  The kind of run. Examples:
+  `deploy`, `promotion`, `retry`, `rollback`, `preview_cleanup`
+- `providerTargetIdentity`
+  The provider-specific target ID. Example:
+  `nixos-shared-host:default:demoapp`
+- `lockScope`
+  The concurrency scope used to prevent conflicting runs. Example:
+  `nixos-shared-host:default:demoapp`
+- `lifecycleState`
+  Where the run is right now. Examples:
+  `queued`, `running`, `pending_approval`, `finished`
+- `terminationReason`
+  Why the run ended early, if it did. Examples:
+  `cancelled`, `superseded`, or `null`
+- `finalOutcome`
+  The final result once the run is done. Example:
+  `succeeded`
+- `dedupe`
+  Information about whether this exact request was newly created or reused.
+- `approval`
+  Approval state and binding details for runs that require human approval.
+- `latestAction`
+  The most recent run action, such as `cancel` or `approve`.
+
+Important enum values:
+
+- `lifecycleState`: `pending_approval`, `queued`, `waiting_for_lock`, `running`,
+  `paused`, `cancelling`, `finished`, `cancelled`
+- `approval.state`: `pending`, `granted`, `no_longer_valid`
+- `run action`: `cancel`, `resume`, `abort`, `approve`
+
+### Submit Example
+
+Most operators should use the `deploy` CLI instead of calling this endpoint
+directly. Direct submit requests are mainly for tooling and integrations.
+
+This is a minimal example showing the shape of a
+`nixos-shared-host-control-plane-submit-request@1` request:
+
+```bash
+curl \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
+  -X POST \
+  http://127.0.0.1:7780/api/v1/submissions \
+  -d '{
+    "schemaVersion": "nixos-shared-host-control-plane-submit-request@1",
+    "submissionId": "submission-2026-04-16T12:00:00Z",
+    "submittedAt": "2026-04-16T12:00:00Z",
+    "deployment": {
+      "deploymentId": "demoapp-dev",
+      "label": "//projects/deployments/demoapp-dev:deploy",
+      "provider": "nixos-shared-host"
+    },
+    "operationKind": "deploy",
+    "artifactDir": "/tmp/demoapp-artifact"
+  }'
+```
+
+Typical response shape:
+
+```json
+{
+  "schemaVersion": "deployment-control-plane-submit-response@1",
+  "submissionId": "submission-2026-04-16T12:00:00Z",
+  "deploymentId": "demoapp-dev",
+  "deploymentLabel": "//projects/deployments/demoapp-dev:deploy",
+  "operationKind": "deploy",
+  "providerTargetIdentity": "nixos-shared-host:default:demoapp",
+  "lockScope": "nixos-shared-host:default:demoapp",
+  "lifecycleState": "queued",
+  "terminationReason": null,
+  "dedupe": {
+    "mode": "created",
+    "requestFingerprint": "sha256:example"
+  }
+}
+```
+
+What the example values mean:
+
+- `submissionId = "submission-2026-04-16T12:00:00Z"`
+  The request ID you use for status or record lookups.
+- `deploymentId = "demoapp-dev"`
+  The logical name of the deployment.
+- `deploymentLabel = "//projects/deployments/demoapp-dev:deploy"`
+  The checked-in repo label used to select the deployment.
+- `operationKind = "deploy"`
+  A normal deployment run rather than a preview, retry, or rollback.
+- `providerTargetIdentity = "nixos-shared-host:default:demoapp"`
+  The concrete target identity on the backend.
+- `lifecycleState = "queued"`
+  The service accepted the request and is waiting to start work.
+
+### Status And Record Examples
+
+Read status by `submissionId`:
+
+```bash
+curl \
+  -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
+  'http://127.0.0.1:7780/api/v1/status?submissionId=submission-2026-04-16T12:00:00Z'
+```
+
+Read the finalized record by `deployRunId`:
+
+```bash
+curl \
+  -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
+  'http://127.0.0.1:7780/api/v1/records?deployRunId=deploy-run-123'
+```
+
+Use `submissionId` when you want to follow the exact request you submitted. Use
+`deployRunId` when you are tracking the actual run as it moves through approval,
+execution, and finalization.
+
+### Run-Action Example
+
+Approve an existing `pending_approval` run instead of resubmitting it:
+
+```bash
+curl \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
+  -X POST \
+  http://127.0.0.1:7780/api/v1/run-actions \
+  -d '{
+    "schemaVersion": "deployment-control-plane-run-action-request@1",
+    "actionId": "approve-2026-04-16T12:05:00Z",
+    "submittedAt": "2026-04-16T12:05:00Z",
+    "submissionId": "submission-2026-04-16T12:00:00Z",
+    "action": "approve",
+    "approval": {
+      "approvalId": "ticket-123",
+      "expectedPayloadFingerprint": "sha256:payload-from-status",
+      "expectedTargetIdentity": "nixos-shared-host:default:demoapp",
+      "expectedProvisionerPlanFingerprint": "sha256:plan-from-status"
+    }
+  }'
+```
+
+What the approval fields mean:
+
+- `actionId = "approve-2026-04-16T12:05:00Z"`
+  A unique ID for this approval action request.
+- `submissionId = "submission-2026-04-16T12:00:00Z"`
+  The already-existing request you are approving.
+- `approvalId = "ticket-123"`
+  A human review reference such as a ticket, incident, or approval record.
+- `expectedPayloadFingerprint = "sha256:payload-from-status"`
+  The payload hash you reviewed from the status response.
+- `expectedTargetIdentity = "nixos-shared-host:default:demoapp"`
+  The exact deployment target you intend to approve.
+- `expectedProvisionerPlanFingerprint = "sha256:plan-from-status"`
+  The infrastructure plan hash you reviewed when provisioning is in scope.
+
+Cancel a queued run:
+
+```bash
+curl \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
+  -X POST \
+  http://127.0.0.1:7780/api/v1/run-actions \
+  -d '{
+    "schemaVersion": "deployment-control-plane-run-action-request@1",
+    "actionId": "cancel-queued-1",
+    "submittedAt": "2026-04-16T12:06:00Z",
+    "submissionId": "submission-2026-04-16T12:00:00Z",
+    "action": "cancel",
+    "idempotencyKey": "cancel-queued-1"
+  }'
+```
+
+## `secretspec` And Vault Runtime APIs
+
+The `secretspec` layer is the stable public surface. It lets callers name the
+secret they need without caring about the backend details. Vault is the current
+backend behind that surface.
+
+### Public Types And Helpers
+
+The public `secretspec` helpers are exported from
+[deployment-secretspec.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-secretspec.ts):
+
+- `DeploymentSecretBackendKind`
+- `DeploymentSecretContractBinding`
+- `deploymentSecretContractBindings()`
+- `deploymentSecretBindingsForStep()`
+
+The runtime helpers are exported from
+[deployment-secret-runtime.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-secret-runtime.ts):
+
+- `DeploymentSecretMaterial`
+- `DeploymentSecretBackend`
+- `createDeploymentSecretRuntime()`
+
+The Vault-backed helpers are exported from:
+
+- `createDeploymentVaultSecretBackend()` in
+  [deployment-secret-vault.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-secret-vault.ts)
+- `createVaultDeploymentSecretRuntime()` in
+  [deployment-secret-runtime-helpers.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-secret-runtime-helpers.ts)
+
+### Requirement Shape
+
+Secret requirements are declared as deployment requirements with a step and a
+contract ID:
+
+```ts
+const requirements = [
+  {
+    name: "cloudflare_api_token",
+    step: "publish",
+    contractId: "secret://deployments/pleomino/cloudflare_api_token",
+    required: true,
+  },
+];
+```
+
+Field meanings with example values:
+
+- `name: "cloudflare_api_token"`
+  A short local name used by the deployment code at runtime.
+- `step: "publish"`
+  Use `publish` when the secret is needed to send a release to a provider.
+- `step: "provision"`
+  Use `provision` when the secret is needed only for infrastructure work.
+- `step: "smoke"`
+  Use `smoke` when the secret is needed only for post-deploy verification.
+- `step: "release_actions.pre_publish"`
+  Use this when a custom pre-publish action needs the secret.
+- `contractId: "secret://deployments/pleomino/cloudflare_api_token"`
+  The stable repo-level secret name; keep this stable even when the value
+  rotates.
+- `required: true`
+  Use `true` when the deployment must fail if the secret is missing.
+- `required: false`
+  Use `false` only for optional behavior such as an authenticated smoke check
+  that can be skipped.
+
+The binding helpers turn those requirements into a backend-independent list of
+secret bindings:
+
+```ts
+import {
+  deploymentSecretContractBindings,
+  deploymentSecretBindingsForStep,
+} from "./build-tools/tools/deployments/deployment-secretspec.ts";
+
+const bindings = deploymentSecretContractBindings(requirements);
+const publishBindings = deploymentSecretBindingsForStep(bindings, "publish");
+```
+
+In this example:
+
+- `deploymentSecretContractBindings(requirements)` converts the raw deployment
+  requirements into a normalized secret-binding list.
+- `deploymentSecretBindingsForStep(bindings, "publish")` filters that list down
+  to only the secrets allowed during the `publish` step.
+
+### Runtime Example
+
+Resolve only the secrets needed for the current step:
+
+```ts
+import { createDeploymentSecretRuntime } from "./build-tools/tools/deployments/deployment-secret-runtime.ts";
+import { createDeploymentVaultSecretBackend } from "./build-tools/tools/deployments/deployment-secret-vault.ts";
+
+const runtime = createDeploymentSecretRuntime({
+  backend: createDeploymentVaultSecretBackend(),
+  requirements,
+  targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+});
+
+const publishSecrets = await runtime.enterStep("publish");
+console.log(publishSecrets.cloudflare_api_token);
+```
+
+What the example values mean:
+
+- `targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages"`
+  The specific deployment target that is allowed to use the secret. In normal
+  deploy flows, this should be the admitted `targetEnvironment.lockScope`
+  value.
+- `runtime.enterStep("publish")`
+  Ask the runtime for only the secrets needed while publishing.
+- `publishSecrets.cloudflare_api_token`
+  Read the secret value by the local `name` from the requirement entry.
+
+Use the convenience helper when you already have deployment context available:
+
+```ts
+import { createVaultDeploymentSecretRuntime } from "./build-tools/tools/deployments/deployment-secret-runtime-helpers.ts";
+
+const runtime = createVaultDeploymentSecretRuntime({
+  admittedContext: {
+    secretRequirements: requirements,
+    targetEnvironment: {
+      lockScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    },
+  },
+});
+```
+
+Use the convenience helper when your code already has admitted deployment
+context and you do not want to wire the backend, requirements, and target scope
+by hand.
+
+Where the target scope comes from:
+
+- `createVaultDeploymentSecretRuntime()` reads
+  `admittedContext.targetEnvironment.lockScope`
+- `createDeploymentSecretRuntime()` checks each secret's `targetScopes` against
+  that runtime `targetScope`
+- in normal deploy flows, `lockScope` is set during admission and is usually the
+  same as `targetEnvironment.providerTargetIdentity`
+
+That means operators should use the deployment's admitted `lockScope` value as
+the source of truth when populating `targetScopes`.
+
+### Vault Fixture Example
+
+Local and test flows use `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH` to point at the
+fixture file read by `createDeploymentVaultSecretBackend()`:
+
+```bash
+export BNX_DEPLOYMENT_VAULT_FIXTURE_PATH="$PWD/vault.json"
+```
+
+Production operators should also read
+[Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md).
+That runbook bootstraps Vault as the source of truth and then exports this
+fixture format for the current runtime.
+
+Example fixture:
+
+```json
+{
+  "schemaVersion": "deployment-vault-fixture@1",
+  "contracts": {
+    "secret://deployments/pleomino/cloudflare_api_token": {
+      "value": "super-secret-token",
+      "allowedSteps": ["publish"],
+      "targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+      "refreshMode": "renew",
+      "credentialClass": "routine"
+    }
+  }
+}
+```
+
+What the common fixture fields mean:
+
+- `"value": "super-secret-token"`
+  The actual secret value returned to the runtime.
+- `"allowedSteps": ["publish"]`
+  Use this for a provider credential that should be available only during the
+  publish step.
+- `"allowedSteps": ["smoke"]`
+  Use this for a credential that should be available only during smoke checks.
+- `"targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"]`
+  The exact deployment target allowed to use this contract. This should match
+  the deployment's admitted `lockScope`.
+- `"refreshMode": "renew"`
+  Use this when the backend should refresh the same credential in place.
+- `"refreshMode": "reacquire"`
+  Use this when the backend should fetch a new credential instead of renewing.
+- `"credentialClass": "routine"`
+  Standard day-to-day deployment credential.
+- `"credentialClass": "break_glass"`
+  Emergency-only credential that normal flows should not consume.
+
+How to get the right `targetScopes` value:
+
+1. first-time setup:
+
+```bash
+deploy \
+  --deployment //projects/deployments/pleomino-staging:deploy \
+  --print-target-identity
+```
+
+For normal deploys, that value is the right starting point for `targetScopes`.
+
+2. exact run verification:
+
+```bash
+deploy \
+  --deployment //projects/deployments/pleomino-staging:deploy \
+  --print-run-lock-scope \
+  --deploy-run-id "$DEPLOY_RUN_ID" \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+Use that `lockScope` value as the source of truth for the exact run.
+
+3. precedence rule:
+
+- if you only need the normal deploy target before the first run, the
+  `--validate-only` output is enough
+- if a run already exists, or if you are doing preview, cleanup, retry,
+  rollback, promotion, or another special flow, prefer the exact `lockScope`
+  returned by the status API
+
+Common admitted shapes by backend:
+
+- Cloudflare Pages:
+  `cloudflare-pages:<account>/<project>`
+- `nixos-shared-host`:
+  `nixos-shared-host:<target-group>:<app>`
+- S3 static:
+  `s3-static:<account>/<bucket>`
+- Kubernetes:
+  `kubernetes:<cluster>/<namespace>/<release>`
+- App Store Connect:
+  `app-store-connect:<issuer>/<app>#track:<track>`
+- Google Play:
+  `google-play:<developer-account>/<app>#track:<track>`
+
+Copyable example:
+
+```json
+"targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"]
+```
+
+### Secret Runtime Rules
+
+The runtime contract is intentionally narrow:
+
+- `enterStep(step)` resolves only the secrets needed for that lifecycle step
+- required contracts fail when missing, revoked, expired, or no longer
+  refreshable
+- routine flows cannot consume `break_glass` credentials
+- records and replay snapshots preserve secret references, not secret values
+
+## When To Open Which Doc
+
+Open [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md)
+when you want the fastest operator command path.
+
+Open [Secrets Usage](/Users/kiltyj/Code/bucknix-fresh/docs/secrets-usage.md)
+when you need the shortest explanation of the `secretspec` and Vault model.
+
+Open [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+when you need the operator workflow for initializing Vault, enabling KV/AppRole,
+writing policies, storing secrets, and exporting the current runtime fixture.
+
+Open [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
+when you need the architectural rationale behind the API surface.
+
+Open [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
+when you need the fail-closed behavioral rules that the public APIs must obey.

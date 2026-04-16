@@ -3,10 +3,11 @@ import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
 import { resolveDeploymentAdmissionEvidence } from "./deployment-admission-cli.ts";
 import { resolveDeploymentForCli } from "./deployment-cli-resolve.ts";
 import {
-  listDeploymentsForCli,
-  printDeployJson,
-  validateDeploymentForCli,
-} from "./deploy-front-door.ts";
+  assertDeployCliReadonlyGuardrails,
+  maybeHandleReadonlyDeployCli,
+  readDeployCliReadonlyFlags,
+} from "./deploy-cli-readonly.ts";
+import { listDeploymentsForCli, printDeployJson } from "./deploy-front-door.ts";
 import { runCloudflareDeployFrontDoor } from "./cloudflare-pages-front-door.ts";
 import { runAppStoreConnectDeployFrontDoor } from "./app-store-connect-front-door.ts";
 import { runGooglePlayDeployFrontDoor } from "./google-play-front-door.ts";
@@ -50,6 +51,7 @@ export async function runDeployCli(opts: {
   if (getFlagBool("list")) {
     if (
       [
+        "print-target-identity",
         "validate-only",
         "provision-only",
         "publish-only",
@@ -67,53 +69,33 @@ export async function runDeployCli(opts: {
   const deployment = await resolveDeploymentForCli(opts.workspaceRoot, requireFlag, {
     deploymentJsonErrorMessage: opts.deploymentJsonErrorMessage,
   });
-  const remove = getFlagBool("remove");
-  const validateOnly = getFlagBool("validate-only");
-  const provisionOnly = getFlagBool("provision-only");
-  const publishOnly = getFlagBool("publish-only");
-  const preview = getFlagBool("preview");
-  const previewCleanup = getFlagBool("preview-cleanup");
-  const rollback = getFlagBool("rollback");
-  const retireTarget = getFlagBool("retire-target");
-  const migrateTarget = getFlagBool("migrate-target");
-  const targetExceptionRef = getFlagStr("target-exception-ref", "").trim();
-  const cleanupReason = getFlagStr("cleanup-reason", "manual_cleanup").trim();
-  const sourceRunId = getFlagStr("source-run-id", "").trim();
-  const artifactDirFlag = getFlagStr("artifact-dir", "").trim();
+  const flags = readDeployCliReadonlyFlags();
   const admissionEvidence = await resolveDeploymentAdmissionEvidence();
   const smokeConnectOverride = resolveSmokeConnectOverride();
+  assertDeployCliReadonlyGuardrails(flags);
   if (
-    validateOnly &&
-    (provisionOnly || publishOnly || preview || previewCleanup || remove || rollback)
+    await maybeHandleReadonlyDeployCli({ workspaceRoot: opts.workspaceRoot, deployment, flags })
   ) {
-    throw new Error(
-      "--validate-only cannot be combined with mutating, preview, or publish-only flags",
-    );
-  }
-  if (provisionOnly && (publishOnly || preview || previewCleanup || remove || rollback)) {
-    throw new Error(
-      "--provision-only cannot be combined with --publish-only, preview, remove, or rollback",
-    );
-  }
-  if (validateOnly) {
-    printDeployJson(await validateDeploymentForCli(opts.workspaceRoot, deployment));
     return;
   }
-  if (preview && previewCleanup) {
+  if (flags.preview && flags.previewCleanup) {
     throw new Error("--preview and --preview-cleanup are mutually exclusive");
   }
-  if (retireTarget && migrateTarget) {
+  if (flags.retireTarget && flags.migrateTarget) {
     throw new Error("--retire-target and --migrate-target are mutually exclusive");
   }
-  if (preview && (publishOnly || remove || rollback)) {
+  if (flags.preview && (flags.publishOnly || flags.remove || flags.rollback)) {
     throw new Error("--preview cannot be combined with --publish-only, --remove, or --rollback");
   }
-  if (previewCleanup && (publishOnly || remove || rollback)) {
+  if (flags.previewCleanup && (flags.publishOnly || flags.remove || flags.rollback)) {
     throw new Error(
       "--preview-cleanup cannot be combined with --publish-only, --remove, or --rollback",
     );
   }
-  if ((retireTarget || migrateTarget) && (publishOnly || remove || preview || previewCleanup)) {
+  if (
+    (flags.retireTarget || flags.migrateTarget) &&
+    (flags.publishOnly || flags.remove || flags.preview || flags.previewCleanup)
+  ) {
     throw new Error(
       "--retire-target/--migrate-target cannot be combined with deploy, publish-only, remove, or preview flags",
     );
@@ -123,11 +105,11 @@ export async function runDeployCli(opts: {
       workspaceRoot: opts.workspaceRoot,
       deployment,
       requireServiceForProtectedShared: opts.publicFrontDoor,
-      publishOnly,
-      provisionOnly,
-      rollback,
-      sourceRunId,
-      artifactDirFlag,
+      publishOnly: flags.publishOnly,
+      provisionOnly: flags.provisionOnly,
+      rollback: flags.rollback,
+      sourceRunId: flags.sourceRunId,
+      artifactDirFlag: flags.artifactDirFlag,
       ...(admissionEvidence ? { admissionEvidence } : {}),
       ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
       hasFlag,
@@ -139,19 +121,19 @@ export async function runDeployCli(opts: {
       workspaceRoot: opts.workspaceRoot,
       deployment,
       requireServiceForProtectedShared: opts.publicFrontDoor,
-      publishOnly,
-      preview,
-      previewCleanup,
-      rollback,
-      retireTarget,
-      migrateTarget,
-      targetExceptionRef,
-      sourceRunId,
-      artifactDirFlag,
-      cleanupReason,
+      publishOnly: flags.publishOnly,
+      preview: flags.preview,
+      previewCleanup: flags.previewCleanup,
+      rollback: flags.rollback,
+      retireTarget: flags.retireTarget,
+      migrateTarget: flags.migrateTarget,
+      targetExceptionRef: flags.targetExceptionRef,
+      sourceRunId: flags.sourceRunId,
+      artifactDirFlag: flags.artifactDirFlag,
+      cleanupReason: flags.cleanupReason,
       ...(admissionEvidence ? { admissionEvidence } : {}),
       ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
-      provisionOnly,
+      provisionOnly: flags.provisionOnly,
     });
     return;
   }
@@ -159,10 +141,10 @@ export async function runDeployCli(opts: {
     await runAppStoreConnectDeployFrontDoor({
       workspaceRoot: opts.workspaceRoot,
       deployment,
-      publishOnly,
-      rollback,
-      sourceRunId,
-      artifactDirFlag,
+      publishOnly: flags.publishOnly,
+      rollback: flags.rollback,
+      sourceRunId: flags.sourceRunId,
+      artifactDirFlag: flags.artifactDirFlag,
       ...(admissionEvidence ? { admissionEvidence } : {}),
     });
     return;
@@ -171,10 +153,10 @@ export async function runDeployCli(opts: {
     await runGooglePlayDeployFrontDoor({
       workspaceRoot: opts.workspaceRoot,
       deployment,
-      publishOnly,
-      rollback,
-      sourceRunId,
-      artifactDirFlag,
+      publishOnly: flags.publishOnly,
+      rollback: flags.rollback,
+      sourceRunId: flags.sourceRunId,
+      artifactDirFlag: flags.artifactDirFlag,
       ...(admissionEvidence ? { admissionEvidence } : {}),
     });
     return;
@@ -184,11 +166,11 @@ export async function runDeployCli(opts: {
       workspaceRoot: opts.workspaceRoot,
       deployment,
       requireServiceForProtectedShared: opts.publicFrontDoor,
-      publishOnly,
-      provisionOnly,
-      rollback,
-      sourceRunId,
-      artifactDirFlag,
+      publishOnly: flags.publishOnly,
+      provisionOnly: flags.provisionOnly,
+      rollback: flags.rollback,
+      sourceRunId: flags.sourceRunId,
+      artifactDirFlag: flags.artifactDirFlag,
       ...(admissionEvidence ? { admissionEvidence } : {}),
       ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
       hasFlag,
@@ -210,11 +192,11 @@ export async function runDeployCli(opts: {
   await runNixosSharedHostDeployFrontDoor({
     workspaceRoot: opts.workspaceRoot,
     deployment,
-    publishOnly,
-    provisionOnly,
-    rollback,
-    sourceRunId,
-    artifactDirFlag,
+    publishOnly: flags.publishOnly,
+    provisionOnly: flags.provisionOnly,
+    rollback: flags.rollback,
+    sourceRunId: flags.sourceRunId,
+    artifactDirFlag: flags.artifactDirFlag,
     ...(admissionEvidence ? { admissionEvidence } : {}),
     ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
   });
