@@ -688,7 +688,7 @@ the source of truth when populating `targetScopes`.
 
 ### Vault Fixture Example
 
-Normal production-style runs point `createDeploymentVaultSecretBackend()` at
+The reviewed production path points `createDeploymentVaultSecretBackend()` at
 Vault directly:
 
 ```bash
@@ -696,11 +696,11 @@ export VAULT_ADDR='https://vault.example.net:8200'
 export VAULT_TOKEN='replace-with-short-lived-vault-token'
 ```
 
-Local and test flows can still use `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH` to point
-at the reviewed fixture file:
+Local development, isolated tests, and explicit bootstrap-oriented workflows
+can intentionally override that runtime path with the reviewed fixture file:
 
 ```bash
-export BNX_DEPLOYMENT_VAULT_FIXTURE_PATH="$PWD/vault.json"
+export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/vault.json"
 ```
 
 Production operators should also read

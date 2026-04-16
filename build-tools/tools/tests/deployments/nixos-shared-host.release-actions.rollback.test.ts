@@ -9,6 +9,7 @@ import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
+import { withEnvOverrides } from "./nixos-shared-host.control-plane.helpers.ts";
 import {
   deploymentReleaseActionFixture,
   deploymentRequirementFixture,
@@ -18,6 +19,14 @@ async function writeArtifact(root: string, html: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });
   await fsp.writeFile(path.join(root, "index.html"), `${html}\n`, "utf8");
   await fsp.writeFile(path.join(root, "healthz"), "ok\n", "utf8");
+}
+
+async function writeVaultFixture(filePath: string, contracts: Record<string, unknown>) {
+  await fsp.writeFile(
+    filePath,
+    JSON.stringify({ schemaVersion: "deployment-vault-fixture@1", contracts }, null, 2) + "\n",
+    "utf8",
+  );
 }
 
 test("routine deploy rejects destructive schema-migration release actions", async () => {
@@ -49,21 +58,35 @@ test("routine deploy rejects destructive schema-migration release actions", asyn
       ],
     });
     const artifactDir = path.join(tmp, "artifact-v2");
+    const fixturePath = path.join(tmp, "vault.json");
     await writeArtifact(artifactDir, "<html>v2</html>");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
-    await assert.rejects(
-      submitNixosSharedHostControlPlaneRun({
-        workspaceRoot: tmp,
-        operationKind: "deploy",
-        deployment,
-        artifactDir,
-        paths: {
-          statePath: path.join(tmp, "platform-state.json"),
-          hostRoot: path.join(tmp, "host"),
-          recordsRoot: path.join(tmp, "records"),
-        },
-      }),
-      /rejects destructive built-in release_actions/,
+    await writeVaultFixture(fixturePath, {
+      "secret://deployments/demoapp/database_url": {
+        value: "postgres://demoapp:test@db.internal/demoapp",
+        allowedSteps: ["release_actions.pre_publish"],
+        targetScopes: ["*"],
+      },
+    });
+    await withEnvOverrides(
+      {
+        BNX_DEPLOYMENT_SECRET_FIXTURE_PATH: fixturePath,
+      },
+      async () =>
+        await assert.rejects(
+          submitNixosSharedHostControlPlaneRun({
+            workspaceRoot: tmp,
+            operationKind: "deploy",
+            deployment,
+            artifactDir,
+            paths: {
+              statePath: path.join(tmp, "platform-state.json"),
+              hostRoot: path.join(tmp, "host"),
+              recordsRoot: path.join(tmp, "records"),
+            },
+          }),
+          /rejects destructive built-in release_actions/,
+        ),
     );
   });
 });

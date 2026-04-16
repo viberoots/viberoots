@@ -67,7 +67,7 @@ test("cloudflare-pages deploy reads Vault directly on the reviewed runtime path"
     process.env.BNX_CLOUDFLARE_PAGES_WRANGLER_BIN = path.join(fake.binDir, "wrangler");
     process.env.VAULT_ADDR = vault.addr;
     process.env.VAULT_TOKEN = vault.token;
-    delete process.env.BNX_DEPLOYMENT_VAULT_FIXTURE_PATH;
+    delete process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
     try {
       const result = await submitCloudflarePagesControlPlaneDeploy({
         workspaceRoot: tmp,

@@ -1,5 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 import { createDeploymentSecretRuntime } from "../../deployments/deployment-secret-runtime.ts";
 import {
@@ -15,6 +18,24 @@ function restoreVaultEnv() {
   process.env = { ...originalEnv };
 }
 
+async function withFixtureFile(
+  contracts: Record<string, unknown>,
+  run: (fixturePath: string) => Promise<void>,
+) {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "deployment-secret-vault-"));
+  const fixturePath = path.join(tmp, "vault.json");
+  await fsp.writeFile(
+    fixturePath,
+    JSON.stringify({ schemaVersion: "deployment-vault-fixture@1", contracts }, null, 2) + "\n",
+    "utf8",
+  );
+  try {
+    await run(fixturePath);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+}
+
 test("direct Vault admission freezes one exact version and runtime reuses it", async () => {
   const vault = await startFakeVaultServer({
     "secret://deployments/pleomino/cloudflare_api_token": {
@@ -27,7 +48,7 @@ test("direct Vault admission freezes one exact version and runtime reuses it", a
   });
   process.env.VAULT_ADDR = vault.addr;
   process.env.VAULT_TOKEN = vault.token;
-  delete process.env.BNX_DEPLOYMENT_VAULT_FIXTURE_PATH;
+  delete process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
   try {
     const admittedReferences = await resolveDeploymentVaultAdmittedReferences({
       requirements: [
@@ -65,7 +86,7 @@ test("direct Vault replay fails closed when the admitted version no longer resol
   const vault = await startFakeVaultServer(state);
   process.env.VAULT_ADDR = vault.addr;
   process.env.VAULT_TOKEN = vault.token;
-  delete process.env.BNX_DEPLOYMENT_VAULT_FIXTURE_PATH;
+  delete process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
   try {
     const admittedReferences = await resolveDeploymentVaultAdmittedReferences({
       requirements: [
@@ -91,4 +112,88 @@ test("direct Vault replay fails closed when the admitted version no longer resol
     restoreVaultEnv();
     await vault.close();
   }
+});
+
+test("neutral fixture env var intentionally overrides direct Vault env", async () => {
+  const vault = await startFakeVaultServer({
+    "secret://deployments/pleomino/cloudflare_api_token": {
+      currentVersion: "12",
+      versions: { "12": { value: "direct-vault-token" } },
+    },
+  });
+  await withFixtureFile(
+    {
+      "secret://deployments/pleomino/cloudflare_api_token": {
+        value: "fixture-token",
+        version: "fixture-v1",
+        allowedSteps: ["publish"],
+        targetScopes: ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+      },
+    },
+    async (fixturePath) => {
+      process.env.VAULT_ADDR = vault.addr;
+      process.env.VAULT_TOKEN = vault.token;
+      process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH = fixturePath;
+      try {
+        const admittedReferences = await resolveDeploymentVaultAdmittedReferences({
+          requirements: [
+            deploymentRequirementFixture({
+              name: "cloudflare_api_token",
+              step: "publish",
+              contractId: "secret://deployments/pleomino/cloudflare_api_token",
+            }),
+          ],
+          targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+        });
+        assert.equal(admittedReferences[0]?.resolvedVersion, "fixture-v1");
+        const runtime = createDeploymentSecretRuntime({
+          backend: createDeploymentVaultSecretBackend(),
+          admittedReferences,
+          targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+        });
+        const publish = await runtime.enterStep("publish");
+        assert.equal(publish.cloudflare_api_token, "fixture-token");
+      } finally {
+        restoreVaultEnv();
+      }
+    },
+  );
+  await vault.close();
+});
+
+test("retired Vault-named fixture env var is ignored and required secret flows fail closed", async () => {
+  await withFixtureFile(
+    {
+      "secret://deployments/pleomino/cloudflare_api_token": {
+        value: "fixture-token",
+        allowedSteps: ["publish"],
+        targetScopes: ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+      },
+    },
+    async (fixturePath) => {
+      process.env.BNX_DEPLOYMENT_VAULT_FIXTURE_PATH = fixturePath;
+      delete process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
+      delete process.env.VAULT_ADDR;
+      delete process.env.VAULT_TOKEN;
+      try {
+        const runtime = createDeploymentSecretRuntime({
+          backend: createDeploymentVaultSecretBackend(),
+          requirements: [
+            deploymentRequirementFixture({
+              name: "cloudflare_api_token",
+              step: "publish",
+              contractId: "secret://deployments/pleomino/cloudflare_api_token",
+            }),
+          ],
+          targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+        });
+        await assert.rejects(
+          async () => await runtime.enterStep("publish"),
+          /BNX_DEPLOYMENT_SECRET_FIXTURE_PATH.*VAULT_ADDR plus VAULT_TOKEN/,
+        );
+      } finally {
+        restoreVaultEnv();
+      }
+    },
+  );
 });

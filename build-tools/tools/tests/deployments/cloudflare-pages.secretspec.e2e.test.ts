@@ -81,7 +81,7 @@ test("cloudflare-pages deploy keeps secretspec-backed Vault values out of record
     process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT = fake.publishRoot;
     process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_LOG = fake.logPath;
     process.env.BNX_CLOUDFLARE_PAGES_WRANGLER_BIN = path.join(fake.binDir, "wrangler");
-    process.env.BNX_DEPLOYMENT_VAULT_FIXTURE_PATH = fixturePath;
+    process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH = fixturePath;
     try {
       const result = await submitCloudflarePagesControlPlaneDeploy({
         workspaceRoot: tmp,
@@ -115,7 +115,7 @@ test("cloudflare-pages deploy keeps secretspec-backed Vault values out of record
       delete process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT;
       delete process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_LOG;
       delete process.env.BNX_CLOUDFLARE_PAGES_WRANGLER_BIN;
-      delete process.env.BNX_DEPLOYMENT_VAULT_FIXTURE_PATH;
+      delete process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
       await server.close();
     }
   });
@@ -154,7 +154,7 @@ test("cloudflare-pages admission fails closed when a required secretspec contrac
     process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT = fake.publishRoot;
     process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_LOG = fake.logPath;
     process.env.BNX_CLOUDFLARE_PAGES_WRANGLER_BIN = path.join(fake.binDir, "wrangler");
-    process.env.BNX_DEPLOYMENT_VAULT_FIXTURE_PATH = fixturePath;
+    process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH = fixturePath;
     try {
       await assert.rejects(
         async () =>
@@ -173,7 +173,7 @@ test("cloudflare-pages admission fails closed when a required secretspec contrac
       delete process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT;
       delete process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_LOG;
       delete process.env.BNX_CLOUDFLARE_PAGES_WRANGLER_BIN;
-      delete process.env.BNX_DEPLOYMENT_VAULT_FIXTURE_PATH;
+      delete process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
     }
   });
 });

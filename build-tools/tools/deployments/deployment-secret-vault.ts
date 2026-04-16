@@ -20,6 +20,7 @@ import {
 import type { DeploymentRequirement } from "./deployment-requirements.ts";
 
 const DEPLOYMENT_VAULT_FIXTURE_SCHEMA = "deployment-vault-fixture@1";
+const DEPLOYMENT_SECRET_FIXTURE_PATH_ENV = "BNX_DEPLOYMENT_SECRET_FIXTURE_PATH";
 
 type DeploymentVaultFixtureEntry = {
   value: string;
@@ -42,14 +43,14 @@ type DeploymentVaultFixture = {
 };
 
 function fixturePath(): string {
-  return String(process.env.BNX_DEPLOYMENT_VAULT_FIXTURE_PATH || "").trim();
+  return String(process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV] || "").trim();
 }
 
 async function readFixture(): Promise<DeploymentVaultFixture> {
   const filePath = fixturePath();
   if (!filePath) {
     throw new Error(
-      "secret-consuming protected/shared runs require either BNX_DEPLOYMENT_VAULT_FIXTURE_PATH or VAULT_ADDR plus VAULT_TOKEN",
+      `secret-consuming protected/shared runs require either ${DEPLOYMENT_SECRET_FIXTURE_PATH_ENV} for the reviewed local/test fixture override or VAULT_ADDR plus VAULT_TOKEN for direct Vault runtime`,
     );
   }
   const parsed = JSON.parse(await fsp.readFile(filePath, "utf8")) as DeploymentVaultFixture;

@@ -7,9 +7,9 @@ Important current-repo reality:
 
 - the reviewed production runtime now reads Vault directly through
   `VAULT_ADDR` plus `VAULT_TOKEN`
-- the exported JSON fixture path through `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH`
+- the exported JSON fixture path through `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
   remains available only for reviewed local, test, and bootstrap-oriented
-  workflows
+  workflows, not as the normal production runtime mechanism
 - this runbook therefore covers both:
   - bootstrapping Vault itself for the direct runtime path
   - optionally exporting the reviewed runtime fixture for local/test workflows
@@ -20,8 +20,8 @@ Use this runbook when:
   first time
 - you are adding a new deployment secret contract and want Vault to be the
   source of truth
-- you are rotating or replacing a secret and need to regenerate the runtime
-  export used by the current deployment flows
+- you are rotating or replacing a secret and need to regenerate the optional
+  local/test runtime export used by a bootstrap or isolated test workflow
 
 ## What Success Looks Like
 
@@ -36,7 +36,7 @@ At the end of this runbook:
   `VAULT_ADDR` plus `VAULT_TOKEN`
 - when needed, a reviewed `deployment-vault-fixture@1` file can still be
   exported from Vault for local/test flows through
-  `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH`
+  `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
 
 ## Before You Start
 
@@ -138,11 +138,13 @@ The deployment system uses three layers:
    `secret://deployments/pleomino/cloudflare_api_token`
 2. Vault stores the real secret value and the metadata that says where it may be
    used
-3. the current runtime reads an exported fixture file that contains those same
+3. the reviewed production runtime reads Vault directly, while local/test
+   workflows can intentionally use an exported fixture file with the same
    contracts and metadata
 
 In other words: Vault is the long-lived source of truth, and the exported
-fixture is the current runtime handoff format.
+fixture is an optional override for local/test/bootstrap flows rather than the
+normal production runtime path.
 
 ## Recommended Path Convention
 
@@ -403,8 +405,8 @@ operator token.
 
 ## Step 10: Export The Runtime Fixture From Vault
 
-The current runtime expects a `deployment-vault-fixture@1` file keyed by
-contract ID.
+The reviewed fixture override path expects a `deployment-vault-fixture@1` file
+keyed by contract ID.
 
 Create the export directory and write the file:
 
@@ -444,10 +446,11 @@ Important handling rules:
 
 ## Step 11: Point The Deployment Runtime At The Export
 
-Set the environment variable expected by the current runtime:
+Set the optional fixture override env var only for local development, isolated
+tests, or explicit bootstrap-oriented workflows:
 
 ```bash
-export BNX_DEPLOYMENT_VAULT_FIXTURE_PATH="$PWD/.local/deploy-secrets/vault.json"
+export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/.local/deploy-secrets/vault.json"
 ```
 
 At this point, the runtime can resolve the same contract IDs that the
@@ -480,7 +483,8 @@ A healthy end-to-end result looks like this:
 - the durable deployment record stores
   `secret://deployments/pleomino/cloudflare_api_token`
   rather than the raw token value
-- the exported fixture file exists only where the deployment runtime needs it
+- the exported fixture file exists only where a reviewed local/test or
+  bootstrap workflow needs it
 
 ## Rotation And Ongoing Operations
 
@@ -488,7 +492,7 @@ When you rotate a secret:
 
 1. write a new version at the same Vault path
 2. regenerate the exported runtime fixture
-3. replace the file referenced by `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH`
+3. replace the file referenced by `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
 4. rerun the deployment or the next workflow that needs the updated secret
 
 Example rotation write:

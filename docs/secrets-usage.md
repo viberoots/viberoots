@@ -13,8 +13,8 @@ Use this guide when you want the shortest path to:
 - understand what `secretspec` means
 - know when a deployment should declare `secret_requirements`
 - resolve secrets at runtime through the current Vault-backed helpers
-- bootstrap Vault as the production source of truth and export the current
-  runtime fixture format
+- bootstrap Vault as the production source of truth and, when needed, export
+  the reviewed local/test runtime fixture format
 - find the right API reference or deeper design doc
 
 ## Reviewed Front Door
@@ -28,8 +28,8 @@ For day-to-day operator deployment flows, start with
 For secret-runtime integration and public helper signatures, open
 [Deployment And Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md).
 
-For production Vault bring-up and the current export bridge into
-`BNX_DEPLOYMENT_VAULT_FIXTURE_PATH`, open
+For production Vault bring-up and the optional local/test export bridge into
+`BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`, open
 [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md).
 
 ## Plain-Language Glossary
@@ -63,10 +63,11 @@ over time so old runs can still be understood:
 }
 ```
 
-For local development or tests, point the Vault helper at a fixture file:
+For local development, isolated tests, or an explicit bootstrap-oriented
+workflow, point the runtime at a reviewed fixture file:
 
 ```bash
-export BNX_DEPLOYMENT_VAULT_FIXTURE_PATH="$PWD/vault.json"
+export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/vault.json"
 ```
 
 Then use the runtime helper described in
@@ -182,19 +183,22 @@ Optional fields you may also see:
 
 ### Step 2: Set Up The Secret Backend
 
-For local development and tests, the shortest path is still the fixture-backed
-Vault backend shown below.
+For the reviewed production runtime path, use direct Vault through
+`VAULT_ADDR` plus `VAULT_TOKEN`.
 
-For production secret storage, use
+For local development, isolated tests, or explicit bootstrap-oriented
+workflows, use the fixture override shown below.
+
+For production secret storage and optional fixture export, use
 [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
 to bootstrap Vault as the source of truth and then export the runtime fixture
-that the current deployment code consumes.
+when one of those non-production workflows needs it.
 
 That means:
 
 - you create a file describing the available secrets
 - you point the runtime at that file with
-  `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH`
+  `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
 - the runtime resolves secrets from that file when the deployment step starts
 
 Create `vault.json`:
@@ -217,7 +221,7 @@ Create `vault.json`:
 Then point the deployment runtime at that file:
 
 ```bash
-export BNX_DEPLOYMENT_VAULT_FIXTURE_PATH="$PWD/vault.json"
+export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/vault.json"
 ```
 
 What this file does:
@@ -468,8 +472,8 @@ This repo now documents two distinct layers:
   [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
 - direct runtime Vault reads for the reviewed production path through
   `VAULT_ADDR` plus `VAULT_TOKEN`
-- the local/test fixture handoff consumed through
-  `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH`
+- the local/test fixture override consumed through
+  `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
 
 Records and replay snapshots now keep admitted non-secret secret references so
 retry and rollback can fetch the same Vault version exactly while still never
