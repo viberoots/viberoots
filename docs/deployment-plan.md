@@ -8785,6 +8785,208 @@ transitional caveat.
 36. PR-66: close the remaining secret-runtime end-state gap by replacing the production
     fixture-handoff model with direct Vault-backed runtime resolution and explicit admitted secret-
     reference replay semantics for retry, rollback, and promotion.
+37. PR-67: remove the remaining fixture-path front-door misnaming by replacing
+    `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH` with one neutral secret-fixture env var and by making the
+    reviewed operator/docs/test surface explicit that the fixture path is for local, test, and
+    bootstrap-oriented workflows rather than the normal production Vault path.
+38. PR-68: finish the fixture-surface naming cleanup by renaming the remaining fixture-only schema,
+    helper, and documentation language away from Vault-specific terminology where the code is
+    actually talking about a repo-owned secret fixture format rather than direct Vault access.
+
+## PR-67: Neutral fixture env var cutover + explicit fixture-vs-direct-Vault docs
+
+### Description
+
+I will remove the remaining front-door misnaming around the local/test fixture path by replacing
+`BNX_DEPLOYMENT_VAULT_FIXTURE_PATH` with one neutral secret-fixture env var and by tightening the
+operator-facing documentation so it is impossible to confuse the fixture override with the normal
+direct-Vault runtime path. This is a direct cutover for the env var name; no compatibility alias is
+needed for this repo.
+
+### Scope & Changes
+
+- Replace `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH` everywhere in reviewed runtime code, tests, helpers,
+  scripts, and docs with one neutral fixture env var such as
+  `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`.
+- Keep the runtime precedence explicit and reviewed:
+  - the fixture env var is an intentional local/test/bootstrap override
+  - direct Vault runtime resolution uses `VAULT_ADDR` plus `VAULT_TOKEN`
+  - the runtime must fail closed when neither path is configured for required secret-consuming
+    flows
+- Update the secret-runtime helper and backend wording so callers can tell at a glance when they
+  are configuring the fixture path versus the real Vault path.
+- Update operator-facing docs, examples, and front-door parity assertions so they clearly answer:
+  - when to use the fixture path
+  - when not to use the fixture path
+  - which path is the reviewed production/default path
+  - how fixture precedence interacts with direct Vault env vars
+- Keep `secretspec` unchanged as the stable repo-level secret contract/interface above both the
+  direct Vault path and the fixture override path.
+
+### Tests (in this PR)
+
+- Add or update deployment-domain tests proving the new neutral fixture env var is the only
+  reviewed fixture override path and that the old Vault-named env var is no longer accepted.
+- Add precedence tests proving the neutral fixture env var overrides direct Vault env vars only when
+  intentionally set, and that runs without either configuration fail closed.
+- Update docs/front-door parity tests so they fail if reviewed docs blur the boundary between the
+  fixture override path and the direct Vault production path.
+- Update representative provider secret-runtime tests so the renamed env var is exercised in the
+  local/test path and direct Vault coverage remains intact.
+
+### Docs (in this PR)
+
+- Update the deployment secrets API, secrets usage guide, and Vault bootstrap runbook so they use
+  the neutral fixture env var consistently and state plainly that:
+  - direct Vault is the reviewed production path
+  - the fixture env var is for local development, isolated tests, and explicit bootstrap-oriented
+    workflows
+  - operators should not treat the fixture override as the normal production runtime mechanism
+- Update any operator or troubleshooting docs that currently imply the fixture path is the normal
+  Vault runtime path.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - neutral fixture env var resolution
+  - fixture-versus-direct-Vault precedence
+  - fail-closed behavior when neither path is configured
+  - docs/front-door parity for the renamed env var and clarified workflow guidance
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to touch secret-runtime helpers, provider deployment tests, deployment-domain
+  docs, and front-door parity assertions because the env var name appears across reviewed runtime
+  and operator-facing surfaces.
+
+### Acceptance Criteria
+
+- The reviewed fixture override env var no longer contains `VAULT` in its name.
+- Direct Vault resolution remains the reviewed production/default path.
+- Reviewed docs and tests make it unambiguous when the fixture path should and should not be used.
+- `secretspec` remains the stable contract layer and is not conflated with either runtime transport
+  path.
+
+### Risks
+
+This is a broad naming cutover across runtime, tests, and docs, so the main risk is leaving one
+stale front-door surface behind and reintroducing confusion about whether the fixture path is part
+of the reviewed production contract.
+
+### Mitigation
+
+Do a direct repo-wide replacement, update the parity tests in the same PR, and make the reviewed
+docs state the direct-Vault-versus-fixture split in one explicit canonical wording.
+
+### Consequence of Not Implementing
+
+Operators and contributors would continue to see a Vault-named fixture env var that implies real
+Vault usage even when the code is actually reading a repo-owned local/test fixture file.
+
+### Downsides for Implementing
+
+This is a disruptive naming cutover for local harnesses and tests, so any stray references to the
+old env var will fail until they are updated together.
+
+### Recommendation
+
+Implement immediately after PR-66 so the newly landed direct-Vault runtime work does not leave a
+misleading fixture override name in the reviewed public surface.
+
+## PR-68: Neutral fixture schema/helper naming + fixture contract docs cleanup
+
+### Description
+
+I will finish the remaining fixture-surface naming cleanup by renaming the fixture-only schema,
+helper, and documentation language away from Vault-specific terminology wherever the code is
+actually talking about the repo-owned secret fixture format rather than direct Vault access. This
+keeps the real Vault backend naming only on the surfaces that actually talk to Vault.
+
+### Scope & Changes
+
+- Rename the fixture-specific schema and helper terminology to neutral secret-fixture language, for
+  example replacing `deployment-vault-fixture@1` and similarly scoped helper/type names with one
+  reviewed secret-fixture contract name.
+- Keep direct Vault code and naming intact where the backend actually performs Vault metadata/data
+  resolution through `VAULT_ADDR` and `VAULT_TOKEN`.
+- Audit reviewed docs and examples so they stop referring to the local/test fixture as if it were
+  itself a Vault runtime path.
+- Ensure the final reviewed terminology draws one explicit line between:
+  - `secretspec` as the contract layer
+  - admitted secret references as the replay/runtime reference layer
+  - the secret fixture as the local/test override format
+  - Vault as the initial production backend
+
+### Tests (in this PR)
+
+- Add or update fixture schema compatibility tests proving the reviewed secret-fixture schema name
+  and shape are used consistently across runtime helpers, local/test fixtures, and end-to-end
+  deployment-domain tests.
+- Update deployment-domain taxonomy/parity coverage so fixture wording drift is caught in the same
+  reviewed suites that guard the operator docs.
+- Add or tighten tests ensuring direct Vault paths still use Vault-specific naming and behavior
+  while fixture-only paths use neutral fixture naming.
+
+### Docs (in this PR)
+
+- Update the shared deployment/secrets docs and the Vault bootstrap runbook so fixture examples use
+  neutral secret-fixture terminology consistently.
+- Document the fixture format as a local/test/bootstrap contract rather than a production runtime
+  transport, and keep the direct Vault path described separately and explicitly.
+- Add or tighten one canonical explanation of how `secretspec`, admitted secret references, direct
+  Vault access, and the secret fixture each relate without overlapping names.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - fixture schema/helper naming parity
+  - direct-Vault-versus-fixture terminology boundaries
+  - operator/docs parity for the final reviewed secret-runtime vocabulary
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to touch fixture schema/constants, fixture-oriented tests, and deployment
+  docs because the cleanup is intentionally about the remaining reviewed naming surface rather than
+  runtime behavior changes.
+
+### Acceptance Criteria
+
+- Fixture-only schema and helper names no longer imply that the local/test fixture is itself a
+  direct Vault runtime path.
+- Direct Vault naming remains only on code/docs that actually speak to Vault.
+- Reviewed documentation uses one coherent vocabulary for `secretspec`, admitted secret references,
+  direct Vault, and the secret fixture.
+
+### Risks
+
+The main risk is partial renaming that leaves mixed terminology and makes the final secret-runtime
+surface harder to reason about than either the old or new wording alone.
+
+### Mitigation
+
+Keep the scope limited to fixture-only names, preserve direct Vault names where they are
+semantically correct, and update the docs/tests in the same PR so the final vocabulary is
+internally consistent.
+
+### Consequence of Not Implementing
+
+Even after the env-var cutover, the repo would still carry fixture-specific Vault wording in schema
+names and examples that can continue to blur the distinction between the fixture override and the
+real Vault backend.
+
+### Downsides for Implementing
+
+This is mostly a naming/documentation cleanup slice, so it adds churn across tests and docs without
+materially changing the deployed runtime behavior.
+
+### Recommendation
+
+Implement immediately after PR-67 so the direct-Vault closeout is followed by one short, coherent
+cleanup pass that leaves the reviewed secret-runtime vocabulary in its final state.
 
 ## Companion Docs
 

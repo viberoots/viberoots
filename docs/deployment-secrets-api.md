@@ -688,8 +688,16 @@ the source of truth when populating `targetScopes`.
 
 ### Vault Fixture Example
 
-Local and test flows use `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH` to point at the
-fixture file read by `createDeploymentVaultSecretBackend()`:
+Normal production-style runs point `createDeploymentVaultSecretBackend()` at
+Vault directly:
+
+```bash
+export VAULT_ADDR='https://vault.example.net:8200'
+export VAULT_TOKEN='replace-with-short-lived-vault-token'
+```
+
+Local and test flows can still use `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH` to point
+at the reviewed fixture file:
 
 ```bash
 export BNX_DEPLOYMENT_VAULT_FIXTURE_PATH="$PWD/vault.json"
@@ -697,8 +705,8 @@ export BNX_DEPLOYMENT_VAULT_FIXTURE_PATH="$PWD/vault.json"
 
 Production operators should also read
 [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md).
-That runbook bootstraps Vault as the source of truth and then exports this
-fixture format for the current runtime.
+That runbook bootstraps Vault as the source of truth for the direct runtime
+path and also shows how to export this fixture format for local/test workflows.
 
 Example fixture:
 
@@ -796,6 +804,8 @@ Copyable example:
 The runtime contract is intentionally narrow:
 
 - `enterStep(step)` resolves only the secrets needed for that lifecycle step
+- initial admission freezes `admittedSecretReferences` with the exact non-secret
+  Vault selector information needed for replay-safe runtime fetches
 - required contracts fail when missing, revoked, expired, or no longer
   refreshable
 - routine flows cannot consume `break_glass` credentials

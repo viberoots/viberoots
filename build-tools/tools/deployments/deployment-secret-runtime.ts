@@ -3,7 +3,7 @@ import type { NixosSharedHostMutationAuthority } from "./nixos-shared-host-contr
 import {
   deploymentSecretBindingsForStep,
   deploymentSecretContractBindings,
-  type DeploymentSecretContractBinding,
+  type DeploymentSecretReference,
 } from "./deployment-secretspec.ts";
 import type {
   DeploymentRequirement,
@@ -11,7 +11,7 @@ import type {
 } from "./deployment-requirements.ts";
 
 export type DeploymentSecretMaterial = {
-  binding: DeploymentSecretContractBinding;
+  binding: DeploymentSecretReference;
   value: string;
   allowedSteps: DeploymentRequirementStep[];
   targetScopes: string[];
@@ -29,7 +29,8 @@ export type DeploymentSecretBackend = {
 type DeploymentSecretRuntimeOpts = {
   authority?: NixosSharedHostMutationAuthority | { kind?: string };
   backend: DeploymentSecretBackend;
-  requirements: DeploymentRequirement[];
+  requirements?: DeploymentRequirement[];
+  admittedReferences?: DeploymentSecretReference[];
   targetScope: string;
   now?: () => Date;
 };
@@ -75,7 +76,10 @@ async function refreshSecret(
 }
 
 export function createDeploymentSecretRuntime(opts: DeploymentSecretRuntimeOpts) {
-  const bindings = deploymentSecretContractBindings(opts.requirements);
+  const bindings =
+    opts.admittedReferences && opts.admittedReferences.length > 0
+      ? opts.admittedReferences
+      : deploymentSecretContractBindings(opts.requirements || []);
   const cached = new Map<string, DeploymentSecretMaterial>();
   const now = opts.now || (() => new Date());
   const mode = authorityMode(opts.authority);

@@ -3,6 +3,11 @@ import type { AppStoreConnectDeployment } from "./contract.ts";
 import { requiredDeploymentStageBranch } from "./contract.ts";
 import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence.ts";
 import type { DeploymentRequirement } from "./deployment-requirements.ts";
+import {
+  resolveInitialAdmittedSecretReferences,
+  resolveSourceRunAdmittedSecretReferences,
+} from "./deployment-secret-admission.ts";
+import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec.ts";
 
 type AppStoreConnectSourceAdmission = {
   mode: "stage_branch_head" | "source_run_reuse" | "promotion_source_run";
@@ -21,9 +26,10 @@ export type AppStoreConnectAdmittedContext = {
   admissionPolicyFingerprint: string;
   environmentStage: string;
   secretRequirements: DeploymentRequirement[];
+  admittedSecretReferences: DeploymentSecretAdmittedReference[];
   runtimeConfigRequirements: DeploymentRequirement[];
   referenceResolutionPolicy: {
-    secrets: "exact_contract_ids";
+    secrets: "exact_admitted_references";
     runtimeConfig: "exact_contract_ids";
   };
   targetExceptionRefs: string[];
@@ -61,7 +67,14 @@ async function targetEnvironment(workspaceRoot: string, deployment: AppStoreConn
   };
 }
 
-function baseContext(deployment: AppStoreConnectDeployment) {
+async function baseContext(
+  deployment: AppStoreConnectDeployment,
+  targetScope: string,
+  sourceAdmittedContext?: {
+    secretRequirements?: DeploymentRequirement[];
+    admittedSecretReferences?: unknown[];
+  },
+) {
   return {
     lanePolicyRef: deployment.lanePolicyRef,
     lanePolicyFingerprint: deployment.lanePolicy.fingerprint,
@@ -69,9 +82,19 @@ function baseContext(deployment: AppStoreConnectDeployment) {
     admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
     environmentStage: deployment.environmentStage,
     secretRequirements: deployment.secretRequirements,
+    admittedSecretReferences: sourceAdmittedContext
+      ? await resolveSourceRunAdmittedSecretReferences({
+          sourceAdmittedContext: sourceAdmittedContext as any,
+          requirements: deployment.secretRequirements,
+          targetScope,
+        })
+      : await resolveInitialAdmittedSecretReferences({
+          requirements: deployment.secretRequirements,
+          targetScope,
+        }),
     runtimeConfigRequirements: deployment.runtimeConfigRequirements,
     referenceResolutionPolicy: {
-      secrets: "exact_contract_ids" as const,
+      secrets: "exact_admitted_references" as const,
       runtimeConfig: "exact_contract_ids" as const,
     },
     targetExceptionRefs: deployment.targetExceptions.map((entry) => entry.ref).sort(),
@@ -87,7 +110,11 @@ async function admittedContextFor(opts: {
 }): Promise<AppStoreConnectAdmittedContext> {
   const target = await targetEnvironment(opts.workspaceRoot, opts.deployment);
   return {
-    ...baseContext(opts.deployment),
+    ...(await baseContext(
+      opts.deployment,
+      target.lockScope,
+      opts.mode === "source_run_reuse" ? opts.sourceRecord?.admittedContext : undefined,
+    )),
     source: {
       mode: opts.mode,
       sourceRef: opts.sourceRecord?.admittedContext?.source?.sourceRef || target.targetRef,

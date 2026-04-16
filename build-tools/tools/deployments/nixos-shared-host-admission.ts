@@ -1,13 +1,22 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostDeployment } from "./contract.ts";
-import { requiredDeploymentStageBranch } from "./contract.ts";
 import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence.ts";
+import {
+  resolveInitialAdmittedSecretReferences,
+  resolveSourceRunAdmittedSecretReferences,
+} from "./deployment-secret-admission.ts";
 import {
   requirementSummary,
   sameRequirementSet,
   type DeploymentRequirement,
 } from "./deployment-requirements.ts";
-import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
+import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec.ts";
+import {
+  gitIsAncestor,
+  replayMismatch,
+  targetEnvironmentAdmission,
+  type NixosSharedHostTargetEnvironmentAdmission,
+} from "./nixos-shared-host-admission-helpers.ts";
 import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
 import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
 
@@ -21,14 +30,6 @@ export type NixosSharedHostSourceAdmission = {
   sourceDeploymentId?: string;
 };
 
-export type NixosSharedHostTargetEnvironmentAdmission = {
-  mode: "stage_branch_snapshot";
-  targetRef: string;
-  targetRevision: string;
-  providerTargetIdentity: string;
-  lockScope: string;
-};
-
 export type NixosSharedHostAdmittedContext = {
   lanePolicyRef: string;
   lanePolicyFingerprint: string;
@@ -36,9 +37,10 @@ export type NixosSharedHostAdmittedContext = {
   admissionPolicyFingerprint: string;
   environmentStage: string;
   secretRequirements: DeploymentRequirement[];
+  admittedSecretReferences: DeploymentSecretAdmittedReference[];
   runtimeConfigRequirements: DeploymentRequirement[];
   referenceResolutionPolicy: {
-    secrets: "exact_contract_ids";
+    secrets: "exact_admitted_references";
     runtimeConfig: "exact_contract_ids";
   };
   targetExceptionRefs: string[];
@@ -47,17 +49,14 @@ export type NixosSharedHostAdmittedContext = {
   targetEnvironment: NixosSharedHostTargetEnvironmentAdmission;
 };
 
-function requiredPolicyRef(deployment: NixosSharedHostDeployment): string {
-  const sourceRef = requiredDeploymentStageBranch(deployment);
-  if (!deployment.admissionPolicy.allowedRefs.includes(sourceRef)) {
-    throw new Error(
-      `deployment admission policy ${deployment.admissionPolicyRef} does not allow source ref ${sourceRef}`,
-    );
-  }
-  return sourceRef;
-}
-
-function baseContext(deployment: NixosSharedHostDeployment) {
+async function baseContext(
+  deployment: NixosSharedHostDeployment,
+  targetScope: string,
+  sourceAdmittedContext?: {
+    secretRequirements?: DeploymentRequirement[];
+    admittedSecretReferences?: unknown[];
+  },
+) {
   return {
     lanePolicyRef: deployment.lanePolicyRef,
     lanePolicyFingerprint: deployment.lanePolicy.fingerprint,
@@ -65,52 +64,23 @@ function baseContext(deployment: NixosSharedHostDeployment) {
     admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
     environmentStage: deployment.environmentStage,
     secretRequirements: deployment.secretRequirements,
+    admittedSecretReferences: sourceAdmittedContext
+      ? await resolveSourceRunAdmittedSecretReferences({
+          sourceAdmittedContext: sourceAdmittedContext as any,
+          requirements: deployment.secretRequirements,
+          targetScope,
+        })
+      : await resolveInitialAdmittedSecretReferences({
+          requirements: deployment.secretRequirements,
+          targetScope,
+        }),
     runtimeConfigRequirements: deployment.runtimeConfigRequirements,
     referenceResolutionPolicy: {
-      secrets: "exact_contract_ids" as const,
+      secrets: "exact_admitted_references" as const,
       runtimeConfig: "exact_contract_ids" as const,
     },
     targetExceptionRefs: deployment.targetExceptions.map((exception) => exception.ref).sort(),
   };
-}
-
-async function gitStdout(workspaceRoot: string, args: string[]): Promise<string> {
-  const out = await $({ cwd: workspaceRoot, stdio: "pipe" })`git ${args}`.nothrow();
-  if ((out as any).exitCode !== 0) {
-    throw new Error(`git ${args.join(" ")} failed in ${workspaceRoot}`);
-  }
-  return String((out as any).stdout || "").trim();
-}
-
-async function gitIsAncestor(
-  workspaceRoot: string,
-  ancestorRevision: string,
-  descendantRevision: string,
-): Promise<boolean> {
-  const out = await $({
-    cwd: workspaceRoot,
-    stdio: "pipe",
-  })`git merge-base --is-ancestor ${ancestorRevision} ${descendantRevision}`.nothrow();
-  return (out as any).exitCode === 0;
-}
-
-async function targetEnvironmentAdmission(
-  workspaceRoot: string,
-  deployment: NixosSharedHostDeployment,
-): Promise<NixosSharedHostTargetEnvironmentAdmission> {
-  const targetRef = requiredPolicyRef(deployment);
-  const targetRevision = await gitStdout(workspaceRoot, ["rev-parse", targetRef]);
-  return {
-    mode: "stage_branch_snapshot",
-    targetRef,
-    targetRevision,
-    providerTargetIdentity: nixosSharedHostDeploymentTargetIdentity(deployment),
-    lockScope: nixosSharedHostDeploymentTargetIdentity(deployment),
-  };
-}
-
-function replayMismatch(field: string, current: string, source: string): string {
-  return `${field} mismatch: current=${current} source=${source}`;
 }
 
 export async function resolveInitialNixosSharedHostAdmittedContext(opts: {
@@ -120,7 +90,7 @@ export async function resolveInitialNixosSharedHostAdmittedContext(opts: {
 }): Promise<NixosSharedHostAdmittedContext> {
   const target = await targetEnvironmentAdmission(opts.workspaceRoot, opts.deployment);
   return {
-    ...baseContext(opts.deployment),
+    ...(await baseContext(opts.deployment, target.lockScope)),
     source: {
       mode: "stage_branch_head",
       sourceRef: target.targetRef,
@@ -205,7 +175,11 @@ source revision ${source.source.sourceRevision} is not reachable from ${target.t
     );
   }
   return {
-    ...baseContext(opts.deployment),
+    ...(await baseContext(
+      opts.deployment,
+      target.lockScope,
+      opts.sourceReplaySnapshot.admittedContext,
+    )),
     source: {
       ...source.source,
       mode: "source_run_reuse",
@@ -224,7 +198,7 @@ export async function resolvePromotionNixosSharedHostAdmittedContext(opts: {
 }): Promise<NixosSharedHostAdmittedContext> {
   const target = await targetEnvironmentAdmission(opts.workspaceRoot, opts.deployment);
   return {
-    ...baseContext(opts.deployment),
+    ...(await baseContext(opts.deployment, target.lockScope)),
     source: {
       mode: "promotion_source_run",
       sourceRef: target.targetRef,

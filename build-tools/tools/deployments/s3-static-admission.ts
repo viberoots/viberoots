@@ -3,6 +3,11 @@ import type { S3StaticDeployment } from "./contract.ts";
 import { requiredDeploymentStageBranch } from "./contract.ts";
 import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence.ts";
 import type { DeploymentRequirement } from "./deployment-requirements.ts";
+import {
+  resolveInitialAdmittedSecretReferences,
+  resolveSourceRunAdmittedSecretReferences,
+} from "./deployment-secret-admission.ts";
+import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec.ts";
 
 export type S3StaticAdmittedContext = {
   lanePolicyRef: string;
@@ -11,9 +16,10 @@ export type S3StaticAdmittedContext = {
   admissionPolicyFingerprint: string;
   environmentStage: string;
   secretRequirements: DeploymentRequirement[];
+  admittedSecretReferences: DeploymentSecretAdmittedReference[];
   runtimeConfigRequirements: DeploymentRequirement[];
   referenceResolutionPolicy: {
-    secrets: "exact_contract_ids";
+    secrets: "exact_admitted_references";
     runtimeConfig: "exact_contract_ids";
   };
   targetExceptionRefs: string[];
@@ -61,9 +67,13 @@ export async function resolveInitialS3StaticAdmittedContext(opts: {
     admissionPolicyFingerprint: opts.deployment.admissionPolicy.fingerprint,
     environmentStage: opts.deployment.environmentStage,
     secretRequirements: opts.deployment.secretRequirements,
+    admittedSecretReferences: await resolveInitialAdmittedSecretReferences({
+      requirements: opts.deployment.secretRequirements,
+      targetScope: opts.deployment.providerTarget.providerTargetIdentity,
+    }),
     runtimeConfigRequirements: opts.deployment.runtimeConfigRequirements,
     referenceResolutionPolicy: {
-      secrets: "exact_contract_ids",
+      secrets: "exact_admitted_references",
       runtimeConfig: "exact_contract_ids",
     },
     targetExceptionRefs: opts.deployment.targetExceptions.map((entry) => entry.ref).sort(),
@@ -126,6 +136,11 @@ export async function resolveSourceRunS3StaticAdmittedContext(opts: {
   const admitted = await resolveInitialS3StaticAdmittedContext(opts);
   return {
     ...admitted,
+    admittedSecretReferences: await resolveSourceRunAdmittedSecretReferences({
+      sourceAdmittedContext: opts.sourceRecord.admittedContext,
+      requirements: opts.deployment.secretRequirements,
+      targetScope: admitted.targetEnvironment.lockScope,
+    }),
     source: {
       mode: "stage_branch_head",
       sourceRef: opts.sourceRecord.admittedContext?.source?.sourceRef || admitted.source.sourceRef,

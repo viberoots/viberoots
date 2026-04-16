@@ -466,11 +466,14 @@ This repo now documents two distinct layers:
 
 - Vault as the long-lived production source of truth in
   [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
-- the current runtime handoff file consumed through
+- direct runtime Vault reads for the reviewed production path through
+  `VAULT_ADDR` plus `VAULT_TOKEN`
+- the local/test fixture handoff consumed through
   `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH`
 
-The current deployment runtime still reads the exported fixture file rather than
-talking to Vault directly.
+Records and replay snapshots now keep admitted non-secret secret references so
+retry and rollback can fetch the same Vault version exactly while still never
+persisting secret values.
 
 ## When To Open Which Doc
 
@@ -480,7 +483,7 @@ signatures.
 
 Open [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
 when you are setting up Vault itself, creating AppRole access, writing secrets,
-or regenerating the runtime export from Vault.
+or generating the optional local/test runtime export from Vault.
 
 Open [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
 when you need the architectural rationale behind `secretspec`, replay

@@ -171,7 +171,10 @@ test("deployment design and scenario docs stay aligned with the reviewed front d
     /DeploymentSecretContractBinding/,
     /createDeploymentSecretRuntime\(\)/,
     /createVaultDeploymentSecretRuntime\(\)/,
+    /VAULT_ADDR/,
+    /VAULT_TOKEN/,
     /BNX_DEPLOYMENT_VAULT_FIXTURE_PATH/,
+    /admittedSecretReferences/,
     /admittedContext\.targetEnvironment\.lockScope/,
     /providerTargetIdentity/,
     /--print-target-identity/,
@@ -183,7 +186,9 @@ test("deployment design and scenario docs stay aligned with the reviewed front d
     assert.match(apiDoc, fragment, `deployment and secrets API doc must cover ${String(fragment)}`);
   }
   for (const fragment of [
-    /current deployment runtime does not read Vault directly/i,
+    /reviewed production runtime now reads Vault directly/i,
+    /VAULT_ADDR/,
+    /VAULT_TOKEN/,
     /BNX_DEPLOYMENT_VAULT_FIXTURE_PATH/,
     /targetScopes/,
     /lockScope/,

@@ -121,7 +121,7 @@ test("cloudflare-pages deploy keeps secretspec-backed Vault values out of record
   });
 });
 
-test("cloudflare-pages deploy fails closed when a required secretspec contract is missing", async () => {
+test("cloudflare-pages admission fails closed when a required secretspec contract is missing", async () => {
   await runInTemp("cloudflare-pages-secretspec-missing", async (tmp, $) => {
     const deployment = cloudflarePagesDeploymentFixture({
       secretRequirements: [
@@ -167,12 +167,7 @@ test("cloudflare-pages deploy fails closed when a required secretspec contract i
           }),
         /required secret contract secret:\/\/deployments\/pleomino\/cloudflare_api_token is missing/,
       );
-      const runFiles = await fsp.readdir(path.join(recordsRoot, "runs"));
-      const record = JSON.parse(
-        await fsp.readFile(path.join(recordsRoot, "runs", runFiles[0] || ""), "utf8"),
-      );
-      assert.equal(record.finalOutcome, "publish_failed");
-      assert.equal(record.failedStep, "publish");
+      await assert.rejects(async () => await fsp.readdir(path.join(recordsRoot, "runs")));
     } finally {
       process.env.PATH = originalEnv.PATH || "";
       delete process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT;

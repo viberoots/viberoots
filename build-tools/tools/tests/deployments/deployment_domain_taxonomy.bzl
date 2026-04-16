@@ -27,6 +27,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-control-plane.restore.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.retention.policy.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-secret-runtime.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-secret-vault.test.ts": True,
     "build-tools/tools/tests/deployments/deploy.front-door.contract.test.ts": True,
     "build-tools/tools/tests/deployments/deploy.front-door.control-plane-operator.contract.test.ts": True,
     "build-tools/tools/tests/deployments/deploy.front-door.provider-target-identity.contract.test.ts": True,
@@ -63,6 +64,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/cloudflare-pages.rollback.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.rollback.guardrails.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.secretspec.e2e.test.ts": True,
+    "build-tools/tools/tests/deployments/cloudflare-pages.vault-direct.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.target-transition.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.validation.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.contract.test.ts": True,
@@ -144,4 +146,5 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/nixos-shared-host.rollback.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.reuse.rollback-guardrails.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.validation.test.ts": True,
+    "build-tools/tools/tests/deployments/vault.test-server.ts": False,
 }

@@ -5,6 +5,8 @@ import type {
 } from "./deployment-requirements.ts";
 
 export type DeploymentSecretBackendKind = "vault";
+export type DeploymentSecretRefreshMode = "renew" | "reacquire" | "none";
+export type DeploymentSecretCredentialClass = "routine" | "break_glass";
 
 export type DeploymentSecretContractBinding = {
   name: string;
@@ -14,6 +16,20 @@ export type DeploymentSecretContractBinding = {
   backend: DeploymentSecretBackendKind;
   referenceId: string;
 };
+
+export type DeploymentSecretAdmittedReference = DeploymentSecretContractBinding & {
+  targetScope: string;
+  backendRef: string;
+  selectorRef: string;
+  resolvedAt: string;
+  resolvedVersion?: string;
+  refreshMode: DeploymentSecretRefreshMode;
+  credentialClass: DeploymentSecretCredentialClass;
+};
+
+export type DeploymentSecretReference =
+  | DeploymentSecretContractBinding
+  | DeploymentSecretAdmittedReference;
 
 export function deploymentSecretContractBindings(
   requirements: DeploymentRequirement[],
@@ -30,8 +46,14 @@ export function deploymentSecretContractBindings(
 }
 
 export function deploymentSecretBindingsForStep(
-  bindings: DeploymentSecretContractBinding[],
+  bindings: DeploymentSecretReference[],
   step: DeploymentRequirementStep,
-): DeploymentSecretContractBinding[] {
+): DeploymentSecretReference[] {
   return bindings.filter((binding) => binding.step === step);
+}
+
+export function isDeploymentSecretAdmittedReference(
+  reference: DeploymentSecretReference,
+): reference is DeploymentSecretAdmittedReference {
+  return "backendRef" in reference && "selectorRef" in reference;
 }

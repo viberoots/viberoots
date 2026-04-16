@@ -5,12 +5,14 @@ deployment secrets.
 
 Important current-repo reality:
 
-- the current deployment runtime does not read Vault directly
-- the runtime still reads an exported JSON file through
-  `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH`
+- the reviewed production runtime now reads Vault directly through
+  `VAULT_ADDR` plus `VAULT_TOKEN`
+- the exported JSON fixture path through `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH`
+  remains available only for reviewed local, test, and bootstrap-oriented
+  workflows
 - this runbook therefore covers both:
-  - bootstrapping Vault itself
-  - exporting the reviewed runtime fixture from Vault
+  - bootstrapping Vault itself for the direct runtime path
+  - optionally exporting the reviewed runtime fixture for local/test workflows
 
 Use this runbook when:
 
@@ -30,8 +32,10 @@ At the end of this runbook:
 - an AppRole-based machine identity can read only the reviewed deployment
   secret paths it needs
 - deployment secrets are stored in Vault using a predictable path convention
-- a reviewed `deployment-vault-fixture@1` file is exported from Vault
-- the deployment runtime reads that export through
+- the reviewed production runtime can read those secrets directly with
+  `VAULT_ADDR` plus `VAULT_TOKEN`
+- when needed, a reviewed `deployment-vault-fixture@1` file can still be
+  exported from Vault for local/test flows through
   `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH`
 
 ## Before You Start
@@ -53,7 +57,7 @@ Example values used in this runbook:
   `secret://deployments/pleomino/cloudflare_api_token`
 - deployment target scope:
   `cloudflare-pages:web-platform-staging/pleomino-staging-pages`
-- exported runtime fixture path:
+- optional exported runtime fixture path:
   `.local/deploy-secrets/vault.json`
 
 ## How To Choose `targetScopes`

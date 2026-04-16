@@ -3,6 +3,11 @@ import type { CloudflarePagesDeployment } from "./contract.ts";
 import { requiredDeploymentStageBranch } from "./contract.ts";
 import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence.ts";
 import type { DeploymentRequirement } from "./deployment-requirements.ts";
+import {
+  resolveInitialAdmittedSecretReferences,
+  resolveSourceRunAdmittedSecretReferences,
+} from "./deployment-secret-admission.ts";
+import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec.ts";
 
 export type CloudflarePagesSourceAdmission = {
   mode: "stage_branch_head" | "source_run_reuse" | "promotion_source_run";
@@ -29,9 +34,10 @@ export type CloudflarePagesAdmittedContext = {
   admissionPolicyFingerprint: string;
   environmentStage: string;
   secretRequirements: DeploymentRequirement[];
+  admittedSecretReferences: DeploymentSecretAdmittedReference[];
   runtimeConfigRequirements: DeploymentRequirement[];
   referenceResolutionPolicy: {
-    secrets: "exact_contract_ids";
+    secrets: "exact_admitted_references";
     runtimeConfig: "exact_contract_ids";
   };
   targetExceptionRefs: string[];
@@ -50,7 +56,14 @@ function requiredPolicyRef(deployment: CloudflarePagesDeployment): string {
   return sourceRef;
 }
 
-function baseContext(deployment: CloudflarePagesDeployment) {
+async function baseContext(
+  deployment: CloudflarePagesDeployment,
+  targetScope: string,
+  sourceAdmittedContext?: {
+    secretRequirements?: DeploymentRequirement[];
+    admittedSecretReferences?: unknown[];
+  },
+) {
   return {
     lanePolicyRef: deployment.lanePolicyRef,
     lanePolicyFingerprint: deployment.lanePolicy.fingerprint,
@@ -58,9 +71,19 @@ function baseContext(deployment: CloudflarePagesDeployment) {
     admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
     environmentStage: deployment.environmentStage,
     secretRequirements: deployment.secretRequirements,
+    admittedSecretReferences: sourceAdmittedContext
+      ? await resolveSourceRunAdmittedSecretReferences({
+          sourceAdmittedContext: sourceAdmittedContext as any,
+          requirements: deployment.secretRequirements,
+          targetScope,
+        })
+      : await resolveInitialAdmittedSecretReferences({
+          requirements: deployment.secretRequirements,
+          targetScope,
+        }),
     runtimeConfigRequirements: deployment.runtimeConfigRequirements,
     referenceResolutionPolicy: {
-      secrets: "exact_contract_ids" as const,
+      secrets: "exact_admitted_references" as const,
       runtimeConfig: "exact_contract_ids" as const,
     },
     targetExceptionRefs: deployment.targetExceptions.map((exception) => exception.ref).sort(),
@@ -97,7 +120,7 @@ export async function resolveInitialCloudflarePagesAdmittedContext(opts: {
 }): Promise<CloudflarePagesAdmittedContext> {
   const target = await targetEnvironmentAdmission(opts.workspaceRoot, opts.deployment);
   return {
-    ...baseContext(opts.deployment),
+    ...(await baseContext(opts.deployment, target.lockScope)),
     source: {
       mode: "stage_branch_head",
       sourceRef: target.targetRef,
@@ -117,7 +140,7 @@ export async function resolvePromotionCloudflarePagesAdmittedContext(opts: {
 }): Promise<CloudflarePagesAdmittedContext> {
   const target = await targetEnvironmentAdmission(opts.workspaceRoot, opts.deployment);
   return {
-    ...baseContext(opts.deployment),
+    ...(await baseContext(opts.deployment, target.lockScope)),
     source: {
       mode: "promotion_source_run",
       sourceRef: target.targetRef,
@@ -148,7 +171,7 @@ export async function resolveSourceRunCloudflarePagesAdmittedContext(opts: {
 }): Promise<CloudflarePagesAdmittedContext> {
   const target = await targetEnvironmentAdmission(opts.workspaceRoot, opts.deployment);
   return {
-    ...baseContext(opts.deployment),
+    ...(await baseContext(opts.deployment, target.lockScope, opts.sourceRecord.admittedContext)),
     source: {
       mode: "source_run_reuse",
       sourceRef: opts.sourceRecord.admittedContext?.source?.sourceRef || target.targetRef,
