@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-export type ReviewedRuntimeEvidenceProvider = "s3-static" | "kubernetes";
+export type ReviewedRuntimeContractProvider = "s3-static" | "kubernetes";
 
 export type CapabilitySection =
   | "retryIdempotency"
@@ -13,8 +13,8 @@ type ImmutableReuseGuarantee =
   | "retained-artifact-unavailable-fails-closed"
   | "recorded-release-inputs-preserved";
 
-export type ReviewedRuntimeEvidence = {
-  provider: ReviewedRuntimeEvidenceProvider;
+export type ReviewedRuntimeContract = {
+  provider: ReviewedRuntimeContractProvider;
   protectedSharedRequiresControlPlane: true;
   sameDeploymentPublishOnlyClassification: "retry";
   rollbackClassification: "rollback";
@@ -24,7 +24,7 @@ export type ReviewedRuntimeEvidence = {
   immutableReuseGuarantee: ImmutableReuseGuarantee;
 };
 
-const REVIEWED_RUNTIME_EVIDENCE: Record<ReviewedRuntimeEvidenceProvider, ReviewedRuntimeEvidence> =
+const REVIEWED_RUNTIME_CONTRACTS: Record<ReviewedRuntimeContractProvider, ReviewedRuntimeContract> =
   {
     "s3-static": {
       provider: "s3-static",
@@ -66,26 +66,25 @@ function immutableReuseText(guarantee: ImmutableReuseGuarantee): string {
     : "retry and rollback preserve the recorded release values fingerprint and per-component publish inputs instead of re-resolving ambient workspace state";
 }
 
-export function reviewedRuntimeEvidenceFor(
-  provider: ReviewedRuntimeEvidenceProvider,
-): ReviewedRuntimeEvidence {
-  return REVIEWED_RUNTIME_EVIDENCE[provider];
+export function reviewedRuntimeContractFor(
+  provider: ReviewedRuntimeContractProvider,
+): ReviewedRuntimeContract {
+  return REVIEWED_RUNTIME_CONTRACTS[provider];
 }
 
-export function reviewedRuntimeParityExpectations(
-  provider: ReviewedRuntimeEvidenceProvider,
+export function reviewedRuntimeParityExpectationsFromContract(
+  contract: ReviewedRuntimeContract,
 ): Partial<Record<CapabilitySection, string[]>> {
-  const evidence = reviewedRuntimeEvidenceFor(provider);
   return {
     retryIdempotency: [
-      retryReuseText(evidence.exactReuseSurface),
+      retryReuseText(contract.exactReuseSurface),
       "same-deployment `--publish-only` is reviewed as `retry`",
-      rollbackIdentityText(evidence.rollbackIdentityScope),
+      rollbackIdentityText(contract.rollbackIdentityScope),
     ],
     immutableReuseOperatorFlows: [
       "same-deployment rollback requires both `--publish-only` and `--rollback`",
       "rollback source selection is limited to prior successful normal live-target runs for the same deployment",
-      immutableReuseText(evidence.immutableReuseGuarantee),
+      immutableReuseText(contract.immutableReuseGuarantee),
     ],
     provisionerSupport: [
       "`--provision-only` is reviewed for protected/shared deployments through the control-plane service when the deployment declares one reviewed built-in provisioner",
@@ -94,4 +93,10 @@ export function reviewedRuntimeParityExpectations(
       "protected/shared mutation, exact-artifact retry or rollback reuse, and reviewed `--provision-only` execution must route through the reviewed control-plane service / worker front door",
     ],
   };
+}
+
+export function reviewedRuntimeParityExpectationsFor(
+  provider: ReviewedRuntimeContractProvider,
+): Partial<Record<CapabilitySection, string[]>> {
+  return reviewedRuntimeParityExpectationsFromContract(reviewedRuntimeContractFor(provider));
 }

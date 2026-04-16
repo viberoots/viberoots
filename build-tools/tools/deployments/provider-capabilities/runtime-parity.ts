@@ -1,10 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentProviderCapability, ProviderCapabilityBullet } from "./types.ts";
 import {
-  reviewedRuntimeParityExpectations,
+  reviewedRuntimeContractFor,
+  reviewedRuntimeParityExpectationsFromContract,
   type CapabilitySection,
-  type ReviewedRuntimeEvidenceProvider,
-} from "./runtime-evidence.ts";
+  type ReviewedRuntimeContract,
+  type ReviewedRuntimeContractProvider,
+} from "./runtime-contract.ts";
 
 function flattenBulletTexts(bullets: ProviderCapabilityBullet[] | undefined): string[] {
   return (bullets || []).flatMap((entry) => [
@@ -30,11 +32,19 @@ function sectionTexts(
 }
 
 export function validateReviewedRuntimeParity(opts: {
-  provider: ReviewedRuntimeEvidenceProvider;
+  provider: ReviewedRuntimeContractProvider;
   capability: DeploymentProviderCapability;
+  runtimeContract?: ReviewedRuntimeContract;
 }): string[] {
+  if (opts.runtimeContract && opts.runtimeContract.provider !== opts.provider) {
+    throw new Error(
+      `runtime contract provider mismatch: expected ${opts.provider}, got ${opts.runtimeContract.provider}`,
+    );
+  }
   const errors: string[] = [];
-  const expectedBySection = reviewedRuntimeParityExpectations(opts.provider);
+  const expectedBySection = reviewedRuntimeParityExpectationsFromContract(
+    opts.runtimeContract || reviewedRuntimeContractFor(opts.provider),
+  );
   for (const [section, expectedTexts] of Object.entries(expectedBySection) as Array<
     [CapabilitySection, string[]]
   >) {
@@ -51,8 +61,9 @@ export function validateReviewedRuntimeParity(opts: {
 }
 
 export function assertReviewedRuntimeParity(opts: {
-  provider: ReviewedRuntimeEvidenceProvider;
+  provider: ReviewedRuntimeContractProvider;
   capability: DeploymentProviderCapability;
+  runtimeContract?: ReviewedRuntimeContract;
 }): void {
   const errors = validateReviewedRuntimeParity(opts);
   if (errors.length > 0) {

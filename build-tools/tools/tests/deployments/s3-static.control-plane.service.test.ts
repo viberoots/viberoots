@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { providerCapabilityFor } from "../../deployments/deployment-provider-capabilities.ts";
-import { reviewedRuntimeEvidenceFor } from "../../deployments/provider-capabilities/runtime-evidence.ts";
+import { reviewedRuntimeContractFor } from "../../deployments/provider-capabilities/runtime-contract.ts";
 import { assertReviewedRuntimeParity } from "../../deployments/provider-capabilities/runtime-parity.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
@@ -100,7 +100,7 @@ test("public s3-static deploy routes deploy, provision-only, retry, and rollback
           recordsRoot: path.join(tmp, "records"),
         });
         try {
-          const runtimeEvidence = reviewedRuntimeEvidenceFor("s3-static");
+          const runtimeContract = reviewedRuntimeContractFor("s3-static");
           const lockScope = deployment.providerTarget.providerTargetIdentity;
           const first = JSON.parse(
             String(
@@ -171,25 +171,25 @@ test("public s3-static deploy routes deploy, provision-only, retry, and rollback
           assert.equal(firstRecord.runClassification, "deploy");
           assert.equal(
             provisionOnlyRecord.runClassification,
-            runtimeEvidence.provisionOnlyClassification,
+            runtimeContract.provisionOnlyClassification,
           );
           assert.equal(
             retryRecord.runClassification,
-            runtimeEvidence.sameDeploymentPublishOnlyClassification,
+            runtimeContract.sameDeploymentPublishOnlyClassification,
           );
           assert.equal(
             retryRecord.operationKind,
-            runtimeEvidence.sameDeploymentPublishOnlyClassification,
+            runtimeContract.sameDeploymentPublishOnlyClassification,
           );
           assert.equal(retryRecord.parentRunId, first.deployRunId);
           assert.equal(retryRecord.releaseLineageId, first.deployRunId);
           assert.equal(retryRecord.artifactLineageId, firstRecord.artifact?.identity);
-          assert.equal(rollbackRecord.runClassification, runtimeEvidence.rollbackClassification);
-          assert.equal(rollbackRecord.operationKind, runtimeEvidence.rollbackClassification);
+          assert.equal(rollbackRecord.runClassification, runtimeContract.rollbackClassification);
+          assert.equal(rollbackRecord.operationKind, runtimeContract.rollbackClassification);
           assert.equal(rollbackRecord.parentRunId, first.deployRunId);
           assert.equal(rollbackRecord.releaseLineageId, first.deployRunId);
           assert.equal(rollbackRecord.artifactLineageId, firstRecord.artifact?.identity);
-          if (runtimeEvidence.protectedSharedRequiresControlPlane) {
+          if (runtimeContract.protectedSharedRequiresControlPlane) {
             for (const record of [firstRecord, provisionOnlyRecord, retryRecord, rollbackRecord]) {
               assertProtectedSharedControlPlaneRecord(record, lockScope);
             }
