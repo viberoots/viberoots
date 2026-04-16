@@ -8158,6 +8158,234 @@ reviewed runtime-facing source of truth rather than by duplicated expectation ta
 
 ---
 
+## PR-63: Approval-summary backend-native response boundary closeout
+
+### Description
+
+I will close one residual protected/shared API-boundary leak left after the broader control-plane
+closeout work: the reviewed submit/status/run-action responses are supposed to expose stable
+backend-native identifiers and lifecycle state only, but the current approval summary still leaks a
+local approval-record filesystem path. This PR removes that mirror-path detail from the reviewed
+public response contract, keeps approval persistence internal, and tightens fail-closed coverage so
+future approval-surface changes cannot reintroduce filesystem-path leakage through a nested field.
+
+### Scope & Changes
+
+- Remove approval-record filesystem path exposure from the reviewed protected/shared response
+  surface:
+  - submit responses
+  - status responses
+  - run-action responses
+- Refine the approval summary contract so it keeps reviewed public identity and state fields only:
+  - approval state
+  - approval id
+  - approval names
+  - approver identity
+  - payload / target / source binding fields already needed for reviewed operator semantics
+- Keep approval persistence and local approval-record storage as internal implementation details:
+  - no reviewed client dependency on repo-local approval-record paths
+  - no new public filesystem-ref fallback for approval lookup or mutation
+- Update the approval-grant path so any internal revoke / revalidation / execution checks use
+  backend-native or internal-only plumbing instead of depending on a path returned through the
+  reviewed public response payload.
+- Keep the PR narrowly scoped to the residual response-boundary leak:
+  - no new approval semantics
+  - no new operator workflow
+  - no broad control-plane refactor beyond removing the leaked filesystem-path field from the
+    reviewed surface
+
+### Tests (in this PR)
+
+- Add or extend contract tests proving reviewed protected/shared submit/status/run-action responses
+  fail closed if an approval summary reintroduces any approval-record filesystem path field.
+- Extend approval-grant coverage so same-run approval, revalidation, and revoke-path tests no
+  longer depend on reading an approval-record path from the reviewed response payload.
+- Add targeted response-shape coverage proving nested approval metadata follows the same
+  backend-native boundary as the top-level protected/shared response contract.
+- Preserve negative-path coverage proving filesystem-mirror fields remain rejected for reviewed
+  protected/shared status lookup and operator flows.
+
+### Docs (in this PR)
+
+- Update [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) if
+  needed so the reviewed protected/shared response-boundary language explicitly covers approval
+  summary fields as part of the same no-filesystem-mirror rule.
+- Update any operator-facing or contributor-facing approval-service docs that currently imply
+  approval-record paths are part of the reviewed client-visible contract.
+- Update this deployment plan if needed so the late-stage control-plane closeout language no longer
+  implies the response-boundary cleanup is already fully complete.
+
+### Verification Commands
+
+- `v`
+- reviewed deployment-domain control-plane contract / approval-flow verification commands introduced
+  or tightened in this PR
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-domain control-plane contracts, approval helpers,
+  operator-facing docs, and deployment-domain tests for the already implemented approval-service
+  behavior. Under the deployment-only verify policy, default `v` / CI can run the reviewed
+  deployment suite rather than the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- No reviewed protected/shared submit/status/run-action response exposes an approval-record
+  filesystem path.
+- The reviewed approval summary keeps stable identifiers and state needed for operator workflows
+  without leaking internal storage details.
+- Approval-flow tests fail closed if a filesystem-mirror field is reintroduced anywhere in the
+  reviewed public response surface.
+- The plan, contract docs, and deployment-domain tests describe the same backend-native approval
+  response boundary.
+
+### Risks
+
+Because the approval summary is nested inside an otherwise cleaned-up response envelope, it is easy
+to treat that nested field as an internal convenience and accidentally preserve one last path leak
+inside an otherwise backend-native contract.
+
+### Mitigation
+
+Treat nested approval metadata as part of the same reviewed public response contract, remove the
+path field in the same PR that tightens fail-closed response-shape coverage, and keep any
+path-based approval persistence strictly internal.
+
+### Consequence of Not Implementing
+
+The deployment plan would continue to overstate the protected/shared API-boundary closeout while
+approval responses still expose one implementation-detail filesystem path that clients are not
+supposed to depend on.
+
+### Downsides for Implementing
+
+This is another narrow contract-and-tests closeout PR rather than visible deployment capability,
+and it may require a little extra internal test plumbing where current approval tests reach
+conveniently for a path exposed by the public response.
+
+### Recommendation
+
+Implement immediately after PR-62 so the reviewed control-plane response surface is fully
+backend-native before treating the late-stage protected/shared API boundary as closed.
+
+---
+
+## PR-64: Kubernetes rollback-identity parity correction closeout
+
+### Description
+
+I will close one remaining internal contradiction in the late-stage provider-capability parity
+layer: the reviewed Kubernetes runtime contract and generated capability docs now describe
+same-deployment rollback in terms of the canonical release target identity, but one
+immutable-reuse wording path still says live-target identity and the shared parity helper encodes
+that stale wording instead of rejecting it. This PR makes the Kubernetes rollback-identity contract
+internally consistent across the shared helper, authoritative capability entry, rendered docs, and
+fail-closed tests so the parity layer actually catches this class of drift.
+
+### Scope & Changes
+
+- Audit the reviewed Kubernetes rollback-identity wording across:
+  - the shared runtime-facing parity helper
+  - the authoritative Kubernetes capability entry
+  - the rendered provider-capabilities doc
+  - any related deployment-domain parity tests
+- Refactor the shared parity helper so provider-specific rollback-identity expectations are derived
+  consistently for every reviewed section that describes rollback-source eligibility, not only for
+  the first retry/idempotency bullets.
+- Update the Kubernetes immutable-reuse wording so it matches the reviewed canonical release-target
+  identity contract everywhere the rollback-source rule is described.
+- Preserve the distinct reviewed `s3-static` live-target identity wording where that provider's
+  contract actually differs; do not flatten both providers onto one generic rollback-identity
+  phrase.
+- Keep the PR narrowly scoped to reviewed rollback-identity parity correction:
+  - no new provider-family behavior
+  - no rollout, retry, or rollback semantic expansion beyond the already implemented reviewed slice
+  - no broad refactor outside the late-stage provider-capability parity path
+
+### Tests (in this PR)
+
+- Add fail-closed parity coverage proving Kubernetes rollback-identity wording must stay aligned
+  across retry/idempotency and immutable-reuse sections rather than drifting between release-target
+  and live-target language.
+- Extend the shared runtime-parity contract tests so they fail when the helper still accepts stale
+  Kubernetes live-target wording in sections that should derive from the canonical release-target
+  identity contract.
+- Preserve provider-specific negative-path coverage proving `s3-static` keeps its reviewed
+  live-target identity wording while Kubernetes keeps its reviewed release-target identity wording.
+- Keep rendered-doc parity coverage in place so registry, shared helper, and generated capability
+  docs all fail closed together when rollback-identity wording drifts.
+
+### Docs (in this PR)
+
+- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+  only as needed so the reviewed Kubernetes rollback-source contract is described consistently in
+  every relevant section.
+- Update any small contributor-facing parity guidance so it is explicit that provider-specific
+  rollback-identity wording must be derived from the shared reviewed runtime contract rather than
+  hand-maintained section-by-section phrases.
+- Update this deployment plan if needed so the late-stage `s3-static` / `kubernetes` parity
+  closeout language no longer implies that PR-62 fully eliminated all provider-specific rollback
+  identity drift.
+
+### Verification Commands
+
+- `v`
+- reviewed provider-capability parity / generation / deployment-domain verification commands
+  introduced or tightened in this PR
+- representative `s3-static` and `kubernetes` parity targets proving provider-specific
+  rollback-identity wording remains aligned with the shared reviewed runtime contract
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-domain provider-capability parity helpers, rendered docs,
+  contributor guidance, and deployment-domain tests for the already implemented `s3-static` /
+  `kubernetes` runtime behavior. Under the deployment-only verify policy, default `v` / CI can run
+  the reviewed deployment suite rather than the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- The shared parity helper no longer accepts stale Kubernetes live-target rollback wording where the
+  reviewed contract requires canonical release-target identity wording.
+- The authoritative Kubernetes capability entry and rendered provider-capability doc describe the
+  same reviewed rollback-source identity contract in every relevant section.
+- The reviewed `s3-static` and `kubernetes` provider slices preserve their intentionally different
+  rollback-identity wording without cross-provider drift.
+- Deployment-domain parity tests fail closed if provider-specific rollback-identity wording becomes
+  internally inconsistent again.
+
+### Risks
+
+Because the late-stage parity layer already looks structurally complete, small wording mismatches
+inside provider-specific helper branches can be easy to miss and can survive while the surrounding
+tests still appear comprehensive.
+
+### Mitigation
+
+Drive every rollback-identity expectation from the same reviewed provider-specific contract inputs,
+and keep fail-closed negative coverage that proves Kubernetes and `s3-static` are checked against
+their own distinct reviewed identity rules.
+
+### Consequence of Not Implementing
+
+The deployment plan would continue to overstate the final `s3-static` / `kubernetes`
+provider-capability parity closeout while one Kubernetes rollback-source rule still contradicts
+itself and the shared helper keeps accepting that contradiction.
+
+### Downsides for Implementing
+
+This is another narrow parity-and-tests closeout PR rather than visible deployment capability, and
+it adds a bit more precision to provider-specific wording contracts that some readers may find
+fussy.
+
+### Recommendation
+
+Implement immediately after PR-63 so the late-stage parity layer closes with one final fail-closed
+pass over provider-specific rollback-identity consistency.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -8250,6 +8478,11 @@ reviewed runtime-facing source of truth rather than by duplicated expectation ta
 32. PR-62: finish that late-stage `s3-static` / `kubernetes` parity closeout by removing the last
     duplicate runtime-evidence table so the validator and service-path parity assertions derive
     from one shared reviewed runtime-facing source.
+33. PR-63: remove the last approval-summary filesystem-path leak so reviewed protected/shared
+    submit/status/run-action responses are fully backend-native rather than mostly backend-native.
+34. PR-64: close the remaining Kubernetes rollback-identity drift so the late-stage
+    provider-capability parity helper actually fails closed on provider-specific rollback contract
+    inconsistencies.
 
 ## Companion Docs
 
