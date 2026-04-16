@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { DEPLOYMENT_SECRET_FIXTURE_SCHEMA } from "../../deployments/deployment-secret-fixture.ts";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import {
@@ -21,10 +22,10 @@ async function writeArtifact(root: string, html: string): Promise<void> {
   await fsp.writeFile(path.join(root, "healthz"), "ok\n", "utf8");
 }
 
-async function writeVaultFixture(filePath: string, contracts: Record<string, unknown>) {
+async function writeSecretFixture(filePath: string, contracts: Record<string, unknown>) {
   await fsp.writeFile(
     filePath,
-    JSON.stringify({ schemaVersion: "deployment-vault-fixture@1", contracts }, null, 2) + "\n",
+    JSON.stringify({ schemaVersion: DEPLOYMENT_SECRET_FIXTURE_SCHEMA, contracts }, null, 2) + "\n",
     "utf8",
   );
 }
@@ -58,10 +59,10 @@ test("routine deploy rejects destructive schema-migration release actions", asyn
       ],
     });
     const artifactDir = path.join(tmp, "artifact-v2");
-    const fixturePath = path.join(tmp, "vault.json");
+    const fixturePath = path.join(tmp, "secret-fixture.json");
     await writeArtifact(artifactDir, "<html>v2</html>");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
-    await writeVaultFixture(fixturePath, {
+    await writeSecretFixture(fixturePath, {
       "secret://deployments/demoapp/database_url": {
         value: "postgres://demoapp:test@db.internal/demoapp",
         allowedSteps: ["release_actions.pre_publish"],

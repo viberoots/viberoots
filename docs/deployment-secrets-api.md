@@ -686,7 +686,7 @@ Where the target scope comes from:
 That means operators should use the deployment's admitted `lockScope` value as
 the source of truth when populating `targetScopes`.
 
-### Vault Fixture Example
+### Secret Fixture Example
 
 The reviewed production path points `createDeploymentVaultSecretBackend()` at
 Vault directly:
@@ -700,7 +700,7 @@ Local development, isolated tests, and explicit bootstrap-oriented workflows
 can intentionally override that runtime path with the reviewed fixture file:
 
 ```bash
-export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/vault.json"
+export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/secret-fixture.json"
 ```
 
 Production operators should also read
@@ -712,7 +712,7 @@ Example fixture:
 
 ```json
 {
-  "schemaVersion": "deployment-vault-fixture@1",
+  "schemaVersion": "deployment-secret-fixture@1",
   "contracts": {
     "secret://deployments/pleomino/cloudflare_api_token": {
       "value": "super-secret-token",
@@ -806,6 +806,9 @@ The runtime contract is intentionally narrow:
 - `enterStep(step)` resolves only the secrets needed for that lifecycle step
 - initial admission freezes `admittedSecretReferences` with the exact non-secret
   Vault selector information needed for replay-safe runtime fetches
+- `secretspec` stays the contract layer, admitted secret references stay the
+  replay/runtime layer, Vault stays the production backend, and the secret
+  fixture stays the local/test override format
 - required contracts fail when missing, revoked, expired, or no longer
   refreshable
 - routine flows cannot consume `break_glass` credentials
@@ -821,7 +824,7 @@ when you need the shortest explanation of the `secretspec` and Vault model.
 
 Open [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
 when you need the operator workflow for initializing Vault, enabling KV/AppRole,
-writing policies, storing secrets, and exporting the current runtime fixture.
+writing policies, storing secrets, and exporting the current secret fixture.
 
 Open [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
 when you need the architectural rationale behind the API surface.

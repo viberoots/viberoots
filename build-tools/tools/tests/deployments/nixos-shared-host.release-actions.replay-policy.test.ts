@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { DEPLOYMENT_SECRET_FIXTURE_SCHEMA } from "../../deployments/deployment-secret-fixture.ts";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
@@ -30,10 +31,10 @@ async function writeDeploymentJson(filePath: string, deployment: unknown): Promi
   await fsp.writeFile(filePath, JSON.stringify(deployment, null, 2) + "\n", "utf8");
 }
 
-async function writeVaultFixture(filePath: string, contracts: Record<string, unknown>) {
+async function writeSecretFixture(filePath: string, contracts: Record<string, unknown>) {
   await fsp.writeFile(
     filePath,
-    JSON.stringify({ schemaVersion: "deployment-vault-fixture@1", contracts }, null, 2) + "\n",
+    JSON.stringify({ schemaVersion: DEPLOYMENT_SECRET_FIXTURE_SCHEMA, contracts }, null, 2) + "\n",
     "utf8",
   );
 }
@@ -75,7 +76,7 @@ test("rollback replay fails when the recorded release-action policy forbids roll
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const recordsRoot = path.join(tmp, "records");
-    const fixturePath = path.join(tmp, "vault.json");
+    const fixturePath = path.join(tmp, "secret-fixture.json");
     await writeArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
@@ -85,7 +86,7 @@ test("rollback replay fails when the recorded release-action policy forbids roll
       deploymentLabel: deployment.label,
       deployment,
     });
-    await writeVaultFixture(fixturePath, {
+    await writeSecretFixture(fixturePath, {
       "secret://deployments/demoapp/database_url": {
         value: "postgres://demoapp:test@db.internal/demoapp",
         allowedSteps: ["release_actions.pre_publish"],

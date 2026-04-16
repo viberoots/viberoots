@@ -14,7 +14,7 @@ Use this guide when you want the shortest path to:
 - know when a deployment should declare `secret_requirements`
 - resolve secrets at runtime through the current Vault-backed helpers
 - bootstrap Vault as the production source of truth and, when needed, export
-  the reviewed local/test runtime fixture format
+  the reviewed local/test secret fixture format
 - find the right API reference or deeper design doc
 
 ## Reviewed Front Door
@@ -39,12 +39,27 @@ For production Vault bring-up and the optional local/test export bridge into
 - `secret_requirements`: the list of secrets a deployment needs
 - contract id: the stable name of one secret, such as
   `secret://deployments/pleomino/cloudflare_api_token`
+- admitted secret reference: the frozen non-secret replay/runtime metadata
+  captured during admission for one resolved secret contract
+- secret fixture: the reviewed local/test override file format named by
+  `deployment-secret-fixture@1`
 - Vault: the current backend that stores the real secret values
+
+## How The Layers Fit Together
+
+- `secretspec` is the contract layer that names required secrets in repo-owned
+  metadata.
+- admitted secret references are the replay/runtime reference layer that freezes
+  the exact non-secret resolution details for one run.
+- Vault is the current production backend that stores and serves the real secret
+  values.
+- the secret fixture is the local/test/bootstrap override format for
+  non-production flows that intentionally do not read Vault directly.
 
 ## Core Model
 
 - deployments declare `secret_requirements`, which are names of needed secrets
-- the system stores secret references, not secret values
+- admission freezes admitted secret references, not secret values
 - runtime secret values are resolved only when a lifecycle step actually needs
   them
 - Vault is the current backend, but callers use the stable `secretspec` layer
@@ -67,7 +82,7 @@ For local development, isolated tests, or an explicit bootstrap-oriented
 workflow, point the runtime at a reviewed fixture file:
 
 ```bash
-export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/vault.json"
+export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/secret-fixture.json"
 ```
 
 Then use the runtime helper described in
@@ -191,7 +206,7 @@ workflows, use the fixture override shown below.
 
 For production secret storage and optional fixture export, use
 [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
-to bootstrap Vault as the source of truth and then export the runtime fixture
+to bootstrap Vault as the source of truth and then export the secret fixture
 when one of those non-production workflows needs it.
 
 That means:
@@ -201,11 +216,11 @@ That means:
   `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
 - the runtime resolves secrets from that file when the deployment step starts
 
-Create `vault.json`:
+Create `secret-fixture.json`:
 
 ```json
 {
-  "schemaVersion": "deployment-vault-fixture@1",
+  "schemaVersion": "deployment-secret-fixture@1",
   "contracts": {
     "secret://deployments/pleomino/cloudflare_api_token": {
       "value": "super-secret-token",
@@ -221,7 +236,7 @@ Create `vault.json`:
 Then point the deployment runtime at that file:
 
 ```bash
-export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/vault.json"
+export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/secret-fixture.json"
 ```
 
 What this file does:
@@ -351,7 +366,7 @@ Complete example with more explicit choices:
 
 ```json
 {
-  "schemaVersion": "deployment-vault-fixture@1",
+  "schemaVersion": "deployment-secret-fixture@1",
   "contracts": {
     "secret://deployments/pleomino/cloudflare_api_token": {
       "value": "super-secret-token",

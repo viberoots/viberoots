@@ -1,10 +1,17 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
-import type { DeploymentRequirementStep } from "./deployment-requirements.ts";
 import type {
   DeploymentSecretBackend,
   DeploymentSecretMaterial,
 } from "./deployment-secret-runtime.ts";
+import {
+  deploymentSecretFixturePath,
+  deploymentSecretFixtureSelector,
+  deploymentSecretFixtureVersion,
+  mergeDeploymentSecretFixtureEntry,
+  readDeploymentSecretFixture,
+  type DeploymentSecretFixture,
+  type DeploymentSecretFixtureEntry,
+} from "./deployment-secret-fixture.ts";
 import {
   acquireDirectVaultSecretReference,
   hasDirectVaultEnv,
@@ -19,68 +26,9 @@ import {
 } from "./deployment-secretspec.ts";
 import type { DeploymentRequirement } from "./deployment-requirements.ts";
 
-const DEPLOYMENT_VAULT_FIXTURE_SCHEMA = "deployment-vault-fixture@1";
-const DEPLOYMENT_SECRET_FIXTURE_PATH_ENV = "BNX_DEPLOYMENT_SECRET_FIXTURE_PATH";
-
-type DeploymentVaultFixtureEntry = {
-  value: string;
-  referenceId?: string;
-  version?: string | number;
-  leaseId?: string;
-  expiresAt?: string;
-  refreshMode?: "renew" | "reacquire" | "none";
-  credentialClass?: "routine" | "break_glass";
-  allowedSteps?: DeploymentRequirementStep[];
-  targetScopes?: string[];
-  revoked?: boolean;
-  renewed?: Partial<DeploymentVaultFixtureEntry>;
-  reacquired?: Partial<DeploymentVaultFixtureEntry>;
-};
-
-type DeploymentVaultFixture = {
-  schemaVersion: typeof DEPLOYMENT_VAULT_FIXTURE_SCHEMA;
-  contracts: Record<string, DeploymentVaultFixtureEntry>;
-};
-
-function fixturePath(): string {
-  return String(process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV] || "").trim();
-}
-
-async function readFixture(): Promise<DeploymentVaultFixture> {
-  const filePath = fixturePath();
-  if (!filePath) {
-    throw new Error(
-      `secret-consuming protected/shared runs require either ${DEPLOYMENT_SECRET_FIXTURE_PATH_ENV} for the reviewed local/test fixture override or VAULT_ADDR plus VAULT_TOKEN for direct Vault runtime`,
-    );
-  }
-  const parsed = JSON.parse(await fsp.readFile(filePath, "utf8")) as DeploymentVaultFixture;
-  if (parsed.schemaVersion !== DEPLOYMENT_VAULT_FIXTURE_SCHEMA || !parsed.contracts) {
-    throw new Error(`invalid deployment vault fixture: ${filePath}`);
-  }
-  return parsed;
-}
-
-function mergedEntry(
-  base: DeploymentVaultFixtureEntry,
-  override: Partial<DeploymentVaultFixtureEntry> | undefined,
-): DeploymentVaultFixtureEntry {
-  return { ...base, ...(override || {}) };
-}
-
-function admittedFixtureSelector(contractId: string, entry: DeploymentVaultFixtureEntry): string {
-  return String(entry.referenceId || contractId).trim();
-}
-
-function admittedFixtureVersion(entry: DeploymentVaultFixtureEntry): string | undefined {
-  const version = entry.version ?? entry.leaseId;
-  if (version === undefined || version === null) return undefined;
-  const normalized = String(version).trim();
-  return normalized ? normalized : undefined;
-}
-
 function materialFromEntry(
   binding: DeploymentSecretReference,
-  entry: DeploymentVaultFixtureEntry,
+  entry: DeploymentSecretFixtureEntry,
 ): DeploymentSecretMaterial {
   if (entry.revoked) {
     throw new Error(`required secret contract ${binding.contractId} is revoked`);
@@ -104,12 +52,12 @@ function materialFromEntry(
 async function resolveFixtureReference(
   binding: DeploymentSecretContractBinding,
   targetScope: string,
-  fixture: DeploymentVaultFixture,
+  fixture: DeploymentSecretFixture,
 ): Promise<DeploymentSecretAdmittedReference | undefined> {
   const entry = fixture.contracts[binding.contractId];
   if (!entry) return undefined;
-  const version = admittedFixtureVersion(entry);
-  const selectorRef = admittedFixtureSelector(binding.contractId, entry);
+  const version = deploymentSecretFixtureVersion(entry);
+  const selectorRef = deploymentSecretFixtureSelector(binding.contractId, entry);
   return {
     ...binding,
     targetScope,
@@ -128,23 +76,23 @@ async function admittedReferenceFor(
   binding: DeploymentSecretContractBinding,
   targetScope: string,
 ): Promise<DeploymentSecretAdmittedReference | undefined> {
-  const fixture = fixturePath() ? await readFixture() : undefined;
+  const fixture = deploymentSecretFixturePath() ? await readDeploymentSecretFixture() : undefined;
   if (fixture) return await resolveFixtureReference(binding, targetScope, fixture);
   return await resolveDirectVaultSecretReference(binding, targetScope);
 }
 
 function ensureFixtureReferenceMatches(
   binding: DeploymentSecretAdmittedReference,
-  entry: DeploymentVaultFixtureEntry,
+  entry: DeploymentSecretFixtureEntry,
 ) {
-  const currentSelector = admittedFixtureSelector(binding.contractId, entry);
+  const currentSelector = deploymentSecretFixtureSelector(binding.contractId, entry);
   if (currentSelector !== binding.selectorRef) {
     throw new Error(
       `required secret contract ${binding.contractId} no longer resolves exactly for selector ${binding.selectorRef}`,
     );
   }
   if (!binding.resolvedVersion) return;
-  const currentVersion = admittedFixtureVersion(entry);
+  const currentVersion = deploymentSecretFixtureVersion(entry);
   if (currentVersion !== binding.resolvedVersion) {
     throw new Error(
       `required secret contract ${binding.contractId} no longer resolves exactly for version ${binding.resolvedVersion}`,
@@ -208,9 +156,9 @@ export function createDeploymentVaultSecretBackend(): DeploymentSecretBackend {
   const acquireCounts = new Map<string, number>();
   return {
     async acquire(binding) {
-      if (!fixturePath() && hasDirectVaultEnv())
+      if (!deploymentSecretFixturePath() && hasDirectVaultEnv())
         return await acquireDirectVaultSecretReference(binding);
-      const fixture = await readFixture();
+      const fixture = await readDeploymentSecretFixture();
       const entry = fixture.contracts[binding.contractId];
       if (!entry) throw new Error(`required secret contract ${binding.contractId} is missing`);
       if (isDeploymentSecretAdmittedReference(binding)) {
@@ -218,15 +166,16 @@ export function createDeploymentVaultSecretBackend(): DeploymentSecretBackend {
       }
       const count = acquireCounts.get(binding.contractId) || 0;
       acquireCounts.set(binding.contractId, count + 1);
-      const selected = count > 0 ? mergedEntry(entry, entry.reacquired) : entry;
+      const selected =
+        count > 0 ? mergeDeploymentSecretFixtureEntry(entry, entry.reacquired) : entry;
       return materialFromEntry(binding, selected);
     },
     async renew(secret) {
-      if (!fixturePath()) return undefined;
-      const fixture = await readFixture();
+      if (!deploymentSecretFixturePath()) return undefined;
+      const fixture = await readDeploymentSecretFixture();
       const entry = fixture.contracts[secret.binding.contractId];
       if (!entry || entry.revoked || secret.refreshMode !== "renew") return undefined;
-      const renewed = mergedEntry(entry, entry.renewed);
+      const renewed = mergeDeploymentSecretFixtureEntry(entry, entry.renewed);
       if (isDeploymentSecretAdmittedReference(secret.binding)) {
         ensureFixtureReferenceMatches(secret.binding, renewed);
       }

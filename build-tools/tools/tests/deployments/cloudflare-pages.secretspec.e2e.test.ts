@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { DEPLOYMENT_SECRET_FIXTURE_SCHEMA } from "../../deployments/deployment-secret-fixture.ts";
 import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloudflare-pages-control-plane.ts";
 import { deploymentRequirementFixture } from "./deployment-metadata.fixture.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
@@ -22,12 +23,12 @@ async function writeWranglerConfig(root: string): Promise<void> {
   await fsp.writeFile(root, '{\n  "compatibility_date": "2026-03-18"\n}\n', "utf8");
 }
 
-async function writeVaultFixture(filePath: string, contracts: Record<string, unknown>) {
+async function writeSecretFixture(filePath: string, contracts: Record<string, unknown>) {
   await fsp.writeFile(
     filePath,
     JSON.stringify(
       {
-        schemaVersion: "deployment-vault-fixture@1",
+        schemaVersion: DEPLOYMENT_SECRET_FIXTURE_SCHEMA,
         contracts,
       },
       null,
@@ -50,13 +51,13 @@ test("cloudflare-pages deploy keeps secretspec-backed Vault values out of record
     });
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
-    const fixturePath = path.join(tmp, "vault.json");
+    const fixturePath = path.join(tmp, "secret-fixture.json");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>pleomino staging</html>\n");
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
-    await writeVaultFixture(fixturePath, {
+    await writeSecretFixture(fixturePath, {
       "secret://deployments/pleomino/cloudflare_api_token": {
         value: "super-secret-token",
         allowedSteps: ["publish"],
@@ -134,13 +135,13 @@ test("cloudflare-pages admission fails closed when a required secretspec contrac
     });
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
-    const fixturePath = path.join(tmp, "vault.json");
+    const fixturePath = path.join(tmp, "secret-fixture.json");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>pleomino staging</html>\n");
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
-    await writeVaultFixture(fixturePath, {});
+    await writeSecretFixture(fixturePath, {});
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,

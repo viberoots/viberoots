@@ -4,6 +4,10 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  DEPLOYMENT_SECRET_FIXTURE_PATH_ENV,
+  DEPLOYMENT_SECRET_FIXTURE_SCHEMA,
+} from "../../deployments/deployment-secret-fixture.ts";
 import { createDeploymentSecretRuntime } from "../../deployments/deployment-secret-runtime.ts";
 import {
   createDeploymentVaultSecretBackend,
@@ -23,10 +27,10 @@ async function withFixtureFile(
   run: (fixturePath: string) => Promise<void>,
 ) {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "deployment-secret-vault-"));
-  const fixturePath = path.join(tmp, "vault.json");
+  const fixturePath = path.join(tmp, "secret-fixture.json");
   await fsp.writeFile(
     fixturePath,
-    JSON.stringify({ schemaVersion: "deployment-vault-fixture@1", contracts }, null, 2) + "\n",
+    JSON.stringify({ schemaVersion: DEPLOYMENT_SECRET_FIXTURE_SCHEMA, contracts }, null, 2) + "\n",
     "utf8",
   );
   try {
@@ -48,7 +52,7 @@ test("direct Vault admission freezes one exact version and runtime reuses it", a
   });
   process.env.VAULT_ADDR = vault.addr;
   process.env.VAULT_TOKEN = vault.token;
-  delete process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
+  delete process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
   try {
     const admittedReferences = await resolveDeploymentVaultAdmittedReferences({
       requirements: [
@@ -86,7 +90,7 @@ test("direct Vault replay fails closed when the admitted version no longer resol
   const vault = await startFakeVaultServer(state);
   process.env.VAULT_ADDR = vault.addr;
   process.env.VAULT_TOKEN = vault.token;
-  delete process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
+  delete process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
   try {
     const admittedReferences = await resolveDeploymentVaultAdmittedReferences({
       requirements: [
@@ -133,7 +137,7 @@ test("neutral fixture env var intentionally overrides direct Vault env", async (
     async (fixturePath) => {
       process.env.VAULT_ADDR = vault.addr;
       process.env.VAULT_TOKEN = vault.token;
-      process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH = fixturePath;
+      process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV] = fixturePath;
       try {
         const admittedReferences = await resolveDeploymentVaultAdmittedReferences({
           requirements: [
@@ -172,7 +176,7 @@ test("retired Vault-named fixture env var is ignored and required secret flows f
     },
     async (fixturePath) => {
       process.env.BNX_DEPLOYMENT_VAULT_FIXTURE_PATH = fixturePath;
-      delete process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
+      delete process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
       delete process.env.VAULT_ADDR;
       delete process.env.VAULT_TOKEN;
       try {
