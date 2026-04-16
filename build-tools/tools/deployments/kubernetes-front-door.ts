@@ -38,22 +38,6 @@ export async function runKubernetesDeployFrontDoor(opts: {
   if (opts.rollback && !opts.publishOnly) {
     throw new Error("kubernetes rollback requires --publish-only");
   }
-  if (opts.provisionOnly) {
-    const recordsRoot = path.resolve(
-      getFlagStr(
-        "records-root",
-        path.join(opts.workspaceRoot, ".local", "deployments", "kubernetes", "records"),
-      ),
-    );
-    const result = await submitKubernetesProvisionOnly({
-      workspaceRoot: opts.workspaceRoot,
-      deployment: opts.deployment,
-      recordsRoot,
-      ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
-    });
-    printDeployJson(summarizeDeploymentResult(result));
-    return;
-  }
   const recordsRoot = path.resolve(
     getFlagStr(
       "records-root",
@@ -82,6 +66,16 @@ export async function runKubernetesDeployFrontDoor(opts: {
         hasFlag: opts.hasFlag || (() => false),
       }),
     );
+    return;
+  }
+  if (opts.provisionOnly) {
+    const result = await submitKubernetesProvisionOnly({
+      workspaceRoot: opts.workspaceRoot,
+      deployment: opts.deployment,
+      recordsRoot,
+      ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
+    });
+    printDeployJson(summarizeDeploymentResult(result));
     return;
   }
   if (opts.publishOnly) {

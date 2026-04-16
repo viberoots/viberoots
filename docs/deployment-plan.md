@@ -7915,6 +7915,130 @@ provider-capability parity pass covering the remaining `s3-static` and `kubernet
 
 ---
 
+## PR-61: Runtime-evidence parity hardening for `s3-static` / `kubernetes` capability closeout
+
+### Description
+
+I will close the residual gap left after PR-60: the provider-capability parity layer now documents
+the reviewed `s3-static` and `kubernetes` protected/shared posture, but the current guardrail still
+proves that the registry contains expected wording rather than proving that the authoritative
+capability contract stays aligned with the implemented protected/shared retry / rollback /
+provision-only runtime behavior. This PR hardens that final parity layer by grounding it in
+reviewed runtime evidence and by extending the missing same-deployment exact-artifact retry
+coverage for both provider families.
+
+### Scope & Changes
+
+- Replace or refactor the current `s3-static` / `kubernetes` provider-capability runtime-parity
+  helper so it validates against one reviewed runtime-evidence surface rather than only checking for
+  duplicated hard-coded capability strings.
+- Keep the parity contract explicit and deterministic:
+  - derive the reviewed protected/shared posture from a shared runtime-facing contract/helper or
+    another reviewed evidence source already exercised by provider service-path tests
+  - do not loosen the guardrail into best-effort wording checks
+- Extend the reviewed `s3-static` protected/shared service-path parity coverage to execute the
+  same-deployment exact-artifact `--publish-only` path without `--rollback` and prove it is treated
+  as reviewed retry behavior.
+- Extend the reviewed `kubernetes` protected/shared service-path parity coverage the same way so
+  retry behavior is proven by runtime-backed tests rather than inferred from rollback coverage.
+- Tighten the provider-capability contract guardrail so it fails closed when:
+  - the capability registry drifts from reviewed runtime evidence
+  - retry posture is documented but not actually covered by the reviewed protected/shared parity
+    tests
+- Keep the PR scoped to the residual parity gap:
+  - no new provider-family behavior
+  - no control-plane architecture changes beyond parity wiring
+  - no expansion beyond the already implemented reviewed `s3-static` / `kubernetes`
+    protected/shared runtime flows
+
+### Tests (in this PR)
+
+- Add or extend runtime-backed parity tests proving the authoritative `s3-static` capability entry
+  matches the reviewed protected/shared front-door posture for:
+  - control-plane-routed mutation
+  - reviewed `--provision-only`
+  - reviewed same-deployment exact-artifact retry
+  - reviewed same-deployment rollback / immutable-reuse flows
+- Add or extend the same runtime-backed parity coverage for `kubernetes`.
+- Add fail-closed provider-capability contract coverage proving the parity guardrail no longer
+  passes when capability text stays stale-but-self-consistent while the reviewed runtime evidence
+  changes.
+- Keep rendered-doc and design-summary parity coverage in place so all reviewed layers stay
+  enforced together:
+  - registry versus runtime-backed reviewed behavior
+  - registry versus generated provider-capability docs
+  - registry versus generated design-summary output
+
+### Docs (in this PR)
+
+- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+  only as needed so the reviewed `s3-static` and `kubernetes` entries continue to describe the
+  implemented protected/shared retry / rollback / provision-only posture exactly.
+- Update any small contributor-facing parity guidance associated with provider-capability rendering
+  or validation so it is explicit that reviewed runtime parity must be backed by implementation
+  evidence rather than duplicated literal wording.
+- Update this deployment plan if needed so the late-stage provider-capability closeout language
+  explicitly includes runtime-evidence parity hardening and the missing retry-path coverage.
+
+### Verification Commands
+
+- `v`
+- reviewed provider-capability parity / generation / deployment-domain verification commands
+  introduced or tightened in this PR
+- representative protected/shared `s3-static` and `kubernetes` service-path parity targets proving
+  deploy, `--provision-only`, same-deployment retry, and rollback all remain aligned with the
+  authoritative capability contract
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within deployment-domain capability metadata, parity helpers, rendered docs,
+  and deployment-domain tests that compare those reviewed artifacts with already implemented runtime
+  behavior. Under the deployment-only verify policy, default `v` / CI can run the reviewed
+  deployment suite rather than the full non-deployment build-system verify scope.
+
+### Acceptance Criteria
+
+- The `s3-static` provider-capability parity guardrail is backed by reviewed runtime evidence rather
+  than only duplicated capability wording.
+- The `kubernetes` provider-capability parity guardrail is backed by reviewed runtime evidence
+  rather than only duplicated capability wording.
+- Reviewed protected/shared parity tests for both providers explicitly cover same-deployment
+  exact-artifact retry in addition to provision-only and rollback.
+- Provider-capability parity tests fail closed when the registry, rendered docs, or design summary
+  drift from the reviewed runtime-backed provider behavior for these slices.
+
+### Risks
+
+If the parity layer keeps reusing duplicated wording as its source of truth, the repo can preserve
+internal consistency between registry and generated docs while still drifting from implemented
+runtime behavior.
+
+### Mitigation
+
+Anchor the parity guardrail to reviewed runtime evidence that is exercised by the provider
+service-path tests, and add explicit retry-path coverage so that the documented immutable-reuse
+contract is proven end to end.
+
+### Consequence of Not Implementing
+
+The deployment plan would still overstate provider-capability closeout while `s3-static` and
+`kubernetes` retain one last gap between the reviewed runtime contract and the guardrails that are
+supposed to enforce it.
+
+### Downsides for Implementing
+
+This is another narrow parity-and-tests closeout PR rather than visible new deployment capability,
+and it adds one more reviewed coupling point between provider runtime evidence and capability
+metadata.
+
+### Recommendation
+
+Implement immediately after PR-60 so the plan closes with one final fail-closed pass over
+runtime-evidence parity and retry-path coverage for `s3-static` and `kubernetes`.
+
+---
+
 ## Recommended Work Order Summary
 
 1. PR-1 through PR-3: get `mini` shared-dev static webapps working end to end on the final-model
@@ -8001,6 +8125,9 @@ provider-capability parity pass covering the remaining `s3-static` and `kubernet
 30. PR-60: close the remaining `s3-static` and `kubernetes` provider-capability parity gap so the
     authoritative capability registry, rendered docs, and reviewed protected/shared runtime-backed
     tests all describe the same rollback / immutable-reuse / provision-only posture.
+31. PR-61: harden that final `s3-static` / `kubernetes` closeout by tying provider-capability
+    parity to reviewed runtime evidence instead of duplicated wording and by adding the missing
+    same-deployment retry coverage for both provider families.
 
 ## Companion Docs
 

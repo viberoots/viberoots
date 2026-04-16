@@ -167,7 +167,12 @@ export async function executeKubernetesControlPlaneSubmission(opts: {
                 recordsRoot: snapshot.recordsRoot,
                 deployRunId: String(snapshot.sourceRunId || ""),
               });
-              if (snapshot.operationKind === "promotion") {
+              const operationKind =
+                snapshot.operationKind === "promotion" &&
+                source.replaySnapshot.deployment.deploymentId === snapshot.deployment.deploymentId
+                  ? "retry"
+                  : snapshot.operationKind;
+              if (operationKind === "promotion") {
                 await assertCrossDeploymentExactPromotionEligible({
                   workspaceRoot: snapshot.workspaceRoot,
                   deployment: snapshot.deployment,
@@ -178,11 +183,7 @@ export async function executeKubernetesControlPlaneSubmission(opts: {
                 workspaceRoot: snapshot.workspaceRoot,
                 deployment: snapshot.deployment,
                 recordsRoot: snapshot.recordsRoot,
-                operationKind:
-                  snapshot.operationKind === "promotion" &&
-                  source.replaySnapshot.deployment.deploymentId === snapshot.deployment.deploymentId
-                    ? "retry"
-                    : snapshot.operationKind,
+                operationKind,
                 componentArtifacts: source.replaySnapshot.componentArtifacts,
                 sourceRecord: source.record,
                 parentRunId: source.record.deployRunId,

@@ -4,11 +4,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { providerCapabilityFor } from "../../deployments/deployment-provider-capabilities.ts";
+import { reviewedRuntimeEvidenceFor } from "../../deployments/provider-capabilities/runtime-evidence.ts";
 import { assertReviewedRuntimeParity } from "../../deployments/provider-capabilities/runtime-parity.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import {
-  readRecord,
   startControlPlaneHarness,
   withEnvOverrides,
 } from "./nixos-shared-host.control-plane.helpers.ts";
@@ -29,6 +29,15 @@ function fakeAwsOverrides(fake: Awaited<ReturnType<typeof installFakeS3StaticAws
     BNX_S3_STATIC_FAKE_AWS_LOG: fake.logPath,
     BNX_S3_STATIC_AWS_BIN: path.join(fake.binDir, "aws"),
   };
+}
+
+function assertProtectedSharedControlPlaneRecord(
+  record: { controlPlane?: { lockScope: string }; finalOutcome: string },
+  lockScope: string,
+) {
+  assert.ok(record.controlPlane);
+  assert.equal(record.controlPlane.lockScope, lockScope);
+  assert.equal(record.finalOutcome, "succeeded");
 }
 
 test("public s3-static deploy requires a control-plane URL for protected/shared targets", async () => {
@@ -54,7 +63,7 @@ test("public s3-static deploy requires a control-plane URL for protected/shared 
   });
 });
 
-test("public s3-static deploy routes deploy, provision-only, and rollback through the control-plane service", async () => {
+test("public s3-static deploy routes deploy, provision-only, retry, and rollback through the control-plane service", async () => {
   await runInTemp("s3-static-public-service-flow", async (tmp, $) => {
     const deployment = s3StaticDeploymentFixture({ provisioner: { type: "terraform-stack" } });
     const artifactA = path.join(tmp, "artifact-a");
@@ -91,6 +100,8 @@ test("public s3-static deploy routes deploy, provision-only, and rollback throug
           recordsRoot: path.join(tmp, "records"),
         });
         try {
+          const runtimeEvidence = reviewedRuntimeEvidenceFor("s3-static");
+          const lockScope = deployment.providerTarget.providerTargetIdentity;
           const first = JSON.parse(
             String(
               (
@@ -104,6 +115,7 @@ test("public s3-static deploy routes deploy, provision-only, and rollback throug
           );
           assert.equal(first.finalOutcome, "succeeded");
           assert.equal("recordPath" in first, false);
+          const firstRecord = first;
           const provisionOnly = JSON.parse(
             String(
               (
@@ -116,6 +128,7 @@ test("public s3-static deploy routes deploy, provision-only, and rollback throug
             ),
           );
           assert.equal(provisionOnly.finalOutcome, "succeeded");
+          const provisionOnlyRecord = provisionOnly;
           const second = JSON.parse(
             String(
               (
@@ -127,6 +140,20 @@ test("public s3-static deploy routes deploy, provision-only, and rollback throug
               ).stdout,
             ),
           );
+          assert.equal(second.finalOutcome, "succeeded");
+          const retry = JSON.parse(
+            String(
+              (
+                await $({
+                  cwd: tmp,
+                  stdio: "pipe",
+                  env: { ...process.env },
+                })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --publish-only --source-run-id ${first.deployRunId} --admission-evidence-json ${evidence} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`
+              ).stdout,
+            ),
+          );
+          assert.equal(retry.finalOutcome, "succeeded");
+          const retryRecord = retry;
           const rollback = JSON.parse(
             String(
               (
@@ -139,8 +166,34 @@ test("public s3-static deploy routes deploy, provision-only, and rollback throug
             ),
           );
           assert.equal(rollback.finalOutcome, "succeeded");
-          const record = await readRecord(harness.controlPlane.url, second.deployRunId);
-          assert.equal(record.provider, "s3-static");
+          const rollbackRecord = rollback;
+          assert.equal(firstRecord.provider, "s3-static");
+          assert.equal(firstRecord.runClassification, "deploy");
+          assert.equal(
+            provisionOnlyRecord.runClassification,
+            runtimeEvidence.provisionOnlyClassification,
+          );
+          assert.equal(
+            retryRecord.runClassification,
+            runtimeEvidence.sameDeploymentPublishOnlyClassification,
+          );
+          assert.equal(
+            retryRecord.operationKind,
+            runtimeEvidence.sameDeploymentPublishOnlyClassification,
+          );
+          assert.equal(retryRecord.parentRunId, first.deployRunId);
+          assert.equal(retryRecord.releaseLineageId, first.deployRunId);
+          assert.equal(retryRecord.artifactLineageId, firstRecord.artifact?.identity);
+          assert.equal(rollbackRecord.runClassification, runtimeEvidence.rollbackClassification);
+          assert.equal(rollbackRecord.operationKind, runtimeEvidence.rollbackClassification);
+          assert.equal(rollbackRecord.parentRunId, first.deployRunId);
+          assert.equal(rollbackRecord.releaseLineageId, first.deployRunId);
+          assert.equal(rollbackRecord.artifactLineageId, firstRecord.artifact?.identity);
+          if (runtimeEvidence.protectedSharedRequiresControlPlane) {
+            for (const record of [firstRecord, provisionOnlyRecord, retryRecord, rollbackRecord]) {
+              assertProtectedSharedControlPlaneRecord(record, lockScope);
+            }
+          }
           const capability = providerCapabilityFor("s3-static");
           assert.ok(capability);
           assertReviewedRuntimeParity({ provider: "s3-static", capability });

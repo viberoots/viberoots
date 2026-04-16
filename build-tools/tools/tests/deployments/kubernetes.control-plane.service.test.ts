@@ -4,11 +4,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { providerCapabilityFor } from "../../deployments/deployment-provider-capabilities.ts";
+import { reviewedRuntimeEvidenceFor } from "../../deployments/provider-capabilities/runtime-evidence.ts";
 import { assertReviewedRuntimeParity } from "../../deployments/provider-capabilities/runtime-parity.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import {
-  readRecord,
   startControlPlaneHarness,
   withEnvOverrides,
 } from "./nixos-shared-host.control-plane.helpers.ts";
@@ -48,6 +48,15 @@ function fakeHelmOverrides(fake: Awaited<ReturnType<typeof installFakeKubernetes
   };
 }
 
+function assertProtectedSharedControlPlaneRecord(
+  record: { controlPlane?: { lockScope: string }; finalOutcome: string },
+  lockScope: string,
+) {
+  assert.ok(record.controlPlane);
+  assert.equal(record.controlPlane.lockScope, lockScope);
+  assert.equal(record.finalOutcome, "succeeded");
+}
+
 test("public kubernetes deploy requires a control-plane URL for protected/shared targets", async () => {
   await runInTemp("kubernetes-public-service-required", async (tmp, $) => {
     const deployment = kubernetesDeploymentFixture();
@@ -72,7 +81,7 @@ test("public kubernetes deploy requires a control-plane URL for protected/shared
   });
 });
 
-test("public kubernetes deploy routes deploy, provision-only, and rollback through the control-plane service", async () => {
+test("public kubernetes deploy routes deploy, provision-only, retry, and rollback through the control-plane service", async () => {
   await runInTemp("kubernetes-public-service-flow", async (tmp, $) => {
     const deployment = kubernetesDeploymentFixture({
       provisioner: { type: "terraform-stack", config: "terraform/main.tf.json" },
@@ -103,6 +112,8 @@ test("public kubernetes deploy routes deploy, provision-only, and rollback throu
           recordsRoot: path.join(tmp, "records"),
         });
         try {
+          const runtimeEvidence = reviewedRuntimeEvidenceFor("kubernetes");
+          const lockScope = deployment.providerTarget.providerTargetIdentity;
           const first = JSON.parse(
             String(
               (
@@ -115,6 +126,7 @@ test("public kubernetes deploy routes deploy, provision-only, and rollback throu
             ),
           );
           assert.equal(first.finalOutcome, "succeeded");
+          const firstRecord = first;
           const provisionOnly = JSON.parse(
             String(
               (
@@ -127,11 +139,25 @@ test("public kubernetes deploy routes deploy, provision-only, and rollback throu
             ),
           );
           assert.equal(provisionOnly.finalOutcome, "succeeded");
+          const provisionOnlyRecord = provisionOnly;
           await $({
             cwd: tmp,
             stdio: "pipe",
             env: { ...process.env },
           })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --artifact-dir ${artifactB} --admission-evidence-json ${evidence} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`;
+          const retry = JSON.parse(
+            String(
+              (
+                await $({
+                  cwd: tmp,
+                  stdio: "pipe",
+                  env: { ...process.env },
+                })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --publish-only --source-run-id ${first.deployRunId} --admission-evidence-json ${evidence} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`
+              ).stdout,
+            ),
+          );
+          assert.equal(retry.finalOutcome, "succeeded");
+          const retryRecord = retry;
           const rollback = JSON.parse(
             String(
               (
@@ -144,8 +170,34 @@ test("public kubernetes deploy routes deploy, provision-only, and rollback throu
             ),
           );
           assert.equal(rollback.finalOutcome, "succeeded");
-          const record = await readRecord(harness.controlPlane.url, rollback.deployRunId);
-          assert.equal(record.provider, "kubernetes");
+          const rollbackRecord = rollback;
+          assert.equal(firstRecord.provider, "kubernetes");
+          assert.equal(firstRecord.runClassification, "deploy");
+          assert.equal(
+            provisionOnlyRecord.runClassification,
+            runtimeEvidence.provisionOnlyClassification,
+          );
+          assert.equal(
+            retryRecord.runClassification,
+            runtimeEvidence.sameDeploymentPublishOnlyClassification,
+          );
+          assert.equal(
+            retryRecord.operationKind,
+            runtimeEvidence.sameDeploymentPublishOnlyClassification,
+          );
+          assert.equal(retryRecord.parentRunId, first.deployRunId);
+          assert.equal(retryRecord.releaseLineageId, first.deployRunId);
+          assert.equal(retryRecord.artifactLineageId, firstRecord.artifact?.identity);
+          assert.equal(rollbackRecord.runClassification, runtimeEvidence.rollbackClassification);
+          assert.equal(rollbackRecord.operationKind, runtimeEvidence.rollbackClassification);
+          assert.equal(rollbackRecord.parentRunId, first.deployRunId);
+          assert.equal(rollbackRecord.releaseLineageId, first.deployRunId);
+          assert.equal(rollbackRecord.artifactLineageId, firstRecord.artifact?.identity);
+          if (runtimeEvidence.protectedSharedRequiresControlPlane) {
+            for (const record of [firstRecord, provisionOnlyRecord, retryRecord, rollbackRecord]) {
+              assertProtectedSharedControlPlaneRecord(record, lockScope);
+            }
+          }
           const capability = providerCapabilityFor("kubernetes");
           assert.ok(capability);
           assertReviewedRuntimeParity({ provider: "kubernetes", capability });

@@ -166,25 +166,6 @@ test("validation fails closed when provider operator examples drift from the rev
   );
 });
 
-test("runtime parity guardrail fails closed when reviewed runtime posture is missing from the registry", () => {
-  const badRegistry = {
-    ...REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER,
-    "s3-static": {
-      ...REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER["s3-static"],
-      retryIdempotency: [
-        {
-          text: "exact-artifact retry is reviewed only when the prior attempt is clearly safe to rerun",
-        },
-      ],
-      immutableReuseOperatorFlows: undefined,
-    },
-  };
-  assert.throws(
-    () => validateProviderCapabilityRegistry(badRegistry),
-    /s3-static: retryIdempotency must describe reviewed runtime parity/,
-  );
-});
-
 test("provider capabilities doc operator examples fail closed on stale deploy selectors", async () => {
   const current = await fsp.readFile(PROVIDER_CAPABILITIES_DOC_PATH, "utf8");
   const stale = current.replace(

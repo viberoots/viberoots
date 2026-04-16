@@ -30,6 +30,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-from-changes.selection.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-promotion-compatibility.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-provider-capabilities.contract.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-provider-capabilities.runtime-parity.contract.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-prerequisites.validation.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-retry-policy.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-runner-identities.replay.provenance.test.ts": True,
