@@ -111,6 +111,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/nixos-shared-host.host-render.contract.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.host-render.duplicate-hostname.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.host-render.partial-slice-preserves.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.mini-service-modules.nix-eval.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.install.dev-machine.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.install.dry-run-and-status.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.install.host-modes.test.ts": True,

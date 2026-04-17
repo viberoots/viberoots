@@ -2,6 +2,10 @@
 import path from "node:path";
 import "zx/globals";
 import { getFlagBool, getFlagStr } from "../lib/cli.ts";
+import {
+  liveRepoScaffoldGuardMessage,
+  shouldRefuseLiveRepoScaffold,
+} from "./scaf/live-repo-guard.ts";
 
 function usage(): void {
   console.log(
@@ -27,23 +31,18 @@ async function main(): Promise<void> {
       process.chdir(root);
     }
   } catch {}
-  // Guard: when invoked under Buck tests, require a sandboxed WORKSPACE_ROOT to avoid mutating live repo
+  // Guard: when invoked under tests/verify, require a sandboxed WORKSPACE_ROOT to avoid mutating live repo
   try {
     const here = path.dirname(new URL(import.meta.url).pathname);
     const realRoot = path.resolve(here, "..", "..", "..");
-    const envRootRaw = (process.env.WORKSPACE_ROOT || process.env.BUCK_TEST_SRC || "").trim();
-    const envRootAbs = envRootRaw ? path.resolve(envRootRaw) : "";
-    const underBuck = Boolean(
-      process.env.BUCK_TEST_TARGET || process.env.BUCK_TARGET || process.env.BUCK_TEST_SRC,
-    );
-    const hasSandboxRoot = Boolean(envRootAbs);
-    const repoRootRaw = String(process.env.REPO_ROOT || "").trim();
-    const liveRootAbs = repoRootRaw ? path.resolve(repoRootRaw) : realRoot;
-    const usingLiveRoot = hasSandboxRoot && envRootAbs === liveRootAbs;
-    if (underBuck && (!hasSandboxRoot || usingLiveRoot)) {
-      console.error(
-        "error: refusing to scaffold in the live repo under Buck tests; ensure WORKSPACE_ROOT points to a temp workspace (use runInTemp)",
-      );
+    if (
+      shouldRefuseLiveRepoScaffold({
+        cwd: process.cwd(),
+        env: process.env,
+        repoRoot: realRoot,
+      })
+    ) {
+      console.error(liveRepoScaffoldGuardMessage());
       process.exit(2);
     }
   } catch {}

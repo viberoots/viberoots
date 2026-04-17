@@ -27,6 +27,9 @@ Use the deeper references when needed:
   for background on why `mini` is set up this way
 - [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
   for the strict system rules behind these workflows
+- [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  for the canonical Vault bring-up path when `mini` deploys need Vault-backed
+  secrets
 
 ## Start Here For `mini` Setup
 
@@ -66,12 +69,16 @@ You only need this guide if:
 For a fresh `mini` install, follow this exact order:
 
 1. run the server install on `mini`
-2. wire `/etc/nixos/bucknix/nixos-shared-host/default.nix` into the
+2. optionally import the reviewed service modules from
+   `/srv/common/build-tools/tools/nix/mini-postgres-module.nix` and
+   `/srv/common/build-tools/tools/nix/mini-vault-module.nix` when you want
+   repo-managed local Postgres and Vault services on `mini`
+3. wire `/etc/nixos/bucknix/nixos-shared-host/default.nix` into the
    authoritative NixOS config and apply it with `sudo nixos-rebuild switch`
-3. start the deployment service and worker on `mini`
-4. install the client profile on each dev machine or Jenkins worker
-5. render a remote plan
-6. run the remote deploy flow
+4. start the deployment service and worker on `mini`
+5. install the client profile on each dev machine or Jenkins worker
+6. render a remote plan
+7. run the remote deploy flow
 
 Use the checklist for the short step-by-step path and the setup guide for the
 full command reference.
@@ -91,6 +98,30 @@ The current supported path includes:
 
 You do not need to read design docs, inspect internal JSON files, or pass
 deployment-service flags directly to the remote wrapper commands.
+
+## Vault For `mini`
+
+If your `mini` deployments use deployment secrets, the canonical Vault setup
+instructions live in
+[Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md).
+
+If you want `mini` itself to run the local services, the reviewed importable
+starting modules live here:
+
+- `/srv/common/build-tools/tools/nix/mini-postgres-module.nix`
+- `/srv/common/build-tools/tools/nix/mini-vault-module.nix`
+
+Use that runbook when you need to:
+
+- initialize and unseal Vault
+- enable audit logging, KV v2, and AppRole
+- create the read policy and AppRole used by deployment secret export
+- write the deployment secrets themselves
+- export a reviewed secret fixture for local/test/bootstrap workflows
+
+This shared-host usage guide does not replace the Vault runbook. It tells you
+how to bring up and use `mini`; the Vault runbook tells you how to bring up the
+secret backend that `mini`-targeted deployments can consume.
 
 ## Install The Reviewed Client Profile
 

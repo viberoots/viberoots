@@ -70,14 +70,19 @@ const EXPECTATIONS: TemplateExpectation[] = [
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-static/"],
   },
   {
+    script: "build-tools/tools/tests/scaffolding/webapp.dev-server.running.test.ts",
+    requiredLabels: ["template:ts/webapp-static", "template:contract", "verify:isolated"],
+    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-static/"],
+  },
+  {
     script:
       "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-contract-and-runtime-smoke.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-next", "template:shared"],
+    requiredLabels: ["template:ts/webapp-ssr-next", "template:shared", "verify:isolated"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr.next-contracts.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-next", "template:contract"],
+    requiredLabels: ["template:ts/webapp-ssr-next", "template:contract", "verify:isolated"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
   },
   {
@@ -92,7 +97,7 @@ const EXPECTATIONS: TemplateExpectation[] = [
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-runtime-consistency.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-next", "template:contract"],
+    requiredLabels: ["template:ts/webapp-ssr-next", "template:contract", "verify:isolated"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
   },
   {
@@ -102,7 +107,7 @@ const EXPECTATIONS: TemplateExpectation[] = [
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.runnable-contracts.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract"],
+    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],
   },
   {
@@ -118,7 +123,7 @@ const EXPECTATIONS: TemplateExpectation[] = [
   {
     script:
       "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-consistency.phase3.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract"],
+    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],
   },
   {

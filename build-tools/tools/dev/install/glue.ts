@@ -3,9 +3,9 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { printSkip } from "../../lib/errors.ts";
-import { getImporterRootsContract } from "../../lib/importer-roots.ts";
 import { nodeFlagsWithZx } from "../../lib/node-run.ts";
 import { findRepoRoot } from "../../lib/repo.ts";
+import { discoverImportersWithLock } from "./importers.ts";
 
 function repoRoot(): string {
   const here = path.dirname(new URL(import.meta.url).pathname);
@@ -129,31 +129,7 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
   if (haveNode && !skipPnpmHash) {
     try {
       const repo = wsRoot;
-      // Reuse the importer roots contract (single source of truth).
-      const importers: string[] = [];
-      const { allowDotImporter, workspaceRoots } = getImporterRootsContract();
-      if (allowDotImporter) {
-        try {
-          await fsp.access(path.join(repo, "pnpm-lock.yaml"));
-          importers.push(".");
-        } catch {}
-      }
-      for (const base of workspaceRoots) {
-        const baseAbs = path.join(repo, base);
-        const entries = await fsp.readdir(baseAbs).catch(() => [] as string[]);
-        for (const name of entries) {
-          const trimmed = String(name || "").trim();
-          if (!trimmed) continue;
-          const impDir = path.join(repo, base, trimmed);
-          const st = await fsp.stat(impDir).catch(() => null);
-          if (!st || !st.isDirectory()) continue;
-          const lock = path.join(impDir, "pnpm-lock.yaml");
-          try {
-            await fsp.access(lock);
-            importers.push(path.join(base, trimmed));
-          } catch {}
-        }
-      }
+      const importers = await discoverImportersWithLock(repo, { cwd: process.cwd() });
       if (importers.length) {
         const updater = path.join(repo, "build-tools/tools/dev/update-pnpm-hash.ts");
         for (const imp of importers) {

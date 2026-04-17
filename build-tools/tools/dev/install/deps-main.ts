@@ -86,12 +86,12 @@ if (glueOnly) {
   } else if (verbose) {
     console.log("[skip] glue regeneration");
   }
-  const glueOnlyImporters = await discoverImportersWithLock(repoRoot);
+  const glueOnlyImporters = await discoverImportersWithLock(repoRoot, { cwd: process.cwd() });
   await syncModuleContractsForWebapps(repoRoot, glueOnlyImporters, dryRun, verbose);
   console.log("Glue refreshed.");
   process.exit(0);
 }
-const importers = await discoverImportersWithLock(repoRoot);
+const importers = await discoverImportersWithLock(repoRoot, { cwd: process.cwd() });
 if (verbose) console.log("[install-deps] discovered importers:", importers.join(", "));
 if (dryRun) {
   for (const imp of importers) {

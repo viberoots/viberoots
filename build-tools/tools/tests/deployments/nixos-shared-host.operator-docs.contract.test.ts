@@ -120,6 +120,26 @@ test("nixos shared host usage guide stays present as the reviewed operator-facin
     /Mini Shared-Dev Deployment Design/,
     "usage guide must link to the design doc",
   );
+  assert.match(
+    usageDoc,
+    /Vault Production Bootstrap Runbook/,
+    "usage guide must point operators at the Vault bootstrap runbook when mini deploys need secrets",
+  );
+  assert.match(
+    usageDoc,
+    /mini-postgres-module\.nix/,
+    "usage guide must point operators at the reviewed importable Postgres module",
+  );
+  assert.match(
+    setupDoc,
+    /mini-postgres-module\.nix/,
+    "setup guide must document the reviewed importable Postgres module",
+  );
+  assert.match(
+    setupDoc,
+    /mini-vault-module\.nix/,
+    "setup guide must document the reviewed importable Vault module",
+  );
   assert.match(usageDoc, /Deployment Contract/, "usage guide must link to the deployment contract");
   assert.match(
     usageDoc,
@@ -131,6 +151,25 @@ test("nixos shared host usage guide stays present as the reviewed operator-facin
     /first documentation entrypoint for setting up\s+`mini`[\s\S]*NixOS Shared Host Usage/,
     "setup guide must point operators at the usage front door as the mini setup entrypoint",
   );
+  assert.match(
+    setupDoc,
+    /Vault Production Bootstrap Runbook/,
+    "setup guide must point operators at the canonical Vault bootstrap runbook",
+  );
+  for (const fragment of [
+    /managed-manual-wire/,
+    /managed-dropin/,
+    /emit-only/,
+    /managed = true/,
+    /wiringState = wired/,
+    /wiringState = missing/,
+  ]) {
+    assert.match(
+      setupDoc,
+      fragment,
+      `setup guide must explain reviewed install-mode or status detail ${String(fragment)}`,
+    );
+  }
   assert.match(
     checklistDoc,
     /NixOS Shared Host Usage/,

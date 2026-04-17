@@ -65,7 +65,7 @@ async function listTestFiles(repoRoot: string): Promise<string[]> {
         stack.push(abs);
         continue;
       }
-      if (entry.name.endsWith(".test.ts")) out.push(abs);
+      if (entry.name.endsWith(".ts")) out.push(abs);
     }
   }
 

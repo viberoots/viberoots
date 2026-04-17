@@ -53,6 +53,11 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "classification": "template:contract",
         "extra_labels": ["verify:isolated"],
     },
+    "build-tools/tools/tests/scaffolding/webapp.dev-server.running.test.ts": {
+        "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static"],
+        "classification": "template:contract",
+        "extra_labels": ["verify:isolated"],
+    },
     "build-tools/tools/tests/scaffolding/webapp-static.dev-multi-module-runtime-contract.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static"],
         "classification": "template:contract",
@@ -76,10 +81,12 @@ _TEMPLATE_TEST_CONVENTIONS = {
     "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-contract-and-runtime-smoke.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
         "classification": "template:shared",
+        "extra_labels": ["verify:isolated"],
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr.next-contracts.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
         "classification": "template:contract",
+        "extra_labels": ["verify:isolated"],
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-hmr.local-ts-dep.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
@@ -93,6 +100,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
     "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-runtime-consistency.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
         "classification": "template:contract",
+        "extra_labels": ["verify:isolated"],
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-multi-module-runtime-contract.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
@@ -105,10 +113,12 @@ _TEMPLATE_TEST_CONVENTIONS = {
     "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-consistency.phase3.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
         "classification": "template:contract",
+        "extra_labels": ["verify:isolated"],
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr-vite.runnable-contracts.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
         "classification": "template:contract",
+        "extra_labels": ["verify:isolated"],
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-hmr.local-ts-dep.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],

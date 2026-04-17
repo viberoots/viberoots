@@ -14,6 +14,12 @@ to technicians when they need the short SOP. Use
 and [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
 for deeper system rules.
 
+If `mini`-targeted deployments need Vault-backed secrets, also open
+[Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md).
+That runbook is the canonical Vault setup path. This setup guide covers the
+shared-host install and control-plane bring-up on `mini`, not Vault bootstrap
+itself.
+
 Current supported scope:
 
 - provider family: `nixos-shared-host`
@@ -22,6 +28,27 @@ Current supported scope:
   - `ssr-webapp` for the reviewed single-component host slice
 - protection class: `shared_nonprod`
 - example deployment: `//projects/deployments/pleomino-dev:deploy`
+
+## When Vault Is In Scope
+
+Use this setup guide for the `mini` host install, config wiring, control-plane
+service, worker, and client profile.
+
+Use [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+for Vault itself.
+
+That is the right next document whether:
+
+- Vault runs on `mini`
+- Vault runs on another machine or cluster that `mini`-targeted deployments
+  consume
+
+In other words:
+
+- `nixos-shared-host-setup.md` explains how to set up the shared-host deploy
+  platform on `mini`
+- `vault-production-bootstrap.md` explains how to set up the Vault backend for
+  deployment secrets
 
 ## Recommended Path For `mini`
 
@@ -40,8 +67,18 @@ The default reviewed path is:
 9. if the service returns `pending_approval`, approve the same frozen run on the
    existing `deploy_run_id`
 
-Use `managed-dropin` only if you want the installer to update the config-entry
-block for you.
+In plain language, `managed-manual-wire` means:
+
+- the installer writes and owns its managed files under
+  `/etc/nixos/bucknix/nixos-shared-host`
+- the installer creates the platform-state, runtime, and records paths it owns
+- the installer does not edit `/etc/nixos/configuration.nix` or your flake entry
+- you add the `/etc/nixos/bucknix/nixos-shared-host/default.nix` import or
+  module entry yourself
+
+Use `managed-dropin` only if you want the installer to update the config entry
+for you. Use `emit-only` only when you want to inspect the generated snippets
+without changing the host.
 
 ## Server Install On `mini`
 
@@ -66,9 +103,44 @@ Expected files and directories:
 - `/var/lib/bucknix/nixos-shared-host/runtime`
 - `/var/lib/bucknix/nixos-shared-host/records`
 
-`managed-manual-wire` is the default because it leaves
-`/etc/nixos/configuration.nix` under your control while still letting the
-installer manage its own files.
+Here, "managed" means "owned by the installer and tracked in
+`install-manifest.json`". Uninstall removes only those managed files and
+directories.
+
+`managed-manual-wire` is the default because it leaves the authoritative NixOS
+config entry under your control while still letting the installer manage its own
+files and runtime directories.
+
+## What `--install-mode` Means
+
+The installer supports three values:
+
+- `managed-manual-wire`
+  Recommended default for `mini`. The installer writes the managed files,
+  creates the state/runtime/records paths, and records them in the install
+  manifest. It does not edit the config entry. After install, `server status`
+  reports `managed = true` and `wiringState = missing` until you add the anchor
+  import and run `nixos-rebuild switch`.
+- `managed-dropin`
+  Hands-off managed install. The installer writes the managed files, creates the
+  state/runtime/records paths, and also edits the config entry you pass in
+  `--config-entry-path` so the anchor is already wired. After install, `server
+status` should report `managed = true` and usually `wiringState = wired`
+  immediately.
+- `emit-only`
+  Preview mode. The installer does not write the managed files, does not create
+  state/runtime/records paths, and does not edit the config entry. Instead, it
+  prints the generated snippet paths, snippet contents, and the instruction that
+  tells you what to wire by hand.
+
+Which mode to choose:
+
+- choose `managed-manual-wire` when you want the reviewed `mini` path and you
+  want to keep the main NixOS config under human review
+- choose `managed-dropin` when you are comfortable letting the installer update
+  the config entry automatically
+- choose `emit-only` when you want to review the generated module and anchor
+  before any host mutation
 
 What the install flags mean:
 
@@ -78,10 +150,13 @@ What the install flags mean:
 - `--config-root /etc/nixos`
   The NixOS config root on `mini`.
 - `--config-entry-path /etc/nixos/configuration.nix`
-  The main NixOS config file that should import the shared-host module.
+  The authoritative NixOS config entry that should import or include the shared
+  host anchor. For `managed-dropin`, this flag is required because the installer
+  edits that file directly. For `managed-manual-wire`, it is still useful
+  because the installer records which file you intend to wire by hand.
 - `--install-mode managed-manual-wire`
-  Recommended default. The installer manages its own files, while you add the
-  import line yourself.
+  Recommended default. The installer manages its own files and runtime
+  directories, while you add the anchor import or module entry yourself.
 
 ## Wire And Verify The Host Config
 
@@ -96,6 +171,10 @@ imports = [
 
 If the host uses a flake-style config entry, add the same anchor path to the
 top-level `modules = [ ... ]` list instead.
+
+This manual wiring step is exactly what makes `managed-manual-wire` "manual
+wire": the installer emitted the anchor file, but you are the one who chooses
+when to add it to the authoritative config entry.
 
 Apply the host config:
 
@@ -118,6 +197,97 @@ What success looks like:
 - `managed` is `true`
 - `wiringState` is `wired`
 - the managed paths listed above still exist
+
+Status field meanings:
+
+- `managed = true`
+  The installer found an install manifest and recognizes the host as one of its
+  managed installs.
+- `wiringState = wired`
+  The config entry currently includes the generated anchor path.
+- `wiringState = missing`
+  The managed files exist, but the config entry does not currently include the
+  anchor path. This is the expected intermediate state right after a fresh
+  `managed-manual-wire` install and before you edit the config entry.
+- `existingManagedPaths`
+  The subset of installer-owned files and directories that still exist on disk.
+  If some are missing, the install has drifted and should be inspected before
+  further changes.
+
+## Optional Importable Service Modules On `mini`
+
+If you also want `mini` itself to run local Postgres and Vault services, the
+repo now includes reviewed importable NixOS modules:
+
+- `/srv/common/build-tools/tools/nix/mini-postgres-module.nix`
+- `/srv/common/build-tools/tools/nix/mini-vault-module.nix`
+
+Use these when the host keeps a checkout of this repo at `/srv/common` and you
+want the service definitions versioned with the rest of the deployment system.
+
+These modules are intentionally opt-in. The shared-host installer does not
+import them for you.
+
+Example `configuration.nix` wiring:
+
+```nix
+imports = [
+  ./hardware-configuration.nix
+  /etc/nixos/bucknix/nixos-shared-host/default.nix
+  /srv/common/build-tools/tools/nix/mini-postgres-module.nix
+  /srv/common/build-tools/tools/nix/mini-vault-module.nix
+];
+```
+
+Example `flake.nix` wiring:
+
+```nix
+modules = [
+  ./configuration.nix
+  /etc/nixos/bucknix/nixos-shared-host/default.nix
+  /srv/common/build-tools/tools/nix/mini-postgres-module.nix
+  /srv/common/build-tools/tools/nix/mini-vault-module.nix
+];
+```
+
+What these modules do:
+
+- `mini-postgres-module.nix`
+  Enables local PostgreSQL on `mini`, pins the reviewed package to
+  `pkgs.postgresql_16`, binds it to `127.0.0.1:5432`, ensures the `deployctl`
+  database exists, and ensures a matching `deployctl` role owns it.
+- `mini-vault-module.nix`
+  Enables local Vault on `mini`, allows the unfree `vault` package, binds Vault
+  to `127.0.0.1:8200`, uses the built-in `raft` storage backend at
+  `/var/lib/vault`, and enables the local UI.
+
+What these modules do not do:
+
+- initialize, unseal, or configure Vault auth, policy, KV mounts, or secrets
+- set Postgres passwords for you
+- start the deploy control-plane service or worker for you
+
+Postgres follow-up after the first `nixos-rebuild switch`:
+
+- set a password for the local `deployctl` database role
+- export `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL` using that credential before
+  you start the service and worker
+
+One reviewed example:
+
+```bash
+sudo -u postgres psql -c "ALTER ROLE deployctl WITH LOGIN PASSWORD 'replace-me';"
+export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:replace-me@127.0.0.1:5432/deployctl'
+```
+
+Vault follow-up after the first `nixos-rebuild switch`:
+
+- use the local service as the installation and lifecycle owner
+- then open [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  for init, unseal, audit, KV v2, AppRole, policy, and secret bootstrap
+
+The Vault module is a host-service baseline, not a substitute for the Vault
+bootstrap runbook.
 
 ## Start The Deployment Service
 
@@ -320,11 +490,12 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
 Install modes:
 
 - `managed-manual-wire`: recommended default
-  Use this when you want the installer to manage its own files but you want to
-  keep the main NixOS config entry under human control.
+  Use this when you want the installer to write and own its managed files, state
+  file, runtime root, and records root, but you want to keep the main NixOS
+  config entry under human control.
 - `managed-dropin`: the installer also manages the config-entry wiring block
   Use this when you want a more hands-off install and are comfortable letting
-  the installer update the config-entry wiring for you.
+  the installer edit the config entry for you.
 - `emit-only`: show what would be installed without changing the host
-  Use this when you want to inspect or review the generated files before making
-  changes on the machine.
+  Use this when you want to inspect the generated module, anchor, and wiring
+  instruction before making any changes on the machine.

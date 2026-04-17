@@ -3,6 +3,7 @@ import path from "node:path";
 import type { ScafContext } from "./types.ts";
 
 import { parseScafArgv } from "./argv.ts";
+import { liveRepoScaffoldGuardMessage, shouldRefuseLiveRepoScaffold } from "./live-repo-guard.ts";
 import { usage } from "./usage.ts";
 
 import { getArgvTokens } from "../../lib/cli.ts";
@@ -27,22 +28,14 @@ function normalizeCwd(repoRoot: string) {
 
 function guardBuckTests(repoRoot: string) {
   try {
-    const envRoot = (process.env.WORKSPACE_ROOT || process.env.BUCK_TEST_SRC || "").trim();
-    const envRootAbs = envRoot ? path.resolve(envRoot) : "";
-    const underBuck = Boolean(
-      process.env.BUCK_TEST_TARGET || process.env.BUCK_TARGET || process.env.BUCK_TEST_SRC,
-    );
-    const hasSandboxRoot = Boolean(envRootAbs);
-    // When running under Buck tests, REPO_ROOT points at the real developer checkout, while
-    // WORKSPACE_ROOT points at the temp workspace (runInTemp). Only block when we're about to
-    // scaffold into the real checkout.
-    const realRootRaw = String(process.env.REPO_ROOT || "").trim();
-    const realRootAbs = realRootRaw ? path.resolve(realRootRaw) : path.resolve(repoRoot);
-    const usingLiveRoot = hasSandboxRoot && envRootAbs === realRootAbs;
-    if (underBuck && (!hasSandboxRoot || usingLiveRoot)) {
-      console.error(
-        "error: refusing to scaffold in the live repo under Buck tests; use runInTemp so WORKSPACE_ROOT points to a temp workspace",
-      );
+    if (
+      shouldRefuseLiveRepoScaffold({
+        cwd: process.cwd(),
+        env: process.env,
+        repoRoot,
+      })
+    ) {
+      console.error(liveRepoScaffoldGuardMessage());
       process.exit(2);
     }
   } catch {}
