@@ -97,6 +97,16 @@ test("nixos shared host usage guide stays present as the reviewed operator-facin
   ]);
   assert.match(
     usageDoc,
+    /start-here entrypoint for first-time `mini` setup/i,
+    "usage guide must declare itself as the mini setup entrypoint",
+  );
+  assert.match(
+    usageDoc,
+    /Start Here For `mini` Setup/,
+    "usage guide must include a dedicated mini setup entrypoint section",
+  );
+  assert.match(
+    usageDoc,
     /NixOS Shared Host Setup/,
     "usage guide must link back to the setup reference",
   );
@@ -118,8 +128,8 @@ test("nixos shared host usage guide stays present as the reviewed operator-facin
   );
   assert.match(
     setupDoc,
-    /NixOS Shared Host Usage/,
-    "setup guide must point operators at the usage front door",
+    /first documentation entrypoint for setting up\s+`mini`[\s\S]*NixOS Shared Host Usage/,
+    "setup guide must point operators at the usage front door as the mini setup entrypoint",
   );
   assert.match(
     checklistDoc,

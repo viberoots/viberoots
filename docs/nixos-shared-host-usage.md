@@ -1,6 +1,7 @@
 # NixOS Shared Host Usage
 
 This is the main day-to-day guide for deployments that go to `mini`.
+It is also the start-here entrypoint for first-time `mini` setup.
 
 If you are new here: `mini` is the shared NixOS machine that receives these
 deployments.
@@ -26,6 +27,22 @@ Use the deeper references when needed:
   for background on why `mini` is set up this way
 - [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
   for the strict system rules behind these workflows
+
+## Start Here For `mini` Setup
+
+If you are setting up `mini` for the first time, start with this page.
+
+Use this entry sequence:
+
+1. stay on this page for the reviewed bring-up order and the first commands to
+   care about
+2. open [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+   when you need the full install, status, uninstall, or alternate-install-mode
+   reference
+3. open [NixOS Shared Host Technician Checklist](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-technician-checklist.md)
+   when you need the short SOP handoff
+4. open [Mini Shared-Dev Deployment Design](/Users/kiltyj/Code/bucknix-fresh/docs/mini-deployment.md)
+   only when you need the design rationale behind the `mini` workflow
 
 Current supported scope:
 

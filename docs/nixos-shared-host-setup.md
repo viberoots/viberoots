@@ -3,7 +3,11 @@
 This is the install and maintenance reference for the supported
 `nixos-shared-host` workflow on `mini`.
 
-Start with [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md) if you want the operator-facing day-to-day path first. Hand
+If you are looking for the first documentation entrypoint for setting up
+`mini`, start with
+[NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md).
+This page is the detailed install and maintenance reference that page sends you
+to. Hand
 [NixOS Shared Host Technician Checklist](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-technician-checklist.md)
 to technicians when they need the short SOP. Use
 [Mini Shared-Dev Deployment Design](/Users/kiltyj/Code/bucknix-fresh/docs/mini-deployment.md)

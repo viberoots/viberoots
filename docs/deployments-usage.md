@@ -29,7 +29,8 @@ Use the deeper docs when needed:
 - [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md)
   for canonical scenario-by-scenario expectations
 - [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
-  for the reviewed `mini` host workflow
+  for the reviewed `mini` host workflow and the start-here path for first-time
+  `mini` setup
 
 ## Main Command
 

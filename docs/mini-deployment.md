@@ -3,6 +3,12 @@
 This document defines a concrete design for using `mini` as the shared development deployment
 destination for application environments served under `*.apps.kilty.io`.
 
+Do not start here when you are trying to set up `mini`.
+Start with [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+for the reviewed operator-facing entrypoint, then open
+[NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+for the install and maintenance reference.
+
 The reviewed provider family is `nixos-shared-host`. In this document, `mini` is the current
 concrete NixOS host instance for that provider shape, not a machine-specific requirement baked into
 the provider contract itself.
