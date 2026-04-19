@@ -9451,6 +9451,145 @@ land as one coherent operator-UX improvement sequence.
 
 ---
 
+## PR-72: Cloudflare preview-cleanup secret boundary + AppRole operator-doc closeout
+
+### Description
+
+I will close the remaining JWT/Vault closeout gaps found after PR-71: Cloudflare Pages preview
+cleanup is still a destructive protected/shared provider operation that reads an ambient
+`CLOUDFLARE_API_TOKEN`, and the `mini` operator docs still present AppRole as part of the normal
+deployment secret workflow. This PR brings preview cleanup under the same reviewed secret/admission
+boundary as publish and smoke, then tightens the operator docs so AppRole is no longer described as
+the reviewed production deployment credential path.
+
+### Scope & Changes
+
+- Extend the reviewed deployment secret requirement step model so provider cleanup credentials can
+  be expressed without ambient environment variables, for example:
+  - add a reviewed `preview_cleanup` lifecycle step
+  - preserve existing `publish`, `smoke`, and `release_actions.*` semantics unchanged
+  - keep validation fail-closed for unknown or unsupported secret requirement steps
+- Update Cloudflare Pages preview cleanup so the normal protected/shared path:
+  - resolves cleanup credentials through the admitted secret-reference runtime
+  - uses the same Vault/JWT-backed direct secret path as other production secret-consuming flows
+  - does not read `CLOUDFLARE_API_TOKEN` directly except in an explicitly reviewed low-level
+    break-glass/test path if one is retained
+  - records only non-secret admitted reference material in execution snapshots, replay snapshots,
+    deploy records, logs, and operator-visible status
+- Require Cloudflare preview-cleanup submissions to preserve the cleanup admitted secret-reference
+  set needed for deterministic execution and replay.
+- Update the concrete Pleomino Cloudflare Pages deployment packages, or a reviewed shared helper if
+  preferred, so staging/prod declare the Cloudflare API token contract needed by publish and preview
+  cleanup instead of depending on ambient wrangler shell state.
+- Make preview-cleanup behavior fail closed when:
+  - the deployment does not declare the required cleanup credential
+  - the admitted reference cannot be resolved exactly
+  - the credential is not authorized for `preview_cleanup`
+  - both a reviewed secret runtime path and an ambient provider token are present in a conflicting
+    way
+- Remove stale AppRole normal-path wording from the `mini` setup and usage docs:
+  - AppRole may be mentioned only as an explicit bootstrap/debugging fallback when that distinction
+    is necessary
+  - the normal production deployment credential story must remain JWT-first remote Vault auth
+  - docs must point operators at `deploy --print-vault-bootstrap`, `deploy-vault-jwt`, and the
+    reviewed `BNX_VAULT_AUTH_METHOD=jwt` runtime contract for normal deployments
+
+### Tests (in this PR)
+
+- Add or extend Cloudflare Pages preview-cleanup tests proving:
+  - cleanup uses admitted secret references for the reviewed protected/shared path
+  - secret values are not persisted in records, snapshots, logs, or operator-visible responses
+  - missing or unauthorized `preview_cleanup` credentials fail closed before mutation
+  - the old ambient `CLOUDFLARE_API_TOKEN` path is rejected for normal protected/shared cleanup
+  - any retained break-glass/test token path is explicit, audited, and not selected by default
+- Add deployment requirement validation tests for the new `preview_cleanup` secret step.
+- Add extraction tests proving the concrete Pleomino Cloudflare Pages `TARGETS` emit the required
+  Cloudflare API token secret requirements for publish and preview cleanup.
+- Add docs/front-door parity tests proving:
+  - the setup guide and usage guide no longer present AppRole as the normal deployment secret path
+  - the Vault runbook remains the canonical place for any explicitly documented bootstrap/debugging
+    AppRole fallback
+  - operator docs describe JWT-first remote Vault auth for normal deployments and secret fixture
+    usage only for reviewed local/test/bootstrap workflows
+
+### Docs (in this PR)
+
+- Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+  and [Secrets Usage](/Users/kiltyj/Code/bucknix-fresh/docs/secrets-usage.md) to include the
+  reviewed `preview_cleanup` lifecycle step and explain how provider cleanup credentials are
+  declared, admitted, and consumed.
+- Update [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) if
+  needed so preview cleanup is clearly inside the protected/shared admitted secret-reference
+  boundary.
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  and [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  so the `mini` secret workflow is JWT-first and does not direct normal operators toward AppRole.
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  only as needed to preserve the explicit boundary between bootstrap/debugging fallbacks and the
+  normal JWT-first deployment runtime.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - Cloudflare Pages preview-cleanup secret runtime behavior
+  - deployment requirement validation for `preview_cleanup`
+  - Pleomino Cloudflare Pages secret requirement extraction
+  - docs/front-door parity for JWT-first operator guidance and AppRole fallback wording
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR touches deployment secret contracts, Cloudflare Pages provider execution, concrete
+  deployment packages, provider/runtime tests, and operator docs. Under the deployment-only verify
+  policy, run the full build-system verify scope unless classifier coverage proves the exact changed
+  paths are safely deployment-owned.
+
+### Acceptance Criteria
+
+- Cloudflare Pages preview cleanup no longer depends on an ambient `CLOUDFLARE_API_TOKEN` for the
+  reviewed protected/shared path.
+- Preview-cleanup credentials are declared through `secret_requirements`, admitted as non-secret
+  references, and consumed through the reviewed Vault/JWT-backed runtime boundary.
+- Pleomino Cloudflare Pages staging/prod deployments declare the reviewed Cloudflare API token
+  contracts needed for publish and cleanup.
+- Secret values still never cross into Buck metadata, checked-in files, control-plane payloads,
+  replay snapshots, deploy records, logs, or operator-visible status surfaces.
+- `mini` operator docs describe one coherent JWT-first production Vault credential story, with
+  AppRole limited to explicit bootstrap/debugging fallback wording if it remains documented at all.
+- Tests fail closed if ambient provider-token cleanup or stale AppRole normal-path guidance is
+  reintroduced.
+
+### Risks
+
+This change cuts across provider cleanup, secret lifecycle typing, concrete deployment metadata,
+and operator docs. The main risk is accidentally making cleanup credentials too broad or creating a
+compatibility path that silently falls back to ambient provider tokens.
+
+### Mitigation
+
+Keep `preview_cleanup` as a narrow reviewed lifecycle step, require explicit secret requirements,
+reuse the existing admitted secret-reference runtime, and add fail-closed tests for both missing
+credentials and ambient-token fallback.
+
+### Consequence of Not Implementing
+
+The deployment plan would continue to overstate the final JWT/Vault closeout: preview cleanup would
+remain outside the reviewed secret boundary, and `mini` operators would still see AppRole described
+as part of the normal deployment secret workflow.
+
+### Downsides for Implementing
+
+Adds one more reviewed lifecycle step and requires updating concrete deployment metadata and tests
+that previously assumed preview cleanup could use provider ambient shell state.
+
+### Recommendation
+
+Implement immediately after PR-71 so the JWT-first Vault and identity-provider closeout is followed
+by one final pass over destructive provider cleanup and operator-facing credential guidance.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
