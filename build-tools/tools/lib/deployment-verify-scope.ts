@@ -8,6 +8,7 @@ export const REVIEWED_DEPLOYMENT_OWNED_BUILD_SYSTEM_PREFIXES = [
 ] as const;
 
 export const REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS = [
+  "build-tools/tools/nix/mini-identity-provider-module.nix",
   "build-tools/tools/nix/mini-postgres-module.nix",
   "build-tools/tools/nix/mini-vault-module.nix",
   "build-tools/tools/nix/nixos-shared-host-module.nix",

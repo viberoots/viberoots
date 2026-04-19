@@ -76,3 +76,67 @@ test("mini vault module evaluates as an importable reviewed host module", async 
     assert.equal(out.storagePath, "/var/lib/vault");
   });
 });
+
+test("mini identity provider module evaluates as reviewed Keycloak defaults", async () => {
+  await runInTemp("mini-identity-provider-module-eval", async (tmp, $) => {
+    const expr = `
+      let
+        system = import <nixpkgs/nixos> {
+          configuration = {
+            imports = [ ./build-tools/tools/nix/mini-identity-provider-module.nix ];
+            system.stateVersion = "24.11";
+          };
+        };
+        host = system.config.bucknix.mini.identityProvider.hostname;
+        vhost = system.config.services.nginx.virtualHosts.\${host};
+      in {
+        enabled = system.config.services.keycloak.enable;
+        package = system.config.services.keycloak.package.pname;
+        hostname = system.config.services.keycloak.settings.hostname;
+        httpHost = system.config.services.keycloak.settings.http-host;
+        httpPort = system.config.services.keycloak.settings.http-port;
+        databaseType = system.config.services.keycloak.database.type;
+        passwordFile = system.config.services.keycloak.database.passwordFile;
+        initialAdminPassword =
+          system.config.services.keycloak.initialAdminPassword or null;
+        nginxEnabled = system.config.services.nginx.enable;
+        forceSSL = vhost.forceSSL;
+        enableACME = vhost.enableACME;
+        proxyPass = vhost.locations."/".proxyPass;
+        acmeEmail = system.config.security.acme.defaults.email;
+        firewallPorts = system.config.networking.firewall.allowedTCPPorts;
+      }
+    `;
+    const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;
+    const out = JSON.parse(String(stdout || "{}")) as {
+      enabled: boolean;
+      package: string;
+      hostname: string;
+      httpHost: string;
+      httpPort: number;
+      databaseType: string;
+      passwordFile: string;
+      initialAdminPassword: string | null;
+      nginxEnabled: boolean;
+      forceSSL: boolean;
+      enableACME: boolean;
+      proxyPass: string;
+      acmeEmail: string;
+      firewallPorts: number[];
+    };
+    assert.equal(out.enabled, true);
+    assert.equal(out.package, "keycloak");
+    assert.equal(out.hostname, "identity.apps.kilty.io");
+    assert.equal(out.httpHost, "127.0.0.1");
+    assert.equal(out.httpPort, 8081);
+    assert.equal(out.databaseType, "postgresql");
+    assert.equal(out.passwordFile, "/var/lib/mini-secrets/keycloak-db-password");
+    assert.equal(out.initialAdminPassword, null);
+    assert.equal(out.nginxEnabled, true);
+    assert.equal(out.forceSSL, true);
+    assert.equal(out.enableACME, true);
+    assert.equal(out.proxyPass, "http://127.0.0.1:8081");
+    assert.equal(out.acmeEmail, "ops@example.com");
+    assert.deepEqual(out.firewallPorts, [80, 443]);
+  });
+});

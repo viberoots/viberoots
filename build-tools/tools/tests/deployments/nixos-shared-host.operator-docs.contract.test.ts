@@ -131,6 +131,26 @@ test("nixos shared host usage guide stays present as the reviewed operator-facin
     "usage guide must point operators at the reviewed importable Postgres module",
   );
   assert.match(
+    usageDoc,
+    /mini-identity-provider-module\.nix/,
+    "usage guide must point operators at the reviewed importable identity-provider module",
+  );
+  assert.match(
+    usageDoc,
+    /deploy-vault-jwt/,
+    "usage guide must mention the reviewed workload-JWT helper",
+  );
+  assert.match(
+    setupDoc,
+    /mini-identity-provider-module\.nix/,
+    "setup guide must document the reviewed importable identity-provider module",
+  );
+  assert.match(
+    setupDoc,
+    /deploy-vault-jwt/,
+    "setup guide must mention the reviewed workload-JWT helper",
+  );
+  assert.match(
     setupDoc,
     /mini-postgres-module\.nix/,
     "setup guide must document the reviewed importable Postgres module",

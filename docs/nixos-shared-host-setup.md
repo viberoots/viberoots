@@ -20,6 +20,17 @@ That runbook is the canonical Vault setup path. This setup guide covers the
 shared-host install and control-plane bring-up on `mini`, not Vault bootstrap
 itself.
 
+For repo-managed local Vault support on `mini`, the reviewed optional service
+modules live at:
+
+- `/srv/common/build-tools/tools/nix/mini-identity-provider-module.nix`
+- `/srv/common/build-tools/tools/nix/mini-postgres-module.nix`
+- `/srv/common/build-tools/tools/nix/mini-vault-module.nix`
+
+The Vault runbook shows how to use the identity-provider module and the
+reviewed `deploy-vault-jwt` helper when `mini` mints client-credentials
+workload JWTs for Vault JWT auth.
+
 Current supported scope:
 
 - provider family: `nixos-shared-host`

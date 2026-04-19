@@ -727,72 +727,39 @@ Host-level requirements for the `mini` identity provider:
 - Issued tokens use the exact issuer string
   `https://identity.apps.kilty.io/realms/deployments`.
 
-Create a host module in the private `mini` NixOS flake, for example
-`/etc/nixos/modules/mini-identity-provider.nix`:
+Use the reviewed importable module from the repo checkout instead of copying
+Keycloak service config into the private host flake:
 
 ```nix
-{ config, pkgs, ... }:
-
 {
-  services.keycloak = {
-    enable = true;
-
-    # The NixOS module uses PostgreSQL by default. This creates the local
-    # database and role, but the database password still comes from an
-    # out-of-store file.
-    database = {
-      type = "postgresql";
-      createLocally = true;
-      passwordFile = "/var/lib/mini-secrets/keycloak-db-password";
-    };
-
-    # Bootstrap only. This value is not stored safely by the NixOS Keycloak
-    # module, so keep it out of public repo state and change it immediately
-    # after the first admin login.
-    initialAdminPassword = "replace-after-first-login";
-
-    settings = {
-      hostname = "identity.apps.kilty.io";
-      http-enabled = true;
-      http-host = "127.0.0.1";
-      http-port = 8081;
-      proxy-headers = "xforwarded";
-      hostname-backchannel-dynamic = true;
-    };
-  };
-
-  services.nginx.enable = true;
-  services.nginx.virtualHosts."identity.apps.kilty.io" = {
-    forceSSL = true;
-    enableACME = true;
-    locations."/" = {
-      proxyPass = "http://127.0.0.1:8081";
-      proxyWebsockets = true;
-      extraConfig = ''
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Port 443;
-        proxy_set_header X-Forwarded-Proto https;
-      '';
-    };
-  };
-
-  security.acme.acceptTerms = true;
-  security.acme.defaults.email = "ops@example.com";
-  networking.firewall.allowedTCPPorts = [ 80 443 ];
-
-  environment.systemPackages = with pkgs; [
-    config.services.keycloak.package
-    curl
-    jq
+  imports = [
+    /srv/common/build-tools/tools/nix/mini-identity-provider-module.nix
   ];
+
+  bucknix.mini.identityProvider = {
+    hostname = "identity.apps.kilty.io";
+    acmeEmail = "ops@example.com";
+    keycloakHttpPort = 8081;
+    databasePasswordFile = "/var/lib/mini-secrets/keycloak-db-password";
+
+    # Set these to false when the existing host config already owns nginx,
+    # certificate integration, or firewall ports.
+    manageNginx = true;
+    manageAcme = true;
+    openFirewall = true;
+  };
 }
 ```
 
+The module enables Keycloak with a local PostgreSQL database, binds the HTTP
+listener to `127.0.0.1`, wires the nginx virtual host for reverse proxying, and
+keeps the database password file as an out-of-store path. It does not set a
+bootstrap admin password or commit client secrets; create those through the
+Keycloak bootstrap/admin flow and rotate them immediately after first use.
+
 If the existing `mini` host module already configures nginx, ACME defaults, or
-firewall ports, merge the Keycloak-specific settings into the existing
-declarations instead of defining those options a second time.
+firewall ports, set the relevant `bucknix.mini.identityProvider.*` ownership
+flags to `false` and merge only the host-owned pieces in that config.
 
 Wire the module into the host flake. In a minimal flake this looks like:
 
@@ -807,7 +774,7 @@ Wire the module into the host flake. In a minimal flake this looks like:
       system = "x86_64-linux";
       modules = [
         ./configuration.nix
-        ./modules/mini-identity-provider.nix
+        /srv/common/build-tools/tools/nix/mini-identity-provider-module.nix
       ];
     };
   };
@@ -914,32 +881,24 @@ The reported `issuer` must be exactly:
 https://identity.apps.kilty.io/realms/deployments
 ```
 
-Mint a test client-credentials token and inspect the claims before wiring Vault
-to it:
+Mint a test client-credentials token through the reviewed helper and inspect
+the claims before wiring Vault to it. The helper discovers the token endpoint
+from OIDC metadata, reads the client secret from the named environment
+variable, writes the JWT with restrictive file permissions, and fails closed if
+the expected issuer, audience, `azp`, or bound claims are missing:
 
 ```bash
 export BNX_DEPLOYER_CLIENT_SECRET='<client-secret-from-keycloak>'
 
-access_token="$(
-  curl -fsS \
-    -X POST \
-    "https://identity.apps.kilty.io/realms/deployments/protocol/openid-connect/token" \
-    -H "Content-Type: application/x-www-form-urlencoded" \
-    --data-urlencode "grant_type=client_credentials" \
-    --data-urlencode "client_id=deployment-runner" \
-    --data-urlencode "client_secret=$BNX_DEPLOYER_CLIENT_SECRET" \
-    | jq -r '.access_token'
-)"
-
-jq -R 'split(".") | .[1] | @base64d | fromjson | {
-  iss,
-  aud,
-  azp,
-  deployment_environment,
-  repository,
-  sub,
-  exp
-}' <<<"$access_token"
+deploy-vault-jwt \
+  --issuer https://identity.apps.kilty.io/realms/deployments \
+  --client-id deployment-runner \
+  --client-secret-env BNX_DEPLOYER_CLIENT_SECRET \
+  --out /tmp/mini-workload.jwt \
+  --audience deployments-vault \
+  --expect-claim deployment_environment=mini \
+  --expect-claim repository=kiltyj/bucknix-fresh \
+  --print-claims
 ```
 
 If the decoded token does not contain the exact issuer, audience, and bound
@@ -1144,14 +1103,14 @@ can mint the workload JWT before invoking `deploy`:
 ```bash
 mkdir -p .local
 
-curl -fsS \
-  -X POST \
-  "https://identity.apps.kilty.io/realms/deployments/protocol/openid-connect/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "grant_type=client_credentials" \
-  --data-urlencode "client_id=deployment-runner" \
-  --data-urlencode "client_secret=$BNX_DEPLOYER_CLIENT_SECRET" \
-  | jq -r '.access_token' > .local/workload.jwt
+deploy-vault-jwt \
+  --issuer https://identity.apps.kilty.io/realms/deployments \
+  --client-id deployment-runner \
+  --client-secret-env BNX_DEPLOYER_CLIENT_SECRET \
+  --out "$PWD/.local/workload.jwt" \
+  --audience deployments-vault \
+  --expect-claim deployment_environment=mini \
+  --expect-claim repository=kiltyj/bucknix-fresh
 
 export VAULT_ADDR='https://secrets.apps.kilty.io:8200'
 export BNX_VAULT_AUTH_METHOD=jwt
@@ -1160,8 +1119,8 @@ export BNX_VAULT_JWT_FILE="$PWD/.local/workload.jwt"
 unset VAULT_TOKEN
 ```
 
-The token endpoint URL, client id, audience mapper, and bound claims must match
-the identity-provider configuration from Step 5 and the Vault role from Step 7.
+The issuer URL, client id, audience mapper, and bound claims must match the
+identity-provider configuration from Step 5 and the Vault role from Step 7.
 
 If JWT login fails, the deployment helper fails closed. Common causes are an
 expired JWT, wrong audience, wrong issuer, missing role binding, rejected bound

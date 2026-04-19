@@ -41,6 +41,7 @@ The initial deployment-owned build-system boundary is intentionally narrow:
 - `build-tools/tools/deployments/**`
 - `build-tools/tools/tests/deployments/**`
 - reviewed deployment-owned support files outside those primary prefixes:
+  - `build-tools/tools/nix/mini-identity-provider-module.nix`
   - `build-tools/tools/nix/mini-postgres-module.nix`
   - `build-tools/tools/nix/mini-vault-module.nix`
   - `build-tools/tools/nix/nixos-shared-host-module.nix`
@@ -137,6 +138,7 @@ inside the repo-wide owner-local methodology gate:
   - `build-tools/deployments/**`
   - `build-tools/tools/deployments/**`
   - `build-tools/tools/tests/deployments/**`
+  - `build-tools/tools/nix/mini-identity-provider-module.nix`
   - `build-tools/tools/nix/mini-postgres-module.nix`
   - `build-tools/tools/nix/mini-vault-module.nix`
   - `build-tools/tools/nix/nixos-shared-host-module.nix`

@@ -70,9 +70,10 @@ For a fresh `mini` install, follow this exact order:
 
 1. run the server install on `mini`
 2. optionally import the reviewed service modules from
+   `/srv/common/build-tools/tools/nix/mini-identity-provider-module.nix`,
    `/srv/common/build-tools/tools/nix/mini-postgres-module.nix` and
    `/srv/common/build-tools/tools/nix/mini-vault-module.nix` when you want
-   repo-managed local Postgres and Vault services on `mini`
+   repo-managed local identity-provider, Postgres, and Vault services on `mini`
 3. wire `/etc/nixos/bucknix/nixos-shared-host/default.nix` into the
    authoritative NixOS config and apply it with `sudo nixos-rebuild switch`
 4. start the deployment service and worker on `mini`
@@ -110,11 +111,13 @@ starting modules live here:
 
 - `/srv/common/build-tools/tools/nix/mini-postgres-module.nix`
 - `/srv/common/build-tools/tools/nix/mini-vault-module.nix`
+- `/srv/common/build-tools/tools/nix/mini-identity-provider-module.nix`
 
 Use that runbook when you need to:
 
 - initialize and unseal Vault
 - enable audit logging, KV v2, and AppRole
+- run the reviewed `deploy-vault-jwt` helper for client-credentials workload JWTs
 - create the read policy and AppRole used by deployment secret export
 - write the deployment secrets themselves
 - export a reviewed secret fixture for local/test/bootstrap workflows
