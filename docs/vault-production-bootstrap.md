@@ -603,14 +603,271 @@ vault auth enable jwt
 ```
 
 Configure the issuer and audience model for your CI or workload identity
-provider. Example values are intentionally placeholders; use the issuer URL,
-audience, and JWKS or OIDC discovery path that your deployment runner actually
-uses:
+provider.
+
+If `mini` is also the identity provider, make the issuer a real HTTPS name that
+both Vault and deployment runners can reach. The reviewed shape is:
+
+- issuer URL: `https://identity.apps.kilty.io/realms/deployments`
+- Vault URL: `https://secrets.apps.kilty.io:8200`
+- deployment audience: `deployments-vault`
+- deployment client id: `deployment-runner`
+- deployment role: `deploy-pleomino-read`
+
+Run the identity provider on `mini` as an OIDC issuer. Keycloak is the most
+practical default when `mini` itself needs to mint non-interactive machine
+tokens because it supports confidential clients and client-credentials token
+flows. Dex is lighter, but use it only when it brokers to another workload
+identity source or when you add a reviewed non-interactive token-minting path.
+
+The realm name is intentionally `deployments`, not the repository or product
+name. If the project is renamed later, keep the issuer stable unless you are
+also ready to update Vault's JWT config, the Vault role bindings, and every
+deployment runner that mints tokens.
+
+### Step 5A: Add Keycloak To The `mini` Flake
+
+Host-level requirements for the `mini` identity provider:
+
+- DNS for `identity.apps.kilty.io` points at `mini`.
+- TLS for `identity.apps.kilty.io` is managed declaratively, like the Vault
+  hostnames in this runbook.
+- The OIDC issuer metadata is available at:
+  `https://identity.apps.kilty.io/realms/deployments/.well-known/openid-configuration`
+- The issuer's JWKS endpoint is reachable from Vault.
+- Issued tokens use the exact issuer string
+  `https://identity.apps.kilty.io/realms/deployments`.
+
+Create a host module in the private `mini` NixOS flake, for example
+`/etc/nixos/modules/mini-identity-provider.nix`:
+
+```nix
+{ config, pkgs, ... }:
+
+{
+  services.keycloak = {
+    enable = true;
+
+    # The NixOS module uses PostgreSQL by default. This creates the local
+    # database and role, but the database password still comes from an
+    # out-of-store file.
+    database = {
+      type = "postgresql";
+      createLocally = true;
+      passwordFile = "/var/lib/mini-secrets/keycloak-db-password";
+    };
+
+    # Bootstrap only. This value is not stored safely by the NixOS Keycloak
+    # module, so keep it out of public repo state and change it immediately
+    # after the first admin login.
+    initialAdminPassword = "replace-after-first-login";
+
+    settings = {
+      hostname = "identity.apps.kilty.io";
+      http-enabled = true;
+      http-host = "127.0.0.1";
+      http-port = 8081;
+      proxy-headers = "xforwarded";
+      hostname-backchannel-dynamic = true;
+    };
+  };
+
+  services.nginx.enable = true;
+  services.nginx.virtualHosts."identity.apps.kilty.io" = {
+    forceSSL = true;
+    enableACME = true;
+    locations."/" = {
+      proxyPass = "http://127.0.0.1:8081";
+      proxyWebsockets = true;
+      extraConfig = ''
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header X-Forwarded-Proto https;
+      '';
+    };
+  };
+
+  security.acme.acceptTerms = true;
+  security.acme.defaults.email = "ops@example.com";
+  networking.firewall.allowedTCPPorts = [ 80 443 ];
+
+  environment.systemPackages = with pkgs; [
+    config.services.keycloak.package
+    curl
+    jq
+  ];
+}
+```
+
+If the existing `mini` host module already configures nginx, ACME defaults, or
+firewall ports, merge the Keycloak-specific settings into the existing
+declarations instead of defining those options a second time.
+
+Wire the module into the host flake. In a minimal flake this looks like:
+
+```nix
+{
+  description = "mini host";
+
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+  outputs = { nixpkgs, ... }: {
+    nixosConfigurations.mini = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ./configuration.nix
+        ./modules/mini-identity-provider.nix
+      ];
+    };
+  };
+}
+```
+
+Before rebuilding, create the database password file on `mini`. Keep this file
+out of git and replace this manual step with the host's reviewed secret
+management system when one is available:
+
+```bash
+sudo install -d -m 0700 /var/lib/mini-secrets
+openssl rand -base64 36 \
+  | sudo tee /var/lib/mini-secrets/keycloak-db-password >/dev/null
+sudo chmod 0600 /var/lib/mini-secrets/keycloak-db-password
+```
+
+Apply the host configuration:
+
+```bash
+sudo nixos-rebuild switch --flake /etc/nixos#mini
+```
+
+Confirm that Keycloak and nginx are up:
+
+```bash
+systemctl status keycloak.service
+systemctl status nginx.service
+sudo ss -ltnp | grep ':8081'
+```
+
+Confirm the public issuer name resolves and serves OIDC metadata. The realm does
+not exist yet, so a `404` here is acceptable before Step 5B; TLS and routing
+errors are not:
+
+```bash
+getent hosts identity.apps.kilty.io
+curl -I https://identity.apps.kilty.io/
+```
+
+### Step 5B: Create The Deployment Realm And Client
+
+Sign in to the Keycloak admin console at:
+
+```text
+https://identity.apps.kilty.io/admin
+```
+
+Use the bootstrap admin account only long enough to create a real operator
+account, rotate the bootstrap password, and configure the deployment realm.
+
+Identity-provider configuration checklist:
+
+1. Create a realm named `deployments`.
+2. Create a confidential OpenID Connect client named `deployment-runner`.
+3. Enable a non-interactive token flow for that client, such as client
+   credentials.
+4. Add an audience mapper so deployment tokens include
+   `aud = "deployments-vault"`.
+5. Add stable bound claims that Vault can check, such as:
+   - `azp = "deployment-runner"`
+   - `deployment_environment = "mini"`
+   - `repository = "kiltyj/bucknix"`
+6. Store the client secret outside the repo, for example in the Jenkins
+   credential store or the reviewed host secret store.
+
+One practical Keycloak admin-console path is:
+
+1. Open `Manage realms`, create the `deployments` realm, and switch into it.
+2. Open `Clients`, create `deployment-runner`, and select the OpenID Connect
+   client type.
+3. Turn on `Client authentication`.
+4. Turn on `Service accounts roles`.
+5. Turn off browser-oriented flows unless they are needed for a reviewed human
+   login path.
+6. In the client credentials tab, copy the generated client secret into the
+   Jenkins credential or host secret named by the deployment runner, such as
+   `BNX_DEPLOYER_CLIENT_SECRET`.
+7. In the client's dedicated client scope, add an `Audience` mapper with
+   `Included Custom Audience` set to `deployments-vault`, and include it in the
+   access token.
+8. In the same scope, add a `Hardcoded claim` mapper for
+   `deployment_environment` with value `mini`, JSON type `String`, and access
+   token inclusion enabled.
+9. Add another `Hardcoded claim` mapper for `repository` with value
+   `kiltyj/bucknix`, JSON type `String`, and access token inclusion enabled.
+
+The `repository` claim should match the current repository identity used by the
+CI or deployment runner. If the repository is renamed, update that mapper and
+the Vault role's `bound_claims` at the same time.
+
+After creating the realm, verify the issuer metadata:
+
+```bash
+curl -fsS \
+  https://identity.apps.kilty.io/realms/deployments/.well-known/openid-configuration \
+  | jq '{issuer, jwks_uri, token_endpoint}'
+```
+
+The reported `issuer` must be exactly:
+
+```text
+https://identity.apps.kilty.io/realms/deployments
+```
+
+Mint a test client-credentials token and inspect the claims before wiring Vault
+to it:
+
+```bash
+export BNX_DEPLOYER_CLIENT_SECRET='<client-secret-from-keycloak>'
+
+access_token="$(
+  curl -fsS \
+    -X POST \
+    "https://identity.apps.kilty.io/realms/deployments/protocol/openid-connect/token" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    --data-urlencode "grant_type=client_credentials" \
+    --data-urlencode "client_id=deployment-runner" \
+    --data-urlencode "client_secret=$BNX_DEPLOYER_CLIENT_SECRET" \
+    | jq -r '.access_token'
+)"
+
+jq -R 'split(".") | .[1] | @base64d | fromjson | {
+  iss,
+  aud,
+  azp,
+  deployment_environment,
+  repository,
+  sub,
+  exp
+}' <<<"$access_token"
+```
+
+If the decoded token does not contain the exact issuer, audience, and bound
+claims shown above, fix the Keycloak realm or client mappers before continuing.
+
+The NixOS Keycloak module also supports `services.keycloak.realmFiles` for
+declarative realm imports. That is useful once the shape is stable, but do not
+put generated client secrets or bootstrap admin passwords in a realm JSON file
+that will enter the Nix store.
+
+### Step 5C: Point Vault At The `mini` Issuer
+
+Then point Vault's JWT auth method at the real `mini` issuer:
 
 ```bash
 vault write auth/jwt/config \
-  oidc_discovery_url="https://issuer.example.net" \
-  bound_issuer="https://issuer.example.net"
+  oidc_discovery_url="https://identity.apps.kilty.io/realms/deployments" \
+  bound_issuer="https://identity.apps.kilty.io/realms/deployments"
 ```
 
 Use JWT auth when a CI job or deployment helper needs machine-to-machine access
@@ -650,8 +907,8 @@ Create a JWT role that uses that read policy:
 ```bash
 vault write auth/jwt/role/deploy-pleomino-read \
   role_type="jwt" \
-  bound_audiences="bucknix-deployments" \
-  bound_claims='{"repository":"kiltyj/bucknix"}' \
+  bound_audiences="deployments-vault" \
+  bound_claims='{"azp":"deployment-runner","deployment_environment":"mini","repository":"kiltyj/bucknix"}' \
   user_claim="sub" \
   token_policies="deploy-pleomino-read" \
   token_ttl="30m" \
@@ -662,12 +919,12 @@ Example values and when to use them:
 
 - `token_policies="deploy-pleomino-read"`
   Attach only the read policy created above.
-- `bound_audiences="bucknix-deployments"`
+- `bound_audiences="deployments-vault"`
   Require the workload JWT audience expected by deployment jobs.
-- `bound_claims='{"repository":"kiltyj/bucknix"}'`
-  Bind the role to reviewed workload identity claims. Use your provider's stable
-  claims for repository, project, service account, branch, environment, or job
-  identity.
+- `bound_claims='{"azp":"deployment-runner","deployment_environment":"mini","repository":"kiltyj/bucknix"}'`
+  Bind the role to reviewed workload identity claims. Use the provider's stable
+  claims for the deployment client, environment, repository, project, service
+  account, branch, or job identity.
 - `user_claim="sub"`
   Use the workload subject as Vault's display identity for auditability.
 - `token_ttl="30m"`
@@ -757,6 +1014,31 @@ unset VAULT_TOKEN
 
 Use `BNX_VAULT_JWT` instead of `BNX_VAULT_JWT_FILE` only when the CI system
 delivers the signed JWT as an environment variable. Do not set both.
+
+For a `mini`-hosted Keycloak-style issuer, a Jenkins worker or deployment runner
+can mint the workload JWT before invoking `deploy`:
+
+```bash
+mkdir -p .local
+
+curl -fsS \
+  -X POST \
+  "https://identity.apps.kilty.io/realms/deployments/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "grant_type=client_credentials" \
+  --data-urlencode "client_id=deployment-runner" \
+  --data-urlencode "client_secret=$BNX_DEPLOYER_CLIENT_SECRET" \
+  | jq -r '.access_token' > .local/workload.jwt
+
+export VAULT_ADDR='https://secrets.apps.kilty.io:8200'
+export BNX_VAULT_AUTH_METHOD=jwt
+export BNX_VAULT_JWT_ROLE='deploy-pleomino-read'
+export BNX_VAULT_JWT_FILE="$PWD/.local/workload.jwt"
+unset VAULT_TOKEN
+```
+
+The token endpoint URL, client id, audience mapper, and bound claims must match
+the identity-provider configuration from Step 5 and the Vault role from Step 7.
 
 If JWT login fails, the deployment helper fails closed. Common causes are an
 expired JWT, wrong audience, wrong issuer, missing role binding, rejected bound
