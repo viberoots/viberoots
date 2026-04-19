@@ -32,6 +32,19 @@ Non-goals:
 - no untested functionality landing behind "we will test later"
 - no local-only shortcuts that contradict the shared-control-plane design for shared environments
 
+Operator UX principle:
+
+- operator-facing flows should not require humans to manually derive deployment identities, Vault
+  paths, policy names, target scopes, OIDC issuer values, or claim bindings when those values can be
+  derived from reviewed deployment metadata, lane governance metadata, or a reviewed host profile
+- `deploy` should provide read-only helpers for deployment-derived facts and safe command/template
+  generation; scripts or importable NixOS modules should cover host and identity-provider setup
+  where external credentials, secrets, and one-time operator custody are involved
+- runbooks should prefer reviewed commands, generated templates, and importable modules over long
+  copy/paste command sequences, while still keeping high-risk custody moments explicit:
+  initialization, unseal keys, root/bootstrap tokens, IdP bootstrap credentials, and real secret
+  values must remain visible operator actions
+
 Verification command convention:
 
 - Prefer the repo wrappers for routine operator and developer flows:
@@ -9119,6 +9132,325 @@ Implement after PR-68 so the fixture terminology cleanup lands first, then make 
 Vault story JWT-first, remote-host-safe, and owned by deployment tooling rather than operator shell
 state.
 
+---
+
+## PR-70: Deployment-derived Vault bootstrap helpers + secret-template operator UX
+
+### Description
+
+I will remove the remaining hand-derived Vault setup strings from the operator workflow by teaching
+the repo-level `deploy` command to print reviewed, deployment-derived Vault bootstrap material. This
+PR does not hide Vault initialization, unseal, root-token custody, or real secret entry; it makes the
+repeatable, metadata-derived parts of the runbook deterministic and machine-readable so operators do
+not copy target scopes, contract ids, policy names, role claims, or Vault paths by hand.
+
+### Scope & Changes
+
+- Add read-only `deploy` helper output for Vault bootstrap, for example:
+  - `deploy --deployment <label> --print-vault-bootstrap`
+  - optional format selectors such as `--vault-bootstrap-format=json|shell|hcl|markdown`
+- Add read-only secret template output, for example:
+  - `deploy --deployment <label> --print-vault-secret-templates`
+  - optional format selectors such as `--vault-secret-template-format=json|files`
+- Derive all values that can safely come from reviewed deployment metadata:
+  - deployment id and label
+  - provider and canonical provider-target identity
+  - normal target scope from `providerTargetIdentityFor(deployment)`
+  - current run lock scope when a `--deploy-run-id` lookup is explicitly requested
+  - secret contract ids from `secret_requirements`
+  - KV v2 mount/path mapping from the reviewed `secret://...` contract convention
+  - allowed deployment steps from each secret requirement
+  - deployment environment stage
+  - repository claim from lane governance metadata instead of hardcoding repository strings in docs
+- Add explicit operator-supplied inputs for IdP/Vault values that are not authoritative deployment
+  metadata:
+  - issuer URL
+  - Vault audience
+  - deployment client id
+  - Vault JWT role name
+  - policy name override
+  - optional extra bound claims
+- Provide conservative deterministic defaults only where the default is clearly mechanical and
+  documented, such as a sanitized read policy name derived from the deployment id.
+- Emit one reviewed bootstrap bundle containing:
+  - Vault JWT auth config command or structured equivalent
+  - read policy HCL for the deployment's required secret paths
+  - JWT role creation command with derived and operator-supplied bound claims
+  - secret JSON templates with `value = "<fill-me>"`, reviewed `allowedSteps`, reviewed
+    `targetScopes`, `refreshMode`, and `credentialClass`
+  - deployment runtime environment exports for the reviewed JWT-first Vault runtime
+  - warnings for values that are intentionally operator-owned rather than derivable
+- Fail closed when:
+  - the deployment cannot be resolved from the public repo source of truth
+  - a secret contract id is not a reviewed Vault-style `secret://...` id
+  - required IdP/Vault values are missing for command output that would otherwise be executable
+  - lane governance repository metadata is missing when repository-bound claims are requested
+  - no secret requirements exist and the requested output would otherwise imply secrets were wired
+- Keep the helper read-only:
+  - no Vault writes
+  - no Keycloak writes
+  - no secret values accepted unless a later reviewed import path is added
+  - no automatic fallback to broad claims or wildcard target scopes
+- Update the Vault bootstrap runbook so most policy, role, target-scope, and secret-template steps
+  invoke the new `deploy` helpers instead of requiring manual derivation.
+- Treat [vault-production-bootstrap.md](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  as an in-scope operator surface for this PR, and keep the runbook's happy path aligned with the
+  generated `deploy` helper output rather than preserving parallel manual instructions.
+- Update any docs that still show hardcoded repository claims such as old repository names when the
+  value should come from lane governance metadata.
+
+### Tests (in this PR)
+
+- Add CLI contract tests for `--print-vault-bootstrap` covering:
+  - JSON output shape
+  - shell/HCL or Markdown output when introduced
+  - deterministic policy and role rendering for a fixture deployment
+  - derived provider-target identity and target scope
+  - repository claim derived from lane governance metadata
+- Add secret-template tests proving:
+  - every `secret_requirements` entry receives one template
+  - `secret://...` contracts map to the reviewed KV v2 path convention
+  - `allowedSteps` and `targetScopes` match the deployment contract
+  - deployments with no secrets produce explicit empty/no-op output rather than misleading
+    placeholder secrets
+- Add fail-closed tests for:
+  - unsupported secret contract ids
+  - missing required issuer/audience/client/role inputs when executable command output is requested
+  - missing lane governance repository metadata for repository-bound claims
+  - incompatible flag combinations with mutation, preview, rollback, or control-plane action flags
+- Add docs/front-door parity tests proving the Vault bootstrap runbook uses the new reviewed helper
+  surface for derivable Vault setup material.
+
+### Docs (in this PR)
+
+- Update [vault-production-bootstrap.md](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  so the operator path starts with `deploy --print-vault-bootstrap` and
+  `deploy --print-vault-secret-templates` for deployment-derived material.
+- Document which values are derived, which values are operator-supplied, and which high-risk steps
+  remain intentionally manual.
+- Document the stable output schemas for machine-readable bootstrap and secret-template output.
+- Document how to use the generated templates in CI and during first-time Vault bootstrap without
+  committing real secret values.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - Vault bootstrap helper output
+  - Vault secret-template helper output
+  - repository-claim derivation from lane governance
+  - docs/front-door parity for the simplified operator workflow
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR touches the public `deploy` CLI surface, deployment metadata readers, Vault operator docs,
+  and docs parity coverage. Under the deployment-only verify policy, default `v` / CI should run the
+  full build-system verify scope unless the reviewed classifier has already proven this exact change
+  set is safely deployment-owned.
+
+### Acceptance Criteria
+
+- Operators no longer need to manually derive target scopes, Vault paths, policy HCL, role bindings,
+  or secret JSON templates from the deployment contract.
+- `deploy` emits deterministic, reviewed, machine-readable Vault bootstrap and secret-template
+  material for a deployment label.
+- The helper derives repository-bound claims from lane governance metadata rather than hardcoded
+  docs examples.
+- High-risk custody steps remain explicit operator actions rather than hidden side effects.
+- Tests and docs describe the same simplified operator workflow.
+
+### Risks
+
+The helper could become unsafe if it turns reviewed templates into implicit mutation or if it invents
+defaults for identity-provider values that should remain operator-owned.
+
+### Mitigation
+
+Keep the new `deploy` surfaces read-only, require explicit issuer/audience/client/role inputs for
+executable output, and fail closed instead of generating broad or wildcard bindings.
+
+### Consequence of Not Implementing
+
+Operators will keep copying deployment-derived strings by hand, which is error-prone and can drift
+from reviewed deployment metadata, especially for repository claims, target scopes, and secret
+contract paths.
+
+### Downsides for Implementing
+
+Adds another public `deploy` read-only surface and output schema that must remain stable enough for
+operator scripts and CI preflight usage.
+
+### Recommendation
+
+Implement immediately after PR-69 so the JWT-first production Vault flow becomes pleasant and
+deterministic before more secret-consuming deployment packages are added.
+
+---
+
+## PR-71: Importable `mini` identity-provider module + reviewed workload-JWT minting helper
+
+### Description
+
+I will turn the `mini` identity-provider setup from a long runbook block into reviewed reusable
+tooling. This PR adds an importable NixOS module for the practical Keycloak-on-`mini` default and a
+small reviewed token-minting helper for CI or operators that need to produce the workload JWT
+consumed by the JWT-first Vault credential provider from PR-69.
+
+### Scope & Changes
+
+- Add an importable NixOS module, for example:
+  - `build-tools/tools/nix/mini-identity-provider-module.nix`
+- Model the Keycloak defaults currently documented in the Vault bootstrap runbook:
+  - hostname default for `identity.apps.kilty.io`
+  - loopback HTTP listener for reverse proxying
+  - nginx virtual host and ACME wiring hooks where safe to default
+  - local PostgreSQL-backed Keycloak service
+  - out-of-store database password file path
+  - no committed bootstrap admin password or client secrets
+- Parameterize host-specific settings using NixOS options or `lib.mkDefault` values so real host
+  config can override:
+  - identity hostname
+  - ACME email or certificate integration
+  - Keycloak HTTP port
+  - database password file
+  - firewall behavior
+  - whether nginx/ACME are managed by this module or by existing host config
+- Add Nix evaluation tests proving the module imports cleanly and exposes the expected service,
+  package, listener, nginx, and password-file configuration without storing secrets in the Nix store.
+- Update the optional `mini` service-module docs to list the identity-provider module next to the
+  existing Postgres and Vault modules.
+- Add a reviewed workload-JWT minting helper, for example:
+  - `build-tools/tools/bin/deploy-vault-jwt`
+  - backed by a TypeScript implementation under `build-tools/tools/deployments/`
+- Support explicit non-interactive inputs:
+  - `--issuer`
+  - `--client-id`
+  - `--client-secret-env`
+  - `--out`
+  - optional expected `--audience`
+  - optional expected bound claims such as `--expect-claim key=value`
+- Fetch the token endpoint from OIDC discovery instead of requiring operators to hand-build the
+  Keycloak token URL.
+- Mint a client-credentials access token and write it to the requested output path with restrictive
+  permissions where the platform supports it.
+- Add an optional `--inspect` or `--print-claims` mode that decodes the JWT payload without printing
+  the client secret and verifies expected issuer, audience, `azp`, and configured bound claims.
+- Fail closed when:
+  - OIDC discovery fails
+  - the token endpoint is missing
+  - the client secret environment variable is unset
+  - the token response has no access token
+  - expected issuer, audience, or bound claims are absent
+  - the output path would overwrite a non-regular file
+- Keep this helper separate from the main `deploy` runtime path:
+  - `deploy` continues to consume `BNX_VAULT_JWT` or `BNX_VAULT_JWT_FILE`
+  - the helper is optional CI/operator glue for IdPs that use client credentials
+  - later CI-specific workload identity adapters can be added without changing the Vault runtime
+    contract
+- Update the Vault bootstrap runbook to use the importable NixOS module and token-minting helper
+  instead of embedding all Keycloak service config and raw `curl` token-minting commands inline.
+- Treat [vault-production-bootstrap.md](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  as an in-scope operator surface for this PR, and require its `mini` IdP setup path to use the
+  reviewed module/helper flow introduced here.
+
+### Tests (in this PR)
+
+- Add Nix evaluation tests for the `mini` identity-provider module covering:
+  - service enabled
+  - expected package selected
+  - listener binds to loopback by default
+  - nginx virtual host wiring when enabled
+  - database password file remains an out-of-store path
+  - no bootstrap admin password or client secret is introduced by the reusable module
+- Add token-helper tests using a fake OIDC provider covering:
+  - discovery-based token endpoint resolution
+  - successful client-credentials token minting
+  - output-file writing
+  - claim inspection and expected-claim validation
+  - no client secret leakage in logs or JSON output
+- Add fail-closed token-helper tests for:
+  - missing secret env var
+  - failed discovery
+  - token endpoint returning non-2xx
+  - missing access token
+  - issuer/audience/bound-claim mismatch
+  - unsafe output path
+- Add docs/operator parity tests proving the runbook uses the module and helper rather than raw
+  copy/paste Keycloak config and token endpoint construction for the happy path.
+
+### Docs (in this PR)
+
+- Update [nixos-shared-host-setup.md](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  and related `mini` usage docs to mention the reviewed identity-provider module.
+- Update [vault-production-bootstrap.md](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  so the Keycloak-on-`mini` path imports the module, then configures realm/client details in
+  Keycloak, then uses `deploy-vault-jwt` for token minting.
+- Document the exact split between:
+  - reviewed NixOS module defaults
+  - operator-owned IdP realm/client setup
+  - secret custody for bootstrap admin and client credentials
+  - runtime Vault JWT consumption by `deploy`
+- Document troubleshooting for discovery, token minting, claim mismatch, and file permission
+  failures.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - identity-provider Nix module evaluation
+  - token-helper fake OIDC flows
+  - claim validation and secret redaction
+  - operator docs parity for the simplified IdP workflow
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR adds an importable NixOS service module, a new reviewed bin entrypoint, deployment-domain
+  token helper tests, and operator docs. Under the deployment-only verify policy, run the full
+  build-system verify scope unless classifier coverage has already reviewed these module and bin
+  paths as deployment-owned.
+
+### Acceptance Criteria
+
+- Setting up `mini` as the IdP no longer requires operators to copy a full Keycloak NixOS service
+  block from the runbook.
+- The reviewed reusable module can be imported by a flakes-based NixOS host and overridden safely by
+  host config.
+- CI or operators can mint the workload JWT through a reviewed helper without hand-building token
+  endpoint URLs or printing secrets.
+- The main deployment runtime remains provider-neutral and continues to consume only the reviewed
+  JWT source environment contract.
+- Tests and docs cover the module, helper, failure modes, and operator custody boundaries.
+
+### Risks
+
+The helper could accidentally become a Keycloak-only runtime dependency or encourage storing IdP
+client secrets in repo-managed files.
+
+### Mitigation
+
+Use OIDC discovery, keep the helper optional and outside the deploy runtime, require client secrets
+through environment or reviewed host secret stores, and document that real secret values never enter
+the repo or Nix store.
+
+### Consequence of Not Implementing
+
+The production Vault workflow would still depend on a long manual IdP setup block and raw `curl`
+commands, making the operator experience brittle despite the JWT-first runtime being implemented.
+
+### Downsides for Implementing
+
+Adds a new reviewed host module and a small OIDC client helper surface that must be maintained as
+Keycloak and NixOS module options evolve.
+
+### Recommendation
+
+Implement after PR-70 so the generated Vault bootstrap material and the reviewed IdP setup helper
+land as one coherent operator-UX improvement sequence.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
@@ -9127,3 +9459,4 @@ state.
 - [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
 - [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md)
 - [Mini Shared-Dev Deployment Design](/Users/kiltyj/Code/bucknix-fresh/docs/mini-deployment.md)
+- [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
