@@ -8792,6 +8792,9 @@ transitional caveat.
 38. PR-68: finish the fixture-surface naming cleanup by renaming the remaining fixture-only schema,
     helper, and documentation language away from Vault-specific terminology where the code is
     actually talking about a repo-owned secret fixture format rather than direct Vault access.
+39. PR-69: move the reviewed production Vault credential story to a JWT-first remote-Vault
+    credential-provider contract so deployment tooling obtains short-lived Vault tokens itself
+    instead of requiring humans, CI glue, or a co-located Vault host to pre-mint `VAULT_TOKEN`.
 
 ## PR-67: Neutral fixture env var cutover + explicit fixture-vs-direct-Vault docs
 
@@ -8987,6 +8990,134 @@ materially changing the deployed runtime behavior.
 
 Implement immediately after PR-67 so the direct-Vault closeout is followed by one short, coherent
 cleanup pass that leaves the reviewed secret-runtime vocabulary in its final state.
+
+## PR-69: JWT-first remote Vault credential provider + production token-minting closeout
+
+### Description
+
+I will replace the current production assumption that callers pre-populate `VAULT_TOKEN` with a
+reviewed JWT-first Vault credential-provider flow. The deployment tooling will treat Vault as a
+remote service, obtain or read a signed workload JWT from the deployment environment, exchange it
+with Vault's JWT auth method for a short-lived scoped Vault token, and use that token internally for
+the existing direct Vault metadata/data reads. This makes the normal production path independent of
+where Vault is hosted and removes the need for humans or ad hoc CI glue to mint deployment tokens
+before running `deploy`.
+
+### Scope & Changes
+
+- Add a reviewed Vault credential-provider layer for deployment secret resolution with JWT as the
+  normal production provider.
+- Define one explicit JWT provider configuration surface, for example:
+  - `VAULT_ADDR` for the remote Vault API endpoint
+  - `BNX_VAULT_AUTH_METHOD=jwt`
+  - `BNX_VAULT_JWT_ROLE` for the Vault JWT role used by the deployment identity
+  - one reviewed JWT source such as `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`, or a CI-specific JWT
+    source adapter
+- Exchange the workload JWT through Vault's JWT auth endpoint and keep the returned Vault token
+  in-memory for the duration of the deployment run.
+- Preserve direct Vault secret resolution semantics after authentication:
+  - admitted secret references still pin the reviewed Vault version for replay
+  - runtime reads still use the existing KV v2 metadata/data API shape
+  - `targetScopes`, `allowedSteps`, `credentialClass`, and `refreshMode` validation remain
+    fail-closed
+- Remove AppRole from the reviewed production deployment runtime path. AppRole may remain documented
+  only as a bootstrap/debugging fallback if still needed for manual operator workflows, but not as
+  the normal deployment-tool credential story.
+- Keep `VAULT_TOKEN` only as an explicit low-level test / break-glass / operator override, not as
+  the default reviewed production contract.
+- Ensure the runtime does not rely on Vault being installed locally, running on the deployment
+  machine, or reachable through a host-local DNS override.
+- Make missing, expired, invalid-audience, invalid-issuer, and rejected-claim JWT failures produce
+  clear operator-facing errors without falling back to fixtures or broader credentials.
+
+### Tests (in this PR)
+
+- Add unit tests for the Vault credential-provider resolver covering:
+  - JWT provider selection
+  - missing JWT role/source failures
+  - explicit rejection of ambiguous mixed auth configuration
+  - low-level `VAULT_TOKEN` override only when the break-glass/test provider is explicitly selected
+- Extend the fake Vault test server or add a focused auth fixture so tests cover JWT login followed
+  by the existing direct metadata/data secret reads.
+- Add end-to-end deployment-domain tests proving production secret-consuming flows can run with a
+  remote Vault URL plus JWT provider config and no pre-minted `VAULT_TOKEN`.
+- Add fail-closed tests for invalid JWT login responses, missing Vault client token, Vault auth
+  `403`, and expired / wrong-audience JWT cases.
+- Keep fixture override tests intact and prove fixture usage remains limited to reviewed
+  local/test/bootstrap workflows rather than becoming a fallback for JWT auth failures.
+- Update docs/front-door parity tests so reviewed docs describe JWT-first production auth and no
+  longer imply that manual `VAULT_TOKEN` minting is the normal deployment path.
+
+### Docs (in this PR)
+
+- Update the Vault bootstrap runbook to configure Vault JWT auth roles for deployment identities as
+  the reviewed production machine-auth path.
+- Update deployment secrets API and secrets usage docs so the production runtime contract is
+  JWT-first remote Vault auth rather than caller-supplied `VAULT_TOKEN`.
+- Document the expected CI/workload identity claims, audience, issuer, role binding, token TTL, and
+  policy attachment model at the operator level.
+- Document `VAULT_TOKEN` as a low-level break-glass/test/debug path only, with guidance not to use
+  root tokens, AppRole SecretIDs, or long-lived Vault tokens for normal deploys.
+- Update troubleshooting guidance for common JWT auth failures and for remote Vault connectivity /
+  TLS / DNS issues when Vault is not co-located with the deployment runner.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - JWT credential-provider resolution
+  - Vault JWT login and direct secret reads
+  - fail-closed auth and claim-mismatch cases
+  - fixture-vs-JWT separation
+  - docs/front-door parity for the final production credential workflow
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is expected to touch deployment secret runtime code, Vault direct backend tests, fake Vault
+  auth test support, operator docs, and docs parity assertions because it changes the reviewed
+  production credential contract rather than only adding one new environment variable.
+
+### Acceptance Criteria
+
+- Normal reviewed production deploys no longer require callers to pre-mint `VAULT_TOKEN`.
+- Deployment tooling can authenticate to a remote Vault instance with JWT and use the resulting
+  short-lived Vault token for the existing direct Vault secret reads.
+- The runtime does not assume Vault is running on the deployment machine.
+- AppRole is not the reviewed normal production deployment credential path.
+- Fixture exports remain optional local/test/bootstrap-only workflows.
+- Reviewed docs, tests, and operator guidance describe one coherent JWT-first production Vault auth
+  model with `VAULT_TOKEN` limited to explicit break-glass/test/debug use.
+
+### Risks
+
+The main risk is coupling the deployment runtime too tightly to one CI provider's claim shape or JWT
+delivery mechanism. A second risk is creating confusing fallback behavior where JWT auth failures
+silently fall back to raw tokens or fixtures and weaken the reviewed production contract.
+
+### Mitigation
+
+Keep the credential-provider interface provider-neutral, make claim bindings explicit in docs and
+tests, require an explicit auth method selection, and fail closed on missing or invalid JWT auth
+without automatic fallback to fixtures or broad Vault tokens.
+
+### Consequence of Not Implementing
+
+Operators would continue needing to mint `VAULT_TOKEN` outside the deployment tooling, which keeps
+the production workflow dependent on ad hoc CI glue, manual bootstrap commands, or assumptions about
+Vault running on the deployment host.
+
+### Downsides for Implementing
+
+This is a real production-auth contract change and requires reviewed Vault JWT role setup plus
+deployment-runtime test infrastructure for auth flows. Local/manual workflows also need a clearer
+debug story because JWT becomes the normal production path instead of a generic pre-minted token.
+
+### Recommendation
+
+Implement after PR-68 so the fixture terminology cleanup lands first, then make the final production
+Vault story JWT-first, remote-host-safe, and owned by deployment tooling rather than operator shell
+state.
 
 ## Companion Docs
 
