@@ -173,6 +173,7 @@ test("deployment design and scenario docs stay aligned with the reviewed front d
     /createVaultDeploymentSecretRuntime\(\)/,
     /VAULT_ADDR/,
     /VAULT_TOKEN/,
+    /BNX_VAULT_AUTH_METHOD=jwt[\s\S]*BNX_VAULT_JWT_ROLE/,
     /BNX_DEPLOYMENT_SECRET_FIXTURE_PATH/,
     /admittedSecretReferences/,
     /admittedContext\.targetEnvironment\.lockScope/,
@@ -186,9 +187,9 @@ test("deployment design and scenario docs stay aligned with the reviewed front d
     assert.match(apiDoc, fragment, `deployment and secrets API doc must cover ${String(fragment)}`);
   }
   for (const fragment of [
-    /reviewed production runtime now reads Vault directly/i,
+    /reviewed production runtime now reads remote Vault/i,
     /VAULT_ADDR/,
-    /VAULT_TOKEN/,
+    /BNX_VAULT_AUTH_METHOD=jwt[\s\S]*BNX_VAULT_JWT_ROLE/,
     /BNX_DEPLOYMENT_SECRET_FIXTURE_PATH/,
     /targetScopes/,
     /lockScope/,
@@ -197,7 +198,7 @@ test("deployment design and scenario docs stay aligned with the reviewed front d
     /vault operator init/,
     /vault audit enable file/,
     /vault secrets enable -path=secret kv-v2/,
-    /vault auth enable approle/,
+    /vault auth enable jwt/,
     /vault policy write deploy-pleomino-read/,
     /vault kv put -mount=secret/,
     /secret:\/\/deployments\/pleomino\/cloudflare_api_token/,

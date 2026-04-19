@@ -6,20 +6,10 @@ import {
   type DeploymentSecretReference,
 } from "./deployment-secretspec.ts";
 import type { DeploymentSecretMaterial } from "./deployment-secret-runtime.ts";
+import { resolveVaultClientCredential } from "./deployment-secret-vault-credentials.ts";
 
-export function hasDirectVaultEnv(): boolean {
-  return (
-    !!String(process.env.VAULT_ADDR || "").trim() && !!String(process.env.VAULT_TOKEN || "").trim()
-  );
-}
-
-function vaultEnv() {
-  const addr = String(process.env.VAULT_ADDR || "").trim();
-  const token = String(process.env.VAULT_TOKEN || "").trim();
-  if (!addr || !token) {
-    throw new Error("direct Vault secret resolution requires VAULT_ADDR plus VAULT_TOKEN");
-  }
-  return { addr, token };
+async function vaultEnv() {
+  return await resolveVaultClientCredential();
 }
 
 function requireVaultContractPath(contractId: string): { mount: string; secretPath: string } {
@@ -40,7 +30,7 @@ async function vaultRequest<T>(
   path: string,
   query?: URLSearchParams,
 ): Promise<{ status: number; data?: T }> {
-  const env = vaultEnv();
+  const env = await vaultEnv();
   const url = new URL(path, env.addr.endsWith("/") ? env.addr : `${env.addr}/`);
   if (query) url.search = query.toString();
   const response = await fetch(url, {

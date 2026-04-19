@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloudflare-pages-control-plane.ts";
+import { VAULT_AUTH_METHOD_ENV } from "../../deployments/deployment-secret-vault-credentials.ts";
 import { deploymentRequirementFixture } from "./deployment-metadata.fixture.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
@@ -37,12 +38,15 @@ test("cloudflare-pages deploy reads Vault directly on the reviewed runtime path"
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
-    const vault = await startFakeVaultServer({
-      "secret://deployments/pleomino/cloudflare_api_token": {
-        currentVersion: "11",
-        versions: { "11": { value: "direct-vault-token" } },
+    const vault = await startFakeVaultServer(
+      {
+        "secret://deployments/pleomino/cloudflare_api_token": {
+          currentVersion: "11",
+          versions: { "11": { value: "direct-vault-token" } },
+        },
       },
-    });
+      { jwtAuth: { role: "deploy-pleomino-read", jwt: "cloudflare.workload.jwt" } },
+    );
     await writeArtifact(artifactDir, "<html>pleomino staging</html>\n");
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
@@ -66,7 +70,10 @@ test("cloudflare-pages deploy reads Vault directly on the reviewed runtime path"
     process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_LOG = fake.logPath;
     process.env.BNX_CLOUDFLARE_PAGES_WRANGLER_BIN = path.join(fake.binDir, "wrangler");
     process.env.VAULT_ADDR = vault.addr;
-    process.env.VAULT_TOKEN = vault.token;
+    process.env[VAULT_AUTH_METHOD_ENV] = "jwt";
+    process.env.BNX_VAULT_JWT_ROLE = "deploy-pleomino-read";
+    process.env.BNX_VAULT_JWT = "cloudflare.workload.jwt";
+    delete process.env.VAULT_TOKEN;
     delete process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
     try {
       const result = await submitCloudflarePagesControlPlaneDeploy({

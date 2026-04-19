@@ -14,9 +14,9 @@ import {
 } from "./deployment-secret-fixture.ts";
 import {
   acquireDirectVaultSecretReference,
-  hasDirectVaultEnv,
   resolveDirectVaultSecretReference,
 } from "./deployment-secret-vault-direct.ts";
+import { hasVaultCredentialConfig } from "./deployment-secret-vault-credentials.ts";
 import {
   deploymentSecretContractBindings,
   isDeploymentSecretAdmittedReference,
@@ -100,39 +100,6 @@ function ensureFixtureReferenceMatches(
   }
 }
 
-async function acquireDirectReference(
-  binding: DeploymentSecretReference,
-): Promise<DeploymentSecretMaterial> {
-  const version = isDeploymentSecretAdmittedReference(binding)
-    ? binding.resolvedVersion
-    : undefined;
-  const response = await vaultRequest<{
-    data?: { data?: Record<string, unknown>; metadata?: { version?: number } };
-  }>(
-    vaultApiPath(binding.contractId, "data"),
-    version ? new URLSearchParams({ version }) : undefined,
-  );
-  if (response.status === 404 || !response.data?.data?.data) {
-    throw new Error(`required secret contract ${binding.contractId} is missing`);
-  }
-  const value = response.data.data.data.value;
-  if (typeof value !== "string") {
-    throw new Error(
-      `required secret contract ${binding.contractId} does not expose string data.value`,
-    );
-  }
-  return {
-    binding,
-    value,
-    allowedSteps: [binding.step],
-    targetScopes: [isDeploymentSecretAdmittedReference(binding) ? binding.targetScope : "*"],
-    credentialClass: isDeploymentSecretAdmittedReference(binding)
-      ? binding.credentialClass
-      : "routine",
-    refreshMode: isDeploymentSecretAdmittedReference(binding) ? binding.refreshMode : "none",
-  };
-}
-
 export async function resolveDeploymentVaultAdmittedReferences(opts: {
   requirements: DeploymentRequirement[];
   targetScope: string;
@@ -156,7 +123,7 @@ export function createDeploymentVaultSecretBackend(): DeploymentSecretBackend {
   const acquireCounts = new Map<string, number>();
   return {
     async acquire(binding) {
-      if (!deploymentSecretFixturePath() && hasDirectVaultEnv())
+      if (!deploymentSecretFixturePath() && hasVaultCredentialConfig())
         return await acquireDirectVaultSecretReference(binding);
       const fixture = await readDeploymentSecretFixture();
       const entry = fixture.contracts[binding.contractId];

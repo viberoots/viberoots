@@ -198,8 +198,12 @@ Optional fields you may also see:
 
 ### Step 2: Set Up The Secret Backend
 
-For the reviewed production runtime path, use direct Vault through
-`VAULT_ADDR` plus `VAULT_TOKEN`.
+For the reviewed production runtime path, use remote Vault with JWT auth through
+`VAULT_ADDR`, `BNX_VAULT_AUTH_METHOD=jwt`, `BNX_VAULT_JWT_ROLE`, and exactly
+one JWT source: `BNX_VAULT_JWT` or `BNX_VAULT_JWT_FILE`.
+
+`VAULT_TOKEN` is only for explicit break-glass, low-level test, or debugging
+use with `BNX_VAULT_AUTH_METHOD=token`; it is not the normal production path.
 
 For local development, isolated tests, or explicit bootstrap-oriented
 workflows, use the fixture override shown below.
@@ -485,8 +489,8 @@ This repo now documents two distinct layers:
 
 - Vault as the long-lived production source of truth in
   [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
-- direct runtime Vault reads for the reviewed production path through
-  `VAULT_ADDR` plus `VAULT_TOKEN`
+- JWT-first runtime Vault reads for the reviewed production path through
+  `VAULT_ADDR`, `BNX_VAULT_AUTH_METHOD=jwt`, and `BNX_VAULT_JWT_ROLE`
 - the local/test fixture override consumed through
   `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
 
@@ -501,7 +505,7 @@ when you need the exact CLI flags, HTTP endpoints, schema names, or helper
 signatures.
 
 Open [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
-when you are setting up Vault itself, creating AppRole access, writing secrets,
+when you are setting up Vault itself, configuring JWT auth roles, writing secrets,
 or generating the optional local/test runtime export from Vault.
 
 Open [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)

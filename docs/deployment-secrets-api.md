@@ -689,12 +689,20 @@ the source of truth when populating `targetScopes`.
 ### Secret Fixture Example
 
 The reviewed production path points `createDeploymentVaultSecretBackend()` at
-Vault directly:
+remote Vault with JWT authentication:
 
 ```bash
 export VAULT_ADDR='https://vault.example.net:8200'
-export VAULT_TOKEN='replace-with-short-lived-vault-token'
+export BNX_VAULT_AUTH_METHOD=jwt
+export BNX_VAULT_JWT_ROLE='deploy-pleomino-read'
+export BNX_VAULT_JWT_FILE="$PWD/.local/workload.jwt"
+unset VAULT_TOKEN
 ```
+
+The runtime exchanges that workload JWT with Vault's JWT auth method and keeps
+the returned Vault token in memory for the deployment run. `VAULT_TOKEN` is only
+for explicit break-glass, low-level test, or debugging use with
+`BNX_VAULT_AUTH_METHOD=token`; it is not the reviewed production contract.
 
 Local development, isolated tests, and explicit bootstrap-oriented workflows
 can intentionally override that runtime path with the reviewed fixture file:
@@ -705,7 +713,7 @@ export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/secret-fixture.json"
 
 Production operators should also read
 [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md).
-That runbook bootstraps Vault as the source of truth for the direct runtime
+That runbook bootstraps Vault as the source of truth for the JWT-first runtime
 path and also shows how to export this fixture format for local/test workflows.
 
 Example fixture:
@@ -823,7 +831,7 @@ Open [Secrets Usage](/Users/kiltyj/Code/bucknix-fresh/docs/secrets-usage.md)
 when you need the shortest explanation of the `secretspec` and Vault model.
 
 Open [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
-when you need the operator workflow for initializing Vault, enabling KV/AppRole,
+when you need the operator workflow for initializing Vault, enabling KV/JWT auth,
 writing policies, storing secrets, and exporting the current secret fixture.
 
 Open [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)

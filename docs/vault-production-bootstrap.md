@@ -10,8 +10,11 @@ host's NixOS configuration before any `vault operator ...` commands are run.
 
 Important current-repo reality:
 
-- the reviewed production runtime now reads Vault directly through
-  `VAULT_ADDR` plus `VAULT_TOKEN`
+- the reviewed production runtime now reads remote Vault through
+  `VAULT_ADDR`, `BNX_VAULT_AUTH_METHOD=jwt`, `BNX_VAULT_JWT_ROLE`, and one
+  workload JWT source (`BNX_VAULT_JWT` or `BNX_VAULT_JWT_FILE`)
+- `VAULT_TOKEN` is reserved for bootstrap, explicit break-glass, low-level test,
+  or debugging use with `BNX_VAULT_AUTH_METHOD=token`
 - the exported JSON secret fixture path through
   `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
   remains available only for reviewed local, test, and bootstrap-oriented
@@ -37,11 +40,11 @@ At the end of this runbook:
   on manually installed packages or ad hoc systemd units
 - Vault is initialized, unsealed, reachable over TLS, and auditing requests
 - a KV v2 secrets engine exists at `secret/`
-- an AppRole-based machine identity can read only the reviewed deployment
-  secret paths it needs
+- a JWT auth role binds the reviewed deployment identity claims to the least
+  privilege read policy
 - deployment secrets are stored in Vault using a predictable path convention
-- the reviewed production runtime can read those secrets directly with
-  `VAULT_ADDR` plus `VAULT_TOKEN`
+- the reviewed production runtime can exchange a workload JWT for a short-lived
+  Vault token and read those secrets without a pre-minted `VAULT_TOKEN`
 - when needed, a reviewed `deployment-secret-fixture@1` file can still be
   exported from Vault for local/test flows through
   `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
@@ -533,7 +536,7 @@ vault audit enable syslog tag="vault-audit" facility="AUTH"
 
 If this returns `permission denied`, check that `VAULT_TOKEN` is set to the
 initial root token or to another token with permission to manage `sys/audit`.
-Read-only deployment tokens and AppRole runtime tokens cannot enable audit
+Read-only deployment tokens and break-glass runtime tokens cannot enable audit
 devices.
 
 Example values:
@@ -591,16 +594,27 @@ If your environment already uses a different mount path, keep that path
 consistent across policies, write commands, runtime configuration, and any
 optional fixture-export scripts.
 
-## Step 5: Enable AppRole For Machine Access
+## Step 5: Enable JWT For Machine Access
 
-Enable the AppRole auth method:
+Enable the JWT auth method:
 
 ```bash
-vault auth enable approle
+vault auth enable jwt
 ```
 
-Use AppRole when a CI job or deployment helper needs machine-to-machine access
-to Vault without an interactive human login.
+Configure the issuer and audience model for your CI or workload identity
+provider. Example values are intentionally placeholders; use the issuer URL,
+audience, and JWKS or OIDC discovery path that your deployment runner actually
+uses:
+
+```bash
+vault write auth/jwt/config \
+  oidc_discovery_url="https://issuer.example.net" \
+  bound_issuer="https://issuer.example.net"
+```
+
+Use JWT auth when a CI job or deployment helper needs machine-to-machine access
+to remote Vault without an interactive human login or a pre-minted Vault token.
 
 ## Step 6: Create A Least-Privilege Read Policy
 
@@ -629,14 +643,17 @@ Use narrower paths when possible:
   Broader and usually less desirable. Use only when one trusted machine really
   must read many deployment families.
 
-## Step 7: Create The Deployment Reader AppRole
+## Step 7: Create The Deployment Reader JWT Role
 
-Create an AppRole that uses that read policy:
+Create a JWT role that uses that read policy:
 
 ```bash
-vault write auth/approle/role/deploy-pleomino-read \
+vault write auth/jwt/role/deploy-pleomino-read \
+  role_type="jwt" \
+  bound_audiences="bucknix-deployments" \
+  bound_claims='{"repository":"kiltyj/bucknix"}' \
+  user_claim="sub" \
   token_policies="deploy-pleomino-read" \
-  secret_id_ttl="30m" \
   token_ttl="30m" \
   token_max_ttl="2h"
 ```
@@ -645,29 +662,23 @@ Example values and when to use them:
 
 - `token_policies="deploy-pleomino-read"`
   Attach only the read policy created above.
-- `secret_id_ttl="30m"`
-  Use a short lifetime for the bootstrap credential handed to CI, the deployment
-  helper, or an explicit fixture export job.
+- `bound_audiences="bucknix-deployments"`
+  Require the workload JWT audience expected by deployment jobs.
+- `bound_claims='{"repository":"kiltyj/bucknix"}'`
+  Bind the role to reviewed workload identity claims. Use your provider's stable
+  claims for repository, project, service account, branch, environment, or job
+  identity.
+- `user_claim="sub"`
+  Use the workload subject as Vault's display identity for auditability.
 - `token_ttl="30m"`
   Use a short-lived token for routine deployment runs.
 - `token_max_ttl="2h"`
   Give enough time for one controlled deployment job without creating a long-lived
   credential.
 
-Read back the role ID and create one secret ID:
-
-```bash
-vault read -field=role_id auth/approle/role/deploy-pleomino-read/role-id
-```
-
-```bash
-vault write -format=json -f auth/approle/role/deploy-pleomino-read/secret-id \
-  | jq -r '.data.secret_id'
-```
-
-Keep both values secure. Together they are the machine credential that can mint a
-Vault token for the deployment runtime. The same credential can also be used for
-the optional fixture export path when a reviewed local/test workflow needs one.
+The deployment environment supplies a signed workload JWT at runtime. Vault
+validates issuer, audience, and bound claims before returning the short-lived
+client token that the deployment helper keeps in memory.
 
 ## Step 8: Store Secrets In Vault
 
@@ -730,40 +741,46 @@ What these fields mean:
 - `"credentialClass": "routine"`
   Normal day-to-day deployment credential.
 
-## Step 9: Provide A Deployment Runtime Vault Token
+## Step 9: Provide A Deployment Runtime Workload JWT
 
-The current reviewed deployment runtime reads Vault with `VAULT_ADDR` plus
-`VAULT_TOKEN`. It does not log in to AppRole by itself yet, so something in the
-deployment environment must mint a short-lived Vault token before `deploy` runs.
-
-That token-minting step can be handled by CI, a small wrapper script, a host
-credential service, or a future deployment-tool enhancement. The important
-runtime contract today is that `deploy` receives a short-lived `VAULT_TOKEN`,
-not the long-lived AppRole `role_id` and `secret_id` directly.
-
-For a manual bootstrap or a simple wrapper, use the AppRole credentials to mint
-the token:
+The reviewed deployment runtime logs in to Vault's JWT auth endpoint itself. The
+deployment environment should provide the remote Vault address, the reviewed
+Vault JWT role, and exactly one signed workload JWT source:
 
 ```bash
-export ROLE_ID='replace-with-role-id'
-export SECRET_ID='replace-with-secret-id'
-
-export VAULT_TOKEN="$(
-  vault write -format=json auth/approle/login \
-    role_id="$ROLE_ID" \
-    secret_id="$SECRET_ID" \
-    | jq -r '.auth.client_token'
-)"
+export VAULT_ADDR='https://secrets.apps.kilty.io:8200'
+export BNX_VAULT_AUTH_METHOD=jwt
+export BNX_VAULT_JWT_ROLE='deploy-pleomino-read'
+export BNX_VAULT_JWT_FILE="$PWD/.local/workload.jwt"
+unset VAULT_TOKEN
 ```
 
-Use this token only for the deployment run or the optional fixture export step
-below. Do not reuse it as a general operator token, and do not store it in the
-repo.
+Use `BNX_VAULT_JWT` instead of `BNX_VAULT_JWT_FILE` only when the CI system
+delivers the signed JWT as an environment variable. Do not set both.
+
+If JWT login fails, the deployment helper fails closed. Common causes are an
+expired JWT, wrong audience, wrong issuer, missing role binding, rejected bound
+claims, remote Vault connectivity, TLS trust, or DNS routing to the wrong Vault
+endpoint.
+
+For an explicit break-glass or low-level test run, an operator may use a
+pre-minted Vault token only by selecting the token provider:
+
+```bash
+export VAULT_ADDR='https://secrets.apps.kilty.io:8200'
+export BNX_VAULT_AUTH_METHOD=token
+export VAULT_TOKEN='replace-with-short-lived-break-glass-token'
+unset BNX_VAULT_JWT
+unset BNX_VAULT_JWT_FILE
+```
+
+Do not use root tokens, long-lived Vault tokens, or reusable bootstrap
+credentials for normal deployments.
 
 ## Step 10: Optional: Export The Secret Fixture From Vault
 
 Skip this step for the normal production path. Production deployments should use
-the Vault API directly through `VAULT_ADDR` plus `VAULT_TOKEN`.
+the Vault API directly through the JWT-first provider configuration above.
 
 Use this step only for reviewed local development, isolated tests, or explicit
 bootstrap-oriented workflows that cannot call Vault directly. The reviewed
@@ -821,12 +838,16 @@ the same contract IDs directly through the Vault API.
 
 ## Step 12: Run A Deployment Through Vault
 
-For the normal production path, keep `VAULT_ADDR` and a short-lived
-`VAULT_TOKEN` in the deployment environment and leave
+For the normal production path, keep `VAULT_ADDR`, `BNX_VAULT_AUTH_METHOD=jwt`,
+`BNX_VAULT_JWT_ROLE`, and one workload JWT source in the deployment environment.
+Leave
 `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH` unset:
 
 ```bash
 export VAULT_ADDR='https://secrets.apps.kilty.io:8200'
+export BNX_VAULT_AUTH_METHOD=jwt
+export BNX_VAULT_JWT_ROLE='deploy-pleomino-read'
+export BNX_VAULT_JWT_FILE="$PWD/.local/workload.jwt"
 unset BNX_DEPLOYMENT_SECRET_FIXTURE_PATH
 ```
 
@@ -894,6 +915,6 @@ These Vault commands are based on the official HashiCorp docs:
 - [operator unseal](https://developer.hashicorp.com/vault/docs/commands/operator/unseal)
 - [audit enable](https://developer.hashicorp.com/vault/docs/commands/audit/enable)
 - [KV v2 setup](https://developer.hashicorp.com/vault/docs/secrets/kv/kv-v2/setup)
-- [AppRole auth](https://developer.hashicorp.com/vault/docs/auth/approle)
+- [JWT auth](https://developer.hashicorp.com/vault/docs/auth/jwt)
 - [policy write](https://developer.hashicorp.com/vault/docs/commands/policy/write)
 - [kv put](https://developer.hashicorp.com/vault/docs/commands/kv/put)

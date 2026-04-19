@@ -13,6 +13,7 @@ import {
   createDeploymentVaultSecretBackend,
   resolveDeploymentVaultAdmittedReferences,
 } from "../../deployments/deployment-secret-vault.ts";
+import { VAULT_AUTH_METHOD_ENV } from "../../deployments/deployment-secret-vault-credentials.ts";
 import { deploymentRequirementFixture } from "./deployment-metadata.fixture.ts";
 import { startFakeVaultServer } from "./vault.test-server.ts";
 
@@ -51,6 +52,7 @@ test("direct Vault admission freezes one exact version and runtime reuses it", a
     },
   });
   process.env.VAULT_ADDR = vault.addr;
+  process.env[VAULT_AUTH_METHOD_ENV] = "token";
   process.env.VAULT_TOKEN = vault.token;
   delete process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
   try {
@@ -89,6 +91,7 @@ test("direct Vault replay fails closed when the admitted version no longer resol
   };
   const vault = await startFakeVaultServer(state);
   process.env.VAULT_ADDR = vault.addr;
+  process.env[VAULT_AUTH_METHOD_ENV] = "token";
   process.env.VAULT_TOKEN = vault.token;
   delete process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
   try {
@@ -136,6 +139,7 @@ test("neutral fixture env var intentionally overrides direct Vault env", async (
     },
     async (fixturePath) => {
       process.env.VAULT_ADDR = vault.addr;
+      process.env[VAULT_AUTH_METHOD_ENV] = "token";
       process.env.VAULT_TOKEN = vault.token;
       process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV] = fixturePath;
       try {
@@ -193,7 +197,7 @@ test("retired Vault-named fixture env var is ignored and required secret flows f
         });
         await assert.rejects(
           async () => await runtime.enterStep("publish"),
-          /BNX_DEPLOYMENT_SECRET_FIXTURE_PATH.*VAULT_ADDR plus VAULT_TOKEN/,
+          /BNX_DEPLOYMENT_SECRET_FIXTURE_PATH.*BNX_VAULT_AUTH_METHOD=jwt/,
         );
       } finally {
         restoreVaultEnv();
