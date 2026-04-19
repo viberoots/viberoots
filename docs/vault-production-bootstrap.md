@@ -65,8 +65,11 @@ You need:
 - network access to the Vault server or cluster
 - an operator credential that can initialize Vault or change mounts, auth
   methods, policies, and secrets
-- the exact `contract_id` values declared in deployment metadata
-- the exact target scope values used by the deployment runtime
+- repo access to run `deploy --deployment <label> --print-vault-bootstrap`
+  and `deploy --deployment <label> --print-vault-secret-templates`
+- operator-owned IdP/Vault inputs that are not deployment metadata:
+  issuer URL, Vault audience, deployment client id, Vault JWT role name, and
+  any extra bound claims
 
 Example values used in this runbook:
 
@@ -84,6 +87,88 @@ Example values used in this runbook:
   `cloudflare-pages:web-platform-staging/pleomino-staging-pages`
 - optional exported secret fixture path:
   `.local/deploy-secrets/secret-fixture.json`
+
+## Start Here: Generate Deployment-Derived Material
+
+Start every deployment-specific Vault bootstrap by asking the reviewed repo
+metadata to print the deterministic parts. This prevents operators from copying
+contract IDs, target scopes, Vault KV paths, policy names, role claims, or
+repository claims by hand.
+
+Generate the machine-readable bootstrap bundle:
+
+```bash
+deploy \
+  --deployment //projects/deployments/pleomino-staging:deploy \
+  --print-vault-bootstrap \
+  --vault-bootstrap-format=json \
+  --issuer-url https://identity.apps.kilty.io/realms/deployments \
+  --vault-audience deployments-vault \
+  --deployment-client-id deployment-runner \
+  --vault-jwt-role deploy-pleomino-read \
+  > vault-bootstrap.json
+```
+
+Generate the fill-in secret templates:
+
+```bash
+deploy \
+  --deployment //projects/deployments/pleomino-staging:deploy \
+  --print-vault-secret-templates \
+  --vault-secret-template-format=files \
+  > vault-secret-templates.txt
+```
+
+For copy/paste bootstrap command review, the same helper can render shell or
+policy HCL:
+
+```bash
+deploy \
+  --deployment //projects/deployments/pleomino-staging:deploy \
+  --print-vault-bootstrap \
+  --vault-bootstrap-format=shell \
+  --issuer-url https://identity.apps.kilty.io/realms/deployments \
+  --vault-audience deployments-vault \
+  --deployment-client-id deployment-runner \
+  --vault-jwt-role deploy-pleomino-read
+```
+
+The helper is read-only. It does not initialize Vault, unseal Vault, write
+policies, write JWT roles, configure Keycloak, accept real secret values, or
+store anything in Vault.
+
+Derived by the helper:
+
+- deployment id, label, provider, stage, and canonical provider target identity
+- target scope, normally the provider target identity; pass `--deploy-run-id`
+  with the control-plane lookup flags when you need the exact admitted run
+  `lockScope`
+- repository claim from lane governance metadata
+- secret contract IDs from `secret_requirements`
+- reviewed KV v2 mount/path mapping for `secret://...` contracts
+- allowed deployment steps for each secret requirement
+- deterministic read policy HCL and a mechanical default policy name
+- secret JSON templates with `value = "<fill-me>"`, `allowedSteps`,
+  `targetScopes`, `refreshMode`, and `credentialClass`
+
+Operator supplied:
+
+- issuer URL, Vault audience, deployment client id, Vault JWT role name, policy
+  name override, and optional `--vault-bound-claim key=value` entries
+- real secret values for the generated JSON templates
+- Vault address, bootstrap operator credential, unseal custody, Keycloak client
+  secret, and workload JWT delivery
+
+Stable JSON schemas:
+
+- `deployment-vault-bootstrap@1` contains `deployment`, `targetScope`, `vault`,
+  `policyHcl`, `secretTemplates`, `runtimeEnvironment`, and `warnings`
+- `deployment-vault-secret-templates@1` contains `deployment`, `targetScope`,
+  `empty`, `message`, and `templates`
+
+If a deployment declares no secret requirements, the secret-template helper
+prints an explicit empty/no-op document. Bootstrap output fails closed in that
+case because there is no least-privilege secret policy to create.
 
 ## How To Choose `targetScopes`
 
@@ -104,24 +189,25 @@ In the current code:
 
 Practical operator workflow:
 
-1. if this is first-time setup and no run exists yet, ask the repo for the
-   canonical target identity:
+1. if this is first-time setup and no run exists yet, use the generated
+   `targetScope.value` from:
 
 ```bash
 deploy \
   --deployment //projects/deployments/pleomino-staging:deploy \
-  --print-target-identity
+  --print-vault-secret-templates
 ```
 
-For ordinary deploy flows, use that exact output string in `targetScopes`.
+For ordinary deploy flows, the helper uses the canonical provider target
+identity in `targetScopes`.
 
 2. if the deployment already has a submitted run, verify the exact admitted
-   value from status:
+   value by passing the run id into the helper:
 
 ```bash
 deploy \
   --deployment //projects/deployments/pleomino-staging:deploy \
-  --print-run-lock-scope \
+  --print-vault-secret-templates \
   --deploy-run-id "$DEPLOY_RUN_ID" \
   --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
 ```
@@ -135,6 +221,9 @@ Use that exact `lockScope` value in `targetScopes`.
 - once a run exists, `lockScope` from the status API is the more exact value
 - for preview or any other non-default flow, prefer the exact status value over
   assumptions
+- if you only need to inspect an existing run without rendering templates, the
+  lower-level helper remains:
+  `deploy --print-run-lock-scope --deploy-run-id "$DEPLOY_RUN_ID"`
 
 Common shapes:
 
@@ -781,7 +870,7 @@ Identity-provider configuration checklist:
 5. Add stable bound claims that Vault can check, such as:
    - `azp = "deployment-runner"`
    - `deployment_environment = "mini"`
-   - `repository = "kiltyj/bucknix"`
+   - `repository = "kiltyj/bucknix-fresh"`
 6. Store the client secret outside the repo, for example in the Jenkins
    credential store or the reviewed host secret store.
 
@@ -804,7 +893,8 @@ One practical Keycloak admin-console path is:
    `deployment_environment` with value `mini`, JSON type `String`, and access
    token inclusion enabled.
 9. Add another `Hardcoded claim` mapper for `repository` with value
-   `kiltyj/bucknix`, JSON type `String`, and access token inclusion enabled.
+   `kiltyj/bucknix-fresh`, JSON type `String`, and access token inclusion
+   enabled.
 
 The `repository` claim should match the current repository identity used by the
 CI or deployment runner. If the repository is renamed, update that mapper and
@@ -878,10 +968,25 @@ to remote Vault without an interactive human login or a pre-minted Vault token.
 Write a policy that allows the deployment runtime to read only the specific
 deployment secrets it needs.
 
-Create `deploy-pleomino-read.hcl`:
+Prefer the generated policy HCL from `deploy --print-vault-bootstrap`. To print
+only that reviewed HCL:
+
+```bash
+deploy \
+  --deployment //projects/deployments/pleomino-staging:deploy \
+  --print-vault-bootstrap \
+  --vault-bootstrap-format=hcl \
+  --issuer-url https://identity.apps.kilty.io/realms/deployments \
+  --vault-audience deployments-vault \
+  --deployment-client-id deployment-runner \
+  --vault-jwt-role deploy-pleomino-read \
+  > deploy-pleomino-read.hcl
+```
+
+For the example deployment, the generated file is equivalent to:
 
 ```hcl
-path "secret/data/deployments/pleomino/*" {
+path "secret/data/deployments/pleomino/cloudflare_api_token" {
   capabilities = ["read"]
 }
 ```
@@ -902,13 +1007,18 @@ Use narrower paths when possible:
 
 ## Step 7: Create The Deployment Reader JWT Role
 
-Create a JWT role that uses that read policy:
+Create a JWT role that uses that read policy. Prefer the generated shell output
+from `deploy --print-vault-bootstrap --vault-bootstrap-format=shell`; it derives
+the repository claim from lane governance metadata and keeps the role binding
+aligned with the deployment contract.
+
+The generated role command has this shape:
 
 ```bash
 vault write auth/jwt/role/deploy-pleomino-read \
   role_type="jwt" \
   bound_audiences="deployments-vault" \
-  bound_claims='{"azp":"deployment-runner","deployment_environment":"mini","repository":"kiltyj/bucknix"}' \
+  bound_claims='{"azp":"deployment-runner","deployment_environment":"mini","repository":"kiltyj/bucknix-fresh"}' \
   user_claim="sub" \
   token_policies="deploy-pleomino-read" \
   token_ttl="30m" \
@@ -921,7 +1031,7 @@ Example values and when to use them:
   Attach only the read policy created above.
 - `bound_audiences="deployments-vault"`
   Require the workload JWT audience expected by deployment jobs.
-- `bound_claims='{"azp":"deployment-runner","deployment_environment":"mini","repository":"kiltyj/bucknix"}'`
+- `bound_claims='{"azp":"deployment-runner","deployment_environment":"mini","repository":"kiltyj/bucknix-fresh"}'`
   Bind the role to reviewed workload identity claims. Use the provider's stable
   claims for the deployment client, environment, repository, project, service
   account, branch, or job identity.
@@ -939,13 +1049,25 @@ client token that the deployment helper keeps in memory.
 
 ## Step 8: Store Secrets In Vault
 
-Store each deployment secret under the recommended KV path using JSON files.
+Store each deployment secret under the generated KV path using the generated
+JSON templates. The helper fills in all non-secret metadata; operators replace
+only `"<fill-me>"` with the real value before writing to Vault.
+
+Generate or refresh the templates:
+
+```bash
+deploy \
+  --deployment //projects/deployments/pleomino-staging:deploy \
+  --print-vault-secret-templates \
+  --vault-secret-template-format=files \
+  > vault-secret-templates.txt
+```
 
 Create `cloudflare_api_token.json`:
 
 ```json
 {
-  "value": "super-secret-token",
+  "value": "<fill-me>",
   "allowedSteps": ["publish"],
   "targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
   "refreshMode": "renew",
@@ -966,7 +1088,7 @@ smoke-check credential:
 
 ```json
 {
-  "value": "preview-password",
+  "value": "<fill-me>",
   "allowedSteps": ["smoke"],
   "targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
   "refreshMode": "none",
@@ -982,8 +1104,9 @@ vault kv put -mount=secret \
 
 What these fields mean:
 
-- `"value": "super-secret-token"`
-  The actual secret value returned to the runtime.
+- `"value": "<fill-me>"`
+  Replace this placeholder with the actual secret value immediately before the
+  local Vault write. Do not commit the filled file.
 - `"allowedSteps": ["publish"]`
   Use `publish` for provider credentials needed only while publishing.
 - `"allowedSteps": ["smoke"]`

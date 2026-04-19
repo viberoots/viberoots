@@ -52,6 +52,8 @@ export async function runDeployCli(opts: {
     if (
       [
         "print-target-identity",
+        "print-vault-bootstrap",
+        "print-vault-secret-templates",
         "validate-only",
         "provision-only",
         "publish-only",

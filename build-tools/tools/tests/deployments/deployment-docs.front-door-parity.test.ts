@@ -199,8 +199,8 @@ test("deployment design and scenario docs stay aligned with the reviewed front d
     /vault audit enable file/,
     /vault secrets enable -path=secret kv-v2/,
     /vault auth enable jwt/,
-    /vault policy write deploy-pleomino-read/,
-    /vault kv put -mount=secret/,
+    /--print-vault-bootstrap[\s\S]*deployment-vault-bootstrap@1/,
+    /--print-vault-secret-templates[\s\S]*deployment-vault-secret-templates@1/,
     /secret:\/\/deployments\/pleomino\/cloudflare_api_token/,
   ]) {
     assert.match(

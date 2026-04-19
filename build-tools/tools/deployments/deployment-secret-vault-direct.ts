@@ -7,23 +7,10 @@ import {
 } from "./deployment-secretspec.ts";
 import type { DeploymentSecretMaterial } from "./deployment-secret-runtime.ts";
 import { resolveVaultClientCredential } from "./deployment-secret-vault-credentials.ts";
+import { requireVaultContractPath, vaultApiPath } from "./deployment-secret-vault-paths.ts";
 
 async function vaultEnv() {
   return await resolveVaultClientCredential();
-}
-
-function requireVaultContractPath(contractId: string): { mount: string; secretPath: string } {
-  const prefix = "secret://";
-  if (!contractId.startsWith(prefix))
-    throw new Error(`unsupported Vault secret contract id: ${contractId}`);
-  const secretPath = contractId.slice(prefix.length).trim().replace(/^\/+/, "");
-  if (!secretPath) throw new Error(`invalid Vault secret contract id: ${contractId}`);
-  return { mount: "secret", secretPath };
-}
-
-function vaultApiPath(contractId: string, kind: "data" | "metadata"): string {
-  const { mount, secretPath } = requireVaultContractPath(contractId);
-  return `/v1/${mount}/${kind}/${secretPath}`;
 }
 
 async function vaultRequest<T>(
