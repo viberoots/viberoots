@@ -8,10 +8,6 @@ import {
   readDeployCliReadonlyFlags,
 } from "./deploy-cli-readonly.ts";
 import { listDeploymentsForCli, printDeployJson } from "./deploy-front-door.ts";
-import { runCloudflareDeployFrontDoor } from "./cloudflare-pages-front-door.ts";
-import { runAppStoreConnectDeployFrontDoor } from "./app-store-connect-front-door.ts";
-import { runGooglePlayDeployFrontDoor } from "./google-play-front-door.ts";
-import { runKubernetesDeployFrontDoor } from "./kubernetes-front-door.ts";
 import { resolveSmokeConnectOverride } from "./deployment-cli-smoke.ts";
 import { runFromChangesCli } from "./deployment-from-changes-cli.ts";
 import {
@@ -22,9 +18,6 @@ import {
   isNixosSharedHostDeployment,
   isS3StaticDeployment,
 } from "./contract.ts";
-import { maybeRunNixosSharedHostRemoteProfile } from "./nixos-shared-host-remote-cli.ts";
-import { runNixosSharedHostDeployFrontDoor } from "./deploy-provider-front-door.ts";
-import { runS3StaticDeployFrontDoor } from "./s3-static-front-door.ts";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();
@@ -103,6 +96,7 @@ export async function runDeployCli(opts: {
     );
   }
   if (isS3StaticDeployment(deployment)) {
+    const { runS3StaticDeployFrontDoor } = await import("./s3-static-front-door.ts");
     await runS3StaticDeployFrontDoor({
       workspaceRoot: opts.workspaceRoot,
       deployment,
@@ -119,6 +113,7 @@ export async function runDeployCli(opts: {
     return;
   }
   if (isCloudflarePagesDeployment(deployment)) {
+    const { runCloudflareDeployFrontDoor } = await import("./cloudflare-pages-front-door.ts");
     await runCloudflareDeployFrontDoor({
       workspaceRoot: opts.workspaceRoot,
       deployment,
@@ -140,6 +135,7 @@ export async function runDeployCli(opts: {
     return;
   }
   if (isAppStoreConnectDeployment(deployment)) {
+    const { runAppStoreConnectDeployFrontDoor } = await import("./app-store-connect-front-door.ts");
     await runAppStoreConnectDeployFrontDoor({
       workspaceRoot: opts.workspaceRoot,
       deployment,
@@ -152,6 +148,7 @@ export async function runDeployCli(opts: {
     return;
   }
   if (isGooglePlayDeployment(deployment)) {
+    const { runGooglePlayDeployFrontDoor } = await import("./google-play-front-door.ts");
     await runGooglePlayDeployFrontDoor({
       workspaceRoot: opts.workspaceRoot,
       deployment,
@@ -164,6 +161,7 @@ export async function runDeployCli(opts: {
     return;
   }
   if (isKubernetesDeployment(deployment)) {
+    const { runKubernetesDeployFrontDoor } = await import("./kubernetes-front-door.ts");
     await runKubernetesDeployFrontDoor({
       workspaceRoot: opts.workspaceRoot,
       deployment,
@@ -182,6 +180,9 @@ export async function runDeployCli(opts: {
   if (!isNixosSharedHostDeployment(deployment)) {
     throw new Error(`unsupported deployment provider: ${deployment.provider}`);
   }
+  const { maybeRunNixosSharedHostRemoteProfile } = await import(
+    "./nixos-shared-host-remote-cli.ts"
+  );
   if (
     await maybeRunNixosSharedHostRemoteProfile({
       workspaceRoot: opts.workspaceRoot,
@@ -191,6 +192,7 @@ export async function runDeployCli(opts: {
   ) {
     return;
   }
+  const { runNixosSharedHostDeployFrontDoor } = await import("./deploy-provider-front-door.ts");
   await runNixosSharedHostDeployFrontDoor({
     workspaceRoot: opts.workspaceRoot,
     deployment,

@@ -1,5 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
 import {
   assertVaultBootstrapExecutableInputs,
@@ -11,6 +13,8 @@ import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts"
 import { installCloudflarePagesTargets } from "./deployment-targets.install.helpers.ts";
 import { deploymentRequirementFixture } from "./deployment-metadata.fixture.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
+
+const repoRoot = process.cwd();
 
 function deploymentWithSecrets() {
   return cloudflarePagesDeploymentFixture({
@@ -56,8 +60,29 @@ test("deploy --print-vault-bootstrap emits deployment-derived JSON", async () =>
       deployment_environment: "staging",
       repository: "kiltyj/bucknix-fresh",
     });
-    assert.match(payload.policyHcl, /secret\/data\/deployments\/pleomino\/cloudflare_api_token/);
+    const policyMatches =
+      payload.policyHcl.match(/secret\/data\/deployments\/pleomino\/cloudflare_api_token/g) || [];
+    assert.equal(policyMatches.length, 1);
   });
+});
+
+test("deploy read-only bootstrap path does not eagerly import provider front doors", async () => {
+  const deployCliPath = path.join(repoRoot, "build-tools", "tools", "deployments", "deploy-cli.ts");
+  const source = await fsp.readFile(deployCliPath, "utf8");
+  for (const providerModule of [
+    "app-store-connect-front-door",
+    "cloudflare-pages-front-door",
+    "deploy-provider-front-door",
+    "google-play-front-door",
+    "kubernetes-front-door",
+    "nixos-shared-host-remote-cli",
+    "s3-static-front-door",
+  ]) {
+    assert.ok(
+      !source.includes(`from "./${providerModule}.ts"`),
+      `read-only deploy commands must not eagerly import ${providerModule}`,
+    );
+  }
 });
 
 test("secret templates preserve one reviewed template per requirement", () => {
