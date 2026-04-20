@@ -303,8 +303,10 @@ The intended production design is:
 - HTTP port 80 does not need to be open for ACME because wildcard certificates
   require a DNS challenge
 
-In the existing top-level NixOS module, add Vault-specific names alongside the
-other `let` bindings:
+In the existing top-level NixOS module, add the shared service names alongside
+the other `let` bindings. In the host shape shown above, these belong in the
+same `let` block as `vaultDomain`, `serviceTcpPorts`, `homeDomain`, and the
+other local constants, before the final `in { ... }`:
 
 ```nix
 vaultDomain = "secrets.apps.kilty.io";
@@ -769,6 +771,9 @@ rewrites, and `networking.firewall.allowedTCPPorts` expressions as the owners.
 Import the identity-provider module once, configure
 `deploymentHost.identityProvider` with its nginx, ACME, and firewall ownership
 disabled, and add one host-owned vhost:
+
+The `identityDomain` and `keycloakHttpPort` names below are the `let` bindings
+added in Step 0:
 
 ```nix
 {
