@@ -310,12 +310,20 @@ other local constants, before the final `in { ... }`:
 
 ```nix
 vaultDomain = "secrets.apps.kilty.io";
-vaultNodeDomain = "vault-1.apps.kilty.io";
 identityDomain = "identity.apps.kilty.io";
-keycloakHttpPort = 8081;
+keycloakHttpPort = 8091;
 acmeCertName = "apps.kilty.io";
 acmeCertDir = config.security.acme.certs.${acmeCertName}.directory;
 ```
+
+Choose a Keycloak loopback port that is not already used by the host. In the
+host shape shown above, `8081` is already used by `mitmWebPort`, so the example
+uses `8091`.
+
+For a single-node Vault host, use `vaultDomain` for both `apiAddress` and
+`clusterAddress`. If you later run a multi-node Vault cluster, add a separate
+node-specific binding such as `vaultNodeDomain = "vault-1.apps.kilty.io";` and
+use that for `clusterAddress`.
 
 Then import the reviewed Vault module from the repo checkout once. Because
 `nixos-rebuild switch --flake /etc/nixos#mini` evaluates the host flake in pure
@@ -389,7 +397,7 @@ deploymentHost.vault = {
   publicHostname = vaultDomain;
   addLocalHostname = true;
   apiAddress = "https://${vaultDomain}:8200";
-  clusterAddress = "https://${vaultNodeDomain}:8201";
+  clusterAddress = "https://${vaultDomain}:8201";
   listenerExtraConfig = ''
     tls_min_version = "tls12"
   '';
@@ -503,7 +511,7 @@ services.vault.extraConfig = ''
   ui = true
   disable_mlock = false
   api_addr = "https://${vaultDomain}:8200"
-  cluster_addr = "https://${vaultNodeDomain}:8201"
+  cluster_addr = "https://${vaultDomain}:8201"
 '';
 ```
 
@@ -896,7 +904,7 @@ Confirm that Keycloak and nginx are up:
 ```bash
 systemctl status keycloak.service
 systemctl status nginx.service
-sudo ss -ltnp | grep ':8081'
+sudo ss -ltnp | grep ':8091'
 ```
 
 Confirm the public issuer name resolves and serves OIDC metadata. The realm does

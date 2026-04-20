@@ -312,13 +312,13 @@ deploymentHost.vault = {
   openFirewall = false;
   addLocalHostname = true;
   apiAddress = "https://secrets.apps.kilty.io:8200";
-  clusterAddress = "https://vault-1.apps.kilty.io:8201";
+  clusterAddress = "https://secrets.apps.kilty.io:8201";
 };
 
 deploymentHost.identityProvider = {
   enable = true;
   hostname = "identity.apps.kilty.io";
-  keycloakHttpPort = 8081;
+  keycloakHttpPort = 8091;
   manageNginx = false;
   manageAcme = false;
   openFirewall = false;

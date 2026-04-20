@@ -174,6 +174,7 @@ test("shared-host identity provider module evaluates as reviewed Keycloak defaul
               enable = true;
               hostname = "identity.example.test";
               acmeEmail = "ops@example.test";
+              keycloakHttpPort = 8091;
               manageNginx = true;
               manageAcme = true;
               openFirewall = true;
@@ -221,14 +222,14 @@ test("shared-host identity provider module evaluates as reviewed Keycloak defaul
     assert.equal(out.package, "keycloak");
     assert.equal(out.hostname, "https://identity.example.test");
     assert.equal(out.httpHost, "127.0.0.1");
-    assert.equal(out.httpPort, 8081);
+    assert.equal(out.httpPort, 8091);
     assert.equal(out.databaseType, "postgresql");
     assert.equal(out.passwordFile, "/var/lib/deployment-host-secrets/keycloak-db-password");
     assert.equal(out.initialAdminPassword, null);
     assert.equal(out.nginxEnabled, true);
     assert.equal(out.forceSSL, true);
     assert.equal(out.enableACME, true);
-    assert.equal(out.proxyPass, "http://127.0.0.1:8081");
+    assert.equal(out.proxyPass, "http://127.0.0.1:8091");
     assert.equal(out.acmeEmail, "ops@example.test");
     assert.deepEqual(out.firewallPorts, [80, 443]);
   });

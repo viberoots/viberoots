@@ -3,8 +3,9 @@ let
   cfg = config.deploymentHost.identityProvider;
   localHost = "127.0.0.1";
   hostname = if cfg.hostname == null then "_disabled.invalid" else cfg.hostname;
+  keycloakHttpPort = if cfg.keycloakHttpPort == null then 0 else cfg.keycloakHttpPort;
   publicUrl = "https://${hostname}";
-  proxyUrl = "http://${localHost}:${toString cfg.keycloakHttpPort}";
+  proxyUrl = "http://${localHost}:${toString keycloakHttpPort}";
 in
 {
   options.deploymentHost.identityProvider = {
@@ -24,8 +25,8 @@ in
       description = "ACME account email used when this module manages certificates.";
     };
     keycloakHttpPort = lib.mkOption {
-      type = lib.types.port;
-      default = 8081;
+      type = lib.types.nullOr lib.types.port;
+      default = null;
       description = "Loopback HTTP port used by Keycloak behind nginx.";
     };
     databasePasswordFile = lib.mkOption {
@@ -57,6 +58,10 @@ in
         message = "deploymentHost.identityProvider.hostname must be set when the identity provider is enabled.";
       }
       {
+        assertion = cfg.keycloakHttpPort != null;
+        message = "deploymentHost.identityProvider.keycloakHttpPort must be set to an unused loopback port.";
+      }
+      {
         assertion = !cfg.manageAcme || cfg.acmeEmail != null;
         message = "deploymentHost.identityProvider.acmeEmail must be set when manageAcme is true.";
       }
@@ -74,7 +79,7 @@ in
         hostname = lib.mkDefault publicUrl;
         http-enabled = lib.mkDefault true;
         http-host = lib.mkDefault localHost;
-        http-port = lib.mkDefault cfg.keycloakHttpPort;
+        http-port = lib.mkDefault keycloakHttpPort;
         proxy-headers = lib.mkDefault "xforwarded";
         hostname-backchannel-dynamic = lib.mkDefault true;
       };
