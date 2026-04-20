@@ -313,25 +313,56 @@ vaultDomain = "secrets.apps.kilty.io";
 vaultNodeDomain = "vault-1.apps.kilty.io";
 identityDomain = "identity.apps.kilty.io";
 keycloakHttpPort = 8081;
-appsAcmeCertName = "apps.kilty.io";
-appsAcmeCertDir = config.security.acme.certs.${appsAcmeCertName}.directory;
+acmeCertName = "apps.kilty.io";
+acmeCertDir = config.security.acme.certs.${acmeCertName}.directory;
 ```
 
-Then import the reviewed Vault module from the repo checkout once. The import
-makes the `deploymentHost.vault.*` options available in the same NixOS module
-graph:
+Then import the reviewed Vault module from the repo checkout once. Because
+`nixos-rebuild switch --flake /etc/nixos#mini` evaluates the host flake in pure
+mode, do not import `/srv/common/...` as an absolute path from
+`configuration.nix`. Also avoid making all of `/srv/common` a flake input,
+because that snapshots the full repo into the store on rebuild. Add only the
+small module directory as a non-flake path input instead:
 
 ```nix
-imports = [
-  # Existing imports stay here.
-  /srv/common/build-tools/tools/nix/shared-host-vault-module.nix
-];
+# /etc/nixos/flake.nix
+{
+  inputs.deploymentModules = {
+    url = "path:/srv/common/build-tools/tools/nix";
+    flake = false;
+  };
+
+  outputs = { nixpkgs, deploymentModules, ... }@inputs: {
+    nixosConfigurations.mini = nixpkgs.lib.nixosSystem {
+      # Existing system and modules settings stay here.
+      specialArgs = {
+        # Existing specialArgs stay here.
+        deploymentModulesRoot = deploymentModules;
+      };
+    };
+  };
+}
 ```
 
-The import can live in `configuration.nix`, in the flake `modules` list, or in
-another local module that your host imports. Do not also declare a parallel
-`services.vault` block unless you are intentionally overriding a specific option
-from the module.
+Then add `deploymentModulesRoot` to the existing argument set at the top of
+`configuration.nix` and import the module through that flake input. This keeps
+the import pure while copying only the small `build-tools/tools/nix` subtree
+from the checkout that lives at `/srv/common`:
+
+```nix
+{ config, lib, pkgs, deploymentModulesRoot, nixpkgsUnstable, nixosHardware, nixMinecraft, ... }:
+
+{
+  imports = [
+    # Existing imports stay here.
+    "${deploymentModulesRoot}/shared-host-vault-module.nix"
+  ];
+}
+```
+
+The import makes the `deploymentHost.vault.*` options available in the same
+NixOS module graph. Do not also declare a parallel `services.vault` block unless
+you are intentionally overriding a specific option from the module.
 
 In the existing `environment.systemPackages` list, keep or add the Vault CLI
 package. Using `config.services.vault.package` keeps the CLI aligned with the
@@ -352,9 +383,9 @@ deploymentHost.vault = {
   address = "0.0.0.0:8200";
   storageBackend = "raft";
   storagePath = "/var/lib/vault";
-  useAppsAcmeCertificate = true;
-  appsAcmeCertName = appsAcmeCertName;
-  appsAcmeGroup = "apps-acme";
+  useAcmeCertificate = true;
+  acmeCertName = acmeCertName;
+  acmeGroup = "apps-acme";
   publicHostname = vaultDomain;
   addLocalHostname = true;
   apiAddress = "https://${vaultDomain}:8200";
@@ -770,19 +801,25 @@ host shape, keep the existing `services.nginx`, `security.acme`, AdGuard
 rewrites, and `networking.firewall.allowedTCPPorts` expressions as the owners.
 Import the identity-provider module once, configure
 `deploymentHost.identityProvider` with its nginx, ACME, and firewall ownership
-disabled, and add one host-owned vhost:
+disabled, and add one host-owned vhost to the existing nginx `virtualHosts`
+merge.
 
 The `identityDomain` and `keycloakHttpPort` names below are the `let` bindings
-added in Step 0:
+added in Step 0. Do not add a second top-level
+`services.nginx.virtualHosts.${identityDomain}` definition in this file; because
+the host already defines `services.nginx = { virtualHosts = ...; };`, that would
+collide during Nix evaluation. Instead, add the new manual vhost inside the
+existing `virtualHosts = (...) // { ... };` expression:
 
 ```nix
 {
   imports = [
     # Existing imports stay here.
-    /srv/common/build-tools/tools/nix/shared-host-identity-provider-module.nix
+    "${deploymentModulesRoot}/shared-host-identity-provider-module.nix"
   ];
 
   deploymentHost.identityProvider = {
+    enable = true;
     hostname = identityDomain;
     keycloakHttpPort = keycloakHttpPort;
     databasePasswordFile = "/var/lib/deployment-host-secrets/keycloak-db-password";
@@ -793,19 +830,29 @@ added in Step 0:
     openFirewall = false;
   };
 
-  services.nginx.virtualHosts.${identityDomain} = {
-    useACMEHost = "apps.kilty.io";
-    onlySSL = true;
-    locations."/" = {
-      proxyPass = "http://127.0.0.1:${toString keycloakHttpPort}";
-      proxyWebsockets = true;
-      extraConfig = ''
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Port 443;
-        proxy_set_header X-Forwarded-Proto https;
-      '';
+  services.nginx = {
+    # Existing nginx settings stay here.
+
+    virtualHosts = (
+      # Existing serviceTcpPorts-generated vhosts stay here.
+    ) // {
+      # Existing manual vhosts stay here.
+
+      "${identityDomain}" = {
+        useACMEHost = "apps.kilty.io";
+        onlySSL = true;
+        locations."/" = {
+          proxyPass = "http://127.0.0.1:${toString keycloakHttpPort}";
+          proxyWebsockets = true;
+          extraConfig = ''
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port 443;
+            proxy_set_header X-Forwarded-Proto https;
+          '';
+        };
+      };
     };
   };
 }
@@ -813,9 +860,13 @@ added in Step 0:
 
 The module enables Keycloak with a local PostgreSQL database, binds the HTTP
 listener to `127.0.0.1`, and keeps the database password file as an out-of-store
-path. It does not own nginx in this host shape, set a bootstrap admin password,
-or commit client secrets; create those through the Keycloak bootstrap/admin flow
-and rotate them immediately after first use.
+path. It renders Keycloak's `hostname` setting as
+`https://${identityDomain}` while keeping `identityDomain` as the bare nginx
+virtual-host name; this is required because Keycloak requires a full URL when
+`hostname-backchannel-dynamic` is enabled. It does not own nginx in this host
+shape, set a bootstrap admin password, or commit client secrets; create those
+through the Keycloak bootstrap/admin flow and rotate them immediately after
+first use.
 
 Do not also add `identity.apps.kilty.io` to the `security.acme.certs."apps.kilty.io".extraDomainNames`
 list. The existing wildcard certificate for `*.apps.kilty.io` already covers

@@ -113,12 +113,30 @@ starting modules live here:
 - `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix`
 - `/srv/common/build-tools/tools/nix/shared-host-identity-provider-module.nix`
 
+For a flake-based `/etc/nixos` host, expose only the module directory as a
+non-flake input:
+
+```nix
+inputs.deploymentModules = {
+  url = "path:/srv/common/build-tools/tools/nix";
+  flake = false;
+};
+```
+
+Then import the modules through `deploymentModules` or a `specialArgs` value
+derived from it. Do not import `/srv/common/...` directly from
+`configuration.nix` during `nixos-rebuild switch --flake`; pure flake evaluation
+rejects absolute paths outside the flake input graph. Avoid pointing the input at
+all of `/srv/common`, since that copies the full repo into the store.
+
 On the current `mini` host shape, those modules augment an existing
 configuration that already owns nginx, wildcard ACME, firewall lists, and DNS
-rewrites. Use `deploymentHost.vault.useAppsAcmeCertificate = true` for direct
+rewrites. Use `deploymentHost.vault.useAcmeCertificate = true` for direct
 Vault TLS on the existing `*.apps.kilty.io` certificate, and set the
 identity-provider `manageNginx`, `manageAcme`, and `openFirewall` flags to
-`false` when adding a host-owned `identity.apps.kilty.io` nginx vhost.
+`false` when adding a host-owned `identity.apps.kilty.io` nginx vhost. The
+modules do not choose public domains for you; set `publicHostname`,
+`acmeCertName`, and `identityProvider.hostname` from the host config.
 
 Use that runbook when you need to:
 

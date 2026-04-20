@@ -235,30 +235,49 @@ repo now includes reviewed importable NixOS modules:
 
 Use these when the host keeps a checkout of this repo at `/srv/common` and you
 want the service definitions versioned with the rest of the deployment system.
+For a flake-based host, add `/srv/common/build-tools/tools/nix` as a non-flake
+path input and import the modules through that input. Do not import
+`/srv/common/...` as an absolute path from `configuration.nix`; pure flake
+evaluation rejects that unless you rebuild with `--impure`. Do not point the
+input at all of `/srv/common` unless you are comfortable copying the full repo
+into the store during rebuilds.
 
 These modules are intentionally opt-in. The shared-host installer does not
 import them for you.
 
-Example `configuration.nix` wiring:
-
-```nix
-imports = [
-  ./hardware-configuration.nix
-  /etc/nixos/bucknix/nixos-shared-host/default.nix
-  /srv/common/build-tools/tools/nix/shared-host-postgres-module.nix
-  /srv/common/build-tools/tools/nix/shared-host-vault-module.nix
-];
-```
-
 Example `flake.nix` wiring:
 
 ```nix
-modules = [
-  ./configuration.nix
-  /etc/nixos/bucknix/nixos-shared-host/default.nix
-  /srv/common/build-tools/tools/nix/shared-host-postgres-module.nix
-  /srv/common/build-tools/tools/nix/shared-host-vault-module.nix
-];
+{
+  inputs.deploymentModules = {
+    url = "path:/srv/common/build-tools/tools/nix";
+    flake = false;
+  };
+
+  outputs = { nixpkgs, deploymentModules, ... }@inputs: {
+    nixosConfigurations.mini = nixpkgs.lib.nixosSystem {
+      # Existing system and modules settings stay here.
+      specialArgs = {
+        # Existing specialArgs stay here.
+        deploymentModulesRoot = deploymentModules;
+      };
+    };
+  };
+}
+```
+
+Example `configuration.nix` wiring:
+
+```nix
+{ config, lib, pkgs, deploymentModulesRoot, ... }:
+
+{
+  imports = [
+    # Existing imports stay here.
+    "${deploymentModulesRoot}/shared-host-postgres-module.nix"
+    "${deploymentModulesRoot}/shared-host-vault-module.nix"
+  ];
+}
 ```
 
 What these modules do:
@@ -270,9 +289,10 @@ What these modules do:
 - `shared-host-vault-module.nix`
   Enables local Vault on `mini`, allows the unfree `vault` package, uses the
   built-in `raft` storage backend at `/var/lib/vault`, and enables the local
-  UI. By default it binds Vault to `127.0.0.1:8200`; when the existing host
-  config already owns the `*.apps.kilty.io` wildcard ACME certificate, set
-  `deploymentHost.vault.useAppsAcmeCertificate = true` and
+  UI. When enabled without TLS options it binds Vault to `127.0.0.1:8200`; when
+  the existing host config already owns the `*.apps.kilty.io` wildcard ACME
+  certificate, set
+  `deploymentHost.vault.useAcmeCertificate = true` and
   `deploymentHost.vault.address = "0.0.0.0:8200"` to run Vault as the direct TLS
   endpoint for `https://secrets.apps.kilty.io:8200`.
 
@@ -283,8 +303,12 @@ host-owned config:
 
 ```nix
 deploymentHost.vault = {
+  enable = true;
   address = "0.0.0.0:8200";
-  useAppsAcmeCertificate = true;
+  useAcmeCertificate = true;
+  acmeCertName = "apps.kilty.io";
+  acmeGroup = "apps-acme";
+  publicHostname = "secrets.apps.kilty.io";
   openFirewall = false;
   addLocalHostname = true;
   apiAddress = "https://secrets.apps.kilty.io:8200";
@@ -292,6 +316,7 @@ deploymentHost.vault = {
 };
 
 deploymentHost.identityProvider = {
+  enable = true;
   hostname = "identity.apps.kilty.io";
   keycloakHttpPort = 8081;
   manageNginx = false;

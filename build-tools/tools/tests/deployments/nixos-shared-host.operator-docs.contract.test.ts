@@ -160,6 +160,31 @@ test("nixos shared host usage guide stays present as the reviewed operator-facin
     /shared-host-vault-module\.nix/,
     "setup guide must document the reviewed importable Vault module",
   );
+  assert.match(
+    setupDoc,
+    /inputs\.deploymentModules = \{[\s\S]*url = "path:\/srv\/common\/build-tools\/tools\/nix";[\s\S]*flake = false;/,
+    "setup guide must document narrow non-flake path input wiring for repo-hosted service modules",
+  );
+  assert.match(
+    setupDoc,
+    /deploymentModulesRoot = deploymentModules/,
+    "setup guide must pass the service-module flake input into configuration.nix",
+  );
+  assert.match(
+    setupDoc,
+    /\$\{deploymentModulesRoot\}\/shared-host-vault-module\.nix/,
+    "setup guide must import service modules through the flake input, not an absolute path",
+  );
+  assert.match(
+    usageDoc,
+    /Avoid pointing the input at\s+all of `\/srv\/common`, since that copies the full repo into the store/,
+    "usage guide must avoid full-repo path inputs for service modules",
+  );
+  assert.match(
+    usageDoc,
+    /pure flake evaluation\s+rejects absolute paths/,
+    "usage guide must warn against direct absolute module imports under flakes",
+  );
   assert.match(usageDoc, /Deployment Contract/, "usage guide must link to the deployment contract");
   assert.match(
     usageDoc,

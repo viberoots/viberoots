@@ -2,23 +2,25 @@
 let
   cfg = config.deploymentHost.identityProvider;
   localHost = "127.0.0.1";
+  hostname = if cfg.hostname == null then "_disabled.invalid" else cfg.hostname;
+  publicUrl = "https://${hostname}";
   proxyUrl = "http://${localHost}:${toString cfg.keycloakHttpPort}";
 in
 {
   options.deploymentHost.identityProvider = {
     enable = lib.mkOption {
       type = lib.types.bool;
-      default = true;
+      default = false;
       description = "Enable the reviewed Keycloak identity-provider defaults for a deployment host.";
     };
     hostname = lib.mkOption {
-      type = lib.types.str;
-      default = "identity.apps.kilty.io";
+      type = lib.types.nullOr lib.types.str;
+      default = null;
       description = "Public hostname for the deployment-host OIDC issuer.";
     };
     acmeEmail = lib.mkOption {
-      type = lib.types.str;
-      default = "ops@example.com";
+      type = lib.types.nullOr lib.types.str;
+      default = null;
       description = "ACME account email used when this module manages certificates.";
     };
     keycloakHttpPort = lib.mkOption {
@@ -33,22 +35,33 @@ in
     };
     manageNginx = lib.mkOption {
       type = lib.types.bool;
-      default = true;
+      default = false;
       description = "Whether this module manages the nginx virtual host.";
     };
     manageAcme = lib.mkOption {
       type = lib.types.bool;
-      default = true;
+      default = false;
       description = "Whether this module manages ACME defaults for the identity host.";
     };
     openFirewall = lib.mkOption {
       type = lib.types.bool;
-      default = true;
+      default = false;
       description = "Whether this module opens HTTP and HTTPS firewall ports.";
     };
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = cfg.hostname != null;
+        message = "deploymentHost.identityProvider.hostname must be set when the identity provider is enabled.";
+      }
+      {
+        assertion = !cfg.manageAcme || cfg.acmeEmail != null;
+        message = "deploymentHost.identityProvider.acmeEmail must be set when manageAcme is true.";
+      }
+    ];
+
     services.keycloak = {
       enable = true;
       package = lib.mkDefault pkgs.keycloak;
@@ -58,7 +71,7 @@ in
         passwordFile = cfg.databasePasswordFile;
       };
       settings = {
-        hostname = lib.mkDefault cfg.hostname;
+        hostname = lib.mkDefault publicUrl;
         http-enabled = lib.mkDefault true;
         http-host = lib.mkDefault localHost;
         http-port = lib.mkDefault cfg.keycloakHttpPort;
@@ -69,7 +82,7 @@ in
 
     services.nginx = lib.mkIf cfg.manageNginx {
       enable = lib.mkDefault true;
-      virtualHosts.${cfg.hostname} = {
+      virtualHosts.${hostname} = {
         forceSSL = lib.mkDefault true;
         enableACME = lib.mkDefault cfg.manageAcme;
         locations."/" = {

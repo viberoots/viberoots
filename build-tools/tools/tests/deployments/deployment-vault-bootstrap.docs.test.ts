@@ -21,12 +21,24 @@ test("Vault bootstrap runbook uses reviewed shared-host IdP module and JWT helpe
   assert.doesNotMatch(doc, /manageAcme = true/);
   assert.doesNotMatch(doc, /openFirewall = true/);
   assert.doesNotMatch(doc, /Add Keycloak To The `mini` Flake/);
+  assert.doesNotMatch(doc, /services\.nginx\.virtualHosts\.\$\{identityDomain\} =/);
+  assert.doesNotMatch(doc, /^\s*\/srv\/common\/build-tools\/tools\/nix\/shared-host-/m);
+  assert.doesNotMatch(doc, /url = "path:\/srv\/common";/);
+  assert.match(
+    doc,
+    /inputs\.deploymentModules = \{[\s\S]*url = "path:\/srv\/common\/build-tools\/tools\/nix";[\s\S]*flake = false;/,
+  );
+  assert.match(doc, /deploymentModulesRoot = deploymentModules/);
+  assert.match(doc, /\$\{deploymentModulesRoot\}\/shared-host-vault-module\.nix/);
+  assert.match(doc, /\$\{deploymentModulesRoot\}\/shared-host-identity-provider-module\.nix/);
   assert.match(doc, /deploy-vault-jwt \\/);
   assert.match(doc, /--client-secret-env BNX_DEPLOYER_CLIENT_SECRET/);
   assert.match(doc, /--expect-claim deployment_environment=mini/);
   assert.match(doc, /permission denied[\s\S]*sys\/auth\/\*/);
-  assert.match(doc, /useAppsAcmeCertificate = true/);
+  assert.match(doc, /useAcmeCertificate = true/);
   assert.match(doc, /manageNginx = false/);
+  assert.match(doc, /full URL[\s\S]*hostname-backchannel-dynamic/);
+  assert.match(doc, /virtualHosts = \([\s\S]*\) \/\/ \{[\s\S]*"\$\{identityDomain\}" =/);
   assert.match(doc, /useACMEHost = "apps\.kilty\.io"/);
   assert.match(doc, /identity\.apps\.kilty\.io[\s\S]*wildcard certificate/);
   assert.doesNotMatch(doc, /protocol\/openid-connect\/token" \\/);

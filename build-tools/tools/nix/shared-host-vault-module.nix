@@ -1,10 +1,11 @@
 { config, lib, pkgs, ... }:
 let
   cfg = config.deploymentHost.vault;
-  acmeCertDir = config.security.acme.certs.${cfg.appsAcmeCertName}.directory;
-  tlsCertFile =
-    if cfg.useAppsAcmeCertificate then "${acmeCertDir}/fullchain.pem" else cfg.tlsCertFile;
-  tlsKeyFile = if cfg.useAppsAcmeCertificate then "${acmeCertDir}/key.pem" else cfg.tlsKeyFile;
+  acmeCertName = if cfg.acmeCertName == null then "_disabled.invalid" else cfg.acmeCertName;
+  publicHostname = if cfg.publicHostname == null then "_disabled.invalid" else cfg.publicHostname;
+  acmeCertDir = config.security.acme.certs.${acmeCertName}.directory;
+  tlsCertFile = if cfg.useAcmeCertificate then "${acmeCertDir}/fullchain.pem" else cfg.tlsCertFile;
+  tlsKeyFile = if cfg.useAcmeCertificate then "${acmeCertDir}/key.pem" else cfg.tlsKeyFile;
   tlsConfig = lib.optionalAttrs (tlsCertFile != null && tlsKeyFile != null) {
     inherit tlsCertFile tlsKeyFile;
   };
@@ -23,7 +24,7 @@ in
   options.deploymentHost.vault = {
     enable = lib.mkOption {
       type = lib.types.bool;
-      default = true;
+      default = false;
       description = "Enable the reviewed Vault service defaults for a deployment host.";
     };
     address = lib.mkOption {
@@ -71,20 +72,20 @@ in
       default = "";
       description = "Additional Vault listener configuration.";
     };
-    useAppsAcmeCertificate = lib.mkOption {
+    useAcmeCertificate = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Use the existing apps.kilty.io ACME certificate directly for Vault TLS.";
+      description = "Use an existing ACME certificate directly for Vault TLS.";
     };
-    appsAcmeCertName = lib.mkOption {
-      type = lib.types.str;
-      default = "apps.kilty.io";
+    acmeCertName = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
       description = "Existing ACME certificate name that covers the Vault hostname.";
     };
-    appsAcmeGroup = lib.mkOption {
+    acmeGroup = lib.mkOption {
       type = lib.types.str;
-      default = "apps-acme";
-      description = "Shared group allowed to read the apps wildcard certificate.";
+      default = "deployment-acme";
+      description = "Shared group allowed to read the selected ACME certificate.";
     };
     openFirewall = lib.mkOption {
       type = lib.types.bool;
@@ -97,13 +98,24 @@ in
       description = "Whether this module maps the public Vault hostname to loopback.";
     };
     publicHostname = lib.mkOption {
-      type = lib.types.str;
-      default = "secrets.apps.kilty.io";
+      type = lib.types.nullOr lib.types.str;
+      default = null;
       description = "Public Vault hostname.";
     };
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = !cfg.useAcmeCertificate || cfg.acmeCertName != null;
+        message = "deploymentHost.vault.acmeCertName must be set when useAcmeCertificate is true.";
+      }
+      {
+        assertion = !cfg.addLocalHostname || cfg.publicHostname != null;
+        message = "deploymentHost.vault.publicHostname must be set when addLocalHostname is true.";
+      }
+    ];
+
     nixpkgs.config.allowUnfreePredicate = lib.mkDefault (
       pkg: builtins.elem (lib.getName pkg) [ "vault" ]
     );
@@ -118,19 +130,19 @@ in
       listenerExtraConfig = lib.mkAfter cfg.listenerExtraConfig;
     } // tlsConfig;
 
-    users.groups.${cfg.appsAcmeGroup}.members = lib.mkIf cfg.useAppsAcmeCertificate [ "vault" ];
-    security.acme.certs.${cfg.appsAcmeCertName} = lib.mkIf cfg.useAppsAcmeCertificate {
-      group = lib.mkDefault cfg.appsAcmeGroup;
+    users.groups.${cfg.acmeGroup}.members = lib.mkIf cfg.useAcmeCertificate [ "vault" ];
+    security.acme.certs.${acmeCertName} = lib.mkIf cfg.useAcmeCertificate {
+      group = lib.mkDefault cfg.acmeGroup;
       postRun = lib.mkAfter ''
         systemctl try-restart vault.service
       '';
     };
-    systemd.services.vault = lib.mkIf cfg.useAppsAcmeCertificate {
-      after = [ "acme-${cfg.appsAcmeCertName}.service" ];
-      wants = [ "acme-${cfg.appsAcmeCertName}.service" ];
+    systemd.services.vault = lib.mkIf cfg.useAcmeCertificate {
+      after = [ "acme-${acmeCertName}.service" ];
+      wants = [ "acme-${acmeCertName}.service" ];
     };
     networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [ 8200 ];
-    networking.hosts."127.0.0.1" = lib.mkIf cfg.addLocalHostname [ cfg.publicHostname ];
+    networking.hosts."127.0.0.1" = lib.mkIf cfg.addLocalHostname [ publicHostname ];
     environment.systemPackages = [ config.services.vault.package ];
   };
 }
