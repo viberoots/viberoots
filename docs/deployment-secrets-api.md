@@ -591,6 +591,9 @@ Field meanings with example values:
   A short local name used by the deployment code at runtime.
 - `step: "publish"`
   Use `publish` when the secret is needed to send a release to a provider.
+- `step: "preview_cleanup"`
+  Use `preview_cleanup` when the secret is needed for a destructive provider
+  preview cleanup operation.
 - `step: "provision"`
   Use `provision` when the secret is needed only for infrastructure work.
 - `step: "smoke"`
@@ -617,6 +620,7 @@ import {
 
 const bindings = deploymentSecretContractBindings(requirements);
 const publishBindings = deploymentSecretBindingsForStep(bindings, "publish");
+const cleanupBindings = deploymentSecretBindingsForStep(bindings, "preview_cleanup");
 ```
 
 In this example:
@@ -625,6 +629,8 @@ In this example:
   requirements into a normalized secret-binding list.
 - `deploymentSecretBindingsForStep(bindings, "publish")` filters that list down
   to only the secrets allowed during the `publish` step.
+- `deploymentSecretBindingsForStep(bindings, "preview_cleanup")` filters that
+  list down to cleanup-only provider credentials.
 
 ### Runtime Example
 
@@ -740,6 +746,9 @@ What the common fixture fields mean:
 - `"allowedSteps": ["publish"]`
   Use this for a provider credential that should be available only during the
   publish step.
+- `"allowedSteps": ["preview_cleanup"]`
+  Use this for a provider credential that should be available only while
+  deleting preview resources.
 - `"allowedSteps": ["smoke"]`
   Use this for a credential that should be available only during smoke checks.
 - `"targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"]`

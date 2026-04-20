@@ -295,7 +295,7 @@ Vault follow-up after the first `nixos-rebuild switch`:
 
 - use the local service as the installation and lifecycle owner
 - then open [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
-  for init, unseal, audit, KV v2, AppRole, policy, and secret bootstrap
+  for init, unseal, audit, KV v2, JWT auth roles, policy, and secret bootstrap
 
 The Vault module is a host-service baseline, not a substitute for the Vault
 bootstrap runbook.

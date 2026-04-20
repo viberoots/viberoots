@@ -116,9 +116,9 @@ starting modules live here:
 Use that runbook when you need to:
 
 - initialize and unseal Vault
-- enable audit logging, KV v2, and AppRole
+- enable audit logging, KV v2, and JWT auth roles
 - run the reviewed `deploy-vault-jwt` helper for client-credentials workload JWTs
-- create the read policy and AppRole used by deployment secret export
+- create the read policy used by deployment secret resolution
 - write the deployment secrets themselves
 - export a reviewed secret fixture for local/test/bootstrap workflows
 

@@ -60,6 +60,7 @@ export async function publishCloudflarePagesStaticWebapp(opts: {
   artifactDir: string;
   renderedConfigPath: string;
   effectiveRunTarget?: CloudflarePagesDeployment["providerTarget"];
+  apiToken?: string;
 }): Promise<CloudflarePagesPublishResult> {
   const effectiveRunTarget = opts.effectiveRunTarget || opts.deployment.providerTarget;
   const result = await $({
@@ -68,6 +69,7 @@ export async function publishCloudflarePagesStaticWebapp(opts: {
     env: {
       ...process.env,
       CLOUDFLARE_ACCOUNT_ID: opts.deployment.providerTarget.account,
+      ...(opts.apiToken ? { CLOUDFLARE_API_TOKEN: opts.apiToken } : {}),
     },
   })`${wranglerBin()} pages deploy ${path.resolve(opts.artifactDir)} --project-name ${opts.deployment.providerTarget.project} ${effectiveRunTarget.previewBranch ? ["--branch", effectiveRunTarget.previewBranch] : []} --config ${path.resolve(opts.renderedConfigPath)}`.nothrow();
   const stdout = String((result as any).stdout || "");

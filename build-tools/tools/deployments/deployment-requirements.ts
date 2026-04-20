@@ -4,10 +4,21 @@ import type { GraphNode } from "../lib/graph.ts";
 export type DeploymentRequirementStep =
   | "provision"
   | "publish"
+  | "preview_cleanup"
   | "smoke"
   | "release_actions.pre_publish"
   | "release_actions.post_publish_pre_smoke"
   | "release_actions.post_smoke";
+
+export const DEPLOYMENT_REQUIREMENT_STEPS: DeploymentRequirementStep[] = [
+  "provision",
+  "publish",
+  "preview_cleanup",
+  "smoke",
+  "release_actions.pre_publish",
+  "release_actions.post_publish_pre_smoke",
+  "release_actions.post_smoke",
+];
 
 export type DeploymentRequirement = {
   name: string;
@@ -112,6 +123,10 @@ function requirementError(label: string, fieldPath: string, message: string): st
   return `${label}: ${fieldPath}: ${message}`;
 }
 
+function isDeploymentRequirementStep(step: string): step is DeploymentRequirementStep {
+  return DEPLOYMENT_REQUIREMENT_STEPS.includes(step as DeploymentRequirementStep);
+}
+
 export function validateDeploymentRequirements(opts: {
   label: string;
   fieldPath: string;
@@ -120,19 +135,32 @@ export function validateDeploymentRequirements(opts: {
 }) {
   const seenNames = new Set<string>();
   for (const requirement of opts.requirements) {
+    const seenKey = `${requirement.name}:${requirement.step}`;
     if (!requirement.name) {
       opts.errors.push(requirementError(opts.label, opts.fieldPath, "entries must set name"));
       continue;
     }
-    if (seenNames.has(requirement.name)) {
+    if (seenNames.has(seenKey)) {
       opts.errors.push(
-        requirementError(opts.label, opts.fieldPath, `duplicate requirement "${requirement.name}"`),
+        requirementError(
+          opts.label,
+          opts.fieldPath,
+          `duplicate requirement "${requirement.name}" for step "${requirement.step}"`,
+        ),
       );
     }
-    seenNames.add(requirement.name);
+    seenNames.add(seenKey);
     if (!requirement.step) {
       opts.errors.push(
         requirementError(opts.label, opts.fieldPath, `${requirement.name} must set step`),
+      );
+    } else if (!isDeploymentRequirementStep(requirement.step)) {
+      opts.errors.push(
+        requirementError(
+          opts.label,
+          opts.fieldPath,
+          `${requirement.name} has unsupported step "${requirement.step}"`,
+        ),
       );
     }
     if (!requirement.contractId) {

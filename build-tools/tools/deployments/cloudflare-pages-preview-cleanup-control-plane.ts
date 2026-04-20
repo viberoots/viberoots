@@ -23,6 +23,7 @@ import {
   createCloudflarePagesDeployRunId,
   writeCloudflarePagesDeployRecord,
 } from "./cloudflare-pages-records.ts";
+import { requireCloudflarePagesApiTokenForStep } from "./cloudflare-pages-secret-steps.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 
@@ -122,10 +123,17 @@ export async function submitCloudflarePagesPreviewCleanup(opts: {
     snapshot,
     async (authority) => {
       try {
+        const apiToken = await requireCloudflarePagesApiTokenForStep({
+          admittedContext: source.sourceRecord.admittedContext,
+          step: "preview_cleanup",
+          authority,
+          requirements: opts.deployment.secretRequirements,
+        });
         await cleanupCloudflarePagesPreview({
           deployment: opts.deployment,
           effectiveRunTarget,
           providerReleaseId: latestPreview?.providerReleaseId,
+          apiToken,
         });
         const record = previewCleanupRecord({
           deployment: opts.deployment,

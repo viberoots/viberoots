@@ -74,7 +74,8 @@ export async function runCloudflarePagesStaticDeploy(opts: {
   let executionPolicy: ReturnType<typeof executionPolicyWithRetry> | undefined;
   try {
     const artifactDir = await requireAdmittedStaticWebappArtifactPath(opts.artifact);
-    await secretRuntime.enterStep("publish");
+    const publishSecrets = await secretRuntime.enterStep("publish");
+    const apiToken = publishSecrets.cloudflare_api_token?.trim() || undefined;
     const preparedConfig = await prepareCloudflarePagesWranglerConfig({
       workspaceRoot: opts.workspaceRoot,
       deployment: opts.deployment,
@@ -103,6 +104,7 @@ export async function runCloudflarePagesStaticDeploy(opts: {
           artifactDir,
           renderedConfigPath: preparedConfig.renderedConfigPath,
           effectiveRunTarget,
+          apiToken,
         }),
       classifyError: () => noPublishAutoRetry(),
     })

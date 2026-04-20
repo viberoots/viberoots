@@ -45,6 +45,21 @@ const ATTRS = [
   "labels",
 ];
 
+function assertCloudflareApiTokenSteps(deployment: {
+  secretRequirements: Array<{ name: string; step: string; contractId: string; required: boolean }>;
+}) {
+  assert.deepEqual(
+    deployment.secretRequirements
+      .filter((requirement) => requirement.name === "cloudflare_api_token")
+      .map((requirement) => [requirement.step, requirement.contractId, requirement.required])
+      .sort(),
+    [
+      ["preview_cleanup", "secret://deployments/pleomino/cloudflare_api_token", true],
+      ["publish", "secret://deployments/pleomino/cloudflare_api_token", true],
+    ],
+  );
+}
+
 test("cloudflare-pages deployment extraction reads canonical metadata from TARGETS via cquery", async () => {
   await runInTemp("cloudflare-pages-cquery-extraction", async (tmp, _$) => {
     const appTargetsPath = path.join(tmp, "projects", "apps", "pleomino", "TARGETS");
@@ -131,7 +146,20 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
         '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
         '    environment_stage = "staging",',
         '    admission_policy = "//projects/deployments/pleomino-shared:staging_release",',
-        "    secret_requirements = [],",
+        "    secret_requirements = [",
+        "        {",
+        '            "name": "cloudflare_api_token",',
+        '            "step": "publish",',
+        '            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",',
+        '            "required": "true",',
+        "        },",
+        "        {",
+        '            "name": "cloudflare_api_token",',
+        '            "step": "preview_cleanup",',
+        '            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",',
+        '            "required": "true",',
+        "        },",
+        "    ],",
         "    runtime_config_requirements = [],",
         "    preview = {",
         '        "target_derivation": "provider_managed_source_run",',
@@ -169,5 +197,25 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
     assert.equal(deployments[0]?.providerTarget.project, "pleomino-staging-pages");
     assert.deepEqual(deployments[0]?.prerequisites, []);
     assert.equal(deployments[0]?.preview?.identitySelector, "source_run");
+    assertCloudflareApiTokenSteps(deployments[0]!);
   });
+});
+
+test("concrete Pleomino Cloudflare TARGETS emit publish and cleanup token requirements", async () => {
+  const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
+  const query =
+    "set(//projects/deployments/pleomino-staging:deploy //projects/deployments/pleomino-prod:deploy //projects/apps/pleomino:app //projects/deployments/pleomino-shared:lane //projects/deployments/pleomino-shared:lane_governance //projects/deployments/pleomino-shared:staging_release //projects/deployments/pleomino-shared:prod_release)";
+  const cquery = await $({
+    stdio: "pipe",
+    env: {
+      ...process.env,
+      HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
+      SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
+    },
+  })`buck2 --isolation-dir ${inheritedBuckIsolation("cloudflare-pages-pleomino-cquery")} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
+  const merged = JSON.parse(String(cquery.stdout || "")) as Record<string, any>;
+  const { deployments, errors } = extractCloudflarePagesDeployments(nodesFromCqueryJson(merged));
+  assert.deepEqual(errors, []);
+  assert.equal(deployments.length, 2);
+  for (const deployment of deployments) assertCloudflareApiTokenSteps(deployment);
 });

@@ -120,6 +120,7 @@ Current reviewed central control-plane implementation note:
 - Public repo-level deploy, list, and validate flows must resolve authoritative deployment metadata from Buck / `TARGETS`, not from hand-authored deployment JSON documents.
 - `publish_mode` is a separate field from `operation_kind`.
 - `preview_cleanup` is a destructive housekeeping run against preview resources; it should preserve preview context in records rather than being treated as a normal publish.
+- Protected/shared preview cleanup must consume provider credentials through admitted `secret_requirements` and must not fall back to ambient provider-token environment variables.
 - Retire/migrate-target records must preserve old target identity, new target identity when applicable, the reviewed exception object, and the resulting ownership state.
 - Final outcome is a separate field from both operation kind and lifecycle state.
 - `pending_approval` is a first-class lifecycle state for accepted protected/shared runs awaiting required human approval.

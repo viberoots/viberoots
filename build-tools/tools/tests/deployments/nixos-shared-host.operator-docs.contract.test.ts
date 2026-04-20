@@ -176,6 +176,16 @@ test("nixos shared host usage guide stays present as the reviewed operator-facin
     /Vault Production Bootstrap Runbook/,
     "setup guide must point operators at the canonical Vault bootstrap runbook",
   );
+  assert.doesNotMatch(
+    usageDoc,
+    /AppRole/,
+    "usage guide must not present AppRole as the normal mini credential path",
+  );
+  assert.doesNotMatch(
+    setupDoc,
+    /AppRole/,
+    "setup guide must not present AppRole as the normal mini credential path",
+  );
   for (const fragment of [
     /managed-manual-wire/,
     /managed-dropin/,

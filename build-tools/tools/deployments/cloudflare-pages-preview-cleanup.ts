@@ -18,12 +18,14 @@ async function cleanupFakePreviewTarget(
 async function deleteCloudflarePagesDeployment(opts: {
   deployment: CloudflarePagesDeployment;
   providerReleaseId: string;
+  apiToken?: string;
+  allowAmbientProviderToken?: boolean;
 }): Promise<void> {
-  const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
+  const apiToken =
+    opts.apiToken?.trim() ||
+    (opts.allowAmbientProviderToken ? process.env.CLOUDFLARE_API_TOKEN?.trim() : "");
   if (!apiToken) {
-    throw new Error(
-      "cloudflare-pages preview cleanup requires CLOUDFLARE_API_TOKEN unless fake wrangler mode is active",
-    );
+    throw new Error("cloudflare-pages preview cleanup requires an admitted Cloudflare API token");
   }
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(opts.deployment.providerTarget.account)}/pages/projects/${encodeURIComponent(opts.deployment.providerTarget.project)}/deployments/${encodeURIComponent(opts.providerReleaseId)}`,
@@ -50,6 +52,8 @@ export async function cleanupCloudflarePagesPreview(opts: {
   deployment: CloudflarePagesDeployment;
   effectiveRunTarget: CloudflarePagesProviderTarget;
   providerReleaseId?: string;
+  apiToken?: string;
+  allowAmbientProviderToken?: boolean;
 }): Promise<void> {
   if (!opts.effectiveRunTarget.previewBranch) {
     throw new Error("cloudflare-pages preview cleanup requires an isolated preview target");
@@ -63,5 +67,7 @@ export async function cleanupCloudflarePagesPreview(opts: {
   await deleteCloudflarePagesDeployment({
     deployment: opts.deployment,
     providerReleaseId: opts.providerReleaseId,
+    apiToken: opts.apiToken,
+    allowAmbientProviderToken: opts.allowAmbientProviderToken,
   });
 }

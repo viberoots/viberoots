@@ -142,6 +142,12 @@ cloudflare_pages_static_webapp_deployment(
             "contract_id": "secret://deployments/pleomino/cloudflare_api_token",
             "required": "true",
         },
+        {
+            "name": "cloudflare_api_token",
+            "step": "preview_cleanup",
+            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",
+            "required": "true",
+        },
     ],
     runtime_config_requirements = [],
 )
@@ -150,8 +156,8 @@ cloudflare_pages_static_webapp_deployment(
 What the fields mean:
 
 - `name`: the local name of the secret inside this deployment
-- `step`: when the secret is required, such as `publish`, `smoke`, or
-  `provision`
+- `step`: when the secret is required, such as `publish`, `preview_cleanup`,
+  `smoke`, or `provision`
 - `contract_id`: the stable repo-level name of the secret
 - `required`: whether the deployment must stop if that secret is missing
 
@@ -164,6 +170,8 @@ Common example values and when to use them:
 - `step = "publish"`
   Use this when the secret is needed to push a release to a provider. This is
   the most common choice for provider API tokens.
+- `step = "preview_cleanup"`
+  Use this when the secret is needed to delete provider preview resources.
 - `step = "provision"`
   Use this when the secret is needed only while creating or updating
   infrastructure.
@@ -328,6 +336,9 @@ Common fixture fields, example values, and when to use them:
 - `"allowedSteps": ["publish"]`
   Use `["publish"]` for provider API tokens that are only needed while
   publishing.
+- `"allowedSteps": ["preview_cleanup"]`
+  Use `["preview_cleanup"]` for provider API tokens that are only needed while
+  deleting preview resources.
 - `"allowedSteps": ["smoke"]`
   Use `["smoke"]` for a credential that is only needed for smoke checks.
 - `"allowedSteps": ["provision"]`

@@ -9,7 +9,20 @@ cloudflare_pages_static_webapp_deployment(
     environment_stage = "staging",
     admission_policy = "//projects/deployments/pleomino-shared:staging_release",
     protection_class = "shared_nonprod",
-    secret_requirements = [],
+    secret_requirements = [
+        {
+            "name": "cloudflare_api_token",
+            "step": "publish",
+            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",
+            "required": "true",
+        },
+        {
+            "name": "cloudflare_api_token",
+            "step": "preview_cleanup",
+            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",
+            "required": "true",
+        },
+    ],
     runtime_config_requirements = [],
     prerequisites = [
         {

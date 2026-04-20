@@ -1,11 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { cleanupCloudflarePagesPreview } from "./cloudflare-pages-preview-cleanup.ts";
 import { runCloudflarePagesStaticDeploy } from "./cloudflare-pages-static-deploy.ts";
-import {
-  createCloudflarePagesDeployRunId,
-  writeCloudflarePagesDeployRecord,
-} from "./cloudflare-pages-records.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
+import { createCloudflarePagesDeployRunId } from "./cloudflare-pages-records.ts";
 import { revalidateControlPlaneAdmission } from "./deployment-control-plane-revalidation.ts";
 import { lockWaitAbortReasonForSubmission } from "./deployment-control-plane-queue.ts";
 import {
@@ -19,12 +14,10 @@ import {
   writeTransitionRecord,
   type CloudflarePagesTargetTransitionRecord,
 } from "./cloudflare-pages-target-transition-records.ts";
-import {
-  createBackendPreviewCleanupRecord,
-  sanitizedBackendRecord,
-} from "./cloudflare-pages-control-plane-backend-records.ts";
+import { sanitizedBackendRecord } from "./cloudflare-pages-control-plane-backend-records.ts";
 // prettier-ignore
 import { persistCloudflareBackendStatus, type CloudflareBackendSubmissionLike } from "./cloudflare-pages-control-plane-backend-status.ts";
+import { executeCloudflarePagesBackendPreviewCleanup } from "./cloudflare-pages-control-plane-backend-preview-cleanup.ts";
 
 export async function executeCloudflarePagesBackendSubmission(opts: {
   workspaceRoot: string;
@@ -62,61 +55,11 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
     try {
       const result =
         snapshot.action?.kind === "preview_cleanup"
-          ? await (async () => {
-              try {
-                await cleanupCloudflarePagesPreview({
-                  deployment: snapshot.deployment,
-                  effectiveRunTarget: snapshot.action.effectiveRunTarget,
-                  providerReleaseId: snapshot.action.providerReleaseId,
-                });
-                const record = createBackendPreviewCleanupRecord({
-                  deployment: snapshot.deployment,
-                  submissionId: snapshot.submissionId,
-                  workerId: opts.workerId,
-                  lockScope: snapshot.lockScope,
-                  admittedContext:
-                    snapshot.sourceRecord?.admittedContext || snapshot.admittedContext,
-                  artifactIdentity: snapshot.action.artifactIdentity,
-                  artifactLineageId: snapshot.action.artifactLineageId,
-                  ...(snapshot.action.parentRunId
-                    ? { parentRunId: snapshot.action.parentRunId }
-                    : {}),
-                  ...(snapshot.action.releaseLineageId
-                    ? { releaseLineageId: snapshot.action.releaseLineageId }
-                    : {}),
-                  effectiveRunTarget: snapshot.action.effectiveRunTarget,
-                  sourceRunId: snapshot.action.previewIdentitySelector.sourceRunId,
-                  cleanupReason: snapshot.action.cleanupReason,
-                  finalOutcome: "succeeded",
-                });
-                return {
-                  record,
-                  recordPath: await writeCloudflarePagesDeployRecord(opts.recordsRoot, record),
-                };
-              } catch (error) {
-                const message = error instanceof Error ? error.message : String(error);
-                const record = createBackendPreviewCleanupRecord({
-                  deployment: snapshot.deployment,
-                  submissionId: snapshot.submissionId,
-                  workerId: opts.workerId,
-                  lockScope: snapshot.lockScope,
-                  admittedContext:
-                    snapshot.sourceRecord?.admittedContext || snapshot.admittedContext,
-                  artifactIdentity: snapshot.action.artifactIdentity,
-                  artifactLineageId: snapshot.action.artifactLineageId,
-                  effectiveRunTarget: snapshot.action.effectiveRunTarget,
-                  sourceRunId: snapshot.action.previewIdentitySelector.sourceRunId,
-                  cleanupReason: snapshot.action.cleanupReason,
-                  finalOutcome: "publish_failed",
-                  error: message,
-                });
-                const recordPath = await writeCloudflarePagesDeployRecord(opts.recordsRoot, record);
-                throw Object.assign(error instanceof Error ? error : new Error(message), {
-                  record,
-                  recordPath,
-                });
-              }
-            })()
+          ? await executeCloudflarePagesBackendPreviewCleanup({
+              recordsRoot: opts.recordsRoot,
+              workerId: opts.workerId,
+              snapshot,
+            })
           : snapshot.targetException
             ? await (async () => {
                 const record: CloudflarePagesTargetTransitionRecord = {

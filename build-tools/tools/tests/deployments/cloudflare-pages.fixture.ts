@@ -7,6 +7,7 @@ import {
   type CloudflarePagesDeployment,
 } from "../../deployments/contract.ts";
 import type { GraphNode } from "../../lib/graph.ts";
+import type { DeploymentRequirement } from "../../deployments/deployment-requirements.ts";
 import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture.ts";
 import {
   nixosSharedHostAdmissionPolicyFixture,
@@ -28,6 +29,23 @@ export function cloudflarePagesPreviewFixture(
     lockScope: "shared",
     ...overrides,
   };
+}
+
+export function cloudflarePagesApiTokenRequirements(): DeploymentRequirement[] {
+  return [
+    {
+      name: "cloudflare_api_token",
+      step: "publish",
+      contractId: "secret://deployments/pleomino/cloudflare_api_token",
+      required: true,
+    },
+    {
+      name: "cloudflare_api_token",
+      step: "preview_cleanup",
+      contractId: "secret://deployments/pleomino/cloudflare_api_token",
+      required: true,
+    },
+  ];
 }
 
 export function cloudflarePagesDeploymentFixture(
