@@ -1,12 +1,16 @@
 #!/usr/bin/env zx-wrapper
 import { randomUUID } from "node:crypto";
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
+import { getFlagStr } from "../lib/cli.ts";
 import type { DeploymentTarget } from "./contract.ts";
 import {
   DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA,
   type DeploymentControlPlaneRunAction,
   type DeploymentControlPlaneStatus,
 } from "./deployment-control-plane-contract.ts";
+import {
+  selectedDeployControlPlaneOperatorAction,
+  type DeployControlPlaneOperatorAction,
+} from "./deploy-control-plane-operator-flags.ts";
 import { printDeployJson } from "./deploy-front-door.ts";
 import { submitNixosSharedHostControlPlaneRunActionViaService } from "./nixos-shared-host-control-plane-client.ts";
 import {
@@ -15,41 +19,6 @@ import {
   requireLookupSelector,
   resolveServiceClientForOperator,
 } from "./deploy-control-plane-operator-client.ts";
-
-export type DeployControlPlaneOperatorAction =
-  | "status"
-  | "record"
-  | "print-run-lock-scope"
-  | "approve"
-  | "cancel-run"
-  | "resume-run"
-  | "abort-run";
-
-function operatorActionFlags(): Array<[DeployControlPlaneOperatorAction, boolean]> {
-  return [
-    ["status", getFlagBool("status")],
-    ["record", getFlagBool("record")],
-    ["print-run-lock-scope", getFlagBool("print-run-lock-scope")],
-    ["approve", getFlagBool("approve")],
-    ["cancel-run", getFlagBool("cancel-run")],
-    ["resume-run", getFlagBool("resume-run")],
-    ["abort-run", getFlagBool("abort-run")],
-  ];
-}
-
-export function selectedDeployControlPlaneOperatorAction():
-  | DeployControlPlaneOperatorAction
-  | undefined {
-  const selected = operatorActionFlags()
-    .filter(([, enabled]) => enabled)
-    .map(([name]) => name);
-  if (selected.length > 1) {
-    throw new Error(
-      `control-plane operator helpers are mutually exclusive; choose one of ${selected.map((name) => `--${name}`).join(", ")}`,
-    );
-  }
-  return selected[0];
-}
 
 function operatorActionLabel(action: DeployControlPlaneOperatorAction): string {
   return `deploy --${action}`;

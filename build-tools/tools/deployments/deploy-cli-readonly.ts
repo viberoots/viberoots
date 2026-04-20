@@ -2,14 +2,9 @@
 import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli.ts";
 import type { DeploymentTarget } from "./contract.ts";
 import {
-  readStatusForOperator,
-  resolveServiceClientForOperator,
-} from "./deploy-control-plane-operator-client.ts";
-import {
-  maybeRunDeployControlPlaneOperatorCommand,
   selectedDeployControlPlaneOperatorAction,
   type DeployControlPlaneOperatorAction,
-} from "./deploy-control-plane-operator.ts";
+} from "./deploy-control-plane-operator-flags.ts";
 import {
   printDeployJson,
   printProviderTargetIdentityForCli,
@@ -177,6 +172,9 @@ async function targetScopeForReadonlyVaultHelper(opts: {
 }) {
   const deployRunId = getFlagStr("deploy-run-id", "").trim();
   if (!deployRunId) return undefined;
+  const { readStatusForOperator, resolveServiceClientForOperator } = await import(
+    "./deploy-control-plane-operator-client.ts"
+  );
   const client = await resolveServiceClientForOperator({
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.deployment,
@@ -232,6 +230,9 @@ export async function maybeHandleReadonlyDeployCli(opts: {
     );
     return true;
   }
+  const { maybeRunDeployControlPlaneOperatorCommand } = await import(
+    "./deploy-control-plane-operator.ts"
+  );
   return await maybeRunDeployControlPlaneOperatorCommand({
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.deployment,

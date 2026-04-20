@@ -9,7 +9,6 @@ import {
 } from "./deploy-cli-readonly.ts";
 import { listDeploymentsForCli, printDeployJson } from "./deploy-front-door.ts";
 import { resolveSmokeConnectOverride } from "./deployment-cli-smoke.ts";
-import { runFromChangesCli } from "./deployment-from-changes-cli.ts";
 import {
   isAppStoreConnectDeployment,
   isCloudflarePagesDeployment,
@@ -38,6 +37,7 @@ export async function runDeployCli(opts: {
 }) {
   ensurePublicSourceOfTruth(opts);
   if (getFlagBool("from-changes")) {
+    const { runFromChangesCli } = await import("./deployment-from-changes-cli.ts");
     await runFromChangesCli(opts.workspaceRoot);
     return;
   }

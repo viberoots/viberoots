@@ -75,15 +75,27 @@ test("deploy read-only bootstrap path does not eagerly import provider front doo
     "deployments",
     "deploy-front-door.ts",
   );
+  const deployCliReadonlyPath = path.join(
+    repoRoot,
+    "build-tools",
+    "tools",
+    "deployments",
+    "deploy-cli-readonly.ts",
+  );
   const source = [
     await fsp.readFile(deployCliPath, "utf8"),
     await fsp.readFile(deployFrontDoorPath, "utf8"),
+    await fsp.readFile(deployCliReadonlyPath, "utf8"),
   ].join("\n");
   for (const providerModule of [
     "app-store-connect-front-door",
     "cloudflare-pages-front-door",
+    "deploy-control-plane-operator",
+    "deploy-control-plane-operator-client",
     "deploy-front-door-validate",
     "deploy-provider-front-door",
+    "deployment-execution",
+    "deployment-from-changes-cli",
     "google-play-front-door",
     "kubernetes-front-door",
     "nixos-shared-host-remote-cli",
