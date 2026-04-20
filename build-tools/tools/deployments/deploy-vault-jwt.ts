@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { getArgvTokens, readFlagBoolFromTokens, readFlagStrFromTokens } from "../lib/argv.ts";
 import { assertJwtClaims, decodeJwtPayload } from "./deploy-vault-jwt-claims.ts";
 
@@ -74,6 +75,7 @@ async function requestClientCredentialsToken(opts: DeployVaultJwtOptions): Promi
 }
 
 async function writeTokenFile(out: string, token: string) {
+  await fsp.mkdir(path.dirname(out), { recursive: true });
   try {
     const stat = await fsp.lstat(out);
     if (!stat.isFile()) throw new Error("output path would overwrite a non-regular file");

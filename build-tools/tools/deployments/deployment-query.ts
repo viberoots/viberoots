@@ -33,6 +33,7 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "health_path",
   "target_group",
   "provider_target",
+  "vault_runtime",
   "smoke",
   "smoke_exception",
   "smoke_runner_class",

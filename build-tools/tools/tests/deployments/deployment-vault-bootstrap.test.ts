@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import {
-  assertVaultBootstrapExecutableInputs,
+  assertVaultBootstrapExecutableDocument,
   buildVaultBootstrapDocument,
   buildVaultSecretTemplatesDocument,
   renderVaultBootstrapDocument,
@@ -147,10 +147,8 @@ test("Vault bootstrap fails closed for unsupported secret contract ids", () => {
 });
 
 test("executable Vault output requires operator-owned IdP and role inputs", () => {
-  assert.throws(
-    () => assertVaultBootstrapExecutableInputs({ issuerUrl: "https://issuer.example" }),
-    /--vault-audience is required/,
-  );
+  const payload = buildVaultBootstrapDocument({ deployment: deploymentWithSecrets() });
+  assert.throws(() => assertVaultBootstrapExecutableDocument(payload), /vault\.issuerUrl/);
 });
 
 test("shell rendering includes auth, policy, role, and runtime exports", () => {
@@ -167,8 +165,27 @@ test("shell rendering includes auth, policy, role, and runtime exports", () => {
   });
   const rendered = renderVaultBootstrapDocument(payload, "shell");
   assert.match(rendered, /vault write auth\/jwt\/config/);
-  assert.match(rendered, /vault policy write deploy-pleomino-staging-read/);
+  assert.match(rendered, /vault policy write deploy-pleomino-read/);
   assert.match(rendered, /vault write auth\/jwt\/role\/deploy-pleomino-read/);
-  assert.match(rendered, /export BNX_VAULT_AUTH_METHOD=jwt/);
+  assert.match(rendered, /export BNX_VAULT_OIDC_ISSUER=/);
   assert.equal(payload.vault.boundClaims.deployment_environment, "mini");
+});
+
+test("executable Vault bootstrap output can use deployment vault_runtime metadata", () => {
+  const payload = buildVaultBootstrapDocument({
+    deployment: cloudflarePagesDeploymentFixture({
+      secretRequirements: deploymentWithSecrets().secretRequirements,
+      vaultRuntime: {
+        addr: "https://vault.example.net:8200",
+        oidcIssuer: "https://identity.example.net/realms/deployments",
+        audience: "deployments-vault",
+        deploymentClientId: "deployment-runner",
+        roleName: "deploy-pleomino-read",
+      },
+    }),
+  });
+  assert.equal(payload.runtimeEnvironment.VAULT_ADDR, "https://vault.example.net:8200");
+  assert.equal(payload.vault.issuerUrl, "https://identity.example.net/realms/deployments");
+  assert.equal(payload.vault.roleName, "deploy-pleomino-read");
+  assert.doesNotThrow(() => assertVaultBootstrapExecutableDocument(payload));
 });

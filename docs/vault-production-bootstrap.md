@@ -10,9 +10,11 @@ host's NixOS configuration before any `vault operator ...` commands are run.
 
 Important current-repo reality:
 
-- the reviewed production runtime now reads remote Vault through
-  `VAULT_ADDR`, `BNX_VAULT_AUTH_METHOD=jwt`, `BNX_VAULT_JWT_ROLE`, and one
-  workload JWT source (`BNX_VAULT_JWT` or `BNX_VAULT_JWT_FILE`)
+- the reviewed production runtime now reads remote Vault directly instead of
+  treating an exported fixture as the normal production secret source
+- normal deploys derive Vault address, issuer, audience, client id, role, and
+  bound claims from deployment `vault_runtime` metadata, mint a fresh workload
+  JWT, and set the internal Vault JWT environment for the secret backend
 - `VAULT_TOKEN` is reserved for bootstrap, explicit break-glass, low-level test,
   or debugging use with `BNX_VAULT_AUTH_METHOD=token`
 - the exported JSON secret fixture path through
@@ -1183,45 +1185,67 @@ What these fields mean:
 
 ## Step 9: Provide A Deployment Runtime Workload JWT
 
-The reviewed deployment runtime logs in to Vault's JWT auth endpoint itself. The
-deployment environment should provide the remote Vault address, the reviewed
-Vault JWT role, and exactly one signed workload JWT source:
+The reviewed deployment runtime logs in to Vault's JWT auth endpoint itself.
+For the normal path, `deploy` mints the short-lived workload JWT just before it
+needs Vault. The deployment target should declare stable Vault runtime metadata
+in `vault_runtime`, so routine deploys do not need Vault or issuer exports.
+
+Example deployment metadata:
+
+```python
+vault_runtime = {
+    "addr": "https://secrets.apps.kilty.io:8200",
+    "oidc_issuer": "https://identity.apps.kilty.io/realms/deployments",
+    "audience": "deployments-vault",
+    "deployment_client_id": "deployment-runner",
+    "deployment_environment": "mini",
+    "jwt_role": "deploy-pleomino-read",
+}
+```
+
+Keep the client secret itself outside the repo:
 
 ```bash
-export VAULT_ADDR='https://secrets.apps.kilty.io:8200'
-export BNX_VAULT_AUTH_METHOD=jwt
-export BNX_VAULT_JWT_ROLE='deploy-pleomino-read'
-export BNX_VAULT_JWT_FILE="$PWD/.local/workload.jwt"
+export BNX_DEPLOYER_CLIENT_SECRET='<deployment-runner-client-secret>'
 unset VAULT_TOKEN
 ```
 
-Use `BNX_VAULT_JWT` instead of `BNX_VAULT_JWT_FILE` only when the CI system
-delivers the signed JWT as an environment variable. Do not set both.
+When `vault_runtime` omits a field, the defaults match the bootstrap examples in
+this runbook:
 
-For a `mini`-hosted Keycloak-style issuer, a Jenkins worker or deployment runner
-can mint the workload JWT before invoking `deploy`:
+- Vault audience: `deployments-vault`
+- deployment client id: `deployment-runner`
+- client secret env var: `BNX_DEPLOYER_CLIENT_SECRET`
+- deployment environment claim: machine hostname, override with
+  `BNX_DEPLOYMENT_ENVIRONMENT` or `--deployment-environment`
+- Vault role: `deploy-<deployment-family>-read` when the deployment id ends in
+  the stage name, otherwise `deploy-<deployment-id>-read`
+- workload JWT file: `.local/deploy-vault/<role>.jwt`
+
+Override deployment metadata only when your Vault or IdP setup intentionally
+differs for a run:
 
 ```bash
-mkdir -p .local
-
-deploy-vault-jwt \
-  --issuer https://identity.apps.kilty.io/realms/deployments \
-  --client-id deployment-runner \
-  --client-secret-env BNX_DEPLOYER_CLIENT_SECRET \
-  --out "$PWD/.local/workload.jwt" \
-  --audience deployments-vault \
-  --expect-claim deployment_environment=mini \
-  --expect-claim repository=kiltyj/bucknix-fresh
-
-export VAULT_ADDR='https://secrets.apps.kilty.io:8200'
-export BNX_VAULT_AUTH_METHOD=jwt
-export BNX_VAULT_JWT_ROLE='deploy-pleomino-read'
-export BNX_VAULT_JWT_FILE="$PWD/.local/workload.jwt"
-unset VAULT_TOKEN
+deploy \
+  --deployment //projects/deployments/pleomino-staging:deploy \
+  --vault-audience deployments-vault \
+  --deployment-client-id deployment-runner \
+  --deployment-environment mini \
+  --deployment-client-secret-env BNX_DEPLOYER_CLIENT_SECRET \
+  --vault-jwt-role deploy-pleomino-read \
+  --vault-jwt-file "$PWD/.local/deploy-vault/deploy-pleomino-read.jwt"
 ```
 
-The issuer URL, client id, audience mapper, and bound claims must match the
-identity-provider configuration from Step 5 and the Vault role from Step 7.
+`deploy-vault-jwt` remains available for low-level smoke tests and debugging,
+but routine deploys should let the deploy front door mint the workload JWT so
+the token is always fresh.
+
+Use `BNX_VAULT_JWT` or `BNX_VAULT_JWT_FILE` directly only when a CI system
+already delivers the signed JWT. Do not set both.
+
+The issuer URL, client id, audience mapper, and deployment-derived bound claims
+must match the identity-provider configuration from Step 5 and the Vault role
+from Step 7.
 
 If JWT login fails, the deployment helper fails closed. Common causes are an
 expired JWT, wrong audience, wrong issuer, missing role binding, rejected bound
@@ -1303,20 +1327,19 @@ the same contract IDs directly through the Vault API.
 
 ## Step 12: Run A Deployment Through Vault
 
-For the normal production path, keep `VAULT_ADDR`, `BNX_VAULT_AUTH_METHOD=jwt`,
-`BNX_VAULT_JWT_ROLE`, and one workload JWT source in the deployment environment.
-Leave
-`BNX_DEPLOYMENT_SECRET_FIXTURE_PATH` unset:
+For the normal production path, keep only the deployment client secret in the
+environment. Leave `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH` unset:
 
 ```bash
-export VAULT_ADDR='https://secrets.apps.kilty.io:8200'
-export BNX_VAULT_AUTH_METHOD=jwt
-export BNX_VAULT_JWT_ROLE='deploy-pleomino-read'
-export BNX_VAULT_JWT_FILE="$PWD/.local/workload.jwt"
+export BNX_DEPLOYER_CLIENT_SECRET='<deployment-runner-client-secret>'
 unset BNX_DEPLOYMENT_SECRET_FIXTURE_PATH
+unset VAULT_TOKEN
 ```
 
-Then run the normal deployment flow:
+Then run the normal deployment flow. The deploy front door mints a fresh
+workload JWT from `vault_runtime`, sets `VAULT_ADDR`, `BNX_VAULT_AUTH_METHOD=jwt`,
+`BNX_VAULT_JWT_ROLE`, and `BNX_VAULT_JWT_FILE` for the in-process secret
+backend, and exchanges that JWT for a short-lived Vault token:
 
 ```bash
 deploy --deployment //projects/deployments/pleomino-staging:deploy

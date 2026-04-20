@@ -21,6 +21,7 @@ const ATTRS = [
   "environment_stage",
   "admission_policy",
   "provider_target",
+  "vault_runtime",
   "preview",
   "prerequisites",
   "secret_requirements",
@@ -218,4 +219,27 @@ test("concrete Pleomino Cloudflare TARGETS emit publish and cleanup token requir
   assert.deepEqual(errors, []);
   assert.equal(deployments.length, 2);
   for (const deployment of deployments) assertCloudflareApiTokenSteps(deployment);
+  assert.deepEqual(
+    deployments
+      .map((deployment) => deployment.vaultRuntime)
+      .sort((a, b) => (a?.roleName || "").localeCompare(b?.roleName || "")),
+    [
+      {
+        addr: "https://secrets.apps.kilty.io:8200",
+        oidcIssuer: "https://identity.apps.kilty.io/realms/deployments",
+        audience: "deployments-vault",
+        deploymentClientId: "deployment-runner",
+        deploymentEnvironment: "mini",
+        roleName: "deploy-pleomino-read",
+      },
+      {
+        addr: "https://secrets.apps.kilty.io:8200",
+        oidcIssuer: "https://identity.apps.kilty.io/realms/deployments",
+        audience: "deployments-vault",
+        deploymentClientId: "deployment-runner",
+        deploymentEnvironment: "mini",
+        roleName: "deploy-pleomino-read",
+      },
+    ],
+  );
 });

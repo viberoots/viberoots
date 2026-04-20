@@ -206,9 +206,13 @@ Optional fields you may also see:
 
 ### Step 2: Set Up The Secret Backend
 
-For the reviewed production runtime path, use remote Vault with JWT auth through
-`VAULT_ADDR`, `BNX_VAULT_AUTH_METHOD=jwt`, `BNX_VAULT_JWT_ROLE`, and exactly
-one JWT source: `BNX_VAULT_JWT` or `BNX_VAULT_JWT_FILE`.
+For the reviewed production runtime path, use remote Vault with deployment-
+derived JWT auth. In normal deploys the front door reads the selected
+deployment's `vault_runtime` metadata, derives the Vault role and bound claims,
+mints a fresh workload JWT, then sets the internal `VAULT_ADDR`,
+`BNX_VAULT_AUTH_METHOD=jwt`, `BNX_VAULT_JWT_ROLE`, and `BNX_VAULT_JWT_FILE`
+values for the secret backend. Operators normally provide only the deployment
+client secret environment variable.
 
 `VAULT_TOKEN` is only for explicit break-glass, low-level test, or debugging
 use with `BNX_VAULT_AUTH_METHOD=token`; it is not the normal production path.
@@ -501,7 +505,7 @@ This repo now documents two distinct layers:
 - Vault as the long-lived production source of truth in
   [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
 - JWT-first runtime Vault reads for the reviewed production path through
-  `VAULT_ADDR`, `BNX_VAULT_AUTH_METHOD=jwt`, and `BNX_VAULT_JWT_ROLE`
+  deployment `vault_runtime` metadata and deployment-derived workload JWTs
 - the local/test fixture override consumed through
   `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
 

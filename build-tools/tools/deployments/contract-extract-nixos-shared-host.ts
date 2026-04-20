@@ -23,6 +23,7 @@ import {
   readString,
   type DeploymentExtractionContext,
 } from "./contract-extract-shared.ts";
+import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata.ts";
 import { readBootstrapPolicy } from "./deployment-bootstrap-policy.ts";
 import {
   resolveDeploymentMetadataRefs,
@@ -76,6 +77,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
     const preview = readPreviewPolicy(node, "preview");
     const smoke = readSmokePolicy(node);
     const bootstrap = readBootstrapPolicy(node, "bootstrap");
+    const vaultRuntime = readVaultRuntimeConfig(node);
     const publisher = readString(node, "publisher");
     const provisioner = readString(node, "provisioner");
     const rolloutPolicy = readRolloutPolicy(node);
@@ -212,6 +214,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
       ...(smoke ? { smoke } : {}),
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
       ...(bootstrap ? { bootstrap } : {}),
+      ...(vaultRuntime ? { vaultRuntime } : {}),
       component: { kind: resolvedComponents[0]!.kind, target: resolvedComponents[0]!.target },
       components: resolvedComponents,
       publisher: { type: publisher },

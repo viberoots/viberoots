@@ -20,6 +20,25 @@ import {
   synchronizeGovernanceChecks,
 } from "./deployment-targets.install.shared-policies.ts";
 
+function renderVaultRuntime(deployment: CloudflarePagesDeployment): Record<string, string>[] {
+  const config = deployment.vaultRuntime;
+  if (!config) return [];
+  return [
+    {
+      ...(config.addr ? { addr: config.addr } : {}),
+      ...(config.oidcIssuer ? { oidc_issuer: config.oidcIssuer } : {}),
+      ...(config.audience ? { audience: config.audience } : {}),
+      ...(config.deploymentClientId ? { deployment_client_id: config.deploymentClientId } : {}),
+      ...(config.deploymentEnvironment
+        ? { deployment_environment: config.deploymentEnvironment }
+        : {}),
+      ...(config.roleName ? { jwt_role: config.roleName } : {}),
+      ...(config.jwtFile ? { jwt_file: config.jwtFile } : {}),
+      ...(config.clientSecretEnv ? { client_secret_env: config.clientSecretEnv } : {}),
+    },
+  ];
+}
+
 export async function installCloudflarePagesTargets(
   workspaceRoot: string,
   deployments: CloudflarePagesDeployment[],
@@ -45,6 +64,9 @@ export async function installCloudflarePagesTargets(
         `    environment_stage = ${JSON.stringify(deployment.environmentStage)},`,
         `    admission_policy = ${JSON.stringify(deployment.admissionPolicyRef)},`,
         `    protection_class = ${JSON.stringify(deployment.protectionClass)},`,
+        ...(deployment.vaultRuntime
+          ? ["    vault_runtime =", ...renderStringRecordList(renderVaultRuntime(deployment))]
+          : []),
         ...["    prerequisites =", ...renderStringRecordList(renderPrerequisiteList(deployment))],
         ...[
           "    secret_requirements =",

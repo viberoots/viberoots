@@ -27,6 +27,7 @@ Minimum fields:
 | `smoke`                       | yes for protected/shared                         | Optional for `local_only`.                                                                                                                                          |
 | `preview`                     | no                                               | Explicit opt-in only.                                                                                                                                               |
 | `prerequisites`               | no                                               | Explicit direct-edge deployment prerequisites.                                                                                                                      |
+| `vault_runtime`               | no                                               | Stable Vault/IdP runtime metadata for deployment-derived JWT auth. Secret values must not be stored here.                                                           |
 | `lane_policy`                 | yes for `shared_nonprod` and `production_facing` | Must resolve to authoritative policy object.                                                                                                                        |
 | `environment_stage`           | yes for `shared_nonprod` and `production_facing` | Must be defined by the lane policy.                                                                                                                                 |
 | `admission_policy`            | yes for `shared_nonprod` and `production_facing` | Repo-owned policy reference.                                                                                                                                        |
@@ -58,6 +59,22 @@ Initial reviewed `nixos-shared-host` shape:
   - `shared_dev_target_identity = "nixos-shared-host:${targetGroupOrDefault}:${appName}"`
 - `target_group` defaults to the provider's implicit shared-dev group when omitted
 - `app_name` must be a lowercase hostname token and must not carry dots or explicit subdomain overrides
+
+### `vault_runtime`
+
+Optional keys:
+
+- `addr`: Vault API URL.
+- `oidc_issuer`: OIDC issuer URL used to mint workload JWTs.
+- `audience`: expected Vault JWT audience.
+- `deployment_client_id`: OIDC client id for the deployment runner.
+- `deployment_environment`: runner or host environment claim bound by Vault.
+- `jwt_role`: Vault JWT role name.
+- `jwt_file`: local runtime JWT file path override, normally omitted.
+- `client_secret_env`: environment variable name containing the OIDC client secret.
+
+`vault_runtime` may contain public routing and identity metadata, but must never contain client
+secrets, Vault tokens, root tokens, or secret material.
 
 ### `components[*]`
 

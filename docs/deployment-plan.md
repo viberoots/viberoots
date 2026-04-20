@@ -9590,6 +9590,512 @@ by one final pass over destructive provider cleanup and operator-facing credenti
 
 ---
 
+## PR-73: In-memory Vault credential context + ambient auth removal
+
+### Description
+
+I will replace the deployment runtime's ambient Vault credential handoff with an explicit in-memory
+secret context. The deploy front door will receive or construct a typed Vault credential object,
+hand it directly to the secret resolver, exchange it for a Vault token inside that resolver, and
+clear all references when the deployment scope exits. This PR intentionally breaks the current
+`BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`, and `BNX_VAULT_AUTH_METHOD` runtime contract in favor of a
+cleaner design because there are no current users that need compatibility.
+
+### Scope & Changes
+
+- Introduce a first-class deployment secret context that is passed explicitly from the deploy front
+  door to provider execution code instead of being discovered from `process.env`.
+- Add a typed in-memory Vault credential model, for example:
+  - `kind = "jwt"` with Vault address, Vault JWT role, workload JWT value, and optional login path
+  - `kind = "token"` only if a reviewed bootstrap/debug path still needs an explicit in-memory
+    token credential
+  - no file path credential for the normal deploy runtime
+- Define the boundary between credential sources and secret resolution:
+  - PR-73 owns the typed in-memory secret context and Vault resolver contract
+  - later credential-source PRs own how a human, Jenkins job, or host secret store obtains the
+    short-lived OIDC/JWT material that populates that context
+  - provider execution code must not know whether a credential came from PKCE, device login,
+    Jenkins, service-account minting, or another reviewed source
+- Update the deployment Vault runtime preparer so the normal secret-consuming path:
+  - reads stable Vault/IdP metadata from `vault_runtime`
+  - accepts an already-materialized typed in-memory Vault credential from a credential-source
+    adapter
+  - optionally constructs a typed credential from test-only/fake inputs for resolver tests
+  - returns a typed secret context instead of mutating `process.env`
+  - never writes `.local/deploy-vault/*.jwt`
+- Replace the env-driven Vault credential provider with an explicit resolver API that accepts the
+  typed credential object and performs `auth/jwt/login` without reading ambient Vault variables.
+- Thread the deployment secret context through every provider front door that can resolve deployment
+  secrets, including:
+  - Cloudflare Pages publish, smoke, preview, and preview cleanup
+  - `s3-static`
+  - `kubernetes`
+  - NixOS shared-host deploys
+  - mobile-store providers if they consume deployment secrets
+- Remove normal-runtime support for `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`,
+  `BNX_VAULT_AUTH_METHOD`, and `VAULT_TOKEN` from deployment secret resolution.
+- Add guardrails so provider code and child-process wrappers do not inherit or log Vault workload
+  JWTs, Vault tokens, or deployment client secrets.
+- Keep secret fixture support explicit and typed as a separate test/local context, not as an ambient
+  environment fallback selected by the production resolver.
+
+### Tests (in this PR)
+
+- Add Vault secret resolver tests proving:
+  - an explicit in-memory JWT credential logs in to Vault and reads authorized secrets
+  - no JWT file is created for the normal auto-minted path
+  - `process.env` is not mutated with `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`,
+    `BNX_VAULT_AUTH_METHOD`, `BNX_VAULT_JWT_ROLE`, or `VAULT_TOKEN`
+  - Vault JWTs and Vault tokens are not included in thrown errors, logs, deploy records, replay
+    snapshots, or operator-visible status
+- Add deploy front-door tests proving the secret context is created from `vault_runtime` metadata
+  and an explicit in-memory credential source, then passed to provider execution without ambient
+  credential variables.
+- Add provider-path tests for each secret-consuming provider proving secret reads use the explicit
+  context and fail closed when the context is missing.
+- Add child-process/environment scrub tests proving provider subprocesses do not inherit Vault JWTs,
+  Vault tokens, or deployment client secrets unless a reviewed command explicitly receives a
+  non-secret reference.
+- Add negative tests proving stale ambient variables do not silently affect normal deployment secret
+  resolution.
+- Add boundary tests proving provider code receives only the typed context and cannot observe which
+  credential source produced it.
+
+### Docs (in this PR)
+
+- Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+  to describe the explicit deployment secret context and the in-memory Vault credential contract.
+- Update [Secrets Usage](/Users/kiltyj/Code/bucknix-fresh/docs/secrets-usage.md) so operators see
+  `vault_runtime` plus a reviewed credential source as the normal runtime inputs, not Vault JWT
+  environment variables or JWT files.
+- Update [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) and
+  [Deployment Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md) if needed to
+  clarify that `vault_runtime` contains stable public routing/identity metadata only.
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  to remove normal-runtime instructions for `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`,
+  `BNX_VAULT_AUTH_METHOD`, and `VAULT_TOKEN`, and to document that workload JWTs and Vault tokens
+  remain in memory during deploy execution.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - explicit in-memory Vault credential login and secret reads
+  - deploy front-door secret-context creation from `vault_runtime`
+  - provider secret-resolution paths without ambient Vault auth
+  - child-process environment scrubbing
+  - docs parity for the no-JWT-file/no-ambient-auth operator workflow
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR replaces a cross-provider secret runtime contract, threads a new context through provider
+  front doors, removes ambient Vault auth behavior, and updates operator docs. Under the
+  deployment-only verify policy, run the full build-system verify scope unless classifier coverage
+  proves every changed path is safely deployment-owned.
+
+### Acceptance Criteria
+
+- Normal deployments never write workload JWTs to disk.
+- Normal deployments never communicate Vault workload JWTs or Vault tokens through `process.env`.
+- Deployment secret resolution receives an explicit typed context and fails closed when the context
+  is missing or does not authorize the requested secret.
+- Provider front doors and subprocess wrappers cannot accidentally inherit Vault JWTs, Vault tokens,
+  or deployment client secrets.
+- Secret fixture usage remains available only through an explicit typed local/test context.
+- Operator docs present one clean runtime story: `vault_runtime` metadata plus the deployment client
+  credential source, with workload JWTs and Vault tokens held only in memory.
+
+### Risks
+
+This PR changes the runtime contract that every secret-consuming provider depends on. The main risk
+is missing one provider path or subprocess helper that still expects ambient environment variables.
+
+### Mitigation
+
+Remove the ambient path instead of keeping a compatibility fallback, thread the typed context through
+all provider APIs in one pass, add fail-closed tests for missing context, and add environment scrub
+tests around subprocess boundaries.
+
+### Consequence of Not Implementing
+
+The deployment runtime would continue to rely on ambient process state or short-lived JWT files for
+credential handoff, leaving avoidable leak surfaces and making secret resolution harder to reason
+about.
+
+### Downsides for Implementing
+
+Requires a coordinated provider API change and more explicit plumbing through deploy execution code,
+which is more invasive than improving the current environment/file handoff.
+
+### Recommendation
+
+Implement after PR-72, once all known secret-consuming provider operations are under the reviewed
+secret boundary, so the final runtime contract can be simplified across providers in one coherent
+breaking change.
+
+---
+
+## PR-74: Deployment credential sources for human, SSH, and Jenkins workflows
+
+### Description
+
+I will add reviewed credential-source adapters that populate the in-memory deployment secret context
+from human login, SSH/headless login, and Jenkins automation without requiring operators to export a
+long-lived deployment client secret by hand. This PR builds on PR-73's typed in-memory Vault
+credential context: credential sources may use browser/device/Jenkins mechanisms to obtain a
+short-lived OIDC token or mint a workload JWT, but provider code receives only the explicit typed
+secret context and never sees ambient Vault JWT files or Vault auth environment variables.
+
+### Scope & Changes
+
+- Add a deployment credential-source model that is separate from the provider secret resolver, for
+  example:
+  - `interactive_pkce` for local desktop human deploys
+  - `interactive_device` for SSH/headless human deploys when the IdP supports device authorization
+  - `interactive_print_url` for SSH/headless fallback when device authorization is unavailable
+  - `jenkins_client_secret` for Jenkins Credentials-bound client-secret minting
+  - `jenkins_oidc` or `external_oidc_token` for Jenkins/workload-identity federation into Vault
+- Extend `vault_runtime` or a reviewed companion runtime config so deployments can declare the
+  stable non-secret defaults for:
+  - preferred credential source
+  - Keycloak/OIDC issuer and audience
+  - CLI public client id for human login
+  - service-account client id for automation minting when needed
+  - Jenkins credential binding name or expected token env name when the source is Jenkins-managed
+  - Vault JWT role and bound claim expectations
+- Implement local interactive OIDC Authorization Code + PKCE for human deploys:
+  - use a public OIDC client with PKCE required
+  - open the system browser only when the CLI detects a local interactive desktop session
+  - always print the authorization URL for transparency and recovery
+  - receive the callback on a local loopback listener with an ephemeral port
+  - validate issuer, audience, client id, and deployment-bound claims before constructing the
+    in-memory Vault credential
+- Define the human-token authorization claim model:
+  - document and validate how Keycloak emits deployer group, realm-role, or client-role claims for
+    interactive human tokens
+  - bind Vault roles for human deploys to reviewed deployer groups/roles plus repository and
+    deployment environment claims
+  - keep service-account `azp`/client-id binding separate from human identity binding
+  - map human identity claims such as `preferred_username` and `email` into Vault identity metadata
+    for audit readability
+- Harden the PKCE callback implementation:
+  - generate high-entropy `state`, nonce, and verifier values
+  - bind the callback listener only to loopback addresses
+  - use an ephemeral port unless an operator explicitly requests a fixed one for SSH tunneling
+  - require exact redirect URI matching
+  - consume the callback once, then close the listener
+  - timeout and fail closed when login is not completed
+- Implement SSH/headless behavior:
+  - detect `SSH_CONNECTION`, `SSH_TTY`, missing GUI display variables, and `CI=true`
+  - never launch a browser on a remote/headless host by default
+  - prefer OAuth 2.0 Device Authorization Grant when supported by the issuer
+  - otherwise print the PKCE authorization URL plus explicit SSH tunnel instructions for the
+    loopback callback
+  - provide explicit flags such as `--login-browser=auto|open|print|device` so operators can
+    override detection safely
+- Implement Jenkins best-practice automation sources:
+  - support Jenkins `withCredentials` Secret Text binding for Keycloak service-account client
+    secrets without treating that env var as an internal deploy runtime contract
+  - support Jenkins-provided external OIDC/workload-identity tokens when the Jenkins installation can
+    act as an issuer trusted by Vault
+  - keep the Jenkins credential visible only to the deploy front door credential-source adapter, then
+    convert it into an in-memory typed Vault credential
+  - document Jenkins same-agent/process-inspection caveats for environment-bound credentials
+  - require `set +x`, Jenkins masking, and no env-dump artifacts in scripted examples
+  - fail closed in CI when no non-interactive credential source is configured
+- Define Vault role claim templates for each source:
+  - human PKCE/device tokens bind to deployer group/role, repository, and deployment environment
+  - Jenkins client-secret automation binds to service client id, repository, job or deployment
+    target, and deployment environment
+  - Jenkins/external OIDC automation binds to Jenkins issuer, job/repository/branch/environment
+    claims, and the expected Vault audience
+- Add command UX for credential source selection:
+  - default to local PKCE on local desktop terminals
+  - default to device/print-only login on SSH/headless sessions
+  - default to configured Jenkins source when `CI=true` and Jenkins markers are present
+  - reject interactive browser login in CI unless explicitly allowed for a reviewed debugging path
+  - keep persistent auth caching out of this PR unless PR-75's cache policy explicitly enables it
+- Add redaction and logging guardrails so authorization URLs, device codes, client secrets, OIDC
+  tokens, Vault JWTs, and Vault tokens are never persisted in deploy records, replay snapshots,
+  logs, or operator-visible status beyond the minimum user-facing login prompt material.
+
+### Tests (in this PR)
+
+- Add credential-source selection tests proving:
+  - local macOS/non-SSH interactive sessions choose browser-capable PKCE by default
+  - SSH/headless sessions print or use device flow without launching an inaccessible browser
+  - CI/Jenkins sessions reject interactive login unless explicitly configured
+  - explicit `--login-browser`/credential-source flags override auto-detection predictably
+- Add interactive PKCE tests with a fake OIDC provider proving:
+  - verifier/challenge generation and callback validation work
+  - authorization URLs are printed
+  - system-browser launch is skipped for SSH/headless sessions
+  - issuer, audience, client id, and deployment-bound claims are validated before Vault login
+  - callback listener binding, state validation, one-shot consumption, and timeout behavior are
+    fail-closed
+- Add human-token claim-binding tests proving group/role claims are required for interactive deploys
+  and that service-account-only claim checks are not accidentally reused for human tokens.
+- Add device-flow tests with a fake OIDC provider proving:
+  - the CLI displays the verification URI and user code
+  - polling succeeds when the browser-side authorization completes
+  - timeout, denied, and slow-down responses fail closed without leaking tokens
+- Add Jenkins source tests proving:
+  - Jenkins Secret Text binding can provide a Keycloak client secret only to the credential-source
+    adapter
+  - Jenkins/external OIDC token sources can produce a typed in-memory Vault credential without a
+    Keycloak client secret
+  - CI fails closed when neither a Jenkins credential binding nor an external OIDC token source is
+    configured
+  - Jenkins-provided secrets and tokens are redacted from logs and not inherited by provider
+    subprocesses
+  - Jenkins shell examples and subprocess wrappers do not preserve env dumps or debug traces that
+    expose credential bindings
+- Add end-to-end deployment-domain tests proving every credential source feeds the same typed
+  in-memory secret context consumed by PR-73's resolver.
+
+### Docs (in this PR)
+
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  with Keycloak setup guidance for:
+  - a public CLI client using Authorization Code + PKCE for human deploys
+  - device authorization support for SSH/headless deploys when available
+  - a Jenkins service-account client only when Jenkins credential binding is the chosen automation
+    source
+  - Jenkins OIDC/workload-identity federation when the Jenkins installation supports it
+  - separate Vault role claim bindings for human group/role tokens, service-account automation
+    tokens, and Jenkins OIDC tokens
+- Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+  and [Secrets Usage](/Users/kiltyj/Code/bucknix-fresh/docs/secrets-usage.md) to describe
+  credential sources as adapters that populate the in-memory secret context, not as provider runtime
+  environment variables.
+- Update [Deployment Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md) to
+  document any new `vault_runtime` credential-source fields and the rule that only non-secret
+  routing/identity metadata may be stored in deployment metadata.
+- Add Jenkins Pipeline examples showing:
+  - `withCredentials([string(credentialsId: ..., variable: ...)])` for service-account client-secret
+    minting
+  - an external OIDC token source when Jenkins federation is configured
+  - `set +x` and log-masking expectations for scripted shell steps
+  - avoiding env dumps, archived workspace files, and debug traces that can reveal Jenkins-bound
+    credentials
+- Document remote SSH behavior so operators know that the CLI prints a URL or device code instead of
+  launching a browser on the server.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - credential-source auto-detection
+  - interactive PKCE callback flow
+  - SSH/headless print-only and device authorization flows
+  - Jenkins credential binding and Jenkins/external OIDC token sources
+  - redaction and subprocess environment scrubbing
+  - docs parity for human, SSH, and Jenkins credential-source workflows
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR adds new deploy front-door credential-source behavior, OIDC flow helpers, Jenkins
+  automation support, CLI UX, tests, and operator docs. Under the deployment-only verify policy, run
+  the full build-system verify scope unless classifier coverage proves all changed OIDC/Jenkins
+  helper paths are safely deployment-owned.
+
+### Acceptance Criteria
+
+- Local human deploys can authenticate through browser-based PKCE without a deployment client secret.
+- SSH/headless human deploys do not launch an inaccessible browser and instead use device flow or a
+  printed PKCE URL with tunnel instructions.
+- Human deploy tokens are authorized through reviewed group/role claims plus deployment-bound
+  repository/environment claims, not service-account-only claim bindings.
+- Jenkins deploys can use Jenkins Credentials best practices for service-account client-secret
+  minting, or Jenkins/external OIDC federation when configured.
+- Jenkins examples and runtime wrappers avoid leaking Jenkins-bound credentials through shell traces,
+  env dumps, logs, artifacts, or provider subprocess inheritance.
+- CI fails closed instead of prompting for interactive login when no automation credential source is
+  configured.
+- All credential sources produce the same explicit in-memory secret context consumed by the deploy
+  runtime.
+- No provider code reads deployment auth material from ambient Vault JWT files or Vault auth
+  environment variables.
+- Docs give operators one clear choice matrix for local desktop, SSH/headless, and Jenkins
+  deployments.
+
+### Risks
+
+OIDC login UX varies across local terminals, SSH sessions, Keycloak capabilities, and Jenkins
+installations. The main risk is overfitting to one environment or accidentally falling back to an
+interactive prompt in CI.
+
+### Mitigation
+
+Keep credential-source selection explicit and testable, prefer device flow for headless sessions,
+make browser launch opt-in outside local desktop auto-detection, fail closed in CI, and cover Jenkins
+credential binding plus external OIDC token sources with fake-provider tests.
+
+### Consequence of Not Implementing
+
+The in-memory secret context would still need a manually supplied client secret for many deploys,
+leaving human SSH workflows awkward and Jenkins workflows under-specified despite removing JWT files
+and ambient Vault auth from provider runtime code.
+
+### Downsides for Implementing
+
+Adds OIDC CLI login UX, device-flow handling, Jenkins-specific operator guidance, and more credential
+source selection logic that must be maintained alongside Keycloak and Jenkins configuration changes.
+
+### Recommendation
+
+Implement after PR-73 so the credential-source UX lands on top of the explicit in-memory secret
+context rather than extending the old ambient env/file Vault authentication contract.
+
+---
+
+## PR-75: Deployment auth diagnostics, session policy, and operator UX closeout
+
+### Description
+
+I will add the operator and CI diagnostics needed to make PR-73 and PR-74 usable without guesswork.
+This PR introduces reviewed auth-explain and auth-doctor commands, makes the session/cache policy an
+explicit product decision, improves Vault/IdP/Jenkins failure messages, and adds redaction parity
+tests so credential-source UX stays safe as it becomes more helpful.
+
+### Scope & Changes
+
+- Add deployment auth inspection commands that do not perform provider mutations:
+  - `deploy auth doctor --deployment <target>` explains which credential source would be selected,
+    why, and what required metadata/config is missing
+  - `deploy auth explain-vault-role --deployment <target>` prints expected issuer, audience, Vault
+    role, policy name, and bound claim keys without printing secret values
+  - `deploy auth print-login --deployment <target>` prints the PKCE/device login instructions
+    without launching a browser
+  - `deploy auth print-jenkins-help --deployment <target>` prints Jenkins credential binding and
+    pipeline guidance for the selected deployment
+- Define the session/cache policy for interactive login:
+  - default to no persistent token/session cache unless the PR explicitly introduces an OS
+    credential-store-backed cache
+  - if a cache is added, store only the minimum refresh/session material in a platform credential
+    store, never in repo files, `.local`, shell history, or plain env files
+  - add `deploy auth status` and `deploy auth logout` only when persistent cache is implemented
+  - ensure cached sessions are scoped by issuer, client id, repository, deployment environment, and
+    credential source
+- Improve failure diagnostics with distinct, actionable categories:
+  - IdP discovery unavailable or issuer mismatch
+  - browser/device login denied, expired, or timed out
+  - Vault JWT login rejected because issuer, audience, role, group/role, or bound claims did not
+    match
+  - Vault policy denied the requested secret path
+  - Jenkins credential binding missing or visible only outside the `withCredentials` block
+  - CI attempted an interactive credential source
+- Add a reusable redaction utility for auth-related diagnostics and logs:
+  - redact OIDC access tokens, refresh tokens, auth codes, PKCE verifiers, device codes, client
+    secrets, Vault JWTs, Vault tokens, and Jenkins-bound secret values
+  - allow printing non-secret routing and identity metadata such as issuer URL, Vault address,
+    audience, role name, policy name, claim names, and verification URI
+  - keep one redaction policy for CLI output, exceptions, deploy records, replay snapshots, and test
+    diagnostics
+- Add a credential-source matrix generator for docs and CLI help so local desktop, SSH/headless,
+  Jenkins Secret Text, Jenkins OIDC, and unsupported CI cases stay aligned.
+- Add operator-safe debug mode that increases structural diagnostics without printing secret values
+  or raw tokens.
+
+### Tests (in this PR)
+
+- Add auth-doctor tests proving:
+  - the selected credential source and selection reason are reported for local desktop, SSH/headless,
+    Jenkins, and CI environments
+  - missing `vault_runtime`, missing IdP metadata, missing Jenkins credential binding, and unsupported
+    CI setups produce actionable non-secret errors
+  - doctor commands do not mint tokens, contact provider mutation APIs, or read deployment secret
+    values
+- Add explain-vault-role tests proving expected issuer, audience, policy, role, and bound claim
+  names are printed without client secrets, JWTs, or Vault tokens.
+- Add session/cache policy tests proving either:
+  - no persistent auth cache exists and repeated login material is kept memory-only
+  - or the cache uses the reviewed OS credential-store path with correct scoping and logout behavior
+- Add failure-diagnostic tests with fake IdP and fake Vault responses for discovery failure, login
+  denial, audience mismatch, missing group/role claim, Vault JWT role rejection, and Vault policy
+  denial.
+- Add redaction snapshot tests covering representative logs, thrown errors, deploy records, replay
+  snapshots, Jenkins help output, PKCE URLs, device-flow prompts, and debug output.
+- Add docs parity tests proving the generated credential-source matrix and Jenkins examples match
+  the CLI help text.
+
+### Docs (in this PR)
+
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  with a troubleshooting section organized by the new diagnostic categories.
+- Update [Secrets Usage](/Users/kiltyj/Code/bucknix-fresh/docs/secrets-usage.md) with the operator
+  command flow:
+  - inspect metadata with `deploy auth doctor`
+  - inspect Vault role expectations with `deploy auth explain-vault-role`
+  - print SSH-safe login instructions with `deploy auth print-login`
+  - print Jenkins guidance with `deploy auth print-jenkins-help`
+- Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+  to document redaction rules, session/cache behavior, and diagnostic boundaries.
+- Update [Deployment Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md) if the
+  credential-source matrix introduces reviewed metadata fields that need schema coverage.
+- Add or update Jenkins Pipeline snippets with auth-doctor preflight examples that fail before
+  provider mutation when credentials are missing or mis-scoped.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - auth doctor and explain commands
+  - session/cache policy
+  - fake IdP/Vault/Jenkins failure diagnostics
+  - redaction snapshots across CLI output, logs, records, and replay material
+  - generated credential-source matrix and docs/help parity
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR adds CLI commands, diagnostics, generated/help docs, redaction utilities, fake IdP/Vault
+  failure tests, and optional platform credential-store integration. Under the deployment-only verify
+  policy, run the full build-system verify scope unless classifier coverage proves all changed auth
+  UX paths are safely deployment-owned.
+
+### Acceptance Criteria
+
+- Operators can run a non-mutating auth doctor command to understand the selected credential source
+  and missing setup before a deploy.
+- SSH users can print login instructions without launching a browser.
+- Jenkins users can print deployment-specific credential binding guidance and fail before mutation
+  when credentials are missing.
+- Vault role expectations are visible without exposing secret values.
+- IdP, Vault, Jenkins, and CI failures produce distinct actionable errors.
+- Session/cache behavior is explicit, tested, and documented.
+- Redaction tests fail if JWTs, Vault tokens, auth codes, PKCE verifiers, device codes, client
+  secrets, or Jenkins-bound secrets appear in logs, errors, records, snapshots, or debug output.
+
+### Risks
+
+Better diagnostics can accidentally become a new secret-leak surface, especially when printing URLs,
+device prompts, Jenkins examples, or debug output.
+
+### Mitigation
+
+Centralize redaction, snapshot representative output, separate non-secret routing metadata from
+credential material, and keep all doctor/explain commands read-only and mutation-free.
+
+### Consequence of Not Implementing
+
+The credential-source architecture would be secure but harder to operate: users would still need to
+infer why local, SSH, Jenkins, or Vault auth failed from low-level IdP and Vault errors.
+
+### Downsides for Implementing
+
+Adds another layer of CLI UX and test fixtures, and a persistent session cache if one is chosen
+would introduce platform-specific credential-store behavior to maintain.
+
+### Recommendation
+
+Implement after PR-74 so all human, SSH, and Jenkins credential sources exist before adding the
+diagnostic and session UX that explains them.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)

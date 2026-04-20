@@ -86,6 +86,7 @@ export function cloudflarePagesDeploymentFixture(
     targetExceptions: overrides.targetExceptions || [],
     ...(overrides.smoke ? { smoke: overrides.smoke } : {}),
     ...(overrides.rolloutPolicy ? { rolloutPolicy: overrides.rolloutPolicy } : {}),
+    ...(overrides.vaultRuntime ? { vaultRuntime: overrides.vaultRuntime } : {}),
     component: {
       kind: STATIC_WEBAPP_COMPONENT,
       target: overrides.component?.target || "//projects/apps/pleomino:app",

@@ -10,7 +10,6 @@ import { deriveAppStoreConnectProviderTarget } from "./deployment-provider-targe
 import { readPrimaryDeploymentComponent } from "./contract-extract-components.ts";
 import {
   deploymentError,
-  duplicateValueEntries,
   pushTokenFieldErrors,
   readLabel,
   readLabelList,
@@ -21,6 +20,7 @@ import {
   readStringRecord,
   type DeploymentExtractionContext,
 } from "./contract-extract-shared.ts";
+import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata.ts";
 import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
 import {
   resolveDeploymentMetadataRefs,
@@ -33,7 +33,7 @@ import {
   APP_STORE_CONNECT_VALID_SIGNING_MODELS,
   APP_STORE_CONNECT_VALID_TRACKS,
   MOBILE_STORE_TARGET_TOKEN_RE,
-  pushDuplicateProviderTargetErrors,
+  pushDuplicateProviderTargetIdentityErrors,
   pushMobileStoreProtectionClassError,
 } from "./mobile-store-extract-helpers.ts";
 import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
@@ -66,6 +66,7 @@ export function extractAppStoreConnectDeploymentsFromContext(
     const releaseActionRefs = readLabelList(node, "release_actions");
     const targetExceptionRefs = readLabelList(node, "target_exceptions");
     const smoke = readSmokePolicy(node);
+    const vaultRuntime = readVaultRuntimeConfig(node);
     const rolloutPolicy = readRolloutPolicy(node);
     const deploymentErrors: string[] = [];
     const issuer = providerTarget.issuer || "";
@@ -217,6 +218,7 @@ export function extractAppStoreConnectDeploymentsFromContext(
       targetExceptions,
       ...(smoke ? { smoke } : {}),
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
+      ...(vaultRuntime ? { vaultRuntime } : {}),
       component: { kind: MOBILE_APP_COMPONENT_KIND, target: componentTarget },
       components: [
         {
@@ -236,14 +238,6 @@ export function extractAppStoreConnectDeploymentsFromContext(
       }),
     });
   }
-  pushDuplicateProviderTargetErrors(
-    context.errors,
-    duplicateValueEntries(
-      deployments.map((deployment) => ({
-        value: deployment.providerTarget.providerTargetIdentity,
-        label: deployment.label,
-      })),
-    ),
-  );
+  pushDuplicateProviderTargetIdentityErrors(context.errors, deployments);
   return deployments.sort((a, b) => a.label.localeCompare(b.label));
 }

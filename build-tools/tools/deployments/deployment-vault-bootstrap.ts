@@ -22,7 +22,12 @@ export type VaultBootstrapInputs = {
 type TargetScope = { value: string; source: "provider-target-identity" | "deploy-run-lock-scope" };
 
 function defaultPolicyName(deployment: DeploymentTarget): string {
-  return `deploy-${sanitizeName(deployment.deploymentId)}-read`;
+  const stageSuffix = deployment.environmentStage ? `-${deployment.environmentStage}` : "";
+  const base =
+    stageSuffix && deployment.deploymentId.endsWith(stageSuffix)
+      ? deployment.deploymentId.slice(0, -stageSuffix.length)
+      : deployment.deploymentId;
+  return `deploy-${sanitizeName(base)}-read`;
 }
 
 function requireRepository(deployment: DeploymentTarget): string {
@@ -96,9 +101,13 @@ export function buildVaultSecretTemplatesDocument(opts: {
 }
 
 function bootstrapInputs(opts: { deployment: DeploymentTarget; inputs: VaultBootstrapInputs }) {
-  const policyName = opts.inputs.policyName?.trim() || defaultPolicyName(opts.deployment);
-  const roleName = opts.inputs.roleName?.trim() || policyName;
-  const clientId = opts.inputs.deploymentClientId?.trim();
+  const metadata = opts.deployment.vaultRuntime;
+  const policyName =
+    opts.inputs.policyName?.trim() ||
+    metadata?.roleName?.trim() ||
+    defaultPolicyName(opts.deployment);
+  const roleName = opts.inputs.roleName?.trim() || metadata?.roleName?.trim() || policyName;
+  const clientId = opts.inputs.deploymentClientId?.trim() || metadata?.deploymentClientId?.trim();
   const claims = sortedObject({
     ...(clientId ? { azp: clientId } : {}),
     deployment_environment: opts.deployment.environmentStage,
@@ -134,9 +143,12 @@ export function buildVaultBootstrapDocument(opts: {
     schemaVersion: DEPLOYMENT_VAULT_BOOTSTRAP_SCHEMA,
     ...baseDocument(opts.deployment, targetScope),
     vault: {
-      issuerUrl: inputs.issuerUrl || "<issuer-url>",
-      audience: inputs.audience || "<vault-audience>",
-      deploymentClientId: inputs.deploymentClientId || "<deployment-client-id>",
+      issuerUrl: inputs.issuerUrl || opts.deployment.vaultRuntime?.oidcIssuer || "<issuer-url>",
+      audience: inputs.audience || opts.deployment.vaultRuntime?.audience || "<vault-audience>",
+      deploymentClientId:
+        inputs.deploymentClientId ||
+        opts.deployment.vaultRuntime?.deploymentClientId ||
+        "<deployment-client-id>",
       roleName: normalized.roleName,
       policyName: normalized.policyName,
       boundClaims: normalized.claims,
@@ -144,10 +156,11 @@ export function buildVaultBootstrapDocument(opts: {
     policyHcl,
     secretTemplates: templates,
     runtimeEnvironment: {
-      VAULT_ADDR: "<vault-addr>",
-      BNX_VAULT_AUTH_METHOD: "jwt",
-      BNX_VAULT_JWT_ROLE: normalized.roleName,
-      BNX_VAULT_JWT_FILE: "<workload-jwt-file>",
+      VAULT_ADDR: opts.deployment.vaultRuntime?.addr || "<vault-addr>",
+      BNX_VAULT_OIDC_ISSUER:
+        inputs.issuerUrl || opts.deployment.vaultRuntime?.oidcIssuer || "<issuer-url>",
+      [opts.deployment.vaultRuntime?.clientSecretEnv || "BNX_DEPLOYER_CLIENT_SECRET"]:
+        "<client-secret>",
     },
     warnings: [
       "Vault initialization, unseal, root-token custody, and real secret entry remain manual operator actions.",
@@ -156,14 +169,18 @@ export function buildVaultBootstrapDocument(opts: {
   };
 }
 
-export function assertVaultBootstrapExecutableInputs(inputs: VaultBootstrapInputs) {
-  for (const [flag, value] of [
-    ["issuer-url", inputs.issuerUrl],
-    ["vault-audience", inputs.audience],
-    ["deployment-client-id", inputs.deploymentClientId],
-    ["vault-jwt-role", inputs.roleName],
+export function assertVaultBootstrapExecutableDocument(
+  document: ReturnType<typeof buildVaultBootstrapDocument>,
+) {
+  for (const [field, value] of [
+    ["issuerUrl", document.vault.issuerUrl],
+    ["audience", document.vault.audience],
+    ["deploymentClientId", document.vault.deploymentClientId],
+    ["roleName", document.vault.roleName],
   ]) {
-    if (!value?.trim()) throw new Error(`--${flag} is required for executable Vault output`);
+    if (!value.trim() || value.startsWith("<")) {
+      throw new Error(`Vault bootstrap executable output requires vault.${field}`);
+    }
   }
 }
 
@@ -190,13 +207,18 @@ export function renderVaultBootstrapDocument(
     '  token_max_ttl="2h"',
   ].join("\n");
   if (format === "shell") {
+    const clientSecretEnv =
+      Object.keys(document.runtimeEnvironment).find(
+        (key) => key !== "VAULT_ADDR" && key !== "BNX_VAULT_OIDC_ISSUER",
+      ) || "BNX_DEPLOYER_CLIENT_SECRET";
     return [
       auth,
       `cat > ${document.vault.policyName}.hcl <<'HCL'\n${document.policyHcl}\nHCL`,
       `vault policy write ${document.vault.policyName} ${document.vault.policyName}.hcl`,
       role,
-      `export BNX_VAULT_AUTH_METHOD=jwt`,
-      `export BNX_VAULT_JWT_ROLE=${shellQuote(document.vault.roleName)}`,
+      `export VAULT_ADDR=${shellQuote(document.runtimeEnvironment.VAULT_ADDR)}`,
+      `export BNX_VAULT_OIDC_ISSUER=${shellQuote(document.runtimeEnvironment.BNX_VAULT_OIDC_ISSUER)}`,
+      `export ${clientSecretEnv}='<client-secret>'`,
     ].join("\n\n");
   }
   return [

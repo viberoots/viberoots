@@ -19,6 +19,7 @@ def s3_static_webapp_deployment(
         prerequisites = [],
         secret_requirements = [],
         runtime_config_requirements = [],
+        vault_runtime = {},
         release_actions = [],
         target_exceptions = [],
         labels = [],
@@ -53,6 +54,7 @@ def s3_static_webapp_deployment(
         prerequisites = prerequisites,
         secret_requirements = secret_requirements,
         runtime_config_requirements = runtime_config_requirements,
+        vault_runtime = vault_runtime,
         release_actions = release_actions,
         target_exceptions = target_exceptions,
         labels = labels + [

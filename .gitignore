@@ -12,6 +12,7 @@ result
 
 # Local temp artifacts
 .tmp/
+.local/deploy-vault/
 .local/deployments/
 plugins/repo-skills/skills/**/references/*.local.md
 

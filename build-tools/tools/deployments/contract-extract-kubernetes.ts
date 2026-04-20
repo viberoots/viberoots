@@ -20,6 +20,7 @@ import {
   readStringRecord,
   type DeploymentExtractionContext,
 } from "./contract-extract-shared.ts";
+import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata.ts";
 import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
 import { resolveDeploymentMetadataRefs } from "./deployment-extract-metadata.ts";
 import { pushKubernetesComponentKindErrors } from "./kubernetes-capability-validation.ts";
@@ -62,6 +63,7 @@ export function extractKubernetesDeploymentsFromContext(
     const releaseActionRefs = readLabelList(node, "release_actions");
     const targetExceptionRefs = readLabelList(node, "target_exceptions");
     const smoke = readSmokePolicy(node);
+    const vaultRuntime = readVaultRuntimeConfig(node);
     const rolloutPolicy = readRolloutPolicy(node);
     const cluster = providerTarget.cluster || "";
     const namespace = providerTarget.namespace || "";
@@ -194,6 +196,7 @@ export function extractKubernetesDeploymentsFromContext(
       targetExceptions,
       ...(smoke ? { smoke } : {}),
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
+      ...(vaultRuntime ? { vaultRuntime } : {}),
       component: { kind: primaryComponent?.kind || componentKind, target: componentTarget },
       components,
       publisher: { type: publisher, config: publisherConfig },

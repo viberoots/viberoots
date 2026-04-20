@@ -10,6 +10,10 @@ import {
 import { listDeploymentsForCli, printDeployJson } from "./deploy-front-door.ts";
 import { resolveSmokeConnectOverride } from "./deployment-cli-smoke.ts";
 import {
+  cleanupDeploymentVaultRuntime,
+  prepareDeploymentVaultRuntime,
+} from "./deployment-vault-runtime.ts";
+import {
   isAppStoreConnectDeployment,
   isCloudflarePagesDeployment,
   isGooglePlayDeployment,
@@ -95,113 +99,124 @@ export async function runDeployCli(opts: {
       "--retire-target/--migrate-target cannot be combined with deploy, publish-only, remove, or preview flags",
     );
   }
-  if (isS3StaticDeployment(deployment)) {
-    const { runS3StaticDeployFrontDoor } = await import("./s3-static-front-door.ts");
-    await runS3StaticDeployFrontDoor({
-      workspaceRoot: opts.workspaceRoot,
-      deployment,
-      requireServiceForProtectedShared: opts.publicFrontDoor,
-      publishOnly: flags.publishOnly,
-      provisionOnly: flags.provisionOnly,
-      rollback: flags.rollback,
-      sourceRunId: flags.sourceRunId,
-      artifactDirFlag: flags.artifactDirFlag,
-      ...(admissionEvidence ? { admissionEvidence } : {}),
-      ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
-      hasFlag,
-    });
-    return;
-  }
-  if (isCloudflarePagesDeployment(deployment)) {
-    const { runCloudflareDeployFrontDoor } = await import("./cloudflare-pages-front-door.ts");
-    await runCloudflareDeployFrontDoor({
-      workspaceRoot: opts.workspaceRoot,
-      deployment,
-      requireServiceForProtectedShared: opts.publicFrontDoor,
-      publishOnly: flags.publishOnly,
-      preview: flags.preview,
-      previewCleanup: flags.previewCleanup,
-      rollback: flags.rollback,
-      retireTarget: flags.retireTarget,
-      migrateTarget: flags.migrateTarget,
-      targetExceptionRef: flags.targetExceptionRef,
-      sourceRunId: flags.sourceRunId,
-      artifactDirFlag: flags.artifactDirFlag,
-      cleanupReason: flags.cleanupReason,
-      ...(admissionEvidence ? { admissionEvidence } : {}),
-      ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
-      provisionOnly: flags.provisionOnly,
-    });
-    return;
-  }
-  if (isAppStoreConnectDeployment(deployment)) {
-    const { runAppStoreConnectDeployFrontDoor } = await import("./app-store-connect-front-door.ts");
-    await runAppStoreConnectDeployFrontDoor({
-      workspaceRoot: opts.workspaceRoot,
-      deployment,
-      publishOnly: flags.publishOnly,
-      rollback: flags.rollback,
-      sourceRunId: flags.sourceRunId,
-      artifactDirFlag: flags.artifactDirFlag,
-      ...(admissionEvidence ? { admissionEvidence } : {}),
-    });
-    return;
-  }
-  if (isGooglePlayDeployment(deployment)) {
-    const { runGooglePlayDeployFrontDoor } = await import("./google-play-front-door.ts");
-    await runGooglePlayDeployFrontDoor({
-      workspaceRoot: opts.workspaceRoot,
-      deployment,
-      publishOnly: flags.publishOnly,
-      rollback: flags.rollback,
-      sourceRunId: flags.sourceRunId,
-      artifactDirFlag: flags.artifactDirFlag,
-      ...(admissionEvidence ? { admissionEvidence } : {}),
-    });
-    return;
-  }
-  if (isKubernetesDeployment(deployment)) {
-    const { runKubernetesDeployFrontDoor } = await import("./kubernetes-front-door.ts");
-    await runKubernetesDeployFrontDoor({
-      workspaceRoot: opts.workspaceRoot,
-      deployment,
-      requireServiceForProtectedShared: opts.publicFrontDoor,
-      publishOnly: flags.publishOnly,
-      provisionOnly: flags.provisionOnly,
-      rollback: flags.rollback,
-      sourceRunId: flags.sourceRunId,
-      artifactDirFlag: flags.artifactDirFlag,
-      ...(admissionEvidence ? { admissionEvidence } : {}),
-      ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
-      hasFlag,
-    });
-    return;
-  }
-  if (!isNixosSharedHostDeployment(deployment)) {
-    throw new Error(`unsupported deployment provider: ${deployment.provider}`);
-  }
-  const { maybeRunNixosSharedHostRemoteProfile } = await import(
-    "./nixos-shared-host-remote-cli.ts"
-  );
-  if (
-    await maybeRunNixosSharedHostRemoteProfile({
-      workspaceRoot: opts.workspaceRoot,
-      deployment,
-      ...(admissionEvidence ? { admissionEvidence } : {}),
-    })
-  ) {
-    return;
-  }
-  const { runNixosSharedHostDeployFrontDoor } = await import("./deploy-provider-front-door.ts");
-  await runNixosSharedHostDeployFrontDoor({
+  const vaultRuntime = await prepareDeploymentVaultRuntime({
     workspaceRoot: opts.workspaceRoot,
     deployment,
-    publishOnly: flags.publishOnly,
-    provisionOnly: flags.provisionOnly,
-    rollback: flags.rollback,
-    sourceRunId: flags.sourceRunId,
-    artifactDirFlag: flags.artifactDirFlag,
-    ...(admissionEvidence ? { admissionEvidence } : {}),
-    ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
+    inputs: flags.vaultRuntimeInputs,
   });
+  try {
+    if (isS3StaticDeployment(deployment)) {
+      const { runS3StaticDeployFrontDoor } = await import("./s3-static-front-door.ts");
+      await runS3StaticDeployFrontDoor({
+        workspaceRoot: opts.workspaceRoot,
+        deployment,
+        requireServiceForProtectedShared: opts.publicFrontDoor,
+        publishOnly: flags.publishOnly,
+        provisionOnly: flags.provisionOnly,
+        rollback: flags.rollback,
+        sourceRunId: flags.sourceRunId,
+        artifactDirFlag: flags.artifactDirFlag,
+        ...(admissionEvidence ? { admissionEvidence } : {}),
+        ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
+        hasFlag,
+      });
+      return;
+    }
+    if (isCloudflarePagesDeployment(deployment)) {
+      const { runCloudflareDeployFrontDoor } = await import("./cloudflare-pages-front-door.ts");
+      await runCloudflareDeployFrontDoor({
+        workspaceRoot: opts.workspaceRoot,
+        deployment,
+        requireServiceForProtectedShared: opts.publicFrontDoor,
+        publishOnly: flags.publishOnly,
+        preview: flags.preview,
+        previewCleanup: flags.previewCleanup,
+        rollback: flags.rollback,
+        retireTarget: flags.retireTarget,
+        migrateTarget: flags.migrateTarget,
+        targetExceptionRef: flags.targetExceptionRef,
+        sourceRunId: flags.sourceRunId,
+        artifactDirFlag: flags.artifactDirFlag,
+        cleanupReason: flags.cleanupReason,
+        ...(admissionEvidence ? { admissionEvidence } : {}),
+        ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
+        provisionOnly: flags.provisionOnly,
+      });
+      return;
+    }
+    if (isAppStoreConnectDeployment(deployment)) {
+      const { runAppStoreConnectDeployFrontDoor } = await import(
+        "./app-store-connect-front-door.ts"
+      );
+      await runAppStoreConnectDeployFrontDoor({
+        workspaceRoot: opts.workspaceRoot,
+        deployment,
+        publishOnly: flags.publishOnly,
+        rollback: flags.rollback,
+        sourceRunId: flags.sourceRunId,
+        artifactDirFlag: flags.artifactDirFlag,
+        ...(admissionEvidence ? { admissionEvidence } : {}),
+      });
+      return;
+    }
+    if (isGooglePlayDeployment(deployment)) {
+      const { runGooglePlayDeployFrontDoor } = await import("./google-play-front-door.ts");
+      await runGooglePlayDeployFrontDoor({
+        workspaceRoot: opts.workspaceRoot,
+        deployment,
+        publishOnly: flags.publishOnly,
+        rollback: flags.rollback,
+        sourceRunId: flags.sourceRunId,
+        artifactDirFlag: flags.artifactDirFlag,
+        ...(admissionEvidence ? { admissionEvidence } : {}),
+      });
+      return;
+    }
+    if (isKubernetesDeployment(deployment)) {
+      const { runKubernetesDeployFrontDoor } = await import("./kubernetes-front-door.ts");
+      await runKubernetesDeployFrontDoor({
+        workspaceRoot: opts.workspaceRoot,
+        deployment,
+        requireServiceForProtectedShared: opts.publicFrontDoor,
+        publishOnly: flags.publishOnly,
+        provisionOnly: flags.provisionOnly,
+        rollback: flags.rollback,
+        sourceRunId: flags.sourceRunId,
+        artifactDirFlag: flags.artifactDirFlag,
+        ...(admissionEvidence ? { admissionEvidence } : {}),
+        ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
+        hasFlag,
+      });
+      return;
+    }
+    if (!isNixosSharedHostDeployment(deployment)) {
+      throw new Error(`unsupported deployment provider: ${deployment.provider}`);
+    }
+    const { maybeRunNixosSharedHostRemoteProfile } = await import(
+      "./nixos-shared-host-remote-cli.ts"
+    );
+    if (
+      await maybeRunNixosSharedHostRemoteProfile({
+        workspaceRoot: opts.workspaceRoot,
+        deployment,
+        ...(admissionEvidence ? { admissionEvidence } : {}),
+      })
+    ) {
+      return;
+    }
+    const { runNixosSharedHostDeployFrontDoor } = await import("./deploy-provider-front-door.ts");
+    await runNixosSharedHostDeployFrontDoor({
+      workspaceRoot: opts.workspaceRoot,
+      deployment,
+      publishOnly: flags.publishOnly,
+      provisionOnly: flags.provisionOnly,
+      rollback: flags.rollback,
+      sourceRunId: flags.sourceRunId,
+      artifactDirFlag: flags.artifactDirFlag,
+      ...(admissionEvidence ? { admissionEvidence } : {}),
+      ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
+    });
+  } finally {
+    await cleanupDeploymentVaultRuntime(vaultRuntime);
+  }
 }

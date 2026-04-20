@@ -23,6 +23,7 @@ import {
   readStringRecord,
   type DeploymentExtractionContext,
 } from "./contract-extract-shared.ts";
+import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata.ts";
 import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
 import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
 import {
@@ -67,6 +68,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
     const targetExceptionRefs = readLabelList(node, "target_exceptions");
     const preview = readPreviewPolicy(node, "preview");
     const smoke = readSmokePolicy(node);
+    const vaultRuntime = readVaultRuntimeConfig(node);
     const rolloutPolicy = readRolloutPolicy(node);
     const account = providerTarget.account || "";
     const project = providerTarget.project || "";
@@ -214,6 +216,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
       targetExceptions,
       ...(smoke ? { smoke } : {}),
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
+      ...(vaultRuntime ? { vaultRuntime } : {}),
       component: { kind: STATIC_WEBAPP_COMPONENT, target: componentTarget },
       components: [
         {

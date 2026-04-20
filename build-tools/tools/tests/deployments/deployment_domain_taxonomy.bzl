@@ -33,6 +33,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-secret-vault.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-vault-bootstrap.docs.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-vault-bootstrap.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-vault-runtime.test.ts": True,
     "build-tools/tools/tests/deployments/deploy-vault-jwt.fail-closed.test.ts": True,
     "build-tools/tools/tests/deployments/deploy-vault-jwt.success.test.ts": True,
     "build-tools/tools/tests/deployments/deploy-vault-jwt.test-helpers.ts": False,

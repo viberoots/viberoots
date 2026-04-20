@@ -23,6 +23,7 @@ import {
   readStringRecord,
   type DeploymentExtractionContext,
 } from "./contract-extract-shared.ts";
+import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata.ts";
 import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
 import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
 import {
@@ -69,6 +70,7 @@ export function extractS3StaticDeploymentsFromContext(
     const targetExceptionRefs = readLabelList(node, "target_exceptions");
     const preview = readPreviewPolicy(node, "preview");
     const smoke = readSmokePolicy(node);
+    const vaultRuntime = readVaultRuntimeConfig(node);
     const rolloutPolicy = readRolloutPolicy(node);
     const account = providerTarget.account || "";
     const bucket = providerTarget.bucket || "";
@@ -212,6 +214,7 @@ export function extractS3StaticDeploymentsFromContext(
       targetExceptions,
       ...(smoke ? { smoke } : {}),
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
+      ...(vaultRuntime ? { vaultRuntime } : {}),
       component: { kind: STATIC_WEBAPP_COMPONENT, target: componentTarget },
       components: [
         {

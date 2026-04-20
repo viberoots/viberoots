@@ -7,6 +7,7 @@ import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import type { DeploymentRequirement } from "./deployment-requirements.ts";
 import type { DeploymentSmokePolicy } from "./deployment-smoke-policy.ts";
 import type { DeploymentTargetException } from "./deployment-target-exceptions.ts";
+import type { DeploymentVaultRuntimeConfig } from "./deployment-vault-runtime-types.ts";
 import {
   MOBILE_APP_COMPONENT_KIND,
   SSR_WEBAPP_COMPONENT_KIND,
@@ -102,6 +103,7 @@ type DeploymentBase = {
   smoke?: DeploymentSmokePolicy;
   rolloutPolicy?: DeploymentRolloutPolicy;
   bootstrap?: DeploymentBootstrapPolicy;
+  vaultRuntime?: DeploymentVaultRuntimeConfig;
   component: {
     kind: DeploymentComponentKind;
     target: string;

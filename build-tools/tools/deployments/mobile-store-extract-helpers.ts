@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { deploymentError } from "./contract-extract-shared.ts";
+import { deploymentError, duplicateValueEntries } from "./contract-extract-shared.ts";
 
 export const MOBILE_STORE_TARGET_TOKEN_RE = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$/;
 export const MOBILE_STORE_VALID_PROTECTION_CLASSES = new Set([
@@ -27,6 +27,21 @@ export function pushDuplicateProviderTargetErrors(
       );
     }
   }
+}
+
+export function pushDuplicateProviderTargetIdentityErrors(
+  errors: string[],
+  deployments: Array<{ label: string; providerTarget: { providerTargetIdentity: string } }>,
+) {
+  pushDuplicateProviderTargetErrors(
+    errors,
+    duplicateValueEntries(
+      deployments.map((deployment) => ({
+        value: deployment.providerTarget.providerTargetIdentity,
+        label: deployment.label,
+      })),
+    ),
+  );
 }
 
 export function pushMobileStoreProtectionClassError(opts: {

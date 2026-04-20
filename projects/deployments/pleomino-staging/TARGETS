@@ -9,6 +9,14 @@ cloudflare_pages_static_webapp_deployment(
     environment_stage = "staging",
     admission_policy = "//projects/deployments/pleomino-shared:staging_release",
     protection_class = "shared_nonprod",
+    vault_runtime = {
+        "addr": "https://secrets.apps.kilty.io:8200",
+        "oidc_issuer": "https://identity.apps.kilty.io/realms/deployments",
+        "audience": "deployments-vault",
+        "deployment_client_id": "deployment-runner",
+        "deployment_environment": "mini",
+        "jwt_role": "deploy-pleomino-read",
+    },
     secret_requirements = [
         {
             "name": "cloudflare_api_token",

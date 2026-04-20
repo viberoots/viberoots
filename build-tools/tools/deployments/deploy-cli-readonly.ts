@@ -11,7 +11,7 @@ import {
   validateDeploymentForCli,
 } from "./deploy-front-door.ts";
 import {
-  assertVaultBootstrapExecutableInputs,
+  assertVaultBootstrapExecutableDocument,
   buildVaultBootstrapDocument,
   buildVaultSecretTemplatesDocument,
   renderVaultBootstrapDocument,
@@ -20,6 +20,10 @@ import {
   type VaultBootstrapInputs,
   type VaultSecretTemplateFormat,
 } from "./deployment-vault-bootstrap.ts";
+import {
+  readDeploymentVaultRuntimeInputsFromFlags,
+  type DeploymentVaultRuntimeInputs,
+} from "./deployment-vault-runtime.ts";
 export type DeployCliReadonlyFlags = {
   printTargetIdentity: boolean;
   printVaultBootstrap: boolean;
@@ -27,6 +31,7 @@ export type DeployCliReadonlyFlags = {
   vaultBootstrapFormat: VaultBootstrapFormat;
   vaultSecretTemplateFormat: VaultSecretTemplateFormat;
   vaultBootstrapInputs: VaultBootstrapInputs;
+  vaultRuntimeInputs: DeploymentVaultRuntimeInputs;
   validateOnly: boolean;
   controlPlaneOperatorAction?: DeployControlPlaneOperatorAction;
   remove: boolean;
@@ -57,6 +62,7 @@ export function readDeployCliReadonlyFlags(): DeployCliReadonlyFlags {
       policyName: getFlagStr("vault-policy-name", "").trim() || undefined,
       extraBoundClaims: readExtraBoundClaims(),
     },
+    vaultRuntimeInputs: readDeploymentVaultRuntimeInputsFromFlags(),
     validateOnly: getFlagBool("validate-only"),
     controlPlaneOperatorAction: selectedDeployControlPlaneOperatorAction(),
     remove: getFlagBool("remove"),
@@ -201,20 +207,16 @@ export async function maybeHandleReadonlyDeployCli(opts: {
     return true;
   }
   if (opts.flags.printVaultBootstrap) {
-    if (opts.flags.vaultBootstrapFormat !== "json") {
-      assertVaultBootstrapExecutableInputs(opts.flags.vaultBootstrapInputs);
-    }
     const targetScope = await targetScopeForReadonlyVaultHelper(opts);
-    console.log(
-      renderVaultBootstrapDocument(
-        buildVaultBootstrapDocument({
-          deployment: opts.deployment,
-          inputs: opts.flags.vaultBootstrapInputs,
-          ...(targetScope ? { targetScope } : {}),
-        }),
-        opts.flags.vaultBootstrapFormat,
-      ),
-    );
+    const document = buildVaultBootstrapDocument({
+      deployment: opts.deployment,
+      inputs: opts.flags.vaultBootstrapInputs,
+      ...(targetScope ? { targetScope } : {}),
+    });
+    if (opts.flags.vaultBootstrapFormat !== "json") {
+      assertVaultBootstrapExecutableDocument(document);
+    }
+    console.log(renderVaultBootstrapDocument(document, opts.flags.vaultBootstrapFormat));
     return true;
   }
   if (opts.flags.printVaultSecretTemplates) {
