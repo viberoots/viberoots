@@ -1,20 +1,20 @@
 { lib, config, pkgs, ... }:
 let
-  cfg = config.bucknix.mini.identityProvider;
+  cfg = config.deploymentHost.identityProvider;
   localHost = "127.0.0.1";
   proxyUrl = "http://${localHost}:${toString cfg.keycloakHttpPort}";
 in
 {
-  options.bucknix.mini.identityProvider = {
+  options.deploymentHost.identityProvider = {
     enable = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Enable the reviewed Keycloak identity-provider defaults for mini.";
+      description = "Enable the reviewed Keycloak identity-provider defaults for a deployment host.";
     };
     hostname = lib.mkOption {
       type = lib.types.str;
       default = "identity.apps.kilty.io";
-      description = "Public hostname for the mini OIDC issuer.";
+      description = "Public hostname for the deployment-host OIDC issuer.";
     };
     acmeEmail = lib.mkOption {
       type = lib.types.str;
@@ -28,7 +28,7 @@ in
     };
     databasePasswordFile = lib.mkOption {
       type = lib.types.str;
-      default = "/var/lib/mini-secrets/keycloak-db-password";
+      default = "/var/lib/deployment-host-secrets/keycloak-db-password";
       description = "Out-of-store file containing the local Keycloak database password.";
     };
     manageNginx = lib.mkOption {

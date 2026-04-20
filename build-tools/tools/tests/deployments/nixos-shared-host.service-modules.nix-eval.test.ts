@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers.ts";
 
-test("mini postgres module evaluates as an importable reviewed host module", async () => {
-  await runInTemp("mini-postgres-module-eval", async (tmp, $) => {
+test("shared-host postgres module evaluates as an importable reviewed host module", async () => {
+  await runInTemp("shared-host-postgres-module-eval", async (tmp, $) => {
     const expr = `
       let
         system = import <nixpkgs/nixos> {
           configuration = {
-            imports = [ ./build-tools/tools/nix/mini-postgres-module.nix ];
+            imports = [ ./build-tools/tools/nix/shared-host-postgres-module.nix ];
             system.stateVersion = "24.11";
           };
         };
@@ -43,13 +43,13 @@ test("mini postgres module evaluates as an importable reviewed host module", asy
   });
 });
 
-test("mini vault module evaluates as an importable reviewed host module", async () => {
-  await runInTemp("mini-vault-module-eval", async (tmp, $) => {
+test("shared-host vault module evaluates as an importable reviewed host module", async () => {
+  await runInTemp("shared-host-vault-module-eval", async (tmp, $) => {
     const expr = `
       let
         system = import <nixpkgs/nixos> {
           configuration = {
-            imports = [ ./build-tools/tools/nix/mini-vault-module.nix ];
+            imports = [ ./build-tools/tools/nix/shared-host-vault-module.nix ];
             system.stateVersion = "24.11";
           };
         };
@@ -77,17 +77,79 @@ test("mini vault module evaluates as an importable reviewed host module", async 
   });
 });
 
-test("mini identity provider module evaluates as reviewed Keycloak defaults", async () => {
-  await runInTemp("mini-identity-provider-module-eval", async (tmp, $) => {
+test("shared-host vault module can augment an existing apps ACME host config", async () => {
+  await runInTemp("shared-host-vault-module-acme-eval", async (tmp, $) => {
     const expr = `
       let
         system = import <nixpkgs/nixos> {
           configuration = {
-            imports = [ ./build-tools/tools/nix/mini-identity-provider-module.nix ];
+            imports = [ ./build-tools/tools/nix/shared-host-vault-module.nix ];
+            system.stateVersion = "24.11";
+            security.acme.certs."apps.kilty.io" = {
+              domain = "*.apps.kilty.io";
+              extraDomainNames = [ "apps.kilty.io" ];
+              dnsProvider = "route53";
+              credentialsFile = "/root/aws-credentials";
+            };
+            deploymentHost.vault = {
+              address = "0.0.0.0:8200";
+              useAppsAcmeCertificate = true;
+              openFirewall = true;
+              addLocalHostname = true;
+              apiAddress = "https://secrets.apps.kilty.io:8200";
+              clusterAddress = "https://vault-1.apps.kilty.io:8201";
+              listenerExtraConfig = "tls_min_version = \\"tls12\\"";
+            };
+          };
+        };
+      in {
+        address = system.config.services.vault.address;
+        tlsCertFile = system.config.services.vault.tlsCertFile;
+        tlsKeyFile = system.config.services.vault.tlsKeyFile;
+        extraConfig = system.config.services.vault.extraConfig;
+        listenerExtraConfig = system.config.services.vault.listenerExtraConfig;
+        acmeGroup = system.config.security.acme.certs."apps.kilty.io".group;
+        acmeMembers = system.config.users.groups.apps-acme.members;
+        firewallPorts = system.config.networking.firewall.allowedTCPPorts;
+        localHosts = system.config.networking.hosts."127.0.0.1";
+      }
+    `;
+    const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;
+    const out = JSON.parse(String(stdout || "{}")) as {
+      address: string;
+      tlsCertFile: string;
+      tlsKeyFile: string;
+      extraConfig: string;
+      listenerExtraConfig: string;
+      acmeGroup: string;
+      acmeMembers: string[];
+      firewallPorts: number[];
+      localHosts: string[];
+    };
+    assert.equal(out.address, "0.0.0.0:8200");
+    assert.match(out.tlsCertFile, /\/var\/lib\/acme\/apps\.kilty\.io\/fullchain\.pem$/);
+    assert.match(out.tlsKeyFile, /\/var\/lib\/acme\/apps\.kilty\.io\/key\.pem$/);
+    assert.match(out.extraConfig, /api_addr = "https:\/\/secrets\.apps\.kilty\.io:8200"/);
+    assert.match(out.extraConfig, /cluster_addr = "https:\/\/vault-1\.apps\.kilty\.io:8201"/);
+    assert.match(out.listenerExtraConfig, /tls_min_version = "tls12"/);
+    assert.equal(out.acmeGroup, "apps-acme");
+    assert.deepEqual(out.acmeMembers, ["vault"]);
+    assert.deepEqual(out.firewallPorts, [8200]);
+    assert.deepEqual(out.localHosts, ["secrets.apps.kilty.io"]);
+  });
+});
+
+test("shared-host identity provider module evaluates as reviewed Keycloak defaults", async () => {
+  await runInTemp("shared-host-identity-provider-module-eval", async (tmp, $) => {
+    const expr = `
+      let
+        system = import <nixpkgs/nixos> {
+          configuration = {
+            imports = [ ./build-tools/tools/nix/shared-host-identity-provider-module.nix ];
             system.stateVersion = "24.11";
           };
         };
-        host = system.config.bucknix.mini.identityProvider.hostname;
+        host = system.config.deploymentHost.identityProvider.hostname;
         vhost = system.config.services.nginx.virtualHosts.\${host};
       in {
         enabled = system.config.services.keycloak.enable;
@@ -130,7 +192,7 @@ test("mini identity provider module evaluates as reviewed Keycloak defaults", as
     assert.equal(out.httpHost, "127.0.0.1");
     assert.equal(out.httpPort, 8081);
     assert.equal(out.databaseType, "postgresql");
-    assert.equal(out.passwordFile, "/var/lib/mini-secrets/keycloak-db-password");
+    assert.equal(out.passwordFile, "/var/lib/deployment-host-secrets/keycloak-db-password");
     assert.equal(out.initialAdminPassword, null);
     assert.equal(out.nginxEnabled, true);
     assert.equal(out.forceSSL, true);

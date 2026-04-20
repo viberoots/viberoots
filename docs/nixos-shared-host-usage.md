@@ -70,9 +70,9 @@ For a fresh `mini` install, follow this exact order:
 
 1. run the server install on `mini`
 2. optionally import the reviewed service modules from
-   `/srv/common/build-tools/tools/nix/mini-identity-provider-module.nix`,
-   `/srv/common/build-tools/tools/nix/mini-postgres-module.nix` and
-   `/srv/common/build-tools/tools/nix/mini-vault-module.nix` when you want
+   `/srv/common/build-tools/tools/nix/shared-host-identity-provider-module.nix`,
+   `/srv/common/build-tools/tools/nix/shared-host-postgres-module.nix` and
+   `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix` when you want
    repo-managed local identity-provider, Postgres, and Vault services on `mini`
 3. wire `/etc/nixos/bucknix/nixos-shared-host/default.nix` into the
    authoritative NixOS config and apply it with `sudo nixos-rebuild switch`
@@ -109,9 +109,16 @@ instructions live in
 If you want `mini` itself to run the local services, the reviewed importable
 starting modules live here:
 
-- `/srv/common/build-tools/tools/nix/mini-postgres-module.nix`
-- `/srv/common/build-tools/tools/nix/mini-vault-module.nix`
-- `/srv/common/build-tools/tools/nix/mini-identity-provider-module.nix`
+- `/srv/common/build-tools/tools/nix/shared-host-postgres-module.nix`
+- `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix`
+- `/srv/common/build-tools/tools/nix/shared-host-identity-provider-module.nix`
+
+On the current `mini` host shape, those modules augment an existing
+configuration that already owns nginx, wildcard ACME, firewall lists, and DNS
+rewrites. Use `deploymentHost.vault.useAppsAcmeCertificate = true` for direct
+Vault TLS on the existing `*.apps.kilty.io` certificate, and set the
+identity-provider `manageNginx`, `manageAcme`, and `openFirewall` flags to
+`false` when adding a host-owned `identity.apps.kilty.io` nginx vhost.
 
 Use that runbook when you need to:
 

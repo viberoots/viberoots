@@ -9300,7 +9300,7 @@ consumed by the JWT-first Vault credential provider from PR-69.
 ### Scope & Changes
 
 - Add an importable NixOS module, for example:
-  - `build-tools/tools/nix/mini-identity-provider-module.nix`
+  - `build-tools/tools/nix/shared-host-identity-provider-module.nix`
 - Model the Keycloak defaults currently documented in the Vault bootstrap runbook:
   - hostname default for `identity.apps.kilty.io`
   - loopback HTTP listener for reverse proxying

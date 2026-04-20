@@ -23,9 +23,9 @@ itself.
 For repo-managed local Vault support on `mini`, the reviewed optional service
 modules live at:
 
-- `/srv/common/build-tools/tools/nix/mini-identity-provider-module.nix`
-- `/srv/common/build-tools/tools/nix/mini-postgres-module.nix`
-- `/srv/common/build-tools/tools/nix/mini-vault-module.nix`
+- `/srv/common/build-tools/tools/nix/shared-host-identity-provider-module.nix`
+- `/srv/common/build-tools/tools/nix/shared-host-postgres-module.nix`
+- `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix`
 
 The Vault runbook shows how to use the identity-provider module and the
 reviewed `deploy-vault-jwt` helper when `mini` mints client-credentials
@@ -230,8 +230,8 @@ Status field meanings:
 If you also want `mini` itself to run local Postgres and Vault services, the
 repo now includes reviewed importable NixOS modules:
 
-- `/srv/common/build-tools/tools/nix/mini-postgres-module.nix`
-- `/srv/common/build-tools/tools/nix/mini-vault-module.nix`
+- `/srv/common/build-tools/tools/nix/shared-host-postgres-module.nix`
+- `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix`
 
 Use these when the host keeps a checkout of this repo at `/srv/common` and you
 want the service definitions versioned with the rest of the deployment system.
@@ -245,8 +245,8 @@ Example `configuration.nix` wiring:
 imports = [
   ./hardware-configuration.nix
   /etc/nixos/bucknix/nixos-shared-host/default.nix
-  /srv/common/build-tools/tools/nix/mini-postgres-module.nix
-  /srv/common/build-tools/tools/nix/mini-vault-module.nix
+  /srv/common/build-tools/tools/nix/shared-host-postgres-module.nix
+  /srv/common/build-tools/tools/nix/shared-host-vault-module.nix
 ];
 ```
 
@@ -256,21 +256,55 @@ Example `flake.nix` wiring:
 modules = [
   ./configuration.nix
   /etc/nixos/bucknix/nixos-shared-host/default.nix
-  /srv/common/build-tools/tools/nix/mini-postgres-module.nix
-  /srv/common/build-tools/tools/nix/mini-vault-module.nix
+  /srv/common/build-tools/tools/nix/shared-host-postgres-module.nix
+  /srv/common/build-tools/tools/nix/shared-host-vault-module.nix
 ];
 ```
 
 What these modules do:
 
-- `mini-postgres-module.nix`
+- `shared-host-postgres-module.nix`
   Enables local PostgreSQL on `mini`, pins the reviewed package to
   `pkgs.postgresql_16`, binds it to `127.0.0.1:5432`, ensures the `deployctl`
   database exists, and ensures a matching `deployctl` role owns it.
-- `mini-vault-module.nix`
-  Enables local Vault on `mini`, allows the unfree `vault` package, binds Vault
-  to `127.0.0.1:8200`, uses the built-in `raft` storage backend at
-  `/var/lib/vault`, and enables the local UI.
+- `shared-host-vault-module.nix`
+  Enables local Vault on `mini`, allows the unfree `vault` package, uses the
+  built-in `raft` storage backend at `/var/lib/vault`, and enables the local
+  UI. By default it binds Vault to `127.0.0.1:8200`; when the existing host
+  config already owns the `*.apps.kilty.io` wildcard ACME certificate, set
+  `deploymentHost.vault.useAppsAcmeCertificate = true` and
+  `deploymentHost.vault.address = "0.0.0.0:8200"` to run Vault as the direct TLS
+  endpoint for `https://secrets.apps.kilty.io:8200`.
+
+For hosts shaped like the current monolithic `mini` configuration, keep nginx,
+ACME, DNS rewrites, and firewall list composition in the host file. Import the
+modules, then set module ownership flags so they augment rather than replace the
+host-owned config:
+
+```nix
+deploymentHost.vault = {
+  address = "0.0.0.0:8200";
+  useAppsAcmeCertificate = true;
+  openFirewall = false;
+  addLocalHostname = true;
+  apiAddress = "https://secrets.apps.kilty.io:8200";
+  clusterAddress = "https://vault-1.apps.kilty.io:8201";
+};
+
+deploymentHost.identityProvider = {
+  hostname = "identity.apps.kilty.io";
+  keycloakHttpPort = 8081;
+  manageNginx = false;
+  manageAcme = false;
+  openFirewall = false;
+};
+```
+
+With that shape, add `8200` to the existing
+`networking.firewall.allowedTCPPorts` expression and add a host-owned nginx
+virtual host for `identity.apps.kilty.io` that uses the existing
+`apps.kilty.io` wildcard certificate. The Vault runbook has the full
+copy/paste snippets for both pieces.
 
 What these modules do not do:
 

@@ -309,12 +309,31 @@ other `let` bindings:
 ```nix
 vaultDomain = "secrets.apps.kilty.io";
 vaultNodeDomain = "vault-1.apps.kilty.io";
+identityDomain = "identity.apps.kilty.io";
+keycloakHttpPort = 8081;
 appsAcmeCertName = "apps.kilty.io";
 appsAcmeCertDir = config.security.acme.certs.${appsAcmeCertName}.directory;
 ```
 
-Then add Vault to the reviewed host configuration. In the existing
-`environment.systemPackages` list, add the Vault CLI package:
+Then import the reviewed Vault module from the repo checkout once. The import
+makes the `deploymentHost.vault.*` options available in the same NixOS module
+graph:
+
+```nix
+imports = [
+  # Existing imports stay here.
+  /srv/common/build-tools/tools/nix/shared-host-vault-module.nix
+];
+```
+
+The import can live in `configuration.nix`, in the flake `modules` list, or in
+another local module that your host imports. Do not also declare a parallel
+`services.vault` block unless you are intentionally overriding a specific option
+from the module.
+
+In the existing `environment.systemPackages` list, keep or add the Vault CLI
+package. Using `config.services.vault.package` keeps the CLI aligned with the
+service package selected by the module:
 
 ```nix
 environment.systemPackages = with pkgs; [
@@ -323,39 +342,36 @@ environment.systemPackages = with pkgs; [
 ];
 ```
 
-Add the Vault service and keep the package allowlist narrow:
+Configure the module for direct public TLS on the existing wildcard certificate:
 
 ```nix
-{
-  # HashiCorp Vault is unfree in current nixpkgs. Keep this narrow instead of
-  # enabling all unfree packages for the host.
-  nixpkgs.config.allowUnfreePredicate = pkg:
-    builtins.elem (lib.getName pkg) [ "vault" ];
+deploymentHost.vault = {
+  enable = true;
+  address = "0.0.0.0:8200";
+  storageBackend = "raft";
+  storagePath = "/var/lib/vault";
+  useAppsAcmeCertificate = true;
+  appsAcmeCertName = appsAcmeCertName;
+  appsAcmeGroup = "apps-acme";
+  publicHostname = vaultDomain;
+  addLocalHostname = true;
+  apiAddress = "https://${vaultDomain}:8200";
+  clusterAddress = "https://${vaultNodeDomain}:8201";
+  listenerExtraConfig = ''
+    tls_min_version = "tls12"
+  '';
 
-  services.vault = {
-    enable = true;
-    storageBackend = "raft";
-    storagePath = "/var/lib/vault";
-    address = "0.0.0.0:8200";
-    tlsCertFile = "${appsAcmeCertDir}/fullchain.pem";
-    tlsKeyFile = "${appsAcmeCertDir}/key.pem";
-    listenerExtraConfig = ''
-      tls_min_version = "tls12"
-    '';
-    extraConfig = ''
-      ui = true
-      disable_mlock = false
-      api_addr = "https://${vaultDomain}:8200"
-      cluster_addr = "https://${vaultNodeDomain}:8201"
-    '';
-  };
-
-  systemd.services.vault = {
-    after = [ "acme-${appsAcmeCertName}.service" ];
-    wants = [ "acme-${appsAcmeCertName}.service" ];
-  };
-}
+  # The pasted host already extends allowedTCPPorts manually. Leave this false
+  # there and add 8200 to that existing expression instead of creating a second
+  # firewall owner.
+  openFirewall = false;
+};
 ```
+
+That is the complete Vault service wiring for the recommended module path. The
+remaining host-owned changes below are shared concerns that this host already
+owns: the composed firewall list, the shared ACME reader group, and the host
+DNS/rewrite shape.
 
 In the real host file, extend the existing firewall expression rather than
 defining `networking.firewall.allowedTCPPorts` a second time. With the current
@@ -507,6 +523,11 @@ on Vault:
 ```nix
 networking.hosts."127.0.0.1" = [ vaultDomain ];
 ```
+
+If the host already has an AdGuard rewrite for `"*.apps.kilty.io"` to `myAddr`,
+that covers both `secrets.apps.kilty.io` and `identity.apps.kilty.io` for LAN
+clients. Keep the host-local mapping anyway when you want bootstrap commands run
+on `mini` itself to use the same TLS name as every other client.
 
 ## Step 1: Point The CLI At Vault
 
@@ -691,6 +712,20 @@ Enable the JWT auth method:
 vault auth enable jwt
 ```
 
+If this returns `permission denied`, TLS and routing are already working; the
+current shell is just using a token that cannot manage `sys/auth/*`. Set
+`VAULT_TOKEN` to the bootstrap root token from Step 2 or to another operator
+token with `sudo` capability on `sys/auth/*`, then retry:
+
+```bash
+export VAULT_TOKEN='<generated-initial-root-token-or-admin-token>'
+vault token lookup
+vault auth enable jwt
+```
+
+Do not use `VAULT_SKIP_VERIFY=true` to solve `permission denied`. That setting
+only bypasses certificate verification and does not grant Vault permissions.
+
 Configure the issuer and audience model for your CI or workload identity
 provider.
 
@@ -703,10 +738,10 @@ both Vault and deployment runners can reach. The reviewed shape is:
 - deployment client id: `deployment-runner`
 - deployment role: `deploy-pleomino-read`
 
-Run the identity provider on `mini` as an OIDC issuer. Keycloak is the most
-practical default when `mini` itself needs to mint non-interactive machine
-tokens because it supports confidential clients and client-credentials token
-flows. Dex is lighter, but use it only when it brokers to another workload
+Run the identity provider on the shared host as an OIDC issuer. Keycloak is the
+most practical default when the host itself needs to mint non-interactive
+machine tokens because it supports confidential clients and client-credentials
+token flows. Dex is lighter, but use it only when it brokers to another workload
 identity source or when you add a reviewed non-interactive token-minting path.
 
 The realm name is intentionally `deployments`, not the repository or product
@@ -714,11 +749,11 @@ name. If the project is renamed later, keep the issuer stable unless you are
 also ready to update Vault's JWT config, the Vault role bindings, and every
 deployment runner that mints tokens.
 
-### Step 5A: Add Keycloak To The `mini` Flake
+### Step 5A: Add Keycloak To The Existing Host Config
 
-Host-level requirements for the `mini` identity provider:
+Host-level requirements for the identity provider:
 
-- DNS for `identity.apps.kilty.io` points at `mini`.
+- DNS for `identity.apps.kilty.io` points at the shared host.
 - TLS for `identity.apps.kilty.io` is managed declaratively, like the Vault
   hostnames in this runbook.
 - The OIDC issuer metadata is available at:
@@ -728,68 +763,70 @@ Host-level requirements for the `mini` identity provider:
   `https://identity.apps.kilty.io/realms/deployments`.
 
 Use the reviewed importable module from the repo checkout instead of copying
-Keycloak service config into the private host flake:
+Keycloak service config into the private host file. In the current monolithic
+host shape, keep the existing `services.nginx`, `security.acme`, AdGuard
+rewrites, and `networking.firewall.allowedTCPPorts` expressions as the owners.
+Import the identity-provider module once, configure
+`deploymentHost.identityProvider` with its nginx, ACME, and firewall ownership
+disabled, and add one host-owned vhost:
 
 ```nix
 {
   imports = [
-    /srv/common/build-tools/tools/nix/mini-identity-provider-module.nix
+    # Existing imports stay here.
+    /srv/common/build-tools/tools/nix/shared-host-identity-provider-module.nix
   ];
 
-  bucknix.mini.identityProvider = {
-    hostname = "identity.apps.kilty.io";
-    acmeEmail = "ops@example.com";
-    keycloakHttpPort = 8081;
-    databasePasswordFile = "/var/lib/mini-secrets/keycloak-db-password";
+  deploymentHost.identityProvider = {
+    hostname = identityDomain;
+    keycloakHttpPort = keycloakHttpPort;
+    databasePasswordFile = "/var/lib/deployment-host-secrets/keycloak-db-password";
 
-    # Set these to false when the existing host config already owns nginx,
-    # certificate integration, or firewall ports.
-    manageNginx = true;
-    manageAcme = true;
-    openFirewall = true;
+    # The existing host file already owns nginx, ACME, and firewall ports.
+    manageNginx = false;
+    manageAcme = false;
+    openFirewall = false;
   };
-}
-```
 
-The module enables Keycloak with a local PostgreSQL database, binds the HTTP
-listener to `127.0.0.1`, wires the nginx virtual host for reverse proxying, and
-keeps the database password file as an out-of-store path. It does not set a
-bootstrap admin password or commit client secrets; create those through the
-Keycloak bootstrap/admin flow and rotate them immediately after first use.
-
-If the existing `mini` host module already configures nginx, ACME defaults, or
-firewall ports, set the relevant `bucknix.mini.identityProvider.*` ownership
-flags to `false` and merge only the host-owned pieces in that config.
-
-Wire the module into the host flake. In a minimal flake this looks like:
-
-```nix
-{
-  description = "mini host";
-
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-
-  outputs = { nixpkgs, ... }: {
-    nixosConfigurations.mini = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
-      modules = [
-        ./configuration.nix
-        /srv/common/build-tools/tools/nix/mini-identity-provider-module.nix
-      ];
+  services.nginx.virtualHosts.${identityDomain} = {
+    useACMEHost = "apps.kilty.io";
+    onlySSL = true;
+    locations."/" = {
+      proxyPass = "http://127.0.0.1:${toString keycloakHttpPort}";
+      proxyWebsockets = true;
+      extraConfig = ''
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header X-Forwarded-Proto https;
+      '';
     };
   };
 }
 ```
 
-Before rebuilding, create the database password file on `mini`. Keep this file
+The module enables Keycloak with a local PostgreSQL database, binds the HTTP
+listener to `127.0.0.1`, and keeps the database password file as an out-of-store
+path. It does not own nginx in this host shape, set a bootstrap admin password,
+or commit client secrets; create those through the Keycloak bootstrap/admin flow
+and rotate them immediately after first use.
+
+Do not also add `identity.apps.kilty.io` to the `security.acme.certs."apps.kilty.io".extraDomainNames`
+list. The existing wildcard certificate for `*.apps.kilty.io` already covers
+it, and duplicate exact names can make ACME reject the order. If the existing
+AdGuard rewrites include `"*.apps.kilty.io"`, no additional DNS rewrite is
+needed for the LAN path.
+
+Before rebuilding, create the database password file on the host. Keep this file
 out of git and replace this manual step with the host's reviewed secret
 management system when one is available:
 
 ```bash
-sudo install -d -m 0700 /var/lib/mini-secrets
+sudo install -d -m 0700 /var/lib/deployment-host-secrets
 openssl rand -base64 36 \
-  | sudo tee /var/lib/mini-secrets/keycloak-db-password >/dev/null
-sudo chmod 0600 /var/lib/mini-secrets/keycloak-db-password
+  | sudo tee /var/lib/deployment-host-secrets/keycloak-db-password >/dev/null
+sudo chmod 0600 /var/lib/deployment-host-secrets/keycloak-db-password
 ```
 
 Apply the host configuration:

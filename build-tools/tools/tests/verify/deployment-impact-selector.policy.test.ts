@@ -41,19 +41,19 @@ test("deployment-impact: deployment taxonomy-only edits stay deployment-only", (
   assert.equal(result.diagnostics.reason, "deployment-owned-build-system-path-changed");
 });
 
-test("deployment-impact: reviewed mini service modules stay deployment-only", () => {
+test("deployment-impact: reviewed shared-host service modules stay deployment-only", () => {
   const result = resolveDeploymentImpactSelection(
     [
-      "build-tools/tools/nix/mini-postgres-module.nix",
-      "build-tools/tools/nix/mini-vault-module.nix",
+      "build-tools/tools/nix/shared-host-postgres-module.nix",
+      "build-tools/tools/nix/shared-host-vault-module.nix",
     ],
     { deploymentTargetLabels },
   );
 
   assert.equal(result.mode, "deployment-only");
   assert.deepEqual(result.diagnostics.deploymentOwnedPaths, [
-    "build-tools/tools/nix/mini-postgres-module.nix",
-    "build-tools/tools/nix/mini-vault-module.nix",
+    "build-tools/tools/nix/shared-host-postgres-module.nix",
+    "build-tools/tools/nix/shared-host-vault-module.nix",
   ]);
   assert.deepEqual(result.diagnostics.fullBuildSystemTriggerPaths, []);
   assert.equal(result.diagnostics.reason, "deployment-owned-build-system-path-changed");

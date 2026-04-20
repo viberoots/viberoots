@@ -4,16 +4,31 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
-test("Vault bootstrap runbook uses reviewed mini IdP module and JWT helper", async () => {
+test("Vault bootstrap runbook uses reviewed shared-host IdP module and JWT helper", async () => {
   const doc = await fsp.readFile(
     path.join(process.cwd(), "docs", "vault-production-bootstrap.md"),
     "utf8",
   );
-  assert.match(doc, /mini-identity-provider-module\.nix/);
-  assert.match(doc, /bucknix\.mini\.identityProvider/);
+  assert.match(doc, /shared-host-identity-provider-module\.nix/);
+  assert.match(doc, /deploymentHost\.identityProvider/);
+  assert.match(doc, /deploymentHost\.vault/);
+  assert.match(doc, /complete Vault service wiring for the recommended module path/);
+  assert.doesNotMatch(doc, /bucknix\.mini/);
+  assert.doesNotMatch(doc, /mini-(identity-provider|postgres|vault)-module\.nix/);
+  assert.doesNotMatch(doc, /If you do not import the module/);
+  assert.doesNotMatch(doc, /minimal host where/);
+  assert.doesNotMatch(doc, /manageNginx = true/);
+  assert.doesNotMatch(doc, /manageAcme = true/);
+  assert.doesNotMatch(doc, /openFirewall = true/);
+  assert.doesNotMatch(doc, /Add Keycloak To The `mini` Flake/);
   assert.match(doc, /deploy-vault-jwt \\/);
   assert.match(doc, /--client-secret-env BNX_DEPLOYER_CLIENT_SECRET/);
   assert.match(doc, /--expect-claim deployment_environment=mini/);
+  assert.match(doc, /permission denied[\s\S]*sys\/auth\/\*/);
+  assert.match(doc, /useAppsAcmeCertificate = true/);
+  assert.match(doc, /manageNginx = false/);
+  assert.match(doc, /useACMEHost = "apps\.kilty\.io"/);
+  assert.match(doc, /identity\.apps\.kilty\.io[\s\S]*wildcard certificate/);
   assert.doesNotMatch(doc, /protocol\/openid-connect\/token" \\/);
   assert.doesNotMatch(doc, /client_secret=\$BNX_DEPLOYER_CLIENT_SECRET/);
   assert.doesNotMatch(doc, /initialAdminPassword = "replace-after-first-login"/);

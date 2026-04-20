@@ -127,12 +127,12 @@ test("nixos shared host usage guide stays present as the reviewed operator-facin
   );
   assert.match(
     usageDoc,
-    /mini-postgres-module\.nix/,
+    /shared-host-postgres-module\.nix/,
     "usage guide must point operators at the reviewed importable Postgres module",
   );
   assert.match(
     usageDoc,
-    /mini-identity-provider-module\.nix/,
+    /shared-host-identity-provider-module\.nix/,
     "usage guide must point operators at the reviewed importable identity-provider module",
   );
   assert.match(
@@ -142,7 +142,7 @@ test("nixos shared host usage guide stays present as the reviewed operator-facin
   );
   assert.match(
     setupDoc,
-    /mini-identity-provider-module\.nix/,
+    /shared-host-identity-provider-module\.nix/,
     "setup guide must document the reviewed importable identity-provider module",
   );
   assert.match(
@@ -152,12 +152,12 @@ test("nixos shared host usage guide stays present as the reviewed operator-facin
   );
   assert.match(
     setupDoc,
-    /mini-postgres-module\.nix/,
+    /shared-host-postgres-module\.nix/,
     "setup guide must document the reviewed importable Postgres module",
   );
   assert.match(
     setupDoc,
-    /mini-vault-module\.nix/,
+    /shared-host-vault-module\.nix/,
     "setup guide must document the reviewed importable Vault module",
   );
   assert.match(usageDoc, /Deployment Contract/, "usage guide must link to the deployment contract");
