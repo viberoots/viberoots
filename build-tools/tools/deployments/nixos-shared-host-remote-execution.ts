@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { scrubDeploymentSecretEnv } from "./deployment-secret-env.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import {
@@ -66,7 +67,7 @@ async function runCommand(argv: string[]): Promise<CommandResult> {
     const { stdout, stderr } = await execFileAsync(file, args, {
       encoding: "utf8",
       maxBuffer: TRANSPORT_MAX_BUFFER,
-      env: process.env,
+      env: scrubDeploymentSecretEnv(),
     });
     return { exitCode: 0, stdout: String(stdout || ""), stderr: String(stderr || "") };
   } catch (error: any) {

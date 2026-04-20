@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloudflare-pages-control-plane.ts";
-import { VAULT_AUTH_METHOD_ENV } from "../../deployments/deployment-secret-vault-credentials.ts";
+import { activateDeploymentSecretContext } from "../../deployments/deployment-secret-context.ts";
 import { deploymentRequirementFixture } from "./deployment-metadata.fixture.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
@@ -69,12 +69,16 @@ test("cloudflare-pages deploy reads Vault directly on the reviewed runtime path"
     process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT = fake.publishRoot;
     process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_LOG = fake.logPath;
     process.env.BNX_CLOUDFLARE_PAGES_WRANGLER_BIN = path.join(fake.binDir, "wrangler");
-    process.env.VAULT_ADDR = vault.addr;
-    process.env[VAULT_AUTH_METHOD_ENV] = "jwt";
-    process.env.BNX_VAULT_JWT_ROLE = "deploy-pleomino-read";
-    process.env.BNX_VAULT_JWT = "cloudflare.workload.jwt";
-    delete process.env.VAULT_TOKEN;
     delete process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
+    const restoreSecretContext = activateDeploymentSecretContext({
+      kind: "vault",
+      credential: {
+        kind: "jwt",
+        addr: vault.addr,
+        role: "deploy-pleomino-read",
+        workloadJwt: "cloudflare.workload.jwt",
+      },
+    });
     try {
       const result = await submitCloudflarePagesControlPlaneDeploy({
         workspaceRoot: tmp,
@@ -93,6 +97,7 @@ test("cloudflare-pages deploy reads Vault directly on the reviewed runtime path"
       assert.equal(record.finalOutcome, "succeeded");
       assert.equal(record.admittedContext.admittedSecretReferences[0].resolvedVersion, "11");
     } finally {
+      restoreSecretContext();
       process.env = originalEnv;
       await server.close();
       await vault.close();

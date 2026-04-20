@@ -9,11 +9,6 @@ import {
   DEFAULT_DEPLOYMENT_CLIENT_SECRET_ENV,
   prepareDeploymentVaultRuntime,
 } from "../../deployments/deployment-vault-runtime.ts";
-import {
-  VAULT_AUTH_METHOD_ENV,
-  VAULT_JWT_FILE_ENV,
-  VAULT_JWT_ROLE_ENV,
-} from "../../deployments/deployment-secret-vault-credentials.ts";
 import { decodeJwtPayload } from "../../deployments/deploy-vault-jwt-claims.ts";
 import {
   cloudflarePagesApiTokenRequirements,
@@ -46,20 +41,23 @@ test("deployment Vault runtime mints a fresh JWT from deployment-derived claims"
       env,
     });
     assert.equal(result.minted, true);
-    assert.equal(env.VAULT_ADDR, "https://vault.example.net:8200");
-    assert.equal(env[VAULT_AUTH_METHOD_ENV], "jwt");
-    assert.equal(env[VAULT_JWT_ROLE_ENV], "deploy-pleomino-read");
-    assert.equal(
-      env[VAULT_JWT_FILE_ENV],
-      path.join(tmp, ".local", "deploy-vault", "deploy-pleomino-read.jwt"),
-    );
-    assert.equal((await fsp.stat(env[VAULT_JWT_FILE_ENV]!)).mode & 0o777, 0o600);
-    const claims = decodeJwtPayload((await fsp.readFile(env[VAULT_JWT_FILE_ENV]!, "utf8")).trim());
+    assert.equal(env.VAULT_ADDR, undefined);
+    assert.equal(env.BNX_VAULT_AUTH_METHOD, undefined);
+    assert.equal(env.BNX_VAULT_JWT_ROLE, undefined);
+    assert.equal(env.BNX_VAULT_JWT_FILE, undefined);
+    assert.equal(result.secretContext?.kind, "vault");
+    const credential =
+      result.secretContext?.kind === "vault" ? result.secretContext.credential : undefined;
+    assert.equal(credential?.kind, "jwt");
+    assert.equal(credential?.addr, "https://vault.example.net:8200");
+    assert.equal(credential?.role, "deploy-pleomino-read");
+    const claims = decodeJwtPayload(credential?.kind === "jwt" ? credential.workloadJwt : "");
     assert.equal(claims.deployment_environment, "mini");
     assert.equal(claims.repository, "kiltyj/bucknix-fresh");
     assert.equal(claims.azp, "deployment-runner");
     await cleanupDeploymentVaultRuntime(result);
-    await assert.rejects(() => fsp.stat(env[VAULT_JWT_FILE_ENV]!), { code: "ENOENT" });
+    assert.equal(credential?.kind === "jwt" ? credential.workloadJwt : "missing", "");
+    assert.equal(result.secretContext, undefined);
   } finally {
     await server.close();
     await fsp.rm(tmp, { recursive: true, force: true });
@@ -71,7 +69,6 @@ test("deployment Vault runtime allows env and flags to override metadata", async
     claims: { deployment_environment: "override-runner" },
   });
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "deployment-vault-runtime-override-"));
-  const jwtFile = path.join(tmp, "override.jwt");
   const env: NodeJS.ProcessEnv = {
     ALT_CLIENT_SECRET: "super-secret",
   };
@@ -89,13 +86,14 @@ test("deployment Vault runtime allows env and flags to override metadata", async
       inputs: {
         deploymentEnvironment: "override-runner",
         clientSecretEnv: "ALT_CLIENT_SECRET",
-        jwtFile,
       },
       env,
     });
     assert.equal(result.minted, true);
-    assert.equal(env[VAULT_JWT_FILE_ENV], jwtFile);
-    const claims = decodeJwtPayload((await fsp.readFile(jwtFile, "utf8")).trim());
+    assert.equal(env.BNX_VAULT_JWT_FILE, undefined);
+    const credential =
+      result.secretContext?.kind === "vault" ? result.secretContext.credential : undefined;
+    const claims = decodeJwtPayload(credential?.kind === "jwt" ? credential.workloadJwt : "");
     assert.equal(claims.deployment_environment, "override-runner");
   } finally {
     await server.close();
@@ -103,19 +101,40 @@ test("deployment Vault runtime allows env and flags to override metadata", async
   }
 });
 
-test("deployment Vault runtime leaves explicit inline JWT auth untouched", async () => {
+test("deployment Vault runtime ignores stale ambient Vault auth variables", async () => {
   const env: NodeJS.ProcessEnv = {
-    VAULT_ADDR: "https://vault.example.net:8200",
-    BNX_VAULT_JWT: "pre.minted.jwt",
+    [DEFAULT_DEPLOYMENT_CLIENT_SECRET_ENV]: "super-secret",
+    VAULT_ADDR: "https://stale.example.invalid:8200",
+    BNX_VAULT_AUTH_METHOD: "token",
+    BNX_VAULT_JWT: "stale.jwt",
+    VAULT_TOKEN: "stale-token",
   };
-  const result = await prepareDeploymentVaultRuntime({
-    workspaceRoot: process.cwd(),
-    deployment: cloudflarePagesDeploymentFixture({
-      secretRequirements: cloudflarePagesApiTokenRequirements(),
-    }),
-    env,
+  const server = await startFakeOidcServer({
+    claims: { deployment_environment: "mini" },
   });
-  assert.equal(result.minted, false);
-  assert.equal(env[VAULT_AUTH_METHOD_ENV], undefined);
-  assert.equal(env[VAULT_JWT_ROLE_ENV], undefined);
+  try {
+    const result = await prepareDeploymentVaultRuntime({
+      workspaceRoot: process.cwd(),
+      deployment: cloudflarePagesDeploymentFixture({
+        secretRequirements: cloudflarePagesApiTokenRequirements(),
+        vaultRuntime: {
+          addr: "https://vault.example.net:8200",
+          oidcIssuer: server.issuer,
+          deploymentEnvironment: "mini",
+        },
+      }),
+      env,
+    });
+    assert.equal(result.minted, true);
+    assert.equal(env.BNX_VAULT_AUTH_METHOD, "token");
+    const credential =
+      result.secretContext?.kind === "vault" ? result.secretContext.credential : undefined;
+    assert.equal(
+      credential?.kind === "jwt" ? credential.addr : "",
+      "https://vault.example.net:8200",
+    );
+    assert.notEqual(credential?.kind === "jwt" ? credential.workloadJwt : "", "stale.jwt");
+  } finally {
+    await server.close();
+  }
 });

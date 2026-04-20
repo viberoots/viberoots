@@ -14,9 +14,10 @@ Important current-repo reality:
   treating an exported fixture as the normal production secret source
 - normal deploys derive Vault address, issuer, audience, client id, role, and
   bound claims from deployment `vault_runtime` metadata, mint a fresh workload
-  JWT, and set the internal Vault JWT environment for the secret backend
-- `VAULT_TOKEN` is reserved for bootstrap, explicit break-glass, low-level test,
-  or debugging use with `BNX_VAULT_AUTH_METHOD=token`
+  JWT, and pass a typed in-memory secret context to the secret backend
+- workload JWTs and Vault tokens stay out of normal deploy environment
+  variables; `VAULT_TOKEN` remains only for manual Vault bootstrap/admin CLI
+  moments outside the deployment runtime
 - the exported JSON secret fixture path through
   `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
   remains available only for reviewed local, test, and bootstrap-oriented
@@ -1232,16 +1233,18 @@ deploy \
   --deployment-client-id deployment-runner \
   --deployment-environment mini \
   --deployment-client-secret-env BNX_DEPLOYER_CLIENT_SECRET \
-  --vault-jwt-role deploy-pleomino-read \
-  --vault-jwt-file "$PWD/.local/deploy-vault/deploy-pleomino-read.jwt"
+  --vault-jwt-role deploy-pleomino-read
 ```
 
 `deploy-vault-jwt` remains available for low-level smoke tests and debugging,
 but routine deploys should let the deploy front door mint the workload JWT so
 the token is always fresh.
 
-Use `BNX_VAULT_JWT` or `BNX_VAULT_JWT_FILE` directly only when a CI system
-already delivers the signed JWT. Do not set both.
+The normal deploy runtime does not accept `BNX_VAULT_JWT` or
+`BNX_VAULT_JWT_FILE` as ambient credential handoff. Later credential-source
+adapters may obtain short-lived JWT material from Jenkins, a human login flow,
+or a host secret store, but provider execution receives only the typed in-memory
+secret context.
 
 The issuer URL, client id, audience mapper, and deployment-derived bound claims
 must match the identity-provider configuration from Step 5 and the Vault role
@@ -1252,17 +1255,8 @@ expired JWT, wrong audience, wrong issuer, missing role binding, rejected bound
 claims, remote Vault connectivity, TLS trust, or DNS routing to the wrong Vault
 endpoint.
 
-For an explicit break-glass or low-level test run, an operator may use a
-pre-minted Vault token only by selecting the token provider:
-
-```bash
-export VAULT_ADDR='https://secrets.apps.kilty.io:8200'
-export BNX_VAULT_AUTH_METHOD=token
-export VAULT_TOKEN='replace-with-short-lived-break-glass-token'
-unset BNX_VAULT_JWT
-unset BNX_VAULT_JWT_FILE
-```
-
+For explicit break-glass or low-level tests, keep Vault tokens out of the
+normal deploy environment and use a reviewed in-memory token credential path.
 Do not use root tokens, long-lived Vault tokens, or reusable bootstrap
 credentials for normal deployments.
 
@@ -1334,12 +1328,15 @@ environment. Leave `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH` unset:
 export BNX_DEPLOYER_CLIENT_SECRET='<deployment-runner-client-secret>'
 unset BNX_DEPLOYMENT_SECRET_FIXTURE_PATH
 unset VAULT_TOKEN
+unset BNX_VAULT_JWT
+unset BNX_VAULT_JWT_FILE
+unset BNX_VAULT_AUTH_METHOD
 ```
 
 Then run the normal deployment flow. The deploy front door mints a fresh
-workload JWT from `vault_runtime`, sets `VAULT_ADDR`, `BNX_VAULT_AUTH_METHOD=jwt`,
-`BNX_VAULT_JWT_ROLE`, and `BNX_VAULT_JWT_FILE` for the in-process secret
-backend, and exchanges that JWT for a short-lived Vault token:
+workload JWT from `vault_runtime`, keeps it in a typed in-memory deployment
+secret context, and exchanges that JWT for a short-lived Vault token inside the
+secret resolver:
 
 ```bash
 deploy --deployment //projects/deployments/pleomino-staging:deploy

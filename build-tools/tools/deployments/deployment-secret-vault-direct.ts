@@ -6,18 +6,18 @@ import {
   type DeploymentSecretReference,
 } from "./deployment-secretspec.ts";
 import type { DeploymentSecretMaterial } from "./deployment-secret-runtime.ts";
-import { resolveVaultClientCredential } from "./deployment-secret-vault-credentials.ts";
+import {
+  resolveVaultClientCredential,
+  type VaultCredentialConfig,
+} from "./deployment-secret-vault-credentials.ts";
 import { requireVaultContractPath, vaultApiPath } from "./deployment-secret-vault-paths.ts";
-
-async function vaultEnv() {
-  return await resolveVaultClientCredential();
-}
 
 async function vaultRequest<T>(
   path: string,
+  credential: VaultCredentialConfig,
   query?: URLSearchParams,
 ): Promise<{ status: number; data?: T }> {
-  const env = await vaultEnv();
+  const env = await resolveVaultClientCredential(credential);
   const url = new URL(path, env.addr.endsWith("/") ? env.addr : `${env.addr}/`);
   if (query) url.search = query.toString();
   const response = await fetch(url, {
@@ -31,10 +31,12 @@ async function vaultRequest<T>(
 export async function resolveDirectVaultSecretReference(
   binding: DeploymentSecretContractBinding,
   targetScope: string,
+  credential: VaultCredentialConfig,
 ): Promise<DeploymentSecretAdmittedReference | undefined> {
   const { mount, secretPath } = requireVaultContractPath(binding.contractId);
   const response = await vaultRequest<{ data?: { current_version?: number } }>(
     vaultApiPath(binding.contractId, "metadata"),
+    credential,
   );
   if (response.status === 404) return undefined;
   const version = String(response.data?.data?.current_version || "").trim();
@@ -55,6 +57,7 @@ export async function resolveDirectVaultSecretReference(
 
 export async function acquireDirectVaultSecretReference(
   binding: DeploymentSecretReference,
+  credential: VaultCredentialConfig,
 ): Promise<DeploymentSecretMaterial> {
   const version = isDeploymentSecretAdmittedReference(binding)
     ? binding.resolvedVersion
@@ -63,6 +66,7 @@ export async function acquireDirectVaultSecretReference(
     data?: { data?: Record<string, unknown> };
   }>(
     vaultApiPath(binding.contractId, "data"),
+    credential,
     version ? new URLSearchParams({ version }) : undefined,
   );
   if (response.status === 404 || !response.data?.data?.data) {

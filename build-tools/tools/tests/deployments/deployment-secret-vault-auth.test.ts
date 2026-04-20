@@ -1,8 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import * as fsp from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import { test } from "node:test";
 import { createDeploymentSecretRuntime } from "../../deployments/deployment-secret-runtime.ts";
 import {
@@ -12,82 +9,16 @@ import {
 import {
   resetVaultCredentialCacheForTests,
   resolveVaultClientCredential,
-  resolveVaultCredentialConfig,
-  VAULT_AUTH_METHOD_ENV,
-  VAULT_JWT_ENV,
-  VAULT_JWT_FILE_ENV,
-  VAULT_JWT_ROLE_ENV,
+  type VaultCredentialConfig,
 } from "../../deployments/deployment-secret-vault-credentials.ts";
+import type { DeploymentSecretContext } from "../../deployments/deployment-secret-context.ts";
+import { scrubDeploymentSecretEnv } from "../../deployments/deployment-secret-env.ts";
 import { deploymentRequirementFixture } from "./deployment-metadata.fixture.ts";
 import { startFakeVaultServer } from "./vault.test-server.ts";
 
-const originalEnv = { ...process.env };
-
-function restoreVaultEnv() {
-  process.env = { ...originalEnv };
-  resetVaultCredentialCacheForTests();
+function jwtCredential(addr: string, role = "deploy-pleomino-read"): VaultCredentialConfig {
+  return { kind: "jwt", addr, role, workloadJwt: "signed.workload.jwt" };
 }
-
-test("Vault credential resolver selects JWT provider and rejects ambiguous auth", () => {
-  const config = resolveVaultCredentialConfig({
-    VAULT_ADDR: "https://vault.example.net:8200",
-    [VAULT_AUTH_METHOD_ENV]: "jwt",
-    [VAULT_JWT_ROLE_ENV]: "deploy-pleomino-read",
-    [VAULT_JWT_ENV]: "workload.jwt",
-  });
-  assert.equal(config.method, "jwt");
-  if (config.method === "jwt") assert.equal(config.role, "deploy-pleomino-read");
-  assert.throws(
-    () =>
-      resolveVaultCredentialConfig({
-        VAULT_ADDR: "https://vault.example.net:8200",
-        [VAULT_AUTH_METHOD_ENV]: "jwt",
-        [VAULT_JWT_ENV]: "workload.jwt",
-      }),
-    /BNX_VAULT_JWT_ROLE/,
-  );
-  assert.throws(
-    () =>
-      resolveVaultCredentialConfig({
-        VAULT_ADDR: "https://vault.example.net:8200",
-        [VAULT_AUTH_METHOD_ENV]: "jwt",
-        [VAULT_JWT_ROLE_ENV]: "deploy-pleomino-read",
-      }),
-    /BNX_VAULT_JWT/,
-  );
-  assert.throws(
-    () =>
-      resolveVaultCredentialConfig({
-        VAULT_ADDR: "https://vault.example.net:8200",
-        [VAULT_AUTH_METHOD_ENV]: "jwt",
-        [VAULT_JWT_ROLE_ENV]: "deploy-pleomino-read",
-        [VAULT_JWT_ENV]: "workload.jwt",
-        VAULT_TOKEN: "pre-minted",
-      }),
-    /ambiguous Vault auth configuration/,
-  );
-});
-
-test("Vault token override is available only through explicit token auth", () => {
-  assert.throws(
-    () =>
-      resolveVaultCredentialConfig({
-        VAULT_ADDR: "https://vault.example.net:8200",
-        VAULT_TOKEN: "break-glass-token",
-      }),
-    /BNX_VAULT_AUTH_METHOD=token/,
-  );
-  const config = resolveVaultCredentialConfig({
-    VAULT_ADDR: "https://vault.example.net:8200",
-    [VAULT_AUTH_METHOD_ENV]: "token",
-    VAULT_TOKEN: "break-glass-token",
-  });
-  assert.deepEqual(config, {
-    addr: "https://vault.example.net:8200",
-    method: "token",
-    token: "break-glass-token",
-  });
-});
 
 test("JWT login mints an in-memory token for direct Vault secret reads", async () => {
   const vault = await startFakeVaultServer(
@@ -99,11 +30,10 @@ test("JWT login mints an in-memory token for direct Vault secret reads", async (
     },
     { jwtAuth: { role: "deploy-pleomino-read", jwt: "signed.workload.jwt" } },
   );
-  process.env.VAULT_ADDR = vault.addr;
-  process.env[VAULT_AUTH_METHOD_ENV] = "jwt";
-  process.env[VAULT_JWT_ROLE_ENV] = "deploy-pleomino-read";
-  process.env[VAULT_JWT_ENV] = "signed.workload.jwt";
-  delete process.env.VAULT_TOKEN;
+  const secretContext: DeploymentSecretContext = {
+    kind: "vault",
+    credential: jwtCredential(vault.addr),
+  };
   try {
     const admittedReferences = await resolveDeploymentVaultAdmittedReferences({
       requirements: [
@@ -114,41 +44,83 @@ test("JWT login mints an in-memory token for direct Vault secret reads", async (
         }),
       ],
       targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+      secretContext,
     });
     const runtime = createDeploymentSecretRuntime({
-      backend: createDeploymentVaultSecretBackend(),
+      backend: createDeploymentVaultSecretBackend(secretContext),
       admittedReferences,
       targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
     });
     assert.equal((await runtime.enterStep("publish")).cloudflare_api_token, "jwt-vault-token");
   } finally {
-    restoreVaultEnv();
+    resetVaultCredentialCacheForTests();
     await vault.close();
   }
 });
 
-test("JWT source files and auth failures are explicit and fail closed", async () => {
-  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "deployment-vault-jwt-"));
-  const jwtFile = path.join(tmp, "workload.jwt");
-  await fsp.writeFile(jwtFile, "file.workload.jwt\n", "utf8");
+test("stale ambient Vault variables do not satisfy deployment secret resolution", async () => {
+  const originalEnv = { ...process.env };
+  process.env.VAULT_ADDR = "https://ambient.example.invalid";
+  process.env.BNX_VAULT_AUTH_METHOD = "token";
+  process.env.VAULT_TOKEN = "ambient-token";
+  try {
+    await assert.rejects(
+      async () =>
+        await resolveDeploymentVaultAdmittedReferences({
+          requirements: [
+            deploymentRequirementFixture({
+              name: "cloudflare_api_token",
+              step: "publish",
+              contractId: "secret://deployments/pleomino/cloudflare_api_token",
+            }),
+          ],
+          targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+        }),
+      /explicit deployment secret context/,
+    );
+  } finally {
+    process.env = originalEnv;
+  }
+});
+
+test("provider subprocess env scrubbing removes Vault and deployment secrets", () => {
+  const env = scrubDeploymentSecretEnv({
+    PATH: "/bin",
+    VAULT_ADDR: "https://vault.example.net",
+    VAULT_TOKEN: "vault-token",
+    BNX_VAULT_JWT: "workload.jwt",
+    BNX_VAULT_JWT_FILE: "/tmp/workload.jwt",
+    BNX_DEPLOYER_CLIENT_SECRET: "client-secret",
+    DEPLOYMENT_CLIENT_SECRET: "deployment-secret",
+  });
+  assert.equal(env.PATH, "/bin");
+  assert.equal(env.VAULT_ADDR, undefined);
+  assert.equal(env.VAULT_TOKEN, undefined);
+  assert.equal(env.BNX_VAULT_JWT, undefined);
+  assert.equal(env.BNX_VAULT_JWT_FILE, undefined);
+  assert.equal(env.BNX_DEPLOYER_CLIENT_SECRET, undefined);
+  assert.equal(env.DEPLOYMENT_CLIENT_SECRET, undefined);
+});
+
+test("JWT auth failures fail closed without exposing workload JWTs", async () => {
   const vault = await startFakeVaultServer(
     {},
     { jwtAuth: { role: "deploy", jwt: "accepted.jwt" } },
   );
-  process.env.VAULT_ADDR = vault.addr;
-  process.env[VAULT_AUTH_METHOD_ENV] = "jwt";
-  process.env[VAULT_JWT_ROLE_ENV] = "deploy";
-  process.env[VAULT_JWT_FILE_ENV] = jwtFile;
-  try {
-    await assert.rejects(
-      async () => await resolveVaultClientCredential(),
-      /expired JWT, audience, issuer, and claim bindings/,
-    );
-  } finally {
-    restoreVaultEnv();
-    await vault.close();
-    await fsp.rm(tmp, { recursive: true, force: true });
-  }
+  await assert.rejects(
+    async () =>
+      await resolveVaultClientCredential({
+        kind: "jwt",
+        addr: vault.addr,
+        role: "deploy",
+        workloadJwt: "rejected.workload.jwt",
+      }),
+    (error: any) =>
+      /expired JWT, audience, issuer, and claim bindings/.test(String(error?.message || "")) &&
+      !String(error?.message || "").includes("rejected.workload.jwt"),
+  );
+  resetVaultCredentialCacheForTests();
+  await vault.close();
 });
 
 test("JWT auth responses without a client token fail closed", async () => {
@@ -156,17 +128,16 @@ test("JWT auth responses without a client token fail closed", async () => {
     {},
     { jwtAuth: { role: "deploy", jwt: "accepted.jwt", missingClientToken: true } },
   );
-  process.env.VAULT_ADDR = vault.addr;
-  process.env[VAULT_AUTH_METHOD_ENV] = "jwt";
-  process.env[VAULT_JWT_ROLE_ENV] = "deploy";
-  process.env[VAULT_JWT_ENV] = "accepted.jwt";
-  try {
-    await assert.rejects(
-      async () => await resolveVaultClientCredential(),
-      /missing auth\.client_token/,
-    );
-  } finally {
-    restoreVaultEnv();
-    await vault.close();
-  }
+  await assert.rejects(
+    async () =>
+      await resolveVaultClientCredential({
+        kind: "jwt",
+        addr: vault.addr,
+        role: "deploy",
+        workloadJwt: "accepted.jwt",
+      }),
+    /missing auth\.client_token/,
+  );
+  resetVaultCredentialCacheForTests();
+  await vault.close();
 });

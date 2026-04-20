@@ -13,6 +13,7 @@ import {
   cleanupDeploymentVaultRuntime,
   prepareDeploymentVaultRuntime,
 } from "./deployment-vault-runtime.ts";
+import { activateDeploymentSecretContext } from "./deployment-secret-context.ts";
 import {
   isAppStoreConnectDeployment,
   isCloudflarePagesDeployment,
@@ -104,6 +105,7 @@ export async function runDeployCli(opts: {
     deployment,
     inputs: flags.vaultRuntimeInputs,
   });
+  const restoreSecretContext = activateDeploymentSecretContext(vaultRuntime.secretContext);
   try {
     if (isS3StaticDeployment(deployment)) {
       const { runS3StaticDeployFrontDoor } = await import("./s3-static-front-door.ts");
@@ -217,6 +219,7 @@ export async function runDeployCli(opts: {
       ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
     });
   } finally {
+    restoreSecretContext();
     await cleanupDeploymentVaultRuntime(vaultRuntime);
   }
 }

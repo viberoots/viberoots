@@ -209,13 +209,13 @@ Optional fields you may also see:
 For the reviewed production runtime path, use remote Vault with deployment-
 derived JWT auth. In normal deploys the front door reads the selected
 deployment's `vault_runtime` metadata, derives the Vault role and bound claims,
-mints a fresh workload JWT, then sets the internal `VAULT_ADDR`,
-`BNX_VAULT_AUTH_METHOD=jwt`, `BNX_VAULT_JWT_ROLE`, and `BNX_VAULT_JWT_FILE`
-values for the secret backend. Operators normally provide only the deployment
-client secret environment variable.
+mints a fresh workload JWT in memory, and passes a typed deployment secret
+context to the secret backend. Operators normally provide only the deployment
+client secret environment variable; workload JWTs and Vault tokens are not
+written to `.local/deploy-vault` and are not communicated through `process.env`.
 
-`VAULT_TOKEN` is only for explicit break-glass, low-level test, or debugging
-use with `BNX_VAULT_AUTH_METHOD=token`; it is not the normal production path.
+Stale ambient variables such as `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`,
+`BNX_VAULT_AUTH_METHOD`, and `VAULT_TOKEN` are not the normal runtime contract.
 
 For local development, isolated tests, or explicit bootstrap-oriented
 workflows, use the fixture override shown below.

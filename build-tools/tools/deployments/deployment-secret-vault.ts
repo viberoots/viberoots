@@ -16,7 +16,11 @@ import {
   acquireDirectVaultSecretReference,
   resolveDirectVaultSecretReference,
 } from "./deployment-secret-vault-direct.ts";
-import { hasVaultCredentialConfig } from "./deployment-secret-vault-credentials.ts";
+import {
+  deploymentSecretContext,
+  missingDeploymentSecretContextError,
+  type DeploymentSecretContext,
+} from "./deployment-secret-context.ts";
 import {
   deploymentSecretContractBindings,
   isDeploymentSecretAdmittedReference,
@@ -75,10 +79,13 @@ async function resolveFixtureReference(
 async function admittedReferenceFor(
   binding: DeploymentSecretContractBinding,
   targetScope: string,
+  secretContext?: DeploymentSecretContext,
 ): Promise<DeploymentSecretAdmittedReference | undefined> {
   const fixture = deploymentSecretFixturePath() ? await readDeploymentSecretFixture() : undefined;
   if (fixture) return await resolveFixtureReference(binding, targetScope, fixture);
-  return await resolveDirectVaultSecretReference(binding, targetScope);
+  const context = deploymentSecretContext(secretContext);
+  if (context?.kind !== "vault") throw missingDeploymentSecretContextError();
+  return await resolveDirectVaultSecretReference(binding, targetScope, context.credential);
 }
 
 function ensureFixtureReferenceMatches(
@@ -103,11 +110,12 @@ function ensureFixtureReferenceMatches(
 export async function resolveDeploymentVaultAdmittedReferences(opts: {
   requirements: DeploymentRequirement[];
   targetScope: string;
+  secretContext?: DeploymentSecretContext;
 }): Promise<DeploymentSecretAdmittedReference[]> {
   const bindings = deploymentSecretContractBindings(opts.requirements);
   const resolved: DeploymentSecretAdmittedReference[] = [];
   for (const binding of bindings) {
-    const admitted = await admittedReferenceFor(binding, opts.targetScope);
+    const admitted = await admittedReferenceFor(binding, opts.targetScope, opts.secretContext);
     if (!admitted) {
       if (binding.required) {
         throw new Error(`required secret contract ${binding.contractId} is missing`);
@@ -119,12 +127,19 @@ export async function resolveDeploymentVaultAdmittedReferences(opts: {
   return resolved;
 }
 
-export function createDeploymentVaultSecretBackend(): DeploymentSecretBackend {
+export function createDeploymentVaultSecretBackend(
+  secretContext?: DeploymentSecretContext,
+): DeploymentSecretBackend {
   const acquireCounts = new Map<string, number>();
   return {
     async acquire(binding) {
-      if (!deploymentSecretFixturePath() && hasVaultCredentialConfig())
-        return await acquireDirectVaultSecretReference(binding);
+      const context = deploymentSecretContext(secretContext);
+      if (!deploymentSecretFixturePath() && context?.kind === "vault") {
+        return await acquireDirectVaultSecretReference(binding, context.credential);
+      }
+      if (!deploymentSecretFixturePath() && context?.kind !== "fixture") {
+        throw missingDeploymentSecretContextError();
+      }
       const fixture = await readDeploymentSecretFixture();
       const entry = fixture.contracts[binding.contractId];
       if (!entry) throw new Error(`required secret contract ${binding.contractId} is missing`);

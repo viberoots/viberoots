@@ -4,6 +4,7 @@ import path from "node:path";
 import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
 import { runNodeWithZx } from "../lib/node-run.ts";
 import { findRepoRoot } from "../lib/repo.ts";
+import { scrubDeploymentSecretEnv } from "./deployment-secret-env.ts";
 import {
   REMOTE_SSH_IDENTITY_FILE_ENV,
   REMOTE_SSH_KNOWN_HOSTS_FILE_ENV,
@@ -134,7 +135,7 @@ async function runDeployChild<T>(
       args,
       cwd: process.cwd(),
       env: {
-        ...process.env,
+        ...scrubDeploymentSecretEnv(),
         [REMOTE_SSH_IDENTITY_FILE_ENV]: ctx.sshIdentityFile,
         [REMOTE_SSH_KNOWN_HOSTS_FILE_ENV]: ctx.sshKnownHostsFile,
       },

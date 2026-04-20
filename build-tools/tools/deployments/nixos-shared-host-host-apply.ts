@@ -2,6 +2,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
+import { scrubDeploymentSecretEnv } from "./deployment-secret-env.ts";
 import {
   defaultManagedRoot,
   hostPath,
@@ -100,7 +101,7 @@ async function runApply(argv: string[]): Promise<void> {
   try {
     await execFileAsync(file, args, {
       encoding: "utf8",
-      env: process.env,
+      env: scrubDeploymentSecretEnv(),
       maxBuffer: APPLY_MAX_BUFFER,
     });
   } catch (error: any) {

@@ -641,7 +641,7 @@ import { createDeploymentSecretRuntime } from "./build-tools/tools/deployments/d
 import { createDeploymentVaultSecretBackend } from "./build-tools/tools/deployments/deployment-secret-vault.ts";
 
 const runtime = createDeploymentSecretRuntime({
-  backend: createDeploymentVaultSecretBackend(),
+  backend: createDeploymentVaultSecretBackend(secretContext),
   requirements,
   targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
 });
@@ -667,6 +667,7 @@ Use the convenience helper when you already have deployment context available:
 import { createVaultDeploymentSecretRuntime } from "./build-tools/tools/deployments/deployment-secret-runtime-helpers.ts";
 
 const runtime = createVaultDeploymentSecretRuntime({
+  secretContext,
   admittedContext: {
     secretRequirements: requirements,
     targetEnvironment: {
@@ -694,8 +695,9 @@ the source of truth when populating `targetScopes`.
 
 ### Secret Fixture Example
 
-The reviewed production path points `createDeploymentVaultSecretBackend()` at
-remote Vault with JWT authentication:
+The reviewed production path points `createDeploymentVaultSecretBackend()` at an
+explicit in-memory deployment secret context backed by remote Vault JWT
+authentication:
 
 ```python
 vault_runtime = {
@@ -713,12 +715,11 @@ Keep the deployment client secret itself in the runner environment, for example
 The deploy front door derives the Vault role and bound claims from the selected
 deployment and its `vault_runtime` metadata, mints the workload JWT, and the
 runtime exchanges it with Vault's JWT auth method. For the in-process secret
-backend, the front door sets the internal `VAULT_ADDR`,
-`BNX_VAULT_AUTH_METHOD=jwt`, `BNX_VAULT_JWT_ROLE`, and `BNX_VAULT_JWT_FILE`
-values from the selected deployment metadata and the freshly minted workload
-JWT. The returned Vault token stays in memory for the deployment run.
-`VAULT_TOKEN` is only for explicit break-glass, low-level test, or debugging use
-with `BNX_VAULT_AUTH_METHOD=token`; it is not the reviewed production contract.
+backend, the front door passes a typed context containing the Vault address,
+Vault JWT role, and workload JWT value. The workload JWT and returned Vault
+token stay in memory for the deployment run; normal deploys do not write JWT
+files or set `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`, `BNX_VAULT_AUTH_METHOD`,
+`BNX_VAULT_JWT_ROLE`, or `VAULT_TOKEN` in `process.env`.
 
 Local development, isolated tests, and explicit bootstrap-oriented workflows
 can intentionally override that runtime path with the reviewed fixture file:

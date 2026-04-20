@@ -33,7 +33,7 @@ export async function readDeploymentSecretFixture(): Promise<DeploymentSecretFix
   const filePath = deploymentSecretFixturePath();
   if (!filePath) {
     throw new Error(
-      `secret-consuming protected/shared runs require either ${DEPLOYMENT_SECRET_FIXTURE_PATH_ENV} for the reviewed local/test secret fixture or VAULT_ADDR plus BNX_VAULT_AUTH_METHOD=jwt for production Vault runtime`,
+      `secret-consuming protected/shared runs require either ${DEPLOYMENT_SECRET_FIXTURE_PATH_ENV} for the reviewed local/test secret fixture or an explicit deployment secret context from vault_runtime metadata`,
     );
   }
   const parsed = JSON.parse(await fsp.readFile(filePath, "utf8")) as DeploymentSecretFixture;

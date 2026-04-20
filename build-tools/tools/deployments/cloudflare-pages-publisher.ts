@@ -2,6 +2,7 @@
 import path from "node:path";
 import { packagePathFromLabel } from "../lib/labels.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
+import { scrubDeploymentSecretEnv } from "./deployment-secret-env.ts";
 
 type CloudflarePagesPublishResult = {
   publicUrl: string;
@@ -67,7 +68,7 @@ export async function publishCloudflarePagesStaticWebapp(opts: {
     cwd: packageDirFor(opts.workspaceRoot, opts.deployment),
     stdio: "pipe",
     env: {
-      ...process.env,
+      ...scrubDeploymentSecretEnv(),
       CLOUDFLARE_ACCOUNT_ID: opts.deployment.providerTarget.account,
       ...(opts.apiToken ? { CLOUDFLARE_API_TOKEN: opts.apiToken } : {}),
     },

@@ -172,9 +172,8 @@ test("deployment design and scenario docs stay aligned with the reviewed front d
     /DeploymentSecretContractBinding/,
     /createDeploymentSecretRuntime\(\)/,
     /createVaultDeploymentSecretRuntime\(\)/,
-    /VAULT_ADDR/,
-    /VAULT_TOKEN/,
-    /BNX_VAULT_AUTH_METHOD=jwt[\s\S]*BNX_VAULT_JWT_ROLE/,
+    /typed context containing the Vault address/,
+    /BNX_VAULT_JWT[\s\S]*BNX_VAULT_JWT_FILE[\s\S]*VAULT_TOKEN/,
     /BNX_DEPLOYMENT_SECRET_FIXTURE_PATH/,
     /admittedSecretReferences/,
     /admittedContext\.targetEnvironment\.lockScope/,
@@ -190,8 +189,8 @@ test("deployment design and scenario docs stay aligned with the reviewed front d
   }
   for (const fragment of [
     /reviewed production runtime now reads remote Vault/i,
-    /VAULT_ADDR/,
-    /BNX_VAULT_AUTH_METHOD=jwt[\s\S]*BNX_VAULT_JWT_ROLE/,
+    /typed in-memory secret context/i,
+    /BNX_VAULT_JWT[\s\S]*BNX_VAULT_JWT_FILE/,
     /BNX_DEPLOYMENT_SECRET_FIXTURE_PATH/,
     /targetScopes/,
     /lockScope/,

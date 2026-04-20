@@ -13,7 +13,7 @@ import {
   createDeploymentVaultSecretBackend,
   resolveDeploymentVaultAdmittedReferences,
 } from "../../deployments/deployment-secret-vault.ts";
-import { VAULT_AUTH_METHOD_ENV } from "../../deployments/deployment-secret-vault-credentials.ts";
+import type { DeploymentSecretContext } from "../../deployments/deployment-secret-context.ts";
 import { deploymentRequirementFixture } from "./deployment-metadata.fixture.ts";
 import { startFakeVaultServer } from "./vault.test-server.ts";
 
@@ -51,9 +51,10 @@ test("direct Vault admission freezes one exact version and runtime reuses it", a
       },
     },
   });
-  process.env.VAULT_ADDR = vault.addr;
-  process.env[VAULT_AUTH_METHOD_ENV] = "token";
-  process.env.VAULT_TOKEN = vault.token;
+  const secretContext: DeploymentSecretContext = {
+    kind: "vault",
+    credential: { kind: "token", addr: vault.addr, token: vault.token },
+  };
   delete process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
   try {
     const admittedReferences = await resolveDeploymentVaultAdmittedReferences({
@@ -65,10 +66,11 @@ test("direct Vault admission freezes one exact version and runtime reuses it", a
         }),
       ],
       targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+      secretContext,
     });
     assert.equal(admittedReferences[0]?.resolvedVersion, "3");
     const runtime = createDeploymentSecretRuntime({
-      backend: createDeploymentVaultSecretBackend(),
+      backend: createDeploymentVaultSecretBackend(secretContext),
       admittedReferences,
       targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
     });
@@ -90,9 +92,10 @@ test("direct Vault replay fails closed when the admitted version no longer resol
     },
   };
   const vault = await startFakeVaultServer(state);
-  process.env.VAULT_ADDR = vault.addr;
-  process.env[VAULT_AUTH_METHOD_ENV] = "token";
-  process.env.VAULT_TOKEN = vault.token;
+  const secretContext: DeploymentSecretContext = {
+    kind: "vault",
+    credential: { kind: "token", addr: vault.addr, token: vault.token },
+  };
   delete process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
   try {
     const admittedReferences = await resolveDeploymentVaultAdmittedReferences({
@@ -104,10 +107,11 @@ test("direct Vault replay fails closed when the admitted version no longer resol
         }),
       ],
       targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+      secretContext,
     });
     state["secret://deployments/pleomino/cloudflare_api_token"].versions["7"].deleted = true;
     const runtime = createDeploymentSecretRuntime({
-      backend: createDeploymentVaultSecretBackend(),
+      backend: createDeploymentVaultSecretBackend(secretContext),
       admittedReferences,
       targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
     });
@@ -138,9 +142,10 @@ test("neutral fixture env var intentionally overrides direct Vault env", async (
       },
     },
     async (fixturePath) => {
-      process.env.VAULT_ADDR = vault.addr;
-      process.env[VAULT_AUTH_METHOD_ENV] = "token";
-      process.env.VAULT_TOKEN = vault.token;
+      const secretContext: DeploymentSecretContext = {
+        kind: "vault",
+        credential: { kind: "token", addr: vault.addr, token: vault.token },
+      };
       process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV] = fixturePath;
       try {
         const admittedReferences = await resolveDeploymentVaultAdmittedReferences({
@@ -152,10 +157,11 @@ test("neutral fixture env var intentionally overrides direct Vault env", async (
             }),
           ],
           targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+          secretContext,
         });
         assert.equal(admittedReferences[0]?.resolvedVersion, "fixture-v1");
         const runtime = createDeploymentSecretRuntime({
-          backend: createDeploymentVaultSecretBackend(),
+          backend: createDeploymentVaultSecretBackend(secretContext),
           admittedReferences,
           targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
         });
@@ -197,7 +203,7 @@ test("retired Vault-named fixture env var is ignored and required secret flows f
         });
         await assert.rejects(
           async () => await runtime.enterStep("publish"),
-          /BNX_DEPLOYMENT_SECRET_FIXTURE_PATH.*BNX_VAULT_AUTH_METHOD=jwt/,
+          /explicit deployment secret context/,
         );
       } finally {
         restoreVaultEnv();

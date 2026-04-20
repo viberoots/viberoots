@@ -2,6 +2,7 @@
 import path from "node:path";
 import { packagePathFromLabel } from "../lib/labels.ts";
 import type { S3StaticDeployment } from "./contract.ts";
+import { scrubDeploymentSecretEnv } from "./deployment-secret-env.ts";
 
 function awsBin(): string {
   return process.env.BNX_S3_STATIC_AWS_BIN?.trim() || "aws";
@@ -35,7 +36,7 @@ export async function publishS3StaticWebapp(opts: {
     cwd: packageDirFor(opts.workspaceRoot, opts.deployment),
     stdio: "pipe",
     env: {
-      ...process.env,
+      ...scrubDeploymentSecretEnv(),
       AWS_DEFAULT_REGION: opts.deployment.providerTarget.region,
       BNX_S3_STATIC_RENDERED_CONFIG: path.resolve(opts.renderedConfigPath),
     },

@@ -1,19 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import path from "node:path";
 import os from "node:os";
-import * as fsp from "node:fs/promises";
 import { getFlagStr } from "../lib/cli.ts";
 import { sanitizeName } from "../lib/sanitize.ts";
 import type { DeploymentTarget } from "./contract.ts";
 import { deploymentSecretFixturePath } from "./deployment-secret-fixture.ts";
-import {
-  VAULT_ADDR_ENV,
-  VAULT_AUTH_METHOD_ENV,
-  VAULT_JWT_ENV,
-  VAULT_JWT_FILE_ENV,
-  VAULT_JWT_ROLE_ENV,
-  VAULT_TOKEN_ENV,
-} from "./deployment-secret-vault-credentials.ts";
+import { VAULT_ADDR_ENV, VAULT_JWT_ROLE_ENV } from "./deployment-secret-vault-credentials.ts";
+import type { DeploymentSecretContext } from "./deployment-secret-context.ts";
 import { mintDeployVaultJwt } from "./deploy-vault-jwt.ts";
 
 export const VAULT_OIDC_ISSUER_ENV = "BNX_VAULT_OIDC_ISSUER";
@@ -31,7 +23,6 @@ export type DeploymentVaultRuntimeInputs = {
   deploymentClientId?: string | undefined;
   deploymentEnvironment?: string | undefined;
   roleName?: string | undefined;
-  jwtFile?: string | undefined;
   clientSecretEnv?: string | undefined;
 };
 
@@ -43,7 +34,6 @@ export function readDeploymentVaultRuntimeInputsFromFlags(): DeploymentVaultRunt
     deploymentClientId: getFlagStr("deployment-client-id", "").trim() || undefined,
     deploymentEnvironment: getFlagStr("deployment-environment", "").trim() || undefined,
     roleName: getFlagStr("vault-jwt-role", "").trim() || undefined,
-    jwtFile: getFlagStr("vault-jwt-file", "").trim() || undefined,
     clientSecretEnv: getFlagStr("deployment-client-secret-env", "").trim() || undefined,
   };
 }
@@ -69,10 +59,6 @@ export function defaultVaultJwtRoleName(deployment: DeploymentTarget): string {
   return `deploy-${sanitizeName(base)}-read`;
 }
 
-function defaultJwtFile(workspaceRoot: string, roleName: string): string {
-  return path.join(workspaceRoot, ".local", "deploy-vault", `${sanitizeName(roleName)}.jwt`);
-}
-
 function inputOrEnv(
   input: string | undefined,
   env: NodeJS.ProcessEnv,
@@ -89,18 +75,21 @@ function runtimeValue(
   metadata: string | undefined,
   fallback = "",
 ): string {
-  return (input?.trim() || readEnv(env, envName) || metadata?.trim() || fallback).trim();
+  return (input?.trim() || metadata?.trim() || readEnv(env, envName) || fallback).trim();
 }
 
 export type PreparedDeploymentVaultRuntime = {
   minted: boolean;
-  jwtFile?: string;
   roleName?: string;
+  secretContext?: DeploymentSecretContext;
 };
 
 export async function cleanupDeploymentVaultRuntime(runtime: PreparedDeploymentVaultRuntime) {
-  if (!runtime.minted || !runtime.jwtFile) return;
-  await fsp.rm(runtime.jwtFile, { force: true });
+  const credential =
+    runtime.secretContext?.kind === "vault" ? runtime.secretContext.credential : undefined;
+  if (credential?.kind === "jwt") credential.workloadJwt = "";
+  if (credential?.kind === "token") credential.token = "";
+  runtime.secretContext = undefined;
 }
 
 export async function prepareDeploymentVaultRuntime(opts: {
@@ -111,16 +100,7 @@ export async function prepareDeploymentVaultRuntime(opts: {
 }): Promise<PreparedDeploymentVaultRuntime> {
   const env = opts.env || process.env;
   if (opts.deployment.secretRequirements.length === 0) return { minted: false };
-  if (deploymentSecretFixturePath()) return { minted: false };
-
-  const method = readEnv(env, VAULT_AUTH_METHOD_ENV);
-  if (method === "token") return { minted: false };
-  if (readEnv(env, VAULT_JWT_ENV)) return { minted: false };
-  if (readEnv(env, VAULT_TOKEN_ENV)) {
-    throw new Error(
-      `${VAULT_TOKEN_ENV} is set; unset it for deployment-derived Vault JWT auth or use ${VAULT_AUTH_METHOD_ENV}=token explicitly`,
-    );
-  }
+  if (deploymentSecretFixturePath()) return { minted: false, secretContext: { kind: "fixture" } };
 
   const metadata = opts.deployment.vaultRuntime;
   const addr = runtimeValue(undefined, env, VAULT_ADDR_ENV, metadata?.addr);
@@ -138,14 +118,6 @@ export async function prepareDeploymentVaultRuntime(opts: {
     metadata?.oidcIssuer,
   );
   if (!issuerUrl) {
-    const existingJwtFile = readEnv(env, VAULT_JWT_FILE_ENV);
-    if (method === "jwt" && readEnv(env, VAULT_JWT_ROLE_ENV) && existingJwtFile) {
-      return {
-        minted: false,
-        jwtFile: existingJwtFile,
-        roleName: readEnv(env, VAULT_JWT_ROLE_ENV),
-      };
-    }
     throw new Error(
       `deployment-derived Vault JWT auth requires vault_runtime.oidc_issuer, ${VAULT_OIDC_ISSUER_ENV}, or --vault-issuer-url`,
     );
@@ -166,15 +138,6 @@ export async function prepareDeploymentVaultRuntime(opts: {
     env,
     VAULT_JWT_ROLE_ENV,
     metadata?.roleName || defaultVaultJwtRoleName(opts.deployment),
-  );
-  const jwtFile = path.resolve(
-    runtimeValue(
-      inputs.jwtFile,
-      env,
-      VAULT_JWT_FILE_ENV,
-      metadata?.jwtFile,
-      defaultJwtFile(opts.workspaceRoot, roleName),
-    ),
   );
   const clientId = runtimeValue(
     inputs.deploymentClientId,
@@ -198,11 +161,10 @@ export async function prepareDeploymentVaultRuntime(opts: {
     os.hostname() || opts.deployment.environmentStage,
   );
 
-  await mintDeployVaultJwt({
+  const minted = await mintDeployVaultJwt({
     issuer: issuerUrl,
     clientId,
     clientSecret,
-    out: jwtFile,
     audience,
     boundClaims: {
       deployment_environment: deploymentEnvironment,
@@ -210,9 +172,17 @@ export async function prepareDeploymentVaultRuntime(opts: {
     },
   });
 
-  env[VAULT_ADDR_ENV] = addr;
-  env[VAULT_AUTH_METHOD_ENV] = "jwt";
-  env[VAULT_JWT_ROLE_ENV] = roleName;
-  env[VAULT_JWT_FILE_ENV] = jwtFile;
-  return { minted: true, jwtFile, roleName };
+  return {
+    minted: true,
+    roleName,
+    secretContext: {
+      kind: "vault",
+      credential: {
+        kind: "jwt",
+        addr,
+        role: roleName,
+        workloadJwt: minted.token,
+      },
+    },
+  };
 }
