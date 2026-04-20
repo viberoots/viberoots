@@ -68,10 +68,21 @@ test("deploy --print-vault-bootstrap emits deployment-derived JSON", async () =>
 
 test("deploy read-only bootstrap path does not eagerly import provider front doors", async () => {
   const deployCliPath = path.join(repoRoot, "build-tools", "tools", "deployments", "deploy-cli.ts");
-  const source = await fsp.readFile(deployCliPath, "utf8");
+  const deployFrontDoorPath = path.join(
+    repoRoot,
+    "build-tools",
+    "tools",
+    "deployments",
+    "deploy-front-door.ts",
+  );
+  const source = [
+    await fsp.readFile(deployCliPath, "utf8"),
+    await fsp.readFile(deployFrontDoorPath, "utf8"),
+  ].join("\n");
   for (const providerModule of [
     "app-store-connect-front-door",
     "cloudflare-pages-front-door",
+    "deploy-front-door-validate",
     "deploy-provider-front-door",
     "google-play-front-door",
     "kubernetes-front-door",

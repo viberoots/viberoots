@@ -3,7 +3,6 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { packagePathFromLabel } from "../lib/labels.ts";
 import { providerTargetIdentityFor, type DeploymentTarget } from "./contract.ts";
-import { validateRepoFrontDoorDeployment } from "./deploy-front-door-validate.ts";
 import { resolveAllDeployments } from "./deployment-query.ts";
 
 export const DEPLOY_LIST_SCHEMA = "deploy-list@1";
@@ -58,6 +57,7 @@ export async function validateDeploymentForCli(
   workspaceRoot: string,
   deployment: DeploymentTarget,
 ) {
+  const { validateRepoFrontDoorDeployment } = await import("./deploy-front-door-validate.ts");
   await requireProviderNativeConfig(workspaceRoot, deployment);
   await validateRepoFrontDoorDeployment(workspaceRoot, deployment);
   return {
