@@ -40,4 +40,38 @@ await runInTemp("startup-check-buck-prelude", async (tmp, $) => {
     throw new Error(
       "startup-check should fail when .buckconfig lacks prelude mapping in repositories/cells",
     );
+
+  // Case 3: Valid mapping but missing prelude entrypoint -> should fail clearly
+  await fs.writeFile(
+    path.join(tmp, ".buckconfig"),
+    [
+      "[buildfile]",
+      "name = TARGETS",
+      "",
+      "[repositories]",
+      "root = .",
+      "prelude = ./prelude",
+      "config = ./prelude",
+      "",
+      "[cells]",
+      "root = .",
+      "prelude = ./prelude",
+      "config = ./prelude",
+      "",
+      "[build]",
+      "prelude = prelude",
+      "user_platform = prelude//platforms:default",
+      "target_platforms = prelude//platforms:default",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await fs.remove(path.join(tmp, "prelude"));
+  failed = false;
+  try {
+    await $({ cwd: tmp })`zx-wrapper build-tools/tools/dev/startup-check.ts`;
+  } catch {
+    failed = true;
+  }
+  if (!failed) throw new Error("startup-check should fail when prelude/prelude.bzl is missing");
 });

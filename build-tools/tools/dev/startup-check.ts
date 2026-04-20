@@ -223,6 +223,14 @@ async function main() {
       );
       process.exit(1);
     }
+    try {
+      await fsp.access("prelude/prelude.bzl");
+    } catch {
+      console.error(
+        "[startup-check] invalid Buck prelude: prelude/prelude.bzl is missing. Re-enter the dev shell or run a repo wrapper so the prelude symlink can be repaired.",
+      );
+      process.exit(1);
+    }
   } catch {
     console.error(
       "[startup-check] .buckconfig not found; run 'nix develop' to generate it. Exporter will fail without a valid prelude mapping.",

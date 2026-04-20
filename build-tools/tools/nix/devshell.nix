@@ -141,25 +141,38 @@ EOF
         fi
       fi
 
-      # Symlink prelude from flake output for local dev if missing; do not edit .buckconfig here
-      if [ ! -e prelude ]; then
+      # Symlink prelude from flake output for local dev. Validate the actual
+      # Buck entrypoint so stale/broken symlinks are repaired, not just present.
+      if [ ! -f prelude/prelude.bzl ]; then
         pre_cache="$cache_dir/prelude-path$lock_suffix"
         pre_cached=""
+        pre_target=""
         if [ -f "$pre_cache" ]; then
           pre_cached="$(cat "$pre_cache" 2>/dev/null || true)"
         fi
-        if [ -n "$pre_cached" ] && [ -d "$pre_cached/prelude" ]; then
-          ln -s "$pre_cached/prelude" prelude 2>/dev/null || true
+        if [ -n "$pre_cached" ] && [ -f "$pre_cached/prelude/prelude.bzl" ]; then
+          pre_target="$pre_cached/prelude"
         else
           pre_out=$(nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null || true)
           if [ -z "$pre_out" ]; then
-            pre_out="${pkgs.nix}/bin/nix eval --raw .#inputs.buck2.outPath 2>/dev/null || true"
+            pre_out="$(${pkgs.nix}/bin/nix eval --raw .#inputs.buck2.outPath 2>/dev/null || true)"
           fi
-          if [ -n "$pre_out" ] && [ -d "$pre_out/prelude" ]; then
-            ln -s "$pre_out/prelude" prelude 2>/dev/null || true
+          if [ -n "$pre_out" ] && [ -f "$pre_out/prelude/prelude.bzl" ]; then
+            pre_target="$pre_out/prelude"
             printf "%s\n" "$pre_out" > "$pre_cache" 2>/dev/null || true
           fi
         fi
+        if [ -n "$pre_target" ]; then
+          if [ -L prelude ] || [ ! -e prelude ]; then
+            rm -f prelude
+            ln -s "$pre_target" prelude
+          else
+            echo "(devShell) prelude exists but is not a valid symlink; expected prelude/prelude.bzl" >&2
+          fi
+        fi
+      fi
+      if [ -f .buckconfig ] && [ ! -f prelude/prelude.bzl ]; then
+        echo "(devShell) failed to materialize Buck prelude at prelude/prelude.bzl" >&2
       fi
     '';
     buildInputs = [
@@ -168,5 +181,4 @@ EOF
     ] ++ (if pkgs.stdenv.isLinux then [ pkgs.fuse-overlayfs pkgs.xdg-utils ] else []);
   };
 }
-
 
