@@ -9,7 +9,9 @@ import {
 } from "./deployment-secret-vault-credentials.ts";
 import {
   DEFAULT_DEPLOYMENT_CLIENT_SECRET_ENV,
+  DEFAULT_DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV,
   DEPLOYMENT_CLIENT_SECRET_ENV_ENV,
+  DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV_ENV,
 } from "./deployment-vault-runtime.ts";
 
 const SECRET_ENV_NAMES = new Set([
@@ -20,7 +22,9 @@ const SECRET_ENV_NAMES = new Set([
   VAULT_JWT_ROLE_ENV,
   VAULT_TOKEN_ENV,
   DEFAULT_DEPLOYMENT_CLIENT_SECRET_ENV,
+  DEFAULT_DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV,
   DEPLOYMENT_CLIENT_SECRET_ENV_ENV,
+  DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV_ENV,
   "CLOUDFLARE_API_TOKEN",
 ]);
 
@@ -30,6 +34,8 @@ function isSecretName(name: string): boolean {
     /^BNX_VAULT/.test(name) ||
     /^BNX_DEPLOYER_.*SECRET/.test(name) ||
     /^BNX_DEPLOYMENT_CLIENT_SECRET/.test(name) ||
+    /^BNX_DEPLOYMENT_.*TOKEN/.test(name) ||
+    /^JENKINS_.*(SECRET|TOKEN)/.test(name) ||
     /^DEPLOYMENT_CLIENT_SECRET$/.test(name)
   );
 }

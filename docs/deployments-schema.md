@@ -67,11 +67,26 @@ Optional keys:
 - `addr`: Vault API URL.
 - `oidc_issuer`: OIDC issuer URL used to mint workload JWTs.
 - `audience`: expected Vault JWT audience.
-- `deployment_client_id`: OIDC client id for the deployment runner.
+- `deployment_client_id`: compatibility OIDC client id used when a separate
+  human or service client id is not declared.
+- `cli_public_client_id`: public OIDC client id for human PKCE/device login.
+- `service_account_client_id`: service-account client id for Jenkins
+  client-secret minting.
 - `deployment_environment`: runner or host environment claim bound by Vault.
 - `jwt_role`: Vault JWT role name.
 - `jwt_file`: local runtime JWT file path override, normally omitted.
-- `client_secret_env`: environment variable name containing the OIDC client secret.
+- `preferred_credential_source`: one of `interactive_pkce`,
+  `interactive_device`, `interactive_print_url`, `jenkins_client_secret`,
+  `jenkins_oidc`, or `external_oidc_token`.
+- `client_secret_env`: compatibility environment variable name containing the
+  OIDC client secret.
+- `jenkins_client_secret_env`: Jenkins Credentials-bound Secret Text variable
+  used only by the front-door credential-source adapter.
+- `external_oidc_token_env`: Jenkins/workload-identity token variable used only
+  by the front-door credential-source adapter.
+- `required_human_claim`: human deployer claim name, such as `groups` or a
+  flat realm-role/client-role mapper claim.
+- `required_human_claim_value`: required value for `required_human_claim`.
 
 `vault_runtime` may contain public routing and identity metadata, but must never contain client
 secrets, Vault tokens, root tokens, or secret material.

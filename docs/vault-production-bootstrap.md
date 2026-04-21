@@ -936,13 +936,21 @@ Identity-provider configuration checklist:
 2. Create a confidential OpenID Connect client named `deployment-runner`.
 3. Enable a non-interactive token flow for that client, such as client
    credentials.
-4. Add an audience mapper so deployment tokens include
+4. Create a public OpenID Connect client named `deployment-cli` with
+   Authorization Code + PKCE required for human deploys.
+5. If SSH/headless human deploys are supported, enable device authorization for
+   the realm or public client. If the issuer cannot support device
+   authorization, operators will use the printed PKCE URL plus an SSH loopback
+   tunnel.
+6. Add an audience mapper so deployment tokens include
    `aud = "deployments-vault"`.
-5. Add stable bound claims that Vault can check, such as:
+7. Add stable bound claims that Vault can check, such as:
    - `azp = "deployment-runner"`
+   - `azp = "deployment-cli"` for human flows
    - `deployment_environment = "mini"`
    - `repository = "kiltyj/bucknix-fresh"`
-6. Store the client secret outside the repo, for example in the Jenkins
+   - a reviewed deployer group or role claim for human flows
+8. Store the service-account client secret outside the repo, for example in the Jenkins
    credential store or the reviewed host secret store.
 
 One practical Keycloak admin-console path is:
@@ -966,6 +974,9 @@ One practical Keycloak admin-console path is:
 9. Add another `Hardcoded claim` mapper for `repository` with value
    `kiltyj/bucknix-fresh`, JSON type `String`, and access token inclusion
    enabled.
+10. Create `deployment-cli` as a public client, require PKCE, allow loopback
+    redirect URIs for the CLI callback, and add a group/role mapper such as
+    `groups = ["deployers"]` for reviewed human deployers.
 
 The `repository` claim should match the current repository identity used by the
 CI or deployment runner. If the repository is renamed, update that mapper and
@@ -1198,13 +1209,35 @@ vault_runtime = {
     "addr": "https://secrets.apps.kilty.io:8200",
     "oidc_issuer": "https://identity.apps.kilty.io/realms/deployments",
     "audience": "deployments-vault",
-    "deployment_client_id": "deployment-runner",
+    "cli_public_client_id": "deployment-cli",
+    "service_account_client_id": "deployment-runner",
     "deployment_environment": "mini",
     "jwt_role": "deploy-pleomino-read",
+    "preferred_credential_source": "interactive_pkce",
+    "required_human_claim": "groups",
+    "required_human_claim_value": "deployers",
 }
 ```
 
-Keep the client secret itself outside the repo:
+Credential-source choices:
+
+- `interactive_pkce`: local human desktop deploys. Configure a public Keycloak
+  CLI client with Authorization Code + PKCE required and an allowed loopback
+  redirect URI.
+- `interactive_device`: SSH/headless human deploys when the issuer supports
+  OAuth 2.0 Device Authorization Grant. The CLI displays the verification URI
+  and user code.
+- `interactive_print_url`: SSH/headless fallback when device authorization is
+  unavailable. The CLI prints the PKCE URL and loopback tunnel instructions
+  instead of launching a browser on the server.
+- `jenkins_client_secret`: Jenkins `withCredentials` Secret Text binding for a
+  service-account client secret. The secret is visible only to the deploy front
+  door, then converted into the in-memory Vault credential context.
+- `jenkins_oidc` or `external_oidc_token`: Jenkins/workload-identity federation
+  when Jenkins can provide an OIDC token from an issuer Vault trusts.
+
+For Jenkins client-secret automation, keep the client secret itself outside the
+repo:
 
 ```bash
 export BNX_DEPLOYER_CLIENT_SECRET='<deployment-runner-client-secret>'
@@ -1215,13 +1248,14 @@ When `vault_runtime` omits a field, the defaults match the bootstrap examples in
 this runbook:
 
 - Vault audience: `deployments-vault`
-- deployment client id: `deployment-runner`
+- service-account client id: `deployment-runner`
+- human public client id: `deployment-cli`
 - client secret env var: `BNX_DEPLOYER_CLIENT_SECRET`
+- external OIDC token env var: `BNX_DEPLOYMENT_OIDC_TOKEN`
 - deployment environment claim: machine hostname, override with
   `BNX_DEPLOYMENT_ENVIRONMENT` or `--deployment-environment`
 - Vault role: `deploy-<deployment-family>-read` when the deployment id ends in
   the stage name, otherwise `deploy-<deployment-id>-read`
-- workload JWT file: `.local/deploy-vault/<role>.jwt`
 
 Override deployment metadata only when your Vault or IdP setup intentionally
 differs for a run:
@@ -1232,6 +1266,7 @@ deploy \
   --vault-audience deployments-vault \
   --deployment-client-id deployment-runner \
   --deployment-environment mini \
+  --credential-source jenkins_client_secret \
   --deployment-client-secret-env BNX_DEPLOYER_CLIENT_SECRET \
   --vault-jwt-role deploy-pleomino-read
 ```
@@ -1241,10 +1276,9 @@ but routine deploys should let the deploy front door mint the workload JWT so
 the token is always fresh.
 
 The normal deploy runtime does not accept `BNX_VAULT_JWT` or
-`BNX_VAULT_JWT_FILE` as ambient credential handoff. Later credential-source
-adapters may obtain short-lived JWT material from Jenkins, a human login flow,
-or a host secret store, but provider execution receives only the typed in-memory
-secret context.
+`BNX_VAULT_JWT_FILE` as ambient credential handoff. Credential-source adapters
+may obtain short-lived JWT material from Jenkins or a human login flow, but
+provider execution receives only the typed in-memory secret context.
 
 The issuer URL, client id, audience mapper, and deployment-derived bound claims
 must match the identity-provider configuration from Step 5 and the Vault role
@@ -1254,6 +1288,47 @@ If JWT login fails, the deployment helper fails closed. Common causes are an
 expired JWT, wrong audience, wrong issuer, missing role binding, rejected bound
 claims, remote Vault connectivity, TLS trust, or DNS routing to the wrong Vault
 endpoint.
+
+### Jenkins Pipeline Credential Sources
+
+Use Jenkins masking and disable shell tracing before invoking `deploy`. Do not
+archive env dumps, workspace files containing token material, or debug traces
+from these steps.
+
+Client-secret minting with a Jenkins Secret Text credential:
+
+```groovy
+withCredentials([string(credentialsId: 'deployment-runner-client-secret', variable: 'JENKINS_DEPLOYMENT_CLIENT_SECRET')]) {
+  sh '''
+    set +x
+    deploy \
+      --deployment //projects/deployments/pleomino-prod:deploy \
+      --credential-source jenkins_client_secret \
+      --deployment-client-secret-env JENKINS_DEPLOYMENT_CLIENT_SECRET
+  '''
+}
+```
+
+External OIDC/workload-identity federation when Jenkins is configured as, or
+can obtain a token from, an issuer trusted by Vault:
+
+```groovy
+withCredentials([string(credentialsId: 'jenkins-deployment-oidc-token', variable: 'JENKINS_OIDC_TOKEN')]) {
+  sh '''
+    set +x
+    deploy \
+      --deployment //projects/deployments/pleomino-prod:deploy \
+      --credential-source external_oidc_token \
+      --external-oidc-token-env JENKINS_OIDC_TOKEN
+  '''
+}
+```
+
+In both cases, bind Vault roles to repository, job/target, branch or
+environment claims, and the expected Vault audience. Jenkins same-agent process
+inspection can expose environment-bound credentials to other jobs running with
+the same operating-system identity, so keep deploy agents dedicated or
+otherwise isolated for protected environments.
 
 For explicit break-glass or low-level tests, keep Vault tokens out of the
 normal deploy environment and use a reviewed in-memory token credential path.
@@ -1321,8 +1396,10 @@ the same contract IDs directly through the Vault API.
 
 ## Step 12: Run A Deployment Through Vault
 
-For the normal production path, keep only the deployment client secret in the
-environment. Leave `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH` unset:
+For the normal production path, leave `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
+unset. Human deploys normally use PKCE/device login without a deployment client
+secret; Jenkins deploys should expose only the selected Jenkins credential
+binding to the deploy front door:
 
 ```bash
 export BNX_DEPLOYER_CLIENT_SECRET='<deployment-runner-client-secret>'

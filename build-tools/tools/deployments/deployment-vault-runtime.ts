@@ -1,42 +1,34 @@
 #!/usr/bin/env zx-wrapper
 import os from "node:os";
-import { getFlagStr } from "../lib/cli.ts";
 import { sanitizeName } from "../lib/sanitize.ts";
 import type { DeploymentTarget } from "./contract.ts";
 import { deploymentSecretFixturePath } from "./deployment-secret-fixture.ts";
 import { VAULT_ADDR_ENV, VAULT_JWT_ROLE_ENV } from "./deployment-secret-vault-credentials.ts";
 import type { DeploymentSecretContext } from "./deployment-secret-context.ts";
-import { mintDeployVaultJwt } from "./deploy-vault-jwt.ts";
+import { resolveCredentialSourceVaultJwt } from "./deployment-credential-source-runtime.ts";
+import {
+  isJenkinsSession,
+  normalizeCredentialSource,
+  selectDeploymentCredentialSource,
+  type DeploymentCredentialSource,
+} from "./deployment-credential-source-selection.ts";
+import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
+export type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
+export { readDeploymentVaultRuntimeInputsFromFlags } from "./deployment-vault-runtime-inputs.ts";
 
 export const VAULT_OIDC_ISSUER_ENV = "BNX_VAULT_OIDC_ISSUER";
 export const VAULT_AUDIENCE_ENV = "BNX_VAULT_AUDIENCE";
 export const DEPLOYMENT_CLIENT_ID_ENV = "BNX_DEPLOYMENT_CLIENT_ID";
+export const DEPLOYMENT_CLI_PUBLIC_CLIENT_ID_ENV = "BNX_DEPLOYMENT_CLI_PUBLIC_CLIENT_ID";
 export const DEPLOYMENT_ENVIRONMENT_ENV = "BNX_DEPLOYMENT_ENVIRONMENT";
 export const DEPLOYMENT_CLIENT_SECRET_ENV_ENV = "BNX_DEPLOYMENT_CLIENT_SECRET_ENV";
+export const DEPLOYMENT_CREDENTIAL_SOURCE_ENV = "BNX_DEPLOYMENT_CREDENTIAL_SOURCE";
+export const DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV_ENV = "BNX_DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV";
 export const DEFAULT_DEPLOYMENT_CLIENT_ID = "deployment-runner";
+export const DEFAULT_DEPLOYMENT_CLI_PUBLIC_CLIENT_ID = "deployment-cli";
 export const DEFAULT_DEPLOYMENT_CLIENT_SECRET_ENV = "BNX_DEPLOYER_CLIENT_SECRET";
+export const DEFAULT_DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV = "BNX_DEPLOYMENT_OIDC_TOKEN";
 export const DEFAULT_VAULT_AUDIENCE = "deployments-vault";
-
-export type DeploymentVaultRuntimeInputs = {
-  issuerUrl?: string | undefined;
-  audience?: string | undefined;
-  deploymentClientId?: string | undefined;
-  deploymentEnvironment?: string | undefined;
-  roleName?: string | undefined;
-  clientSecretEnv?: string | undefined;
-};
-
-export function readDeploymentVaultRuntimeInputsFromFlags(): DeploymentVaultRuntimeInputs {
-  return {
-    issuerUrl:
-      getFlagStr("vault-issuer-url", "").trim() || getFlagStr("issuer-url", "").trim() || undefined,
-    audience: getFlagStr("vault-audience", "").trim() || undefined,
-    deploymentClientId: getFlagStr("deployment-client-id", "").trim() || undefined,
-    deploymentEnvironment: getFlagStr("deployment-environment", "").trim() || undefined,
-    roleName: getFlagStr("vault-jwt-role", "").trim() || undefined,
-    clientSecretEnv: getFlagStr("deployment-client-secret-env", "").trim() || undefined,
-  };
-}
 
 function readEnv(env: NodeJS.ProcessEnv, name: string): string {
   return String(env[name] || "").trim();
@@ -81,6 +73,7 @@ function runtimeValue(
 export type PreparedDeploymentVaultRuntime = {
   minted: boolean;
   roleName?: string;
+  credentialSource?: DeploymentCredentialSource;
   secretContext?: DeploymentSecretContext;
 };
 
@@ -127,11 +120,10 @@ export async function prepareDeploymentVaultRuntime(opts: {
     inputs.clientSecretEnv,
     env,
     DEPLOYMENT_CLIENT_SECRET_ENV_ENV,
-    metadata?.clientSecretEnv || DEFAULT_DEPLOYMENT_CLIENT_SECRET_ENV,
+    metadata?.jenkinsClientSecretEnv ||
+      metadata?.clientSecretEnv ||
+      DEFAULT_DEPLOYMENT_CLIENT_SECRET_ENV,
   );
-  const clientSecret = readEnv(env, clientSecretEnv);
-  if (!clientSecret)
-    throw new Error(`client secret environment variable is unset: ${clientSecretEnv}`);
 
   const roleName = inputOrEnv(
     inputs.roleName,
@@ -143,8 +135,15 @@ export async function prepareDeploymentVaultRuntime(opts: {
     inputs.deploymentClientId,
     env,
     DEPLOYMENT_CLIENT_ID_ENV,
-    metadata?.deploymentClientId,
+    metadata?.serviceAccountClientId || metadata?.deploymentClientId,
     DEFAULT_DEPLOYMENT_CLIENT_ID,
+  );
+  const humanClientId = runtimeValue(
+    inputs.cliPublicClientId,
+    env,
+    DEPLOYMENT_CLI_PUBLIC_CLIENT_ID_ENV,
+    metadata?.cliPublicClientId || metadata?.deploymentClientId,
+    DEFAULT_DEPLOYMENT_CLI_PUBLIC_CLIENT_ID,
   );
   const audience = runtimeValue(
     inputs.audience,
@@ -160,28 +159,58 @@ export async function prepareDeploymentVaultRuntime(opts: {
     metadata?.deploymentEnvironment,
     os.hostname() || opts.deployment.environmentStage,
   );
+  const externalOidcTokenEnv = inputOrEnv(
+    inputs.externalOidcTokenEnv,
+    env,
+    DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV_ENV,
+    metadata?.externalOidcTokenEnv || DEFAULT_DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV,
+  );
+  const preferredSource =
+    inputs.credentialSource ||
+    normalizeCredentialSource(readEnv(env, DEPLOYMENT_CREDENTIAL_SOURCE_ENV)) ||
+    metadata?.preferredCredentialSource ||
+    (isJenkinsSession(env) || readEnv(env, clientSecretEnv) ? "jenkins_client_secret" : undefined);
+  const selection = selectDeploymentCredentialSource({
+    preferred: preferredSource,
+    loginBrowser: inputs.loginBrowser,
+    env,
+  });
 
-  const minted = await mintDeployVaultJwt({
-    issuer: issuerUrl,
-    clientId,
-    clientSecret,
+  const credential = await resolveCredentialSourceVaultJwt({
+    source: selection.source,
+    addr,
+    roleName,
+    issuerUrl,
+    serviceClientId: clientId,
+    humanClientId,
+    clientSecretEnv,
+    externalOidcTokenEnv,
     audience,
-    boundClaims: {
-      deployment_environment: deploymentEnvironment,
-      repository: requireRepository(opts.deployment),
-    },
+    deploymentEnvironment,
+    repository: requireRepository(opts.deployment),
+    humanClaim: metadata?.requiredHumanClaim
+      ? {
+          name: metadata.requiredHumanClaim,
+          value: metadata.requiredHumanClaimValue,
+        }
+      : undefined,
+    env,
+    openBrowser: selection.source === "interactive_pkce",
+    timeoutMs: inputs.timeoutMs,
+    prompt: (message) => console.error(message),
   });
 
   return {
     minted: true,
     roleName,
+    credentialSource: credential.source,
     secretContext: {
       kind: "vault",
       credential: {
         kind: "jwt",
-        addr,
-        role: roleName,
-        workloadJwt: minted.token,
+        addr: credential.addr,
+        role: credential.roleName,
+        workloadJwt: credential.workloadJwt,
       },
     },
   };

@@ -31,21 +31,45 @@ export async function startFakeOidcServer(opts?: {
   tokenStatus?: number;
   omitToken?: boolean;
   claims?: Record<string, unknown>;
+  device?: {
+    firstPollError?: "authorization_pending" | "slow_down" | "access_denied";
+    interval?: number;
+  };
 }): Promise<FakeOidcServer> {
   const requests: string[] = [];
   let issuer = "";
+  let devicePolls = 0;
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || "/", issuer);
     requests.push(`${req.method || "GET"} ${url.pathname}`);
     if (url.pathname.endsWith("/.well-known/openid-configuration")) {
       sendJson(res, opts?.discoveryStatus || 200, {
         issuer,
+        authorization_endpoint: `${issuer}/protocol/openid-connect/auth`,
         token_endpoint: `${issuer}/protocol/openid-connect/token`,
+        device_authorization_endpoint: `${issuer}/protocol/openid-connect/auth/device`,
+      });
+      return;
+    }
+    if (url.pathname.endsWith("/protocol/openid-connect/auth/device")) {
+      sendJson(res, 200, {
+        device_code: "fake-device-code",
+        user_code: "ABCD-EFGH",
+        verification_uri: `${issuer}/device`,
+        interval: opts?.device?.interval || 1,
       });
       return;
     }
     if (url.pathname.endsWith("/protocol/openid-connect/token")) {
       const body = new URLSearchParams(await readBody(req));
+      if (body.get("grant_type") === "urn:ietf:params:oauth:grant-type:device_code") {
+        devicePolls++;
+        const firstPollError = opts?.device?.firstPollError;
+        if (devicePolls === 1 && firstPollError) {
+          sendJson(res, 400, { error: firstPollError });
+          return;
+        }
+      }
       const claims = {
         iss: issuer,
         aud: "deployments-vault",

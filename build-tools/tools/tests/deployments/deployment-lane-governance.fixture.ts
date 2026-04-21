@@ -201,17 +201,10 @@ async function ensureReviewedDeploymentTargetsInstalled(
   workspaceRoot: string,
   deployment: { label: string; provider?: string },
 ): Promise<void> {
-  const targetsPath = path.join(
-    workspaceRoot,
-    deployment.label.replace(/^\/\//, "").split(":")[0] || "",
-    "TARGETS",
-  );
   try {
-    await fsp.access(targetsPath);
+    await resolveDeploymentFromTarget(workspaceRoot, deployment.label);
     return;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-  }
+  } catch {}
   switch (deployment.provider) {
     case NIXOS_SHARED_HOST_PROVIDER:
       await installNixosSharedHostTargets(workspaceRoot, [deployment as NixosSharedHostDeployment]);

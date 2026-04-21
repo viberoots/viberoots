@@ -209,10 +209,24 @@ Optional fields you may also see:
 For the reviewed production runtime path, use remote Vault with deployment-
 derived JWT auth. In normal deploys the front door reads the selected
 deployment's `vault_runtime` metadata, derives the Vault role and bound claims,
-mints a fresh workload JWT in memory, and passes a typed deployment secret
-context to the secret backend. Operators normally provide only the deployment
-client secret environment variable; workload JWTs and Vault tokens are not
-written to `.local/deploy-vault` and are not communicated through `process.env`.
+mints or receives a fresh workload JWT through the selected credential-source
+adapter, and passes a typed deployment secret context to the secret backend.
+Provider code receives only that explicit context. It does not read Vault JWT
+files, Vault auth environment variables, Jenkins credential bindings, OIDC
+tokens, or client secrets from ambient `process.env`.
+
+Credential sources are selected from non-secret `vault_runtime` metadata, CLI
+flags, and session detection:
+
+- local desktop human deploys default to Authorization Code + PKCE with a
+  public CLI client
+- SSH/headless human deploys use device authorization when the issuer supports
+  it, otherwise the CLI prints a PKCE URL and loopback tunnel instructions
+- Jenkins deploys use either a Jenkins Credentials-bound client secret to mint
+  the workload JWT, or a Jenkins/external OIDC token trusted by Vault
+
+Workload JWTs and Vault tokens are not written to `.local/deploy-vault` and are
+not communicated through `process.env`.
 
 Stale ambient variables such as `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`,
 `BNX_VAULT_AUTH_METHOD`, and `VAULT_TOKEN` are not the normal runtime contract.

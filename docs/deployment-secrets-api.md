@@ -159,6 +159,23 @@ Common example values:
 - `postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl`
   Typical local Postgres connection string for the deployment service.
 
+Vault credential-source overrides:
+
+- `--credential-source <source>`: force `interactive_pkce`,
+  `interactive_device`, `interactive_print_url`, `jenkins_client_secret`,
+  `jenkins_oidc`, or `external_oidc_token`.
+- `--login-browser auto|open|print|device`: override human login behavior.
+  `auto` opens a browser only for local desktop sessions, avoids browser launch
+  on SSH/headless sessions, and rejects interactive login in CI unless a
+  reviewed override is supplied.
+- `--cli-public-client-id <client-id>`: public OIDC client for human
+  PKCE/device login.
+- `--deployment-client-id <client-id>`: service-account client for automation.
+- `--deployment-client-secret-env <env-name>`: Jenkins/client-secret source
+  variable name.
+- `--external-oidc-token-env <env-name>`: Jenkins/workload-identity OIDC token
+  variable name.
+
 ### CLI Examples
 
 List reviewed deployments:
@@ -704,17 +721,25 @@ vault_runtime = {
     "addr": "https://vault.example.net:8200",
     "oidc_issuer": "https://identity.example.net/realms/deployments",
     "audience": "deployments-vault",
-    "deployment_client_id": "deployment-runner",
+    "cli_public_client_id": "deployment-cli",
+    "service_account_client_id": "deployment-runner",
     "deployment_environment": "runner-prod",
+    "preferred_credential_source": "jenkins_client_secret",
+    "jenkins_client_secret_env": "JENKINS_DEPLOYMENT_CLIENT_SECRET",
 }
 ```
 
-Keep the deployment client secret itself in the runner environment, for example
-`BNX_DEPLOYER_CLIENT_SECRET`.
+Keep Jenkins-bound client secrets and external OIDC tokens outside the repo.
+They are read only by the deploy front-door credential-source adapter, then
+converted into the explicit in-memory Vault credential context. For local human
+deploys, set `preferred_credential_source = "interactive_pkce"` or leave
+selection on auto so the CLI uses a public PKCE client on desktop terminals and
+device/print-only behavior on SSH/headless sessions.
 
 The deploy front door derives the Vault role and bound claims from the selected
-deployment and its `vault_runtime` metadata, mints the workload JWT, and the
-runtime exchanges it with Vault's JWT auth method. For the in-process secret
+deployment and its `vault_runtime` metadata. The selected credential source
+then obtains a short-lived JWT through PKCE, device authorization, Jenkins
+client-secret minting, or an external OIDC token. For the in-process secret
 backend, the front door passes a typed context containing the Vault address,
 Vault JWT role, and workload JWT value. The workload JWT and returned Vault
 token stay in memory for the deployment run; normal deploys do not write JWT
