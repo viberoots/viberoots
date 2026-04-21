@@ -10579,6 +10579,12 @@ secrets, PKCE verifiers, or client secrets.
   only redacted credential-source metadata and never the secret material.
 - Remove direct laptop-side Vault credential preparation from protected/shared deployment entry
   points.
+- Clarify the boundary between artifact production and secret-bearing deployment execution:
+  - client-side artifact builds may be allowed by the artifact admission contract in PR-80
+  - client-side builds must not receive Vault JWTs, Vault tokens, provider credentials, or deployment
+    secret material
+  - the `mini` worker remains the only runtime that prepares Vault credentials and performs
+    protected/shared provider mutation
 
 ### Tests (in this PR)
 
@@ -10590,6 +10596,8 @@ secrets, PKCE verifiers, or client secrets.
   replay snapshots, logs, and thrown errors.
 - Add rejection tests proving protected/shared service-backed deploys fail closed on fixture,
   ambient-token, or client-supplied secret inputs.
+- Add tests proving an admitted client-built artifact path does not cause the client process to mint,
+  receive, or forward Vault/provider credentials.
 - Add fake Vault / fake IdP integration tests proving the worker mints a fresh JWT, logs into Vault,
   reads only admitted secret references, and clears credential memory after execution.
 
@@ -10602,6 +10610,8 @@ secrets, PKCE verifiers, or client secrets.
   secret boundary and server-local credential configuration.
 - Update deployment service setup docs with required environment variables or secret-file references
   for worker-side credential sources.
+- Update artifact/deployment docs to state that client-built artifacts are allowed only as
+  non-secret inputs to server-side artifact admission, not as authority for deployment mutation.
 
 ### Verification Commands
 
@@ -10611,6 +10621,7 @@ secrets, PKCE verifiers, or client secrets.
   - direct Vault admitted-reference resolution
   - missing worker credential failures
   - protected/shared client-side credential rejection
+  - client-built artifact credential-boundary coverage
   - redaction snapshots
   - protected/shared fixture and ambient credential rejection
 
@@ -10630,6 +10641,8 @@ secrets, PKCE verifiers, or client secrets.
   provider secrets.
 - Protected/shared service-backed deploys reject fixture, ambient-token, and client-supplied secret
   inputs.
+- Client-built artifacts, when later admitted by the service, do not expand the client into the
+  Vault/provider secret boundary.
 
 ### Risks
 
@@ -10658,120 +10671,157 @@ worker takes over Vault/runtime credentials.
 
 ---
 
-## PR-80: Server-side artifact source and build contract for remote deployments
+## PR-80: Artifact admission and materialization contract for remote deployments
 
 ### Description
 
 I will replace laptop-local artifact paths in protected/shared service submissions with a reviewed
-server-side artifact source contract. In the deployment-server model, `mini` must build or retrieve
-the exact artifact it will deploy from an auditable source reference, rather than trusting a path on
-the operator's laptop. This PR makes protected/shared remote deploys submit intent plus source
-identity, then lets the `mini` worker materialize, fingerprint, admit, and replay the artifact under
+artifact admission contract. In the deployment-server model, `mini` does not have to build every
+artifact, but it must admit one immutable artifact before protected/shared mutation. This PR lets
+artifacts be produced by the server, the client, CI, or an earlier admitted run, then has the `mini`
+service fingerprint, store or resolve, admit, snapshot, and deploy only the admitted artifact under
 control-plane authority.
 
 ### Scope & Changes
 
-- Add a versioned server-side artifact source contract for protected/shared service submissions:
-  - git repository URL or reviewed local checkout identity
-  - commit SHA or immutable source revision
-  - deployment label
-  - optional build target or resolved artifact target
-  - expected workspace cleanliness / dirty-tree policy
-  - optional source provenance supplied by CI
-- Make remote-client protected/shared deploys submit source identity instead of laptop-local
-  `artifactDir`.
-- Add worker-side artifact materialization:
+- Add a versioned artifact input contract for protected/shared service submissions:
+  - `server_build`: submit source revision, deployment label, build target, and build policy; `mini`
+    materializes the artifact
+  - `client_upload`: submit source/build provenance plus artifact bytes or an archive upload session;
+    `mini` stores and admits the uploaded artifact
+  - `ci_attested`: submit an immutable artifact reference plus CI provenance/attestation; `mini`
+    verifies and admits the referenced artifact
+  - `existing_admitted_artifact`: submit a prior admitted run/artifact selector for promotion,
+    retry, rollback, preview, preview cleanup, or publish-only flows
+- Replace protected/shared `artifactDir` submissions with artifact input descriptors. A laptop may
+  build an artifact, but it cannot ask `mini` to deploy a path on the laptop.
+- Add server-side artifact admission:
+  - compute or verify content digest on `mini`
+  - enforce size, archive format, symlink, executable-bit, and path traversal policy
+  - store uploaded or materialized artifacts in a retained artifact store before provider mutation
+  - record source revision, build target, producer kind, artifact digest, artifact storage reference,
+    and replay snapshot
+  - reject dirty or unpinned protected/shared submissions unless the dirty state is represented by an
+    explicit reviewed source bundle or patch artifact admitted by the server
+- Add worker-side materialization for `server_build`:
   - fetch or update the reviewed checkout on `mini`
   - verify the requested commit
   - build the deployment artifact from the reviewed target
-  - store artifact provenance, fingerprint, and replay snapshot
-  - reject dirty or unpinned protected/shared submissions
+  - admit the resulting artifact through the same artifact admission path as uploads and CI outputs
+- Add upload support for `client_upload`:
+  - create a bounded upload session after auth/admission prechecks
+  - stream or post the artifact archive to the service
+  - compute digest server-side rather than trusting a client-supplied checksum
+  - bind upload completion to the authenticated submission and reject orphaned or expired uploads
+- Add verification support for `ci_attested`:
+  - verify the referenced artifact is immutable and retrievable
+  - validate required CI provenance or attestation fields
+  - admit the artifact only after digest and source/build metadata match the deployment policy
 - Preserve exact-artifact reuse for promotion, rollback, preview, and publish-only operations:
   - source-run selection remains backend-native
   - publish-only must not rebuild
   - rollback must replay the admitted exact artifact
-- Keep artifact upload out of the initial production path. If upload is needed later, require a
-  separate reviewed contract with checksum, size, provenance, retention, and malware/supply-chain
-  policy.
-- Update Cloudflare Pages protected/shared service routing so initial deploys no longer require
-  client-resolved `artifactDir`.
+- Update Cloudflare Pages protected/shared service routing so provider publish always receives an
+  admitted artifact reference, regardless of whether the artifact was built on `mini`, uploaded from
+  the client, produced by CI, or selected from a previous admitted run.
 
 ### Tests (in this PR)
 
-- Add service-contract tests proving protected/shared remote deploy submissions reject laptop-local
-  artifact paths.
-- Add worker materialization tests using an isolated fixture repo:
+- Add service-contract tests proving protected/shared submissions reject laptop-local artifact paths
+  while accepting reviewed artifact input descriptors.
+- Add artifact admission tests for:
+  - server-side digest computation
+  - archive normalization and path traversal rejection
+  - size/type limit enforcement
+  - upload session expiry and orphan cleanup
+  - producer-kind provenance recording
+  - replay snapshot artifact identity
+- Add `server_build` materialization tests using an isolated fixture repo:
   - pinned commit builds successfully
   - missing commit fails closed
   - dirty/unpinned source fails for protected/shared deploys
-  - artifact fingerprint and provenance are recorded
-  - replay snapshots contain source identity and artifact identity
+- Add `client_upload` tests proving:
+  - client-built archives can be uploaded and admitted
+  - the server computes the digest and stores the artifact before mutation
+  - corrupted, oversized, expired, orphaned, and path-unsafe uploads fail closed
+  - upload metadata does not grant the client Vault/provider credentials
+- Add `ci_attested` tests proving immutable references and required provenance are verified before
+  admission.
 - Add Cloudflare Pages service tests proving deploy, promotion, rollback, preview, and preview
-  cleanup keep exact-artifact semantics under the new source contract.
+  cleanup keep exact-artifact semantics under the new admission contract.
 - Add rejection tests proving protected/shared submissions cannot use laptop-local artifact
-  directories or client-resolved build output paths.
+  directories or client-resolved build output paths without uploading/admitting the artifact.
 
 ### Docs (in this PR)
 
 - Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
   and [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md) with the
-  server-side source/build contract.
+  artifact admission contract, including `server_build`, `client_upload`, `ci_attested`, and
+  `existing_admitted_artifact` examples.
 - Update [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) with
-  the distinction between source identity, admitted artifact identity, and replay artifact identity.
-- Update operator docs so production examples use a committed source revision rather than a laptop
-  `dist` path.
+  the distinction between artifact producer, source identity, admitted artifact identity, and replay
+  artifact identity.
+- Update operator docs so production examples never submit a laptop `dist` path directly, but may
+  either request a server build or upload a local build artifact for server admission.
 
 ### Verification Commands
 
 - `v`
 - targeted deployment-domain tests covering:
-  - server-side source contract validation
-  - worker artifact materialization
+  - artifact input contract validation
+  - artifact admission and storage
+  - server-build materialization
+  - client-upload admission
+  - CI-attested artifact admission
   - Cloudflare Pages protected/shared service routing
   - exact-artifact replay/promotion/rollback parity
-  - source/artifact provenance docs parity
+  - artifact provenance docs parity
 
 ### Expected Regression Scope
 
 - `mixed-build-system`
-- This PR affects artifact resolution, build/materialization behavior, Cloudflare Pages service
-  submissions, and replay contracts. Run full build-system verification unless classifier coverage
-  proves all touched surfaces are deployment-owned.
+- This PR affects artifact resolution, upload/admission behavior, build/materialization behavior,
+  Cloudflare Pages service submissions, and replay contracts. Run full build-system verification
+  unless classifier coverage proves all touched surfaces are deployment-owned.
 
 ### Acceptance Criteria
 
-- Laptop remote-client protected/shared deploys no longer submit local artifact paths.
-- The `mini` worker builds or resolves artifacts from a pinned reviewed source reference.
+- Laptop remote-client protected/shared deploys no longer submit local artifact paths; they submit a
+  reviewed artifact input descriptor or upload an artifact for server admission.
+- The `mini` service admits one immutable artifact before protected/shared provider mutation.
+- The admitted artifact may come from a server build, client upload, CI-attested reference, or prior
+  admitted run.
 - Artifact identity, source identity, and replay provenance are recorded and redacted correctly.
 - Promotion, rollback, preview, and publish-only still replay admitted exact artifacts.
 - Protected/shared submissions reject laptop-local artifact directories and client-resolved build
-  output paths.
+  output paths unless the artifact bytes are uploaded and admitted by the service.
 
 ### Risks
 
-Server-side builds can add runtime cost, cache complexity, and source checkout management risk to the
-deployment worker.
+Allowing client-built artifact uploads increases service surface area, artifact storage needs, and
+supply-chain risk compared with server-only builds.
 
 ### Mitigation
 
-Start with pinned commits and a reviewed checkout contract, keep upload out of scope, record
-provenance, fail closed on dirty/unpinned sources, and add focused materialization tests before
-provider mutation.
+Treat uploads as untrusted artifact inputs until admitted, compute digest server-side, enforce
+archive and size policy, retain admitted artifacts before mutation, bind approvals to the admitted
+artifact digest, and keep Vault/provider credentials exclusively on `mini`.
 
 ### Consequence of Not Implementing
 
-Remote-client deploys would either fail on laptop-local paths or require mini to trust arbitrary
-client artifacts, both of which undermine the deployment-server model.
+Remote-client deploys would force all initial artifacts to be built on `mini` or by CI, which would
+unnecessarily reject useful laptop-build workflows even when the server could safely admit and deploy
+the resulting immutable artifact.
 
 ### Downsides for Implementing
 
-Adds source checkout/build orchestration and may make protected/shared deploys slower until caching
-and prebuild behavior are tuned.
+Adds upload/session/storage policy and artifact-admission complexity, and local builds remain weaker
+than CI attestations unless paired with strong provenance.
 
 ### Recommendation
 
-Implement after PR-79 so the worker already owns the trusted runtime environment and can safely
-materialize artifacts server-side.
+Implement after PR-79 so the worker already owns the trusted secret/runtime boundary before the
+service starts admitting artifacts from multiple producer modes.
 
 ---
 
@@ -10800,13 +10850,15 @@ coherent operator experience: submit from the laptop, authenticate in the browse
   - service auth/session configuration
   - worker-side Vault credential-source configuration
   - records/artifact/cache roots
+  - upload session and admitted-artifact storage roots
 - Improve remote-client status UX:
   - poll status with concise phase messages
   - surface pending approval state and approval instructions
   - print final record summary and deploy run id
+  - surface artifact admission phase, upload progress, admitted artifact digest, and producer kind
   - provide machine-readable JSON mode for automation
-  - include redacted failure diagnostics from auth, admission, worker, Vault, provider publish, and
-    smoke phases
+  - include redacted failure diagnostics from auth, artifact admission, worker, Vault, provider
+    publish, and smoke phases
 - Add optional log tail or event stream endpoint only if it can be redacted and bounded; otherwise
   document the initial polling-only UX and leave streaming for a later PR.
 - Do not expose bearer-token human deployment as part of the normal hosted operator path. Human
@@ -10818,10 +10870,13 @@ coherent operator experience: submit from the laptop, authenticate in the browse
   inventory.
 - Add service startup/config tests for required database, records root, auth session, and worker
   credential-source configuration.
+- Add hosted upload/admitted-artifact storage config tests proving uploaded artifacts are retained
+  before mutation and worker-only storage paths are not exposed publicly.
 - Add remote-client UX tests for:
   - submit/login/status/final-result flow
+  - client upload progress and admitted artifact digest display
   - pending approval summary
-  - failed auth/admission/Vault/provider/smoke diagnostics
+  - failed auth/artifact-admission/Vault/provider/smoke diagnostics
   - JSON output stability
   - token/log redaction
 - Add doc-contract tests proving operator docs use hosted service URLs rather than stale laptop-local
@@ -10834,7 +10889,7 @@ coherent operator experience: submit from the laptop, authenticate in the browse
 - Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
   with the laptop-as-client workflow.
 - Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
-  with hosted service URL examples and status/result shapes.
+  with hosted service URL examples, upload/admission examples, and status/result shapes.
 - Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
   so Step 9 points operators at hosted `mini` deployment service login for normal interactive
   deploys.
@@ -10845,6 +10900,7 @@ coherent operator experience: submit from the laptop, authenticate in the browse
 - targeted deployment-domain tests covering:
   - NixOS module eval for hosted service/callback ingress
   - service config validation
+  - hosted upload/admitted-artifact storage validation
   - remote-client status/result UX
   - redacted diagnostics
   - docs/operator-contract parity
@@ -10852,8 +10908,9 @@ coherent operator experience: submit from the laptop, authenticate in the browse
 ### Expected Regression Scope
 
 - `mixed-build-system`
-- This PR touches NixOS module wiring, service configuration, remote-client UX, and docs. Run full
-  build-system verification unless deployment-domain classifier coverage safely scopes the change.
+- This PR touches NixOS module wiring, service configuration, hosted artifact storage,
+  remote-client UX, and docs. Run full build-system verification unless deployment-domain classifier
+  coverage safely scopes the change.
 
 ### Acceptance Criteria
 
@@ -10861,6 +10918,8 @@ coherent operator experience: submit from the laptop, authenticate in the browse
 - The service and worker can be configured as long-running host services with private backend ports.
 - A laptop operator can submit, authenticate, monitor, and receive final results without running
   provider mutation locally.
+- Hosted status output shows artifact admission state and admitted artifact identity for server
+  builds, client uploads, CI-attested artifacts, and prior admitted artifacts.
 - Status and failure output are actionable, stable, and redacted.
 - Operator docs no longer imply that the reviewed server-mode path depends on laptop-local callback
   listeners or artifact paths.
@@ -10882,13 +10941,13 @@ service setup path, or usable laptop-client workflow.
 
 ### Downsides for Implementing
 
-Adds host-service deployment and operator UX work that must stay synchronized with auth, worker, and
-artifact contracts.
+Adds host-service deployment and operator UX work that must stay synchronized with auth, worker,
+artifact admission, and storage contracts.
 
 ### Recommendation
 
 Implement after PR-80 so the hosted operator surface can document the final server-owned auth,
-worker-owned secrets, and server-side artifact behavior together.
+worker-owned secrets, and artifact-admission behavior together.
 
 ---
 
@@ -10898,9 +10957,11 @@ worker-owned secrets, and server-side artifact behavior together.
 
 I will make the deployment-server model the only production contract for protected/shared `mini`
 deployments. This PR removes obsolete local-run surfaces instead of carrying parallel production
-paths: no laptop-owned callbacks, no laptop-local artifacts, no client-side Vault runtime, no trusted
-client principals, and no fixture paths in protected/shared submission or worker execution. The
-production story is intentionally narrow: the laptop is a client, `mini` is the deployment server.
+paths: no laptop-owned callbacks, no laptop-local artifact paths, no client-side Vault runtime, no
+trusted client principals, and no fixture paths in protected/shared submission or worker execution.
+Client-built artifacts remain valid only after upload and server-side admission. The production story
+is intentionally narrow: the laptop may build and submit artifacts, but `mini` admits artifacts and
+performs deployment mutation.
 
 ### Scope & Changes
 
@@ -10909,7 +10970,7 @@ production story is intentionally narrow: the laptop is a client, `mini` is the 
   begins.
 - Remove or hard-disable obsolete protected/shared entry points:
   - CLI-owned public-host PKCE callback selection
-  - laptop-local `artifactDir` submission
+  - laptop-local `artifactDir` or path-only artifact submission
   - ambient Vault JWT / Vault token / provider-token inputs
   - fixture credential sources
   - client-supplied principals or authorization grants
@@ -10918,26 +10979,26 @@ production story is intentionally narrow: the laptop is a client, `mini` is the 
   - missing deployment service URL
   - callback host not routed to the service
   - Keycloak redirect allowlist missing the service-owned callback URL
-  - local artifact path supplied to a protected/shared service deployment
+  - local artifact path supplied without upload/admission to a protected/shared service deployment
   - ambient credential input supplied to a protected/shared service deployment
   - forged or client-supplied identity fields
 - Update generated docs, examples, and capability/operator-contract text so production examples only
-  show the deployment-server path.
+  show the deployment-server path and reviewed artifact producer modes.
 - Remove shims and tests that only exist to keep protected/shared laptop-run workflows available.
 
 ### Tests (in this PR)
 
 - Add guardrail tests proving protected/shared remote-client deploys fail closed on:
   - CLI-owned public-host callback selection
-  - laptop-local artifact directories
+  - laptop-local artifact directories or path-only artifact descriptors
   - ambient Vault tokens/JWTs
   - fixture credential sources
   - direct laptop provider mutation
   - forged client principal/grant fields
 - Add diagnostics tests for missing service URL, stale callback routing, Keycloak redirect mismatch,
-  rejected local artifact paths, rejected ambient credentials, and forged identity fields.
+  rejected path-only artifacts, rejected ambient credentials, and forged identity fields.
 - Add doc-contract tests proving production examples point to server-owned login, worker-owned
-  secrets, server-side artifact materialization, and hosted `mini` status/result URLs.
+  secrets, server-admitted artifacts, and hosted `mini` status/result URLs.
 - Remove test expectations that require protected/shared local-run behavior to be supported.
 
 ### Docs (in this PR)
@@ -10946,7 +11007,7 @@ production story is intentionally narrow: the laptop is a client, `mini` is the 
   protected/shared production workflow is laptop client to hosted `mini` service.
 - Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
   so Step 9 no longer implies that an operator manually supplies a JWT, runs a laptop callback
-  listener, or deploys from a laptop artifact path.
+  listener, or deploys from a laptop artifact path without upload/admission.
 - Update [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
   and generated summaries so Cloudflare Pages protected/shared capability text describes only the
   deployment-server path.
@@ -10954,7 +11015,8 @@ production story is intentionally narrow: the laptop is a client, `mini` is the 
   - authenticate through `mini`
   - authorize on `mini`
   - prepare secrets on `mini`
-  - build or retrieve artifacts on `mini`
+  - upload, build, verify, or select artifacts for admission on `mini`
+  - admit immutable artifacts on `mini`
   - mutate providers from `mini`
 
 ### Verification Commands
@@ -10963,7 +11025,7 @@ production story is intentionally narrow: the laptop is a client, `mini` is the 
 - targeted deployment-domain tests covering:
   - server-mode guardrails
   - stale callback diagnostics
-  - rejected local-run surfaces
+  - rejected local-run surfaces and path-only artifact submissions
   - docs/capability parity
   - redaction snapshots
 
@@ -10977,8 +11039,10 @@ production story is intentionally narrow: the laptop is a client, `mini` is the 
 ### Acceptance Criteria
 
 - Protected/shared `mini` deployments require the deployment-server path.
-- Laptop-owned callbacks, laptop-local artifacts, ambient Vault credentials, fixture credential
+- Laptop-owned callbacks, laptop-local artifact paths, ambient Vault credentials, fixture credential
   sources, trusted client identities, and direct laptop provider mutation are rejected.
+- Client-built artifacts remain allowed only through service upload/admission, with server-recorded
+  immutable artifact identity.
 - Production docs and generated capability text present one story: laptop client, `mini` server.
 - Diagnostics fail before mutation and explain the required server-owned replacement.
 - No protected/shared tests require obsolete local-run behavior.
@@ -10996,7 +11060,8 @@ introducing flags that would keep two production contracts alive.
 ### Consequence of Not Implementing
 
 The repo would carry two competing protected/shared stories, causing operators to keep asking
-whether callbacks, secrets, artifacts, and provider mutation belong to the laptop or to `mini`.
+whether callbacks, artifact admission, secrets, and provider mutation belong to the laptop or to
+`mini`.
 
 ### Downsides for Implementing
 
