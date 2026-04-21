@@ -5,6 +5,7 @@ export type FakeOidcServer = {
   issuer: string;
   close: () => Promise<void>;
   requests: string[];
+  tokenRequests: URLSearchParams[];
 };
 
 function b64url(value: string): string {
@@ -37,6 +38,7 @@ export async function startFakeOidcServer(opts?: {
   };
 }): Promise<FakeOidcServer> {
   const requests: string[] = [];
+  const tokenRequests: URLSearchParams[] = [];
   let issuer = "";
   let devicePolls = 0;
   const server = http.createServer(async (req, res) => {
@@ -62,6 +64,7 @@ export async function startFakeOidcServer(opts?: {
     }
     if (url.pathname.endsWith("/protocol/openid-connect/token")) {
       const body = new URLSearchParams(await readBody(req));
+      tokenRequests.push(body);
       if (body.get("grant_type") === "urn:ietf:params:oauth:grant-type:device_code") {
         devicePolls++;
         const firstPollError = opts?.device?.firstPollError;
@@ -94,6 +97,7 @@ export async function startFakeOidcServer(opts?: {
   return {
     issuer,
     requests,
+    tokenRequests,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };
 }

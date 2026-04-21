@@ -1217,6 +1217,13 @@ vault_runtime = {
     "service_account_client_id": "deployment-runner",
     "deployment_environment": "mini",
     "jwt_role": "deploy-pleomino-read",
+    "pkce_callback_mode": "public_host",
+    "pkce_callback_external_scheme": "https",
+    "pkce_callback_external_host": "deploy-auth.apps.kilty.io",
+    "pkce_callback_external_path": "/oidc/callback",
+    "pkce_callback_bind_host": "127.0.0.1",
+    "pkce_callback_bind_port": "8765",
+    "pkce_callback_bind_path": "/oidc/callback",
     "preferred_credential_source": "interactive_pkce",
     "required_human_claim": "groups",
     "required_human_claim_value": "deployers",
@@ -1225,9 +1232,11 @@ vault_runtime = {
 
 Credential-source choices:
 
-- `interactive_pkce`: local human desktop deploys. Configure a public Keycloak
-  CLI client with Authorization Code + PKCE required and an allowed loopback
-  redirect URI.
+- `interactive_pkce`: local human desktop deploys and reviewed shared-host
+  browser login. Configure a public Keycloak CLI client with Authorization Code
+  - PKCE required. Allow loopback redirect URIs for local desktops and allow the
+    exact shared-host redirect URI
+    `https://deploy-auth.apps.kilty.io/oidc/callback` for `mini`.
 - `interactive_device`: SSH/headless human deploys when the issuer supports
   OAuth 2.0 Device Authorization Grant. The CLI displays the verification URI
   and user code.
@@ -1239,6 +1248,35 @@ Credential-source choices:
   door, then converted into the in-memory Vault credential context.
 - `jenkins_oidc` or `external_oidc_token`: Jenkins/workload-identity federation
   when Jenkins can provide an OIDC token from an issuer Vault trusts.
+
+For the current `mini` host inventory:
+
+| Purpose       | Hostname                     |
+| ------------- | ---------------------------- |
+| OIDC issuer   | `identity.apps.kilty.io`     |
+| Vault API     | `secrets.apps.kilty.io:8200` |
+| PKCE callback | `deploy-auth.apps.kilty.io`  |
+
+The deploy-auth callback hostname is a host-owned nginx route to the one-shot
+deploy command listener:
+
+```nix
+deploymentHost.deployAuthCallback = {
+  enable = true;
+  hostname = "deploy-auth.apps.kilty.io";
+  callbackPath = "/oidc/callback";
+  localBindHost = "127.0.0.1";
+  localBindPort = 8765;
+  manageNginx = false;
+  manageAcme = false;
+  openFirewall = false;
+};
+```
+
+Keep the local bind port off the public firewall for this reverse-proxied shape.
+The Keycloak redirect allowlist uses only
+`https://deploy-auth.apps.kilty.io/oidc/callback`; the local
+`http://127.0.0.1:8765/oidc/callback` URI is private host wiring.
 
 For Jenkins client-secret automation, keep the client secret itself outside the
 repo:

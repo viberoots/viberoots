@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentCredentialSource } from "./deployment-credential-source-selection.ts";
+import type { DeploymentPkceCallbackProfileInput } from "./deployment-pkce-callback-profile.ts";
 
 export type DeploymentVaultRuntimeConfig = {
   addr?: string;
@@ -17,4 +18,5 @@ export type DeploymentVaultRuntimeConfig = {
   externalOidcTokenEnv?: string;
   requiredHumanClaim?: string;
   requiredHumanClaimValue?: string;
+  pkceCallback?: DeploymentPkceCallbackProfileInput;
 };

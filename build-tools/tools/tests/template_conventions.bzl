@@ -47,6 +47,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
     "build-tools/tools/tests/scaffolding/webapp-static.dev-hmr.local-ts-dep.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static"],
         "classification": "template:contract",
+        "extra_labels": ["verify:isolated"],
     },
     "build-tools/tools/tests/scaffolding/webapp-static.dev-reload.wasm-producer.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static"],
@@ -73,6 +74,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
     "build-tools/tools/tests/scaffolding/webapp-static-pwa.dev-hmr.local-ts-dep.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static-pwa"],
         "classification": "template:contract",
+        "extra_labels": ["verify:isolated"],
     },
     "build-tools/tools/tests/scaffolding/webapp-static-pwa.runtime-offline.contract.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static-pwa"],
@@ -91,6 +93,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
     "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-hmr.local-ts-dep.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
         "classification": "template:contract",
+        "extra_labels": ["verify:isolated"],
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-reload.wasm-producer.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],
@@ -123,6 +126,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
     "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-hmr.local-ts-dep.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
         "classification": "template:contract",
+        "extra_labels": ["verify:isolated"],
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-reload.wasm-producer.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],

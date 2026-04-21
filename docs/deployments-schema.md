@@ -88,9 +88,44 @@ Optional keys:
 - `required_human_claim`: human deployer claim name, such as `groups` or a
   flat realm-role/client-role mapper claim.
 - `required_human_claim_value`: required value for `required_human_claim`.
+- `pkce_callback_mode`: `loopback` or `public_host`.
+- `pkce_callback_external_scheme`: browser-facing redirect scheme, `http` or
+  `https`.
+- `pkce_callback_external_host`: browser-facing redirect hostname.
+- `pkce_callback_external_port`: optional browser-facing redirect port. Omit
+  this for reviewed HTTPS reverse-proxy profiles on the default port.
+- `pkce_callback_external_path`: browser-facing redirect path, usually
+  `/oidc/callback`.
+- `pkce_callback_bind_host`: local host where the deploy command listens.
+- `pkce_callback_bind_port`: stable local port where the deploy command
+  listens for public-host callback profiles.
+- `pkce_callback_bind_path`: local listener path, usually `/oidc/callback`.
+- `pkce_callback_open_firewall`: `true` only for reviewed direct-public
+  profiles. Reverse-proxied profiles keep the local bind port private.
 
 `vault_runtime` may contain public routing and identity metadata, but must never contain client
 secrets, Vault tokens, root tokens, or secret material.
+
+For the reviewed `mini` shared deploy host shape, existing Vault-backed deployments should use:
+
+```python
+vault_runtime = {
+    "addr": "https://secrets.apps.kilty.io:8200",
+    "oidc_issuer": "https://identity.apps.kilty.io/realms/deployments",
+    "audience": "deployments-vault",
+    "deployment_client_id": "deployment-runner",
+    "cli_public_client_id": "deployment-cli",
+    "deployment_environment": "mini",
+    "jwt_role": "deploy-pleomino-read",
+    "pkce_callback_mode": "public_host",
+    "pkce_callback_external_scheme": "https",
+    "pkce_callback_external_host": "deploy-auth.apps.kilty.io",
+    "pkce_callback_external_path": "/oidc/callback",
+    "pkce_callback_bind_host": "127.0.0.1",
+    "pkce_callback_bind_port": "8765",
+    "pkce_callback_bind_path": "/oidc/callback",
+}
+```
 
 ### `components[*]`
 

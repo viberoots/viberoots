@@ -73,7 +73,10 @@ For a fresh `mini` install, follow this exact order:
    `/srv/common/build-tools/tools/nix/shared-host-identity-provider-module.nix`,
    `/srv/common/build-tools/tools/nix/shared-host-postgres-module.nix` and
    `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix` when you want
-   repo-managed local identity-provider, Postgres, and Vault services on `mini`
+   repo-managed local identity-provider, Postgres, and Vault services on `mini`.
+   Also import
+   `/srv/common/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
+   when `mini` should serve the reviewed public PKCE callback route.
 3. wire `/etc/nixos/bucknix/nixos-shared-host/default.nix` into the
    authoritative NixOS config and apply it with `sudo nixos-rebuild switch`
 4. start the deployment service and worker on `mini`
@@ -112,6 +115,7 @@ starting modules live here:
 - `/srv/common/build-tools/tools/nix/shared-host-postgres-module.nix`
 - `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix`
 - `/srv/common/build-tools/tools/nix/shared-host-identity-provider-module.nix`
+- `/srv/common/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
 
 For a flake-based `/etc/nixos` host, expose only the module directory as a
 non-flake input:
@@ -134,9 +138,12 @@ configuration that already owns nginx, wildcard ACME, firewall lists, and DNS
 rewrites. Use `deploymentHost.vault.useAcmeCertificate = true` for direct
 Vault TLS on the existing `*.apps.kilty.io` certificate, and set the
 identity-provider `manageNginx`, `manageAcme`, and `openFirewall` flags to
-`false` when adding a host-owned `identity.apps.kilty.io` nginx vhost. The
-modules do not choose public domains for you; set `publicHostname`,
-`acmeCertName`, and `identityProvider.hostname` from the host config.
+`false` when adding a host-owned `identity.apps.kilty.io` nginx vhost. Use the
+deploy-auth callback module the same way for `deploy-auth.apps.kilty.io`, routing
+to `127.0.0.1:8765` without opening that local bind port publicly. The modules
+do not choose public domains for you; set `publicHostname`, `acmeCertName`,
+`identityProvider.hostname`, and `deployAuthCallback.hostname` from the host
+config.
 
 Use that runbook when you need to:
 

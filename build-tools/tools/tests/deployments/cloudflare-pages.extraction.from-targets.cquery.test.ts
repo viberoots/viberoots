@@ -61,6 +61,25 @@ function assertCloudflareApiTokenSteps(deployment: {
   );
 }
 
+const EXPECTED_MINI_VAULT_RUNTIME = {
+  addr: "https://secrets.apps.kilty.io:8200",
+  oidcIssuer: "https://identity.apps.kilty.io/realms/deployments",
+  audience: "deployments-vault",
+  deploymentClientId: "deployment-runner",
+  cliPublicClientId: "deployment-cli",
+  deploymentEnvironment: "mini",
+  roleName: "deploy-pleomino-read",
+  pkceCallback: {
+    mode: "public_host",
+    externalScheme: "https",
+    externalHost: "deploy-auth.apps.kilty.io",
+    externalPath: "/oidc/callback",
+    bindHost: "127.0.0.1",
+    bindPort: "8765",
+    bindPath: "/oidc/callback",
+  },
+};
+
 test("cloudflare-pages deployment extraction reads canonical metadata from TARGETS via cquery", async () => {
   await runInTemp("cloudflare-pages-cquery-extraction", async (tmp, _$) => {
     const appTargetsPath = path.join(tmp, "projects", "apps", "pleomino", "TARGETS");
@@ -223,23 +242,6 @@ test("concrete Pleomino Cloudflare TARGETS emit publish and cleanup token requir
     deployments
       .map((deployment) => deployment.vaultRuntime)
       .sort((a, b) => (a?.roleName || "").localeCompare(b?.roleName || "")),
-    [
-      {
-        addr: "https://secrets.apps.kilty.io:8200",
-        oidcIssuer: "https://identity.apps.kilty.io/realms/deployments",
-        audience: "deployments-vault",
-        deploymentClientId: "deployment-runner",
-        deploymentEnvironment: "mini",
-        roleName: "deploy-pleomino-read",
-      },
-      {
-        addr: "https://secrets.apps.kilty.io:8200",
-        oidcIssuer: "https://identity.apps.kilty.io/realms/deployments",
-        audience: "deployments-vault",
-        deploymentClientId: "deployment-runner",
-        deploymentEnvironment: "mini",
-        roleName: "deploy-pleomino-read",
-      },
-    ],
+    [EXPECTED_MINI_VAULT_RUNTIME, EXPECTED_MINI_VAULT_RUNTIME],
   );
 });

@@ -60,7 +60,26 @@ test("print-login instructions are browserless and memory-only", async () => {
   assert.equal(login.browserLaunched, false);
   assert.equal(login.tokensMinted, false);
   assert.equal(login.sessionPolicy.persistentCache, false);
+  assert.equal(login.pkceCallback.mode, "public_host");
+  assert.equal(login.pkceCallback.externalHost, "deploy-auth.apps.kilty.io");
+  assert.equal(login.pkceCallback.bindPort, 8765);
   assert.match(login.instructions.join("\n"), /--login-browser=print/);
+});
+
+test("auth doctor lets CLI/env callback profile overrides win over metadata", async () => {
+  const deployment = await fixtureDeployment();
+  const doctor = buildDeploymentAuthDoctor(deployment, {
+    BNX_DEPLOYMENT_PKCE_CALLBACK_MODE: "public_host",
+    BNX_DEPLOYMENT_PKCE_CALLBACK_EXTERNAL_SCHEME: "http",
+    BNX_DEPLOYMENT_PKCE_CALLBACK_HOST: "override.example.test",
+    BNX_DEPLOYMENT_PKCE_CALLBACK_EXTERNAL_PORT: "8088",
+    BNX_DEPLOYMENT_PKCE_CALLBACK_BIND_HOST: "127.0.0.1",
+    BNX_DEPLOYMENT_PKCE_CALLBACK_BIND_PORT: "18088",
+  });
+  assert.equal(doctor.vaultRuntime.pkceCallback.externalScheme, "http");
+  assert.equal(doctor.vaultRuntime.pkceCallback.externalHost, "override.example.test");
+  assert.equal(doctor.vaultRuntime.pkceCallback.externalPort, 8088);
+  assert.equal(doctor.vaultRuntime.pkceCallback.bindPort, 18088);
 });
 
 test("Jenkins help and matrix share the reviewed credential env names", async () => {

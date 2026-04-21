@@ -53,24 +53,7 @@ nix_cpp_wasm_static_lib(
       await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
     );
 
-    // 3) Export graph once
-    await exportGraphInTemp({ tmp, $ });
-
-    // 4) Build C++ WASI static lib via selected (planner routes flavor:wasm + wasm:wasi)
-    const outCppPath = await buildSelectedOutPath({
-      tmp,
-      $,
-      target: "//projects/libs/math-core:core_wasm",
-      env: { PLANNER_ONLY_CPP: "1" },
-    });
-    // Basic artifact presence check
-    const libDir = path.join(outCppPath, "lib");
-    const files = (await fs.pathExists(libDir)) ? await fs.readdir(libDir) : [];
-    if (!files.find((f) => f.endsWith(".a"))) {
-      throw new Error(`expected static archive under ${libDir}`);
-    }
-
-    // 5) TinyGo package exporting a wasm function `add` (pure Go, no C++ link required for smoke)
+    // 3) TinyGo package exporting a wasm function `add` (pure Go, no C++ link required for smoke)
     const apiDir = path.join(tmp, "projects", "libs", "math-api");
     await fs.mkdirp(apiDir);
     await fs.outputFile(
@@ -105,6 +88,23 @@ nix_go_tiny_wasm_lib(
 )
 `,
     );
+
+    // 4) Export graph after all selected-build targets exist.
+    await exportGraphInTemp({ tmp, $ });
+
+    // 5) Build C++ WASI static lib via selected (planner routes flavor:wasm + wasm:wasi)
+    const outCppPath = await buildSelectedOutPath({
+      tmp,
+      $,
+      target: "//projects/libs/math-core:core_wasm",
+      env: { PLANNER_ONLY_CPP: "1" },
+    });
+    // Basic artifact presence check
+    const libDir = path.join(outCppPath, "lib");
+    const files = (await fs.pathExists(libDir)) ? await fs.readdir(libDir) : [];
+    if (!files.find((f) => f.endsWith(".a"))) {
+      throw new Error(`expected static archive under ${libDir}`);
+    }
 
     // 6) Build TinyGo WASI wasm via graph-generator-selected-wasm (WEB_WASM_BACKEND=wasi_single)
     const outWasmPath = await buildSelectedOutPath({

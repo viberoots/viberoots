@@ -10096,6 +10096,203 @@ diagnostic and session UX that explains them.
 
 ---
 
+## PR-76: Reviewed public PKCE callback profile for externally reachable deploy hosts
+
+### Description
+
+I will make externally reachable PKCE callbacks a reviewed deployment-auth design instead of an
+ad-hoc operator override. This PR introduces a first-class callback profile for human PKCE deploys
+so shared deploy hosts can print login URLs whose redirect URI points at the deploy host by default,
+without requiring an SSH loopback forward. Loopback remains the fallback for local developer
+machines and unconfigured deployments. The PR must also migrate the existing reviewed deployment
+targets to the new metadata shape, using the concrete `mini` hostnames already in service for
+deployment auth: Vault at `https://secrets.apps.kilty.io:8200`, the IdP issuer at
+`https://identity.apps.kilty.io/realms/deployments`, and the reviewed reverse-proxied callback URL
+`https://deploy-auth.apps.kilty.io/oidc/callback`.
+
+### Scope & Changes
+
+- Add reviewed `vault_runtime.pkce_callback` metadata for the public CLI client:
+  - `mode = "loopback" | "public_host"`
+  - external redirect fields used in the rendered authorization URL and Keycloak allowlist:
+    `external_scheme`, `external_host`, optional `external_port`, and `external_path`
+  - local listener fields used only by the deploy command: `bind_host`, `bind_port`, and optional
+    `bind_path`
+  - support both direct public callback mode and reverse-proxy mode by allowing the external URI to
+    differ from the local bind URI
+  - allow `external_scheme = "https"` with no explicit external port so reverse-proxied callbacks
+    can render as `https://deploy-auth.apps.kilty.io/oidc/callback`
+  - allow `external_scheme = "http"` and explicit external ports for non-proxied dev/test callback
+    profiles when they are reviewed and allowlisted
+- Update existing deployment targets, not just schemas and helpers, so checked-in deployments that
+  already use `mini` Vault runtime metadata gain the reviewed callback profile in the same PR:
+  - preserve `vault_runtime.addr = "https://secrets.apps.kilty.io:8200"`
+  - preserve `vault_runtime.oidc_issuer = "https://identity.apps.kilty.io/realms/deployments"`
+  - preserve `vault_runtime.deployment_environment = "mini"`
+  - add the reviewed reverse-proxy profile with `external_scheme = "https"`,
+    `external_host = "deploy-auth.apps.kilty.io"`, no explicit external port,
+    `external_path = "/oidc/callback"`, and a stable local `bind_port`
+  - update both deployment metadata and runbook examples so production, staging, and docs do not
+    drift from the same `mini` hostname inventory
+- Update credential-source selection so `interactive_pkce` resolves callback configuration in this
+  precedence order:
+  - CLI flags for emergency/operator override
+  - environment variables for host-local deploy-runner configuration
+  - reviewed deployment metadata from `vault_runtime.pkce_callback`
+  - loopback fallback when no public callback profile is configured
+- Switch public-host PKCE mode from ephemeral bind ports to a stable reviewed local bind port so
+  reverse-proxy rules, firewall rules, runbooks, and diagnostics can be deterministic. Keycloak
+  redirect URI allowlisting must use the external redirect URI, not the local bind URI.
+- Add NixOS/reverse-proxy support for the reviewed `mini` shape:
+  - route `https://deploy-auth.apps.kilty.io/oidc/callback` to the deploy command's local callback
+    listener, for example `http://127.0.0.1:<stable-bind-port>/oidc/callback`
+  - keep the local bind port off the public firewall when nginx or another reverse proxy terminates
+    HTTPS on the same host
+  - allow direct-public profiles to open the bind port only when the deployment metadata explicitly
+    requests that shape
+- Keep the callback listener one-shot, state-checked, timeout-bound, and code-only:
+  - reject state mismatches
+  - consume exactly one callback
+  - close the listener after success, failure, timeout, or command interruption
+  - never print auth codes, PKCE verifiers, access tokens, refresh tokens, workload JWTs, or Vault
+    tokens
+- Add preflight validation for public-host mode:
+  - fail before printing the login URL when the configured port cannot be bound
+  - print a non-secret diagnostic when the external redirect URI or local bind profile is missing
+    required fields
+  - explain that the OIDC client must allow the exact external redirect URI
+  - explain that the browser must be able to reach the external URL while the deploy command waits
+- Keep device authorization as the preferred browserless flow when the issuer supports it, but allow
+  public-host PKCE to be the default printed-login behavior for reviewed shared deploy hosts where
+  device authorization is unavailable or not desired.
+
+### Tests (in this PR)
+
+- Add PKCE callback profile unit tests proving:
+  - loopback mode preserves the existing `127.0.0.1` redirect URI and loopback bind behavior
+  - reverse-proxy public-host mode prints `https://deploy-auth.apps.kilty.io/oidc/callback` with no
+    explicit external port in `redirect_uri`
+  - direct public-host mode can still print an explicit reviewed external port when configured
+  - public-host mode binds the configured local `bind_host`/`bind_port` and fails clearly when the
+    bind port is unavailable
+  - invalid hosts, URL-shaped hosts, missing ports, and unsupported schemes fail before any login URL
+    is printed
+- Add fake-OIDC integration tests proving:
+  - the authorization URL uses the same reviewed redirect URI that the token exchange submits
+  - the external redirect URI used for authorization/token exchange may differ from the local bind
+    URI that receives the reverse-proxied callback
+  - state mismatch and missing-code callbacks still fail without leaking auth codes
+  - one-shot callback consumption still closes the public listener after success or rejection
+- Add credential-source selection tests for CLI flag, environment, metadata, and loopback-fallback
+  precedence.
+- Add deployment metadata extraction/schema tests proving every existing `mini` Vault-backed
+  deployment target has the expected Vault address, IdP issuer, deployment environment, and reviewed
+  public callback profile.
+- Add auth diagnostic tests proving `deploy auth doctor` and `deploy auth print-login` describe the
+  selected callback profile without minting tokens or printing secret values.
+- Add redaction tests covering printed PKCE URLs, callback diagnostics, bind errors, and timeout
+  errors.
+
+### Docs (in this PR)
+
+- Update [Deployment Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md) with the
+  `vault_runtime.pkce_callback` shape, allowed modes, required fields, and precedence rules.
+- Update the checked-in `projects/deployments/**/TARGETS` deployment metadata that already points at
+  `mini` Vault/IdP infrastructure so the new public callback profile is present on those deployment
+  targets, not only documented as a future option.
+- Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+  with the public-host PKCE flags, environment variables, metadata fallback, and security boundary.
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  with Keycloak redirect URI allowlist examples for
+  `https://deploy-auth.apps.kilty.io/oidc/callback`, the nginx/reverse-proxy route to the local
+  bind listener, the firewall/DNS requirements for shared deploy hosts, and a single `mini` hostname
+  table covering `identity.apps.kilty.io`, `secrets.apps.kilty.io`, and
+  `deploy-auth.apps.kilty.io`.
+- Update [Secrets Usage](/Users/kiltyj/Code/bucknix-fresh/docs/secrets-usage.md) with operator
+  examples showing:
+  - local desktop loopback PKCE
+  - shared deploy-host public callback PKCE
+  - device-flow fallback
+  - SSH loopback forwarding only for deployments without a reviewed public callback profile
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - PKCE callback profile parsing and precedence
+  - reverse-proxied public-host callback rendering, local listener bind, and one-shot behavior
+  - fake OIDC authorization URL / token exchange redirect URI parity
+  - existing `mini` deployment target metadata migration
+  - auth doctor / print-login diagnostics
+  - docs/schema parity and auth redaction snapshots
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR changes interactive deployment auth runtime behavior, deployment metadata parsing,
+  diagnostics, tests, and operator docs. Under the deployment-only verify policy, run the full
+  build-system verify scope unless classifier coverage proves all changed PKCE/auth paths are safely
+  deployment-owned.
+
+### Acceptance Criteria
+
+- A deployment with reviewed `vault_runtime.pkce_callback.mode = "public_host"` prints a PKCE login
+  URL whose `redirect_uri` uses the reviewed external redirect URI by default.
+- The reviewed `mini` public callback profile renders
+  `https://deploy-auth.apps.kilty.io/oidc/callback` with no explicit port in the browser-facing URL,
+  while the deploy command listens on the separate stable local bind host/port behind the reverse
+  proxy.
+- Existing checked-in `mini` Vault-backed deployments are updated in the same PR to include the
+  reviewed public callback profile while preserving the current `mini` IdP and Vault hostnames:
+  `identity.apps.kilty.io` for OIDC, `secrets.apps.kilty.io:8200` for Vault, and
+  `deploy-auth.apps.kilty.io` for the external PKCE callback.
+- A browser that can reach the configured host/port can complete the callback without an SSH
+  loopback forward.
+- Keycloak/OIDC redirect URI allowlisting is deterministic because it uses the reviewed external
+  redirect URI, while reverse-proxy routing and local bind configuration are documented separately.
+- Deployments without a public callback profile keep the existing loopback-safe behavior.
+- Public callback listeners remain one-shot, state-validated, timeout-bound, and closed after
+  completion.
+- Public callback diagnostics are actionable and contain no auth codes, PKCE verifiers, tokens,
+  client secrets, workload JWTs, or Vault tokens.
+- Operator docs clearly distinguish public-host PKCE, loopback PKCE, SSH forwarding, and device
+  authorization.
+
+### Risks
+
+Making the callback externally reachable by default on shared deploy hosts increases the importance
+of exact redirect URI allowlisting, reverse-proxy routing, listener lifetime, and redaction. Hostname
+autodetection can also be wrong in VPN, split-DNS, NAT, or IPv6 environments, and proxy/bind
+misconfiguration could produce a login URL that Keycloak accepts but cannot deliver to the waiting
+deploy process.
+
+### Mitigation
+
+Require reviewed metadata for public-host defaults instead of silently deriving hostnames, separate
+the external redirect URI from the local bind URI, validate the local bind before printing the URL,
+document the nginx/reverse-proxy route for `deploy-auth.apps.kilty.io`, keep loopback as the
+unconfigured fallback, preserve one-shot state validation, and cover public callback diagnostics with
+redaction snapshots.
+
+### Consequence of Not Implementing
+
+SSH/headless operators would still need loopback forwarding or device authorization even on deploy
+hosts that are intentionally reachable from their browsers, leaving the printed PKCE login URL less
+useful for shared production deploy workflows.
+
+### Downsides for Implementing
+
+Adds another reviewed deployment-auth metadata surface, requires DNS, reverse-proxy, local bind, and
+Keycloak redirect allowlist coordination, and introduces stable callback-port contention that must be
+handled with clear preflight failures.
+
+### Recommendation
+
+Implement after PR-75 so the callback profile builds on the credential-source selection, diagnostics,
+redaction, and operator UX already introduced for human, SSH/headless, and Jenkins deployment auth.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)

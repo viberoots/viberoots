@@ -7,6 +7,7 @@ import { deploymentAuthMatrix, renderDeploymentJenkinsHelp } from "./deployment-
 import { redactDeploymentAuthJson, redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
 import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan.ts";
 import type { DeploymentTarget } from "./contract.ts";
+import { resolveDeploymentPkceCallbackProfile } from "./deployment-pkce-callback-profile.ts";
 
 export const DEPLOYMENT_AUTH_DOCTOR_SCHEMA = "deployment-auth-doctor@1";
 export const DEPLOYMENT_AUTH_EXPLAIN_VAULT_ROLE_SCHEMA = "deployment-auth-vault-role@1";
@@ -53,10 +54,16 @@ function deploymentSummary(deployment: DeploymentTarget) {
 }
 
 export function buildDeploymentAuthDoctor(deployment: DeploymentTarget, env = process.env) {
+  const inputs = readDeploymentVaultRuntimeInputsFromFlags();
   const plan = resolveDeploymentVaultRuntimePlan({
     deployment,
-    inputs: readDeploymentVaultRuntimeInputsFromFlags(),
+    inputs,
     env,
+  });
+  const callbackProfile = resolveDeploymentPkceCallbackProfile({
+    inputs: inputs.pkceCallback,
+    env,
+    metadata: deployment.vaultRuntime?.pkceCallback,
   });
   return redactDeploymentAuthJson({
     schemaVersion: DEPLOYMENT_AUTH_DOCTOR_SCHEMA,
@@ -80,6 +87,7 @@ export function buildDeploymentAuthDoctor(deployment: DeploymentTarget, env = pr
       repository: plan.repository,
       boundClaimKeys: ["deployment_environment", "repository"],
       humanClaim: plan.humanClaim?.name,
+      pkceCallback: callbackProfile,
     },
   });
 }
@@ -118,10 +126,16 @@ export function buildDeploymentAuthLoginInstructions(
   deployment: DeploymentTarget,
   env = process.env,
 ) {
+  const inputs = readDeploymentVaultRuntimeInputsFromFlags();
   const plan = resolveDeploymentVaultRuntimePlan({
     deployment,
-    inputs: readDeploymentVaultRuntimeInputsFromFlags(),
+    inputs,
     env,
+  });
+  const callbackProfile = resolveDeploymentPkceCallbackProfile({
+    inputs: inputs.pkceCallback,
+    env,
+    metadata: deployment.vaultRuntime?.pkceCallback,
   });
   return redactDeploymentAuthJson({
     schemaVersion: DEPLOYMENT_AUTH_LOGIN_SCHEMA,
@@ -133,12 +147,15 @@ export function buildDeploymentAuthLoginInstructions(
     credentialSource: selectionStatus(plan),
     instructions: [
       "Use --login-browser=print to print a PKCE URL without launching a browser.",
+      "Use reviewed vault_runtime PKCE callback metadata for shared deploy hosts.",
+      "Use --pkce-callback-* flags only for emergency/operator callback overrides.",
       "Use --login-browser=device when the issuer supports device authorization.",
       "The resulting workload JWT is kept in memory for the deploy process only.",
     ],
     issuer: plan.issuerUrl,
     audience: plan.audience,
     clientId: plan.humanClientId,
+    pkceCallback: callbackProfile,
     boundClaimKeys: ["deployment_environment", "repository"],
   });
 }

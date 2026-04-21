@@ -8,6 +8,7 @@ import {
 } from "./deployment-credential-source-oidc.ts";
 import { runPkceLogin } from "./deployment-credential-source-pkce.ts";
 import type { DeploymentCredentialSource } from "./deployment-credential-source-selection.ts";
+import type { DeploymentPkceCallbackProfileInput } from "./deployment-pkce-callback-profile.ts";
 
 export type CredentialSourceRuntimeOptions = {
   source: DeploymentCredentialSource;
@@ -24,6 +25,7 @@ export type CredentialSourceRuntimeOptions = {
   humanClaim?: HumanClaimRequirement | undefined;
   env: NodeJS.ProcessEnv;
   openBrowser: boolean;
+  pkceCallback?: DeploymentPkceCallbackProfileInput | undefined;
   prompt?: (message: string) => void;
   timeoutMs?: number | undefined;
 };
@@ -99,6 +101,7 @@ async function readInteractiveToken(opts: CredentialSourceRuntimeOptions): Promi
     boundClaims: boundClaims(opts),
     humanClaim: opts.humanClaim,
     openBrowser: opts.openBrowser && opts.source === "interactive_pkce",
+    callbackProfile: opts.pkceCallback,
     timeoutMs: opts.timeoutMs,
     prompt: opts.prompt,
   });

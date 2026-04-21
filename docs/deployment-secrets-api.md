@@ -168,6 +168,24 @@ Vault credential-source overrides:
   `auto` opens a browser only for local desktop sessions, avoids browser launch
   on SSH/headless sessions, and rejects interactive login in CI unless a
   reviewed override is supplied.
+- `--pkce-callback-mode loopback|public_host`: force the callback profile.
+- `--pkce-callback-external-scheme http|https`: browser-facing redirect scheme.
+- `--pkce-callback-host <host>`: browser-facing redirect host.
+- `--pkce-callback-external-port <port>`: browser-facing redirect port. Omit it
+  for HTTPS reverse-proxy profiles that use the default port.
+- `--pkce-callback-external-path <path>`: browser-facing redirect path.
+- `--pkce-callback-bind-host <host>`: local listener bind address.
+- `--pkce-callback-bind-port <port>`: stable local listener port.
+- `--pkce-callback-bind-path <path>`: local listener path.
+- `BNX_DEPLOYMENT_PKCE_CALLBACK_MODE`,
+  `BNX_DEPLOYMENT_PKCE_CALLBACK_EXTERNAL_SCHEME`,
+  `BNX_DEPLOYMENT_PKCE_CALLBACK_HOST`,
+  `BNX_DEPLOYMENT_PKCE_CALLBACK_EXTERNAL_PORT`,
+  `BNX_DEPLOYMENT_PKCE_CALLBACK_EXTERNAL_PATH`,
+  `BNX_DEPLOYMENT_PKCE_CALLBACK_BIND_HOST`,
+  `BNX_DEPLOYMENT_PKCE_CALLBACK_BIND_PORT`, and
+  `BNX_DEPLOYMENT_PKCE_CALLBACK_BIND_PATH`: environment fallbacks for the same
+  controls.
 - `--cli-public-client-id <client-id>`: public OIDC client for human
   PKCE/device login.
 - `--deployment-client-id <client-id>`: service-account client for automation.
@@ -175,6 +193,13 @@ Vault credential-source overrides:
   variable name.
 - `--external-oidc-token-env <env-name>`: Jenkins/workload-identity OIDC token
   variable name.
+
+`interactive_pkce` resolves callback configuration in this order: CLI flags,
+environment variables, reviewed `vault_runtime` metadata, then loopback fallback.
+For the reviewed `mini` deploy host, metadata advertises
+`https://deploy-auth.apps.kilty.io/oidc/callback` while the command binds only
+`http://127.0.0.1:8765/oidc/callback` behind nginx. Keycloak must allowlist the
+external URI, not the local bind URI.
 
 ### CLI Examples
 

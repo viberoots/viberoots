@@ -152,8 +152,17 @@ export async function runWebappLocalTsDependencyTest(options: {
       serverStderr.push(String(chunk || ""));
       if (serverStderr.length > 100) serverStderr.shift();
     });
+    const serverLogs = () => `${serverStdout.join("")}\n${serverStderr.join("")}`;
 
     try {
+      await waitForValue(
+        async () => {
+          assertNoProcessRestart(devServer, devServer.pid);
+          return serverLogs();
+        },
+        (logs) => /\bready in\b|Local:/i.test(logs),
+        60000,
+      );
       await waitForHttpOk(`http://127.0.0.1:${port}/`);
       const mainModuleUrl = `http://127.0.0.1:${port}/src/main.ts`;
       const firstMainModule = await httpGet(mainModuleUrl);
@@ -206,6 +215,18 @@ export async function runWebappLocalTsDependencyTest(options: {
       const nextModule = await httpGet(currentDepModuleUrl);
       assert.equal(nextModule.status, 200);
       assert.match(nextModule.body, /phase1-b/);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const tailOut = serverStdout.join("").slice(-6000);
+      const tailErr = serverStderr.join("").slice(-6000);
+      throw new Error(
+        [
+          message,
+          `[hmr-contract] temp=${tmp} app=${appAbs} pid=${String(devServer.pid || "")}`,
+          `[hmr-contract] stdout tail:\n${tailOut}`,
+          `[hmr-contract] stderr tail:\n${tailErr}`,
+        ].join("\n"),
+      );
     } finally {
       await stopServer(devServer);
     }

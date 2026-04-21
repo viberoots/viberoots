@@ -8,6 +8,7 @@ export const REVIEWED_DEPLOYMENT_OWNED_BUILD_SYSTEM_PREFIXES = [
 ] as const;
 
 export const REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS = [
+  "build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix",
   "build-tools/tools/nix/shared-host-identity-provider-module.nix",
   "build-tools/tools/nix/shared-host-postgres-module.nix",
   "build-tools/tools/nix/shared-host-vault-module.nix",

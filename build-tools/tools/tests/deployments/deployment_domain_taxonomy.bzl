@@ -104,6 +104,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/nixos-shared-host.control-plane.backend.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.control-plane.service.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.contract.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.deploy-auth-callback-module.nix-eval.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.failure-records.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.jenkins.contract.test.ts": True,

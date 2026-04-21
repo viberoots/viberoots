@@ -26,6 +26,7 @@ modules live at:
 - `/srv/common/build-tools/tools/nix/shared-host-identity-provider-module.nix`
 - `/srv/common/build-tools/tools/nix/shared-host-postgres-module.nix`
 - `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix`
+- `/srv/common/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
 
 The Vault runbook shows how to use the identity-provider module and the
 reviewed deploy auth diagnostics. Its `deploy-vault-jwt` helper remains
@@ -234,6 +235,7 @@ repo now includes reviewed importable NixOS modules:
 
 - `/srv/common/build-tools/tools/nix/shared-host-postgres-module.nix`
 - `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix`
+- `/srv/common/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
 
 Use these when the host keeps a checkout of this repo at `/srv/common` and you
 want the service definitions versioned with the rest of the deployment system.
@@ -278,6 +280,7 @@ Example `configuration.nix` wiring:
     # Existing imports stay here.
     "${deploymentModulesRoot}/shared-host-postgres-module.nix"
     "${deploymentModulesRoot}/shared-host-vault-module.nix"
+    "${deploymentModulesRoot}/shared-host-deploy-auth-callback-module.nix"
   ];
 }
 ```
@@ -297,6 +300,11 @@ What these modules do:
   `deploymentHost.vault.useAcmeCertificate = true` and
   `deploymentHost.vault.address = "0.0.0.0:8200"` to run Vault as the direct TLS
   endpoint for `https://secrets.apps.kilty.io:8200`.
+- `shared-host-deploy-auth-callback-module.nix`
+  Adds the reviewed nginx route for the deploy command's one-shot PKCE callback
+  listener. For `mini`, route `deploy-auth.apps.kilty.io` to
+  `http://127.0.0.1:8765/oidc/callback` and keep that local port off the public
+  firewall.
 
 For hosts shaped like the current monolithic `mini` configuration, keep nginx,
 ACME, DNS rewrites, and firewall list composition in the host file. Import the
@@ -325,13 +333,24 @@ deploymentHost.identityProvider = {
   manageAcme = false;
   openFirewall = false;
 };
+
+deploymentHost.deployAuthCallback = {
+  enable = true;
+  hostname = "deploy-auth.apps.kilty.io";
+  callbackPath = "/oidc/callback";
+  localBindHost = "127.0.0.1";
+  localBindPort = 8765;
+  manageNginx = false;
+  manageAcme = false;
+  openFirewall = false;
+};
 ```
 
 With that shape, add `8200` to the existing
 `networking.firewall.allowedTCPPorts` expression and add a host-owned nginx
-virtual host for `identity.apps.kilty.io` that uses the existing
-`apps.kilty.io` wildcard certificate. The Vault runbook has the full
-copy/paste snippets for both pieces.
+virtual host for `identity.apps.kilty.io` plus a host-owned callback vhost for
+`deploy-auth.apps.kilty.io` that uses the existing `apps.kilty.io` wildcard
+certificate. The Vault runbook has the full copy/paste snippets.
 
 What these modules do not do:
 

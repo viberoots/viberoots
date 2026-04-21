@@ -1,14 +1,14 @@
 /** @vitest-environment jsdom */
-import React from "react";
-import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  loadPersistedGameStateFromHash,
-  savePersistedGameStateToHash,
-} from "../src/game/persistence.ts";
 import * as solverRuntime from "../src/game/solver/solver-runtime.ts";
-import { createInitialGameState } from "../src/game/state.ts";
-import { GameScreen } from "../src/ui/game-screen.tsx";
+import {
+  currentSolveState,
+  flushUi,
+  readPersisted,
+  renderGameScreen,
+  seedSinglePurplePlacement,
+  waitFor,
+} from "./game-solve-browser-helpers.tsx";
 
 vi.mock("../src/game/solver/solver-runtime.ts", async () => {
   const actual = await vi.importActual<typeof import("../src/game/solver/solver-runtime.ts")>(
@@ -20,36 +20,9 @@ vi.mock("../src/game/solver/solver-runtime.ts", async () => {
   };
 });
 
-function flushUi(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-async function waitFor(assertion: () => boolean, timeoutMs = 3000): Promise<void> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
-    if (assertion()) {
-      return;
-    }
-    await flushUi();
-  }
-  throw new Error("timed out waiting for condition");
-}
-
-function readPersisted() {
-  return loadPersistedGameStateFromHash(window.location, createInitialGameState());
-}
-
-function currentSolveState(container: HTMLDivElement): string {
-  const status = container.querySelector('[data-testid="pleomino-solve-state"]');
-  if (!(status instanceof HTMLElement)) {
-    throw new Error("expected solve status element");
-  }
-  return (status.textContent ?? "").trim();
-}
-
 describe("game screen solve cancellation", () => {
   let container: HTMLDivElement | null = null;
-  let root: Root | null = null;
+  let root: ReturnType<typeof renderGameScreen>["root"] | null = null;
 
   afterEach(async () => {
     vi.clearAllMocks();
@@ -66,18 +39,7 @@ describe("game screen solve cancellation", () => {
   });
 
   it("cancels stale solve results when board state changes during solving", async () => {
-    const seeded = createInitialGameState();
-    seeded.board.placedPieces = [
-      {
-        instanceId: "purple-2-1#1",
-        pieceId: "purple-2-1",
-        transform: { rotation: 0, flipped: false },
-        position: { x: 1, y: 1 },
-        isPlaced: true,
-      },
-    ];
-    seeded.nextPlacedInstanceId = 2;
-    savePersistedGameStateToHash(window.history, window.location, seeded);
+    seedSinglePurplePlacement();
     let resolveSolve:
       | ((value: Awaited<ReturnType<typeof solverRuntime.solveBoardWithRuntime>>) => void)
       | null = null;
@@ -89,11 +51,9 @@ describe("game screen solve cancellation", () => {
         }),
     );
 
-    container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-    root.render(<GameScreen url="/games/pleomino" />);
+    ({ container, root } = renderGameScreen());
     await flushUi();
+    await waitFor(() => (readPersisted()?.board.placedPieces.length ?? 0) === 1);
 
     const solveButton = document.querySelector('[data-testid="pleomino-action-solve"]');
     if (!(solveButton instanceof HTMLElement)) {
@@ -101,6 +61,7 @@ describe("game screen solve cancellation", () => {
     }
     solveButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     await waitFor(() => container !== null && currentSolveState(container) === "solving");
+    await waitFor(() => solveBoardWithRuntime.mock.calls.length === 1 && resolveSolve !== null);
 
     const resetButton = document.querySelector('[data-testid="pleomino-action-reset"]');
     if (!(resetButton instanceof HTMLElement)) {

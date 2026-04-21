@@ -7,6 +7,7 @@ import { resolveCredentialSourceVaultJwt } from "./deployment-credential-source-
 import type { DeploymentCredentialSource } from "./deployment-credential-source-selection.ts";
 import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
 import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan.ts";
+import { resolveDeploymentPkceCallbackProfile } from "./deployment-pkce-callback-profile.ts";
 export type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
 export { readDeploymentVaultRuntimeInputsFromFlags } from "./deployment-vault-runtime-inputs.ts";
 export {
@@ -76,6 +77,13 @@ export async function prepareDeploymentVaultRuntime(opts: {
     humanClaim: plan.humanClaim,
     env,
     openBrowser: plan.selection.source === "interactive_pkce",
+    pkceCallback: plan.selection.source.startsWith("interactive")
+      ? resolveDeploymentPkceCallbackProfile({
+          inputs: opts.inputs?.pkceCallback,
+          env,
+          metadata: opts.deployment.vaultRuntime?.pkceCallback,
+        })
+      : undefined,
     timeoutMs: opts.inputs?.timeoutMs,
     prompt: (message) => console.error(message),
   }).catch((error) => {

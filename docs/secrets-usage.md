@@ -219,9 +219,17 @@ Credential sources are selected from non-secret `vault_runtime` metadata, CLI
 flags, and session detection:
 
 - local desktop human deploys default to Authorization Code + PKCE with a
-  public CLI client
+  public CLI client and loopback callback
 - SSH/headless human deploys use device authorization when the issuer supports
-  it, otherwise the CLI prints a PKCE URL and loopback tunnel instructions
+  it, otherwise the CLI prints a PKCE URL. The default callback stays on
+  loopback and can be completed with an SSH forward.
+- reviewed shared deploy hosts can use public-host PKCE metadata so the printed
+  login URL redirects to `https://deploy-auth.apps.kilty.io/oidc/callback`,
+  while nginx forwards that request to the command's local
+  `http://127.0.0.1:8765/oidc/callback` listener. Use SSH loopback forwarding
+  only for deployments without a reviewed public callback profile.
+- when device authorization is available, it remains the preferred browserless
+  SSH/headless flow.
 - Jenkins deploys use either a Jenkins Credentials-bound client secret to mint
   the workload JWT, or a Jenkins/external OIDC token trusted by Vault
 

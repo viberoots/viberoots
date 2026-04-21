@@ -3,10 +3,12 @@ import type { GraphNode } from "../lib/graph.ts";
 import type { DeploymentVaultRuntimeConfig } from "./deployment-vault-runtime-types.ts";
 import { readStringRecord } from "./deployment-graph-readers.ts";
 import { normalizeCredentialSource } from "./deployment-credential-source-selection.ts";
+import { readMetadataPkceCallbackProfile } from "./deployment-pkce-callback-profile.ts";
 
 export function readVaultRuntimeConfig(node: GraphNode): DeploymentVaultRuntimeConfig | undefined {
   const raw = readStringRecord(node, "vault_runtime");
   if (Object.keys(raw).length === 0) return undefined;
+  const pkceCallback = readMetadataPkceCallbackProfile(raw);
   return {
     ...(raw.addr ? { addr: raw.addr } : {}),
     ...(raw.oidc_issuer ? { oidcIssuer: raw.oidc_issuer } : {}),
@@ -31,5 +33,6 @@ export function readVaultRuntimeConfig(node: GraphNode): DeploymentVaultRuntimeC
     ...(raw.required_human_claim_value
       ? { requiredHumanClaimValue: raw.required_human_claim_value }
       : {}),
+    ...(pkceCallback ? { pkceCallback } : {}),
   };
 }

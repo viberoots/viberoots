@@ -79,7 +79,10 @@ export async function waitForValue<T>(
       `timed out waiting for expected value after ${timeoutMs}ms (last error: ${message})`,
     );
   }
-  throw new Error(`timed out waiting for expected value after ${timeoutMs}ms`);
+  const rendered = typeof last === "string" ? last : JSON.stringify(last);
+  throw new Error(
+    `timed out waiting for expected value after ${timeoutMs}ms (last value: ${String(rendered)})`,
+  );
 }
 
 export async function waitForConsecutive(

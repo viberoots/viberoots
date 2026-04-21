@@ -9,6 +9,12 @@ import {
   validateOidcToken,
   type HumanClaimRequirement,
 } from "./deployment-credential-source-oidc.ts";
+import {
+  normalizeDeploymentPkceCallbackProfile,
+  urlHost,
+  type DeploymentPkceCallbackProfile,
+  type DeploymentPkceCallbackProfileInput,
+} from "./deployment-pkce-callback-profile.ts";
 
 export type PkceLoginOptions = {
   issuer: string;
@@ -17,12 +23,15 @@ export type PkceLoginOptions = {
   boundClaims: Record<string, string>;
   humanClaim?: HumanClaimRequirement | undefined;
   openBrowser: boolean;
+  callbackProfile?: DeploymentPkceCallbackProfileInput | undefined;
   timeoutMs?: number | undefined;
   prompt?: (message: string) => void;
 };
 
 export type PkceCallbackListener = {
   redirectUri: string;
+  localCallbackUri: string;
+  profile: DeploymentPkceCallbackProfile;
   waitForCode: Promise<string>;
   close: () => Promise<void>;
 };
@@ -36,10 +45,22 @@ function closeServer(server: http.Server): Promise<void> {
   return new Promise((resolve) => server.close(() => resolve()));
 }
 
+function uriFor(opts: {
+  scheme: "http" | "https";
+  host: string;
+  port?: number | undefined;
+  path: string;
+}): string {
+  const port = opts.port ? `:${opts.port}` : "";
+  return `${opts.scheme}://${urlHost(opts.host)}${port}${opts.path}`;
+}
+
 export async function startPkceCallbackListener(opts: {
   state: string;
+  callbackProfile?: DeploymentPkceCallbackProfileInput | undefined;
   timeoutMs?: number | undefined;
 }): Promise<PkceCallbackListener> {
+  const profile = normalizeDeploymentPkceCallbackProfile(opts.callbackProfile);
   let settled = false;
   let timeout: NodeJS.Timeout | undefined;
   let resolveCode: (code: string) => void = () => {};
@@ -51,6 +72,10 @@ export async function startPkceCallbackListener(opts: {
   const server = http.createServer(async (req, res) => {
     if (settled) return callbackResponse(res, 410, "login callback already consumed");
     const url = new URL(req.url || "/", "http://127.0.0.1");
+    if (url.pathname !== profile.bindPath) {
+      callbackResponse(res, 404, "login callback path not found");
+      return;
+    }
     const code = url.searchParams.get("code") || "";
     const state = url.searchParams.get("state") || "";
     settled = true;
@@ -65,7 +90,16 @@ export async function startPkceCallbackListener(opts: {
     resolveCode(code);
     await closeServer(server);
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise<void>((resolve, reject) => {
+    const onError = (error: Error) => {
+      reject(new Error(`PKCE callback bind failed for ${profile.bindHost}: ${error.message}`));
+    };
+    server.once("error", onError);
+    server.listen(profile.bindPort || 0, profile.bindHost, () => {
+      server.off("error", onError);
+      resolve();
+    });
+  });
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("PKCE callback listener failed");
   timeout = setTimeout(async () => {
@@ -74,8 +108,23 @@ export async function startPkceCallbackListener(opts: {
     rejectCode(new Error("OIDC login timed out before callback completed"));
     await closeServer(server);
   }, opts.timeoutMs || 300_000);
+  const port = profile.bindPort || address.port;
+  const redirectPort = profile.externalPort || (profile.mode === "loopback" ? port : undefined);
+  const redirectUri = uriFor({
+    scheme: profile.externalScheme,
+    host: profile.externalHost,
+    port: redirectPort,
+    path: profile.externalPath,
+  });
   return {
-    redirectUri: `http://127.0.0.1:${address.port}/oidc/callback`,
+    redirectUri,
+    localCallbackUri: uriFor({
+      scheme: "http",
+      host: profile.bindHost,
+      port,
+      path: profile.bindPath,
+    }),
+    profile,
     waitForCode,
     close: async () => {
       if (timeout) clearTimeout(timeout);
@@ -101,7 +150,11 @@ export async function runPkceLogin(opts: PkceLoginOptions): Promise<string> {
   const state = randomSecret();
   const nonce = randomSecret();
   const verifier = randomSecret(48);
-  const listener = await startPkceCallbackListener({ state, timeoutMs: opts.timeoutMs });
+  const listener = await startPkceCallbackListener({
+    state,
+    callbackProfile: opts.callbackProfile,
+    timeoutMs: opts.timeoutMs,
+  });
   try {
     const url = authorizationUrl({
       endpoint: discovery.authorizationEndpoint,
@@ -114,7 +167,13 @@ export async function runPkceLogin(opts: PkceLoginOptions): Promise<string> {
     });
     opts.prompt?.(`Open this deployment login URL: ${url}`);
     if (!opts.openBrowser) {
-      opts.prompt?.(`For SSH, forward ${listener.redirectUri} to this host and complete login.`);
+      if (listener.profile.mode === "loopback") {
+        opts.prompt?.(`For SSH, forward ${listener.redirectUri} to this host and complete login.`);
+      } else {
+        opts.prompt?.(
+          `OIDC will redirect to ${listener.redirectUri}; reverse proxy ${listener.profile.externalHost} to ${listener.localCallbackUri} while the deploy command is waiting.`,
+        );
+      }
     } else {
       await launchBrowser(url);
     }
