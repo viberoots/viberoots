@@ -10293,6 +10293,723 @@ redaction, and operator UX already introduced for human, SSH/headless, and Jenki
 
 ---
 
+## PR-77: Server-owned deployment login sessions and OIDC callback endpoint
+
+### Description
+
+I will move the reviewed interactive deployment login ownership from an ephemeral repo-level CLI
+listener to the long-running deployment service on `mini`. This PR introduces server-owned OIDC
+login sessions so `mini` can receive `https://deploy-auth.apps.kilty.io/oidc/callback`, validate
+the browser login, and bind the authenticated human principal to a pending deployment intent. The
+laptop becomes an operator client that opens the login URL and observes status; it no longer needs to
+own the PKCE callback listener for shared/protected `mini` deployment workflows.
+
+### Scope & Changes
+
+- Add service-owned deployment auth session storage to the shared control-plane service:
+  - generate and persist a short-lived auth session id
+  - store OIDC `state`, `nonce`, PKCE verifier, requested deployment/action metadata, expiry, and
+    requested credential-source mode without writing secret material to deployment records
+  - consume each callback exactly once and expire abandoned sessions deterministically
+- Add HTTP endpoints to the deployment service:
+  - `POST /api/v1/auth/login` to create a login session and return a non-secret login URL plus
+    session id
+  - `GET /oidc/callback` to receive Keycloak redirects for server-owned PKCE sessions
+  - `GET /api/v1/auth/session?sessionId=...` to report login/session status to CLI clients
+- Reuse the existing OIDC discovery, authorization URL, token exchange, JWT validation, claim
+  binding, redaction, and failure-diagnostic helpers from PR-74 through PR-76 rather than creating a
+  parallel auth implementation.
+- Keep the reviewed public callback hostname inventory:
+  - `identity.apps.kilty.io` as the issuer
+  - `deploy-auth.apps.kilty.io` as the browser-facing callback host
+  - `secrets.apps.kilty.io:8200` as the Vault API used later by the worker
+- Make the service validate human claims server-side:
+  - required audience
+  - issuer
+  - repository claim
+  - deployment environment claim
+  - optional human group/role claim from `vault_runtime.required_human_claim`
+- Record only a redacted authenticated principal and authorization decision in control-plane
+  submissions; never persist OIDC auth codes, PKCE verifiers, access tokens, refresh tokens,
+  workload JWTs, Vault tokens, or provider credentials.
+- Remove CLI-owned PKCE callback handling from protected/shared deployment flows. Local developer
+  auth tests should exercise the same service-owned callback path against an isolated test service
+  rather than carrying a second production callback mode.
+
+### Tests (in this PR)
+
+- Add unit tests for auth session creation, expiry, one-shot consumption, state mismatch rejection,
+  nonce handling, and callback replay rejection.
+- Add fake-OIDC service integration tests proving:
+  - `/api/v1/auth/login` returns a login URL whose `redirect_uri` is
+    `https://deploy-auth.apps.kilty.io/oidc/callback`
+  - `/oidc/callback` exchanges the code using the same redirect URI
+  - successful callback produces an authenticated principal without exposing tokens
+  - expired, missing, mismatched, and replayed callbacks fail closed
+- Add redaction snapshot tests for login URLs, callback errors, auth session status, service logs,
+  and control-plane records.
+- Add guardrail tests proving protected/shared deploys do not start CLI-owned callback listeners or
+  accept laptop-owned callback URLs.
+
+### Docs (in this PR)
+
+- Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+  with the server-owned auth session endpoints, schemas, and redaction boundary.
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  so Step 9 presents one normal interactive deployment story: `mini` owns the login session,
+  receives the callback, and authorizes the deployment request.
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  so `deploy-auth.apps.kilty.io` points at the deployment service callback endpoint rather than a
+  one-shot CLI listener in the reviewed server-mode path.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - service auth session lifecycle
+  - fake OIDC callback handling
+  - auth principal derivation
+  - callback redaction
+  - protected/shared callback guardrails
+  - docs/schema parity
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR changes deployment service HTTP APIs, auth runtime behavior, redaction, and operator docs.
+  Under the deployment-only verify policy, run the full build-system verify scope unless classifier
+  coverage proves the new auth-service surface stays deployment-owned.
+
+### Acceptance Criteria
+
+- A remote client can request a login session from `mini` and receive a browser login URL without
+  starting a local callback listener.
+- Keycloak redirects to `https://deploy-auth.apps.kilty.io/oidc/callback`, and the deployment
+  service on `mini` consumes the callback.
+- The service records an authenticated human principal and authorization evidence without persisting
+  token material.
+- Callback sessions are one-shot, timeout-bound, state-validated, and redacted.
+- Protected/shared interactive deploys do not start laptop/CLI-owned callback listeners.
+
+### Risks
+
+Moving PKCE state into a long-running service creates a durable auth-session surface that could leak
+or replay sensitive material if session storage, logging, or callback validation is loose.
+
+### Mitigation
+
+Persist only minimal session state, encrypt or avoid storing token material, enforce short expiry,
+consume sessions atomically, centralize redaction, and add fake-OIDC replay/state-mismatch tests.
+
+### Consequence of Not Implementing
+
+`mini` can expose a public callback route, but shared/protected interactive deploys still require the
+actual `deploy` process to run on `mini` or a tunnel back to the laptop.
+
+### Downsides for Implementing
+
+Adds a real service auth/session subsystem and intentionally removes the simpler CLI-owned listener
+path from protected/shared deployment workflows.
+
+### Recommendation
+
+Implement first in the deployment-server sequence so all later remote-client, Vault, artifact, and
+status work has a server-side authenticated principal to build on.
+
+---
+
+## PR-78: Remote deployment client mode and server-derived authorization boundary
+
+### Description
+
+I will add a reviewed remote-client deployment mode where the laptop submits deployment intent to
+the `mini` deployment service instead of running the protected/shared mutation path locally. The
+service, not the client, derives `requestedBy`, authorization grants, and approval evidence from the
+server-owned authenticated session introduced in PR-77. The repo-level `deploy` command becomes a
+client for protected/shared server-mode deployments: it starts or reuses a login session, submits the
+deployment request, and polls or streams status.
+
+### Scope & Changes
+
+- Add a remote/server-mode client path to the repo-level `deploy` front door:
+  - submit deployment intent to a configured control-plane URL
+  - start service-owned login when the service requires authentication
+  - open or print the returned login URL
+  - poll session and deployment status until the submission is queued, rejected, or finished
+- Add a stable remote-client configuration contract:
+  - `--control-plane-url` / `BNX_DEPLOY_CONTROL_PLANE_URL`
+  - optional `--remote mini` or profile alias that resolves to the service endpoint
+  - no client-side Vault JWT, provider token, or PKCE callback material in normal server mode
+- Rework protected/shared service submission authorization:
+  - reject client-supplied `requestedBy` and authorization grants in normal remote mode
+  - derive principal and grants from the authenticated service session
+  - remove trusted-client identity and grant paths from protected/shared submissions
+- Add an explicit service-side authorization decision before queueing:
+  - submitter role for allowed shared/staging deploys
+  - approver role for approval actions
+  - operator role for cancel/resume/abort
+  - production-facing approval requirements enforced by the existing admission policy
+- Remove protected/shared direct mutation from the laptop front door. Protected/shared client calls
+  must route through the service boundary.
+- Return machine-readable summaries that contain backend-native identifiers:
+  - auth session id
+  - submission id
+  - deploy run id when available
+  - lifecycle state
+  - final outcome
+  - redacted failure category and action
+
+### Tests (in this PR)
+
+- Add remote-client CLI tests proving protected/shared deploys submit to the service instead of
+  preparing local Vault credentials or starting a local callback listener.
+- Add service authorization tests proving `requestedBy` and grants are derived from the authenticated
+  session rather than trusted from request JSON.
+- Add rejection tests for:
+  - unauthenticated protected/shared submissions
+  - client-supplied forged principals
+  - missing roles
+  - production-facing approval requirements
+  - stale or expired auth sessions
+- Add run-action tests proving approve/cancel/resume/abort use the same server-derived principal
+  boundary.
+- Add result-surface tests proving the CLI prints stable service identifiers and redacted errors.
+
+### Docs (in this PR)
+
+- Update [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md) with the
+  remote/server-mode operator workflow from a laptop.
+- Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+  with the remote-client submission flow and authenticated service boundary.
+- Update `mini` setup docs so operators know they are using service-owned login and hosted
+  deployment service submission for protected/shared deploys.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - remote-client protected/shared submission
+  - server-derived authorization
+  - forged-principal rejection
+  - approval/run-action authorization
+  - machine-readable result parity
+  - docs/schema parity
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR touches repo-level deploy front-door routing, service authorization, status/result
+  contracts, and operator docs. Run full build-system verification unless the deployment-impact
+  classifier safely isolates all changed paths.
+
+### Acceptance Criteria
+
+- A laptop can submit a protected/shared deployment request to the `mini` service without running the
+  provider mutation locally.
+- The service derives the authenticated principal and authorization decision server-side.
+- Forged client identities are rejected or ignored.
+- Approval and run-action paths use the same authorization boundary as submissions.
+- The CLI reports service-native status and final results without local record-path assumptions.
+
+### Risks
+
+Remote-client UX can accidentally create a second authorization model if the service continues to
+accept trusted client identity fields for convenience.
+
+### Mitigation
+
+Fail closed on client-supplied principals in server mode, centralize authorization decisions, and
+snapshot request/response boundaries.
+
+### Consequence of Not Implementing
+
+The deployment service may own login sessions, but laptop users would still need to know low-level
+service APIs instead of using a coherent `deploy` client workflow.
+
+### Downsides for Implementing
+
+Requires a breaking front-door simplification: protected/shared deployment commands become remote
+service submissions instead of local provider mutation.
+
+### Recommendation
+
+Implement after PR-77 so remote-client submission can depend on a real server-owned authenticated
+principal.
+
+---
+
+## PR-79: Worker-owned Vault runtime and server-side credential sources
+
+### Description
+
+I will move production Vault credential preparation for service-backed deployments out of the laptop
+client and into the `mini` worker execution path. In the deployment-server model, the worker is the
+trusted runtime that mints or obtains short-lived Vault workload credentials, reads direct Vault
+secrets through the typed in-memory secret context, and performs provider execution. The client only
+authenticates the human request; it never receives or forwards Vault JWTs, Vault tokens, provider
+secrets, PKCE verifiers, or client secrets.
+
+### Scope & Changes
+
+- Move `prepareDeploymentVaultRuntime(...)` from the client-side front-door path into the
+  service-backed worker execution path for protected/shared submissions.
+- Extend control-plane execution snapshots with non-secret Vault runtime metadata needed by the
+  worker:
+  - Vault address
+  - OIDC issuer
+  - audience
+  - service-account client id
+  - role name
+  - deployment environment
+  - repository claim
+  - required human claim summary where needed for authorization audit
+- Keep secret credential inputs on `mini` only:
+  - service account client secret env/file reference
+  - external OIDC token env reference
+  - future workload identity source
+  - no client-submitted secret values
+- Add a server-mode credential-source policy:
+  - interactive human PKCE authenticates the submitter, not the worker's Vault credential
+  - worker Vault access uses server-local secret references or a reviewed `mini` workload identity
+    source
+  - fixture, ambient-token, and client-supplied secret paths are invalid for protected/shared
+    service-backed deployments
+- Activate the typed in-memory secret context only inside worker execution and clear it after the run.
+- Ensure replay snapshots, control-plane payloads, deploy records, logs, and status responses include
+  only redacted credential-source metadata and never the secret material.
+- Remove direct laptop-side Vault credential preparation from protected/shared deployment entry
+  points.
+
+### Tests (in this PR)
+
+- Add worker execution tests proving service-backed Cloudflare Pages deploys prepare Vault runtime on
+  the worker, not in the laptop/client process.
+- Add negative tests proving protected/shared remote submissions fail if the worker-side credential
+  source is missing or misconfigured before provider mutation.
+- Add redaction tests covering execution snapshots, submission/status responses, deploy records,
+  replay snapshots, logs, and thrown errors.
+- Add rejection tests proving protected/shared service-backed deploys fail closed on fixture,
+  ambient-token, or client-supplied secret inputs.
+- Add fake Vault / fake IdP integration tests proving the worker mints a fresh JWT, logs into Vault,
+  reads only admitted secret references, and clears credential memory after execution.
+
+### Docs (in this PR)
+
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  to state that server-mode human login authorizes the request, while the `mini` worker owns Vault
+  runtime credentials.
+- Update [Secrets Usage](/Users/kiltyj/Code/bucknix-fresh/docs/secrets-usage.md) with the worker-side
+  secret boundary and server-local credential configuration.
+- Update deployment service setup docs with required environment variables or secret-file references
+  for worker-side credential sources.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - worker-side Vault runtime preparation
+  - direct Vault admitted-reference resolution
+  - missing worker credential failures
+  - protected/shared client-side credential rejection
+  - redaction snapshots
+  - protected/shared fixture and ambient credential rejection
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR changes the secret-runtime trust boundary for service-backed deployments and affects
+  provider execution. Run the full build-system verify scope unless deployment-only classifier
+  coverage proves all changed paths stay deployment-owned.
+
+### Acceptance Criteria
+
+- Protected/shared server-mode deploys do not mint or carry Vault credentials in the laptop client.
+- The `mini` worker mints or obtains the Vault workload credential during execution.
+- Provider execution receives only the typed in-memory secret context.
+- Control-plane records and replay material remain free of JWTs, Vault tokens, client secrets, and
+  provider secrets.
+- Protected/shared service-backed deploys reject fixture, ambient-token, and client-supplied secret
+  inputs.
+
+### Risks
+
+Moving credential preparation into the worker can break existing service-backed provider paths if
+they rely on ambient process context set by the client front door.
+
+### Mitigation
+
+Make the worker-side path the protected/shared execution contract, add fake IdP/Vault end-to-end
+tests, and snapshot credential redaction everywhere the worker writes state.
+
+### Consequence of Not Implementing
+
+The laptop would remain part of the production secret boundary, which contradicts the deployment
+server goal and makes server-owned callbacks only a partial UX improvement.
+
+### Downsides for Implementing
+
+Requires a breaking trust-boundary cleanup across service submission, worker execution, secrets,
+records, and replay snapshots.
+
+### Recommendation
+
+Implement after PR-78 so the service can authenticate and authorize the human request before the
+worker takes over Vault/runtime credentials.
+
+---
+
+## PR-80: Server-side artifact source and build contract for remote deployments
+
+### Description
+
+I will replace laptop-local artifact paths in protected/shared service submissions with a reviewed
+server-side artifact source contract. In the deployment-server model, `mini` must build or retrieve
+the exact artifact it will deploy from an auditable source reference, rather than trusting a path on
+the operator's laptop. This PR makes protected/shared remote deploys submit intent plus source
+identity, then lets the `mini` worker materialize, fingerprint, admit, and replay the artifact under
+control-plane authority.
+
+### Scope & Changes
+
+- Add a versioned server-side artifact source contract for protected/shared service submissions:
+  - git repository URL or reviewed local checkout identity
+  - commit SHA or immutable source revision
+  - deployment label
+  - optional build target or resolved artifact target
+  - expected workspace cleanliness / dirty-tree policy
+  - optional source provenance supplied by CI
+- Make remote-client protected/shared deploys submit source identity instead of laptop-local
+  `artifactDir`.
+- Add worker-side artifact materialization:
+  - fetch or update the reviewed checkout on `mini`
+  - verify the requested commit
+  - build the deployment artifact from the reviewed target
+  - store artifact provenance, fingerprint, and replay snapshot
+  - reject dirty or unpinned protected/shared submissions
+- Preserve exact-artifact reuse for promotion, rollback, preview, and publish-only operations:
+  - source-run selection remains backend-native
+  - publish-only must not rebuild
+  - rollback must replay the admitted exact artifact
+- Keep artifact upload out of the initial production path. If upload is needed later, require a
+  separate reviewed contract with checksum, size, provenance, retention, and malware/supply-chain
+  policy.
+- Update Cloudflare Pages protected/shared service routing so initial deploys no longer require
+  client-resolved `artifactDir`.
+
+### Tests (in this PR)
+
+- Add service-contract tests proving protected/shared remote deploy submissions reject laptop-local
+  artifact paths.
+- Add worker materialization tests using an isolated fixture repo:
+  - pinned commit builds successfully
+  - missing commit fails closed
+  - dirty/unpinned source fails for protected/shared deploys
+  - artifact fingerprint and provenance are recorded
+  - replay snapshots contain source identity and artifact identity
+- Add Cloudflare Pages service tests proving deploy, promotion, rollback, preview, and preview
+  cleanup keep exact-artifact semantics under the new source contract.
+- Add rejection tests proving protected/shared submissions cannot use laptop-local artifact
+  directories or client-resolved build output paths.
+
+### Docs (in this PR)
+
+- Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+  and [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md) with the
+  server-side source/build contract.
+- Update [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) with
+  the distinction between source identity, admitted artifact identity, and replay artifact identity.
+- Update operator docs so production examples use a committed source revision rather than a laptop
+  `dist` path.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - server-side source contract validation
+  - worker artifact materialization
+  - Cloudflare Pages protected/shared service routing
+  - exact-artifact replay/promotion/rollback parity
+  - source/artifact provenance docs parity
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR affects artifact resolution, build/materialization behavior, Cloudflare Pages service
+  submissions, and replay contracts. Run full build-system verification unless classifier coverage
+  proves all touched surfaces are deployment-owned.
+
+### Acceptance Criteria
+
+- Laptop remote-client protected/shared deploys no longer submit local artifact paths.
+- The `mini` worker builds or resolves artifacts from a pinned reviewed source reference.
+- Artifact identity, source identity, and replay provenance are recorded and redacted correctly.
+- Promotion, rollback, preview, and publish-only still replay admitted exact artifacts.
+- Protected/shared submissions reject laptop-local artifact directories and client-resolved build
+  output paths.
+
+### Risks
+
+Server-side builds can add runtime cost, cache complexity, and source checkout management risk to the
+deployment worker.
+
+### Mitigation
+
+Start with pinned commits and a reviewed checkout contract, keep upload out of scope, record
+provenance, fail closed on dirty/unpinned sources, and add focused materialization tests before
+provider mutation.
+
+### Consequence of Not Implementing
+
+Remote-client deploys would either fail on laptop-local paths or require mini to trust arbitrary
+client artifacts, both of which undermine the deployment-server model.
+
+### Downsides for Implementing
+
+Adds source checkout/build orchestration and may make protected/shared deploys slower until caching
+and prebuild behavior are tuned.
+
+### Recommendation
+
+Implement after PR-79 so the worker already owns the trusted runtime environment and can safely
+materialize artifacts server-side.
+
+---
+
+## PR-81: Hosted `mini` deployment service ingress, status, and operator UX
+
+### Description
+
+I will make the `mini` deployment service a real hosted operator surface rather than a local HTTP
+helper. This PR adds reviewed NixOS/nginx wiring for the deployment API and auth callback, improves
+remote-client status/log UX, and documents the laptop-as-client workflow end to end. The result is a
+coherent operator experience: submit from the laptop, authenticate in the browser, watch the run on
+`mini`, and receive a stable final record summary.
+
+### Scope & Changes
+
+- Add or extend NixOS modules for hosted deployment service ingress:
+  - `deploy.apps.kilty.io` or an explicitly reviewed deployment-service hostname
+  - `deploy-auth.apps.kilty.io/oidc/callback` routed to the same service's callback endpoint
+  - TLS via the existing `apps.kilty.io` wildcard certificate
+  - host-owned nginx wiring for the current monolithic `mini` configuration
+  - private service bind address and no public exposure of worker-only ports
+- Add deployment service process configuration docs and examples:
+  - service command
+  - worker command
+  - database URL secret source
+  - service auth/session configuration
+  - worker-side Vault credential-source configuration
+  - records/artifact/cache roots
+- Improve remote-client status UX:
+  - poll status with concise phase messages
+  - surface pending approval state and approval instructions
+  - print final record summary and deploy run id
+  - provide machine-readable JSON mode for automation
+  - include redacted failure diagnostics from auth, admission, worker, Vault, provider publish, and
+    smoke phases
+- Add optional log tail or event stream endpoint only if it can be redacted and bounded; otherwise
+  document the initial polling-only UX and leave streaming for a later PR.
+- Do not expose bearer-token human deployment as part of the normal hosted operator path. Human
+  operators authenticate through the service-owned OIDC session flow.
+
+### Tests (in this PR)
+
+- Add NixOS module eval tests for service and callback ingress using the reviewed `mini` hostname
+  inventory.
+- Add service startup/config tests for required database, records root, auth session, and worker
+  credential-source configuration.
+- Add remote-client UX tests for:
+  - submit/login/status/final-result flow
+  - pending approval summary
+  - failed auth/admission/Vault/provider/smoke diagnostics
+  - JSON output stability
+  - token/log redaction
+- Add doc-contract tests proving operator docs use hosted service URLs rather than stale laptop-local
+  control-plane URLs for the reviewed `mini` path.
+
+### Docs (in this PR)
+
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  with hosted deployment service and worker bring-up.
+- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  with the laptop-as-client workflow.
+- Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+  with hosted service URL examples and status/result shapes.
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  so Step 9 points operators at hosted `mini` deployment service login for normal interactive
+  deploys.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - NixOS module eval for hosted service/callback ingress
+  - service config validation
+  - remote-client status/result UX
+  - redacted diagnostics
+  - docs/operator-contract parity
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR touches NixOS module wiring, service configuration, remote-client UX, and docs. Run full
+  build-system verification unless deployment-domain classifier coverage safely scopes the change.
+
+### Acceptance Criteria
+
+- `mini` exposes a reviewed HTTPS deployment service endpoint and callback endpoint.
+- The service and worker can be configured as long-running host services with private backend ports.
+- A laptop operator can submit, authenticate, monitor, and receive final results without running
+  provider mutation locally.
+- Status and failure output are actionable, stable, and redacted.
+- Operator docs no longer imply that the reviewed server-mode path depends on laptop-local callback
+  listeners or artifact paths.
+
+### Risks
+
+Exposing the deployment service over HTTPS increases the operational and security importance of
+service auth, TLS, firewall posture, and redacted logs.
+
+### Mitigation
+
+Keep private bind defaults, require explicit nginx/TLS wiring, and add redaction tests for hosted
+service logs, status responses, and operator-facing diagnostics.
+
+### Consequence of Not Implementing
+
+The core server-side architecture may exist, but operators would still lack a clear hosted endpoint,
+service setup path, or usable laptop-client workflow.
+
+### Downsides for Implementing
+
+Adds host-service deployment and operator UX work that must stay synchronized with auth, worker, and
+artifact contracts.
+
+### Recommendation
+
+Implement after PR-80 so the hosted operator surface can document the final server-owned auth,
+worker-owned secrets, and server-side artifact behavior together.
+
+---
+
+## PR-82: Deployment-server contract hardening and obsolete local-run surface removal
+
+### Description
+
+I will make the deployment-server model the only production contract for protected/shared `mini`
+deployments. This PR removes obsolete local-run surfaces instead of carrying parallel production
+paths: no laptop-owned callbacks, no laptop-local artifacts, no client-side Vault runtime, no trusted
+client principals, and no fixture paths in protected/shared submission or worker execution. The
+production story is intentionally narrow: the laptop is a client, `mini` is the deployment server.
+
+### Scope & Changes
+
+- Make protected/shared `mini` deployments require a configured deployment service endpoint or
+  profile. Missing service configuration fails before auth, artifact, or provider mutation work
+  begins.
+- Remove or hard-disable obsolete protected/shared entry points:
+  - CLI-owned public-host PKCE callback selection
+  - laptop-local `artifactDir` submission
+  - ambient Vault JWT / Vault token / provider-token inputs
+  - fixture credential sources
+  - client-supplied principals or authorization grants
+  - direct laptop provider mutation for protected/shared deployments
+- Add concise fail-closed diagnostics for each rejected surface:
+  - missing deployment service URL
+  - callback host not routed to the service
+  - Keycloak redirect allowlist missing the service-owned callback URL
+  - local artifact path supplied to a protected/shared service deployment
+  - ambient credential input supplied to a protected/shared service deployment
+  - forged or client-supplied identity fields
+- Update generated docs, examples, and capability/operator-contract text so production examples only
+  show the deployment-server path.
+- Remove shims and tests that only exist to keep protected/shared laptop-run workflows available.
+
+### Tests (in this PR)
+
+- Add guardrail tests proving protected/shared remote-client deploys fail closed on:
+  - CLI-owned public-host callback selection
+  - laptop-local artifact directories
+  - ambient Vault tokens/JWTs
+  - fixture credential sources
+  - direct laptop provider mutation
+  - forged client principal/grant fields
+- Add diagnostics tests for missing service URL, stale callback routing, Keycloak redirect mismatch,
+  rejected local artifact paths, rejected ambient credentials, and forged identity fields.
+- Add doc-contract tests proving production examples point to server-owned login, worker-owned
+  secrets, server-side artifact materialization, and hosted `mini` status/result URLs.
+- Remove test expectations that require protected/shared local-run behavior to be supported.
+
+### Docs (in this PR)
+
+- Update [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md) so the
+  protected/shared production workflow is laptop client to hosted `mini` service.
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  so Step 9 no longer implies that an operator manually supplies a JWT, runs a laptop callback
+  listener, or deploys from a laptop artifact path.
+- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+  and generated summaries so Cloudflare Pages protected/shared capability text describes only the
+  deployment-server path.
+- Add a short operator contract summary:
+  - authenticate through `mini`
+  - authorize on `mini`
+  - prepare secrets on `mini`
+  - build or retrieve artifacts on `mini`
+  - mutate providers from `mini`
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - server-mode guardrails
+  - stale callback diagnostics
+  - rejected local-run surfaces
+  - docs/capability parity
+  - redaction snapshots
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR is a broad operator-contract cleanup across front-door routing, auth diagnostics,
+  deployment docs, and capability text. Run the full build-system verify scope unless deployment
+  classifier coverage proves all touched surfaces are deployment-owned.
+
+### Acceptance Criteria
+
+- Protected/shared `mini` deployments require the deployment-server path.
+- Laptop-owned callbacks, laptop-local artifacts, ambient Vault credentials, fixture credential
+  sources, trusted client identities, and direct laptop provider mutation are rejected.
+- Production docs and generated capability text present one story: laptop client, `mini` server.
+- Diagnostics fail before mutation and explain the required server-owned replacement.
+- No protected/shared tests require obsolete local-run behavior.
+
+### Risks
+
+Existing tests or scripts may still encode the earlier laptop-run assumptions, and this PR will
+break them by design.
+
+### Mitigation
+
+Update tests and docs in the same PR, fail before mutation with targeted diagnostics, and avoid
+introducing flags that would keep two production contracts alive.
+
+### Consequence of Not Implementing
+
+The repo would carry two competing protected/shared stories, causing operators to keep asking
+whether callbacks, secrets, artifacts, and provider mutation belong to the laptop or to `mini`.
+
+### Downsides for Implementing
+
+Introduces intentional breaking changes across deployment entry points, tests, examples, and
+operator docs.
+
+### Recommendation
+
+Implement after PR-81 as the contract-hardening closeout so the new architecture becomes the
+protected/shared production path rather than another optional mode.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
