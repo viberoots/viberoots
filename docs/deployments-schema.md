@@ -74,7 +74,8 @@ Optional keys:
   client-secret minting.
 - `deployment_environment`: runner or host environment claim bound by Vault.
 - `jwt_role`: Vault JWT role name.
-- `jwt_file`: local runtime JWT file path override, normally omitted.
+- `jwt_file`: legacy metadata key. Normal deployment runtimes do not read
+  workload JWTs from files; omit this for PR-73+ credential-source flows.
 - `preferred_credential_source`: one of `interactive_pkce`,
   `interactive_device`, `interactive_print_url`, `jenkins_client_secret`,
   `jenkins_oidc`, or `external_oidc_token`.

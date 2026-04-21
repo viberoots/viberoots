@@ -996,11 +996,12 @@ The reported `issuer` must be exactly:
 https://identity.apps.kilty.io/realms/deployments
 ```
 
-Mint a test client-credentials token through the reviewed helper and inspect
-the claims before wiring Vault to it. The helper discovers the token endpoint
-from OIDC metadata, reads the client secret from the named environment
-variable, writes the JWT with restrictive file permissions, and fails closed if
-the expected issuer, audience, `azp`, or bound claims are missing:
+For a low-level client-credentials smoke check, mint a test token through the
+reviewed helper and inspect the claims before wiring Vault to it. This helper is
+not the normal deployment handoff path. It discovers the token endpoint from
+OIDC metadata, reads the client secret from the named environment variable,
+writes the JWT with restrictive file permissions for the smoke check, and fails
+closed if the expected issuer, audience, `azp`, or bound claims are missing:
 
 ```bash
 export BNX_DEPLOYER_CLIENT_SECRET='<client-secret-from-keycloak>'
@@ -1018,6 +1019,9 @@ deploy-vault-jwt \
 
 If the decoded token does not contain the exact issuer, audience, and bound
 claims shown above, fix the Keycloak realm or client mappers before continuing.
+Do not configure routine deploys to consume `/tmp/mini-workload.jwt`;
+PR-73+ deploys use credential-source adapters and an in-memory Vault credential
+context instead of JWT files.
 
 The NixOS Keycloak module also supports `services.keycloak.realmFiles` for
 declarative realm imports. That is useful once the shape is stable, but do not
@@ -1398,8 +1402,22 @@ the same contract IDs directly through the Vault API.
 
 For the normal production path, leave `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
 unset. Human deploys normally use PKCE/device login without a deployment client
-secret; Jenkins deploys should expose only the selected Jenkins credential
-binding to the deploy front door:
+secret:
+
+```bash
+unset BNX_DEPLOYMENT_SECRET_FIXTURE_PATH
+unset VAULT_TOKEN
+unset BNX_VAULT_JWT
+unset BNX_VAULT_JWT_FILE
+unset BNX_VAULT_AUTH_METHOD
+
+deploy \
+  --deployment //projects/deployments/pleomino-staging:deploy \
+  --login-browser auto
+```
+
+Jenkins deploys should expose only the selected Jenkins credential binding to
+the deploy front door:
 
 ```bash
 export BNX_DEPLOYER_CLIENT_SECRET='<deployment-runner-client-secret>'
@@ -1408,16 +1426,17 @@ unset VAULT_TOKEN
 unset BNX_VAULT_JWT
 unset BNX_VAULT_JWT_FILE
 unset BNX_VAULT_AUTH_METHOD
+
+deploy \
+  --deployment //projects/deployments/pleomino-staging:deploy \
+  --credential-source jenkins_client_secret \
+  --deployment-client-secret-env BNX_DEPLOYER_CLIENT_SECRET
 ```
 
-Then run the normal deployment flow. The deploy front door mints a fresh
-workload JWT from `vault_runtime`, keeps it in a typed in-memory deployment
-secret context, and exchanges that JWT for a short-lived Vault token inside the
-secret resolver:
-
-```bash
-deploy --deployment //projects/deployments/pleomino-staging:deploy
-```
+In both cases, the deploy front door mints or receives a fresh workload JWT from
+the selected credential source and `vault_runtime`, keeps it in a typed
+in-memory deployment secret context, and exchanges that JWT for a short-lived
+Vault token inside the secret resolver.
 
 If you want to force one exact local build output, you can still provide the
 usual override:

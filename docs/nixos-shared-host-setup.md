@@ -28,8 +28,10 @@ modules live at:
 - `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix`
 
 The Vault runbook shows how to use the identity-provider module and the
-reviewed `deploy-vault-jwt` helper when `mini` mints client-credentials
-workload JWTs for Vault JWT auth.
+reviewed deploy auth diagnostics. Its `deploy-vault-jwt` helper remains
+available for low-level token smoke/debug checks, but normal deploys should let
+the deploy front door choose the credential source and keep workload JWTs in
+memory.
 
 Current supported scope:
 

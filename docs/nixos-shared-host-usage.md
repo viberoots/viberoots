@@ -142,7 +142,10 @@ Use that runbook when you need to:
 
 - initialize and unseal Vault
 - enable audit logging, KV v2, and JWT auth roles
-- run the reviewed `deploy-vault-jwt` helper for client-credentials workload JWTs
+- inspect credential-source selection with `deploy auth doctor` and Vault role
+  expectations with `deploy auth explain-vault-role`
+- optionally run the reviewed `deploy-vault-jwt` helper for low-level
+  client-credentials token smoke/debug checks
 - create the read policy used by deployment secret resolution
 - write the deployment secrets themselves
 - export a reviewed secret fixture for local/test/bootstrap workflows
