@@ -28,6 +28,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-control-plane.response-boundary.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.restore.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.retention.policy.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-auth-diagnostics.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-secret-runtime.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-secret-vault-auth.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-secret-vault.test.ts": True,

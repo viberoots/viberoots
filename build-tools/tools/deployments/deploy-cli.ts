@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
+import { maybeHandleDeploymentAuthCli } from "./deployment-auth-diagnostics.ts";
 import { resolveDeploymentAdmissionEvidence } from "./deployment-admission-cli.ts";
 import { resolveDeploymentForCli } from "./deployment-cli-resolve.ts";
 import {
@@ -41,6 +42,7 @@ export async function runDeployCli(opts: {
   deploymentJsonErrorMessage: string;
 }) {
   ensurePublicSourceOfTruth(opts);
+  if (await maybeHandleDeploymentAuthCli(opts.workspaceRoot)) return;
   if (getFlagBool("from-changes")) {
     const { runFromChangesCli } = await import("./deployment-from-changes-cli.ts");
     await runFromChangesCli(opts.workspaceRoot);

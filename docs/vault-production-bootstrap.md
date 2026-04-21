@@ -1463,6 +1463,40 @@ vault kv put -mount=secret \
 Keep the `contract_id` stable during rotation. The secret value changes, but the
 repo-level contract name should not.
 
+## Troubleshooting Auth Setup
+
+Start with the read-only doctor:
+
+```bash
+deploy auth doctor --deployment //projects/deployments/pleomino-staging:deploy
+```
+
+Use the reported category to choose the next fix:
+
+- IdP discovery unavailable or issuer mismatch:
+  check `vault_runtime.oidc_issuer`, the IdP discovery document, and network
+  access from the operator or Jenkins runner.
+- Browser/device login denied, expired, or timed out:
+  rerun login with `deploy auth print-login --deployment <label>` and complete
+  the PKCE or device-flow prompt before the timeout.
+- Vault JWT login rejected:
+  compare the issuer, audience, role, group/role claim, and bound claim keys
+  with `deploy auth explain-vault-role --deployment <label>`.
+- Vault policy denied the requested secret path:
+  verify the generated policy allows the exact `secret://...` contract path and
+  target scope used by the deployment.
+- Jenkins credential binding missing or out of scope:
+  run `deploy auth print-jenkins-help --deployment <label>` and keep the
+  `deploy` invocation inside the printed `withCredentials` block.
+- CI attempted an interactive credential source:
+  set `--credential-source jenkins_client_secret`, `jenkins_oidc`, or
+  `external_oidc_token` and bind the matching environment variable.
+
+All diagnostic output is redacted. It may show issuer URLs, Vault addresses,
+audiences, role names, policy names, and claim names, but it must not show client
+secrets, JWTs, Vault tokens, PKCE verifiers, device codes, auth codes, or
+Jenkins-bound secret values.
+
 ## Related Docs
 
 - [Secrets Usage](/Users/kiltyj/Code/bucknix-fresh/docs/secrets-usage.md)

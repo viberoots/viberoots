@@ -527,6 +527,35 @@ Records and replay snapshots now keep admitted non-secret secret references so
 retry and rollback can fetch the same Vault version exactly while still never
 persisting secret values.
 
+## Auth Diagnostics
+
+Use the auth commands before a protected/shared deploy when setup is uncertain:
+
+```bash
+deploy auth doctor --deployment //projects/deployments/pleomino-staging:deploy
+deploy auth explain-vault-role --deployment //projects/deployments/pleomino-staging:deploy
+deploy auth print-login --deployment //projects/deployments/pleomino-staging:deploy
+deploy auth print-jenkins-help --deployment //projects/deployments/pleomino-staging:deploy
+```
+
+`deploy auth doctor` is read-only: it reports the selected credential source,
+why it was selected, missing Vault metadata, missing Jenkins/OIDC bindings, and
+the memory-only session policy without minting tokens, reading secret values, or
+calling provider mutation APIs.
+
+`deploy auth explain-vault-role` prints safe routing metadata: issuer, audience,
+Vault address, role name, generated policy name, and bound claim names. It does
+not print client secrets, JWTs, Vault tokens, PKCE verifiers, device codes, or
+Jenkins-bound secret values.
+
+`deploy auth print-login` prints SSH-safe login guidance without launching a
+browser. `deploy auth print-jenkins-help` prints the Jenkins `withCredentials`
+shape and the selected deployment's credential environment variable names.
+
+The default session policy is memory-only. There is no persistent token cache,
+no `deploy auth status`, and no `deploy auth logout` until a reviewed OS
+credential-store cache is introduced.
+
 ## When To Open Which Doc
 
 Open [Deployment And Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)

@@ -867,6 +867,38 @@ The runtime contract is intentionally narrow:
 - routine flows cannot consume `break_glass` credentials
 - records and replay snapshots preserve secret references, not secret values
 
+### Auth Diagnostic APIs
+
+The public deploy front door exposes a read-only auth group:
+
+- `deploy auth doctor --deployment <label>`
+  Reports the selected credential source, selection reason, Vault runtime
+  metadata, missing required setup, and memory-only session policy.
+- `deploy auth explain-vault-role --deployment <label>`
+  Reports issuer, audience, Vault address, role name, generated policy name,
+  and bound claim keys for the deployment's Vault JWT role.
+- `deploy auth print-login --deployment <label>`
+  Prints browserless PKCE/device-flow guidance for SSH and headless operators.
+- `deploy auth print-jenkins-help --deployment <label>`
+  Prints Jenkins Secret Text/OIDC binding guidance for the selected deployment.
+- `deploy auth credential-source-matrix --deployment <label>`
+  Emits the shared credential-source matrix used by CLI help and docs parity
+  tests.
+
+All auth diagnostic commands are non-mutating. They do not mint tokens, exchange
+Vault credentials, read deployment secret values, write repo-local cache files,
+or call provider mutation APIs.
+
+Auth diagnostic output uses the shared deployment auth redaction policy. It
+redacts OIDC access tokens, refresh tokens, auth codes, PKCE verifiers, device
+codes, client secrets, Vault JWTs, Vault tokens, and Jenkins-bound secret values.
+It may print non-secret routing metadata such as issuer URL, Vault address,
+audience, role name, policy name, claim names, and verification instructions.
+
+The current session/cache product policy is explicit: interactive login material
+is memory-only for the deploy process. Persistent auth cache support is absent,
+so there is no `deploy auth status` or `deploy auth logout` command.
+
 ## When To Open Which Doc
 
 Open [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md)
