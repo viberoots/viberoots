@@ -13,6 +13,10 @@ export type NixosSharedHostResolvedServiceClient = {
   plan: NixosSharedHostServiceClientPlan;
 };
 
+const REMOTE_ALIASES: Record<string, string> = {
+  mini: "http://mini:7780",
+};
+
 function requireNonEmpty(value: string | undefined, message: string): string {
   const normalized = String(value || "").trim();
   if (!normalized) throw new Error(message);
@@ -60,13 +64,21 @@ export function resolveServiceClientFromManifest(
 export function resolveServiceClientFromFlags(opts: {
   controlPlaneUrl?: string;
   controlPlaneToken?: string;
+  remote?: string;
   env?: NodeJS.ProcessEnv;
   context: string;
 }): NixosSharedHostResolvedServiceClient {
   const env = opts.env || process.env;
+  const remote = String(opts.remote || "").trim();
+  if (remote && !REMOTE_ALIASES[remote]) {
+    throw new Error(`--remote ${remote} is not a known deployment service alias`);
+  }
   const controlPlaneUrl = requireNonEmpty(
-    opts.controlPlaneUrl,
-    `${opts.context} requires --control-plane-url or BNX_DEPLOY_CONTROL_PLANE_URL`,
+    opts.controlPlaneUrl ||
+      (remote === "mini"
+        ? String(env.BNX_DEPLOY_MINI_CONTROL_PLANE_URL || "").trim() || REMOTE_ALIASES.mini
+        : ""),
+    `${opts.context} requires --control-plane-url or BNX_DEPLOY_CONTROL_PLANE_URL (or --remote mini)`,
   );
   const controlPlaneToken = String(opts.controlPlaneToken || "").trim();
   const envToken = String(env.BNX_DEPLOY_CONTROL_PLANE_TOKEN || "").trim();

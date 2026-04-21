@@ -1,8 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import {
-  authorizeControlPlaneRunAction,
-  authorizeControlPlaneSubmit,
-} from "./deployment-control-plane-authz.ts";
+import { authorizeControlPlaneSubmit } from "./deployment-control-plane-authz.ts";
+import { resolveSubmitAuthorizationBoundary } from "./deployment-service-authorization-boundary.ts";
 import {
   CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
   type CloudflarePagesControlPlaneSubmitRequest,
@@ -28,7 +26,6 @@ import {
   resolveBackendIdempotency,
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend.ts";
-import { consumeDeploymentAuthSessionAuthorization } from "./deployment-auth-session-service.ts";
 import {
   NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
   type NixosSharedHostControlPlaneSubmitRequest,
@@ -42,7 +39,7 @@ export {
 } from "./nixos-shared-host-control-plane-service-read.ts";
 
 // prettier-ignore
-export type ServiceRunActionRequest = DeploymentControlPlaneRunActionRequest & { deployRunId?: string; requestedBy?: DeploymentPrincipal; authorization?: DeploymentControlPlaneAuthorization; };
+export type ServiceRunActionRequest = DeploymentControlPlaneRunActionRequest & { deployRunId?: string; authSessionId?: string; requestedBy?: DeploymentPrincipal; authorization?: DeploymentControlPlaneAuthorization; };
 
 type ServiceSubmitRequest =
   | NixosSharedHostControlPlaneSubmitRequest
@@ -93,21 +90,29 @@ export async function handleControlPlaneSubmit(
           recordsRoot: opts.paths.recordsRoot,
           backendDatabaseUrl: opts.backend.databaseUrl,
         });
-  const sessionAuthorization =
-    "authSessionId" in request && request.authSessionId
-      ? await consumeDeploymentAuthSessionAuthorization({
+  const boundary =
+    request.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
+      ? await resolveSubmitAuthorizationBoundary({
           recordsRoot: opts.paths.recordsRoot,
-          sessionId: request.authSessionId,
-          deploymentId: resolvedRequest.deployment.deploymentId,
+          deployment: resolvedRequest.deployment,
           operationKind: resolvedRequest.operationKind,
+          authSessionId: request.authSessionId,
+          request,
+          authorization: resolvedRequest.authorization,
+          requestedBy: resolvedRequest.requestedBy,
+          admissionEvidence: resolvedRequest.admissionEvidence,
         })
-      : undefined;
-  const requestAuthorization = resolvedRequest.authorization || sessionAuthorization;
-  const authorization = requestAuthorization
+      : {
+          authorization: resolvedRequest.authorization,
+          requestedBy:
+            resolvedRequest.requestedBy || resolvedRequest.admissionEvidence?.requestedBy,
+          admissionEvidence: resolvedRequest.admissionEvidence,
+        };
+  const authorization = boundary.authorization
     ? authorizeControlPlaneSubmit({
         deployment: resolvedRequest.deployment,
         operationKind: resolvedRequest.operationKind,
-        authorization: requestAuthorization,
+        authorization: boundary.authorization,
       })
     : undefined;
   try {
@@ -127,8 +132,7 @@ export async function handleControlPlaneSubmit(
                 ? { idempotencyKey: resolvedRequest.idempotencyKey }
                 : {}),
             },
-            requestedBy:
-              resolvedRequest.requestedBy || resolvedRequest.admissionEvidence?.requestedBy,
+            requestedBy: boundary.requestedBy,
             ...(authorization ? { authorization } : {}),
             ...(resolvedRequest.deployBatchId
               ? { deployBatchId: resolvedRequest.deployBatchId }
@@ -155,8 +159,8 @@ export async function handleControlPlaneSubmit(
               ? { smokeConnectOverride: resolvedRequest.smokeConnectOverride }
               : {}),
             ...(resolvedRequest.source ? { source: resolvedRequest.source } : {}),
-            ...(resolvedRequest.admissionEvidence
-              ? { admissionEvidence: resolvedRequest.admissionEvidence }
+            ...(boundary.admissionEvidence
+              ? { admissionEvidence: boundary.admissionEvidence }
               : {}),
           })
         : await prepareBackendCloudflarePagesControlPlaneRun({

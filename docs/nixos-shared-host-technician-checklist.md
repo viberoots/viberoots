@@ -167,9 +167,11 @@ direnv exec . build-tools/tools/bin/deploy \
   --profile mini \
   --approve \
   --deploy-run-id "$DEPLOY_RUN_ID" \
-  --approval-id ticket-123 \
-  --requested-by-principal user:reviewer
+  --approval-id ticket-123
 ```
+
+For auth-required protected/shared runs, the service opens or prints the login
+URL and records the reviewer from the authenticated service session.
 
 Before approving, check at least:
 

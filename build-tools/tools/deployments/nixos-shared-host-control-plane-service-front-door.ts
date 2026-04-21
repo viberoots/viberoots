@@ -25,6 +25,12 @@ function resolvedArtifactDirsByComponentId(artifactDirsByComponentId?: Record<st
   );
 }
 
+function clientAdmissionEvidence(admissionEvidence?: DeploymentAdmissionEvidence) {
+  if (!admissionEvidence) return undefined;
+  const { requestedBy: _requestedBy, ...evidence } = admissionEvidence;
+  return evidence;
+}
+
 async function readFinalizedRecord(opts: {
   controlPlaneUrl: string;
   controlPlaneToken?: string;
@@ -96,6 +102,7 @@ export async function runNixosSharedHostDirectServiceMutation(opts: {
     rejectUnauthorized?: boolean;
   };
 }) {
+  const admissionEvidence = clientAdmissionEvidence(opts.admissionEvidence);
   const request: NixosSharedHostControlPlaneSubmitRequest = {
     schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
     submissionId: createNixosSharedHostSubmissionId(),
@@ -114,7 +121,7 @@ export async function runNixosSharedHostDirectServiceMutation(opts: {
     ...(opts.publishBehavior ? { publishBehavior: opts.publishBehavior } : {}),
     ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
     ...(opts.rollback ? { rollback: true } : {}),
-    ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
+    ...(admissionEvidence ? { admissionEvidence } : {}),
     ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
   };
   const { final } = await submitNixosSharedHostControlPlaneViaService({

@@ -336,8 +336,7 @@ direnv exec . build-tools/tools/bin/deploy \
   --profile mini \
   --approve \
   --deploy-run-id "$DEPLOY_RUN_ID" \
-  --approval-id ticket-123 \
-  --requested-by-principal user:reviewer
+  --approval-id ticket-123
 ```
 
 What the approval flags mean:
@@ -345,12 +344,12 @@ What the approval flags mean:
 - `--approval-id ticket-123`
   The human review reference, such as a ticket, change request, or approval
   record.
-- `--requested-by-principal user:reviewer`
-  The reviewer identity recorded on the approval action.
 
 The helper reads the current status first and copies the expected payload
 fingerprint, target identity, and provisioner-plan fingerprint automatically,
 so you do not need to build the JSON request by hand.
+For auth-required protected/shared runs, the service opens or prints the login
+URL and records the reviewer from the authenticated service session.
 
 Approval keeps the same `deploy_run_id` and continues the existing run. If you
 get `approval_no_longer_valid` or `unauthorized`, re-run `--status` on that

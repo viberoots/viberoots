@@ -238,5 +238,6 @@ export async function maybeHandleReadonlyDeployCli(opts: {
   return await maybeRunDeployControlPlaneOperatorCommand({
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.deployment,
+    vaultRuntimeInputs: opts.flags.vaultRuntimeInputs,
   });
 }

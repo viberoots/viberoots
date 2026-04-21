@@ -52,6 +52,7 @@ function collectProfileModeConflicts(): string[] {
     "host-config-out",
     "control-plane-url",
     "control-plane-token",
+    "remote",
     "publish-only",
     "rollback",
     "source-run-id",

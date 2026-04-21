@@ -3,6 +3,11 @@ import { randomUUID } from "node:crypto";
 import { getFlagStr } from "../lib/cli.ts";
 import type { DeploymentTarget } from "./contract.ts";
 import {
+  createAndWaitForServiceOwnedAuthSession,
+  shouldUseServiceOwnedInteractiveAuth,
+} from "./deployment-service-auth-client.ts";
+import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
+import {
   DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA,
   type DeploymentControlPlaneRunAction,
   type DeploymentControlPlaneStatus,
@@ -37,9 +42,29 @@ function requestedByFromFlags() {
   };
 }
 
+function rejectTrustedClientPrincipalFlags() {
+  if (getFlagStr("requested-by-principal", "").trim()) {
+    throw new Error("auth-required run actions derive the principal from the service session");
+  }
+  if (getFlagStr("requested-by-display-name", "").trim()) {
+    throw new Error("auth-required run actions derive the principal from the service session");
+  }
+}
+
+function serviceAction(action: DeployControlPlaneOperatorAction): DeploymentControlPlaneRunAction {
+  return action === "approve"
+    ? "approve"
+    : action === "cancel-run"
+      ? "cancel"
+      : action === "resume-run"
+        ? "resume"
+        : "abort";
+}
+
 function buildRunActionRequest(
   action: DeploymentControlPlaneRunAction,
   status: DeploymentControlPlaneStatus,
+  authSessionId?: string,
 ) {
   const requestedBy = requestedByFromFlags();
   const request = {
@@ -48,6 +73,7 @@ function buildRunActionRequest(
     submittedAt: new Date().toISOString(),
     submissionId: status.submissionId,
     action,
+    ...(authSessionId ? { authSessionId } : {}),
     ...(requestedBy ? { requestedBy } : {}),
   };
   if (action !== "approve") return request;
@@ -84,27 +110,41 @@ async function runActionForOperator(opts: {
   status: DeploymentControlPlaneStatus;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  deployment: DeploymentTarget;
+  vaultRuntimeInputs?: DeploymentVaultRuntimeInputs;
 }) {
+  const action = serviceAction(opts.action);
+  const useServiceAuth = shouldUseServiceOwnedInteractiveAuth({
+    deployment: opts.deployment,
+    inputs: opts.vaultRuntimeInputs,
+  });
+  if (useServiceAuth) rejectTrustedClientPrincipalFlags();
+  const authSessionId = useServiceAuth ? await authSessionForRunAction(opts, action) : undefined;
   const response = await submitNixosSharedHostControlPlaneRunActionViaService({
     controlPlaneUrl: opts.controlPlaneUrl,
     ...(opts.controlPlaneToken ? { token: opts.controlPlaneToken } : {}),
-    request: buildRunActionRequest(
-      opts.action === "approve"
-        ? "approve"
-        : opts.action === "cancel-run"
-          ? "cancel"
-          : opts.action === "resume-run"
-            ? "resume"
-            : "abort",
-      opts.status,
-    ),
+    request: buildRunActionRequest(action, opts.status, authSessionId),
   });
   printDeployJson(response);
+}
+
+async function authSessionForRunAction(
+  opts: Parameters<typeof runActionForOperator>[0],
+  action: DeploymentControlPlaneRunAction,
+) {
+  return await createAndWaitForServiceOwnedAuthSession({
+    controlPlaneUrl: opts.controlPlaneUrl,
+    ...(opts.controlPlaneToken ? { controlPlaneToken: opts.controlPlaneToken } : {}),
+    deployment: opts.deployment,
+    operationKind: action,
+    inputs: opts.vaultRuntimeInputs,
+  });
 }
 
 export async function maybeRunDeployControlPlaneOperatorCommand(opts: {
   workspaceRoot: string;
   deployment: DeploymentTarget;
+  vaultRuntimeInputs?: DeploymentVaultRuntimeInputs;
 }): Promise<boolean> {
   const action = selectedDeployControlPlaneOperatorAction();
   if (!action) return false;
@@ -146,6 +186,8 @@ export async function maybeRunDeployControlPlaneOperatorCommand(opts: {
     action,
     status,
     controlPlaneUrl: serviceClient.controlPlaneUrl,
+    deployment: opts.deployment,
+    vaultRuntimeInputs: opts.vaultRuntimeInputs,
     ...(serviceClient.controlPlaneToken
       ? { controlPlaneToken: serviceClient.controlPlaneToken }
       : {}),

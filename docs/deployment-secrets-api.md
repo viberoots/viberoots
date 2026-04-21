@@ -133,8 +133,10 @@ Common example values:
 Deployment-service routing:
 
 - `--control-plane-url <url>`: the deployment service URL
+- `--remote mini`: shorthand for the reviewed `mini` deployment service endpoint
 - `--control-plane-token <token>`: optional bearer token for the service
 - `BNX_DEPLOY_CONTROL_PLANE_URL`: environment fallback for `--control-plane-url`
+- `BNX_DEPLOY_MINI_CONTROL_PLANE_URL`: optional override for `--remote mini`
 - `BNX_DEPLOY_CONTROL_PLANE_TOKEN`: environment fallback used by reviewed
   service clients
 
@@ -144,6 +146,9 @@ Common example values:
   Use when the service is running on the same machine.
 - `--control-plane-url http://mini:7780`
   Use when the service is running on the host named `mini`.
+- `--remote mini`
+  Use the reviewed mini alias; defaults to `http://mini:7780` unless
+  `BNX_DEPLOY_MINI_CONTROL_PLANE_URL` is set.
 - `BNX_DEPLOY_CONTROL_PLANE_TOKEN=replace-me`
   Example token environment variable for local or CI use.
 

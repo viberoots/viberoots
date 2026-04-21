@@ -26,6 +26,8 @@ export function principalFromOidcClaims(claims: JwtClaims): DeploymentPrincipal 
 }
 
 function roleForOperation(operationKind: string): DeploymentControlPlaneRole {
+  if (operationKind === "approve") return "approver";
+  if (["cancel", "resume", "abort"].includes(operationKind)) return "operator";
   return operationKind === "explicit_removal" ||
     operationKind === "preview_cleanup" ||
     operationKind === "retire_target" ||

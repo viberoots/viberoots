@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { authorizeControlPlaneRunAction } from "./deployment-control-plane-authz.ts";
 import { submitDeploymentControlPlaneRunAction } from "./deployment-control-plane-run-action.ts";
+import { resolveRunActionAuthorizationBoundary } from "./deployment-service-authorization-boundary.ts";
 import {
   enqueueBackendSubmission,
   readBackendSubmissionEnvelopeByDeployRunId,
@@ -37,13 +37,15 @@ export async function handleControlPlaneRunActionService(
   const snapshot = await readControlPlaneJson<NixosSharedHostControlPlaneSnapshot>(
     materialized.executionSnapshotPath,
   );
-  const authorization = request.authorization
-    ? authorizeControlPlaneRunAction({
-        deployment: snapshot.deployment,
-        action: request.action,
-        authorization: request.authorization,
-      })
-    : undefined;
+  const boundary = await resolveRunActionAuthorizationBoundary({
+    recordsRoot: opts.backend.recordsRoot,
+    deployment: snapshot.deployment,
+    action: request.action,
+    authSessionId: request.authSessionId,
+    request,
+    authorization: request.authorization,
+    requestedBy: request.requestedBy,
+  });
   try {
     const response = await submitDeploymentControlPlaneRunAction({
       workspaceRoot: opts.workspaceRoot,
@@ -52,9 +54,7 @@ export async function handleControlPlaneRunActionService(
       submissionPath: materialized.submissionPath,
       action: request.action,
       idempotencyKey: request.idempotencyKey || request.actionId,
-      ...(request.requestedBy || request.authorization?.requestedBy
-        ? { requestedBy: request.requestedBy || request.authorization?.requestedBy }
-        : {}),
+      ...(boundary.requestedBy ? { requestedBy: boundary.requestedBy } : {}),
       ...(request.approval ? { approval: request.approval } : {}),
     });
     await persistMaterializedSubmission({
@@ -73,7 +73,7 @@ export async function handleControlPlaneRunActionService(
       opts.backend,
       runActionRequestPathFor(opts.backend.recordsRoot, response.actionId),
     );
-    return { ...response, ...(authorization ? { authorization } : {}) };
+    return { ...response, ...(boundary.decision ? { authorization: boundary.decision } : {}) };
   } finally {
     await persistMaterializedSnapshot({
       backend: opts.backend,

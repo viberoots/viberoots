@@ -35,8 +35,8 @@ function assertApprovalGrantParity(doc: string, label: string) {
   assert.match(doc, /--approval-id/, `${label} must document approval references`);
   assert.match(
     doc,
-    /--requested-by-principal/,
-    `${label} must document reviewer identity for approvals`,
+    /authenticated service session/,
+    `${label} must document service-derived reviewer identity for approvals`,
   );
   assert.match(doc, /payloadFingerprint/, `${label} must document payload fingerprint binding`);
   assert.match(

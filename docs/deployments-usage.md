@@ -229,7 +229,6 @@ deploy --deployment //projects/deployments/pleomino-prod:deploy \
   --approve \
   --deploy-run-id <deploy-run-id> \
   --approval-id <ticket-or-review-ref> \
-  --requested-by-principal <reviewer-principal> \
   --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
 ```
 
@@ -239,6 +238,8 @@ when the run is waiting for human approval.
 
 If you are using the reviewed `nixos-shared-host` client profile workflow, use
 `--profile mini` instead of `--control-plane-url`.
+For auth-required protected/shared runs, the deployment service opens or prints
+the login URL and records the approver from the authenticated service session.
 
 ## Which Backend Am I Using
 

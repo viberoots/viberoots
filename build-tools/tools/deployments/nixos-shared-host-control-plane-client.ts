@@ -114,6 +114,7 @@ export async function submitNixosSharedHostControlPlaneRunActionViaService(opts:
   token?: string;
   request: DeploymentControlPlaneRunActionRequest & {
     deployRunId?: string;
+    authSessionId?: string;
     requestedBy?: DeploymentPrincipal;
     authorization?: DeploymentControlPlaneAuthorization;
   };

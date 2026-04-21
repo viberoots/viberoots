@@ -44,6 +44,8 @@ export class DeploymentIdempotencyConflictError extends DeploymentControlPlaneEr
 }
 
 export class DeploymentUnauthorizedError extends DeploymentControlPlaneError {
+  statusCode = 403;
+
   constructor(message: string) {
     super("unauthorized", message);
     this.name = "DeploymentUnauthorizedError";

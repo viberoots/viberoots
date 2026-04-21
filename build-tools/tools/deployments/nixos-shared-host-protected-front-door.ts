@@ -43,6 +43,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
   smokeConnectOverride?: unknown;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  remote?: string;
   vaultRuntimeInputs?: DeploymentVaultRuntimeInputs;
   hasFlag: (flag: string) => boolean;
 }) {
@@ -67,6 +68,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
   const serviceClient = resolveServiceClientFromFlags({
     controlPlaneUrl: opts.controlPlaneUrl,
     controlPlaneToken: opts.controlPlaneToken,
+    remote: opts.remote,
     context: `nixos-shared-host ${opts.deployment.protectionClass} mutation`,
   });
   const result = opts.remove

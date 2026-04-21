@@ -63,7 +63,12 @@ export async function expireDeploymentAuthSession(
   recordsRoot: string,
   session: DeploymentAuthSessionRecord,
 ) {
-  if (session.status !== "pending" || Date.now() < Date.parse(session.expiresAt)) return session;
+  if (
+    !["pending", "authenticated"].includes(session.status) ||
+    Date.now() < Date.parse(session.expiresAt)
+  ) {
+    return session;
+  }
   const expired = { ...session, status: "expired" as const, failure: "auth session expired" };
   await writeDeploymentAuthSession(recordsRoot, expired);
   return expired;

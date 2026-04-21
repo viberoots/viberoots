@@ -204,15 +204,17 @@ export async function consumeDeploymentAuthSessionAuthorization(opts: {
   operationKind: string;
 }) {
   const session = await readDeploymentAuthSession(opts.recordsRoot, opts.sessionId);
-  if (!session) throw new Error("auth session not found");
+  if (!session) throw Object.assign(new Error("auth session not found"), { statusCode: 403 });
   if (session.deployment.deploymentId !== opts.deploymentId) {
-    throw new Error("auth session deployment mismatch");
+    throw Object.assign(new Error("auth session deployment mismatch"), { statusCode: 403 });
   }
   if (session.operationKind !== opts.operationKind) {
-    throw new Error("auth session operation mismatch");
+    throw Object.assign(new Error("auth session operation mismatch"), { statusCode: 403 });
   }
   if (session.status !== "authenticated" || !session.authorization) {
-    throw new Error(`auth session is not authenticated: ${session.status}`);
+    throw Object.assign(new Error(`auth session is not authenticated: ${session.status}`), {
+      statusCode: 403,
+    });
   }
   await writeDeploymentAuthSession(opts.recordsRoot, { ...session, status: "consumed" });
   return session.authorization;
