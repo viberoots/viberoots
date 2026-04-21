@@ -82,6 +82,7 @@ export async function runNixosSharedHostDirectServiceMutation(opts: {
   controlPlaneToken?: string;
   deployment: NixosSharedHostDeployment;
   operationKind: NixosSharedHostControlPlaneOperationKind;
+  authSessionId?: string;
   artifactDir?: string;
   artifactDirsByComponentId?: Record<string, string>;
   publishBehavior?: "publish-only" | "provision-only";
@@ -101,6 +102,7 @@ export async function runNixosSharedHostDirectServiceMutation(opts: {
     submittedAt: new Date().toISOString(),
     deployment: opts.deployment,
     operationKind: opts.operationKind,
+    ...(opts.authSessionId ? { authSessionId: opts.authSessionId } : {}),
     ...(opts.artifactDir ? { artifactDir: path.resolve(opts.artifactDir) } : {}),
     ...(resolvedArtifactDirsByComponentId(opts.artifactDirsByComponentId)
       ? {

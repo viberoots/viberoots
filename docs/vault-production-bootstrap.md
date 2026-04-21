@@ -1222,7 +1222,7 @@ vault_runtime = {
     "pkce_callback_external_host": "deploy-auth.apps.kilty.io",
     "pkce_callback_external_path": "/oidc/callback",
     "pkce_callback_bind_host": "127.0.0.1",
-    "pkce_callback_bind_port": "8765",
+    "pkce_callback_bind_port": "7780",
     "pkce_callback_bind_path": "/oidc/callback",
     "preferred_credential_source": "interactive_pkce",
     "required_human_claim": "groups",
@@ -1234,8 +1234,8 @@ Credential-source choices:
 
 - `interactive_pkce`: local human desktop deploys and reviewed shared-host
   browser login. Configure a public Keycloak CLI client with Authorization Code
-  - PKCE required. Allow loopback redirect URIs for local desktops and allow the
-    exact shared-host redirect URI
+  - PKCE required. Allow loopback redirect URIs for local-only desktops and
+    allow the exact shared-host redirect URI
     `https://deploy-auth.apps.kilty.io/oidc/callback` for `mini`.
 - `interactive_device`: SSH/headless human deploys when the issuer supports
   OAuth 2.0 Device Authorization Grant. The CLI displays the verification URI
@@ -1257,8 +1257,8 @@ For the current `mini` host inventory:
 | Vault API     | `secrets.apps.kilty.io:8200` |
 | PKCE callback | `deploy-auth.apps.kilty.io`  |
 
-The deploy-auth callback hostname is a host-owned nginx route to the one-shot
-deploy command listener:
+The deploy-auth callback hostname is a host-owned nginx route to the long-running
+deployment service callback endpoint:
 
 ```nix
 deploymentHost.deployAuthCallback = {
@@ -1266,17 +1266,20 @@ deploymentHost.deployAuthCallback = {
   hostname = "deploy-auth.apps.kilty.io";
   callbackPath = "/oidc/callback";
   localBindHost = "127.0.0.1";
-  localBindPort = 8765;
+  localBindPort = 7780;
   manageNginx = false;
   manageAcme = false;
   openFirewall = false;
 };
 ```
 
-Keep the local bind port off the public firewall for this reverse-proxied shape.
-The Keycloak redirect allowlist uses only
-`https://deploy-auth.apps.kilty.io/oidc/callback`; the local
-`http://127.0.0.1:8765/oidc/callback` URI is private host wiring.
+Keep the service bind port off the public firewall for this reverse-proxied
+shape. The normal interactive story is: the laptop asks `mini` for an auth
+session, opens the returned browser URL, Keycloak redirects to
+`https://deploy-auth.apps.kilty.io/oidc/callback`, and the deployment service
+records only a redacted principal plus authorization evidence. The Keycloak
+redirect allowlist uses only that external URI; the local service URL is private
+host wiring.
 
 For Jenkins client-secret automation, keep the client secret itself outside the
 repo:

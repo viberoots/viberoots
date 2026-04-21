@@ -12,6 +12,12 @@ import {
   readControlPlaneRecord,
   readControlPlaneStatus,
 } from "./nixos-shared-host-control-plane-service-read.ts";
+import {
+  createDeploymentAuthLoginSession,
+  handleDeploymentAuthCallback,
+  readPublicDeploymentAuthSession,
+} from "./deployment-auth-session-service.ts";
+import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
 
 async function readJsonBody<T>(request: http.IncomingMessage): Promise<T> {
   const chunks: Buffer[] = [];
@@ -44,11 +50,29 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
   };
   const server = http.createServer(async (request, response) => {
     try {
+      const url = new URL(request.url || "/", "http://127.0.0.1");
+      if (request.method === "GET" && url.pathname === "/oidc/callback") {
+        const code = url.searchParams.get("code") || "";
+        const state = url.searchParams.get("state") || "";
+        if (!code || !state) {
+          writeJson(response, 400, { error: "OIDC callback missing code or state" });
+          return;
+        }
+        writeJson(
+          response,
+          200,
+          await handleDeploymentAuthCallback({
+            recordsRoot: opts.paths.recordsRoot,
+            code,
+            state,
+          }),
+        );
+        return;
+      }
       if (!checkToken(request, opts.token)) {
         writeJson(response, 401, { error: "unauthorized" });
         return;
       }
-      const url = new URL(request.url || "/", "http://127.0.0.1");
       if (request.method === "GET" && url.pathname === "/healthz") {
         writeJson(response, 200, { ok: true });
         return;
@@ -63,6 +87,29 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
             backend,
           }),
         );
+        return;
+      }
+      if (request.method === "POST" && url.pathname === "/api/v1/auth/login") {
+        writeJson(
+          response,
+          200,
+          await createDeploymentAuthLoginSession({
+            recordsRoot: opts.paths.recordsRoot,
+            request: await readJsonBody(request),
+          }),
+        );
+        return;
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/auth/session") {
+        const sessionId = url.searchParams.get("sessionId") || "";
+        const session = sessionId
+          ? await readPublicDeploymentAuthSession(opts.paths.recordsRoot, sessionId)
+          : undefined;
+        if (!session) {
+          writeJson(response, 404, { error: "auth session not found" });
+          return;
+        }
+        writeJson(response, 200, session);
         return;
       }
       if (request.method === "GET" && url.pathname === "/api/v1/status") {
@@ -108,7 +155,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
     } catch (error) {
       const statusCode = Number((error as any)?.statusCode) || 500;
       writeJson(response, statusCode, {
-        error: error instanceof Error ? error.message : String(error),
+        error: redactDeploymentAuthText(error instanceof Error ? error.message : String(error)),
       });
     }
   });

@@ -8,6 +8,11 @@ import type { NixosSharedHostDeployment } from "./contract.ts";
 import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
 import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door.ts";
 import { resolveServiceClientFromFlags } from "./nixos-shared-host-service-client-config.ts";
+import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
+import {
+  createAndWaitForServiceOwnedAuthSession,
+  shouldUseServiceOwnedInteractiveAuth,
+} from "./deployment-service-auth-client.ts";
 
 const SERVICE_ONLY_LOCAL_FLAGS = [
   "host-root",
@@ -38,6 +43,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
   smokeConnectOverride?: unknown;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  vaultRuntimeInputs?: DeploymentVaultRuntimeInputs;
   hasFlag: (flag: string) => boolean;
 }) {
   rejectServiceOnlyLocalFlags(opts.hasFlag);
@@ -71,6 +77,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
           : {}),
         deployment: opts.deployment,
         operationKind: "explicit_removal",
+        ...(await authSession(opts, serviceClient, "explicit_removal")),
         ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
       })
     : opts.provisionOnly
@@ -81,6 +88,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
             : {}),
           deployment: opts.deployment,
           operationKind: "provision_only",
+          ...(await authSession(opts, serviceClient, "provision_only")),
           publishBehavior: "provision-only",
           ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
           ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
@@ -96,6 +104,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
               : {}),
             deployment: opts.deployment,
             operationKind: opts.rollback ? "rollback" : "promotion",
+            ...(await authSession(opts, serviceClient, opts.rollback ? "rollback" : "promotion")),
             publishBehavior: "publish-only",
             sourceRunId: opts.sourceRunId,
             ...(opts.rollback ? { rollback: true } : {}),
@@ -111,6 +120,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
               : {}),
             deployment: opts.deployment,
             operationKind: "deploy",
+            ...(await authSession(opts, serviceClient, "deploy")),
             ...(isMultiComponentNixosSharedHostDeployment(opts.deployment)
               ? {
                   artifactDirsByComponentId: await resolveComponentArtifactDirsForCli(
@@ -127,4 +137,30 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
               : {}),
           });
   return result.kind === "result" ? summarizeDeploymentResult(result.result as any) : result.status;
+}
+
+async function authSession(
+  opts: Parameters<typeof runProtectedNixosSharedHostDeployFrontDoor>[0],
+  serviceClient: ReturnType<typeof resolveServiceClientFromFlags>,
+  operationKind: string,
+) {
+  if (
+    !shouldUseServiceOwnedInteractiveAuth({
+      deployment: opts.deployment,
+      inputs: opts.vaultRuntimeInputs,
+    })
+  ) {
+    return {};
+  }
+  return {
+    authSessionId: await createAndWaitForServiceOwnedAuthSession({
+      controlPlaneUrl: serviceClient.controlPlaneUrl,
+      ...(serviceClient.controlPlaneToken
+        ? { controlPlaneToken: serviceClient.controlPlaneToken }
+        : {}),
+      deployment: opts.deployment,
+      operationKind,
+      inputs: opts.vaultRuntimeInputs,
+    }),
+  };
 }

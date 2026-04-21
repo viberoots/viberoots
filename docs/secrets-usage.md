@@ -223,11 +223,11 @@ flags, and session detection:
 - SSH/headless human deploys use device authorization when the issuer supports
   it, otherwise the CLI prints a PKCE URL. The default callback stays on
   loopback and can be completed with an SSH forward.
-- reviewed shared deploy hosts can use public-host PKCE metadata so the printed
+- reviewed shared deploy hosts use service-owned PKCE sessions so the printed
   login URL redirects to `https://deploy-auth.apps.kilty.io/oidc/callback`,
-  while nginx forwards that request to the command's local
-  `http://127.0.0.1:8765/oidc/callback` listener. Use SSH loopback forwarding
-  only for deployments without a reviewed public callback profile.
+  while nginx forwards that request to the deployment service's private callback
+  endpoint. Use SSH loopback forwarding only for deployments without a reviewed
+  public callback profile.
 - when device authorization is available, it remains the preferred browserless
   SSH/headless flow.
 - Jenkins deploys use either a Jenkins Credentials-bound client secret to mint

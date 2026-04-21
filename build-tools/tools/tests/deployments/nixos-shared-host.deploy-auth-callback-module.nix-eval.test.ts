@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers.ts";
 
-test("shared-host deploy auth callback module routes public HTTPS to local PKCE listener", async () => {
+test("shared-host deploy auth callback module routes public HTTPS to deployment service", async () => {
   await runInTemp("shared-host-deploy-auth-callback-module-eval", async (tmp, $) => {
     const expr = `
       let
@@ -15,7 +15,7 @@ test("shared-host deploy auth callback module routes public HTTPS to local PKCE 
               enable = true;
               hostname = "deploy-auth.example.test";
               callbackPath = "/oidc/callback";
-              localBindPort = 8765;
+              localBindPort = 7780;
               manageNginx = true;
               manageAcme = true;
               acmeEmail = "ops@example.test";
@@ -46,7 +46,7 @@ test("shared-host deploy auth callback module routes public HTTPS to local PKCE 
     assert.equal(out.nginxEnabled, true);
     assert.equal(out.forceSSL, true);
     assert.equal(out.enableACME, true);
-    assert.equal(out.proxyPass, "http://127.0.0.1:8765/oidc/callback");
+    assert.equal(out.proxyPass, "http://127.0.0.1:7780/oidc/callback");
     assert.equal(out.acmeEmail, "ops@example.test");
     assert.deepEqual(out.firewallPorts, [80, 443]);
   });

@@ -8,6 +8,11 @@ import type {
 } from "./deployment-control-plane-contract.ts";
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract.ts";
+import type {
+  DeploymentAuthLoginRequest,
+  DeploymentAuthLoginResponse,
+  DeploymentAuthSessionStatus,
+} from "./deployment-auth-session-types.ts";
 
 const ACTIVE_LIFECYCLE_STATES = new Set(["queued", "waiting_for_lock", "running", "cancelling"]);
 
@@ -123,4 +128,49 @@ export async function submitNixosSharedHostControlPlaneRunActionViaService(opts:
       body: JSON.stringify(opts.request),
     }),
   );
+}
+
+export async function createDeploymentAuthLoginViaService(opts: {
+  controlPlaneUrl: string;
+  token?: string;
+  request: DeploymentAuthLoginRequest;
+}) {
+  return await readJson<DeploymentAuthLoginResponse>(
+    fetch(new URL("/api/v1/auth/login", opts.controlPlaneUrl), {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...authHeaders(opts.token),
+      },
+      body: JSON.stringify(opts.request),
+    }),
+  );
+}
+
+export async function readDeploymentAuthSessionViaService(opts: {
+  controlPlaneUrl: string;
+  token?: string;
+  sessionId: string;
+}) {
+  const url = new URL("/api/v1/auth/session", opts.controlPlaneUrl);
+  url.searchParams.set("sessionId", opts.sessionId);
+  return await readJson<DeploymentAuthSessionStatus>(
+    fetch(url, { headers: { ...authHeaders(opts.token) } }),
+  );
+}
+
+export async function waitForDeploymentAuthSessionViaService(opts: {
+  controlPlaneUrl: string;
+  token?: string;
+  sessionId: string;
+  pollMs?: number;
+  timeoutMs?: number;
+}) {
+  const deadline = Date.now() + (opts.timeoutMs ?? 300_000);
+  while (Date.now() < deadline) {
+    const status = await readDeploymentAuthSessionViaService(opts);
+    if (status.status !== "pending") return status;
+    await new Promise((resolve) => setTimeout(resolve, opts.pollMs ?? 250));
+  }
+  throw new Error(`timed out waiting for auth session ${opts.sessionId}`);
 }

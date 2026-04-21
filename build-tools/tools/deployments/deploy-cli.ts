@@ -23,6 +23,7 @@ import {
   isNixosSharedHostDeployment,
   isS3StaticDeployment,
 } from "./contract.ts";
+import { shouldUseServiceOwnedInteractiveAuth } from "./deployment-service-auth-client.ts";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();
@@ -102,11 +103,21 @@ export async function runDeployCli(opts: {
       "--retire-target/--migrate-target cannot be combined with deploy, publish-only, remove, or preview flags",
     );
   }
-  const vaultRuntime = await prepareDeploymentVaultRuntime({
-    workspaceRoot: opts.workspaceRoot,
-    deployment,
-    inputs: flags.vaultRuntimeInputs,
-  });
+  const serviceOwnedAuth =
+    opts.publicFrontDoor &&
+    isNixosSharedHostDeployment(deployment) &&
+    deployment.protectionClass !== "local_only" &&
+    shouldUseServiceOwnedInteractiveAuth({
+      deployment,
+      inputs: flags.vaultRuntimeInputs,
+    });
+  const vaultRuntime = serviceOwnedAuth
+    ? { minted: false }
+    : await prepareDeploymentVaultRuntime({
+        workspaceRoot: opts.workspaceRoot,
+        deployment,
+        inputs: flags.vaultRuntimeInputs,
+      });
   const restoreSecretContext = activateDeploymentSecretContext(vaultRuntime.secretContext);
   try {
     if (isS3StaticDeployment(deployment)) {
@@ -217,6 +228,7 @@ export async function runDeployCli(opts: {
       rollback: flags.rollback,
       sourceRunId: flags.sourceRunId,
       artifactDirFlag: flags.artifactDirFlag,
+      vaultRuntimeInputs: flags.vaultRuntimeInputs,
       ...(admissionEvidence ? { admissionEvidence } : {}),
       ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
     });

@@ -16,6 +16,7 @@ import {
   runNixosSharedHostProvisionOnlyFrontDoor,
   runNixosSharedHostPublishOnlyFrontDoor,
 } from "./nixos-shared-host-direct-source-front-door.ts";
+import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
 
 export async function runNixosSharedHostDeployFrontDoor(opts: {
   workspaceRoot: string;
@@ -25,6 +26,7 @@ export async function runNixosSharedHostDeployFrontDoor(opts: {
   rollback: boolean;
   sourceRunId: string;
   artifactDirFlag: string;
+  vaultRuntimeInputs?: DeploymentVaultRuntimeInputs;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
 }) {
@@ -99,6 +101,7 @@ export async function runNixosSharedHostDeployFrontDoor(opts: {
           getFlagStr("control-plane-url", "").trim() ||
           String(process.env.BNX_DEPLOY_CONTROL_PLANE_URL || "").trim(),
         controlPlaneToken: getFlagStr("control-plane-token", "").trim() || undefined,
+        vaultRuntimeInputs: opts.vaultRuntimeInputs,
         hasFlag,
       }),
     );

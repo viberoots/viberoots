@@ -19,17 +19,17 @@ in
     callbackPath = lib.mkOption {
       type = lib.types.str;
       default = "/oidc/callback";
-      description = "Public and local callback path routed to the deploy command listener.";
+      description = "Public and local callback path routed to the deployment service.";
     };
     localBindHost = lib.mkOption {
       type = lib.types.str;
       default = "127.0.0.1";
-      description = "Local host where the deploy command binds its one-shot PKCE listener.";
+      description = "Local host where the deployment service binds.";
     };
     localBindPort = lib.mkOption {
       type = lib.types.port;
-      default = 8765;
-      description = "Stable local port where the deploy command binds its PKCE listener.";
+      default = 7780;
+      description = "Stable local port where the deployment service listens.";
     };
     manageNginx = lib.mkOption {
       type = lib.types.bool;

@@ -195,11 +195,30 @@ Vault credential-source overrides:
   variable name.
 
 `interactive_pkce` resolves callback configuration in this order: CLI flags,
-environment variables, reviewed `vault_runtime` metadata, then loopback fallback.
-For the reviewed `mini` deploy host, metadata advertises
-`https://deploy-auth.apps.kilty.io/oidc/callback` while the command binds only
-`http://127.0.0.1:8765/oidc/callback` behind nginx. Keycloak must allowlist the
-external URI, not the local bind URI.
+environment variables, reviewed `vault_runtime` metadata, then loopback fallback
+for local-only deploys. For protected/shared `mini` deploys, the deployment
+service owns the login session and receives the browser callback at
+`https://deploy-auth.apps.kilty.io/oidc/callback`; the laptop client prints or
+opens the login URL and polls session status.
+
+Deployment-service auth endpoints:
+
+- `POST /api/v1/auth/login`
+  Creates a short-lived server-owned PKCE session for a deployment/action and
+  returns a non-secret `loginUrl`, `sessionId`, `redirectUri`, and expiry.
+- `GET /oidc/callback`
+  Receives the Keycloak redirect, exchanges the code with the same redirect URI,
+  validates issuer, audience, repository, deployment environment, and any
+  required human claim, then records a redacted authenticated principal.
+- `GET /api/v1/auth/session?sessionId=...`
+  Reports `pending`, `authenticated`, `failed`, `expired`, or `consumed` without
+  exposing auth codes, PKCE verifiers, access tokens, refresh tokens, Vault
+  tokens, workload JWTs, or provider credentials.
+
+Keycloak must allowlist the external URI
+`https://deploy-auth.apps.kilty.io/oidc/callback`. Local loopback listeners are
+only for local-only or emergency/operator override flows that do not use the
+reviewed shared service path.
 
 ### CLI Examples
 
@@ -920,9 +939,12 @@ codes, client secrets, Vault JWTs, Vault tokens, and Jenkins-bound secret values
 It may print non-secret routing metadata such as issuer URL, Vault address,
 audience, role name, policy name, claim names, and verification instructions.
 
-The current session/cache product policy is explicit: interactive login material
-is memory-only for the deploy process. Persistent auth cache support is absent,
-so there is no `deploy auth status` or `deploy auth logout` command.
+The current repo-level diagnostic session/cache product policy is explicit:
+interactive login material is memory-only for the deploy process. Shared
+deployment service auth sessions are separate short-lived server records: they
+persist only state, nonce, PKCE verifier, requested action metadata, redacted
+principal, and authorization evidence, and never persist token material. There
+is still no repo-local `deploy auth status` or `deploy auth logout` command.
 
 ## When To Open Which Doc
 

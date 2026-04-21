@@ -122,7 +122,7 @@ vault_runtime = {
     "pkce_callback_external_host": "deploy-auth.apps.kilty.io",
     "pkce_callback_external_path": "/oidc/callback",
     "pkce_callback_bind_host": "127.0.0.1",
-    "pkce_callback_bind_port": "8765",
+    "pkce_callback_bind_port": "7780",
     "pkce_callback_bind_path": "/oidc/callback",
 }
 ```

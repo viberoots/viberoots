@@ -24,6 +24,7 @@ export type NixosSharedHostControlPlaneSubmitRequest = {
   deployment: NixosSharedHostDeployment;
   operationKind: NixosSharedHostControlPlaneOperationKind;
   idempotencyKey?: string;
+  authSessionId?: string;
   requestedBy?: DeploymentPrincipal;
   authorization?: DeploymentControlPlaneAuthorization;
   deployBatchId?: string;

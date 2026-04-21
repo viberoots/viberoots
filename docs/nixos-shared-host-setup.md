@@ -301,10 +301,10 @@ What these modules do:
   `deploymentHost.vault.address = "0.0.0.0:8200"` to run Vault as the direct TLS
   endpoint for `https://secrets.apps.kilty.io:8200`.
 - `shared-host-deploy-auth-callback-module.nix`
-  Adds the reviewed nginx route for the deploy command's one-shot PKCE callback
-  listener. For `mini`, route `deploy-auth.apps.kilty.io` to
-  `http://127.0.0.1:8765/oidc/callback` and keep that local port off the public
-  firewall.
+  Adds the reviewed nginx route for the deployment service's OIDC callback
+  endpoint. For `mini`, route `deploy-auth.apps.kilty.io` to the control-plane
+  service's local `/oidc/callback` endpoint and keep that service port off the
+  public firewall.
 
 For hosts shaped like the current monolithic `mini` configuration, keep nginx,
 ACME, DNS rewrites, and firewall list composition in the host file. Import the
@@ -339,7 +339,7 @@ deploymentHost.deployAuthCallback = {
   hostname = "deploy-auth.apps.kilty.io";
   callbackPath = "/oidc/callback";
   localBindHost = "127.0.0.1";
-  localBindPort = 8765;
+  localBindPort = 7780;
   manageNginx = false;
   manageAcme = false;
   openFirewall = false;
@@ -349,8 +349,9 @@ deploymentHost.deployAuthCallback = {
 With that shape, add `8200` to the existing
 `networking.firewall.allowedTCPPorts` expression and add a host-owned nginx
 virtual host for `identity.apps.kilty.io` plus a host-owned callback vhost for
-`deploy-auth.apps.kilty.io` that uses the existing `apps.kilty.io` wildcard
-certificate. The Vault runbook has the full copy/paste snippets.
+`deploy-auth.apps.kilty.io` that proxies to the deployment service and uses the
+existing `apps.kilty.io` wildcard certificate. The Vault runbook has the full
+copy/paste snippets.
 
 What these modules do not do:
 

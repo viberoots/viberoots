@@ -28,6 +28,7 @@ import {
   resolveBackendIdempotency,
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend.ts";
+import { consumeDeploymentAuthSessionAuthorization } from "./deployment-auth-session-service.ts";
 import {
   NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
   type NixosSharedHostControlPlaneSubmitRequest,
@@ -92,11 +93,21 @@ export async function handleControlPlaneSubmit(
           recordsRoot: opts.paths.recordsRoot,
           backendDatabaseUrl: opts.backend.databaseUrl,
         });
-  const authorization = resolvedRequest.authorization
+  const sessionAuthorization =
+    "authSessionId" in request && request.authSessionId
+      ? await consumeDeploymentAuthSessionAuthorization({
+          recordsRoot: opts.paths.recordsRoot,
+          sessionId: request.authSessionId,
+          deploymentId: resolvedRequest.deployment.deploymentId,
+          operationKind: resolvedRequest.operationKind,
+        })
+      : undefined;
+  const requestAuthorization = resolvedRequest.authorization || sessionAuthorization;
+  const authorization = requestAuthorization
     ? authorizeControlPlaneSubmit({
         deployment: resolvedRequest.deployment,
         operationKind: resolvedRequest.operationKind,
-        authorization: resolvedRequest.authorization,
+        authorization: requestAuthorization,
       })
     : undefined;
   try {

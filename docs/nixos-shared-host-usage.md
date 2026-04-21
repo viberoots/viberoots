@@ -140,7 +140,7 @@ Vault TLS on the existing `*.apps.kilty.io` certificate, and set the
 identity-provider `manageNginx`, `manageAcme`, and `openFirewall` flags to
 `false` when adding a host-owned `identity.apps.kilty.io` nginx vhost. Use the
 deploy-auth callback module the same way for `deploy-auth.apps.kilty.io`, routing
-to `127.0.0.1:8765` without opening that local bind port publicly. The modules
+to `127.0.0.1:7780` without opening that local service port publicly. The modules
 do not choose public domains for you; set `publicHostname`, `acmeCertName`,
 `identityProvider.hostname`, and `deployAuthCallback.hostname` from the host
 config.

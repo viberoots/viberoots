@@ -62,7 +62,7 @@ test("print-login instructions are browserless and memory-only", async () => {
   assert.equal(login.sessionPolicy.persistentCache, false);
   assert.equal(login.pkceCallback.mode, "public_host");
   assert.equal(login.pkceCallback.externalHost, "deploy-auth.apps.kilty.io");
-  assert.equal(login.pkceCallback.bindPort, 8765);
+  assert.equal(login.pkceCallback.bindPort, 7780);
   assert.match(login.instructions.join("\n"), /--login-browser=print/);
 });
 

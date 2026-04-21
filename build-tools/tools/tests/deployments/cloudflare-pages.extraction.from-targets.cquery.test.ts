@@ -75,7 +75,7 @@ const EXPECTED_MINI_VAULT_RUNTIME = {
     externalHost: "deploy-auth.apps.kilty.io",
     externalPath: "/oidc/callback",
     bindHost: "127.0.0.1",
-    bindPort: "8765",
+    bindPort: "7780",
     bindPath: "/oidc/callback",
   },
 };

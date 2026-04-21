@@ -1,0 +1,70 @@
+#!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
+import path from "node:path";
+import {
+  DEPLOYMENT_AUTH_SESSION_RECORD_SCHEMA,
+  type DeploymentAuthSessionRecord,
+} from "./deployment-auth-session-types.ts";
+
+function authSessionDir(recordsRoot: string): string {
+  return path.join(recordsRoot, "control-plane", "auth-sessions");
+}
+
+function authSessionPath(recordsRoot: string, sessionId: string): string {
+  return path.join(authSessionDir(recordsRoot), `${sessionId}.json`);
+}
+
+async function readSessionFile(file: string): Promise<DeploymentAuthSessionRecord | undefined> {
+  try {
+    const parsed = JSON.parse(await fsp.readFile(file, "utf8")) as DeploymentAuthSessionRecord;
+    if (parsed.schemaVersion !== DEPLOYMENT_AUTH_SESSION_RECORD_SCHEMA) {
+      throw new Error(`unsupported auth session schema: ${parsed.schemaVersion}`);
+    }
+    return parsed;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
+}
+
+export async function writeDeploymentAuthSession(
+  recordsRoot: string,
+  session: DeploymentAuthSessionRecord,
+) {
+  await fsp.mkdir(authSessionDir(recordsRoot), { recursive: true });
+  await fsp.writeFile(
+    authSessionPath(recordsRoot, session.sessionId),
+    JSON.stringify(session, null, 2),
+  );
+}
+
+export async function readDeploymentAuthSession(recordsRoot: string, sessionId: string) {
+  const session = await readSessionFile(authSessionPath(recordsRoot, sessionId));
+  if (!session) return undefined;
+  return await expireDeploymentAuthSession(recordsRoot, session);
+}
+
+export async function findDeploymentAuthSessionByState(recordsRoot: string, state: string) {
+  let entries: string[] = [];
+  try {
+    entries = await fsp.readdir(authSessionDir(recordsRoot));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  for (const entry of entries) {
+    if (!entry.endsWith(".json")) continue;
+    const session = await readSessionFile(path.join(authSessionDir(recordsRoot), entry));
+    if (session?.state === state) return await expireDeploymentAuthSession(recordsRoot, session);
+  }
+  return undefined;
+}
+
+export async function expireDeploymentAuthSession(
+  recordsRoot: string,
+  session: DeploymentAuthSessionRecord,
+) {
+  if (session.status !== "pending" || Date.now() < Date.parse(session.expiresAt)) return session;
+  const expired = { ...session, status: "expired" as const, failure: "auth session expired" };
+  await writeDeploymentAuthSession(recordsRoot, expired);
+  return expired;
+}
