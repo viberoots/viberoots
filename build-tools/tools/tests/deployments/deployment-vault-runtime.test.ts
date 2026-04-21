@@ -9,6 +9,10 @@ import {
   DEFAULT_DEPLOYMENT_CLIENT_SECRET_ENV,
   prepareDeploymentVaultRuntime,
 } from "../../deployments/deployment-vault-runtime.ts";
+import {
+  prepareWorkerDeploymentVaultRuntime,
+  workerVaultRuntimeMetadata,
+} from "../../deployments/deployment-vault-runtime-worker.ts";
 import { decodeJwtPayload } from "../../deployments/deploy-vault-jwt-claims.ts";
 import {
   cloudflarePagesApiTokenRequirements,
@@ -137,4 +141,57 @@ test("deployment Vault runtime ignores stale ambient Vault auth variables", asyn
   } finally {
     await server.close();
   }
+});
+
+test("worker Vault runtime rejects fixture and interactive client credential sources", async () => {
+  const previousFixture = process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
+  process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH = "/tmp/local-secret-fixture.json";
+  try {
+    await assert.rejects(
+      prepareWorkerDeploymentVaultRuntime({
+        workspaceRoot: process.cwd(),
+        deployment: cloudflarePagesDeploymentFixture({
+          secretRequirements: cloudflarePagesApiTokenRequirements(),
+        }),
+      }),
+      /server-mode worker Vault access must not use BNX_DEPLOYMENT_SECRET_FIXTURE_PATH/,
+    );
+  } finally {
+    if (previousFixture === undefined) delete process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
+    else process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH = previousFixture;
+  }
+
+  await assert.rejects(
+    prepareWorkerDeploymentVaultRuntime({
+      workspaceRoot: process.cwd(),
+      deployment: cloudflarePagesDeploymentFixture({
+        secretRequirements: cloudflarePagesApiTokenRequirements(),
+        vaultRuntime: {
+          addr: "https://vault.example.net:8200",
+          oidcIssuer: "https://identity.example.test",
+          preferredCredentialSource: "interactive_pkce",
+        },
+      }),
+      env: {},
+    }),
+    /server-mode worker Vault access requires a server-local credential source/,
+  );
+});
+
+test("worker Vault runtime metadata keeps only non-secret credential references", () => {
+  const token = "server-local-worker-token";
+  const metadata = workerVaultRuntimeMetadata({
+    deployment: cloudflarePagesDeploymentFixture({
+      secretRequirements: cloudflarePagesApiTokenRequirements(),
+      vaultRuntime: {
+        addr: "https://vault.example.net:8200",
+        oidcIssuer: "https://identity.example.test",
+        preferredCredentialSource: "external_oidc_token",
+        externalOidcTokenEnv: "BNX_WORKER_OIDC_TOKEN",
+      },
+    }),
+    env: { BNX_WORKER_OIDC_TOKEN: token },
+  });
+  assert.equal(metadata?.externalOidcTokenEnv, "BNX_WORKER_OIDC_TOKEN");
+  assert.ok(!JSON.stringify(metadata).includes(token));
 });

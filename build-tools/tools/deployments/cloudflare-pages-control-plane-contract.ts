@@ -14,6 +14,7 @@ import type {
   DeploymentControlPlaneTerminationReason,
 } from "./deployment-control-plane-contract.ts";
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
+import type { DeploymentWorkerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker.ts";
 
 export const CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA =
   "cloudflare-pages-control-plane-snapshot@2";
@@ -52,6 +53,7 @@ export type CloudflarePagesControlPlaneSnapshot = {
   lockScope: string;
   deployment: CloudflarePagesDeployment;
   admittedContext: CloudflarePagesAdmittedContext;
+  vaultRuntime?: DeploymentWorkerVaultRuntimeMetadata;
   paths: CloudflarePagesControlPlanePaths;
   action:
     | {

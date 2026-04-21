@@ -785,18 +785,19 @@ deploys, set `preferred_credential_source = "interactive_pkce"` or leave
 selection on auto so the CLI uses a public PKCE client on desktop terminals and
 device/print-only behavior on SSH/headless sessions.
 
-The deploy front door derives the Vault role and bound claims from the selected
-deployment and its `vault_runtime` metadata. The selected credential source
-then obtains a short-lived JWT through PKCE, device authorization, Jenkins
-client-secret minting, or an external OIDC token. For the in-process secret
-backend, the front door passes a typed context containing the Vault address,
-Vault JWT role, and workload JWT value. The workload JWT and returned Vault
-token stay in memory for the deployment run; normal deploys do not write JWT
-files or set `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`, `BNX_VAULT_AUTH_METHOD`,
+Local/direct deploys derive the Vault role and bound claims from the selected
+deployment and its `vault_runtime` metadata, then create a typed context containing the Vault address.
+Protected service-backed deploys use a different boundary: the submitter's PKCE/device session
+authorizes the request, while the `mini` worker reads non-secret Vault runtime metadata from the
+execution snapshot and obtains a server-local workload credential immediately
+before provider execution. The workload JWT and returned Vault token stay in
+worker memory for the deployment run; normal deploys do not write JWT files or
+set `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`, `BNX_VAULT_AUTH_METHOD`,
 `BNX_VAULT_JWT_ROLE`, or `VAULT_TOKEN` in `process.env`.
 
 Local development, isolated tests, and explicit bootstrap-oriented workflows
-can intentionally override that runtime path with the reviewed fixture file:
+can intentionally override the local/direct runtime path with the reviewed
+fixture file. Protected service-backed workers reject this override:
 
 ```bash
 export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/secret-fixture.json"

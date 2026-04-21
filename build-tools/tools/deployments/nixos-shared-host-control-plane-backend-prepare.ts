@@ -61,7 +61,10 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
   const submissionId = opts.submissionId || createNixosSharedHostSubmissionId();
   const requestedBy =
     opts.requestedBy || opts.admissionEvidence?.requestedBy || defaultRequestedBy();
-  const snapshot = await createNixosSharedHostControlPlaneSnapshot(opts, submissionId);
+  const snapshot = await createNixosSharedHostControlPlaneSnapshot(
+    { ...opts, deferSecretReferenceResolution: true },
+    submissionId,
+  );
   const deployRunId = createNixosSharedHostDeployRunId();
   snapshot.provisionerPlan = await writeNixosSharedHostProvisionerPlan({ snapshot });
   const executionSnapshotPath = executionSnapshotPathFor(opts.paths.recordsRoot, submissionId);

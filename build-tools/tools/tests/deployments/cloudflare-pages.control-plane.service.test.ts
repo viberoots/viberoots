@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers.ts";
@@ -10,68 +9,30 @@ import {
   cloudflarePagesPreviewFixture,
   installCloudflarePagesTargets,
 } from "./cloudflare-pages.fixture.ts";
-import { DEPLOYMENT_SECRET_FIXTURE_SCHEMA } from "../../deployments/deployment-secret-fixture.ts";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
 import { deriveCloudflarePagesPreviewTarget } from "../../deployments/cloudflare-pages-preview.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import {
+  readBackendSnapshot,
   readRecord,
   startControlPlaneHarness,
   withEnvOverrides,
 } from "./nixos-shared-host.control-plane.helpers.ts";
 import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
-
-async function writeArtifact(root: string, html: string): Promise<void> {
-  await fsp.mkdir(root, { recursive: true });
-  await fsp.writeFile(path.join(root, "index.html"), html, "utf8");
-}
-
-async function writeWranglerConfig(root: string) {
-  await fsp.mkdir(path.dirname(root), { recursive: true });
-  await fsp.writeFile(root, '{\n  "compatibility_date": "2026-03-18"\n}\n', "utf8");
-}
-
-async function writeSecretFixture(filePath: string) {
-  await fsp.writeFile(
-    filePath,
-    JSON.stringify(
-      {
-        schemaVersion: DEPLOYMENT_SECRET_FIXTURE_SCHEMA,
-        contracts: {
-          "secret://deployments/pleomino/cloudflare_api_token": {
-            value: "service-secret-token",
-            allowedSteps: ["publish", "preview_cleanup"],
-            targetScopes: ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
-          },
-        },
-      },
-      null,
-      2,
-    ) + "\n",
-    "utf8",
-  );
-}
-
-function fakeCloudflareOverrides(
-  fake: Awaited<ReturnType<typeof installFakeCloudflarePagesWrangler>>,
-  fixturePath?: string,
-): Record<string, string> {
-  const overrides: Record<string, string> = {
-    PATH: `${fake.binDir}:${process.env.PATH || ""}`,
-    BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT: fake.publishRoot,
-    BNX_CLOUDFLARE_FAKE_WRANGLER_LOG: fake.logPath,
-    BNX_CLOUDFLARE_PAGES_WRANGLER_BIN: path.join(fake.binDir, "wrangler"),
-  };
-  if (fixturePath) overrides.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH = fixturePath;
-  return overrides;
-}
+import { fakeJwt } from "./deploy-vault-jwt.test-helpers.ts";
+import { startFakeVaultServer } from "./vault.test-server.ts";
+import {
+  fakeCloudflareOverrides,
+  writeCloudflareServiceArtifact,
+  writeWranglerConfig,
+} from "./cloudflare-pages.service-flow.helpers.ts";
 
 test("public cloudflare-pages deploy requires a control-plane URL for protected/shared targets", async () => {
   await runInTemp("cloudflare-pages-public-service-required", async (tmp, $) => {
     const deployment = cloudflarePagesDeploymentFixture();
     const artifactDir = path.join(tmp, "artifact");
-    await writeArtifact(artifactDir, "<html>service-required</html>\n");
+    await writeCloudflareServiceArtifact(artifactDir, "<html>service-required</html>\n");
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
@@ -100,7 +61,7 @@ test("public cloudflare-pages deploy rejects mixed service and local records fla
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const recordsRoot = path.join(tmp, "records");
-    await writeArtifact(artifactDir, "<html>mixed-mode</html>\n");
+    await writeCloudflareServiceArtifact(artifactDir, "<html>mixed-mode</html>\n");
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
@@ -134,20 +95,45 @@ test("public cloudflare-pages deploy rejects mixed service and local records fla
 
 test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollback through the control-plane service", async () => {
   await runInTemp("cloudflare-pages-public-service-flow", async (tmp, $) => {
+    const issuer = "https://identity.example.test";
+    const workerJwt = fakeJwt({
+      iss: issuer,
+      aud: "deployments-vault",
+      azp: "deployment-runner",
+      deployment_environment: "mini",
+      repository: "kiltyj/bucknix-fresh",
+    });
+    const vault = await startFakeVaultServer(
+      {
+        "secret://deployments/pleomino/cloudflare_api_token": {
+          currentVersion: "1",
+          versions: { "1": { value: "service-secret-token" } },
+        },
+      },
+      { jwtAuth: { role: "deploy-pleomino-read", jwt: workerJwt } },
+    );
     const deployment = cloudflarePagesDeploymentFixture({
       preview: cloudflarePagesPreviewFixture(),
       secretRequirements: cloudflarePagesApiTokenRequirements(),
+      vaultRuntime: {
+        addr: vault.addr,
+        oidcIssuer: issuer,
+        audience: "deployments-vault",
+        deploymentClientId: "deployment-runner",
+        deploymentEnvironment: "mini",
+        roleName: "deploy-pleomino-read",
+        preferredCredentialSource: "external_oidc_token",
+        externalOidcTokenEnv: "BNX_WORKER_OIDC_TOKEN",
+      },
     });
     const artifactA = path.join(tmp, "artifact-a");
     const artifactB = path.join(tmp, "artifact-b");
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const recordsRoot = path.join(tmp, "records");
-    const fixturePath = path.join(tmp, "secret-fixture.json");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
-    await writeArtifact(artifactA, "<html>artifact-a</html>\n");
-    await writeArtifact(artifactB, "<html>artifact-b</html>\n");
-    await writeSecretFixture(fixturePath);
+    await writeCloudflareServiceArtifact(artifactA, "<html>artifact-a</html>\n");
+    await writeCloudflareServiceArtifact(artifactB, "<html>artifact-b</html>\n");
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
@@ -166,8 +152,13 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
     });
     let previewServer: Awaited<ReturnType<typeof startCloudflarePagesPublicServer>> | undefined;
     try {
-      const env = { ...process.env, ...fakeCloudflareOverrides(fake, fixturePath) };
-      await withEnvOverrides(fakeCloudflareOverrides(fake, fixturePath), async () => {
+      const workerEnv = {
+        ...fakeCloudflareOverrides(fake),
+        BNX_WORKER_OIDC_TOKEN: workerJwt,
+      };
+      await withEnvOverrides(workerEnv, async () => {
+        const env = { ...process.env, ...fakeCloudflareOverrides(fake) };
+        delete env.BNX_WORKER_OIDC_TOKEN;
         const harness = await startControlPlaneHarness({
           workspaceRoot: tmp,
           hostRoot,
@@ -186,6 +177,14 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
           const firstRecord = await readRecord(harness.controlPlane.url, firstSummary.deployRunId);
           assert.equal("submissionPath" in (firstRecord.controlPlane || {}), false);
           assert.equal("executionSnapshotPath" in (firstRecord.controlPlane || {}), false);
+          const firstSnapshot = await readBackendSnapshot(
+            recordsRoot,
+            firstRecord.controlPlane.submissionId,
+          );
+          const serializedSnapshot = JSON.stringify(firstSnapshot);
+          assert.equal(firstSnapshot.vaultRuntime.addr, vault.addr);
+          assert.ok(!serializedSnapshot.includes(workerJwt));
+          assert.ok(!serializedSnapshot.includes("service-secret-token"));
 
           previewServer = await startCloudflarePagesPublicServer({
             deployment,
@@ -237,6 +236,7 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
     } finally {
       if (previewServer) await previewServer.close();
       await normalServer.close();
+      await vault.close();
     }
   });
 });

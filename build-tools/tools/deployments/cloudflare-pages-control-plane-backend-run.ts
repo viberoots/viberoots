@@ -1,15 +1,21 @@
 #!/usr/bin/env zx-wrapper
 import { runCloudflarePagesStaticDeploy } from "./cloudflare-pages-static-deploy.ts";
+import type { CloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-contract.ts";
 import { createCloudflarePagesDeployRunId } from "./cloudflare-pages-records.ts";
+import { resolveCloudflarePagesAdmittedSecretReferences } from "./cloudflare-pages-admission.ts";
 import { revalidateControlPlaneAdmission } from "./deployment-control-plane-revalidation.ts";
 import { lockWaitAbortReasonForSubmission } from "./deployment-control-plane-queue.ts";
 import {
   acquireBackendControlPlaneLock,
   writeBackendDeployRecordDoc,
+  writeBackendSnapshotDoc,
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend.ts";
 import { removeMirrorFile } from "./nixos-shared-host-control-plane-backend-materialize.ts";
-import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
+import {
+  readControlPlaneJson,
+  writeControlPlaneJson,
+} from "./nixos-shared-host-control-plane-store.ts";
 import {
   writeTransitionRecord,
   type CloudflarePagesTargetTransitionRecord,
@@ -18,6 +24,34 @@ import { sanitizedBackendRecord } from "./cloudflare-pages-control-plane-backend
 // prettier-ignore
 import { persistCloudflareBackendStatus, type CloudflareBackendSubmissionLike } from "./cloudflare-pages-control-plane-backend-status.ts";
 import { executeCloudflarePagesBackendPreviewCleanup } from "./cloudflare-pages-control-plane-backend-preview-cleanup.ts";
+import { withWorkerDeploymentVaultRuntime } from "./deployment-vault-runtime-worker.ts";
+import type { DeploymentSecretContext } from "./deployment-secret-context.ts";
+
+async function prepareWorkerAdmittedSnapshot(opts: {
+  workspaceRoot: string;
+  backend: NixosSharedHostControlPlaneBackendTarget;
+  executionSnapshotPath: string;
+  executionSnapshotRef: string;
+  snapshot: CloudflarePagesControlPlaneSnapshot;
+  secretContext?: DeploymentSecretContext;
+}) {
+  if (!opts.snapshot.admittedContext) return;
+  await revalidateControlPlaneAdmission({
+    workspaceRoot: opts.workspaceRoot,
+    deployment: opts.snapshot.deployment,
+    admittedContext: opts.snapshot.admittedContext,
+  });
+  opts.snapshot.admittedContext = {
+    ...opts.snapshot.admittedContext,
+    admittedSecretReferences: await resolveCloudflarePagesAdmittedSecretReferences({
+      deployment: opts.snapshot.deployment,
+      admittedContext: opts.snapshot.admittedContext,
+      ...(opts.secretContext ? { secretContext: opts.secretContext } : {}),
+    }),
+  };
+  await writeControlPlaneJson(opts.executionSnapshotPath, opts.snapshot);
+  await writeBackendSnapshotDoc(opts.backend, opts.snapshot, opts.executionSnapshotRef);
+}
 
 export async function executeCloudflarePagesBackendSubmission(opts: {
   workspaceRoot: string;
@@ -45,21 +79,27 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
       executionSnapshotRef: opts.executionSnapshotRef,
       submission: running,
     });
-    if (snapshot.admittedContext) {
-      await revalidateControlPlaneAdmission({
-        workspaceRoot: opts.workspaceRoot,
-        deployment: snapshot.deployment,
-        admittedContext: snapshot.admittedContext,
-      });
-    }
     try {
       const result =
         snapshot.action?.kind === "preview_cleanup"
-          ? await executeCloudflarePagesBackendPreviewCleanup({
-              recordsRoot: opts.recordsRoot,
-              workerId: opts.workerId,
-              snapshot,
-            })
+          ? await withWorkerDeploymentVaultRuntime(
+              { workspaceRoot: opts.workspaceRoot, deployment: snapshot.deployment },
+              async (runtime) => {
+                await prepareWorkerAdmittedSnapshot({
+                  workspaceRoot: opts.workspaceRoot,
+                  backend: opts.backend,
+                  executionSnapshotPath: opts.executionSnapshotPath,
+                  executionSnapshotRef: opts.executionSnapshotRef,
+                  snapshot,
+                  ...(runtime.secretContext ? { secretContext: runtime.secretContext } : {}),
+                });
+                return await executeCloudflarePagesBackendPreviewCleanup({
+                  recordsRoot: opts.recordsRoot,
+                  workerId: opts.workerId,
+                  snapshot,
+                });
+              },
+            )
           : snapshot.targetException
             ? await (async () => {
                 const record: CloudflarePagesTargetTransitionRecord = {
@@ -105,44 +145,57 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
                   recordPath: await writeTransitionRecord(opts.recordsRoot, record),
                 };
               })()
-            : await runCloudflarePagesStaticDeploy({
-                workspaceRoot: opts.workspaceRoot,
-                deployment: snapshot.deployment,
-                artifact: snapshot.action.publishInput.artifact,
-                recordsRoot: opts.recordsRoot,
-                operationKind: snapshot.operationKind,
-                admittedContext: snapshot.admittedContext,
-                ...(snapshot.action.parentRunId
-                  ? { parentRunId: snapshot.action.parentRunId }
-                  : {}),
-                ...(snapshot.action.releaseLineageId
-                  ? { releaseLineageId: snapshot.action.releaseLineageId }
-                  : {}),
-                ...(snapshot.action.artifactLineageId
-                  ? { artifactLineageId: snapshot.action.artifactLineageId }
-                  : {}),
-                ...(snapshot.deployBatchId ? { deployBatchId: snapshot.deployBatchId } : {}),
-                ...(snapshot.action.publishMode
-                  ? { publishMode: snapshot.action.publishMode }
-                  : {}),
-                ...(snapshot.action.effectiveRunTarget
-                  ? { effectiveRunTarget: snapshot.action.effectiveRunTarget }
-                  : {}),
-                ...(snapshot.action.previewIdentitySelector
-                  ? { previewIdentitySelector: snapshot.action.previewIdentitySelector }
-                  : {}),
-                authority: {
-                  kind: "control-plane-worker",
-                  submissionId: snapshot.submissionId,
-                  submissionPath: opts.submissionRef,
-                  workerId: opts.workerId,
-                  lockScope: snapshot.lockScope,
-                  executionSnapshotPath: opts.executionSnapshotPath,
+            : await withWorkerDeploymentVaultRuntime(
+                { workspaceRoot: opts.workspaceRoot, deployment: snapshot.deployment },
+                async (runtime) => {
+                  await prepareWorkerAdmittedSnapshot({
+                    workspaceRoot: opts.workspaceRoot,
+                    backend: opts.backend,
+                    executionSnapshotPath: opts.executionSnapshotPath,
+                    executionSnapshotRef: opts.executionSnapshotRef,
+                    snapshot,
+                    ...(runtime.secretContext ? { secretContext: runtime.secretContext } : {}),
+                  });
+                  return await runCloudflarePagesStaticDeploy({
+                    workspaceRoot: opts.workspaceRoot,
+                    deployment: snapshot.deployment,
+                    artifact: snapshot.action.publishInput.artifact,
+                    recordsRoot: opts.recordsRoot,
+                    operationKind: snapshot.operationKind,
+                    admittedContext: snapshot.admittedContext,
+                    ...(snapshot.action.parentRunId
+                      ? { parentRunId: snapshot.action.parentRunId }
+                      : {}),
+                    ...(snapshot.action.releaseLineageId
+                      ? { releaseLineageId: snapshot.action.releaseLineageId }
+                      : {}),
+                    ...(snapshot.action.artifactLineageId
+                      ? { artifactLineageId: snapshot.action.artifactLineageId }
+                      : {}),
+                    ...(snapshot.deployBatchId ? { deployBatchId: snapshot.deployBatchId } : {}),
+                    ...(snapshot.action.publishMode
+                      ? { publishMode: snapshot.action.publishMode }
+                      : {}),
+                    ...(snapshot.action.effectiveRunTarget
+                      ? { effectiveRunTarget: snapshot.action.effectiveRunTarget }
+                      : {}),
+                    ...(snapshot.action.previewIdentitySelector
+                      ? { previewIdentitySelector: snapshot.action.previewIdentitySelector }
+                      : {}),
+                    authority: {
+                      kind: "control-plane-worker",
+                      submissionId: snapshot.submissionId,
+                      submissionPath: opts.submissionRef,
+                      workerId: opts.workerId,
+                      lockScope: snapshot.lockScope,
+                      executionSnapshotPath: opts.executionSnapshotPath,
+                    },
+                    ...(snapshot.smokeConnectOverride
+                      ? { smokeConnectOverride: snapshot.smokeConnectOverride }
+                      : {}),
+                  });
                 },
-                ...(snapshot.smokeConnectOverride
-                  ? { smokeConnectOverride: snapshot.smokeConnectOverride }
-                  : {}),
-              });
+              );
       await writeBackendDeployRecordDoc(
         opts.backend,
         sanitizedBackendRecord(result.record),

@@ -9,7 +9,7 @@ export function renderStringList(values: string[]): string {
   return `[${values.map((value) => JSON.stringify(value)).join(", ")}]`;
 }
 
-function renderStringDictLines(values: Record<string, string>, indent = "    "): string[] {
+export function renderStringDictLines(values: Record<string, string>, indent = "    "): string[] {
   return [
     `${indent}{`,
     ...Object.entries(values).map(

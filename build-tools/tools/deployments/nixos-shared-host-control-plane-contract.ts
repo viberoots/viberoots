@@ -18,6 +18,7 @@ import type {
   DeploymentAdmissionEvidence,
   DeploymentPrincipal,
 } from "./deployment-admission-evidence.ts";
+import type { DeploymentWorkerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker.ts";
 
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA =
   "nixos-shared-host-control-plane-snapshot@4";
@@ -65,6 +66,7 @@ export type NixosSharedHostControlPlaneSnapshot = {
   provisionerPlan?: NixosSharedHostProvisionerPlanRef;
   admittedContext?: NixosSharedHostAdmittedContext;
   admissionEvidence?: DeploymentAdmissionEvidence;
+  vaultRuntime?: DeploymentWorkerVaultRuntimeMetadata;
   paths: NixosSharedHostControlPlanePaths;
   action:
     | {

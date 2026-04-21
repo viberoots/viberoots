@@ -23,7 +23,6 @@ import {
   isNixosSharedHostDeployment,
   isS3StaticDeployment,
 } from "./contract.ts";
-import { shouldUseServiceOwnedInteractiveAuth } from "./deployment-service-auth-client.ts";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();
@@ -103,15 +102,11 @@ export async function runDeployCli(opts: {
       "--retire-target/--migrate-target cannot be combined with deploy, publish-only, remove, or preview flags",
     );
   }
-  const serviceOwnedAuth =
+  const serviceBackedWorkerRuntime =
     opts.publicFrontDoor &&
-    isNixosSharedHostDeployment(deployment) &&
     deployment.protectionClass !== "local_only" &&
-    shouldUseServiceOwnedInteractiveAuth({
-      deployment,
-      inputs: flags.vaultRuntimeInputs,
-    });
-  const vaultRuntime = serviceOwnedAuth
+    (isNixosSharedHostDeployment(deployment) || isCloudflarePagesDeployment(deployment));
+  const vaultRuntime = serviceBackedWorkerRuntime
     ? { minted: false }
     : await prepareDeploymentVaultRuntime({
         workspaceRoot: opts.workspaceRoot,

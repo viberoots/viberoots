@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { DEPLOYMENT_SECRET_FIXTURE_SCHEMA } from "../../deployments/deployment-secret-fixture.ts";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
@@ -15,10 +14,7 @@ import {
   startControlPlaneHarness,
   withEnvOverrides,
 } from "./nixos-shared-host.control-plane.helpers.ts";
-import {
-  deploymentReleaseActionFixture,
-  deploymentRequirementFixture,
-} from "./deployment-metadata.fixture.ts";
+import { deploymentReleaseActionFixture } from "./deployment-metadata.fixture.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 async function writeArtifact(root: string): Promise<void> {
@@ -31,29 +27,9 @@ async function writeDeploymentJson(filePath: string, deployment: unknown): Promi
   await fsp.writeFile(filePath, JSON.stringify(deployment, null, 2) + "\n", "utf8");
 }
 
-async function writeSecretFixture(filePath: string, contracts: Record<string, unknown>) {
-  await fsp.writeFile(
-    filePath,
-    JSON.stringify({ schemaVersion: DEPLOYMENT_SECRET_FIXTURE_SCHEMA, contracts }, null, 2) + "\n",
-    "utf8",
-  );
-}
-
 test("rollback replay fails when the recorded release-action policy forbids rollback rerun", async () => {
   await runInTemp("nixos-shared-host-release-actions-replay-policy", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture({
-      secretRequirements: [
-        deploymentRequirementFixture({
-          name: "database_url",
-          contractId: "secret://deployments/demoapp/database_url",
-        }),
-      ],
-      runtimeConfigRequirements: [
-        deploymentRequirementFixture({
-          name: "schema_version",
-          contractId: "config://deployments/demoapp/schema_version",
-        }),
-      ],
       releaseActions: [
         deploymentReleaseActionFixture({
           ref: "//projects/deployments/demoapp-shared:post_publish_verification",
@@ -76,7 +52,6 @@ test("rollback replay fails when the recorded release-action policy forbids roll
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const recordsRoot = path.join(tmp, "records");
-    const fixturePath = path.join(tmp, "secret-fixture.json");
     await writeArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
@@ -86,16 +61,8 @@ test("rollback replay fails when the recorded release-action policy forbids roll
       deploymentLabel: deployment.label,
       deployment,
     });
-    await writeSecretFixture(fixturePath, {
-      "secret://deployments/demoapp/database_url": {
-        value: "postgres://demoapp:test@db.internal/demoapp",
-        allowedSteps: ["release_actions.pre_publish"],
-        targetScopes: ["*"],
-      },
-    });
     await withEnvOverrides(
       {
-        BNX_DEPLOYMENT_SECRET_FIXTURE_PATH: fixturePath,
         BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
       },
       async () => {

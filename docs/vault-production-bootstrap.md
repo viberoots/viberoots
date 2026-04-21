@@ -1202,9 +1202,13 @@ What these fields mean:
 ## Step 9: Provide A Deployment Runtime Workload JWT
 
 The reviewed deployment runtime logs in to Vault's JWT auth endpoint itself.
-For the normal path, `deploy` mints the short-lived workload JWT just before it
-needs Vault. The deployment target should declare stable Vault runtime metadata
-in `vault_runtime`, so routine deploys do not need Vault or issuer exports.
+For local/direct deploys, `deploy` mints the short-lived workload JWT just
+before it needs Vault. For protected service-backed deploys, the laptop client
+only completes the human authorization flow; the `mini` worker mints or reads
+the workload JWT from server-local credential references and then activates the
+typed in-memory secret context for provider execution. The deployment target
+should declare stable Vault runtime metadata in `vault_runtime`, so routine
+deploys do not need Vault or issuer exports on the laptop.
 
 Example deployment metadata:
 
@@ -1233,6 +1237,8 @@ vault_runtime = {
 Credential-source choices:
 
 - `interactive_pkce`: local human desktop deploys and reviewed shared-host
+  submitter authorization. It authenticates the human request; it is not a
+  worker Vault credential source for protected service-backed deploys.
   browser login. Configure a public Keycloak CLI client with Authorization Code
   - PKCE required. Allow loopback redirect URIs for local-only desktops and
     allow the exact shared-host redirect URI

@@ -32,7 +32,10 @@ The Vault runbook shows how to use the identity-provider module and the
 reviewed deploy auth diagnostics. Its `deploy-vault-jwt` helper remains
 available for low-level token smoke/debug checks, but normal deploys should let
 the deploy front door choose the credential source and keep workload JWTs in
-memory.
+memory for local/direct runs. For protected service-backed runs, configure the
+deployment worker with the server-local credential source environment variables
+or files named by `vault_runtime`; the client must not submit Vault JWTs,
+Vault tokens, provider secrets, PKCE verifiers, or client secrets.
 
 Current supported scope:
 

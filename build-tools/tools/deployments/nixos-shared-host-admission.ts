@@ -5,6 +5,7 @@ import {
   resolveInitialAdmittedSecretReferences,
   resolveSourceRunAdmittedSecretReferences,
 } from "./deployment-secret-admission.ts";
+import type { DeploymentSecretContext } from "./deployment-secret-context.ts";
 import {
   requirementSummary,
   sameRequirementSet,
@@ -56,7 +57,14 @@ async function baseContext(
     secretRequirements?: DeploymentRequirement[];
     admittedSecretReferences?: unknown[];
   },
+  opts?: {
+    secretContext?: DeploymentSecretContext;
+    deferSecretReferenceResolution?: boolean;
+  },
 ) {
+  const sourceAdmittedReferences = Array.isArray(sourceAdmittedContext?.admittedSecretReferences)
+    ? (sourceAdmittedContext.admittedSecretReferences as DeploymentSecretAdmittedReference[])
+    : [];
   return {
     lanePolicyRef: deployment.lanePolicyRef,
     lanePolicyFingerprint: deployment.lanePolicy.fingerprint,
@@ -64,16 +72,20 @@ async function baseContext(
     admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
     environmentStage: deployment.environmentStage,
     secretRequirements: deployment.secretRequirements,
-    admittedSecretReferences: sourceAdmittedContext
-      ? await resolveSourceRunAdmittedSecretReferences({
-          sourceAdmittedContext: sourceAdmittedContext as any,
-          requirements: deployment.secretRequirements,
-          targetScope,
-        })
-      : await resolveInitialAdmittedSecretReferences({
-          requirements: deployment.secretRequirements,
-          targetScope,
-        }),
+    admittedSecretReferences: opts?.deferSecretReferenceResolution
+      ? sourceAdmittedReferences
+      : sourceAdmittedContext
+        ? await resolveSourceRunAdmittedSecretReferences({
+            sourceAdmittedContext: sourceAdmittedContext as any,
+            requirements: deployment.secretRequirements,
+            targetScope,
+            secretContext: opts?.secretContext,
+          })
+        : await resolveInitialAdmittedSecretReferences({
+            requirements: deployment.secretRequirements,
+            targetScope,
+            secretContext: opts?.secretContext,
+          }),
     runtimeConfigRequirements: deployment.runtimeConfigRequirements,
     referenceResolutionPolicy: {
       secrets: "exact_admitted_references" as const,
@@ -87,10 +99,12 @@ export async function resolveInitialNixosSharedHostAdmittedContext(opts: {
   workspaceRoot: string;
   deployment: NixosSharedHostDeployment;
   artifactIdentity?: string;
+  secretContext?: DeploymentSecretContext;
+  deferSecretReferenceResolution?: boolean;
 }): Promise<NixosSharedHostAdmittedContext> {
   const target = await targetEnvironmentAdmission(opts.workspaceRoot, opts.deployment);
   return {
-    ...(await baseContext(opts.deployment, target.lockScope)),
+    ...(await baseContext(opts.deployment, target.lockScope, undefined, opts)),
     source: {
       mode: "stage_branch_head",
       sourceRef: target.targetRef,
@@ -109,6 +123,8 @@ export async function resolveReplayNixosSharedHostAdmittedContext(opts: {
   sourceRecord: NixosSharedHostDeployRecord;
   sourceReplaySnapshot: NixosSharedHostReplaySnapshot;
   rollback: boolean;
+  secretContext?: DeploymentSecretContext;
+  deferSecretReferenceResolution?: boolean;
 }): Promise<NixosSharedHostAdmittedContext> {
   const source = opts.sourceReplaySnapshot.admittedContext;
   const target = await targetEnvironmentAdmission(opts.workspaceRoot, opts.deployment);
@@ -179,6 +195,7 @@ source revision ${source.source.sourceRevision} is not reachable from ${target.t
       opts.deployment,
       target.lockScope,
       opts.sourceReplaySnapshot.admittedContext,
+      opts,
     )),
     source: {
       ...source.source,
@@ -195,10 +212,12 @@ export async function resolvePromotionNixosSharedHostAdmittedContext(opts: {
   deployment: NixosSharedHostDeployment;
   artifactIdentity?: string;
   sourceRecord: { deployRunId: string; deploymentId: string };
+  secretContext?: DeploymentSecretContext;
+  deferSecretReferenceResolution?: boolean;
 }): Promise<NixosSharedHostAdmittedContext> {
   const target = await targetEnvironmentAdmission(opts.workspaceRoot, opts.deployment);
   return {
-    ...(await baseContext(opts.deployment, target.lockScope)),
+    ...(await baseContext(opts.deployment, target.lockScope, undefined, opts)),
     source: {
       mode: "promotion_source_run",
       sourceRef: target.targetRef,
@@ -210,4 +229,17 @@ export async function resolvePromotionNixosSharedHostAdmittedContext(opts: {
     },
     targetEnvironment: target,
   };
+}
+
+export async function resolveNixosSharedHostAdmittedSecretReferences(opts: {
+  deployment: NixosSharedHostDeployment;
+  admittedContext: NixosSharedHostAdmittedContext;
+  secretContext?: DeploymentSecretContext;
+}): Promise<DeploymentSecretAdmittedReference[]> {
+  return await resolveSourceRunAdmittedSecretReferences({
+    sourceAdmittedContext: opts.admittedContext,
+    requirements: opts.deployment.secretRequirements,
+    targetScope: opts.admittedContext.targetEnvironment.lockScope,
+    secretContext: opts.secretContext,
+  });
 }

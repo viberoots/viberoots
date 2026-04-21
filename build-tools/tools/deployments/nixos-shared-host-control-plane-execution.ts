@@ -6,15 +6,37 @@ import { runNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deplo
 import {
   acquireControlPlaneLock,
   readControlPlaneJson,
+  writeControlPlaneJson,
 } from "./nixos-shared-host-control-plane-store.ts";
 import { nixosSharedHostLockScopes } from "./nixos-shared-host-components.ts";
 import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
+import { withWorkerDeploymentVaultRuntime } from "./deployment-vault-runtime-worker.ts";
+import { resolveNixosSharedHostAdmittedSecretReferences } from "./nixos-shared-host-admission.ts";
+import type { DeploymentSecretContext } from "./deployment-secret-context.ts";
+
+async function resolveWorkerAdmittedSecrets(opts: {
+  snapshot: NixosSharedHostControlPlaneSnapshot;
+  executionSnapshotPath: string;
+  secretContext?: DeploymentSecretContext;
+}) {
+  if (!opts.snapshot.admittedContext) return;
+  opts.snapshot.admittedContext = {
+    ...opts.snapshot.admittedContext,
+    admittedSecretReferences: await resolveNixosSharedHostAdmittedSecretReferences({
+      deployment: opts.snapshot.deployment,
+      admittedContext: opts.snapshot.admittedContext,
+      ...(opts.secretContext ? { secretContext: opts.secretContext } : {}),
+    }),
+  };
+  await writeControlPlaneJson(opts.executionSnapshotPath, opts.snapshot);
+}
 
 export async function runNixosSharedHostControlPlaneWorker(opts: {
   submissionPath: string;
   executionSnapshotPath: string;
   recordSubmissionPath?: string;
   recordExecutionSnapshotPath?: string;
+  workspaceRoot?: string;
   workerId: string;
   fencingToken?: string;
   deployRunId?: string;
@@ -34,52 +56,65 @@ export async function runNixosSharedHostControlPlaneWorker(opts: {
     executionSnapshotPath: opts.recordExecutionSnapshotPath || opts.executionSnapshotPath,
   };
   return snapshot.action.kind === "deploy"
-    ? await runNixosSharedHostStaticDeploy({
-        deployment: snapshot.deployment,
-        operationKind:
-          snapshot.operationKind === "retry" ||
-          snapshot.operationKind === "rollback" ||
-          snapshot.operationKind === "promotion" ||
-          snapshot.operationKind === "provision_only"
-            ? snapshot.operationKind
-            : "deploy",
-        ...(opts.deployRunId ? { deployRunId: opts.deployRunId } : {}),
-        publishBehavior: snapshot.action.publishBehavior,
-        ...(snapshot.action.publishInput
-          ? snapshot.action.publishInput.kind === "exact-artifact"
-            ? { artifact: snapshot.action.publishInput.artifact }
-            : {
-                componentArtifacts: snapshot.action.publishInput.components,
-                compositeArtifactIdentity: snapshot.action.publishInput.compositeArtifactIdentity,
-              }
-          : {}),
-        statePath: snapshot.paths.statePath,
-        hostRoot: snapshot.paths.hostRoot,
-        recordsRoot: snapshot.paths.recordsRoot,
-        ...(snapshot.action.parentRunId ? { parentRunId: snapshot.action.parentRunId } : {}),
-        ...(snapshot.action.releaseLineageId
-          ? { releaseLineageId: snapshot.action.releaseLineageId }
-          : {}),
-        ...(snapshot.action.artifactLineageId
-          ? { artifactLineageId: snapshot.action.artifactLineageId }
-          : {}),
-        ...(snapshot.action.recordedComponentResults
-          ? { sourceComponentResults: snapshot.action.recordedComponentResults }
-          : {}),
-        ...(snapshot.deployBatchId ? { deployBatchId: snapshot.deployBatchId } : {}),
-        ...(snapshot.admittedContext ? { admittedContext: snapshot.admittedContext } : {}),
-        ...(snapshot.recordedReleaseActions
-          ? { releaseActions: snapshot.recordedReleaseActions }
-          : {}),
-        ...(opts.progressiveRollout ? { progressiveRollout: opts.progressiveRollout } : {}),
-        ...(snapshot.provisionerPlan ? { provisionerPlan: snapshot.provisionerPlan } : {}),
-        ...(snapshot.paths.hostConfigPath ? { hostConfigPath: snapshot.paths.hostConfigPath } : {}),
-        ...(snapshot.smokeConnectOverride
-          ? { smokeConnectOverride: snapshot.smokeConnectOverride }
-          : {}),
-        ...(opts.gateEvaluator ? { gateEvaluator: opts.gateEvaluator } : {}),
-        authority,
-      })
+    ? await withWorkerDeploymentVaultRuntime(
+        { workspaceRoot: opts.workspaceRoot || process.cwd(), deployment: snapshot.deployment },
+        async (runtime) => {
+          await resolveWorkerAdmittedSecrets({
+            snapshot,
+            executionSnapshotPath: opts.executionSnapshotPath,
+            ...(runtime.secretContext ? { secretContext: runtime.secretContext } : {}),
+          });
+          return await runNixosSharedHostStaticDeploy({
+            deployment: snapshot.deployment,
+            operationKind:
+              snapshot.operationKind === "retry" ||
+              snapshot.operationKind === "rollback" ||
+              snapshot.operationKind === "promotion" ||
+              snapshot.operationKind === "provision_only"
+                ? snapshot.operationKind
+                : "deploy",
+            ...(opts.deployRunId ? { deployRunId: opts.deployRunId } : {}),
+            publishBehavior: snapshot.action.publishBehavior,
+            ...(snapshot.action.publishInput
+              ? snapshot.action.publishInput.kind === "exact-artifact"
+                ? { artifact: snapshot.action.publishInput.artifact }
+                : {
+                    componentArtifacts: snapshot.action.publishInput.components,
+                    compositeArtifactIdentity:
+                      snapshot.action.publishInput.compositeArtifactIdentity,
+                  }
+              : {}),
+            statePath: snapshot.paths.statePath,
+            hostRoot: snapshot.paths.hostRoot,
+            recordsRoot: snapshot.paths.recordsRoot,
+            ...(snapshot.action.parentRunId ? { parentRunId: snapshot.action.parentRunId } : {}),
+            ...(snapshot.action.releaseLineageId
+              ? { releaseLineageId: snapshot.action.releaseLineageId }
+              : {}),
+            ...(snapshot.action.artifactLineageId
+              ? { artifactLineageId: snapshot.action.artifactLineageId }
+              : {}),
+            ...(snapshot.action.recordedComponentResults
+              ? { sourceComponentResults: snapshot.action.recordedComponentResults }
+              : {}),
+            ...(snapshot.deployBatchId ? { deployBatchId: snapshot.deployBatchId } : {}),
+            ...(snapshot.admittedContext ? { admittedContext: snapshot.admittedContext } : {}),
+            ...(snapshot.recordedReleaseActions
+              ? { releaseActions: snapshot.recordedReleaseActions }
+              : {}),
+            ...(opts.progressiveRollout ? { progressiveRollout: opts.progressiveRollout } : {}),
+            ...(snapshot.provisionerPlan ? { provisionerPlan: snapshot.provisionerPlan } : {}),
+            ...(snapshot.paths.hostConfigPath
+              ? { hostConfigPath: snapshot.paths.hostConfigPath }
+              : {}),
+            ...(snapshot.smokeConnectOverride
+              ? { smokeConnectOverride: snapshot.smokeConnectOverride }
+              : {}),
+            ...(opts.gateEvaluator ? { gateEvaluator: opts.gateEvaluator } : {}),
+            authority,
+          });
+        },
+      )
     : await runNixosSharedHostExplicitRemoval({
         deployment: snapshot.deployment,
         statePath: snapshot.paths.statePath,

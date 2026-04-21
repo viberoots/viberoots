@@ -160,6 +160,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
     const result = await runNixosSharedHostControlPlaneWorker({
       submissionPath: opts.submissionPath,
       executionSnapshotPath: opts.executionSnapshotPath,
+      workspaceRoot: opts.workspaceRoot,
       ...(opts.recordSubmissionPath ? { recordSubmissionPath: opts.recordSubmissionPath } : {}),
       ...(opts.recordExecutionSnapshotPath
         ? { recordExecutionSnapshotPath: opts.recordExecutionSnapshotPath }

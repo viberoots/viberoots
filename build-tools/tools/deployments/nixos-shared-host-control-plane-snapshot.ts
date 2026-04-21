@@ -38,6 +38,7 @@ import {
   recordedComponentResults,
 } from "./nixos-shared-host-control-plane-snapshot-helpers.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
+import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker.ts";
 
 export type NixosSharedHostControlPlaneSourceSelection = {
   record: NixosSharedHostDeployRecord | { deployRunId: string; deploymentId: string };
@@ -62,7 +63,13 @@ export type NixosSharedHostControlPlaneSnapshotOpts = {
   smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;
   source?: NixosSharedHostControlPlaneSourceSelection;
   admissionEvidence?: DeploymentAdmissionEvidence;
+  deferSecretReferenceResolution?: boolean;
 };
+
+function vaultRuntimeFor(deployment: NixosSharedHostDeployment) {
+  const vaultRuntime = workerVaultRuntimeMetadata({ deployment });
+  return vaultRuntime ? { vaultRuntime } : {};
+}
 
 export function createNixosSharedHostSubmissionId(): string {
   return `cp-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
@@ -163,6 +170,9 @@ export async function createNixosSharedHostControlPlaneSnapshot(
             deployment: opts.deployment,
             artifactIdentity,
             sourceRecord: opts.source!.record,
+            ...(opts.deferSecretReferenceResolution
+              ? { deferSecretReferenceResolution: true }
+              : {}),
           })
         : hasReplaySnapshot(opts.source)
           ? await resolveReplayNixosSharedHostAdmittedContext({
@@ -172,11 +182,17 @@ export async function createNixosSharedHostControlPlaneSnapshot(
               sourceRecord: opts.source.record,
               sourceReplaySnapshot: opts.source.replaySnapshot,
               rollback: opts.operationKind === "rollback",
+              ...(opts.deferSecretReferenceResolution
+                ? { deferSecretReferenceResolution: true }
+                : {}),
             })
           : await resolveInitialNixosSharedHostAdmittedContext({
               workspaceRoot: opts.workspaceRoot,
               deployment: opts.deployment,
               artifactIdentity,
+              ...(opts.deferSecretReferenceResolution
+                ? { deferSecretReferenceResolution: true }
+                : {}),
             });
   const progressiveRollout = createNixosSharedHostProgressiveRollout(opts.deployment);
   return {
@@ -200,6 +216,7 @@ export async function createNixosSharedHostControlPlaneSnapshot(
       : {}),
     ...(admittedContext ? { admittedContext } : {}),
     ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
+    ...vaultRuntimeFor(opts.deployment),
     paths: {
       statePath: path.resolve(opts.paths.statePath),
       hostRoot: path.resolve(opts.paths.hostRoot),

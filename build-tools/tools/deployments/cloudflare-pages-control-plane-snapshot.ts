@@ -17,12 +17,18 @@ import {
   admitStaticWebappArtifact,
   type AdmittedStaticWebappArtifact,
 } from "./static-webapp-artifacts.ts";
+import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker.ts";
 
 export type CloudflarePagesPromotionSourceSelection = {
   record: DeploymentRunRecordLike;
   recordPath?: string;
   replaySnapshotPath: string;
 };
+
+function vaultRuntimeFor(deployment: CloudflarePagesDeployment) {
+  const vaultRuntime = workerVaultRuntimeMetadata({ deployment });
+  return vaultRuntime ? { vaultRuntime } : {};
+}
 
 export async function createCloudflarePagesControlPlaneSnapshot(
   opts: {
@@ -39,6 +45,7 @@ export async function createCloudflarePagesControlPlaneSnapshot(
     artifactLineageId?: string;
     source?: CloudflarePagesPromotionSourceSelection;
     smokeConnectOverride?: CloudflarePagesSmokeConnectOverride;
+    deferSecretReferenceResolution?: boolean;
   },
   submissionId: string,
 ): Promise<CloudflarePagesControlPlaneSnapshot> {
@@ -62,11 +69,13 @@ export async function createCloudflarePagesControlPlaneSnapshot(
         deployment: opts.deployment,
         artifactIdentity: artifact.identity,
         sourceRecord: opts.source.record,
+        ...(opts.deferSecretReferenceResolution ? { deferSecretReferenceResolution: true } : {}),
       })
     : await resolveInitialCloudflarePagesAdmittedContext({
         workspaceRoot: opts.workspaceRoot,
         deployment: opts.deployment,
         artifactIdentity: artifact.identity,
+        ...(opts.deferSecretReferenceResolution ? { deferSecretReferenceResolution: true } : {}),
       });
   const lockScope = opts.deployment.providerTarget.providerTargetIdentity;
   return {
@@ -81,6 +90,7 @@ export async function createCloudflarePagesControlPlaneSnapshot(
     lockScope,
     deployment: opts.deployment,
     admittedContext,
+    ...vaultRuntimeFor(opts.deployment),
     paths: {
       workspaceRoot: path.resolve(opts.workspaceRoot),
       recordsRoot: path.resolve(opts.recordsRoot),

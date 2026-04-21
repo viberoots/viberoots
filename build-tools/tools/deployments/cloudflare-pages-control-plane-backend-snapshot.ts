@@ -8,15 +8,20 @@ import {
   cloudflarePagesPreviewIdentitySelector,
   deriveCloudflarePagesPreviewTarget,
 } from "./cloudflare-pages-preview.ts";
-import {
-  approvalSatisfied,
-  CLOUDFLARE_PAGES_TARGET_TRANSITION_SNAPSHOT_SCHEMA,
-} from "./cloudflare-pages-target-transition.ts";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker.ts";
+import { targetTransitionSnapshot } from "./cloudflare-pages-control-plane-backend-transition-snapshot.ts";
 
 // prettier-ignore
 export type CloudflarePagesBackendSnapshot = CloudflarePagesControlPlaneSnapshot | Record<string, unknown>;
+
+function vaultRuntimeFor(
+  deployment: ResolvedCloudflarePagesServiceSubmitRequest["request"]["deployment"],
+) {
+  const vaultRuntime = workerVaultRuntimeMetadata({ deployment });
+  return vaultRuntime ? { vaultRuntime } : {};
+}
 
 async function previewSnapshot(
   resolved: Extract<ResolvedCloudflarePagesServiceSubmitRequest, { kind: "preview" }>,
@@ -33,6 +38,7 @@ async function previewSnapshot(
     deployment: resolved.request.deployment,
     artifactIdentity: resolved.selection.artifact.identity,
     sourceRecord: resolved.selection.sourceRecord,
+    deferSecretReferenceResolution: true,
   });
   admittedContext.policyEvaluation = await evaluateDeploymentAdmission({
     workspaceRoot,
@@ -55,6 +61,7 @@ async function previewSnapshot(
     lockScope: resolved.request.deployment.providerTarget.providerTargetIdentity,
     deployment: resolved.request.deployment,
     admittedContext,
+    ...vaultRuntimeFor(resolved.request.deployment),
     paths: { workspaceRoot, recordsRoot },
     action: {
       kind: "deploy",
@@ -85,6 +92,7 @@ async function rollbackSnapshot(
     deployment: resolved.request.deployment,
     artifactIdentity: resolved.selection.artifact.identity,
     sourceRecord: resolved.selection.sourceRecord,
+    deferSecretReferenceResolution: true,
   });
   admittedContext.policyEvaluation = await evaluateDeploymentAdmission({
     workspaceRoot,
@@ -107,6 +115,7 @@ async function rollbackSnapshot(
     lockScope: resolved.request.deployment.providerTarget.providerTargetIdentity,
     deployment: resolved.request.deployment,
     admittedContext,
+    ...vaultRuntimeFor(resolved.request.deployment),
     paths: { workspaceRoot, recordsRoot },
     action: {
       kind: "deploy",
@@ -145,6 +154,7 @@ function previewCleanupSnapshot(
     lockScope: resolved.request.deployment.providerTarget.providerTargetIdentity,
     deployment: resolved.request.deployment,
     admittedContext: resolved.selection.sourceRecord.admittedContext,
+    ...vaultRuntimeFor(resolved.request.deployment),
     paths: { workspaceRoot, recordsRoot },
     action: {
       kind: "preview_cleanup",
@@ -169,29 +179,6 @@ function previewCleanupSnapshot(
   };
 }
 
-function targetTransitionSnapshot(
-  resolved: Extract<ResolvedCloudflarePagesServiceSubmitRequest, { kind: "target_transition" }>,
-) {
-  if (!approvalSatisfied(resolved.targetException, resolved.request.admissionEvidence)) {
-    throw new DeploymentAdmissionError(
-      "approval_required",
-      `target transition requires reviewed approval evidence ${resolved.targetException.approvalEvidence}`,
-    );
-  }
-  return {
-    schemaVersion: CLOUDFLARE_PAGES_TARGET_TRANSITION_SNAPSHOT_SCHEMA,
-    submissionId: resolved.request.submissionId,
-    submittedAt: resolved.request.submittedAt,
-    operationKind: resolved.operationKind,
-    deploymentId: resolved.request.deployment.deploymentId,
-    deploymentLabel: resolved.request.deployment.label,
-    providerTargetIdentity: resolved.request.deployment.providerTarget.providerTargetIdentity,
-    lockScope: resolved.targetException.sharedLockScope,
-    deployment: resolved.request.deployment,
-    targetException: resolved.targetException,
-  };
-}
-
 export async function buildCloudflarePagesBackendSnapshot(
   resolved: ResolvedCloudflarePagesServiceSubmitRequest,
   opts: {
@@ -212,6 +199,7 @@ export async function buildCloudflarePagesBackendSnapshot(
         ...(resolved.request.smokeConnectOverride
           ? { smokeConnectOverride: resolved.request.smokeConnectOverride }
           : {}),
+        deferSecretReferenceResolution: true,
       },
       resolved.request.submissionId,
     );
@@ -236,6 +224,7 @@ export async function buildCloudflarePagesBackendSnapshot(
         ...(resolved.request.smokeConnectOverride
           ? { smokeConnectOverride: resolved.request.smokeConnectOverride }
           : {}),
+        deferSecretReferenceResolution: true,
       },
       resolved.request.submissionId,
     );

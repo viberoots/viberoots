@@ -207,13 +207,17 @@ Optional fields you may also see:
 ### Step 2: Set Up The Secret Backend
 
 For the reviewed production runtime path, use remote Vault with deployment-
-derived JWT auth. In normal deploys the front door reads the selected
+derived JWT auth. In local/direct deploys the front door reads the selected
 deployment's `vault_runtime` metadata, derives the Vault role and bound claims,
-mints or receives a fresh workload JWT through the selected credential-source
-adapter, and passes a typed deployment secret context to the secret backend.
-Provider code receives only that explicit context. It does not read Vault JWT
-files, Vault auth environment variables, Jenkins credential bindings, OIDC
-tokens, or client secrets from ambient `process.env`.
+and passes a typed deployment secret context to the secret backend. In
+protected service-backed deploys, the laptop client only authenticates and
+authorizes the human request; the `mini` worker reads the same non-secret
+runtime metadata from the execution snapshot, obtains the workload credential
+from server-local credential references, and activates the typed in-memory
+secret context only while provider execution is running. Provider code receives
+only that explicit context. It does not read Vault JWT files, Vault auth
+environment variables, Jenkins credential bindings, OIDC tokens, or client
+secrets from ambient `process.env`.
 
 Credential sources are selected from non-secret `vault_runtime` metadata, CLI
 flags, and session detection:
@@ -226,8 +230,9 @@ flags, and session detection:
 - reviewed shared deploy hosts use service-owned PKCE sessions so the printed
   login URL redirects to `https://deploy-auth.apps.kilty.io/oidc/callback`,
   while nginx forwards that request to the deployment service's private callback
-  endpoint. Use SSH loopback forwarding only for deployments without a reviewed
-  public callback profile.
+  endpoint. That session authenticates the submitter; it is not forwarded to the
+  worker as a Vault workload credential. Use SSH loopback forwarding only for
+  deployments without a reviewed public callback profile.
 - when device authorization is available, it remains the preferred browserless
   SSH/headless flow.
 - Jenkins deploys use either a Jenkins Credentials-bound client secret to mint
@@ -238,6 +243,8 @@ not communicated through `process.env`.
 
 Stale ambient variables such as `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`,
 `BNX_VAULT_AUTH_METHOD`, and `VAULT_TOKEN` are not the normal runtime contract.
+Protected service-backed workers also reject the local/test fixture override,
+interactive client credential sources, and client-submitted secret values.
 
 For local development, isolated tests, or explicit bootstrap-oriented
 workflows, use the fixture override shown below.

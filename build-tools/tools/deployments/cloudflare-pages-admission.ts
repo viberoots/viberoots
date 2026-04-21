@@ -7,6 +7,7 @@ import {
   resolveInitialAdmittedSecretReferences,
   resolveSourceRunAdmittedSecretReferences,
 } from "./deployment-secret-admission.ts";
+import type { DeploymentSecretContext } from "./deployment-secret-context.ts";
 import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec.ts";
 
 export type CloudflarePagesSourceAdmission = {
@@ -63,7 +64,14 @@ async function baseContext(
     secretRequirements?: DeploymentRequirement[];
     admittedSecretReferences?: unknown[];
   },
+  opts?: {
+    secretContext?: DeploymentSecretContext;
+    deferSecretReferenceResolution?: boolean;
+  },
 ) {
+  const sourceAdmittedReferences = Array.isArray(sourceAdmittedContext?.admittedSecretReferences)
+    ? (sourceAdmittedContext.admittedSecretReferences as DeploymentSecretAdmittedReference[])
+    : [];
   return {
     lanePolicyRef: deployment.lanePolicyRef,
     lanePolicyFingerprint: deployment.lanePolicy.fingerprint,
@@ -71,16 +79,20 @@ async function baseContext(
     admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
     environmentStage: deployment.environmentStage,
     secretRequirements: deployment.secretRequirements,
-    admittedSecretReferences: sourceAdmittedContext
-      ? await resolveSourceRunAdmittedSecretReferences({
-          sourceAdmittedContext: sourceAdmittedContext as any,
-          requirements: deployment.secretRequirements,
-          targetScope,
-        })
-      : await resolveInitialAdmittedSecretReferences({
-          requirements: deployment.secretRequirements,
-          targetScope,
-        }),
+    admittedSecretReferences: opts?.deferSecretReferenceResolution
+      ? sourceAdmittedReferences
+      : sourceAdmittedContext
+        ? await resolveSourceRunAdmittedSecretReferences({
+            sourceAdmittedContext: sourceAdmittedContext as any,
+            requirements: deployment.secretRequirements,
+            targetScope,
+            secretContext: opts?.secretContext,
+          })
+        : await resolveInitialAdmittedSecretReferences({
+            requirements: deployment.secretRequirements,
+            targetScope,
+            secretContext: opts?.secretContext,
+          }),
     runtimeConfigRequirements: deployment.runtimeConfigRequirements,
     referenceResolutionPolicy: {
       secrets: "exact_admitted_references" as const,
@@ -117,10 +129,12 @@ export async function resolveInitialCloudflarePagesAdmittedContext(opts: {
   workspaceRoot: string;
   deployment: CloudflarePagesDeployment;
   artifactIdentity: string;
+  secretContext?: DeploymentSecretContext;
+  deferSecretReferenceResolution?: boolean;
 }): Promise<CloudflarePagesAdmittedContext> {
   const target = await targetEnvironmentAdmission(opts.workspaceRoot, opts.deployment);
   return {
-    ...(await baseContext(opts.deployment, target.lockScope)),
+    ...(await baseContext(opts.deployment, target.lockScope, undefined, opts)),
     source: {
       mode: "stage_branch_head",
       sourceRef: target.targetRef,
@@ -137,10 +151,12 @@ export async function resolvePromotionCloudflarePagesAdmittedContext(opts: {
   deployment: CloudflarePagesDeployment;
   artifactIdentity: string;
   sourceRecord: { deployRunId: string; deploymentId: string };
+  secretContext?: DeploymentSecretContext;
+  deferSecretReferenceResolution?: boolean;
 }): Promise<CloudflarePagesAdmittedContext> {
   const target = await targetEnvironmentAdmission(opts.workspaceRoot, opts.deployment);
   return {
-    ...(await baseContext(opts.deployment, target.lockScope)),
+    ...(await baseContext(opts.deployment, target.lockScope, undefined, opts)),
     source: {
       mode: "promotion_source_run",
       sourceRef: target.targetRef,
@@ -168,10 +184,17 @@ export async function resolveSourceRunCloudflarePagesAdmittedContext(opts: {
       };
     };
   };
+  secretContext?: DeploymentSecretContext;
+  deferSecretReferenceResolution?: boolean;
 }): Promise<CloudflarePagesAdmittedContext> {
   const target = await targetEnvironmentAdmission(opts.workspaceRoot, opts.deployment);
   return {
-    ...(await baseContext(opts.deployment, target.lockScope, opts.sourceRecord.admittedContext)),
+    ...(await baseContext(
+      opts.deployment,
+      target.lockScope,
+      opts.sourceRecord.admittedContext,
+      opts,
+    )),
     source: {
       mode: "source_run_reuse",
       sourceRef: opts.sourceRecord.admittedContext?.source?.sourceRef || target.targetRef,
@@ -184,4 +207,17 @@ export async function resolveSourceRunCloudflarePagesAdmittedContext(opts: {
     },
     targetEnvironment: target,
   };
+}
+
+export async function resolveCloudflarePagesAdmittedSecretReferences(opts: {
+  deployment: CloudflarePagesDeployment;
+  admittedContext: CloudflarePagesAdmittedContext;
+  secretContext?: DeploymentSecretContext;
+}): Promise<DeploymentSecretAdmittedReference[]> {
+  return await resolveSourceRunAdmittedSecretReferences({
+    sourceAdmittedContext: opts.admittedContext,
+    requirements: opts.deployment.secretRequirements,
+    targetScope: opts.admittedContext.targetEnvironment.lockScope,
+    secretContext: opts.secretContext,
+  });
 }
