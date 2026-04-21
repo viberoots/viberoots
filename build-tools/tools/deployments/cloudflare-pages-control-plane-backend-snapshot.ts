@@ -12,17 +12,15 @@ import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
 import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker.ts";
 import { targetTransitionSnapshot } from "./cloudflare-pages-control-plane-backend-transition-snapshot.ts";
-
+import { resolveCloudflarePagesArtifactInput } from "./cloudflare-pages-artifact-input.ts";
 // prettier-ignore
 export type CloudflarePagesBackendSnapshot = CloudflarePagesControlPlaneSnapshot | Record<string, unknown>;
-
 function vaultRuntimeFor(
   deployment: ResolvedCloudflarePagesServiceSubmitRequest["request"]["deployment"],
 ) {
   const vaultRuntime = workerVaultRuntimeMetadata({ deployment });
   return vaultRuntime ? { vaultRuntime } : {};
 }
-
 async function previewSnapshot(
   resolved: Extract<ResolvedCloudflarePagesServiceSubmitRequest, { kind: "preview" }>,
   workspaceRoot: string,
@@ -81,7 +79,6 @@ async function previewSnapshot(
       : {}),
   };
 }
-
 async function rollbackSnapshot(
   resolved: Extract<ResolvedCloudflarePagesServiceSubmitRequest, { kind: "rollback" }>,
   workspaceRoot: string,
@@ -132,7 +129,6 @@ async function rollbackSnapshot(
       : {}),
   };
 }
-
 function previewCleanupSnapshot(
   resolved: Extract<ResolvedCloudflarePagesServiceSubmitRequest, { kind: "preview_cleanup" }>,
   workspaceRoot: string,
@@ -178,7 +174,18 @@ function previewCleanupSnapshot(
     },
   };
 }
-
+async function artifactFromInput(
+  resolved: Extract<ResolvedCloudflarePagesServiceSubmitRequest, { kind: "deploy" | "promotion" }>,
+  opts: { workspaceRoot: string; recordsRoot: string },
+) {
+  return await resolveCloudflarePagesArtifactInput({
+    workspaceRoot: opts.workspaceRoot,
+    recordsRoot: opts.recordsRoot,
+    deployment: resolved.request.deployment,
+    submissionId: resolved.request.submissionId,
+    artifactInput: resolved.artifactInput!,
+  });
+}
 export async function buildCloudflarePagesBackendSnapshot(
   resolved: ResolvedCloudflarePagesServiceSubmitRequest,
   opts: {
@@ -195,7 +202,7 @@ export async function buildCloudflarePagesBackendSnapshot(
         ...(resolved.request.deployBatchId
           ? { deployBatchId: resolved.request.deployBatchId }
           : {}),
-        artifactDir: resolved.artifactDir,
+        artifact: await artifactFromInput(resolved, opts),
         ...(resolved.request.smokeConnectOverride
           ? { smokeConnectOverride: resolved.request.smokeConnectOverride }
           : {}),
@@ -213,7 +220,7 @@ export async function buildCloudflarePagesBackendSnapshot(
         ...(resolved.request.deployBatchId
           ? { deployBatchId: resolved.request.deployBatchId }
           : {}),
-        ...(resolved.artifactDir ? { artifactDir: resolved.artifactDir } : {}),
+        ...(resolved.artifactInput ? { artifact: await artifactFromInput(resolved, opts) } : {}),
         ...(resolved.artifact ? { artifact: resolved.artifact } : {}),
         operationKind: resolved.operationKind,
         publishBehavior: resolved.request.publishBehavior || "deploy",

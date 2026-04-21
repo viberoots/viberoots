@@ -18,11 +18,24 @@ import {
   readPublicDeploymentAuthSession,
 } from "./deployment-auth-session-service.ts";
 import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
+import { createStaticWebappUploadSession } from "./static-webapp-upload-sessions.ts";
+
+const MAX_REQUEST_BODY_BYTES = 60 * 1024 * 1024;
+
+async function readRawBody(request: http.IncomingMessage): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of request) {
+    const buffer = Buffer.from(chunk);
+    total += buffer.byteLength;
+    if (total > MAX_REQUEST_BODY_BYTES) throw new Error("request body exceeds size limit");
+    chunks.push(buffer);
+  }
+  return Buffer.concat(chunks);
+}
 
 async function readJsonBody<T>(request: http.IncomingMessage): Promise<T> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of request) chunks.push(Buffer.from(chunk));
-  return JSON.parse(Buffer.concat(chunks).toString("utf8")) as T;
+  return JSON.parse((await readRawBody(request)).toString("utf8")) as T;
 }
 
 function writeJson(response: http.ServerResponse, statusCode: number, value: unknown) {
@@ -85,6 +98,23 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
             workspaceRoot: opts.workspaceRoot,
             paths: opts.paths,
             backend,
+          }),
+        );
+        return;
+      }
+      if (request.method === "POST" && url.pathname === "/api/v1/artifact-uploads/static-webapp") {
+        const submissionId = String(request.headers["x-bnx-submission-id"] || "").trim();
+        if (!submissionId) {
+          writeJson(response, 400, { error: "artifact upload requires x-bnx-submission-id" });
+          return;
+        }
+        writeJson(
+          response,
+          200,
+          await createStaticWebappUploadSession({
+            recordsRoot: opts.paths.recordsRoot,
+            submissionId,
+            archiveBytes: await readRawBody(request),
           }),
         );
         return;

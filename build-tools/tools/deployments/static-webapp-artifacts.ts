@@ -4,14 +4,37 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { copyTree } from "../lib/copy-tree.ts";
 import { sanitizeName } from "../lib/sanitize.ts";
+import { inspectStaticWebappArtifactDir } from "./static-webapp-artifact-bundle.ts";
 
 export const STATIC_WEBAPP_ARTIFACT_PROVENANCE_SCHEMA = "static-webapp-artifact-provenance@1";
+
+export type StaticWebappArtifactProducerKind =
+  | "server_build"
+  | "client_upload"
+  | "ci_attested"
+  | "existing_admitted_artifact"
+  | "local_direct";
+
+export type StaticWebappArtifactProducer = {
+  producerKind: StaticWebappArtifactProducerKind;
+  sourceRevision?: string;
+  deploymentLabel?: string;
+  buildTarget?: string;
+  storageReference?: string;
+  archiveDigest?: string;
+  archiveFormat?: string;
+  ciRunId?: string;
+};
 
 export type AdmittedStaticWebappArtifact = {
   kind: "static-webapp";
   identity: string;
   storedArtifactPath: string;
   provenancePath: string;
+  producerKind?: StaticWebappArtifactProducerKind;
+  sourceRevision?: string;
+  buildTarget?: string;
+  storageReference?: string;
 };
 
 type StaticWebappArtifactProvenance = {
@@ -20,28 +43,15 @@ type StaticWebappArtifactProvenance = {
   artifactIdentity: string;
   storedArtifactPath: string;
   admittedAt: string;
+  producer?: StaticWebappArtifactProducer;
 };
-
-async function walkFiles(root: string, dir = root): Promise<string[]> {
-  const entries = await fsp.readdir(dir, { withFileTypes: true });
-  const files: string[] = [];
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    const abs = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...(await walkFiles(root, abs)));
-      continue;
-    }
-    if (entry.isFile()) files.push(path.relative(root, abs));
-  }
-  return files;
-}
 
 export async function artifactIdentityForStaticWebappDir(artifactDir: string): Promise<string> {
   const hash = crypto.createHash("sha256");
-  for (const rel of await walkFiles(artifactDir)) {
-    const abs = path.join(artifactDir, rel);
-    hash.update(`${rel}\n`);
-    hash.update(await fsp.readFile(abs));
+  for (const file of await inspectStaticWebappArtifactDir(artifactDir)) {
+    hash.update(`${file.rel}\n`);
+    hash.update(file.executable ? "executable\n" : "file\n");
+    hash.update(await fsp.readFile(file.abs));
     hash.update("\n");
   }
   return `static-webapp:${hash.digest("hex")}`;
@@ -85,6 +95,7 @@ async function ensureStoredArtifact(sourcePath: string, storedArtifactPath: stri
 async function ensureArtifactProvenance(
   provenancePath: string,
   artifact: AdmittedStaticWebappArtifact,
+  producer?: StaticWebappArtifactProducer,
 ): Promise<void> {
   if (await pathExists(provenancePath)) return;
   await fsp.mkdir(path.dirname(provenancePath), { recursive: true });
@@ -94,6 +105,7 @@ async function ensureArtifactProvenance(
     artifactIdentity: artifact.identity,
     storedArtifactPath: artifact.storedArtifactPath,
     admittedAt: new Date().toISOString(),
+    ...(producer ? { producer } : {}),
   };
   await fsp.writeFile(provenancePath, JSON.stringify(provenance, null, 2) + "\n", "utf8");
 }
@@ -101,6 +113,7 @@ async function ensureArtifactProvenance(
 export async function admitStaticWebappArtifact(opts: {
   recordsRoot: string;
   artifactDir: string;
+  producer?: StaticWebappArtifactProducer;
 }): Promise<AdmittedStaticWebappArtifact> {
   const artifactDir = path.resolve(opts.artifactDir);
   const identity = await artifactIdentityForStaticWebappDir(artifactDir);
@@ -109,10 +122,45 @@ export async function admitStaticWebappArtifact(opts: {
     identity,
     storedArtifactPath: artifactStoredPathFor(opts.recordsRoot, identity),
     provenancePath: artifactProvenancePathFor(opts.recordsRoot, identity),
+    ...(opts.producer?.producerKind ? { producerKind: opts.producer.producerKind } : {}),
+    ...(opts.producer?.sourceRevision ? { sourceRevision: opts.producer.sourceRevision } : {}),
+    ...(opts.producer?.buildTarget ? { buildTarget: opts.producer.buildTarget } : {}),
+    ...(opts.producer?.storageReference
+      ? { storageReference: opts.producer.storageReference }
+      : {}),
   };
   await ensureStoredArtifact(artifactDir, artifact.storedArtifactPath);
-  await ensureArtifactProvenance(artifact.provenancePath, artifact);
+  await ensureArtifactProvenance(artifact.provenancePath, artifact, opts.producer);
   return artifact;
+}
+
+export async function readAdmittedStaticWebappArtifact(opts: {
+  recordsRoot: string;
+  artifactIdentity: string;
+}): Promise<AdmittedStaticWebappArtifact> {
+  const provenancePath = artifactProvenancePathFor(opts.recordsRoot, opts.artifactIdentity);
+  const provenance = JSON.parse(
+    await fsp.readFile(provenancePath, "utf8"),
+  ) as StaticWebappArtifactProvenance;
+  if (provenance.schemaVersion !== STATIC_WEBAPP_ARTIFACT_PROVENANCE_SCHEMA) {
+    throw new Error(`unsupported static-webapp artifact provenance: ${provenance.schemaVersion}`);
+  }
+  return {
+    kind: "static-webapp",
+    identity: provenance.artifactIdentity,
+    storedArtifactPath: provenance.storedArtifactPath,
+    provenancePath,
+    ...(provenance.producer?.producerKind
+      ? { producerKind: provenance.producer.producerKind }
+      : {}),
+    ...(provenance.producer?.sourceRevision
+      ? { sourceRevision: provenance.producer.sourceRevision }
+      : {}),
+    ...(provenance.producer?.buildTarget ? { buildTarget: provenance.producer.buildTarget } : {}),
+    ...(provenance.producer?.storageReference
+      ? { storageReference: provenance.producer.storageReference }
+      : {}),
+  };
 }
 
 export async function requireAdmittedStaticWebappArtifactPath(

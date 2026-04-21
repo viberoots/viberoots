@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { CloudflarePagesControlPlaneSubmitRequest } from "./cloudflare-pages-control-plane-api-contract.ts";
+import type { CloudflarePagesArtifactInput } from "./cloudflare-pages-artifact-input.ts";
 import type { CloudflarePagesSmokeConnectOverride } from "./cloudflare-pages-control-plane-contract.ts";
 import {
   findLatestCloudflarePagesPreviewRecord,
@@ -25,11 +26,11 @@ type RequestCommon = {
 export type ResolvedCloudflarePagesServiceSubmitRequest =
   | (RequestCommon & {
       kind: "deploy";
-      artifactDir: string;
+      artifactInput: CloudflarePagesArtifactInput;
     })
   | (RequestCommon & {
       kind: "promotion";
-      artifactDir?: string;
+      artifactInput?: CloudflarePagesArtifactInput;
       operationKind: "promotion";
       parentRunId: string;
       releaseLineageId: string;
@@ -60,14 +61,20 @@ export type ResolvedCloudflarePagesServiceSubmitRequest =
       targetException: DeploymentTargetException;
     });
 
-function requireArtifactDir(request: CloudflarePagesControlPlaneSubmitRequest): string {
-  const artifactDir = String(request.artifactDir || "").trim();
-  if (!artifactDir) {
+function requireArtifactInput(
+  request: CloudflarePagesControlPlaneSubmitRequest,
+): CloudflarePagesArtifactInput {
+  if (request.artifactDir) {
     throw new Error(
-      `cloudflare-pages ${request.operationKind} submission requires --artifact-dir or a resolved artifact directory`,
+      "cloudflare-pages protected/shared submissions must use artifactInput; laptop-local artifactDir is not admitted",
     );
   }
-  return artifactDir;
+  if (!request.artifactInput) {
+    throw new Error(
+      `cloudflare-pages ${request.operationKind} submission requires an artifactInput descriptor`,
+    );
+  }
+  return request.artifactInput;
 }
 
 function requireSourceRunId(request: CloudflarePagesControlPlaneSubmitRequest, message: string) {
@@ -214,7 +221,7 @@ export async function resolveCloudflarePagesServiceSubmitRequest(
     return {
       kind: "promotion",
       request,
-      artifactDir: requireArtifactDir(request),
+      artifactInput: requireArtifactInput(request),
       operationKind: "promotion",
       parentRunId: promotion.parentRunId,
       releaseLineageId: promotion.releaseLineageId,
@@ -229,6 +236,6 @@ export async function resolveCloudflarePagesServiceSubmitRequest(
   return {
     kind: "deploy",
     request,
-    artifactDir: requireArtifactDir(request),
+    artifactInput: requireArtifactInput(request),
   };
 }

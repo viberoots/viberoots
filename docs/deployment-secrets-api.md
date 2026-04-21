@@ -468,7 +468,8 @@ Most operators should use the `deploy` CLI instead of calling this endpoint
 directly. Direct submit requests are mainly for tooling and integrations.
 
 This is a minimal example showing the shape of a
-`nixos-shared-host-control-plane-submit-request@1` request:
+`cloudflare-pages-control-plane-submit-request@1` request after an artifact has
+already been uploaded to the service:
 
 ```bash
 curl \
@@ -477,18 +478,29 @@ curl \
   -X POST \
   http://127.0.0.1:7780/api/v1/submissions \
   -d '{
-    "schemaVersion": "nixos-shared-host-control-plane-submit-request@1",
+    "schemaVersion": "cloudflare-pages-control-plane-submit-request@1",
     "submissionId": "submission-2026-04-16T12:00:00Z",
     "submittedAt": "2026-04-16T12:00:00Z",
     "deployment": {
-      "deploymentId": "demoapp-dev",
-      "label": "//projects/deployments/demoapp-dev:deploy",
-      "provider": "nixos-shared-host"
+      "deploymentId": "pleomino-staging",
+      "label": "//projects/deployments/pleomino-staging:deploy",
+      "provider": "cloudflare-pages"
     },
     "operationKind": "deploy",
-    "artifactDir": "/tmp/demoapp-artifact"
+    "artifactInput": {
+      "kind": "client_upload",
+      "uploadSessionId": "upload-2026-04-16T12:00:00Z",
+      "sourceRevision": "7d3f2c1",
+      "deploymentLabel": "//projects/deployments/pleomino-staging:deploy",
+      "buildTarget": "//projects/apps/pleomino:app"
+    }
   }'
 ```
+
+For protected/shared `cloudflare-pages`, direct `artifactDir` values are not a
+valid service submission. The supported artifact-input producer modes are
+`server_build`, `client_upload`, `ci_attested`, and
+`existing_admitted_artifact`.
 
 Typical response shape:
 

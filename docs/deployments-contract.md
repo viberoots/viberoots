@@ -17,6 +17,7 @@ Current reviewed central control-plane implementation note:
 - Reviewed operator inspection/export flows must resolve protected/shared control-plane state by backend-native identifiers (`submission_id`, `deploy_run_id`) through the service surfaces such as `GET /api/v1/status` and `GET /api/v1/records`, not by reading filesystem mirror paths.
 - Explicit `pgmem://...` backend URLs remain valid for isolated fixture tests and local harnesses; those harnesses should exercise the same backend-native contracts rather than rely on durable submission or deploy-record mirror files.
 - For public repo-level protected/shared `cloudflare-pages` mutation, missing `--control-plane-url` or `BNX_DEPLOY_CONTROL_PLANE_URL` is a fail-closed configuration error, and mixing that service-routed path with local-only flags such as `--records-root` or `--control-plane-database-url` is out of contract.
+- Protected/shared `cloudflare-pages` service submissions must carry a versioned `artifactInput` descriptor. The service rejects laptop-local `artifactDir` paths, admits uploaded, server-built, CI-attested, or previously admitted artifacts under control-plane storage, and publishes only the admitted artifact reference.
 
 - `TARGETS` is the authoritative source of deployment metadata.
 - Every concrete deployment lives at `projects/deployments/<deployment-id>/` and exposes a canonical `:deploy` target.
@@ -64,6 +65,7 @@ Current reviewed central control-plane implementation note:
 - `same_artifact` lanes reuse the same admitted artifact across environments.
 - `rebuild_per_stage` lanes promote the admitted source revision and build a new admitted stage artifact before publish.
 - The reviewed `rebuild_per_stage` operator path is a mutating promotion submission with `--source-run-id` plus a target-stage artifact input, not `--publish-only`.
+- Artifact producer identity, source revision, admitted artifact identity, storage reference, and replay artifact identity are distinct record fields. Replays, preview, rollback, and publish-only flows must use the recorded admitted artifact identity rather than rebuilding or re-reading a client path.
 - For promotion, `--source-run-id` may select any earlier admitted run that remains eligible under the lane's current promotion policy; it is not limited to the latest candidate, and it is not an override around lane policy.
 - Protected/shared smoke is required and blocking by default unless there is an explicit `smoke.exception`.
 - Multi-component retry remains deployment-atomic by default after partial publish failure; already-proven-live components may be treated as no-op reuse only when the adapter can prove their live published identity still matches the intended resolved artifact identity and no declared rollout or release-action rule requires re-publish.

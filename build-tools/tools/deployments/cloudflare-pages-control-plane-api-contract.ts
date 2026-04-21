@@ -9,6 +9,7 @@ import type {
 } from "./cloudflare-pages-control-plane-contract.ts";
 import type { CloudflarePagesPreviewCleanupReason } from "./cloudflare-pages-preview.ts";
 import type { CloudflarePagesTargetTransitionOperationKind } from "./cloudflare-pages-target-transition.ts";
+import type { CloudflarePagesArtifactInput } from "./cloudflare-pages-artifact-input.ts";
 
 export const CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA =
   "cloudflare-pages-control-plane-submit-request@1";
@@ -31,6 +32,7 @@ export type CloudflarePagesControlPlaneSubmitRequest = {
   authorization?: DeploymentControlPlaneAuthorization;
   deployBatchId?: string;
   artifactDir?: string;
+  artifactInput?: CloudflarePagesArtifactInput;
   sourceRunId?: string;
   targetExceptionRef?: string;
   publishBehavior?: CloudflarePagesPublishBehavior;

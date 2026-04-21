@@ -13,6 +13,7 @@ import {
   submitNixosSharedHostControlPlaneViaService,
 } from "./nixos-shared-host-control-plane-client.ts";
 import { resolveServiceClientFromFlags } from "./nixos-shared-host-service-client-config.ts";
+import { uploadCloudflarePagesClientArtifact } from "./cloudflare-pages-artifact-upload-client.ts";
 
 const SERVICE_ONLY_LOCAL_FLAGS = ["records-root", "control-plane-database-url"] as const;
 
@@ -95,9 +96,28 @@ export async function runProtectedCloudflarePagesDeployFrontDoor(opts: {
     controlPlaneToken: opts.controlPlaneToken,
     context: `cloudflare-pages ${opts.deployment.protectionClass} mutation`,
   });
+  const submissionId = createCloudflarePagesSubmissionId();
+  const needsArtifactInput =
+    !opts.publishOnly &&
+    !opts.preview &&
+    !opts.previewCleanup &&
+    !opts.retireTarget &&
+    !opts.migrateTarget;
+  const artifactInput = needsArtifactInput
+    ? await uploadCloudflarePagesClientArtifact({
+        workspaceRoot: opts.workspaceRoot,
+        controlPlaneUrl: serviceClient.controlPlaneUrl,
+        ...(serviceClient.controlPlaneToken
+          ? { controlPlaneToken: serviceClient.controlPlaneToken }
+          : {}),
+        submissionId,
+        deployment: opts.deployment,
+        artifactDir: await resolveArtifactDirForCli(opts.workspaceRoot, opts.deployment),
+      })
+    : undefined;
   const request: CloudflarePagesControlPlaneSubmitRequest = {
     schemaVersion: CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
-    submissionId: createCloudflarePagesSubmissionId(),
+    submissionId,
     submittedAt: new Date().toISOString(),
     deployment: opts.deployment,
     operationKind: opts.retireTarget
@@ -111,13 +131,7 @@ export async function runProtectedCloudflarePagesDeployFrontDoor(opts: {
             : opts.publishOnly || opts.sourceRunId
               ? "promotion"
               : "deploy",
-    ...(!opts.publishOnly &&
-    !opts.preview &&
-    !opts.previewCleanup &&
-    !opts.retireTarget &&
-    !opts.migrateTarget
-      ? { artifactDir: await resolveArtifactDirForCli(opts.workspaceRoot, opts.deployment) }
-      : {}),
+    ...(artifactInput ? { artifactInput } : {}),
     ...(opts.publishOnly ? { publishBehavior: "publish-only" as const } : {}),
     ...(opts.preview ? { publishMode: "preview" as const } : {}),
     ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),

@@ -183,6 +183,12 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
           );
           const serializedSnapshot = JSON.stringify(firstSnapshot);
           assert.equal(firstSnapshot.vaultRuntime.addr, vault.addr);
+          assert.equal(firstSnapshot.action.publishInput.artifact.producerKind, "client_upload");
+          assert.match(
+            firstSnapshot.action.publishInput.artifact.storageReference,
+            /^upload-session:/,
+          );
+          assert.ok(!serializedSnapshot.includes(artifactA));
           assert.ok(!serializedSnapshot.includes(workerJwt));
           assert.ok(!serializedSnapshot.includes("service-secret-token"));
 

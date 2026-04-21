@@ -78,6 +78,11 @@ target automatically.
 Use `--artifact-dir <dir>` only when you want to override that default and
 point at a specific local build output folder.
 
+For protected/shared `cloudflare-pages` runs that use `--control-plane-url`, the
+CLI uploads that local folder to the deployment service first. The submit
+request sent to `mini` contains an admitted artifact-input descriptor, not the
+laptop path. The worker publishes the artifact retained by the service.
+
 Use this when:
 
 - you want to publish the latest version defined by the deployment target
