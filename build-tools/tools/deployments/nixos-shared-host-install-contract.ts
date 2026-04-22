@@ -97,16 +97,12 @@ export function createEmptyPlatformStateJson(): string {
   return JSON.stringify(emptyNixosSharedHostPlatformState(), null, 2) + "\n";
 }
 
-export function renderManagedModule(opts: { repoRoot: string; statePath: string }): string {
-  const moduleSource = path.posix.join(
-    opts.repoRoot.replace(/\\/g, "/"),
-    "build-tools/tools/nix/nixos-shared-host-module.nix",
-  );
+export function renderManagedModule(opts: { statePath: string }): string {
   return [
-    "{ ... }:",
+    "{ deploymentModulesRoot, ... }:",
     "{",
     "  imports = [",
-    `    ${moduleSource}`,
+    '    "${deploymentModulesRoot}/nixos-shared-host-module.nix"',
     "  ];",
     "",
     "  nixosSharedHost.enable = true;",

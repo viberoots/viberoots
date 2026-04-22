@@ -175,6 +175,7 @@ test("nixos shared host usage guide stays present as the reviewed operator-facin
     /\$\{deploymentModulesRoot\}\/shared-host-vault-module\.nix/,
     "setup guide must import service modules through the flake input, not an absolute path",
   );
+  assert.match(setupDoc, /\$\{deploymentModulesRoot\}\/nixos-shared-host-module\.nix/);
   assert.match(
     usageDoc,
     /Avoid pointing the input at\s+all of `\/srv\/common`, since that copies the full repo into the store/,

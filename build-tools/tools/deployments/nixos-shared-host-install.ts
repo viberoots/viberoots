@@ -108,7 +108,6 @@ async function runServerCommand(action: string, repoRoot: string) {
         : undefined;
     const result = await installNixosSharedHost({
       hostRoot,
-      repoRoot,
       configRoot,
       configTopology,
       configEntryPath: String(promptInput.configEntryPath || "") || undefined,

@@ -53,6 +53,15 @@ test("nixos-shared-host server install supports emit-only on flake roots without
       String(summary.emittedSnippets.managedModuleSource || ""),
       /nixosSharedHost\.enable = true;/,
     );
+    assert.match(
+      String(summary.emittedSnippets.managedModuleSource || ""),
+      /\{ deploymentModulesRoot, \.\.\. \}:/,
+    );
+    assert.match(
+      String(summary.emittedSnippets.managedModuleSource || ""),
+      /\$\{deploymentModulesRoot\}\/nixos-shared-host-module\.nix/,
+    );
+    assert.doesNotMatch(String(summary.emittedSnippets.managedModuleSource || ""), /\/srv\/common/);
     assert.equal(
       summary.emittedSnippets.managedAnchorPath,
       "/etc/nixos/deployment-host/default.nix",

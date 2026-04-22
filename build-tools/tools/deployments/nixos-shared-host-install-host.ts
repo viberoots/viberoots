@@ -37,7 +37,6 @@ import {
 
 export async function installNixosSharedHost(opts: {
   hostRoot: string;
-  repoRoot: string;
   configRoot: string;
   configTopology?: NixosSharedHostConfigTopology;
   configEntryPath?: string;
@@ -120,7 +119,6 @@ export async function installNixosSharedHost(opts: {
     anchorPath: manifest.managedEntryPoints.anchorPath,
   });
   const managedModuleSource = renderManagedModule({
-    repoRoot: opts.repoRoot,
     statePath: manifest.statePath,
   });
   const managedAnchorSource = renderManagedAnchor(managedRoot);

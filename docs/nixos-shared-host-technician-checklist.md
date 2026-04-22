@@ -54,6 +54,12 @@ Expected files and directories:
 - persistent backend data: `/var/lib/deployment-host/runtime`
 - persistent backend data: `/var/lib/deployment-host/records`
 
+Before rebuilding a flake host, confirm `/etc/nixos/flake.nix` exposes the
+module directory as `deploymentModulesRoot`; the generated
+`deployment-host-managed.nix` imports
+`"${deploymentModulesRoot}/nixos-shared-host-module.nix"` and should not require
+`--impure`.
+
 ## Wire And Verify The Host
 
 Add the managed anchor to `/etc/nixos/configuration.nix`:
