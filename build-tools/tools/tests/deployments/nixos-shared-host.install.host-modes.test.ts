@@ -97,7 +97,7 @@ test("nixos-shared-host server install defaults the config entry to flake.nix wh
     assert.equal(summary.wiringState, "missing");
     await fsp.writeFile(
       path.join(fixture.hostRoot, "etc/nixos/flake.nix"),
-      "{ outputs = { nixpkgs, ... }: { nixosConfigurations.mini = nixpkgs.lib.nixosSystem { modules = [ /etc/nixos/deployment-host/default.nix ]; }; }; }\n",
+      "{ outputs = { nixpkgs, ... }: { nixosConfigurations.mini = nixpkgs.lib.nixosSystem { modules = [ ./deployment-host/default.nix ]; }; }; }\n",
       "utf8",
     );
     const status =

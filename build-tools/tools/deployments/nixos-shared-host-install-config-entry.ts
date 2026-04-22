@@ -62,6 +62,15 @@ export function configEntryContainsManagedAnchor(source: string, anchorPath: str
   return source.includes(anchorLiteralPath(anchorPath));
 }
 
+export function configEntryContainsManagedAnchorVariant(
+  source: string,
+  anchorPath: string,
+  variants: string[] = [],
+): boolean {
+  if (configEntryContainsManagedAnchor(source, anchorPath)) return true;
+  return variants.some((variant) => source.includes(anchorLiteralPath(variant)));
+}
+
 export function installManagedConfigEntry(opts: {
   source: string;
   topology: NixosSharedHostConfigTopology;

@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { configEntryContainsManagedAnchor } from "./nixos-shared-host-install-config-entry.ts";
+import { configEntryContainsManagedAnchorVariant } from "./nixos-shared-host-install-config-entry.ts";
 import {
   hostPath,
   normalizeHostLogicalPath,
@@ -124,9 +124,15 @@ export async function detectWiringState(
   if (!logicalEntryPath) return "unknown";
   const entryPath = hostPath(hostRoot, logicalEntryPath);
   if (!(await pathExists(entryPath))) return "missing";
-  return configEntryContainsManagedAnchor(
+  const entryDir = path.posix.dirname(normalizeHostLogicalPath(logicalEntryPath));
+  const relativeAnchor = `./${path.posix.relative(
+    entryDir,
+    normalizeHostLogicalPath(manifest.managedEntryPoints.anchorPath),
+  )}`;
+  return configEntryContainsManagedAnchorVariant(
     await readText(entryPath),
     manifest.managedEntryPoints.anchorPath,
+    [relativeAnchor],
   )
     ? "wired"
     : "missing";
