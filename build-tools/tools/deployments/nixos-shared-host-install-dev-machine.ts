@@ -20,6 +20,21 @@ export type ClientInput = {
   controlPlaneTokenEnv?: string;
 };
 
+type ClientProfile = {
+  manifestPath: string;
+  manifest: NixosSharedHostClientManifest;
+};
+
+type InvalidClientProfile = {
+  manifestPath: string;
+  profileName: string;
+  error: string;
+};
+
+type ClientProfileReadResult =
+  | ({ valid: true } & ClientProfile)
+  | ({ valid: false } & InvalidClientProfile);
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -54,6 +69,24 @@ function clientManifestPath(outputRoot: string, profileName: string): string {
 
 export async function readClientManifest(filePath: string): Promise<NixosSharedHostClientManifest> {
   return parseClientManifest(JSON.parse(await fsp.readFile(filePath, "utf8")), filePath);
+}
+
+async function readClientProfile(manifestPath: string): Promise<ClientProfileReadResult> {
+  try {
+    return {
+      valid: true,
+      manifestPath,
+      manifest: await readClientManifest(manifestPath),
+    };
+  } catch (error: any) {
+    if (error?.code === "ENOENT") throw error;
+    return {
+      valid: false,
+      manifestPath,
+      profileName: path.basename(manifestPath, ".json"),
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 async function listClientManifestPaths(outputRoot: string): Promise<string[]> {
@@ -125,16 +158,29 @@ export async function installNixosSharedHostClient(opts: {
 
 export async function listNixosSharedHostClients(opts: { outputRoot: string }): Promise<{
   outputRoot: string;
-  profiles: { manifestPath: string; manifest: NixosSharedHostClientManifest }[];
+  profiles: ClientProfile[];
+  invalidProfiles: InvalidClientProfile[];
 }> {
   const manifestPaths = await listClientManifestPaths(opts.outputRoot);
-  const profiles = await Promise.all(
-    manifestPaths.map(async (manifestPath) => ({
-      manifestPath,
-      manifest: await readClientManifest(manifestPath),
-    })),
-  );
-  return { outputRoot: path.resolve(opts.outputRoot), profiles };
+  const records = await Promise.all(manifestPaths.map(readClientProfile));
+  const profiles: ClientProfile[] = [];
+  const invalidProfiles: InvalidClientProfile[] = [];
+  for (const record of records) {
+    if (record.valid) {
+      profiles.push({ manifestPath: record.manifestPath, manifest: record.manifest });
+      continue;
+    }
+    invalidProfiles.push({
+      manifestPath: record.manifestPath,
+      profileName: record.profileName,
+      error: record.error,
+    });
+  }
+  return {
+    outputRoot: path.resolve(opts.outputRoot),
+    profiles,
+    invalidProfiles,
+  };
 }
 
 export async function readNixosSharedHostClientProfile(opts: {
@@ -153,7 +199,12 @@ export async function uninstallNixosSharedHostClient(opts: {
   profileName?: string;
   all?: boolean;
   dryRun?: boolean;
-}): Promise<{ outputRoot: string; removedProfiles: string[]; removedPaths: string[] }> {
+}): Promise<{
+  outputRoot: string;
+  removedProfiles: string[];
+  removedPaths: string[];
+  invalidProfiles: InvalidClientProfile[];
+}> {
   if (opts.all && opts.profileName) {
     throw new Error("client uninstall accepts either --profile or --all, not both");
   }
@@ -163,21 +214,35 @@ export async function uninstallNixosSharedHostClient(opts: {
   const manifestPaths = opts.all
     ? await listClientManifestPaths(opts.outputRoot)
     : [clientManifestPath(opts.outputRoot, String(opts.profileName || ""))];
-  const installedProfiles = await Promise.all(
-    manifestPaths.map(async (manifestPath) => ({
-      manifestPath,
-      manifest: await readClientManifest(manifestPath),
-    })),
-  );
-  const removedPaths = Array.from(
-    new Set(installedProfiles.flatMap(({ manifest }) => manifest.localManagedPaths)),
-  ).sort();
+  const installedProfiles = await Promise.all(manifestPaths.map(readClientProfile));
+  const removedProfiles = new Set<string>();
+  const removedPaths = new Set<string>();
+  const invalidProfiles: InvalidClientProfile[] = [];
+  for (const installedProfile of installedProfiles) {
+    if (installedProfile.valid) {
+      removedProfiles.add(installedProfile.manifest.profileName);
+      for (const managedPath of installedProfile.manifest.localManagedPaths) {
+        removedPaths.add(managedPath);
+      }
+      continue;
+    }
+    invalidProfiles.push({
+      manifestPath: installedProfile.manifestPath,
+      profileName: installedProfile.profileName,
+      error: installedProfile.error,
+    });
+    removedProfiles.add(installedProfile.profileName);
+    removedPaths.add(installedProfile.manifestPath);
+  }
   if (!opts.dryRun) {
-    await Promise.all(removedPaths.map((managedPath) => fsp.rm(managedPath, { force: true })));
+    await Promise.all(
+      Array.from(removedPaths).map((managedPath) => fsp.rm(managedPath, { force: true })),
+    );
   }
   return {
     outputRoot: path.resolve(opts.outputRoot),
-    removedProfiles: installedProfiles.map(({ manifest }) => manifest.profileName).sort(),
-    removedPaths,
+    removedProfiles: Array.from(removedProfiles).sort(),
+    removedPaths: Array.from(removedPaths).sort(),
+    invalidProfiles,
   };
 }

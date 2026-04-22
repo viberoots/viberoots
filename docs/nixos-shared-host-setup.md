@@ -508,6 +508,9 @@ Optional verification:
 direnv exec . build-tools/tools/bin/nixos-shared-host-install client list
 ```
 
+If the output includes `invalidProfiles`, remove stale entries with
+`direnv exec . build-tools/tools/bin/nixos-shared-host-install client uninstall --profile <name>`.
+
 Common example values for the client-install flags:
 
 - `--profile mini`

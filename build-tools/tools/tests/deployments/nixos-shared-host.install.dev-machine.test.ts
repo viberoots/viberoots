@@ -111,6 +111,47 @@ test("nixos-shared-host client list reports installed profiles", async () => {
   });
 });
 
+test("nixos-shared-host client list reports malformed profiles without blocking valid ones", async () => {
+  await runInTemp("nixos-shared-host-client-list-invalid", async (tmp, $) => {
+    const outputRoot = path.join(tmp, "profiles");
+    await fsp.mkdir(outputRoot, { recursive: true });
+    await fsp.writeFile(
+      path.join(outputRoot, "default.json"),
+      JSON.stringify(
+        {
+          schemaVersion: "nixos-shared-host-client@1",
+          tool: "nixos-shared-host-install",
+          toolFingerprint: "old",
+          profileName: "default",
+          destination: "default",
+          remoteRepoPath: "/srv/common",
+          remoteStatePath: "/var/lib/bucknix/nixos-shared-host/platform-state.json",
+          remoteRuntimeRoot: "/var/lib/bucknix/nixos-shared-host/runtime",
+          remoteRecordsRoot: "/var/lib/bucknix/nixos-shared-host/records",
+          sshMode: "ssh",
+          localManagedPaths: [path.join(outputRoot, "default.json")],
+        },
+        null,
+        2,
+      ),
+    );
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --control-plane-url http://127.0.0.1:7780`;
+    const result =
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client list --output-root ${outputRoot}`;
+    const summary = JSON.parse(String(result.stdout));
+    assert.deepEqual(
+      summary.profiles.map(
+        (entry: { manifest: { profileName: string } }) => entry.manifest.profileName,
+      ),
+      ["mini"],
+    );
+    assert.deepEqual(
+      summary.invalidProfiles.map((entry: { profileName: string }) => entry.profileName),
+      ["default"],
+    );
+  });
+});
+
 test("nixos-shared-host client uninstall removes exactly one profile when --profile is provided", async () => {
   await runInTemp("nixos-shared-host-client-uninstall-profile", async (tmp, $) => {
     const outputRoot = path.join(tmp, "profiles");
@@ -122,6 +163,35 @@ test("nixos-shared-host client uninstall removes exactly one profile when --prof
     assert.deepEqual(summary.removedProfiles, ["mini"]);
     await assert.rejects(() => fsp.access(path.join(outputRoot, "mini.json")));
     await fsp.access(path.join(outputRoot, "staging.json"));
+  });
+});
+
+test("nixos-shared-host client uninstall removes malformed profiles by name", async () => {
+  await runInTemp("nixos-shared-host-client-uninstall-invalid", async (tmp, $) => {
+    const outputRoot = path.join(tmp, "profiles");
+    await fsp.mkdir(outputRoot, { recursive: true });
+    const staleProfile = path.join(outputRoot, "default.json");
+    await fsp.writeFile(staleProfile, '{"profileName":"default"}');
+    const uninstall =
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client uninstall --output-root ${outputRoot} --profile default`;
+    const summary = JSON.parse(String(uninstall.stdout));
+    assert.deepEqual(summary.removedProfiles, ["default"]);
+    assert.deepEqual(summary.removedPaths, [staleProfile]);
+    assert.deepEqual(
+      summary.invalidProfiles.map((entry: { profileName: string }) => entry.profileName),
+      ["default"],
+    );
+    await assert.rejects(() => fsp.access(staleProfile));
+  });
+});
+
+test("nixos-shared-host client uninstall fails for a missing profile", async () => {
+  await runInTemp("nixos-shared-host-client-uninstall-missing-profile", async (tmp, $) => {
+    const outputRoot = path.join(tmp, "profiles");
+    const result =
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client uninstall --output-root ${outputRoot} --profile missing`.nothrow();
+    assert.notEqual(result.exitCode, 0);
+    assert.match(String(result.stderr), /ENOENT|no such file/i);
   });
 });
 
