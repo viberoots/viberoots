@@ -30,7 +30,7 @@ test("clean-temp-outs preserves live or shared devbuild isolation dirs", () => {
     false,
   );
   assert.equal(
-    shouldRemoveDeadDevBuildIsolationDir("bucknix-fresh", () => false),
+    shouldRemoveDeadDevBuildIsolationDir("workspace-fresh", () => false),
     false,
   );
 });
@@ -40,13 +40,13 @@ test("clean-temp-outs pruning removes dead one-shot devbuild dirs only", async (
   const buckOut = path.join(repoRoot, "buck-out");
   await fsp.mkdir(path.join(buckOut, "devbuild-12345"), { recursive: true });
   await fsp.mkdir(path.join(buckOut, "devbuild-shared-1a82e8dd60"), { recursive: true });
-  await fsp.mkdir(path.join(buckOut, "bucknix-fresh"), { recursive: true });
+  await fsp.mkdir(path.join(buckOut, "workspace-fresh"), { recursive: true });
 
   try {
     const removed = await pruneDeadDevBuildIsolationDirs(repoRoot, () => false);
     assert.deepEqual(removed, ["devbuild-12345"]);
     await assert.doesNotReject(() => fsp.access(path.join(buckOut, "devbuild-shared-1a82e8dd60")));
-    await assert.doesNotReject(() => fsp.access(path.join(buckOut, "bucknix-fresh")));
+    await assert.doesNotReject(() => fsp.access(path.join(buckOut, "workspace-fresh")));
     await assert.rejects(() => fsp.access(path.join(buckOut, "devbuild-12345")));
   } finally {
     await fsp.rm(repoRoot, { recursive: true, force: true });

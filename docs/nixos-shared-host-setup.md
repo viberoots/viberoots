@@ -5,17 +5,17 @@ This is the install and maintenance reference for the supported
 
 If you are looking for the first documentation entrypoint for setting up
 `mini`, start with
-[NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md).
+[NixOS Shared Host Usage](nixos-shared-host-usage.md).
 This page is the detailed install and maintenance reference that page sends you
 to. Hand
-[NixOS Shared Host Technician Checklist](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-technician-checklist.md)
+[NixOS Shared Host Technician Checklist](nixos-shared-host-technician-checklist.md)
 to technicians when they need the short SOP. Use
-[Mini Shared-Dev Deployment Design](/Users/kiltyj/Code/bucknix-fresh/docs/mini-deployment.md)
-and [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
+[Mini Shared-Dev Deployment Design](mini-deployment.md)
+and [Deployment Contract](deployments-contract.md)
 for deeper system rules.
 
 If `mini`-targeted deployments need Vault-backed secrets, also open
-[Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md).
+[Vault Production Bootstrap Runbook](vault-production-bootstrap.md).
 That runbook is the canonical Vault setup path. This setup guide covers the
 shared-host install and control-plane bring-up on `mini`, not Vault bootstrap
 itself.
@@ -53,7 +53,7 @@ Current supported scope:
 Use this setup guide for the `mini` host install, config wiring, control-plane
 service, worker, and client profile.
 
-Use [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+Use [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
 for Vault itself.
 
 That is the right next document whether:
@@ -75,7 +75,7 @@ The default reviewed path is:
 
 1. prepare a repo checkout on `mini` at `/srv/common`
 2. run `server install --install-mode managed-manual-wire` on `mini`
-3. import `/etc/nixos/bucknix/nixos-shared-host/default.nix` into the
+3. import `/etc/nixos/nixos-shared-host/default.nix` into the
    authoritative NixOS config
 4. run `sudo nixos-rebuild switch`
 5. start the deployment service and worker
@@ -89,10 +89,10 @@ The default reviewed path is:
 In plain language, `managed-manual-wire` means:
 
 - the installer writes and owns its managed files under
-  `/etc/nixos/bucknix/nixos-shared-host`
+  `/etc/nixos/nixos-shared-host`
 - the installer creates the platform-state, runtime, and records paths it owns
 - the installer does not edit `/etc/nixos/configuration.nix` or your flake entry
-- you add the `/etc/nixos/bucknix/nixos-shared-host/default.nix` import or
+- you add the `/etc/nixos/nixos-shared-host/default.nix` import or
   module entry yourself
 
 Use `managed-dropin` only if you want the installer to update the config entry
@@ -115,12 +115,12 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
 
 Expected files and directories:
 
-- `/etc/nixos/bucknix/nixos-shared-host/install-manifest.json`
-- `/etc/nixos/bucknix/nixos-shared-host/nixos-shared-host-managed.nix`
-- `/etc/nixos/bucknix/nixos-shared-host/default.nix`
-- `/var/lib/bucknix/nixos-shared-host/platform-state.json`
-- `/var/lib/bucknix/nixos-shared-host/runtime`
-- `/var/lib/bucknix/nixos-shared-host/records`
+- `/etc/nixos/nixos-shared-host/install-manifest.json`
+- `/etc/nixos/nixos-shared-host/nixos-shared-host-managed.nix`
+- `/etc/nixos/nixos-shared-host/default.nix`
+- `/var/lib/nixos-shared-host/platform-state.json`
+- `/var/lib/nixos-shared-host/runtime`
+- `/var/lib/nixos-shared-host/records`
 
 Here, "managed" means "owned by the installer and tracked in
 `install-manifest.json`". Uninstall removes only those managed files and
@@ -184,7 +184,7 @@ Add the managed anchor to the authoritative config entry:
 ```nix
 imports = [
   ./hardware-configuration.nix
-  /etc/nixos/bucknix/nixos-shared-host/default.nix
+  /etc/nixos/nixos-shared-host/default.nix
 ];
 ```
 
@@ -399,7 +399,7 @@ export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:replace-me@12
 Vault follow-up after the first `nixos-rebuild switch`:
 
 - use the local service as the installation and lifecycle owner
-- then open [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+- then open [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   for init, unseal, audit, KV v2, JWT auth roles, policy, and secret bootstrap
 
 The Vault module is a host-service baseline, not a substitute for the Vault
@@ -421,11 +421,11 @@ Plain-language version:
 
 What the service and worker flags mean:
 
-- `--host-root /var/lib/bucknix/nixos-shared-host/runtime`
+- `--host-root /var/lib/nixos-shared-host/runtime`
   The runtime root on `mini`.
-- `--state /var/lib/bucknix/nixos-shared-host/platform-state.json`
+- `--state /var/lib/nixos-shared-host/platform-state.json`
   The shared-host state file.
-- `--records-root /var/lib/bucknix/nixos-shared-host/records`
+- `--records-root /var/lib/nixos-shared-host/records`
   The records directory on `mini`. This root also contains retained upload and
   admitted-artifact storage used by the hosted service.
 - `--control-plane-database-url "$BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL"`
@@ -449,16 +449,16 @@ Common example values:
 export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
 export BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
 direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts \
-  --host-root /var/lib/bucknix/nixos-shared-host/runtime \
-  --state /var/lib/bucknix/nixos-shared-host/platform-state.json \
-  --records-root /var/lib/bucknix/nixos-shared-host/records \
+  --host-root /var/lib/nixos-shared-host/runtime \
+  --state /var/lib/nixos-shared-host/platform-state.json \
+  --records-root /var/lib/nixos-shared-host/records \
   --host 127.0.0.1 \
   --port 7780
 ```
 
 ```bash
 direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-worker.ts \
-  --records-root /var/lib/bucknix/nixos-shared-host/records
+  --records-root /var/lib/nixos-shared-host/records
 ```
 
 Required worker-side secret-source prep after PR-79 and later:
@@ -489,9 +489,9 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --profile mini \
   --destination mini \
   --remote-repo-path /srv/common \
-  --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json \
-  --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime \
-  --remote-records-root /var/lib/bucknix/nixos-shared-host/records \
+  --remote-state-path /var/lib/nixos-shared-host/platform-state.json \
+  --remote-runtime-root /var/lib/nixos-shared-host/runtime \
+  --remote-records-root /var/lib/nixos-shared-host/records \
   --ssh-mode ssh \
   --control-plane-url https://deploy.apps.kilty.io \
   --control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN
@@ -512,9 +512,9 @@ Common example values for the client-install flags:
 - `--profile mini`
 - `--destination mini`
 - `--remote-repo-path /srv/common`
-- `--remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json`
-- `--remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime`
-- `--remote-records-root /var/lib/bucknix/nixos-shared-host/records`
+- `--remote-state-path /var/lib/nixos-shared-host/platform-state.json`
+- `--remote-runtime-root /var/lib/nixos-shared-host/runtime`
+- `--remote-records-root /var/lib/nixos-shared-host/records`
 - `--ssh-mode ssh`
 - `--control-plane-url https://deploy.apps.kilty.io`
 - `--control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN`

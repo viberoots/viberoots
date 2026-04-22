@@ -17,17 +17,17 @@ workflow:
 
 Use the deeper references when needed:
 
-- [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md)
+- [Deployments Usage](deployments-usage.md)
   for the repo-wide reviewed deployment workflows across all provider families
-- [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+- [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   for install details, alternate install modes, status, and uninstall
-- [NixOS Shared Host Technician Checklist](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-technician-checklist.md)
+- [NixOS Shared Host Technician Checklist](nixos-shared-host-technician-checklist.md)
   for the short SOP handoff path
-- [Mini Shared-Dev Deployment Design](/Users/kiltyj/Code/bucknix-fresh/docs/mini-deployment.md)
+- [Mini Shared-Dev Deployment Design](mini-deployment.md)
   for background on why `mini` is set up this way
-- [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
+- [Deployment Contract](deployments-contract.md)
   for the strict system rules behind these workflows
-- [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+- [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   for the canonical Vault bring-up path when `mini` deploys need Vault-backed
   secrets
 
@@ -39,12 +39,12 @@ Use this entry sequence:
 
 1. stay on this page for the reviewed bring-up order and the first commands to
    care about
-2. open [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+2. open [NixOS Shared Host Setup](nixos-shared-host-setup.md)
    when you need the full install, status, uninstall, or alternate-install-mode
    reference
-3. open [NixOS Shared Host Technician Checklist](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-technician-checklist.md)
+3. open [NixOS Shared Host Technician Checklist](nixos-shared-host-technician-checklist.md)
    when you need the short SOP handoff
-4. open [Mini Shared-Dev Deployment Design](/Users/kiltyj/Code/bucknix-fresh/docs/mini-deployment.md)
+4. open [Mini Shared-Dev Deployment Design](mini-deployment.md)
    only when you need the design rationale behind the `mini` workflow
 
 Current supported scope:
@@ -79,7 +79,7 @@ For a fresh `mini` install, follow this exact order:
    when `mini` should serve the reviewed hosted deployment API route and
    `/srv/common/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
    when `mini` should serve the reviewed public PKCE callback route.
-3. wire `/etc/nixos/bucknix/nixos-shared-host/default.nix` into the
+3. wire `/etc/nixos/nixos-shared-host/default.nix` into the
    authoritative NixOS config and apply it with `sudo nixos-rebuild switch`
 4. start the deployment service and worker on `mini`
 5. install the client profile on each dev machine or Jenkins worker
@@ -109,7 +109,7 @@ deployment-service flags directly to the remote wrapper commands.
 
 If your `mini` deployments use deployment secrets, the canonical Vault setup
 instructions live in
-[Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md).
+[Vault Production Bootstrap Runbook](vault-production-bootstrap.md).
 
 If you want `mini` itself to run the local services, the reviewed importable
 starting modules live here:
@@ -176,9 +176,9 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --profile mini \
   --destination mini \
   --remote-repo-path /srv/common \
-  --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json \
-  --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime \
-  --remote-records-root /var/lib/bucknix/nixos-shared-host/records \
+  --remote-state-path /var/lib/nixos-shared-host/platform-state.json \
+  --remote-runtime-root /var/lib/nixos-shared-host/runtime \
+  --remote-records-root /var/lib/nixos-shared-host/records \
   --ssh-mode ssh \
   --control-plane-url https://deploy.apps.kilty.io \
   --control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN
@@ -203,11 +203,11 @@ What the install flags mean:
   matches the host name.
 - `--remote-repo-path /srv/common`
   The repo checkout on `mini` that remote deploy commands should use.
-- `--remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json`
+- `--remote-state-path /var/lib/nixos-shared-host/platform-state.json`
   The host state file used by the shared-host deployment backend.
-- `--remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime`
+- `--remote-runtime-root /var/lib/nixos-shared-host/runtime`
   The root directory where runtime files are materialized on `mini`.
-- `--remote-records-root /var/lib/bucknix/nixos-shared-host/records`
+- `--remote-records-root /var/lib/nixos-shared-host/records`
   The root directory where deployment records are stored on `mini`.
 - `--ssh-mode ssh`
   Use normal SSH transport. This is the standard choice for the current
@@ -233,9 +233,9 @@ The plan output should show:
 
 - destination `mini`
 - remote repo path `/srv/common`
-- remote state path `/var/lib/bucknix/nixos-shared-host/platform-state.json`
-- remote runtime root `/var/lib/bucknix/nixos-shared-host/runtime`
-- remote records root `/var/lib/bucknix/nixos-shared-host/records`
+- remote state path `/var/lib/nixos-shared-host/platform-state.json`
+- remote runtime root `/var/lib/nixos-shared-host/runtime`
+- remote records root `/var/lib/nixos-shared-host/records`
 - a `serviceClient` block with the deployment service URL and token env
 
 ## Run The Reviewed Remote Deploy

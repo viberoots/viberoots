@@ -80,18 +80,34 @@ export function hostPath(hostRoot: string, logicalPath: string): string {
 }
 
 export function defaultManagedRoot(configRoot: string): string {
-  return path.posix.join(normalizeHostLogicalPath(configRoot), "bucknix", "nixos-shared-host");
+  return path.posix.join(normalizeHostLogicalPath(configRoot), "nixos-shared-host");
 }
 
 export function defaultStatePath(): string {
-  return "/var/lib/bucknix/nixos-shared-host/platform-state.json";
+  return "/var/lib/nixos-shared-host/platform-state.json";
 }
 
 export function defaultRuntimeRoot(): string {
-  return "/var/lib/bucknix/nixos-shared-host/runtime";
+  return "/var/lib/nixos-shared-host/runtime";
 }
 
 export function defaultRecordsRoot(): string {
+  return "/var/lib/nixos-shared-host/records";
+}
+
+export function legacyDefaultManagedRoot(configRoot: string): string {
+  return path.posix.join(normalizeHostLogicalPath(configRoot), "bucknix", "nixos-shared-host");
+}
+
+function legacyDefaultStatePath(): string {
+  return "/var/lib/bucknix/nixos-shared-host/platform-state.json";
+}
+
+function legacyDefaultRuntimeRoot(): string {
+  return "/var/lib/bucknix/nixos-shared-host/runtime";
+}
+
+function legacyDefaultRecordsRoot(): string {
   return "/var/lib/bucknix/nixos-shared-host/records";
 }
 
@@ -208,10 +224,11 @@ export function parseInstallManifest(raw: unknown): NixosSharedHostInstallManife
       installMode: parsed.installMode || "emit-only",
       configTopology: "plain",
       configRoot: parsed.configRoot || "/etc/nixos",
-      managedRoot: parsed.managedRoot || defaultManagedRoot(parsed.configRoot || "/etc/nixos"),
-      statePath: parsed.statePath || defaultStatePath(),
-      runtimeRoot: parsed.runtimeRoot || defaultRuntimeRoot(),
-      recordsRoot: parsed.recordsRoot || defaultRecordsRoot(),
+      managedRoot:
+        parsed.managedRoot || legacyDefaultManagedRoot(parsed.configRoot || "/etc/nixos"),
+      statePath: parsed.statePath || legacyDefaultStatePath(),
+      runtimeRoot: parsed.runtimeRoot || legacyDefaultRuntimeRoot(),
+      recordsRoot: parsed.recordsRoot || legacyDefaultRecordsRoot(),
     });
   }
   throw new Error(

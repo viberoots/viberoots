@@ -2,9 +2,9 @@
 
 This is the short technician checklist for the supported `mini` workflow.
 
-Use [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+Use [NixOS Shared Host Usage](nixos-shared-host-usage.md)
 for the operator-facing workflow and
-[NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+[NixOS Shared Host Setup](nixos-shared-host-setup.md)
 for the fuller install reference.
 
 Current supported scope:
@@ -47,12 +47,12 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
 
 Expected files and directories:
 
-- `/etc/nixos/bucknix/nixos-shared-host/install-manifest.json`
-- `/etc/nixos/bucknix/nixos-shared-host/nixos-shared-host-managed.nix`
-- `/etc/nixos/bucknix/nixos-shared-host/default.nix`
-- `/var/lib/bucknix/nixos-shared-host/platform-state.json`
-- `/var/lib/bucknix/nixos-shared-host/runtime`
-- `/var/lib/bucknix/nixos-shared-host/records`
+- `/etc/nixos/nixos-shared-host/install-manifest.json`
+- `/etc/nixos/nixos-shared-host/nixos-shared-host-managed.nix`
+- `/etc/nixos/nixos-shared-host/default.nix`
+- `/var/lib/nixos-shared-host/platform-state.json`
+- `/var/lib/nixos-shared-host/runtime`
+- `/var/lib/nixos-shared-host/records`
 
 ## Wire And Verify The Host
 
@@ -61,7 +61,7 @@ Add the managed anchor to `/etc/nixos/configuration.nix`:
 ```nix
 imports = [
   ./hardware-configuration.nix
-  /etc/nixos/bucknix/nixos-shared-host/default.nix
+  /etc/nixos/nixos-shared-host/default.nix
 ];
 ```
 
@@ -95,16 +95,16 @@ Run on `mini` from `/srv/common`:
 export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
 export BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
 direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts \
-  --host-root /var/lib/bucknix/nixos-shared-host/runtime \
-  --state /var/lib/bucknix/nixos-shared-host/platform-state.json \
-  --records-root /var/lib/bucknix/nixos-shared-host/records \
+  --host-root /var/lib/nixos-shared-host/runtime \
+  --state /var/lib/nixos-shared-host/platform-state.json \
+  --records-root /var/lib/nixos-shared-host/records \
   --host 127.0.0.1 \
   --port 7780
 ```
 
 ```bash
 direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-worker.ts \
-  --records-root /var/lib/bucknix/nixos-shared-host/records
+  --records-root /var/lib/nixos-shared-host/records
 ```
 
 What success looks like:
@@ -130,9 +130,9 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --profile mini \
   --destination mini \
   --remote-repo-path /srv/common \
-  --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json \
-  --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime \
-  --remote-records-root /var/lib/bucknix/nixos-shared-host/records \
+  --remote-state-path /var/lib/nixos-shared-host/platform-state.json \
+  --remote-runtime-root /var/lib/nixos-shared-host/runtime \
+  --remote-records-root /var/lib/nixos-shared-host/records \
   --ssh-mode ssh \
   --control-plane-url https://deploy.apps.kilty.io \
   --control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN

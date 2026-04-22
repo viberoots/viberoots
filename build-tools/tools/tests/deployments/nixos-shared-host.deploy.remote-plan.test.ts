@@ -14,7 +14,7 @@ async function installClientProfile(
   sshMode: string = "ssh",
   controlPlaneUrl: string = "http://127.0.0.1:7780",
 ): Promise<void> {
-  await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime --remote-records-root /var/lib/bucknix/nixos-shared-host/records --ssh-mode ${sshMode} --control-plane-url ${controlPlaneUrl}`;
+  await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /var/lib/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/nixos-shared-host/runtime --remote-records-root /var/lib/nixos-shared-host/records --ssh-mode ${sshMode} --control-plane-url ${controlPlaneUrl}`;
 }
 
 async function installReviewedDeployment(workspaceRoot: string): Promise<string> {
@@ -39,10 +39,10 @@ test("deploy plan reads the reviewed remote profile deterministically", async ()
       destination: "mini",
       transportMode: "ssh",
       remoteRepoPath: "/srv/common",
-      remoteStatePath: "/var/lib/bucknix/nixos-shared-host/platform-state.json",
-      remoteRuntimeRoot: "/var/lib/bucknix/nixos-shared-host/runtime",
-      remoteRecordsRoot: "/var/lib/bucknix/nixos-shared-host/records",
-      remoteArtifactStageRoot: "/var/lib/bucknix/nixos-shared-host/runtime/.deploy-artifacts",
+      remoteStatePath: "/var/lib/nixos-shared-host/platform-state.json",
+      remoteRuntimeRoot: "/var/lib/nixos-shared-host/runtime",
+      remoteRecordsRoot: "/var/lib/nixos-shared-host/records",
+      remoteArtifactStageRoot: "/var/lib/nixos-shared-host/runtime/.deploy-artifacts",
       serviceClient: {
         mode: "control-plane-service",
         controlPlaneUrl: "http://127.0.0.1:7780",
@@ -63,7 +63,7 @@ test("deploy plan reads the reviewed remote profile deterministically", async ()
         explicitOptInRequired: true,
         selectedMode: "skip",
         remoteConfigRoot: "/etc/nixos",
-        remoteManagedRoot: "/etc/nixos/bucknix/nixos-shared-host",
+        remoteManagedRoot: "/etc/nixos/nixos-shared-host",
       },
       hostApplyExpectedLater: true,
     });
@@ -98,7 +98,7 @@ test("deploy plan renders reviewed host-apply selection when remote apply is req
     const profileRoot = `${tmp}/profiles`;
     await installClientProfile($, profileRoot);
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan --apply-host --remote-config-root /srv/nixos --remote-managed-root /srv/nixos/bucknix/nixos-shared-host`.nothrow();
+      await $`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan --apply-host --remote-config-root /srv/nixos --remote-managed-root /srv/nixos/nixos-shared-host`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /service-only remote profiles do not support/);
   });
@@ -180,9 +180,9 @@ test("deploy plan fails closed on malformed client manifests", async () => {
         profileName: "mini",
         destination: "mini",
         remoteRepoPath: "/srv/common",
-        remoteStatePath: "/var/lib/bucknix/nixos-shared-host/platform-state.json",
-        remoteRuntimeRoot: "/var/lib/bucknix/nixos-shared-host/runtime",
-        remoteRecordsRoot: "/var/lib/bucknix/nixos-shared-host/records",
+        remoteStatePath: "/var/lib/nixos-shared-host/platform-state.json",
+        remoteRuntimeRoot: "/var/lib/nixos-shared-host/runtime",
+        remoteRecordsRoot: "/var/lib/nixos-shared-host/records",
         sshMode: "ssh",
         localManagedPaths: [],
       }),

@@ -8,6 +8,8 @@ import {
   defaultRecordsRoot,
   defaultRuntimeRoot,
   defaultStatePath,
+  hostPath,
+  legacyDefaultManagedRoot,
   manifestPathFor,
   type NixosSharedHostConfigTopology,
   type NixosSharedHostInstallMode,
@@ -28,6 +30,7 @@ import {
   statusNixosSharedHost,
   uninstallNixosSharedHost,
 } from "./nixos-shared-host-install-host.ts";
+import { pathExists } from "./nixos-shared-host-install-host-support.ts";
 
 type HostInstallInput = {
   serverRoot: string;
@@ -44,9 +47,8 @@ type HostInstallInput = {
 
 function requireSubcommands(): [string, string] {
   const [scope = "", action = ""] = getPositionals();
-  if (!scope || !action) {
+  if (!scope || !action)
     throw new Error("usage: nixos-shared-host-install <server|client> <install|uninstall|status>");
-  }
   return [scope, action];
 }
 
@@ -89,7 +91,7 @@ async function runServerCommand(action: string, repoRoot: string) {
   if (action === "install" && !configRoot) throw new Error("missing required --config-root");
   const managedRoot =
     String(promptInput.managedRoot || "") || (configRoot ? defaultManagedRoot(configRoot) : "");
-  const manifestPath = getFlagStr(
+  let manifestPath = getFlagStr(
     "manifest-path",
     managedRoot ? manifestPathFor(managedRoot) : "",
   ).trim();
@@ -126,6 +128,17 @@ async function runServerCommand(action: string, repoRoot: string) {
   }
   if (!manifestPath)
     throw new Error("missing required --manifest-path or --managed-root/--config-root");
+  if (
+    !hasFlag("manifest-path") &&
+    !hasFlag("managed-root") &&
+    configRoot &&
+    !(await pathExists(hostPath(hostRoot, manifestPath)))
+  ) {
+    const legacyManifestPath = manifestPathFor(legacyDefaultManagedRoot(configRoot));
+    if (await pathExists(hostPath(hostRoot, legacyManifestPath))) {
+      manifestPath = legacyManifestPath;
+    }
+  }
   if (action === "uninstall") {
     console.log(
       JSON.stringify(
@@ -232,7 +245,4 @@ async function main() {
   throw new Error(`unsupported command "${scope} ${action}"`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+main().catch((error) => (console.error(error), process.exit(1)));

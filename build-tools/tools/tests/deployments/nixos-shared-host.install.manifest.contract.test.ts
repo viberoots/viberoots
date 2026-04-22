@@ -13,10 +13,10 @@ test("nixos-shared-host install manifest parses current schema", () => {
     configTopology: "plain",
     configRoot: "/etc/nixos",
     configEntryPath: "/etc/nixos/configuration.nix",
-    managedRoot: "/etc/nixos/bucknix/nixos-shared-host",
-    statePath: "/var/lib/bucknix/nixos-shared-host/platform-state.json",
-    runtimeRoot: "/var/lib/bucknix/nixos-shared-host/runtime",
-    recordsRoot: "/var/lib/bucknix/nixos-shared-host/records",
+    managedRoot: "/etc/nixos/nixos-shared-host",
+    statePath: "/var/lib/nixos-shared-host/platform-state.json",
+    runtimeRoot: "/var/lib/nixos-shared-host/runtime",
+    recordsRoot: "/var/lib/nixos-shared-host/records",
   });
   const parsed = parseInstallManifest(manifest);
   assert.equal(parsed.schemaVersion, "nixos-shared-host-install@1");
@@ -43,4 +43,16 @@ test("nixos-shared-host install manifest migrates reviewed legacy v0 schema", ()
     manifest.managedEntryPoints.anchorPath,
     "/etc/nixos/bucknix/nixos-shared-host/default.nix",
   );
+});
+
+test("nixos-shared-host install manifest keeps legacy v0 implied defaults on legacy paths", () => {
+  const manifest = parseInstallManifest({
+    schemaVersion: "nixos-shared-host-install@0",
+    installMode: "emit-only",
+    configRoot: "/etc/nixos",
+  });
+  assert.equal(manifest.managedRoot, "/etc/nixos/bucknix/nixos-shared-host");
+  assert.equal(manifest.statePath, "/var/lib/bucknix/nixos-shared-host/platform-state.json");
+  assert.equal(manifest.runtimeRoot, "/var/lib/bucknix/nixos-shared-host/runtime");
+  assert.equal(manifest.recordsRoot, "/var/lib/bucknix/nixos-shared-host/records");
 });

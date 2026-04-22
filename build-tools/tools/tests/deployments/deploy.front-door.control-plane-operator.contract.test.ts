@@ -189,7 +189,7 @@ test("deploy --approve uses the installed profile and status bindings instead of
       await $({
         cwd: tmp,
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /var/lib/bucknix/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime --remote-records-root /var/lib/bucknix/nixos-shared-host/records --ssh-mode ssh --control-plane-url ${mock.url}`;
+      })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /var/lib/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/nixos-shared-host/runtime --remote-records-root /var/lib/nixos-shared-host/records --ssh-mode ssh --control-plane-url ${mock.url}`;
       const approveResult = await $({
         cwd: tmp,
         stdio: "pipe",

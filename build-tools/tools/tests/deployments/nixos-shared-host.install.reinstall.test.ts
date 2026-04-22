@@ -14,23 +14,21 @@ test("nixos-shared-host server uninstall removes only managed assets and support
       withNginxConfig: true,
     });
     await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin`;
-    const sibling = path.join(fixture.hostRoot, "etc/nixos/bucknix/unmanaged.txt");
+    const sibling = path.join(fixture.hostRoot, "etc/nixos/unmanaged-sibling.txt");
     await fsp.mkdir(path.dirname(sibling), { recursive: true });
     await fsp.writeFile(sibling, "keep-me\n", "utf8");
     await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server uninstall --server-root ${fixture.hostRoot} --config-root /etc/nixos`;
     await fsp.access(sibling);
     assert.doesNotMatch(
       await fsp.readFile(path.join(fixture.hostRoot, "etc/nixos/configuration.nix"), "utf8"),
-      /BEGIN bucknix nixos-shared-host/,
+      /BEGIN nixos-shared-host managed block/,
     );
     await assert.rejects(
-      fsp.access(
-        path.join(fixture.hostRoot, "etc/nixos/bucknix/nixos-shared-host/install-manifest.json"),
-      ),
+      fsp.access(path.join(fixture.hostRoot, "etc/nixos/nixos-shared-host/install-manifest.json")),
     );
     await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin`;
     await fsp.access(
-      path.join(fixture.hostRoot, "etc/nixos/bucknix/nixos-shared-host/install-manifest.json"),
+      path.join(fixture.hostRoot, "etc/nixos/nixos-shared-host/install-manifest.json"),
     );
     assert.equal(await fsp.readFile(sibling, "utf8"), "keep-me\n");
   });
@@ -43,7 +41,7 @@ test("nixos-shared-host manual-wire uninstall leaves server config entry untouch
       topology: "plain",
     });
     const operatorManagedConfig =
-      "{ ... }:\n{\n  imports = [\n    /etc/nixos/bucknix/nixos-shared-host/default.nix\n  ];\n}\n";
+      "{ ... }:\n{\n  imports = [\n    /etc/nixos/nixos-shared-host/default.nix\n  ];\n}\n";
     await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-manual-wire`;
     await fsp.writeFile(
       path.join(fixture.hostRoot, "etc/nixos/configuration.nix"),
@@ -56,9 +54,7 @@ test("nixos-shared-host manual-wire uninstall leaves server config entry untouch
       operatorManagedConfig,
     );
     await assert.rejects(
-      fsp.access(
-        path.join(fixture.hostRoot, "etc/nixos/bucknix/nixos-shared-host/install-manifest.json"),
-      ),
+      fsp.access(path.join(fixture.hostRoot, "etc/nixos/nixos-shared-host/install-manifest.json")),
     );
   });
 });
