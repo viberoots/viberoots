@@ -36,7 +36,8 @@ the deploy front door choose the credential source and keep workload JWTs in
 memory for local/direct runs. For protected service-backed runs, configure the
 deployment worker with the server-local credential source environment variables
 or files named by `vault_runtime`; the client must not submit Vault JWTs,
-Vault tokens, provider secrets, PKCE verifiers, or client secrets.
+Vault tokens, fixture paths, provider secrets, PKCE verifiers, requested
+principals, authorization grants, or client secrets.
 
 Current supported scope:
 
@@ -460,16 +461,20 @@ direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control
   --records-root /var/lib/bucknix/nixos-shared-host/records
 ```
 
-Required worker-side secret-source prep after PR-79 through PR-81:
+Required worker-side secret-source prep after PR-79 and later:
 
 - set `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL` for both service and worker
 - set the server-local credential variable referenced by `vault_runtime`, for
   example `BNX_DEPLOYER_CLIENT_SECRET` for a reviewed service-account client
   secret, or `BNX_DEPLOYMENT_OIDC_TOKEN` for an external workload identity
   token
-- leave `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`, laptop Vault JWTs, Vault tokens,
-  provider tokens, PKCE verifiers, and client secrets out of protected/shared
-  service submissions
+- keep `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`, ambient Vault JWTs, ambient Vault
+  tokens, provider tokens, PKCE verifiers, and client secrets out of both the
+  protected/shared client submission and the worker process environment unless a
+  reviewed server-local credential source explicitly names the variable
+- rely on the service-owned auth session for the human principal; protected/shared
+  service submissions reject client-supplied `requestedBy` and authorization
+  grants
 
 When you check status later, use the service and the IDs it returns:
 `submissionId` and `deployRunId`.
@@ -541,8 +546,10 @@ direnv exec . build-tools/tools/bin/deploy \
   --artifact-dir ./dist
 ```
 
-`--artifact-dir ./dist` is optional. Use it only when you want to point at one
-specific local build output folder.
+`--artifact-dir ./dist` is optional. In the reviewed profile workflow it names a
+local source folder for staging or upload; it is not submitted to the hosted
+service as a trusted laptop path. The service works from the `mini`-side staged
+or admitted artifact before provider mutation.
 
 If you leave it out, the deploy command uses the deployment target metadata to
 build and locate the artifact automatically.

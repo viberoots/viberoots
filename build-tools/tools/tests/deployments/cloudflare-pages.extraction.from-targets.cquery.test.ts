@@ -67,8 +67,11 @@ const EXPECTED_MINI_VAULT_RUNTIME = {
   audience: "deployments-vault",
   deploymentClientId: "deployment-runner",
   cliPublicClientId: "deployment-cli",
+  serviceAccountClientId: "deployment-runner",
   deploymentEnvironment: "mini",
   roleName: "deploy-pleomino-read",
+  requiredHumanClaim: "groups",
+  requiredHumanClaimValue: "deployers",
   pkceCallback: {
     mode: "public_host",
     externalScheme: "https",

@@ -14,6 +14,7 @@ cloudflare_pages_static_webapp_deployment(
         "oidc_issuer": "https://identity.apps.kilty.io/realms/deployments",
         "audience": "deployments-vault",
         "deployment_client_id": "deployment-runner",
+        "service_account_client_id": "deployment-runner",
         "cli_public_client_id": "deployment-cli",
         "deployment_environment": "mini",
         "jwt_role": "deploy-pleomino-read",
@@ -24,6 +25,8 @@ cloudflare_pages_static_webapp_deployment(
         "pkce_callback_bind_host": "127.0.0.1",
         "pkce_callback_bind_port": "7780",
         "pkce_callback_bind_path": "/oidc/callback",
+        "required_human_claim": "groups",
+        "required_human_claim_value": "deployers",
     },
     secret_requirements = [
         {

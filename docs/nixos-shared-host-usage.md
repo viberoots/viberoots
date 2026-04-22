@@ -249,8 +249,11 @@ direnv exec . build-tools/tools/bin/deploy \
   --artifact-dir ./dist
 ```
 
-`--artifact-dir ./dist` is optional here. It is only needed if you want to use
-that exact local build output folder.
+`--artifact-dir ./dist` is optional here. It is a client-side source override:
+the reviewed profile workflow transports that folder to `mini` first, then the
+hosted deployment service works from the `mini`-side staged or admitted artifact.
+The service submission must not trust a laptop-local path as deployment
+authority.
 
 If you omit `--artifact-dir`, the deploy command uses the deployment target
 metadata to figure out which app target to build and where its artifact lives.
@@ -279,6 +282,11 @@ deployment service recorded in the client profile.
 
 Do not pass `--control-plane-url`, `--apply-host`, or `--apply-host-dry-run`
 to those wrappers. They read that information from the installed profile.
+
+Do not pass Vault JWT files, Vault tokens, fixture paths, provider credentials,
+or client-supplied principals through these client commands. For protected/shared
+`mini` runs, the deployment service derives the authenticated principal and the
+worker uses server-local Vault credential sources.
 
 ## Inspect Status And Results
 
@@ -361,7 +369,7 @@ The helper reads the current status first and copies the expected payload
 fingerprint, target identity, and provisioner-plan fingerprint automatically,
 so you do not need to build the JSON request by hand.
 For auth-required protected/shared runs, the service opens or prints the login
-URL and records the reviewer from the authenticated service session.
+URL and records the approver from the authenticated service session.
 
 Approval keeps the same `deploy_run_id` and continues the existing run. If you
 get `approval_no_longer_valid` or `unauthorized`, re-run `--status` on that

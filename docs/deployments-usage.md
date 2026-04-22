@@ -75,13 +75,13 @@ For a normal deploy, this is usually enough. The deployment definition tells
 the CLI which app target to build, and the CLI resolves the artifact from that
 target automatically.
 
-Use `--artifact-dir <dir>` only when you want to override that default and
-point at a specific local build output folder.
+Use `--artifact-dir <dir>` only when you want to override that default and name a
+specific build output folder as the client-side artifact source.
 
-For protected/shared `cloudflare-pages` runs that use `--control-plane-url`, the
-CLI uploads that local folder to the deployment service first. The submit
-request sent to `mini` contains an admitted artifact-input descriptor, not the
-laptop path. The worker publishes the artifact retained by the service.
+For protected/shared service-backed runs, a local folder is only an artifact
+source. The CLI or reviewed profile workflow must upload, stage, or otherwise
+admit the artifact through `mini` before provider mutation. The service request
+must not rely on a laptop-local path as authority.
 
 Use this when:
 

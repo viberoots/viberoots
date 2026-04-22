@@ -24,19 +24,38 @@ import {
 function renderVaultRuntime(deployment: CloudflarePagesDeployment): Record<string, string> {
   const config = deployment.vaultRuntime;
   if (!config) return {};
-  const fields = [
+  const callback = config.pkceCallback;
+  const fields: Array<[string, unknown]> = [
     ["addr", config.addr],
     ["oidc_issuer", config.oidcIssuer],
     ["audience", config.audience],
     ["deployment_client_id", config.deploymentClientId],
+    ["cli_public_client_id", config.cliPublicClientId],
+    ["service_account_client_id", config.serviceAccountClientId],
     ["deployment_environment", config.deploymentEnvironment],
     ["jwt_role", config.roleName],
     ["jwt_file", config.jwtFile],
     ["client_secret_env", config.clientSecretEnv],
     ["preferred_credential_source", config.preferredCredentialSource],
+    ["jenkins_client_secret_env", config.jenkinsClientSecretEnv],
     ["external_oidc_token_env", config.externalOidcTokenEnv],
+    ["required_human_claim", config.requiredHumanClaim],
+    ["required_human_claim_value", config.requiredHumanClaimValue],
+    ["pkce_callback_mode", callback?.mode],
+    ["pkce_callback_external_scheme", callback?.externalScheme],
+    ["pkce_callback_external_host", callback?.externalHost],
+    ["pkce_callback_external_port", callback?.externalPort],
+    ["pkce_callback_external_path", callback?.externalPath],
+    ["pkce_callback_bind_host", callback?.bindHost],
+    ["pkce_callback_bind_port", callback?.bindPort],
+    ["pkce_callback_bind_path", callback?.bindPath],
+    ["pkce_callback_open_firewall", callback?.openFirewall],
   ];
-  return Object.fromEntries(fields.filter((entry): entry is [string, string] => !!entry[1]));
+  return Object.fromEntries(
+    fields.flatMap(([key, value]) =>
+      value === undefined || value === null || value === "" ? [] : [[key, String(value)]],
+    ),
+  );
 }
 
 export async function installCloudflarePagesTargets(

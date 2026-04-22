@@ -87,8 +87,10 @@ Discovery and validation:
 
 Mutation and replay:
 
-- `--artifact-dir <dir>`: optional override that tells the CLI to use a
-  specific built app folder from your machine
+- `--artifact-dir <dir>`: optional override that names a specific built app
+  folder as the client-side artifact source. For protected/shared service-backed
+  runs, the reviewed client path must stage, upload, or admit that artifact on
+  `mini`; the hosted service must not trust the laptop path directly.
 - `--publish-only`: reuse an earlier accepted build instead of building again
 - `--provision-only`: change infrastructure without publishing a new app version
 - `--rollback`: tell the system you are restoring an earlier run
@@ -253,7 +255,9 @@ deploy \
 
 For a normal deploy, the CLI can usually build and resolve the artifact from
 the deployment target metadata. Use `--artifact-dir` only when you want to
-override that and point at a specific local build output folder.
+override that and name a specific build output folder as the artifact source.
+For protected/shared service-backed runs, that folder is uploaded, staged, or
+admitted through `mini` before provider mutation.
 
 Submit a preview from an admitted run:
 
@@ -313,7 +317,6 @@ deploy \
   --approve \
   --deploy-run-id deploy-run-123 \
   --approval-id ticket-123 \
-  --requested-by-principal user:reviewer \
   --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
 ```
 
@@ -334,8 +337,11 @@ Operator helper flags:
   inspect or act on
 - `--approval-id <ref>`: required with `--approve`; use a ticket, change
   request, or similar review reference
-- `--requested-by-principal <principal>`: optional reviewer/operator identity
-  recorded on the run action
+
+For auth-required protected/shared service actions, the service derives the
+approver or operator identity from the authenticated service session. Do not
+send client-supplied `requestedBy` or authorization grants for the reviewed
+shared path.
 
 For the reviewed `nixos-shared-host` client-profile workflow, replace
 `--control-plane-url ...` with `--profile mini`.

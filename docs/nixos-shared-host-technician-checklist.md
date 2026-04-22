@@ -98,6 +98,7 @@ direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control
   --host-root /var/lib/bucknix/nixos-shared-host/runtime \
   --state /var/lib/bucknix/nixos-shared-host/platform-state.json \
   --records-root /var/lib/bucknix/nixos-shared-host/records \
+  --host 127.0.0.1 \
   --port 7780
 ```
 
@@ -111,6 +112,9 @@ What success looks like:
 - the service binds successfully
 - the worker stays running
 - both processes use the same Postgres URL
+- worker-side Vault credential variables are present only on `mini`, and
+  fixture paths or laptop Vault token/JWT variables are not exported into the
+  service submission path
 - operators know that normal inspection stays on the service, keyed by
   `submissionId` or `deployRunId`
 - operators know `pending_approval` runs are resumed with the `approve` action
@@ -170,7 +174,7 @@ direnv exec . build-tools/tools/bin/deploy \
 ```
 
 For auth-required protected/shared runs, the service opens or prints the login
-URL and records the reviewer from the authenticated service session.
+URL and records the approver from the authenticated service session.
 
 Before approving, check at least:
 

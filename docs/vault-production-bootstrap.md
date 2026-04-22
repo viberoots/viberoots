@@ -1241,11 +1241,10 @@ Credential-source choices:
 
 - `interactive_pkce`: local human desktop deploys and reviewed shared-host
   submitter authorization. It authenticates the human request; it is not a
-  worker Vault credential source for protected service-backed deploys.
-  browser login. Configure a public Keycloak CLI client with Authorization Code
-  - PKCE required. Allow loopback redirect URIs for local-only desktops and
-    allow the exact shared-host redirect URI
-    `https://deploy-auth.apps.kilty.io/oidc/callback` for `mini`.
+  worker Vault credential source for protected service-backed deploys. Configure
+  a public Keycloak CLI client with Authorization Code + PKCE required. Allow
+  loopback redirect URIs for local-only desktops and allow the exact shared-host
+  redirect URI `https://deploy-auth.apps.kilty.io/oidc/callback` for `mini`.
 - `interactive_device`: SSH/headless human deploys when the issuer supports
   OAuth 2.0 Device Authorization Grant. The CLI displays the verification URI
   and user code.
@@ -1464,9 +1463,10 @@ the same contract IDs directly through the Vault API.
 
 ## Step 12: Run A Deployment Through Vault
 
-For the normal production path, leave `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
+For local/direct production flows, leave `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
 unset. Human deploys normally use PKCE/device login without a deployment client
-secret:
+secret, and non-service provider execution receives only the typed in-memory
+secret context:
 
 ```bash
 unset BNX_DEPLOYMENT_SECRET_FIXTURE_PATH
@@ -1480,8 +1480,56 @@ deploy \
   --login-browser auto
 ```
 
-Jenkins deploys should expose only the selected Jenkins credential binding to
-the deploy front door:
+For protected/shared `mini` deploys, use the hosted service path. The laptop
+client authenticates to `mini`; it does not mint or forward Vault workload
+credentials:
+
+```bash
+unset BNX_DEPLOYMENT_SECRET_FIXTURE_PATH
+unset VAULT_TOKEN
+unset BNX_VAULT_JWT
+unset BNX_VAULT_JWT_FILE
+unset BNX_VAULT_AUTH_METHOD
+
+deploy \
+  --deployment //projects/deployments/pleomino-staging:deploy \
+  --profile mini
+```
+
+If you need to force one exact local build output for a protected/shared `mini`
+run, pass it only as an artifact source for the service-backed workflow:
+
+```bash
+deploy \
+  --deployment //projects/deployments/pleomino-staging:deploy \
+  --profile mini \
+  --artifact-dir ./dist
+```
+
+The reviewed client/profile path stages or uploads the artifact before
+submission; `mini` admits or materializes the artifact and performs provider
+mutation. Do not submit a laptop-local path directly to the hosted service.
+
+Jenkins deploys to protected/shared `mini` should use the reviewed shared-host
+wrapper and keep Vault credential material on `mini`:
+
+```bash
+unset BNX_DEPLOYMENT_SECRET_FIXTURE_PATH
+unset VAULT_TOKEN
+unset BNX_VAULT_JWT
+unset BNX_VAULT_JWT_FILE
+unset BNX_VAULT_AUTH_METHOD
+
+nixos-shared-host-jenkins-deploy \
+  --deployment //projects/deployments/pleomino-staging:deploy \
+  --profile mini \
+  --artifact-dir "$WORKSPACE/projects/apps/pleomino/dist" \
+  --ssh-identity-file "$JENKINS_SSH_IDENTITY" \
+  --ssh-known-hosts "$JENKINS_KNOWN_HOSTS"
+```
+
+Jenkins deploys for local/direct or CI-owned non-service flows should expose
+only the selected Jenkins credential binding to the deploy front door:
 
 ```bash
 export BNX_DEPLOYER_CLIENT_SECRET='<deployment-runner-client-secret>'
@@ -1504,15 +1552,6 @@ exchanges that JWT for a short-lived Vault token inside the secret resolver.
 For protected/shared service deployments, keep those credential inputs on
 `mini`; the laptop client submits to the hosted service and does not supply
 Vault runtime credentials.
-
-If you want to force one exact local build output, you can still provide the
-usual override:
-
-```bash
-deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
-  --artifact-dir ./dist
-```
 
 ## Step 13: Verify The Result
 

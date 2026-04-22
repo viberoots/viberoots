@@ -244,7 +244,10 @@ not communicated through `process.env`.
 Stale ambient variables such as `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`,
 `BNX_VAULT_AUTH_METHOD`, and `VAULT_TOKEN` are not the normal runtime contract.
 Protected service-backed workers also reject the local/test fixture override,
-interactive client credential sources, and client-submitted secret values.
+interactive client credential sources as worker Vault credentials, and
+client-submitted secret values. The interactive client session authenticates the
+human request to the service; it is not forwarded to the worker as Vault
+workload credential material.
 
 For local development, isolated tests, or explicit bootstrap-oriented
 workflows, use the fixture override shown below.
@@ -445,11 +448,13 @@ Important note about `--artifact-dir`:
 - if you omit it, the deploy CLI uses the deployment target's component metadata
   to build and find the artifact automatically
 - if you include it, you are telling the CLI to use that local build output
-  folder instead of auto-resolving the artifact
+  folder as the artifact source instead of auto-resolving the artifact
 
 So the deployment target or macro does provide the source-of-truth artifact
 target. `--artifact-dir` is just an operator override for cases where you want
-to point at a specific local build output.
+to point at a specific local build output. For protected/shared service-backed
+runs, that folder must be staged, uploaded, or admitted through `mini`; the
+hosted service must not trust a laptop-local path directly.
 
 Example with an explicit local override:
 
