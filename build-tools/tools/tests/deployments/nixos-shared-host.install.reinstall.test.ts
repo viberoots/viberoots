@@ -17,7 +17,7 @@ test("nixos-shared-host server uninstall removes only managed assets and support
     const sibling = path.join(fixture.hostRoot, "etc/nixos/unmanaged-sibling.txt");
     await fsp.mkdir(path.dirname(sibling), { recursive: true });
     await fsp.writeFile(sibling, "keep-me\n", "utf8");
-    const statePath = path.join(fixture.hostRoot, "var/lib/deployment-host/platform-state.json");
+    const statePath = path.join(fixture.hostRoot, "etc/nixos/deployment-host/platform-state.json");
     const runtimeSecret = path.join(
       fixture.hostRoot,
       "var/lib/deployment-host/runtime/secrets/do-not-remove.txt",
@@ -86,12 +86,12 @@ test("nixos-shared-host manual-wire uninstall leaves server config entry untouch
         configTopology: "plain",
         configRoot: "/etc/nixos",
         managedRoot: "/etc/nixos/deployment-host",
-        statePath: "/var/lib/deployment-host/platform-state.json",
+        statePath: "/etc/nixos/deployment-host/platform-state.json",
         runtimeRoot: "/var/lib/deployment-host/runtime",
         recordsRoot: "/var/lib/deployment-host/records",
         managedPaths: [
           "/etc/nixos/deployment-host/install-manifest.json",
-          "/var/lib/deployment-host/platform-state.json",
+          "/var/lib/deployment-host/runtime/unsafe-generated-file",
         ],
         managedDirectories: ["/etc/nixos/deployment-host"],
         managedUsers: [],

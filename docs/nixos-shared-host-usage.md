@@ -176,7 +176,7 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --profile mini \
   --destination mini \
   --remote-repo-path /srv/common \
-  --remote-state-path /var/lib/deployment-host/platform-state.json \
+  --remote-state-path /etc/nixos/deployment-host/platform-state.json \
   --remote-runtime-root /var/lib/deployment-host/runtime \
   --remote-records-root /var/lib/deployment-host/records \
   --ssh-mode ssh \
@@ -203,8 +203,10 @@ What the install flags mean:
   matches the host name.
 - `--remote-repo-path /srv/common`
   The repo checkout on `mini` that remote deploy commands should use.
-- `--remote-state-path /var/lib/deployment-host/platform-state.json`
-  The host state file used by the shared-host deployment backend.
+- `--remote-state-path /etc/nixos/deployment-host/platform-state.json`
+  The host state file used by the shared-host deployment backend. It sits inside
+  the NixOS flake tree because the generated host module reads it during pure
+  evaluation; do not put secrets in it.
 - `--remote-runtime-root /var/lib/deployment-host/runtime`
   The root directory where runtime files are materialized on `mini`.
 - `--remote-records-root /var/lib/deployment-host/records`
@@ -233,7 +235,7 @@ The plan output should show:
 
 - destination `mini`
 - remote repo path `/srv/common`
-- remote state path `/var/lib/deployment-host/platform-state.json`
+- remote state path `/etc/nixos/deployment-host/platform-state.json`
 - remote runtime root `/var/lib/deployment-host/runtime`
 - remote records root `/var/lib/deployment-host/records`
 - a `serviceClient` block with the deployment service URL and token env

@@ -112,7 +112,7 @@ async function runServerCommand(action: string, repoRoot: string) {
       configTopology,
       configEntryPath: String(promptInput.configEntryPath || "") || undefined,
       managedRoot: managedRoot || undefined,
-      statePath: String(promptInput.statePath || defaultStatePath()),
+      statePath: String(promptInput.statePath || defaultStatePath(managedRoot)),
       runtimeRoot: String(promptInput.runtimeRoot || defaultRuntimeRoot()),
       recordsRoot: String(promptInput.recordsRoot || defaultRecordsRoot()),
       installMode,

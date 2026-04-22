@@ -50,15 +50,17 @@ Expected files and directories:
 - `/etc/nixos/deployment-host/install-manifest.json`
 - `/etc/nixos/deployment-host/deployment-host-managed.nix`
 - `/etc/nixos/deployment-host/default.nix`
-- persistent backend data: `/var/lib/deployment-host/platform-state.json`
-- persistent backend data: `/var/lib/deployment-host/runtime`
-- persistent backend data: `/var/lib/deployment-host/records`
+- flake-evaluated persistent state: `/etc/nixos/deployment-host/platform-state.json`
+- persistent runtime data: `/var/lib/deployment-host/runtime`
+- persistent deployment records: `/var/lib/deployment-host/records`
 
 Before rebuilding a flake host, confirm `/etc/nixos/flake.nix` exposes the
 module directory as `deploymentModulesRoot`; the generated
 `deployment-host-managed.nix` imports
 `"${deploymentModulesRoot}/nixos-shared-host-module.nix"` and should not require
 `--impure`.
+Keep secrets out of `platform-state.json`; it is read by Nix during pure flake
+evaluation.
 
 ## Wire And Verify The Host
 
@@ -102,7 +104,7 @@ export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.
 export BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
 direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts \
   --host-root /var/lib/deployment-host/runtime \
-  --state /var/lib/deployment-host/platform-state.json \
+  --state /etc/nixos/deployment-host/platform-state.json \
   --records-root /var/lib/deployment-host/records \
   --host 127.0.0.1 \
   --port 7780
@@ -136,7 +138,7 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --profile mini \
   --destination mini \
   --remote-repo-path /srv/common \
-  --remote-state-path /var/lib/deployment-host/platform-state.json \
+  --remote-state-path /etc/nixos/deployment-host/platform-state.json \
   --remote-runtime-root /var/lib/deployment-host/runtime \
   --remote-records-root /var/lib/deployment-host/records \
   --ssh-mode ssh \

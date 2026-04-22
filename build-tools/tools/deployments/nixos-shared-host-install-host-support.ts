@@ -30,6 +30,23 @@ export async function mkdirHostDirectories(hostRoot: string, logicalDirs: string
   }
 }
 
+export async function removeManagedInstallPaths(
+  hostRoot: string,
+  manifest: NixosSharedHostInstallManifestV1,
+): Promise<void> {
+  for (const logicalPath of [...manifest.managedPaths].sort().reverse()) {
+    await fsp.rm(hostPath(hostRoot, logicalPath), { force: true });
+  }
+  for (const logicalPath of [...manifest.managedDirectories].sort().reverse()) {
+    try {
+      await fsp.rmdir(hostPath(hostRoot, logicalPath));
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code || "";
+      if (!["ENOENT", "ENOTEMPTY", "EEXIST"].includes(code)) throw error;
+    }
+  }
+}
+
 export function assertUninstallInventoryIsConfigOnly(
   manifest: NixosSharedHostInstallManifestV1,
 ): void {

@@ -14,7 +14,7 @@ test("nixos-shared-host install manifest parses current schema", () => {
     configRoot: "/etc/nixos",
     configEntryPath: "/etc/nixos/configuration.nix",
     managedRoot: "/etc/nixos/deployment-host",
-    statePath: "/var/lib/deployment-host/platform-state.json",
+    statePath: "/etc/nixos/deployment-host/platform-state.json",
     runtimeRoot: "/var/lib/deployment-host/runtime",
     recordsRoot: "/var/lib/deployment-host/records",
   });
@@ -29,7 +29,7 @@ test("nixos-shared-host install manifest parses current schema", () => {
     "/etc/nixos/deployment-host/install-manifest.json",
   ]);
   assert.deepEqual(parsed.managedDirectories, ["/etc/nixos/deployment-host"]);
-  assert.equal(parsed.statePath, "/var/lib/deployment-host/platform-state.json");
+  assert.equal(parsed.statePath, "/etc/nixos/deployment-host/platform-state.json");
   assert.equal(parsed.runtimeRoot, "/var/lib/deployment-host/runtime");
   assert.equal(parsed.recordsRoot, "/var/lib/deployment-host/records");
 });

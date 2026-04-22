@@ -26,7 +26,7 @@ const plan: NixosSharedHostRemotePlan = {
   destination: "mini",
   transportMode: "ssh",
   remoteRepoPath: "/srv/common",
-  remoteStatePath: "/var/lib/deployment-host/platform-state.json",
+  remoteStatePath: "/etc/nixos/deployment-host/platform-state.json",
   remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
   remoteRecordsRoot: "/var/lib/deployment-host/records",
   remoteArtifactStageRoot: "/var/lib/deployment-host/runtime/.deploy-artifacts",
@@ -120,7 +120,7 @@ test("remote SSH transport assembles reviewed host-apply commands for switch and
   assert.match(switchApply[4] || "", /--managed-root '\/etc\/nixos\/deployment-host'/);
   assert.match(
     switchApply[4] || "",
-    /--expected-state-path '\/var\/lib\/deployment-host\/platform-state\.json'/,
+    /--expected-state-path '\/etc\/nixos\/deployment-host\/platform-state\.json'/,
   );
   const dryRunPlan: NixosSharedHostRemotePlan = {
     ...switchPlan,

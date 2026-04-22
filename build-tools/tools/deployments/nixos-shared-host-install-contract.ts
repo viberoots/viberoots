@@ -69,8 +69,8 @@ export function defaultManagedRoot(configRoot: string): string {
   return path.posix.join(normalizeHostLogicalPath(configRoot), "deployment-host");
 }
 
-export function defaultStatePath(): string {
-  return "/var/lib/deployment-host/platform-state.json";
+export function defaultStatePath(managedRoot = defaultManagedRoot("/etc/nixos")): string {
+  return path.posix.join(normalizeHostLogicalPath(managedRoot), "platform-state.json");
 }
 
 export function defaultRuntimeRoot(): string {
@@ -97,7 +97,16 @@ export function createEmptyPlatformStateJson(): string {
   return JSON.stringify(emptyNixosSharedHostPlatformState(), null, 2) + "\n";
 }
 
-export function renderManagedModule(opts: { statePath: string }): string {
+function renderStatePathForManagedModule(opts: { managedRoot: string; statePath: string }): string {
+  const managedRoot = normalizeHostLogicalPath(opts.managedRoot);
+  const statePath = normalizeHostLogicalPath(opts.statePath);
+  if (path.posix.dirname(statePath) === managedRoot) {
+    return `./${path.posix.basename(statePath)}`;
+  }
+  return statePath;
+}
+
+export function renderManagedModule(opts: { managedRoot: string; statePath: string }): string {
   return [
     "{ deploymentModulesRoot, ... }:",
     "{",
@@ -106,7 +115,7 @@ export function renderManagedModule(opts: { statePath: string }): string {
     "  ];",
     "",
     "  nixosSharedHost.enable = true;",
-    `  nixosSharedHost.statePath = ${normalizeHostLogicalPath(opts.statePath)};`,
+    `  nixosSharedHost.statePath = ${renderStatePathForManagedModule(opts)};`,
     "}",
     "",
   ].join("\n");

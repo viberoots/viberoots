@@ -33,6 +33,7 @@ import {
   pathExists,
   readManifestIfPresent,
   readText,
+  removeManagedInstallPaths,
 } from "./nixos-shared-host-install-host-support.ts";
 
 export async function installNixosSharedHost(opts: {
@@ -72,7 +73,7 @@ export async function installNixosSharedHost(opts: {
     configEntryPath: opts.configEntryPath,
     configInjected: opts.installMode === "managed-dropin",
     managedRoot,
-    statePath: opts.statePath || defaultStatePath(),
+    statePath: opts.statePath || defaultStatePath(managedRoot),
     runtimeRoot: opts.runtimeRoot || defaultRuntimeRoot(),
     recordsRoot: opts.recordsRoot || defaultRecordsRoot(),
   });
@@ -119,6 +120,7 @@ export async function installNixosSharedHost(opts: {
     anchorPath: manifest.managedEntryPoints.anchorPath,
   });
   const managedModuleSource = renderManagedModule({
+    managedRoot: manifest.managedRoot,
     statePath: manifest.statePath,
   });
   const managedAnchorSource = renderManagedAnchor(managedRoot);
@@ -216,9 +218,7 @@ export async function uninstallNixosSharedHost(opts: {
   }
   const removedPaths = [...manifest.managedPaths, ...manifest.managedDirectories].sort().reverse();
   if (!opts.dryRun) {
-    for (const logicalPath of removedPaths) {
-      await fsp.rm(hostPath(opts.hostRoot, logicalPath), { recursive: true, force: true });
-    }
+    await removeManagedInstallPaths(opts.hostRoot, manifest);
   }
   return { manifest, removedPaths };
 }

@@ -20,7 +20,7 @@ test("nixos-shared-host server install supports managed-dropin on plain /etc/nix
     assert.equal(summary.managed, true);
     assert.equal(summary.manifest.installMode, "managed-dropin");
     assert.equal(summary.wiringState, "wired");
-    await fsp.access(path.join(fixture.hostRoot, "var/lib/deployment-host/platform-state.json"));
+    await fsp.access(path.join(fixture.hostRoot, "etc/nixos/deployment-host/platform-state.json"));
     await fsp.access(
       path.join(fixture.hostRoot, "etc/nixos/deployment-host/deployment-host-managed.nix"),
     );
@@ -61,14 +61,19 @@ test("nixos-shared-host server install supports emit-only on flake roots without
       String(summary.emittedSnippets.managedModuleSource || ""),
       /\$\{deploymentModulesRoot\}\/nixos-shared-host-module\.nix/,
     );
+    assert.match(
+      String(summary.emittedSnippets.managedModuleSource || ""),
+      /nixosSharedHost\.statePath = \.\/platform-state\.json;/,
+    );
     assert.doesNotMatch(String(summary.emittedSnippets.managedModuleSource || ""), /\/srv\/common/);
+    assert.doesNotMatch(String(summary.emittedSnippets.managedModuleSource || ""), /\/var\/lib/);
     assert.equal(
       summary.emittedSnippets.managedAnchorPath,
       "/etc/nixos/deployment-host/default.nix",
     );
     assert.match(String(summary.emittedSnippets.managedAnchorSource || ""), /imports = \[/);
     await assert.rejects(
-      fsp.access(path.join(fixture.hostRoot, "var/lib/deployment-host/platform-state.json")),
+      fsp.access(path.join(fixture.hostRoot, "etc/nixos/deployment-host/platform-state.json")),
     );
     await assert.rejects(
       fsp.access(path.join(fixture.hostRoot, "etc/nixos/deployment-host/default.nix")),
@@ -98,7 +103,7 @@ test("nixos-shared-host server install supports managed-manual-wire without edit
     await fsp.access(
       path.join(fixture.hostRoot, "etc/nixos/deployment-host/install-manifest.json"),
     );
-    await fsp.access(path.join(fixture.hostRoot, "var/lib/deployment-host/platform-state.json"));
+    await fsp.access(path.join(fixture.hostRoot, "etc/nixos/deployment-host/platform-state.json"));
     assert.equal(
       await fsp.readFile(path.join(fixture.hostRoot, "etc/nixos/configuration.nix"), "utf8"),
       configBefore,
@@ -144,6 +149,6 @@ test("nixos-shared-host server install ignores empty stdin", async () => {
     })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.manifest.installMode, "managed-manual-wire");
-    await fsp.access(path.join(fixture.hostRoot, "var/lib/deployment-host/platform-state.json"));
+    await fsp.access(path.join(fixture.hostRoot, "etc/nixos/deployment-host/platform-state.json"));
   });
 });

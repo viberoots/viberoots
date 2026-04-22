@@ -14,7 +14,7 @@ async function installClientProfile(
   sshMode: string = "ssh",
   controlPlaneUrl: string = "http://127.0.0.1:7780",
 ): Promise<void> {
-  await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /var/lib/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ${sshMode} --control-plane-url ${controlPlaneUrl}`;
+  await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /etc/nixos/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ${sshMode} --control-plane-url ${controlPlaneUrl}`;
 }
 
 async function installReviewedDeployment(workspaceRoot: string): Promise<string> {
@@ -39,7 +39,7 @@ test("deploy plan reads the reviewed remote profile deterministically", async ()
       destination: "mini",
       transportMode: "ssh",
       remoteRepoPath: "/srv/common",
-      remoteStatePath: "/var/lib/deployment-host/platform-state.json",
+      remoteStatePath: "/etc/nixos/deployment-host/platform-state.json",
       remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
       remoteRecordsRoot: "/var/lib/deployment-host/records",
       remoteArtifactStageRoot: "/var/lib/deployment-host/runtime/.deploy-artifacts",
@@ -180,7 +180,7 @@ test("deploy plan fails closed on malformed client manifests", async () => {
         profileName: "mini",
         destination: "mini",
         remoteRepoPath: "/srv/common",
-        remoteStatePath: "/var/lib/deployment-host/platform-state.json",
+        remoteStatePath: "/etc/nixos/deployment-host/platform-state.json",
         remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
         remoteRecordsRoot: "/var/lib/deployment-host/records",
         sshMode: "ssh",

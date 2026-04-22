@@ -66,7 +66,7 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
           profileName: "mini",
           destination: "mini",
           remoteRepoPath: "/srv/common",
-          remoteStatePath: "/var/lib/deployment-host/platform-state.json",
+          remoteStatePath: "/etc/nixos/deployment-host/platform-state.json",
           remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
           remoteRecordsRoot: "/var/lib/deployment-host/records",
           sshMode: "ssh",
@@ -89,7 +89,7 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
   assert.deepEqual(capturedRules?.defaults, {
     profileName: "default",
     remoteRepoPath: "/srv/common",
-    remoteStatePath: "/var/lib/deployment-host/platform-state.json",
+    remoteStatePath: "/etc/nixos/deployment-host/platform-state.json",
     remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
     remoteRecordsRoot: "/var/lib/deployment-host/records",
     sshMode: "ssh",
