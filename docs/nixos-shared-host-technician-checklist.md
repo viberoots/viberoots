@@ -24,7 +24,8 @@ Confirm all of these before making changes:
 - `/etc/nix/nix.conf` on `mini` already enables `nix-command` and `flakes`
 - the reviewed repo checkout on `mini` exists at `/srv/common`
 - the authoritative config root on `mini` is `/etc/nixos`
-- the authoritative config entry on `mini` is `/etc/nixos/configuration.nix`
+- the authoritative config entry on `mini` is `/etc/nixos/flake.nix` when it
+  exists, otherwise `/etc/nixos/configuration.nix`
 - each dev machine or Jenkins worker that will run deploys has its own repo
   checkout
 - client machines can reach `mini` over the reviewed SSH path
@@ -41,7 +42,6 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   server install \
   --server-root / \
   --config-root /etc/nixos \
-  --config-entry-path /etc/nixos/configuration.nix \
   --install-mode managed-manual-wire
 ```
 
@@ -64,10 +64,11 @@ evaluation.
 
 ## Wire And Verify The Host
 
-Add the managed anchor to `/etc/nixos/configuration.nix`:
+Add the managed anchor to the authoritative config entry. On flake hosts, this
+is usually the `modules` list in `/etc/nixos/flake.nix`:
 
 ```nix
-imports = [
+modules = [
   ./hardware-configuration.nix
   /etc/nixos/deployment-host/default.nix
 ];

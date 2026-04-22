@@ -92,19 +92,8 @@ function serverPromptRules(): JsonPromptRuleSet {
       configRoot: "/etc/nixos",
       installMode: "managed-manual-wire",
     },
-    requiredWhen: [
-      {
-        if: { installMode: "managed-manual-wire" },
-        require: ["configEntryPath"],
-      },
-      {
-        if: { installMode: "managed-dropin" },
-        require: ["configEntryPath"],
-      },
-    ],
-    defaultTemplates: {
-      configEntryPath: "${configRoot}/configuration.nix",
-    },
+    requiredWhen: [],
+    defaultTemplates: {},
   };
 }
 

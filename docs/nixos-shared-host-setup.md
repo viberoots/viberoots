@@ -111,7 +111,6 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   server install \
   --server-root / \
   --config-root /etc/nixos \
-  --config-entry-path /etc/nixos/configuration.nix \
   --install-mode managed-manual-wire
 ```
 
@@ -184,9 +183,9 @@ What the install flags mean:
   The NixOS config root on `mini`.
 - `--config-entry-path /etc/nixos/configuration.nix`
   The authoritative NixOS config entry that should import or include the shared
-  host anchor. For `managed-dropin`, this flag is required because the installer
-  edits that file directly. For `managed-manual-wire`, it is still useful
-  because the installer records which file you intend to wire by hand.
+  host anchor. If omitted, the installer checks for `${configRoot}/flake.nix`
+  first and falls back to `${configRoot}/configuration.nix`. Pass this flag
+  only when you need to override that detected entry.
 - `--install-mode managed-manual-wire`
   Recommended default. The installer manages its own files and runtime
   directories, while you add the anchor import or module entry yourself.

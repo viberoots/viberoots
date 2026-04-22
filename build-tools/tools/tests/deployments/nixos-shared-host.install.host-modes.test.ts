@@ -81,6 +81,29 @@ test("nixos-shared-host server install supports emit-only on flake roots without
   });
 });
 
+test("nixos-shared-host server install defaults the config entry to flake.nix when present", async () => {
+  await runInTemp("nixos-shared-host-host-install-default-flake-entry", async (tmp, $) => {
+    const fixture = await createNixosSharedHostInstallFixture({
+      root: tmp,
+      topology: "flake",
+      withExtraImports: true,
+    });
+    const result =
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --install-mode managed-manual-wire`;
+    const summary = JSON.parse(String(result.stdout));
+    assert.equal(summary.manifest.configEntryPath, "/etc/nixos/flake.nix");
+    assert.equal(summary.wiringState, "missing");
+    await fsp.writeFile(
+      path.join(fixture.hostRoot, "etc/nixos/flake.nix"),
+      "{ outputs = { nixpkgs, ... }: { nixosConfigurations.mini = nixpkgs.lib.nixosSystem { modules = [ /etc/nixos/deployment-host/default.nix ]; }; }; }\n",
+      "utf8",
+    );
+    const status =
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server status --server-root ${fixture.hostRoot} --config-root /etc/nixos`;
+    assert.equal(JSON.parse(String(status.stdout)).wiringState, "wired");
+  });
+});
+
 test("nixos-shared-host server install supports managed-manual-wire without editing config entry", async () => {
   await runInTemp("nixos-shared-host-host-install-manual-wire", async (tmp, $) => {
     const fixture = await createNixosSharedHostInstallFixture({
@@ -146,9 +169,10 @@ test("nixos-shared-host server install ignores empty stdin", async () => {
     });
     const result = await $({
       input: "",
-    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix`;
+    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.manifest.installMode, "managed-manual-wire");
+    assert.equal(summary.manifest.configEntryPath, "/etc/nixos/configuration.nix");
     await fsp.access(path.join(fixture.hostRoot, "etc/nixos/deployment-host/platform-state.json"));
   });
 });

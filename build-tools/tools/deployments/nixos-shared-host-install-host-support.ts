@@ -102,6 +102,20 @@ export async function detectConfigTopology(
   );
 }
 
+export async function detectDefaultConfigEntryPath(
+  hostRoot: string,
+  configRoot: string,
+): Promise<string> {
+  const root = normalizeHostLogicalPath(configRoot);
+  const flakeEntry = path.posix.join(root, "flake.nix");
+  if (await pathExists(hostPath(hostRoot, flakeEntry))) return flakeEntry;
+  const plainEntry = path.posix.join(root, "configuration.nix");
+  if (await pathExists(hostPath(hostRoot, plainEntry))) return plainEntry;
+  throw new Error(
+    `${root}: unable to detect config entry path (expected flake.nix or configuration.nix)`,
+  );
+}
+
 export async function detectWiringState(
   hostRoot: string,
   manifest: NixosSharedHostInstallManifestV1,

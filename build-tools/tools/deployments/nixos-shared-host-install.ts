@@ -28,6 +28,7 @@ import {
   statusNixosSharedHost,
   uninstallNixosSharedHost,
 } from "./nixos-shared-host-install-host.ts";
+import { detectDefaultConfigEntryPath } from "./nixos-shared-host-install-host-support.ts";
 
 type HostInstallInput = {
   serverRoot: string;
@@ -106,11 +107,14 @@ async function runServerCommand(action: string, repoRoot: string) {
       topologyValue === "flake" || topologyValue === "plain"
         ? (topologyValue as NixosSharedHostConfigTopology)
         : undefined;
+    const configEntryPath =
+      String(promptInput.configEntryPath || "") ||
+      (await detectDefaultConfigEntryPath(hostRoot, configRoot));
     const result = await installNixosSharedHost({
       hostRoot,
       configRoot,
       configTopology,
-      configEntryPath: String(promptInput.configEntryPath || "") || undefined,
+      configEntryPath,
       managedRoot: managedRoot || undefined,
       statePath: String(promptInput.statePath || defaultStatePath(managedRoot)),
       runtimeRoot: String(promptInput.runtimeRoot || defaultRuntimeRoot()),
