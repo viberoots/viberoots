@@ -79,8 +79,7 @@ The default reviewed path is:
    authoritative NixOS config
 4. run `sudo nixos-rebuild switch`
 5. start the deployment service and worker
-6. run `client install --profile mini --destination mini` on each dev machine
-   or Jenkins worker
+6. run `client install --profile mini` on each dev machine or Jenkins worker
 7. render `deploy --profile mini --plan`
 8. run the reviewed remote deploy flow
 9. if the service returns `pending_approval`, approve the same frozen run on the
@@ -496,14 +495,7 @@ Run from each dev machine or Jenkins worker that will target `mini`:
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   client install \
   --profile mini \
-  --destination mini \
-  --remote-repo-path /srv/common \
-  --remote-state-path /etc/nixos/deployment-host/platform-state.json \
-  --remote-runtime-root /var/lib/deployment-host/runtime \
-  --remote-records-root /var/lib/deployment-host/records \
-  --ssh-mode ssh \
-  --control-plane-url https://deploy.apps.kilty.io \
-  --control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN
+  --control-plane-url https://deploy.apps.kilty.io
 ```
 
 The client profile is written here:
@@ -520,13 +512,25 @@ Common example values for the client-install flags:
 
 - `--profile mini`
 - `--destination mini`
+  Defaults to the profile name. Override only when the destination label should
+  differ from the local profile name.
 - `--remote-repo-path /srv/common`
+  Default value. Override only when the checkout on the host lives elsewhere.
 - `--remote-state-path /etc/nixos/deployment-host/platform-state.json`
+  Default value. The state file is flake-visible and must not contain secrets.
 - `--remote-runtime-root /var/lib/deployment-host/runtime`
+  Default value. Runtime materialization lives under the canonical
+  deployment-host data root.
 - `--remote-records-root /var/lib/deployment-host/records`
+  Default value. Deployment records live under the canonical deployment-host
+  data root.
 - `--ssh-mode ssh`
+  Default value. Selects the SSH transport for remote command execution.
+  Override only if a future reviewed transport mode exists.
 - `--control-plane-url https://deploy.apps.kilty.io`
 - `--control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN`
+  Default value. This stores the environment variable name in the profile; the
+  token value itself stays outside the profile.
 
 ## Review The Remote Plan And Deploy
 

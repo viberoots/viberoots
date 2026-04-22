@@ -132,19 +132,14 @@ Run from each dev machine or Jenkins worker:
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   client install \
   --profile mini \
-  --destination mini \
-  --remote-repo-path /srv/common \
-  --remote-state-path /etc/nixos/deployment-host/platform-state.json \
-  --remote-runtime-root /var/lib/deployment-host/runtime \
-  --remote-records-root /var/lib/deployment-host/records \
-  --ssh-mode ssh \
-  --control-plane-url https://deploy.apps.kilty.io \
-  --control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN
+  --control-plane-url https://deploy.apps.kilty.io
 ```
 
 The installed profile should be here:
 
 - `.local/deployments/nixos-shared-host/clients/mini.json`
+- `--control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN` is the default;
+  the profile stores the env var name, not the token value
 
 What success looks like:
 

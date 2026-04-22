@@ -68,7 +68,6 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
   );
   assert.deepEqual(capturedRules?.required, [
     "profileName",
-    "destination",
     "remoteRepoPath",
     "remoteStatePath",
     "remoteRuntimeRoot",

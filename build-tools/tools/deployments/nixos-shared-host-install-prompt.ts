@@ -124,7 +124,6 @@ function clientPromptRules(repoRoot: string): JsonPromptRuleSet {
     },
     required: [
       "profileName",
-      "destination",
       "remoteRepoPath",
       "remoteStatePath",
       "remoteRuntimeRoot",

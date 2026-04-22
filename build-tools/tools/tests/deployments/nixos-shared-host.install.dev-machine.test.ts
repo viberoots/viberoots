@@ -9,10 +9,22 @@ test("nixos-shared-host client install accepts required parameters by flags", as
   await runInTemp("nixos-shared-host-client-flags", async (tmp, $) => {
     const outputRoot = path.join(tmp, "profiles");
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /etc/nixos/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --control-plane-url http://127.0.0.1:7780`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.manifest.profileName, "mini");
     assert.equal(summary.manifest.destination, "mini");
+    assert.equal(summary.manifest.remoteRepoPath, "/srv/common");
+    assert.equal(
+      summary.manifest.remoteStatePath,
+      "/etc/nixos/deployment-host/platform-state.json",
+    );
+    assert.equal(summary.manifest.remoteRuntimeRoot, "/var/lib/deployment-host/runtime");
+    assert.equal(summary.manifest.remoteRecordsRoot, "/var/lib/deployment-host/records");
+    assert.equal(summary.manifest.sshMode, "ssh");
+    assert.equal(
+      summary.manifest.serviceClient.controlPlaneTokenEnv,
+      "BNX_DEPLOY_CONTROL_PLANE_TOKEN",
+    );
     await fsp.access(path.join(outputRoot, "mini.json"));
   });
 });
@@ -41,8 +53,19 @@ test("nixos-shared-host client install accepts required parameters by stdin and 
     const partialSummary = JSON.parse(String(partial.stdout));
     assert.equal(partialSummary.manifest.profileName, "mini");
     assert.equal(partialSummary.manifest.destination, "mini");
+    assert.equal(partialSummary.manifest.remoteRepoPath, "/srv/common");
+    assert.equal(
+      partialSummary.manifest.remoteStatePath,
+      "/etc/nixos/deployment-host/platform-state.json",
+    );
+    assert.equal(partialSummary.manifest.remoteRuntimeRoot, "/var/lib/deployment-host/runtime");
+    assert.equal(partialSummary.manifest.remoteRecordsRoot, "/var/lib/deployment-host/records");
     assert.equal(partialSummary.manifest.sshMode, "ssh");
     assert.equal(partialSummary.manifest.serviceClient.controlPlaneUrl, "http://127.0.0.1:7780");
+    assert.equal(
+      partialSummary.manifest.serviceClient.controlPlaneTokenEnv,
+      "BNX_DEPLOY_CONTROL_PLANE_TOKEN",
+    );
   });
 });
 
@@ -51,9 +74,22 @@ test("nixos-shared-host client install ignores empty stdin", async () => {
     const outputRoot = path.join(tmp, "profiles");
     const result = await $({
       input: "",
-    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /etc/nixos/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
+    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --control-plane-url http://127.0.0.1:7780`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.manifest.profileName, "mini");
+    assert.equal(summary.manifest.destination, "mini");
+    assert.equal(summary.manifest.remoteRepoPath, "/srv/common");
+    assert.equal(
+      summary.manifest.remoteStatePath,
+      "/etc/nixos/deployment-host/platform-state.json",
+    );
+    assert.equal(summary.manifest.remoteRuntimeRoot, "/var/lib/deployment-host/runtime");
+    assert.equal(summary.manifest.remoteRecordsRoot, "/var/lib/deployment-host/records");
+    assert.equal(summary.manifest.sshMode, "ssh");
+    assert.equal(
+      summary.manifest.serviceClient.controlPlaneTokenEnv,
+      "BNX_DEPLOY_CONTROL_PLANE_TOKEN",
+    );
     await fsp.access(path.join(outputRoot, "mini.json"));
   });
 });

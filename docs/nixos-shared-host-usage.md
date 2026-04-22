@@ -174,14 +174,7 @@ Run this on each dev machine or Jenkins worker:
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   client install \
   --profile mini \
-  --destination mini \
-  --remote-repo-path /srv/common \
-  --remote-state-path /etc/nixos/deployment-host/platform-state.json \
-  --remote-runtime-root /var/lib/deployment-host/runtime \
-  --remote-records-root /var/lib/deployment-host/records \
-  --ssh-mode ssh \
-  --control-plane-url https://deploy.apps.kilty.io \
-  --control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN
+  --control-plane-url https://deploy.apps.kilty.io
 ```
 
 A client profile is a local file that tells the deploy command how to reach
@@ -199,26 +192,28 @@ What the install flags mean:
   The local profile name. Use `mini` when this machine should talk to the
   shared host named `mini`.
 - `--destination mini`
-  The human-readable destination name stored in the profile. In this workflow it
-  matches the host name.
+  The human-readable destination name stored in the profile. It defaults to the
+  profile name, so the reviewed `mini` workflow does not need this flag.
 - `--remote-repo-path /srv/common`
-  The repo checkout on `mini` that remote deploy commands should use.
+  The default repo checkout on `mini` that remote deploy commands should use.
+  Override only if the checkout lives elsewhere.
 - `--remote-state-path /etc/nixos/deployment-host/platform-state.json`
-  The host state file used by the shared-host deployment backend. It sits inside
-  the NixOS flake tree because the generated host module reads it during pure
-  evaluation; do not put secrets in it.
+  The default host state file used by the shared-host deployment backend. It
+  sits inside the NixOS flake tree because the generated host module reads it
+  during pure evaluation; do not put secrets in it.
 - `--remote-runtime-root /var/lib/deployment-host/runtime`
-  The root directory where runtime files are materialized on `mini`.
+  The default root directory where runtime files are materialized on `mini`.
 - `--remote-records-root /var/lib/deployment-host/records`
-  The root directory where deployment records are stored on `mini`.
+  The default root directory where deployment records are stored on `mini`.
 - `--ssh-mode ssh`
-  Use normal SSH transport. This is the standard choice for the current
-  reviewed workflow.
+  Default value. Selects the SSH transport for remote command execution. Use
+  the default unless a future reviewed transport mode exists.
 - `--control-plane-url https://deploy.apps.kilty.io`
   The hosted deployment service URL that laptop clients should call.
 - `--control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN`
-  The environment variable name that holds the deployment service token on the
-  client machine or Jenkins worker.
+  Default value. This stores the environment variable name that holds the
+  deployment service token on the client machine or Jenkins worker; it does not
+  store the token value.
 
 ## Review The Remote Plan
 
