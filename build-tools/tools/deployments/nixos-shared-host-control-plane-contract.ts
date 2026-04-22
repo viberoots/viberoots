@@ -8,6 +8,7 @@ import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-prog
 import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
 import type {
   DeploymentControlPlaneApprovalSummary,
+  DeploymentControlPlaneArtifactStatus,
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneLifecycleState,
   DeploymentControlPlaneRequestDedupe,
@@ -115,6 +116,7 @@ export type NixosSharedHostControlPlaneSubmission = {
   rejectionCode?: DeploymentControlPlaneSubmitRejectionCode;
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
   approval?: DeploymentControlPlaneApprovalSummary;
+  artifact?: DeploymentControlPlaneArtifactStatus;
   latestAction?: {
     actionId: string;
     action: "cancel" | "resume" | "abort" | "approve";

@@ -131,7 +131,7 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime \
   --remote-records-root /var/lib/bucknix/nixos-shared-host/records \
   --ssh-mode ssh \
-  --control-plane-url http://127.0.0.1:7780 \
+  --control-plane-url https://deploy.apps.kilty.io \
   --control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN
 ```
 

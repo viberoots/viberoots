@@ -75,6 +75,8 @@ For a fresh `mini` install, follow this exact order:
    `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix` when you want
    repo-managed local identity-provider, Postgres, and Vault services on `mini`.
    Also import
+   `/srv/common/build-tools/tools/nix/shared-host-deployment-service-module.nix`
+   when `mini` should serve the reviewed hosted deployment API route and
    `/srv/common/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
    when `mini` should serve the reviewed public PKCE callback route.
 3. wire `/etc/nixos/bucknix/nixos-shared-host/default.nix` into the
@@ -115,6 +117,7 @@ starting modules live here:
 - `/srv/common/build-tools/tools/nix/shared-host-postgres-module.nix`
 - `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix`
 - `/srv/common/build-tools/tools/nix/shared-host-identity-provider-module.nix`
+- `/srv/common/build-tools/tools/nix/shared-host-deployment-service-module.nix`
 - `/srv/common/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
 
 For a flake-based `/etc/nixos` host, expose only the module directory as a
@@ -139,10 +142,12 @@ rewrites. Use `deploymentHost.vault.useAcmeCertificate = true` for direct
 Vault TLS on the existing `*.apps.kilty.io` certificate, and set the
 identity-provider `manageNginx`, `manageAcme`, and `openFirewall` flags to
 `false` when adding a host-owned `identity.apps.kilty.io` nginx vhost. Use the
-deploy-auth callback module the same way for `deploy-auth.apps.kilty.io`, routing
-to `127.0.0.1:7780` without opening that local service port publicly. The modules
-do not choose public domains for you; set `publicHostname`, `acmeCertName`,
-`identityProvider.hostname`, and `deployAuthCallback.hostname` from the host
+deployment-service module the same way for `deploy.apps.kilty.io`, routing to
+`127.0.0.1:7780` without opening that local service port publicly. The deploy
+auth callback module handles `deploy-auth.apps.kilty.io/oidc/callback` on the
+same private service listener. The modules do not choose public domains for you;
+set `publicHostname`, `acmeCertName`, `identityProvider.hostname`,
+`deploymentService.hostname`, and `deployAuthCallback.hostname` from the host
 config.
 
 Use that runbook when you need to:
@@ -175,7 +180,7 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime \
   --remote-records-root /var/lib/bucknix/nixos-shared-host/records \
   --ssh-mode ssh \
-  --control-plane-url http://127.0.0.1:7780 \
+  --control-plane-url https://deploy.apps.kilty.io \
   --control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN
 ```
 
@@ -207,8 +212,8 @@ What the install flags mean:
 - `--ssh-mode ssh`
   Use normal SSH transport. This is the standard choice for the current
   reviewed workflow.
-- `--control-plane-url http://127.0.0.1:7780`
-  The deployment service URL that the client profile should call.
+- `--control-plane-url https://deploy.apps.kilty.io`
+  The hosted deployment service URL that laptop clients should call.
 - `--control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN`
   The environment variable name that holds the deployment service token on the
   client machine or Jenkins worker.
@@ -284,8 +289,14 @@ direnv exec . build-tools/tools/bin/deploy \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
   --status \
+  --text \
   --deploy-run-id "$DEPLOY_RUN_ID"
 ```
+
+The text response gives you the current phase, approval guidance when the run is
+waiting, and admitted artifact identity when the service has already admitted an
+artifact. For automation, omit `--text` to keep the machine-readable JSON
+response.
 
 The response gives you two important IDs:
 
@@ -310,6 +321,7 @@ direnv exec . build-tools/tools/bin/deploy \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
   --status \
+  --text \
   --deploy-run-id "$DEPLOY_RUN_ID"
 ```
 

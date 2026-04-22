@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { randomUUID } from "node:crypto";
-import { getFlagStr } from "../lib/cli.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli.ts";
 import type { DeploymentTarget } from "./contract.ts";
 import {
   createAndWaitForServiceOwnedAuthSession,
@@ -17,6 +17,10 @@ import {
   type DeployControlPlaneOperatorAction,
 } from "./deploy-control-plane-operator-flags.ts";
 import { printDeployJson } from "./deploy-front-door.ts";
+import {
+  formatDeploymentControlPlaneRecordText,
+  formatDeploymentControlPlaneStatusText,
+} from "./deployment-control-plane-status-format.ts";
 import { submitNixosSharedHostControlPlaneRunActionViaService } from "./nixos-shared-host-control-plane-client.ts";
 import {
   readRecordForOperator,
@@ -156,15 +160,15 @@ export async function maybeRunDeployControlPlaneOperatorCommand(opts: {
     actionLabel,
   });
   if (action === "record") {
-    printDeployJson(
-      await readRecordForOperator({
-        controlPlaneUrl: serviceClient.controlPlaneUrl,
-        ...(serviceClient.controlPlaneToken
-          ? { controlPlaneToken: serviceClient.controlPlaneToken }
-          : {}),
-        selector,
-      }),
-    );
+    const record = await readRecordForOperator({
+      controlPlaneUrl: serviceClient.controlPlaneUrl,
+      ...(serviceClient.controlPlaneToken
+        ? { controlPlaneToken: serviceClient.controlPlaneToken }
+        : {}),
+      selector,
+    });
+    if (getFlagBool("text")) console.log(formatDeploymentControlPlaneRecordText(record));
+    else printDeployJson(record);
     return true;
   }
   const status = await readStatusForOperator({
@@ -175,7 +179,8 @@ export async function maybeRunDeployControlPlaneOperatorCommand(opts: {
     selector,
   });
   if (action === "status") {
-    printDeployJson(status);
+    if (getFlagBool("text")) console.log(formatDeploymentControlPlaneStatusText(status));
+    else printDeployJson(status);
     return true;
   }
   if (action === "print-run-lock-scope") {

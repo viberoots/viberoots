@@ -143,11 +143,12 @@ Deployment-service routing:
 Common example values:
 
 - `--control-plane-url http://127.0.0.1:7780`
-  Use when the service is running on the same machine.
-- `--control-plane-url http://mini:7780`
-  Use when the service is running on the host named `mini`.
+  Use only from `mini` itself or local test harnesses.
+- `--control-plane-url https://deploy.apps.kilty.io`
+  Use the reviewed hosted `mini` deployment service endpoint from laptops and
+  automation outside the host.
 - `--remote mini`
-  Use the reviewed mini alias; defaults to `http://mini:7780` unless
+  Use the reviewed mini alias; defaults to `https://deploy.apps.kilty.io` unless
   `BNX_DEPLOY_MINI_CONTROL_PLANE_URL` is set.
 - `BNX_DEPLOY_CONTROL_PLANE_TOKEN=replace-me`
   Example token environment variable for local or CI use.
@@ -274,7 +275,7 @@ deploy \
 Use the deployment service path:
 
 ```bash
-export BNX_DEPLOY_CONTROL_PLANE_URL='http://127.0.0.1:7780'
+export BNX_DEPLOY_CONTROL_PLANE_URL='https://deploy.apps.kilty.io'
 export BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
 
 deploy \
@@ -317,7 +318,11 @@ deploy \
 Operator helper flags:
 
 - `--status`: print the current status JSON for one service-backed run
+- `--status --text`: print a concise operator summary for one service-backed
+  run, including phase, approval guidance, and admitted artifact identity when
+  present
 - `--record`: print the finalized provider record for one run
+- `--record --text`: print a concise final record summary
 - `--print-run-lock-scope`: print only the exact admitted `lockScope` value
 - `--approve`: approve a `pending_approval` run using the current status
   bindings
@@ -452,6 +457,9 @@ What they mean, with example values:
   Information about whether this exact request was newly created or reused.
 - `approval`
   Approval state and binding details for runs that require human approval.
+- `artifact`
+  Hosted artifact-admission summary for service-backed runs, including producer
+  kind and admitted artifact digest when available.
 - `latestAction`
   The most recent run action, such as `cancel` or `approve`.
 
@@ -476,7 +484,7 @@ curl \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
   -X POST \
-  http://127.0.0.1:7780/api/v1/submissions \
+  https://deploy.apps.kilty.io/api/v1/submissions \
   -d '{
     "schemaVersion": "cloudflare-pages-control-plane-submit-request@1",
     "submissionId": "submission-2026-04-16T12:00:00Z",
@@ -544,7 +552,7 @@ Read status by `submissionId`:
 ```bash
 curl \
   -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
-  'http://127.0.0.1:7780/api/v1/status?submissionId=submission-2026-04-16T12:00:00Z'
+  'https://deploy.apps.kilty.io/api/v1/status?submissionId=submission-2026-04-16T12:00:00Z'
 ```
 
 Read the finalized record by `deployRunId`:
@@ -552,7 +560,7 @@ Read the finalized record by `deployRunId`:
 ```bash
 curl \
   -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
-  'http://127.0.0.1:7780/api/v1/records?deployRunId=deploy-run-123'
+  'https://deploy.apps.kilty.io/api/v1/records?deployRunId=deploy-run-123'
 ```
 
 Use `submissionId` when you want to follow the exact request you submitted. Use
@@ -568,7 +576,7 @@ curl \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
   -X POST \
-  http://127.0.0.1:7780/api/v1/run-actions \
+  https://deploy.apps.kilty.io/api/v1/run-actions \
   -d '{
     "schemaVersion": "deployment-control-plane-run-action-request@1",
     "actionId": "approve-2026-04-16T12:05:00Z",
@@ -606,7 +614,7 @@ curl \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
   -X POST \
-  http://127.0.0.1:7780/api/v1/run-actions \
+  https://deploy.apps.kilty.io/api/v1/run-actions \
   -d '{
     "schemaVersion": "deployment-control-plane-run-action-request@1",
     "actionId": "cancel-queued-1",

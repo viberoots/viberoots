@@ -14,7 +14,7 @@ export type NixosSharedHostResolvedServiceClient = {
 };
 
 const REMOTE_ALIASES: Record<string, string> = {
-  mini: "http://mini:7780",
+  mini: "https://deploy.apps.kilty.io",
 };
 
 function requireNonEmpty(value: string | undefined, message: string): string {

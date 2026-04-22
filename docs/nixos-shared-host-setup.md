@@ -26,6 +26,7 @@ modules live at:
 - `/srv/common/build-tools/tools/nix/shared-host-identity-provider-module.nix`
 - `/srv/common/build-tools/tools/nix/shared-host-postgres-module.nix`
 - `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix`
+- `/srv/common/build-tools/tools/nix/shared-host-deployment-service-module.nix`
 - `/srv/common/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
 
 The Vault runbook shows how to use the identity-provider module and the
@@ -238,6 +239,7 @@ repo now includes reviewed importable NixOS modules:
 
 - `/srv/common/build-tools/tools/nix/shared-host-postgres-module.nix`
 - `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix`
+- `/srv/common/build-tools/tools/nix/shared-host-deployment-service-module.nix`
 - `/srv/common/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
 
 Use these when the host keeps a checkout of this repo at `/srv/common` and you
@@ -283,6 +285,7 @@ Example `configuration.nix` wiring:
     # Existing imports stay here.
     "${deploymentModulesRoot}/shared-host-postgres-module.nix"
     "${deploymentModulesRoot}/shared-host-vault-module.nix"
+    "${deploymentModulesRoot}/shared-host-deployment-service-module.nix"
     "${deploymentModulesRoot}/shared-host-deploy-auth-callback-module.nix"
   ];
 }
@@ -303,6 +306,11 @@ What these modules do:
   `deploymentHost.vault.useAcmeCertificate = true` and
   `deploymentHost.vault.address = "0.0.0.0:8200"` to run Vault as the direct TLS
   endpoint for `https://secrets.apps.kilty.io:8200`.
+- `shared-host-deployment-service-module.nix`
+  Adds the reviewed nginx route for the hosted deployment service API. For
+  `mini`, route `deploy.apps.kilty.io` to the control-plane service's private
+  `127.0.0.1:7780` listener. The module rejects wildcard backend binds so the
+  worker/service port is not exposed directly.
 - `shared-host-deploy-auth-callback-module.nix`
   Adds the reviewed nginx route for the deployment service's OIDC callback
   endpoint. For `mini`, route `deploy-auth.apps.kilty.io` to the control-plane
@@ -337,6 +345,16 @@ deploymentHost.identityProvider = {
   openFirewall = false;
 };
 
+deploymentHost.deploymentService = {
+  enable = true;
+  hostname = "deploy.apps.kilty.io";
+  localBindHost = "127.0.0.1";
+  localBindPort = 7780;
+  manageNginx = false;
+  manageAcme = false;
+  openFirewall = false;
+};
+
 deploymentHost.deployAuthCallback = {
   enable = true;
   hostname = "deploy-auth.apps.kilty.io";
@@ -350,10 +368,12 @@ deploymentHost.deployAuthCallback = {
 ```
 
 With that shape, add `8200` to the existing
-`networking.firewall.allowedTCPPorts` expression and add a host-owned nginx
-virtual host for `identity.apps.kilty.io` plus a host-owned callback vhost for
-`deploy-auth.apps.kilty.io` that proxies to the deployment service and uses the
-existing `apps.kilty.io` wildcard certificate. The Vault runbook has the full
+`networking.firewall.allowedTCPPorts` expression and add host-owned nginx
+virtual hosts for `identity.apps.kilty.io`, `deploy.apps.kilty.io`, and
+`deploy-auth.apps.kilty.io`. The deployment-service vhost proxies `/` to
+`http://127.0.0.1:7780`; the deploy-auth vhost proxies `/oidc/callback` to the
+same private service listener. Both deployment vhosts use the existing
+`apps.kilty.io` wildcard certificate. The Vault runbook has the full
 copy/paste snippets.
 
 What these modules do not do:
@@ -392,6 +412,11 @@ Plain-language version:
 
 - the service accepts deployment requests and answers status queries
 - the worker picks up accepted requests and performs the actual work
+- uploaded artifacts, admitted artifacts, auth sessions, status, and records are
+  stored under the configured records root or the backend database before any
+  provider mutation starts
+- worker-side Vault credentials come from server-local env/file references or a
+  reviewed workload identity source on `mini`, never from the laptop request
 
 What the service and worker flags mean:
 
@@ -400,18 +425,22 @@ What the service and worker flags mean:
 - `--state /var/lib/bucknix/nixos-shared-host/platform-state.json`
   The shared-host state file.
 - `--records-root /var/lib/bucknix/nixos-shared-host/records`
-  The records directory on `mini`.
+  The records directory on `mini`. This root also contains retained upload and
+  admitted-artifact storage used by the hosted service.
 - `--control-plane-database-url "$BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL"`
   The Postgres URL both processes use.
 - `--port 7780`
   The TCP port where the deployment service listens.
+- `--host 127.0.0.1`
+  The private bind address. Keep the service on loopback and expose it only
+  through the reviewed HTTPS nginx vhost.
 
 Common example values:
 
 - `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'`
 - `--port 7780`
 - service URL from another machine:
-  `http://mini:7780`
+  `https://deploy.apps.kilty.io`
 - service URL on `mini` itself:
   `http://127.0.0.1:7780`
 
@@ -422,6 +451,7 @@ direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control
   --state /var/lib/bucknix/nixos-shared-host/platform-state.json \
   --records-root /var/lib/bucknix/nixos-shared-host/records \
   --control-plane-database-url "$BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL" \
+  --host 127.0.0.1 \
   --port 7780
 ```
 
@@ -430,6 +460,17 @@ direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control
   --records-root /var/lib/bucknix/nixos-shared-host/records \
   --control-plane-database-url "$BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL"
 ```
+
+Required worker-side secret-source prep after PR-79 through PR-81:
+
+- set `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL` for both service and worker
+- set the server-local credential variable referenced by `vault_runtime`, for
+  example `BNX_DEPLOYER_CLIENT_SECRET` for a reviewed service-account client
+  secret, or `BNX_DEPLOYMENT_OIDC_TOKEN` for an external workload identity
+  token
+- leave `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`, laptop Vault JWTs, Vault tokens,
+  provider tokens, PKCE verifiers, and client secrets out of protected/shared
+  service submissions
 
 When you check status later, use the service and the IDs it returns:
 `submissionId` and `deployRunId`.
@@ -448,7 +489,7 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime \
   --remote-records-root /var/lib/bucknix/nixos-shared-host/records \
   --ssh-mode ssh \
-  --control-plane-url http://127.0.0.1:7780 \
+  --control-plane-url https://deploy.apps.kilty.io \
   --control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN
 ```
 
@@ -471,7 +512,7 @@ Common example values for the client-install flags:
 - `--remote-runtime-root /var/lib/bucknix/nixos-shared-host/runtime`
 - `--remote-records-root /var/lib/bucknix/nixos-shared-host/records`
 - `--ssh-mode ssh`
-- `--control-plane-url http://127.0.0.1:7780`
+- `--control-plane-url https://deploy.apps.kilty.io`
 - `--control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN`
 
 ## Review The Remote Plan And Deploy

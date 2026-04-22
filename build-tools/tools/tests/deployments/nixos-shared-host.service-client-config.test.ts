@@ -10,7 +10,7 @@ test("nixos shared-host service client resolves the reviewed mini remote alias",
       context: "deploy",
       env: {},
     }).controlPlaneUrl,
-    "http://mini:7780",
+    "https://deploy.apps.kilty.io",
   );
   assert.equal(
     resolveServiceClientFromFlags({

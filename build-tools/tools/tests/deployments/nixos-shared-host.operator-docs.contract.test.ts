@@ -17,7 +17,7 @@ function assertServiceClientInstallParity(doc: string, label: string) {
   assert.match(doc, /client install \\/, `${label} must document client install`);
   assert.match(
     doc,
-    /--control-plane-url http:\/\/127\.0\.0\.1:7780/,
+    /--control-plane-url https:\/\/deploy\.apps\.kilty\.io/,
     `${label} must require --control-plane-url`,
   );
   assert.match(

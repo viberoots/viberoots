@@ -1199,7 +1199,7 @@ What these fields mean:
 - `"credentialClass": "routine"`
   Normal day-to-day deployment credential.
 
-## Step 9: Provide A Deployment Runtime Workload JWT
+## Step 9: Point Operators At The Hosted `mini` Deployment Service
 
 The reviewed deployment runtime logs in to Vault's JWT auth endpoint itself.
 For local/direct deploys, `deploy` mints the short-lived workload JWT just
@@ -1259,12 +1259,25 @@ For the current `mini` host inventory:
 
 | Purpose       | Hostname                     |
 | ------------- | ---------------------------- |
+| Deploy API    | `deploy.apps.kilty.io`       |
 | OIDC issuer   | `identity.apps.kilty.io`     |
 | Vault API     | `secrets.apps.kilty.io:8200` |
 | PKCE callback | `deploy-auth.apps.kilty.io`  |
 
-The deploy-auth callback hostname is a host-owned nginx route to the long-running
-deployment service callback endpoint:
+The deploy API and deploy-auth callback hostnames are host-owned nginx routes to
+the long-running deployment service:
+
+```nix
+deploymentHost.deploymentService = {
+  enable = true;
+  hostname = "deploy.apps.kilty.io";
+  localBindHost = "127.0.0.1";
+  localBindPort = 7780;
+  manageNginx = false;
+  manageAcme = false;
+  openFirewall = false;
+};
+```
 
 ```nix
 deploymentHost.deployAuthCallback = {
@@ -1281,7 +1294,8 @@ deploymentHost.deployAuthCallback = {
 
 Keep the service bind port off the public firewall for this reverse-proxied
 shape. The normal interactive story is: the laptop asks `mini` for an auth
-session, opens the returned browser URL, Keycloak redirects to
+session through `https://deploy.apps.kilty.io`, opens the returned browser URL,
+Keycloak redirects to
 `https://deploy-auth.apps.kilty.io/oidc/callback`, and the deployment service
 records only a redacted principal plus authorization evidence. The Keycloak
 redirect allowlist uses only that external URI; the local service URL is private

@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 import type {
+  DeploymentControlPlaneArtifactStatus,
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneRequestDedupe,
 } from "./deployment-control-plane-contract.ts";
@@ -10,6 +11,36 @@ import {
   type CloudflarePagesControlPlaneSubmission,
 } from "./cloudflare-pages-control-plane-contract.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
+
+function digestFromIdentity(identity: string): string | undefined {
+  return identity.startsWith("static-webapp:")
+    ? identity.slice("static-webapp:".length)
+    : undefined;
+}
+
+function artifactStatusFromSnapshot(
+  snapshot: CloudflarePagesControlPlaneSnapshot,
+): DeploymentControlPlaneArtifactStatus | undefined {
+  const action = snapshot.action;
+  if (action.kind === "preview_cleanup") {
+    return {
+      phase: "admitted",
+      producerKind: "existing_admitted_artifact",
+      artifactIdentity: action.artifactIdentity,
+      artifactDigest: digestFromIdentity(action.artifactIdentity),
+    };
+  }
+  const artifact = action.publishInput.artifact;
+  return {
+    phase: "admitted",
+    ...(artifact.producerKind ? { producerKind: artifact.producerKind } : {}),
+    artifactIdentity: artifact.identity,
+    artifactDigest: digestFromIdentity(artifact.identity),
+    ...(artifact.sourceRevision ? { sourceRevision: artifact.sourceRevision } : {}),
+    ...(artifact.buildTarget ? { buildTarget: artifact.buildTarget } : {}),
+    ...(artifact.storageReference ? { storageReference: artifact.storageReference } : {}),
+  };
+}
 
 export function createCloudflarePagesControlPlaneSubmission(
   deployment: CloudflarePagesDeployment,
@@ -53,6 +84,9 @@ export function createCloudflarePagesControlPlaneSubmission(
     ...(opts.authorization ? { authorization: opts.authorization } : {}),
     ...(opts.rejectionCode ? { rejectionCode: opts.rejectionCode } : {}),
     ...(opts.pendingReasonCode ? { pendingReasonCode: opts.pendingReasonCode } : {}),
+    ...(artifactStatusFromSnapshot(snapshot)
+      ? { artifact: artifactStatusFromSnapshot(snapshot) }
+      : {}),
     admission: opts.admission,
   };
 }

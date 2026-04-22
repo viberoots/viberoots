@@ -8,6 +8,7 @@ import type {
 import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
 import type {
   DeploymentControlPlaneAuthorizationDecision,
+  DeploymentControlPlaneArtifactStatus,
   DeploymentControlPlaneLifecycleState,
   DeploymentControlPlaneRequestDedupe,
   DeploymentControlPlaneSubmitRejectionCode,
@@ -119,6 +120,7 @@ export type CloudflarePagesControlPlaneSubmission = {
   authorization?: DeploymentControlPlaneAuthorizationDecision;
   rejectionCode?: DeploymentControlPlaneSubmitRejectionCode;
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
+  artifact?: DeploymentControlPlaneArtifactStatus;
   latestAction?: {
     actionId: string;
     action: "cancel" | "resume";

@@ -11,6 +11,7 @@ test("shared-host service modules do not hardcode a public deployment domain", a
     [
       "shared-host-vault-module.nix",
       "shared-host-identity-provider-module.nix",
+      "shared-host-deployment-service-module.nix",
       "shared-host-deploy-auth-callback-module.nix",
       "shared-host-postgres-module.nix",
     ].map(async (file) => await fsp.readFile(path.join(moduleDir, file), "utf8")),

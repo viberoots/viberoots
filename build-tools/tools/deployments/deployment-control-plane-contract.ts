@@ -110,6 +110,21 @@ export type DeploymentControlPlaneApprovalSummary = {
   approver?: DeploymentPrincipal;
 };
 
+export type DeploymentControlPlaneArtifactStatus = {
+  phase: "admission_pending" | "admitted" | "unavailable" | "not_applicable";
+  producerKind?:
+    | "server_build"
+    | "client_upload"
+    | "ci_attested"
+    | "existing_admitted_artifact"
+    | "local_direct";
+  artifactIdentity?: string;
+  artifactDigest?: string;
+  sourceRevision?: string;
+  buildTarget?: string;
+  storageReference?: string;
+};
+
 export type DeploymentControlPlaneApprovalGrantRequest = {
   approvalId?: string;
   approvalNames?: string[];
@@ -173,6 +188,7 @@ export type DeploymentControlPlaneResponseBase = {
     | DeploymentControlPlaneRunActionRejectionCode;
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
   approval?: DeploymentControlPlaneApprovalSummary;
+  artifact?: DeploymentControlPlaneArtifactStatus;
   latestAction?: {
     actionId: string;
     action: DeploymentControlPlaneRunAction;
