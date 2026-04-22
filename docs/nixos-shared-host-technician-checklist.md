@@ -39,10 +39,7 @@ Run from the repo checkout on `mini`:
 ```bash
 cd /srv/common
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
-  server install \
-  --server-root / \
-  --config-root /etc/nixos \
-  --install-mode managed-manual-wire
+  server install
 ```
 
 Expected files and directories:
@@ -85,9 +82,7 @@ Then verify the install:
 ```bash
 cd /srv/common
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
-  server status \
-  --server-root / \
-  --config-root /etc/nixos
+  server status
 ```
 
 Completion criteria:

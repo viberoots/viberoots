@@ -74,7 +74,7 @@ In other words:
 The default reviewed path is:
 
 1. prepare a repo checkout on `mini` at `/srv/common`
-2. run `server install --install-mode managed-manual-wire` on `mini`
+2. run `server install` on `mini`
 3. import `/etc/nixos/deployment-host/default.nix` into the
    authoritative NixOS config
 4. run `sudo nixos-rebuild switch`
@@ -108,10 +108,7 @@ Run from the repo checkout on `mini`:
 ```bash
 cd /srv/common
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
-  server install \
-  --server-root / \
-  --config-root /etc/nixos \
-  --install-mode managed-manual-wire
+  server install
 ```
 
 Expected files and directories:
@@ -177,18 +174,19 @@ Which mode to choose:
 What the install flags mean:
 
 - `--server-root /`
-  The filesystem root of the host being configured. Use `/` for the normal
+  The filesystem root of the host being configured. Defaults to `/`, the normal
   local-machine install path.
 - `--config-root /etc/nixos`
-  The NixOS config root on `mini`.
+  The NixOS config root on `mini`. Defaults to `/etc/nixos`.
 - `--config-entry-path /etc/nixos/configuration.nix`
   The authoritative NixOS config entry that should import or include the shared
   host anchor. If omitted, the installer checks for `${configRoot}/flake.nix`
   first and falls back to `${configRoot}/configuration.nix`. Pass this flag
   only when you need to override that detected entry.
 - `--install-mode managed-manual-wire`
-  Recommended default. The installer manages its own files and runtime
-  directories, while you add the anchor import or module entry yourself.
+  Recommended default and the value used when the flag is omitted. The
+  installer manages its own files and runtime directories, while you add the
+  anchor import or module entry yourself.
 
 ## Wire And Verify The Host Config
 
@@ -219,9 +217,7 @@ Then verify the install:
 ```bash
 cd /srv/common
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
-  server status \
-  --server-root / \
-  --config-root /etc/nixos
+  server status
 ```
 
 What success looks like:
@@ -629,9 +625,7 @@ Inspect the install at any time:
 
 ```bash
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
-  server status \
-  --server-root / \
-  --config-root /etc/nixos
+  server status
 ```
 
 Uninstall removes only the generated config files and directories owned by the
@@ -641,9 +635,7 @@ and any secret-adjacent files:
 
 ```bash
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
-  server uninstall \
-  --server-root / \
-  --config-root /etc/nixos
+  server uninstall
 ```
 
 Install modes:

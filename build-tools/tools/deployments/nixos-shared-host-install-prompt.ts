@@ -89,6 +89,7 @@ function serverPromptRules(): JsonPromptRuleSet {
     },
     required: ["configRoot", "installMode"],
     defaults: {
+      serverRoot: "/",
       configRoot: "/etc/nixos",
       installMode: "managed-manual-wire",
     },

@@ -43,6 +43,10 @@ type HostInstallInput = {
   dryRun: boolean;
 };
 
+const DEFAULT_SERVER_ROOT = "/";
+const DEFAULT_CONFIG_ROOT = "/etc/nixos";
+const DEFAULT_INSTALL_MODE: NixosSharedHostInstallMode = "managed-manual-wire";
+
 function requireSubcommands(): [string, string] {
   const [scope = "", action = ""] = getPositionals();
   if (!scope || !action)
@@ -84,9 +88,8 @@ async function runServerCommand(action: string, repoRoot: string) {
     action === "install"
       ? await maybePromptServerInstallInput(mergedServerInput)
       : mergedServerInput;
-  const hostRoot = path.resolve(String(promptInput.serverRoot || "/"));
-  const configRoot = String(promptInput.configRoot || "");
-  if (action === "install" && !configRoot) throw new Error("missing required --config-root");
+  const hostRoot = path.resolve(String(promptInput.serverRoot || DEFAULT_SERVER_ROOT));
+  const configRoot = String(promptInput.configRoot || DEFAULT_CONFIG_ROOT);
   const managedRoot =
     String(promptInput.managedRoot || "") || (configRoot ? defaultManagedRoot(configRoot) : "");
   let manifestPath = getFlagStr(
@@ -94,7 +97,9 @@ async function runServerCommand(action: string, repoRoot: string) {
     managedRoot ? manifestPathFor(managedRoot) : "",
   ).trim();
   if (action === "install") {
-    const installMode = String(promptInput.installMode || "") as NixosSharedHostInstallMode;
+    const installMode = String(
+      promptInput.installMode || DEFAULT_INSTALL_MODE,
+    ) as NixosSharedHostInstallMode;
     if (
       installMode !== "emit-only" &&
       installMode !== "managed-manual-wire" &&

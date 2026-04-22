@@ -31,6 +31,7 @@ test("nixos-shared-host prompt helper uses inline rules for server install", asy
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0]?.rules.required, ["configRoot", "installMode"]);
   assert.deepEqual(calls[0]?.rules.defaults, {
+    serverRoot: "/",
     configRoot: "/etc/nixos",
     installMode: "managed-manual-wire",
   });
@@ -94,7 +95,11 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
 });
 
 test("nixos-shared-host prompt helper applies declarative defaults without prompting when not interactive", async () => {
-  const input = { configRoot: "/etc/nixos", installMode: "managed-manual-wire" as const };
+  const input = {};
   const result = await maybePromptServerInstallInput(input, { interactive: false });
-  assert.deepEqual(result, input);
+  assert.deepEqual(result, {
+    serverRoot: "/",
+    configRoot: "/etc/nixos",
+    installMode: "managed-manual-wire",
+  });
 });

@@ -89,8 +89,10 @@ test("nixos-shared-host server install defaults the config entry to flake.nix wh
       withExtraImports: true,
     });
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --install-mode managed-manual-wire`;
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot}`;
     const summary = JSON.parse(String(result.stdout));
+    assert.equal(summary.manifest.configRoot, "/etc/nixos");
+    assert.equal(summary.manifest.installMode, "managed-manual-wire");
     assert.equal(summary.manifest.configEntryPath, "/etc/nixos/flake.nix");
     assert.equal(summary.wiringState, "missing");
     await fsp.writeFile(
@@ -99,7 +101,7 @@ test("nixos-shared-host server install defaults the config entry to flake.nix wh
       "utf8",
     );
     const status =
-      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server status --server-root ${fixture.hostRoot} --config-root /etc/nixos`;
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server status --server-root ${fixture.hostRoot}`;
     assert.equal(JSON.parse(String(status.stdout)).wiringState, "wired");
   });
 });
@@ -169,8 +171,9 @@ test("nixos-shared-host server install ignores empty stdin", async () => {
     });
     const result = await $({
       input: "",
-    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos`;
+    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot}`;
     const summary = JSON.parse(String(result.stdout));
+    assert.equal(summary.manifest.configRoot, "/etc/nixos");
     assert.equal(summary.manifest.installMode, "managed-manual-wire");
     assert.equal(summary.manifest.configEntryPath, "/etc/nixos/configuration.nix");
     await fsp.access(path.join(fixture.hostRoot, "etc/nixos/deployment-host/platform-state.json"));
