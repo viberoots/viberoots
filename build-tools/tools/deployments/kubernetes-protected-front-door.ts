@@ -11,6 +11,7 @@ import {
   rejectServiceOnlyLocalFlags,
 } from "./deployment-provider-protected-front-door.ts";
 import { KUBERNETES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "./kubernetes-control-plane.ts";
+import { serviceSubmissionAdmissionEvidence } from "./deployment-service-client-contract.ts";
 
 export async function runProtectedKubernetesDeployFrontDoor(opts: {
   workspaceRoot: string;
@@ -26,6 +27,7 @@ export async function runProtectedKubernetesDeployFrontDoor(opts: {
   hasFlag: (flag: string) => boolean;
 }) {
   rejectServiceOnlyLocalFlags(opts.hasFlag, "kubernetes");
+  const admissionEvidence = serviceSubmissionAdmissionEvidence(opts.admissionEvidence as any);
   const serviceClient = resolveServiceClientFromFlags({
     controlPlaneUrl: opts.controlPlaneUrl,
     controlPlaneToken: opts.controlPlaneToken,
@@ -57,7 +59,7 @@ export async function runProtectedKubernetesDeployFrontDoor(opts: {
           : { artifactDir: await resolveArtifactDirForCli(opts.workspaceRoot, opts.deployment) }
         : {}),
       ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
-      ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
+      ...(admissionEvidence ? { admissionEvidence } : {}),
       ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
     },
   });

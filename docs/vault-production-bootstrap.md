@@ -1208,7 +1208,10 @@ only completes the human authorization flow; the `mini` worker mints or reads
 the workload JWT from server-local credential references and then activates the
 typed in-memory secret context for provider execution. The deployment target
 should declare stable Vault runtime metadata in `vault_runtime`, so routine
-deploys do not need Vault or issuer exports on the laptop.
+deploys do not need Vault or issuer exports on the laptop. Protected/shared
+service submissions reject laptop Vault tokens, Vault JWT files, fixture secret
+paths, client-side provider-token inputs, and client-supplied principals or
+authorization grants.
 
 Example deployment metadata:
 
@@ -1494,10 +1497,13 @@ deploy \
   --deployment-client-secret-env BNX_DEPLOYER_CLIENT_SECRET
 ```
 
-In both cases, the deploy front door mints or receives a fresh workload JWT from
-the selected credential source and `vault_runtime`, keeps it in a typed
-in-memory deployment secret context, and exchanges that JWT for a short-lived
-Vault token inside the secret resolver.
+For local/direct and CI-owned non-service flows, the deploy front door mints or
+receives a fresh workload JWT from the selected credential source and
+`vault_runtime`, keeps it in a typed in-memory deployment secret context, and
+exchanges that JWT for a short-lived Vault token inside the secret resolver.
+For protected/shared service deployments, keep those credential inputs on
+`mini`; the laptop client submits to the hosted service and does not supply
+Vault runtime credentials.
 
 If you want to force one exact local build output, you can still provide the
 usual override:

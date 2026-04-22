@@ -245,6 +245,10 @@ If you are using the reviewed `nixos-shared-host` client profile workflow, use
 `--profile mini` instead of `--control-plane-url`.
 For auth-required protected/shared runs, the deployment service opens or prints
 the login URL and records the approver from the authenticated service session.
+Do not pass laptop Vault tokens, Vault JWT files, secret fixture paths, or
+client-supplied principals to protected/shared service deployments. `mini`
+derives identity through its service session and the worker uses server-owned
+secret context for provider mutation.
 
 ## Which Backend Am I Using
 

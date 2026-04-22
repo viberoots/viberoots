@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA } from "../../deployments/deployment-control-plane-contract.ts";
+import { serviceSubmissionAdmissionEvidence } from "../../deployments/deployment-service-client-contract.ts";
 import {
   localHarnessControlPlaneDatabaseUrl,
   readBackendSnapshotBySubmissionId,
@@ -205,7 +206,9 @@ export async function submitServiceRequest(opts: {
         ...(opts.artifactDirsByComponentId
           ? { artifactDirsByComponentId: opts.artifactDirsByComponentId }
           : {}),
-        ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
+        ...(serviceSubmissionAdmissionEvidence(opts.admissionEvidence as any)
+          ? { admissionEvidence: serviceSubmissionAdmissionEvidence(opts.admissionEvidence as any) }
+          : {}),
         ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
       }),
     }),

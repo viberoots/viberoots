@@ -14,6 +14,7 @@ import {
 } from "./nixos-shared-host-control-plane-client.ts";
 import { resolveServiceClientFromFlags } from "./nixos-shared-host-service-client-config.ts";
 import { uploadCloudflarePagesClientArtifact } from "./cloudflare-pages-artifact-upload-client.ts";
+import { serviceSubmissionAdmissionEvidence } from "./deployment-service-client-contract.ts";
 
 const SERVICE_ONLY_LOCAL_FLAGS = ["records-root", "control-plane-database-url"] as const;
 
@@ -91,6 +92,7 @@ export async function runProtectedCloudflarePagesDeployFrontDoor(opts: {
   hasFlag: (flag: string) => boolean;
 }) {
   rejectServiceOnlyLocalFlags(opts.hasFlag);
+  const admissionEvidence = serviceSubmissionAdmissionEvidence(opts.admissionEvidence as any);
   const serviceClient = resolveServiceClientFromFlags({
     controlPlaneUrl: opts.controlPlaneUrl,
     controlPlaneToken: opts.controlPlaneToken,
@@ -137,7 +139,7 @@ export async function runProtectedCloudflarePagesDeployFrontDoor(opts: {
     ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
     ...(opts.targetExceptionRef ? { targetExceptionRef: opts.targetExceptionRef } : {}),
     ...(opts.previewCleanup ? { cleanupReason: opts.cleanupReason as any } : {}),
-    ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
+    ...(admissionEvidence ? { admissionEvidence } : {}),
     ...(opts.smokeConnectOverride
       ? { smokeConnectOverride: opts.smokeConnectOverride as any }
       : {}),

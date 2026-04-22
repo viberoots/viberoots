@@ -115,9 +115,7 @@ export const NIXOS_SHARED_HOST_PARTIAL_PUBLISH_OBSERVABILITY: ProviderCapability
     bullet("artifact provenance and stored exact-artifact references for admitted deploys"),
     bullet("parent-run and artifact-lineage fields for retry / rollback reuse"),
     bullet("deployment metadata fingerprint and replay snapshot path"),
-    bullet(
-      "failed step when a run terminates unsuccessfully after admission into the local workflow",
-    ),
+    bullet("failed step when a run terminates unsuccessfully after service-side admission"),
     bullet("for multi-component runs:", [
       bullet("per-component exact artifact references"),
       bullet("per-component publish outcome, smoke outcome, and live-identity proof"),
@@ -160,7 +158,7 @@ export const NIXOS_SHARED_HOST_PROVISIONER_SUPPORT: ProviderCapabilityBullet[] =
       "the current host-consumer boundary is the NixOS module `build-tools/tools/nix/nixos-shared-host-module.nix`",
     ),
     bullet(
-      "the initial operator workflow also has a reviewed local materialization path that mirrors the same container filesystem contract for end-to-end publish and smoke testing",
+      "the initial operator workflow also has a reviewed service materialization path that mirrors the same container filesystem contract for end-to-end publish and smoke testing",
     ),
   ]),
 ];

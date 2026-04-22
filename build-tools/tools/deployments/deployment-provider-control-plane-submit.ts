@@ -11,6 +11,7 @@ import {
   queueS3StaticControlPlaneSubmission,
   type S3StaticControlPlaneSubmitRequest,
 } from "./s3-static-control-plane.ts";
+import { assertNoProtectedSharedClientIdentityFields } from "./deployment-service-client-contract.ts";
 
 export type DeploymentProviderServiceSubmitRequest =
   | S3StaticControlPlaneSubmitRequest
@@ -33,6 +34,10 @@ export async function queueDeploymentProviderControlPlaneSubmission(
     backend: NixosSharedHostControlPlaneBackendTarget;
   },
 ) {
+  assertNoProtectedSharedClientIdentityFields({
+    deployment: request.deployment,
+    request,
+  });
   return request.schemaVersion === S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
     ? await queueS3StaticControlPlaneSubmission({
         workspaceRoot: opts.workspaceRoot,

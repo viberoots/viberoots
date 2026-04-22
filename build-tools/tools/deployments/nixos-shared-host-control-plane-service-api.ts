@@ -7,6 +7,7 @@ import {
 } from "./cloudflare-pages-control-plane-api-contract.ts";
 import { prepareBackendCloudflarePagesControlPlaneRun } from "./cloudflare-pages-control-plane-backend-prepare.ts";
 import { resolveCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit.ts";
+import { assertNoProtectedSharedClientIdentityFields } from "./deployment-service-client-contract.ts";
 import { handleControlPlaneRunActionService } from "./deployment-control-plane-run-action-service.ts";
 import {
   isDeploymentProviderServiceSubmitRequest,
@@ -60,6 +61,10 @@ export async function handleControlPlaneSubmit(
   ) {
     throw new Error(`unsupported schema version: ${request.schemaVersion}`);
   }
+  assertNoProtectedSharedClientIdentityFields({
+    deployment: request.deployment,
+    request,
+  });
   if (isDeploymentProviderServiceSubmitRequest(request)) {
     return await queueDeploymentProviderControlPlaneSubmission(request, opts);
   }

@@ -186,7 +186,7 @@ Normative-source note:
   - artifact provenance and stored exact-artifact references for admitted deploys
   - parent-run and artifact-lineage fields for retry / rollback reuse
   - deployment metadata fingerprint and replay snapshot path
-  - failed step when a run terminates unsuccessfully after admission into the local workflow
+  - failed step when a run terminates unsuccessfully after service-side admission
   - for multi-component runs:
     - per-component exact artifact references
     - per-component publish outcome, smoke outcome, and live-identity proof
@@ -207,7 +207,7 @@ Normative-source note:
   - host realization consumes only that authoritative platform state and owns container and ingress creation on the target NixOS host
   - host generation derives one generic `static-app-host` container plus one nginx route per declared app and fails closed on duplicate hostnames or backend identities
   - the current host-consumer boundary is the NixOS module `build-tools/tools/nix/nixos-shared-host-module.nix`
-  - the initial operator workflow also has a reviewed local materialization path that mirrors the same container filesystem contract for end-to-end publish and smoke testing
+  - the initial operator workflow also has a reviewed service materialization path that mirrors the same container filesystem contract for end-to-end publish and smoke testing
 
 ### Built-In `release_actions` Support
 

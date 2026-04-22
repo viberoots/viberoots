@@ -15,6 +15,7 @@ import {
   prepareDeploymentVaultRuntime,
 } from "./deployment-vault-runtime.ts";
 import { activateDeploymentSecretContext } from "./deployment-secret-context.ts";
+import { assertNoProtectedSharedClientCredentialInputs } from "./deployment-service-client-contract.ts";
 import {
   isAppStoreConnectDeployment,
   isCloudflarePagesDeployment,
@@ -80,6 +81,11 @@ export async function runDeployCli(opts: {
   ) {
     return;
   }
+  assertNoProtectedSharedClientCredentialInputs({
+    deployment,
+    publicFrontDoor: opts.publicFrontDoor,
+    vaultRuntimeInputs: flags.vaultRuntimeInputs,
+  });
   if (flags.preview && flags.previewCleanup) {
     throw new Error("--preview and --preview-cleanup are mutually exclusive");
   }
