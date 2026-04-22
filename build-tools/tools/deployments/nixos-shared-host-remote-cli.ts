@@ -15,6 +15,7 @@ import {
   type NixosSharedHostRemotePlan,
 } from "./nixos-shared-host-remote-target.ts";
 import type { ClientInput } from "./nixos-shared-host-install-dev-machine.ts";
+import { requireServiceTokenFromEnv } from "./nixos-shared-host-service-client-config.ts";
 
 type RemoteOverrides = Partial<ClientInput>;
 
@@ -190,6 +191,10 @@ export async function maybeRunNixosSharedHostRemoteProfile(opts: {
       "remote profile execution requires --deployment <label>; --deployment-json is not accepted",
     );
   }
+  requireServiceTokenFromEnv(
+    plan.serviceClient.controlPlaneTokenEnv,
+    `remote profile "${plan.profileName}" deploy`,
+  );
   console.log(
     JSON.stringify(
       await runNixosSharedHostRemoteDeploy({

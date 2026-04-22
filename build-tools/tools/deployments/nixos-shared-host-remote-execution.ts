@@ -18,7 +18,7 @@ import {
 } from "./nixos-shared-host-remote-target.ts";
 import { createNixosSharedHostDeployRunId } from "./nixos-shared-host-records.ts";
 import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door.ts";
-import { resolveServiceTokenFromEnv } from "./nixos-shared-host-service-client-config.ts";
+import { requireServiceTokenFromEnv } from "./nixos-shared-host-service-client-config.ts";
 
 const execFileAsync = promisify(execFile);
 const TRANSPORT_MAX_BUFFER = 10 * 1024 * 1024;
@@ -127,6 +127,10 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
 }): Promise<NixosSharedHostRemoteDeploySummary> {
   const executionId = createNixosSharedHostDeployRunId("remote");
   const stagedArtifactPath = createNixosSharedHostRemoteArtifactPath(opts.plan, executionId);
+  const controlPlaneToken = requireServiceTokenFromEnv(
+    opts.plan.serviceClient.controlPlaneTokenEnv,
+    `remote profile "${opts.plan.profileName}" deploy`,
+  );
   let stagePrepared = false;
   let pendingError: Error | null = null;
   let controlPlane: NixosSharedHostRemoteDeploySummary["controlPlane"] | null = null;
@@ -134,7 +138,10 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
     buildRemoteSshArgv(opts.plan.destination, buildRemoteRepoPreflightScript(opts.plan)),
   );
   if (preflight.exitCode !== 0) {
-    throw commandFailure("remote repo preflight failed", preflight);
+    throw commandFailure(
+      `remote repo preflight over SSH failed for "${opts.plan.destination}" while checking ${opts.plan.remoteRepoPath}`,
+      preflight,
+    );
   }
   try {
     const prepare = await runCommand(
@@ -157,13 +164,7 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
     const record = requireServiceRecord(
       await runNixosSharedHostDirectServiceMutation({
         controlPlaneUrl: opts.plan.serviceClient.controlPlaneUrl,
-        ...(opts.plan.serviceClient.controlPlaneTokenEnv
-          ? {
-              controlPlaneToken: resolveServiceTokenFromEnv(
-                opts.plan.serviceClient.controlPlaneTokenEnv,
-              ),
-            }
-          : {}),
+        ...(controlPlaneToken ? { controlPlaneToken } : {}),
         deployment: opts.deployment,
         operationKind: "deploy",
         artifactDir: stagedArtifactPath,

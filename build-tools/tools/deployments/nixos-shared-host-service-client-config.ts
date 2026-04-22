@@ -47,6 +47,20 @@ export function resolveServiceTokenFromEnv(
   return token || undefined;
 }
 
+export function requireServiceTokenFromEnv(
+  tokenEnv: string | undefined,
+  context: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+  const token = resolveServiceTokenFromEnv(tokenEnv, env);
+  if (tokenEnv && !token) {
+    throw new Error(
+      `${context} requires ${tokenEnv} to be set because the selected client profile stores serviceClient.controlPlaneTokenEnv=${tokenEnv}`,
+    );
+  }
+  return token;
+}
+
 export function resolveServiceClientFromManifest(
   manifest: NixosSharedHostClientManifest,
   env: NodeJS.ProcessEnv = process.env,

@@ -172,7 +172,29 @@ test("remote deploy fails closed when the reviewed remote repo checkout is missi
       env: remoteExecEnv(env),
     })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
     assert.notEqual(result.exitCode, 0);
-    assert.match(String(result.stderr), /remote repo preflight failed/);
+    assert.match(String(result.stderr), /remote repo preflight over SSH failed/);
     assert.match(String(result.stderr), /missing reviewed remote repo checkout/);
+  });
+});
+
+test("remote deploy reports missing control-plane token before SSH preflight", async () => {
+  await runInTemp("nixos-shared-host-remote-missing-token", async (tmp, $) => {
+    const { env, artifactDir, admissionEvidencePath, profileRoot } = await prepareRemoteExecFixture(
+      {
+        tmp,
+        $,
+        artifactFiles: { "index.html": "<html>missing-token</html>\n", healthz: "ok\n" },
+      },
+    );
+    const result = await $({
+      cwd: tmp,
+      env: remoteExecEnv(env, {
+        BNX_DEPLOY_CONTROL_PLANE_TOKEN: "",
+        FAKE_SSH_FAIL: "1",
+      }),
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
+    assert.notEqual(result.exitCode, 0);
+    assert.match(String(result.stderr), /requires BNX_DEPLOY_CONTROL_PLANE_TOKEN to be set/);
+    assert.doesNotMatch(String(result.stderr), /fake ssh transport failure/);
   });
 });

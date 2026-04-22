@@ -14,6 +14,7 @@ import { installFakeRemoteTransport } from "./nixos-shared-host.remote-transport
 import {
   installClientProfile,
   installReviewedPleominoTargets,
+  jenkinsExecEnv,
   pleominoDeploymentFixture,
   prepareReviewedRemoteHostPaths,
   writeArtifact,
@@ -71,10 +72,7 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
     try {
       const result = await $({
         cwd: tmp,
-        env: {
-          ...env,
-          IN_NIX_SHELL: "1",
-        },
+        env: jenkinsExecEnv(env),
       })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.ok, true);

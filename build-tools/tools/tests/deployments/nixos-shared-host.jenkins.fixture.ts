@@ -9,6 +9,15 @@ import { createNixosSharedHostInstallFixture } from "./nixos-shared-host.install
 
 export const REVIEWED_PLEOMINO_DEPLOYMENT_LABEL = "//projects/deployments/pleomino-dev:deploy";
 
+export function jenkinsExecEnv(env: Record<string, string>, extra: Record<string, string> = {}) {
+  return {
+    ...env,
+    BNX_DEPLOY_CONTROL_PLANE_TOKEN: "test-control-plane-token",
+    IN_NIX_SHELL: "1",
+    ...extra,
+  };
+}
+
 export function pleominoDeploymentFixture() {
   return nixosSharedHostDeploymentFixture({
     deploymentId: "pleomino-dev",

@@ -72,7 +72,12 @@ export function pleominoDeploymentFixture(): NixosSharedHostDeployment {
 }
 
 export function remoteExecEnv(env: Record<string, string>, extra: Record<string, string> = {}) {
-  return { ...env, IN_NIX_SHELL: "1", ...extra };
+  return {
+    ...env,
+    BNX_DEPLOY_CONTROL_PLANE_TOKEN: "test-control-plane-token",
+    IN_NIX_SHELL: "1",
+    ...extra,
+  };
 }
 
 export async function writeArtifact(root: string, files: Record<string, string>): Promise<void> {
