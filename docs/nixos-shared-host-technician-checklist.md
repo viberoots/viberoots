@@ -93,18 +93,17 @@ Run on `mini` from `/srv/common`:
 
 ```bash
 export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
+export BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
 direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts \
   --host-root /var/lib/bucknix/nixos-shared-host/runtime \
   --state /var/lib/bucknix/nixos-shared-host/platform-state.json \
   --records-root /var/lib/bucknix/nixos-shared-host/records \
-  --control-plane-database-url "$BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL" \
   --port 7780
 ```
 
 ```bash
 direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-worker.ts \
-  --records-root /var/lib/bucknix/nixos-shared-host/records \
-  --control-plane-database-url "$BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL"
+  --records-root /var/lib/bucknix/nixos-shared-host/records
 ```
 
 What success looks like:

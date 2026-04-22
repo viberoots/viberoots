@@ -1,8 +1,20 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { getFlagStr } from "../lib/cli.ts";
 import { findRepoRoot } from "../lib/repo.ts";
 import { startNixosSharedHostControlPlaneServer } from "./nixos-shared-host-control-plane-server.ts";
+
+export function resolveControlPlaneServiceToken(opts: {
+  tokenFlag: string;
+  env?: NodeJS.ProcessEnv;
+}): string | undefined {
+  return (
+    opts.tokenFlag.trim() ||
+    String((opts.env || process.env).BNX_DEPLOY_CONTROL_PLANE_TOKEN || "").trim() ||
+    undefined
+  );
+}
 
 async function main() {
   const workspaceRoot = await findRepoRoot(process.cwd());
@@ -11,7 +23,7 @@ async function main() {
   );
   const port = Number(getFlagStr("port", "7780").trim() || "7780");
   const host = getFlagStr("host", "127.0.0.1").trim() || "127.0.0.1";
-  const token = getFlagStr("token", "").trim() || undefined;
+  const token = resolveControlPlaneServiceToken({ tokenFlag: getFlagStr("token", "") });
   const backendDatabaseUrl =
     getFlagStr("control-plane-database-url", "").trim() ||
     String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
@@ -38,7 +50,9 @@ async function main() {
   console.log(JSON.stringify({ url: server.url }, null, 2));
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
