@@ -25,7 +25,7 @@ test("nixos-shared-host server install dry-run is deterministic and non-mutating
     );
     assert.deepEqual(first.manifest, second.manifest);
     await assert.rejects(
-      fsp.access(path.join(fixture.hostRoot, "etc/nixos/nixos-shared-host/install-manifest.json")),
+      fsp.access(path.join(fixture.hostRoot, "etc/nixos/deployment-host/install-manifest.json")),
     );
   });
 });
@@ -44,7 +44,7 @@ test("nixos-shared-host server status reports partially drifted installs", async
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.managed, true);
     assert.equal(summary.wiringState, "missing");
-    assert.ok(summary.existingManagedPaths.includes("/etc/nixos/nixos-shared-host/default.nix"));
+    assert.ok(summary.existingManagedPaths.includes("/etc/nixos/deployment-host/default.nix"));
   });
 });
 
@@ -54,7 +54,7 @@ test("nixos-shared-host server status can inspect manual-wire installs after ope
     await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-manual-wire`;
     await fsp.writeFile(
       path.join(fixture.hostRoot, "etc/nixos/configuration.nix"),
-      "{ ... }:\n{\n  imports = [\n    ./hardware-configuration.nix\n    /etc/nixos/nixos-shared-host/default.nix\n  ];\n}\n",
+      "{ ... }:\n{\n  imports = [\n    ./hardware-configuration.nix\n    /etc/nixos/deployment-host/default.nix\n  ];\n}\n",
       "utf8",
     );
     const result =
@@ -75,7 +75,7 @@ test("nixos-shared-host server status reports uninstalled servers and uninstall 
     await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin`;
     await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server uninstall --server-root ${fixture.hostRoot} --config-root /etc/nixos --dry-run`;
     await fsp.access(
-      path.join(fixture.hostRoot, "etc/nixos/nixos-shared-host/install-manifest.json"),
+      path.join(fixture.hostRoot, "etc/nixos/deployment-host/install-manifest.json"),
     );
   });
 });

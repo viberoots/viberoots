@@ -5,11 +5,45 @@ import path from "node:path";
 import { configEntryContainsManagedAnchor } from "./nixos-shared-host-install-config-entry.ts";
 import {
   hostPath,
+  normalizeHostLogicalPath,
   readInstallManifest,
   type NixosSharedHostConfigTopology,
   type NixosSharedHostInstallManifestV1,
   type NixosSharedHostWiringState,
 } from "./nixos-shared-host-install-contract.ts";
+
+export function manifestDataDirectories(manifest: NixosSharedHostInstallManifestV1): string[] {
+  return Array.from(
+    new Set([path.posix.dirname(manifest.statePath), manifest.runtimeRoot, manifest.recordsRoot]),
+  );
+}
+
+export function manifestInstallDirectories(manifest: NixosSharedHostInstallManifestV1): string[] {
+  return Array.from(
+    new Set([...manifest.managedDirectories, ...manifestDataDirectories(manifest)]),
+  );
+}
+
+export async function mkdirHostDirectories(hostRoot: string, logicalDirs: string[]): Promise<void> {
+  for (const logicalDir of logicalDirs) {
+    await fsp.mkdir(hostPath(hostRoot, logicalDir), { recursive: true });
+  }
+}
+
+export function assertUninstallInventoryIsConfigOnly(
+  manifest: NixosSharedHostInstallManifestV1,
+): void {
+  const managedRoot = normalizeHostLogicalPath(manifest.managedRoot);
+  const managedRootPrefix = managedRoot.endsWith("/") ? managedRoot : `${managedRoot}/`;
+  for (const logicalPath of [...manifest.managedPaths, ...manifest.managedDirectories]) {
+    const normalized = normalizeHostLogicalPath(logicalPath);
+    if (normalized !== managedRoot && !normalized.startsWith(managedRootPrefix)) {
+      throw new Error(
+        `refusing to uninstall path outside managed config root: ${logicalPath} is not under ${managedRoot}`,
+      );
+    }
+  }
+}
 
 export async function pathExists(filePath: string): Promise<boolean> {
   try {

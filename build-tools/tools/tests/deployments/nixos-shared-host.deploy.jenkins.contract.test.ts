@@ -20,9 +20,9 @@ test("jenkins wrapper emits a stable machine-readable preflight plan", async () 
       $,
       profileRoot,
       "/srv/common",
-      "/var/lib/nixos-shared-host/platform-state.json",
-      "/var/lib/nixos-shared-host/runtime",
-      "/var/lib/nixos-shared-host/records",
+      "/var/lib/deployment-host/platform-state.json",
+      "/var/lib/deployment-host/runtime",
+      "/var/lib/deployment-host/records",
       "http://127.0.0.1:7780",
     );
     const auth = await writeJenkinsAuthFiles(tmp);
@@ -51,9 +51,9 @@ test("jenkins wrapper fails closed on missing artifact input and still emits JSO
       $,
       profileRoot,
       "/srv/common",
-      "/var/lib/nixos-shared-host/platform-state.json",
-      "/var/lib/nixos-shared-host/runtime",
-      "/var/lib/nixos-shared-host/records",
+      "/var/lib/deployment-host/platform-state.json",
+      "/var/lib/deployment-host/runtime",
+      "/var/lib/deployment-host/records",
       "http://127.0.0.1:7780",
     );
     const auth = await writeJenkinsAuthFiles(tmp);
@@ -78,9 +78,9 @@ test("jenkins wrapper fails closed on missing reviewed SSH host metadata", async
       $,
       profileRoot,
       "/srv/common",
-      "/var/lib/nixos-shared-host/platform-state.json",
-      "/var/lib/nixos-shared-host/runtime",
-      "/var/lib/nixos-shared-host/records",
+      "/var/lib/deployment-host/platform-state.json",
+      "/var/lib/deployment-host/runtime",
+      "/var/lib/deployment-host/records",
       "http://127.0.0.1:7780",
     );
     const auth = await writeJenkinsAuthFiles(tmp);
@@ -105,9 +105,9 @@ test("jenkins wrapper rejects incompatible host-apply flags", async () => {
       $,
       profileRoot,
       "/srv/common",
-      "/var/lib/nixos-shared-host/platform-state.json",
-      "/var/lib/nixos-shared-host/runtime",
-      "/var/lib/nixos-shared-host/records",
+      "/var/lib/deployment-host/platform-state.json",
+      "/var/lib/deployment-host/runtime",
+      "/var/lib/deployment-host/records",
       "http://127.0.0.1:7780",
     );
     const auth = await writeJenkinsAuthFiles(tmp);
@@ -132,9 +132,9 @@ test("jenkins wrapper rejects unsupported local control-plane flags", async () =
       $,
       profileRoot,
       "/srv/common",
-      "/var/lib/nixos-shared-host/platform-state.json",
-      "/var/lib/nixos-shared-host/runtime",
-      "/var/lib/nixos-shared-host/records",
+      "/var/lib/deployment-host/platform-state.json",
+      "/var/lib/deployment-host/runtime",
+      "/var/lib/deployment-host/records",
       "http://127.0.0.1:7780",
     );
     const auth = await writeJenkinsAuthFiles(tmp);
@@ -160,9 +160,9 @@ test("jenkins wrapper rejects legacy host apply flags in service-only mode", asy
       $,
       profileRoot,
       "/srv/common",
-      "/var/lib/nixos-shared-host/platform-state.json",
-      "/var/lib/nixos-shared-host/runtime",
-      "/var/lib/nixos-shared-host/records",
+      "/var/lib/deployment-host/platform-state.json",
+      "/var/lib/deployment-host/runtime",
+      "/var/lib/deployment-host/records",
       "http://127.0.0.1:7780",
     );
     const auth = await writeJenkinsAuthFiles(tmp);

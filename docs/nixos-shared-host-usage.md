@@ -79,7 +79,7 @@ For a fresh `mini` install, follow this exact order:
    when `mini` should serve the reviewed hosted deployment API route and
    `/srv/common/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
    when `mini` should serve the reviewed public PKCE callback route.
-3. wire `/etc/nixos/nixos-shared-host/default.nix` into the
+3. wire `/etc/nixos/deployment-host/default.nix` into the
    authoritative NixOS config and apply it with `sudo nixos-rebuild switch`
 4. start the deployment service and worker on `mini`
 5. install the client profile on each dev machine or Jenkins worker
@@ -176,9 +176,9 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --profile mini \
   --destination mini \
   --remote-repo-path /srv/common \
-  --remote-state-path /var/lib/nixos-shared-host/platform-state.json \
-  --remote-runtime-root /var/lib/nixos-shared-host/runtime \
-  --remote-records-root /var/lib/nixos-shared-host/records \
+  --remote-state-path /var/lib/deployment-host/platform-state.json \
+  --remote-runtime-root /var/lib/deployment-host/runtime \
+  --remote-records-root /var/lib/deployment-host/records \
   --ssh-mode ssh \
   --control-plane-url https://deploy.apps.kilty.io \
   --control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN
@@ -203,11 +203,11 @@ What the install flags mean:
   matches the host name.
 - `--remote-repo-path /srv/common`
   The repo checkout on `mini` that remote deploy commands should use.
-- `--remote-state-path /var/lib/nixos-shared-host/platform-state.json`
+- `--remote-state-path /var/lib/deployment-host/platform-state.json`
   The host state file used by the shared-host deployment backend.
-- `--remote-runtime-root /var/lib/nixos-shared-host/runtime`
+- `--remote-runtime-root /var/lib/deployment-host/runtime`
   The root directory where runtime files are materialized on `mini`.
-- `--remote-records-root /var/lib/nixos-shared-host/records`
+- `--remote-records-root /var/lib/deployment-host/records`
   The root directory where deployment records are stored on `mini`.
 - `--ssh-mode ssh`
   Use normal SSH transport. This is the standard choice for the current
@@ -233,9 +233,9 @@ The plan output should show:
 
 - destination `mini`
 - remote repo path `/srv/common`
-- remote state path `/var/lib/nixos-shared-host/platform-state.json`
-- remote runtime root `/var/lib/nixos-shared-host/runtime`
-- remote records root `/var/lib/nixos-shared-host/records`
+- remote state path `/var/lib/deployment-host/platform-state.json`
+- remote runtime root `/var/lib/deployment-host/runtime`
+- remote records root `/var/lib/deployment-host/records`
 - a `serviceClient` block with the deployment service URL and token env
 
 ## Run The Reviewed Remote Deploy

@@ -47,12 +47,12 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
 
 Expected files and directories:
 
-- `/etc/nixos/nixos-shared-host/install-manifest.json`
-- `/etc/nixos/nixos-shared-host/nixos-shared-host-managed.nix`
-- `/etc/nixos/nixos-shared-host/default.nix`
-- `/var/lib/nixos-shared-host/platform-state.json`
-- `/var/lib/nixos-shared-host/runtime`
-- `/var/lib/nixos-shared-host/records`
+- `/etc/nixos/deployment-host/install-manifest.json`
+- `/etc/nixos/deployment-host/deployment-host-managed.nix`
+- `/etc/nixos/deployment-host/default.nix`
+- persistent backend data: `/var/lib/deployment-host/platform-state.json`
+- persistent backend data: `/var/lib/deployment-host/runtime`
+- persistent backend data: `/var/lib/deployment-host/records`
 
 ## Wire And Verify The Host
 
@@ -61,7 +61,7 @@ Add the managed anchor to `/etc/nixos/configuration.nix`:
 ```nix
 imports = [
   ./hardware-configuration.nix
-  /etc/nixos/nixos-shared-host/default.nix
+  /etc/nixos/deployment-host/default.nix
 ];
 ```
 
@@ -95,16 +95,16 @@ Run on `mini` from `/srv/common`:
 export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
 export BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
 direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts \
-  --host-root /var/lib/nixos-shared-host/runtime \
-  --state /var/lib/nixos-shared-host/platform-state.json \
-  --records-root /var/lib/nixos-shared-host/records \
+  --host-root /var/lib/deployment-host/runtime \
+  --state /var/lib/deployment-host/platform-state.json \
+  --records-root /var/lib/deployment-host/records \
   --host 127.0.0.1 \
   --port 7780
 ```
 
 ```bash
 direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-worker.ts \
-  --records-root /var/lib/nixos-shared-host/records
+  --records-root /var/lib/deployment-host/records
 ```
 
 What success looks like:
@@ -130,9 +130,9 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --profile mini \
   --destination mini \
   --remote-repo-path /srv/common \
-  --remote-state-path /var/lib/nixos-shared-host/platform-state.json \
-  --remote-runtime-root /var/lib/nixos-shared-host/runtime \
-  --remote-records-root /var/lib/nixos-shared-host/records \
+  --remote-state-path /var/lib/deployment-host/platform-state.json \
+  --remote-runtime-root /var/lib/deployment-host/runtime \
+  --remote-records-root /var/lib/deployment-host/records \
   --ssh-mode ssh \
   --control-plane-url https://deploy.apps.kilty.io \
   --control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN

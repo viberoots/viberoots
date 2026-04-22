@@ -8,8 +8,6 @@ import {
   defaultRecordsRoot,
   defaultRuntimeRoot,
   defaultStatePath,
-  hostPath,
-  legacyDefaultManagedRoot,
   manifestPathFor,
   type NixosSharedHostConfigTopology,
   type NixosSharedHostInstallMode,
@@ -30,7 +28,6 @@ import {
   statusNixosSharedHost,
   uninstallNixosSharedHost,
 } from "./nixos-shared-host-install-host.ts";
-import { pathExists } from "./nixos-shared-host-install-host-support.ts";
 
 type HostInstallInput = {
   serverRoot: string;
@@ -128,17 +125,6 @@ async function runServerCommand(action: string, repoRoot: string) {
   }
   if (!manifestPath)
     throw new Error("missing required --manifest-path or --managed-root/--config-root");
-  if (
-    !hasFlag("manifest-path") &&
-    !hasFlag("managed-root") &&
-    configRoot &&
-    !(await pathExists(hostPath(hostRoot, manifestPath)))
-  ) {
-    const legacyManifestPath = manifestPathFor(legacyDefaultManagedRoot(configRoot));
-    if (await pathExists(hostPath(hostRoot, legacyManifestPath))) {
-      manifestPath = legacyManifestPath;
-    }
-  }
   if (action === "uninstall") {
     console.log(
       JSON.stringify(

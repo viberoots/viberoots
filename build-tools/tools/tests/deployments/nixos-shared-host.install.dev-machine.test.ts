@@ -9,7 +9,7 @@ test("nixos-shared-host client install accepts required parameters by flags", as
   await runInTemp("nixos-shared-host-client-flags", async (tmp, $) => {
     const outputRoot = path.join(tmp, "profiles");
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /var/lib/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/nixos-shared-host/runtime --remote-records-root /var/lib/nixos-shared-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /var/lib/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.manifest.profileName, "mini");
     assert.equal(summary.manifest.destination, "mini");
@@ -24,9 +24,9 @@ test("nixos-shared-host client install accepts required parameters by stdin and 
       profileName: "mini",
       destination: "mini",
       remoteRepoPath: "/srv/common",
-      remoteStatePath: "/var/lib/nixos-shared-host/platform-state.json",
-      remoteRuntimeRoot: "/var/lib/nixos-shared-host/runtime",
-      remoteRecordsRoot: "/var/lib/nixos-shared-host/records",
+      remoteStatePath: "/var/lib/deployment-host/platform-state.json",
+      remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
+      remoteRecordsRoot: "/var/lib/deployment-host/records",
       sshMode: "ssh",
       controlPlaneUrl: "http://127.0.0.1:7780",
     });
@@ -51,7 +51,7 @@ test("nixos-shared-host client install ignores empty stdin", async () => {
     const outputRoot = path.join(tmp, "profiles");
     const result = await $({
       input: "",
-    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /var/lib/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/nixos-shared-host/runtime --remote-records-root /var/lib/nixos-shared-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
+    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /var/lib/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.manifest.profileName, "mini");
     await fsp.access(path.join(outputRoot, "mini.json"));
@@ -61,8 +61,8 @@ test("nixos-shared-host client install ignores empty stdin", async () => {
 test("nixos-shared-host client list reports installed profiles", async () => {
   await runInTemp("nixos-shared-host-client-list", async (tmp, $) => {
     const outputRoot = path.join(tmp, "profiles");
-    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /var/lib/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/nixos-shared-host/runtime --remote-records-root /var/lib/nixos-shared-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
-    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile staging --destination staging --remote-repo-path /srv/common --remote-state-path /var/lib/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/nixos-shared-host/runtime --remote-records-root /var/lib/nixos-shared-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /var/lib/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile staging --destination staging --remote-repo-path /srv/common --remote-state-path /var/lib/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
     const result =
       await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client list --output-root ${outputRoot}`;
     const summary = JSON.parse(String(result.stdout));
@@ -78,8 +78,8 @@ test("nixos-shared-host client list reports installed profiles", async () => {
 test("nixos-shared-host client uninstall removes exactly one profile when --profile is provided", async () => {
   await runInTemp("nixos-shared-host-client-uninstall-profile", async (tmp, $) => {
     const outputRoot = path.join(tmp, "profiles");
-    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /var/lib/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/nixos-shared-host/runtime --remote-records-root /var/lib/nixos-shared-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
-    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile staging --destination staging --remote-repo-path /srv/common --remote-state-path /var/lib/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/nixos-shared-host/runtime --remote-records-root /var/lib/nixos-shared-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /var/lib/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile staging --destination staging --remote-repo-path /srv/common --remote-state-path /var/lib/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
     const uninstall =
       await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client uninstall --output-root ${outputRoot} --profile mini`;
     const summary = JSON.parse(String(uninstall.stdout));
@@ -92,8 +92,8 @@ test("nixos-shared-host client uninstall removes exactly one profile when --prof
 test("nixos-shared-host client uninstall removes all profiles when --all is provided", async () => {
   await runInTemp("nixos-shared-host-client-uninstall-all", async (tmp, $) => {
     const outputRoot = path.join(tmp, "profiles");
-    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /var/lib/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/nixos-shared-host/runtime --remote-records-root /var/lib/nixos-shared-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
-    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile staging --destination staging --remote-repo-path /srv/common --remote-state-path /var/lib/nixos-shared-host/platform-state.json --remote-runtime-root /var/lib/nixos-shared-host/runtime --remote-records-root /var/lib/nixos-shared-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /var/lib/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
+    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile staging --destination staging --remote-repo-path /srv/common --remote-state-path /var/lib/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
     const uninstall =
       await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client uninstall --output-root ${outputRoot} --all`;
     const summary = JSON.parse(String(uninstall.stdout));

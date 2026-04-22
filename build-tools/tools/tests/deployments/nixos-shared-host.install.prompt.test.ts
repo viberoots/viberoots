@@ -55,7 +55,7 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
   let capturedRules: Record<string, unknown> | undefined;
   let capturedInput: Record<string, unknown> | undefined;
   const result = await maybePromptClientInstallInput(
-    "/Users/kiltyj/Code/bucknix-fresh",
+    "/workspace",
     {},
     {
       interactive: true,
@@ -66,9 +66,9 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
           profileName: "mini",
           destination: "mini",
           remoteRepoPath: "/srv/common",
-          remoteStatePath: "/var/lib/nixos-shared-host/platform-state.json",
-          remoteRuntimeRoot: "/var/lib/nixos-shared-host/runtime",
-          remoteRecordsRoot: "/var/lib/nixos-shared-host/records",
+          remoteStatePath: "/var/lib/deployment-host/platform-state.json",
+          remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
+          remoteRecordsRoot: "/var/lib/deployment-host/records",
           sshMode: "ssh",
           controlPlaneUrl: "http://127.0.0.1:7780",
           controlPlaneTokenEnv: "BNX_DEPLOY_CONTROL_PLANE_TOKEN",
@@ -89,9 +89,9 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
   assert.deepEqual(capturedRules?.defaults, {
     profileName: "default",
     remoteRepoPath: "/srv/common",
-    remoteStatePath: "/var/lib/nixos-shared-host/platform-state.json",
-    remoteRuntimeRoot: "/var/lib/nixos-shared-host/runtime",
-    remoteRecordsRoot: "/var/lib/nixos-shared-host/records",
+    remoteStatePath: "/var/lib/deployment-host/platform-state.json",
+    remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
+    remoteRecordsRoot: "/var/lib/deployment-host/records",
     sshMode: "ssh",
     controlPlaneUrl: "http://127.0.0.1:7780",
     controlPlaneTokenEnv: "BNX_DEPLOY_CONTROL_PLANE_TOKEN",

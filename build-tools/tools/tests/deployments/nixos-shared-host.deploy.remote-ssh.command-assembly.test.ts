@@ -26,10 +26,10 @@ const plan: NixosSharedHostRemotePlan = {
   destination: "mini",
   transportMode: "ssh",
   remoteRepoPath: "/srv/common",
-  remoteStatePath: "/var/lib/nixos-shared-host/platform-state.json",
-  remoteRuntimeRoot: "/var/lib/nixos-shared-host/runtime",
-  remoteRecordsRoot: "/var/lib/nixos-shared-host/records",
-  remoteArtifactStageRoot: "/var/lib/nixos-shared-host/runtime/.deploy-artifacts",
+  remoteStatePath: "/var/lib/deployment-host/platform-state.json",
+  remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
+  remoteRecordsRoot: "/var/lib/deployment-host/records",
+  remoteArtifactStageRoot: "/var/lib/deployment-host/runtime/.deploy-artifacts",
   artifactSource: {
     kind: "explicit-artifact-dir",
     localArtifactDir: "/tmp/local-artifact",
@@ -44,7 +44,7 @@ const plan: NixosSharedHostRemotePlan = {
     explicitOptInRequired: true,
     selectedMode: "skip",
     remoteConfigRoot: "/etc/nixos",
-    remoteManagedRoot: "/etc/nixos/nixos-shared-host",
+    remoteManagedRoot: "/etc/nixos/deployment-host",
   },
   hostApplyExpectedLater: true,
 };
@@ -53,7 +53,7 @@ test("remote SSH transport assembles reviewed preflight, staging, deploy, and cl
   const remoteArtifactPath = createNixosSharedHostRemoteArtifactPath(plan, "remote-123");
   assert.equal(
     remoteArtifactPath,
-    "/var/lib/nixos-shared-host/runtime/.deploy-artifacts/projects-deployments-pleomino-dev-deploy/remote-123",
+    "/var/lib/deployment-host/runtime/.deploy-artifacts/projects-deployments-pleomino-dev-deploy/remote-123",
   );
   const preflight = buildRemoteSshArgv(plan.destination, buildRemoteRepoPreflightScript(plan));
   assert.deepEqual(preflight.slice(0, 4), ["ssh", "mini", "bash", "-lc"]);
@@ -73,7 +73,7 @@ test("remote SSH transport assembles reviewed preflight, staging, deploy, and cl
     "-az",
     "--delete",
     "/tmp/local-artifact/",
-    "mini:/var/lib/nixos-shared-host/runtime/.deploy-artifacts/projects-deployments-pleomino-dev-deploy/remote-123/",
+    "mini:/var/lib/deployment-host/runtime/.deploy-artifacts/projects-deployments-pleomino-dev-deploy/remote-123/",
   ]);
   const deploy = buildRemoteSshArgv(
     plan.destination,
@@ -91,7 +91,7 @@ test("remote SSH transport assembles reviewed preflight, staging, deploy, and cl
   assert.match(deploy[4] || "", /direnv exec \. build-tools\/tools\/bin\/deploy/);
   assert.match(
     deploy[4] || "",
-    /--artifact-dir '\/var\/lib\/nixos-shared-host\/runtime\/\.deploy-artifacts/,
+    /--artifact-dir '\/var\/lib\/deployment-host\/runtime\/\.deploy-artifacts/,
   );
   assert.match(deploy[4] || "", /--smoke-connect-host '127\.0\.0\.1'/);
   assert.match(deploy[4] || "", /--smoke-connect-port '3443'/);
@@ -117,10 +117,10 @@ test("remote SSH transport assembles reviewed host-apply commands for switch and
   );
   assert.match(switchApply[4] || "", /nixos-shared-host-host-apply\.ts/);
   assert.match(switchApply[4] || "", /--config-root '\/etc\/nixos'/);
-  assert.match(switchApply[4] || "", /--managed-root '\/etc\/nixos\/nixos-shared-host'/);
+  assert.match(switchApply[4] || "", /--managed-root '\/etc\/nixos\/deployment-host'/);
   assert.match(
     switchApply[4] || "",
-    /--expected-state-path '\/var\/lib\/nixos-shared-host\/platform-state\.json'/,
+    /--expected-state-path '\/var\/lib\/deployment-host\/platform-state\.json'/,
   );
   const dryRunPlan: NixosSharedHostRemotePlan = {
     ...switchPlan,

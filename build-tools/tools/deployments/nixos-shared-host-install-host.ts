@@ -24,9 +24,12 @@ import {
   renderManagedModule,
 } from "./nixos-shared-host-install-contract.ts";
 import {
+  assertUninstallInventoryIsConfigOnly,
   detectConfigTopology,
   detectWiringState,
   ensureWritable,
+  manifestInstallDirectories,
+  mkdirHostDirectories,
   pathExists,
   readManifestIfPresent,
   readText,
@@ -85,7 +88,13 @@ export async function installNixosSharedHost(opts: {
   if (!nixConf.includes("nix-command") || !nixConf.includes("flakes")) {
     throw new Error("host preflight failed: /etc/nix/nix.conf must enable nix-command and flakes");
   }
-  for (const logicalPath of [...manifest.managedPaths, ...manifest.managedDirectories]) {
+  for (const logicalPath of [
+    ...manifest.managedPaths,
+    ...manifest.managedDirectories,
+    manifest.statePath,
+    manifest.runtimeRoot,
+    manifest.recordsRoot,
+  ]) {
     await ensureWritable(hostPath(opts.hostRoot, logicalPath));
   }
   if (existing && existing.managedRoot !== manifest.managedRoot) {
@@ -125,9 +134,7 @@ export async function installNixosSharedHost(opts: {
   ] as Array<[string, string]>;
   if (!opts.dryRun) {
     if (opts.installMode === "managed-dropin") {
-      for (const logicalDir of manifest.managedDirectories) {
-        await fsp.mkdir(hostPath(opts.hostRoot, logicalDir), { recursive: true });
-      }
+      await mkdirHostDirectories(opts.hostRoot, manifestInstallDirectories(manifest));
       for (const [logicalPath, content] of writes) {
         const physical = hostPath(opts.hostRoot, logicalPath);
         await fsp.mkdir(path.dirname(physical), { recursive: true });
@@ -151,9 +158,7 @@ export async function installNixosSharedHost(opts: {
           "managed-manual-wire refuses to reuse an existing managed install; use status or uninstall",
         );
       }
-      for (const logicalDir of manifest.managedDirectories) {
-        await fsp.mkdir(hostPath(opts.hostRoot, logicalDir), { recursive: true });
-      }
+      await mkdirHostDirectories(opts.hostRoot, manifestInstallDirectories(manifest));
       for (const [logicalPath, content] of writes) {
         const physical = hostPath(opts.hostRoot, logicalPath);
         await fsp.mkdir(path.dirname(physical), { recursive: true });
@@ -200,6 +205,7 @@ export async function uninstallNixosSharedHost(opts: {
 }): Promise<{ manifest: NixosSharedHostInstallManifestV1; removedPaths: string[] }> {
   const manifest = await readManifestIfPresent(opts.hostRoot, opts.manifestPath);
   if (!manifest) throw new Error(`managed install manifest not found: ${opts.manifestPath}`);
+  assertUninstallInventoryIsConfigOnly(manifest);
   if (!opts.dryRun && manifest.configInjection?.path) {
     const configEntryPath = hostPath(opts.hostRoot, manifest.configInjection.path);
     if (await pathExists(configEntryPath)) {

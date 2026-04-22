@@ -17,18 +17,35 @@ test("nixos-shared-host server uninstall removes only managed assets and support
     const sibling = path.join(fixture.hostRoot, "etc/nixos/unmanaged-sibling.txt");
     await fsp.mkdir(path.dirname(sibling), { recursive: true });
     await fsp.writeFile(sibling, "keep-me\n", "utf8");
+    const statePath = path.join(fixture.hostRoot, "var/lib/deployment-host/platform-state.json");
+    const runtimeSecret = path.join(
+      fixture.hostRoot,
+      "var/lib/deployment-host/runtime/secrets/do-not-remove.txt",
+    );
+    const recordSecret = path.join(
+      fixture.hostRoot,
+      "var/lib/deployment-host/records/secrets/do-not-remove.txt",
+    );
+    await fsp.writeFile(statePath, '{"valuable":true}\n', "utf8");
+    await fsp.mkdir(path.dirname(runtimeSecret), { recursive: true });
+    await fsp.writeFile(runtimeSecret, "runtime-secret\n", "utf8");
+    await fsp.mkdir(path.dirname(recordSecret), { recursive: true });
+    await fsp.writeFile(recordSecret, "record-secret\n", "utf8");
     await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server uninstall --server-root ${fixture.hostRoot} --config-root /etc/nixos`;
     await fsp.access(sibling);
+    assert.equal(await fsp.readFile(statePath, "utf8"), '{"valuable":true}\n');
+    assert.equal(await fsp.readFile(runtimeSecret, "utf8"), "runtime-secret\n");
+    assert.equal(await fsp.readFile(recordSecret, "utf8"), "record-secret\n");
     assert.doesNotMatch(
       await fsp.readFile(path.join(fixture.hostRoot, "etc/nixos/configuration.nix"), "utf8"),
-      /BEGIN nixos-shared-host managed block/,
+      /BEGIN deployment-host managed block/,
     );
     await assert.rejects(
-      fsp.access(path.join(fixture.hostRoot, "etc/nixos/nixos-shared-host/install-manifest.json")),
+      fsp.access(path.join(fixture.hostRoot, "etc/nixos/deployment-host/install-manifest.json")),
     );
     await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin`;
     await fsp.access(
-      path.join(fixture.hostRoot, "etc/nixos/nixos-shared-host/install-manifest.json"),
+      path.join(fixture.hostRoot, "etc/nixos/deployment-host/install-manifest.json"),
     );
     assert.equal(await fsp.readFile(sibling, "utf8"), "keep-me\n");
   });
@@ -41,7 +58,7 @@ test("nixos-shared-host manual-wire uninstall leaves server config entry untouch
       topology: "plain",
     });
     const operatorManagedConfig =
-      "{ ... }:\n{\n  imports = [\n    /etc/nixos/nixos-shared-host/default.nix\n  ];\n}\n";
+      "{ ... }:\n{\n  imports = [\n    /etc/nixos/deployment-host/default.nix\n  ];\n}\n";
     await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-manual-wire`;
     await fsp.writeFile(
       path.join(fixture.hostRoot, "etc/nixos/configuration.nix"),
@@ -54,41 +71,43 @@ test("nixos-shared-host manual-wire uninstall leaves server config entry untouch
       operatorManagedConfig,
     );
     await assert.rejects(
-      fsp.access(path.join(fixture.hostRoot, "etc/nixos/nixos-shared-host/install-manifest.json")),
+      fsp.access(path.join(fixture.hostRoot, "etc/nixos/deployment-host/install-manifest.json")),
     );
-  });
-});
-
-test("nixos-shared-host server uninstall accepts reviewed legacy manifest versions", async () => {
-  await runInTemp("nixos-shared-host-host-uninstall-v0", async (tmp, $) => {
-    const fixture = await createNixosSharedHostInstallFixture({ root: tmp, topology: "plain" });
-    const managedRoot = path.join(fixture.hostRoot, "etc/nixos/bucknix/nixos-shared-host");
-    await fsp.mkdir(managedRoot, { recursive: true });
+    await fsp.mkdir(path.join(fixture.hostRoot, "etc/nixos/deployment-host"), {
+      recursive: true,
+    });
     await fsp.writeFile(
-      path.join(managedRoot, "install-manifest.json"),
-      JSON.stringify(
-        {
-          schemaVersion: "nixos-shared-host-install@0",
-          installMode: "managed-dropin",
-          configRoot: "/etc/nixos",
-          managedRoot: "/etc/nixos/bucknix/nixos-shared-host",
-          statePath: "/var/lib/bucknix/nixos-shared-host/platform-state.json",
-          runtimeRoot: "/var/lib/bucknix/nixos-shared-host/runtime",
-          recordsRoot: "/var/lib/bucknix/nixos-shared-host/records",
-          dropInPath: "/etc/nixos/bucknix/nixos-shared-host/nixos-shared-host-managed.nix",
-          anchorPath: "/etc/nixos/bucknix/nixos-shared-host/default.nix",
+      path.join(fixture.hostRoot, "etc/nixos/deployment-host/install-manifest.json"),
+      JSON.stringify({
+        schemaVersion: "nixos-shared-host-install@1",
+        tool: "nixos-shared-host-install",
+        toolFingerprint: "test",
+        installMode: "managed-manual-wire",
+        configTopology: "plain",
+        configRoot: "/etc/nixos",
+        managedRoot: "/etc/nixos/deployment-host",
+        statePath: "/var/lib/deployment-host/platform-state.json",
+        runtimeRoot: "/var/lib/deployment-host/runtime",
+        recordsRoot: "/var/lib/deployment-host/records",
+        managedPaths: [
+          "/etc/nixos/deployment-host/install-manifest.json",
+          "/var/lib/deployment-host/platform-state.json",
+        ],
+        managedDirectories: ["/etc/nixos/deployment-host"],
+        managedUsers: [],
+        managedEntryPoints: {
+          modulePath: "/etc/nixos/deployment-host/deployment-host-managed.nix",
+          anchorPath: "/etc/nixos/deployment-host/default.nix",
         },
-        null,
-        2,
-      ) + "\n",
+      }) + "\n",
       "utf8",
     );
-    await fsp.writeFile(path.join(managedRoot, "default.nix"), "{ ... }: { }\n", "utf8");
-    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server uninstall --server-root ${fixture.hostRoot} --config-root /etc/nixos`;
-    await assert.rejects(
-      fsp.access(
-        path.join(fixture.hostRoot, "etc/nixos/bucknix/nixos-shared-host/install-manifest.json"),
-      ),
+    const unsafeUninstall =
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server uninstall --server-root ${fixture.hostRoot} --config-root /etc/nixos`.nothrow();
+    assert.notEqual(unsafeUninstall.exitCode, 0);
+    assert.match(
+      String(unsafeUninstall.stderr),
+      /refusing to uninstall path outside managed config root/,
     );
   });
 });

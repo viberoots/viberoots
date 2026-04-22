@@ -2,10 +2,8 @@
 import path from "node:path";
 import type { NixosSharedHostConfigTopology } from "./nixos-shared-host-install-contract.ts";
 
-const START_MARKER = "# BEGIN nixos-shared-host managed block";
-const END_MARKER = "# END nixos-shared-host managed block";
-const LEGACY_START_MARKER = "# BEGIN bucknix nixos-shared-host";
-const LEGACY_END_MARKER = "# END bucknix nixos-shared-host";
+const START_MARKER = "# BEGIN deployment-host managed block";
+const END_MARKER = "# END deployment-host managed block";
 
 function listTokenFor(topology: NixosSharedHostConfigTopology): string {
   return topology === "flake" ? "modules" : "imports";
@@ -20,27 +18,15 @@ function normalizeIndent(line: string): string {
   return match?.[1] || "";
 }
 
-function removeManagedBlockWithMarkers(
-  source: string,
-  startMarker: string,
-  endMarker: string,
-): string {
-  const start = source.indexOf(startMarker);
+function removeManagedBlock(source: string): string {
+  const start = source.indexOf(START_MARKER);
   if (start < 0) return source;
-  const end = source.indexOf(endMarker, start);
+  const end = source.indexOf(END_MARKER, start);
   if (end < 0) throw new Error("managed config-entry markers are unbalanced");
-  const after = end + endMarker.length;
+  const after = end + END_MARKER.length;
   const suffix = source.slice(after).replace(/^\n/, "");
   const prefix = source.slice(0, start).replace(/\n?$/, "\n");
   return prefix + suffix;
-}
-
-function removeManagedBlock(source: string): string {
-  return removeManagedBlockWithMarkers(
-    removeManagedBlockWithMarkers(source, LEGACY_START_MARKER, LEGACY_END_MARKER),
-    START_MARKER,
-    END_MARKER,
-  );
 }
 
 function findAssignment(source: string, token: string): { openIndex: number; closeIndex: number } {
@@ -71,9 +57,7 @@ export function renderConfigEntryInstruction(opts: {
 }
 
 export function configEntryContainsManagedAnchor(source: string, anchorPath: string): boolean {
-  const managed =
-    (source.includes(START_MARKER) && source.includes(END_MARKER)) ||
-    (source.includes(LEGACY_START_MARKER) && source.includes(LEGACY_END_MARKER));
+  const managed = source.includes(START_MARKER) && source.includes(END_MARKER);
   if (managed && source.includes(anchorPath)) return true;
   return source.includes(anchorLiteralPath(anchorPath));
 }

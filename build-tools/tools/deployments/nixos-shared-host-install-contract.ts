@@ -4,7 +4,6 @@ import path from "node:path";
 import { emptyNixosSharedHostPlatformState } from "./nixos-shared-host-platform.ts";
 
 export const NIXOS_SHARED_HOST_INSTALL_SCHEMA_V1 = "nixos-shared-host-install@1";
-export const NIXOS_SHARED_HOST_INSTALL_SCHEMA_V0 = "nixos-shared-host-install@0";
 export const NIXOS_SHARED_HOST_CLIENT_SCHEMA_V1 = "nixos-shared-host-client@1";
 export const NIXOS_SHARED_HOST_INSTALL_TOOL = "nixos-shared-host-install";
 
@@ -34,19 +33,6 @@ export type NixosSharedHostInstallManifestV1 = {
   configInjection?: {
     path: string;
   };
-};
-
-type NixosSharedHostInstallManifestV0 = {
-  schemaVersion: typeof NIXOS_SHARED_HOST_INSTALL_SCHEMA_V0;
-  installMode: NixosSharedHostInstallMode;
-  configRoot: string;
-  managedRoot: string;
-  statePath: string;
-  runtimeRoot: string;
-  recordsRoot: string;
-  dropInPath: string;
-  anchorPath: string;
-  managedPaths?: string[];
 };
 
 export type NixosSharedHostClientManifest = {
@@ -80,35 +66,19 @@ export function hostPath(hostRoot: string, logicalPath: string): string {
 }
 
 export function defaultManagedRoot(configRoot: string): string {
-  return path.posix.join(normalizeHostLogicalPath(configRoot), "nixos-shared-host");
+  return path.posix.join(normalizeHostLogicalPath(configRoot), "deployment-host");
 }
 
 export function defaultStatePath(): string {
-  return "/var/lib/nixos-shared-host/platform-state.json";
+  return "/var/lib/deployment-host/platform-state.json";
 }
 
 export function defaultRuntimeRoot(): string {
-  return "/var/lib/nixos-shared-host/runtime";
+  return "/var/lib/deployment-host/runtime";
 }
 
 export function defaultRecordsRoot(): string {
-  return "/var/lib/nixos-shared-host/records";
-}
-
-export function legacyDefaultManagedRoot(configRoot: string): string {
-  return path.posix.join(normalizeHostLogicalPath(configRoot), "bucknix", "nixos-shared-host");
-}
-
-function legacyDefaultStatePath(): string {
-  return "/var/lib/bucknix/nixos-shared-host/platform-state.json";
-}
-
-function legacyDefaultRuntimeRoot(): string {
-  return "/var/lib/bucknix/nixos-shared-host/runtime";
-}
-
-function legacyDefaultRecordsRoot(): string {
-  return "/var/lib/bucknix/nixos-shared-host/records";
+  return "/var/lib/deployment-host/records";
 }
 
 export function manifestPathFor(managedRoot: string): string {
@@ -116,7 +86,7 @@ export function manifestPathFor(managedRoot: string): string {
 }
 
 export function modulePathFor(managedRoot: string): string {
-  return path.posix.join(normalizeHostLogicalPath(managedRoot), "nixos-shared-host-managed.nix");
+  return path.posix.join(normalizeHostLogicalPath(managedRoot), "deployment-host-managed.nix");
 }
 
 export function anchorPathFor(managedRoot: string): string {
@@ -164,21 +134,10 @@ export function createInstallManifestV1(input: {
   recordsRoot: string;
 }): NixosSharedHostInstallManifestV1 {
   const managedRoot = normalizeHostLogicalPath(input.managedRoot);
-  const managedDirectories = Array.from(
-    new Set(
-      [managedRoot, input.runtimeRoot, input.recordsRoot]
-        .map((value) => normalizeHostLogicalPath(value))
-        .sort(),
-    ),
-  );
+  const managedDirectories = [managedRoot];
   const managedPaths = Array.from(
     new Set(
-      [
-        manifestPathFor(managedRoot),
-        modulePathFor(managedRoot),
-        anchorPathFor(managedRoot),
-        normalizeHostLogicalPath(input.statePath),
-      ].sort(),
+      [manifestPathFor(managedRoot), modulePathFor(managedRoot), anchorPathFor(managedRoot)].sort(),
     ),
   );
   return {
@@ -209,27 +168,12 @@ export function createInstallManifestV1(input: {
 }
 
 export function parseInstallManifest(raw: unknown): NixosSharedHostInstallManifestV1 {
-  const parsed = raw as Partial<
-    NixosSharedHostInstallManifestV1 & NixosSharedHostInstallManifestV0
-  >;
+  const parsed = raw as Partial<NixosSharedHostInstallManifestV1>;
   if (parsed?.schemaVersion === NIXOS_SHARED_HOST_INSTALL_SCHEMA_V1) {
     if (!Array.isArray(parsed.managedPaths) || !Array.isArray(parsed.managedDirectories)) {
       throw new Error("invalid nixos-shared-host install manifest: missing managed path inventory");
     }
     return parsed as NixosSharedHostInstallManifestV1;
-  }
-  if (parsed?.schemaVersion === NIXOS_SHARED_HOST_INSTALL_SCHEMA_V0) {
-    return createInstallManifestV1({
-      toolFingerprint: "migrated-from-v0",
-      installMode: parsed.installMode || "emit-only",
-      configTopology: "plain",
-      configRoot: parsed.configRoot || "/etc/nixos",
-      managedRoot:
-        parsed.managedRoot || legacyDefaultManagedRoot(parsed.configRoot || "/etc/nixos"),
-      statePath: parsed.statePath || legacyDefaultStatePath(),
-      runtimeRoot: parsed.runtimeRoot || legacyDefaultRuntimeRoot(),
-      recordsRoot: parsed.recordsRoot || legacyDefaultRecordsRoot(),
-    });
   }
   throw new Error(
     `unsupported nixos-shared-host install manifest schema "${String(parsed?.schemaVersion || "")}"`,

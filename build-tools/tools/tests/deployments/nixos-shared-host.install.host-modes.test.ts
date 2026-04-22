@@ -20,13 +20,13 @@ test("nixos-shared-host server install supports managed-dropin on plain /etc/nix
     assert.equal(summary.managed, true);
     assert.equal(summary.manifest.installMode, "managed-dropin");
     assert.equal(summary.wiringState, "wired");
-    await fsp.access(path.join(fixture.hostRoot, "var/lib/nixos-shared-host/platform-state.json"));
+    await fsp.access(path.join(fixture.hostRoot, "var/lib/deployment-host/platform-state.json"));
     await fsp.access(
-      path.join(fixture.hostRoot, "etc/nixos/nixos-shared-host/nixos-shared-host-managed.nix"),
+      path.join(fixture.hostRoot, "etc/nixos/deployment-host/deployment-host-managed.nix"),
     );
     assert.match(
       await fsp.readFile(path.join(fixture.hostRoot, "etc/nixos/configuration.nix"), "utf8"),
-      /BEGIN nixos-shared-host managed block/,
+      /BEGIN deployment-host managed block/,
     );
     await fsp.access(path.join(fixture.hostRoot, "etc/nixos/nginx.nix"));
   });
@@ -47,7 +47,7 @@ test("nixos-shared-host server install supports emit-only on flake roots without
     assert.match(String(summary.configInstruction || ""), /modules = \[ .*default\.nix .*]/);
     assert.equal(
       summary.emittedSnippets.managedModulePath,
-      "/etc/nixos/nixos-shared-host/nixos-shared-host-managed.nix",
+      "/etc/nixos/deployment-host/deployment-host-managed.nix",
     );
     assert.match(
       String(summary.emittedSnippets.managedModuleSource || ""),
@@ -55,14 +55,14 @@ test("nixos-shared-host server install supports emit-only on flake roots without
     );
     assert.equal(
       summary.emittedSnippets.managedAnchorPath,
-      "/etc/nixos/nixos-shared-host/default.nix",
+      "/etc/nixos/deployment-host/default.nix",
     );
     assert.match(String(summary.emittedSnippets.managedAnchorSource || ""), /imports = \[/);
     await assert.rejects(
-      fsp.access(path.join(fixture.hostRoot, "var/lib/nixos-shared-host/platform-state.json")),
+      fsp.access(path.join(fixture.hostRoot, "var/lib/deployment-host/platform-state.json")),
     );
     await assert.rejects(
-      fsp.access(path.join(fixture.hostRoot, "etc/nixos/nixos-shared-host/default.nix")),
+      fsp.access(path.join(fixture.hostRoot, "etc/nixos/deployment-host/default.nix")),
     );
   });
 });
@@ -87,9 +87,9 @@ test("nixos-shared-host server install supports managed-manual-wire without edit
     assert.equal(summary.manifest.configInjection, undefined);
     assert.match(String(summary.configInstruction || ""), /imports = \[ .*default\.nix .*]/);
     await fsp.access(
-      path.join(fixture.hostRoot, "etc/nixos/nixos-shared-host/install-manifest.json"),
+      path.join(fixture.hostRoot, "etc/nixos/deployment-host/install-manifest.json"),
     );
-    await fsp.access(path.join(fixture.hostRoot, "var/lib/nixos-shared-host/platform-state.json"));
+    await fsp.access(path.join(fixture.hostRoot, "var/lib/deployment-host/platform-state.json"));
     assert.equal(
       await fsp.readFile(path.join(fixture.hostRoot, "etc/nixos/configuration.nix"), "utf8"),
       configBefore,
@@ -109,19 +109,16 @@ test("nixos-shared-host server install accepts stdin JSON and flags override std
       configRoot: "/etc/nixos",
       configEntryPath: "/etc/nixos/configuration.nix",
       installMode: "emit-only",
-      statePath: "/var/lib/nixos-shared-host-custom/platform-state.json",
+      statePath: "/var/lib/deployment-host-custom/platform-state.json",
     });
     const result = await $({
       input: payload,
     })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --install-mode managed-dropin`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.manifest.installMode, "managed-dropin");
-    assert.equal(
-      summary.manifest.statePath,
-      "/var/lib/nixos-shared-host-custom/platform-state.json",
-    );
+    assert.equal(summary.manifest.statePath, "/var/lib/deployment-host-custom/platform-state.json");
     await fsp.access(
-      path.join(fixture.hostRoot, "var/lib/nixos-shared-host-custom/platform-state.json"),
+      path.join(fixture.hostRoot, "var/lib/deployment-host-custom/platform-state.json"),
     );
   });
 });
@@ -138,6 +135,6 @@ test("nixos-shared-host server install ignores empty stdin", async () => {
     })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.manifest.installMode, "managed-manual-wire");
-    await fsp.access(path.join(fixture.hostRoot, "var/lib/nixos-shared-host/platform-state.json"));
+    await fsp.access(path.join(fixture.hostRoot, "var/lib/deployment-host/platform-state.json"));
   });
 });
