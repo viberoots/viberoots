@@ -447,6 +447,8 @@ What the service and worker flags mean:
 - `--host 127.0.0.1`
   The private bind address. Keep the service on loopback and expose it only
   through the reviewed HTTPS nginx vhost.
+- `BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'`
+  Required for the reviewed hosted service. The service startup fails closed without a bearer token unless `BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1` explicitly marks a local fixture service.
 
 Common example values:
 
@@ -479,6 +481,9 @@ direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control
 Required worker-side secret-source prep after PR-79 and later:
 
 - set `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL` for both service and worker
+- set `BNX_DEPLOY_CONTROL_PLANE_TOKEN` or pass `--token` for the reviewed
+  hosted service; unconfigured hosted protected/shared routes fail closed, and
+  tokenless startup is reserved for explicit fixture mode only
 - set the server-local credential variable referenced by `vault_runtime`, for
   example `BNX_DEPLOYER_CLIENT_SECRET` for a reviewed service-account client
   secret, or `BNX_DEPLOYMENT_OIDC_TOKEN` for an external workload identity

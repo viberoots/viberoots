@@ -48,6 +48,7 @@ test("control-plane service persists queued submissions across restart and a sep
       workspaceRoot: tmp,
       paths,
       backendDatabaseUrl,
+      localFixture: true,
     });
     try {
       const submitted = await submitServiceRequest({
@@ -88,6 +89,7 @@ test("control-plane service persists queued submissions across restart and a sep
         workspaceRoot: tmp,
         paths,
         backendDatabaseUrl,
+        localFixture: true,
       });
       try {
         const afterRestart = await readStatus(restarted.url, submitted.submissionId);
@@ -147,6 +149,7 @@ test("control-plane run-action API cancels a queued submission and keeps the sta
       workspaceRoot: tmp,
       paths,
       backendDatabaseUrl,
+      localFixture: true,
     });
     try {
       const submitted = await submitServiceRequest({
@@ -162,6 +165,7 @@ test("control-plane run-action API cancels a queued submission and keeps the sta
         workspaceRoot: tmp,
         paths,
         backendDatabaseUrl,
+        localFixture: true,
       });
       try {
         const status = await readStatus(restarted.url, submitted.submissionId);
@@ -208,6 +212,7 @@ test("repo-level deploy submits shared-host mutation through the configured cont
       workspaceRoot: tmp,
       paths,
       backendDatabaseUrl,
+      localFixture: true,
     });
     const worker = startNixosSharedHostControlPlaneWorkerLoop({
       workspaceRoot: tmp,

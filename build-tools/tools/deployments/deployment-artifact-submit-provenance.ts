@@ -20,6 +20,7 @@ import {
 import { decodeBackendJson } from "./nixos-shared-host-control-plane-backend-db.ts";
 import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract.ts";
 import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-control-plane-contract.ts";
+import { finalizedStagedArtifactReference } from "./nixos-shared-host-artifact-submit-request.ts";
 
 export type ArtifactChallengeRow = {
   challenge_id: string;
@@ -90,6 +91,9 @@ export function verifyArtifactChallengeForSubmit(opts: {
   assertArtifactChallengeBindingMatches({
     stored: binding,
     request: opts.request,
+    finalizedStagedArtifactReference:
+      opts.finalizedStagedArtifactReference ||
+      finalizedStagedArtifactReference(opts.request as any),
     ...(opts.authorization ? { authorization: opts.authorization } : {}),
   });
   verifyArtifactBindingProof({

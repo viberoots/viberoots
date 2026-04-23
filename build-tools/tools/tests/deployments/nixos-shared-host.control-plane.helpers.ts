@@ -120,6 +120,7 @@ export async function startControlPlaneHarness(opts: {
       workspaceRoot: opts.workspaceRoot,
       paths,
       backendDatabaseUrl,
+      localFixture: true,
     });
     const worker = startNixosSharedHostControlPlaneWorkerLoop({
       workspaceRoot: opts.workspaceRoot,

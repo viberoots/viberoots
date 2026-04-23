@@ -1,6 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
+import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
+import { runInTemp } from "../lib/test-helpers.ts";
 import { resolveControlPlaneServiceToken } from "../../deployments/nixos-shared-host-control-plane-service.ts";
 
 test("control-plane service token falls back to BNX_DEPLOY_CONTROL_PLANE_TOKEN", () => {
@@ -22,4 +25,32 @@ test("control-plane service token falls back to BNX_DEPLOY_CONTROL_PLANE_TOKEN",
     resolveControlPlaneServiceToken({ tokenFlag: "", env: {} as NodeJS.ProcessEnv }),
     undefined,
   );
+});
+
+test("control-plane service requires a reviewed token unless fixture mode is explicit", async () => {
+  await runInTemp("nixos-control-plane-service-token-required", async (tmp) => {
+    const env = {} as NodeJS.ProcessEnv;
+    const paths = {
+      statePath: `${tmp}/platform-state.json`,
+      hostRoot: `${tmp}/host`,
+      recordsRoot: `${tmp}/records`,
+    };
+    await assert.rejects(
+      startNixosSharedHostControlPlaneServer({
+        workspaceRoot: tmp,
+        paths,
+        backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
+        env,
+      }),
+      /requires --token or BNX_DEPLOY_CONTROL_PLANE_TOKEN/,
+    );
+    const fixture = await startNixosSharedHostControlPlaneServer({
+      workspaceRoot: tmp,
+      paths,
+      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
+      localFixture: true,
+      env,
+    });
+    await fixture.close();
+  });
 });

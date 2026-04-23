@@ -69,6 +69,7 @@ test("challenge issuance rejects unauthorized auth-required requests before pers
       workspaceRoot: tmp,
       paths,
       backendDatabaseUrl: backend.databaseUrl,
+      localFixture: true,
     });
     try {
       const request = await baseRequest(deployment, artifactDir);
@@ -123,6 +124,7 @@ test("final submit rejects auth principal drift without consuming the challenge"
       workspaceRoot: tmp,
       paths,
       backendDatabaseUrl: backend.databaseUrl,
+      localFixture: true,
     });
     try {
       const request = await baseRequest(deployment, artifactDir);

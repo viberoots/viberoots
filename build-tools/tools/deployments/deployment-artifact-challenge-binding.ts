@@ -4,6 +4,7 @@ import {
   baseArtifactChallengeRequest,
   type DeploymentArtifactChallengeRequest,
 } from "./deployment-artifact-binding.ts";
+import { DeploymentUnauthorizedError } from "./deployment-control-plane-errors.ts";
 import type {
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneScope,
@@ -20,6 +21,7 @@ export type DeploymentArtifactChallengeBinding = {
   request: DeploymentArtifactChallengeRequest;
   providerTargetIdentity: string;
   lockScope: string;
+  finalizedStagedArtifactReference?: string;
   authorization?: DeploymentArtifactAuthorizationBinding;
 };
 
@@ -36,6 +38,7 @@ function authorizationBinding(
 
 export function artifactChallengeBinding(opts: {
   request: DeploymentArtifactChallengeRequest;
+  finalizedStagedArtifactReference?: string;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
 }): DeploymentArtifactChallengeBinding {
   const providerTargetIdentity = nixosSharedHostDeploymentTargetIdentity(opts.request.deployment);
@@ -43,6 +46,9 @@ export function artifactChallengeBinding(opts: {
     request: baseArtifactChallengeRequest(opts.request),
     providerTargetIdentity,
     lockScope: providerTargetIdentity,
+    ...(opts.finalizedStagedArtifactReference
+      ? { finalizedStagedArtifactReference: opts.finalizedStagedArtifactReference }
+      : {}),
     ...(authorizationBinding(opts.authorization)
       ? { authorization: authorizationBinding(opts.authorization) }
       : {}),
@@ -60,10 +66,14 @@ export function decodeArtifactChallengeBinding(value: unknown): DeploymentArtifa
 export function assertArtifactChallengeBindingMatches(opts: {
   stored: DeploymentArtifactChallengeBinding;
   request: DeploymentArtifactChallengeRequest;
+  finalizedStagedArtifactReference?: string;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
 }) {
   const expected = artifactChallengeBinding({
     request: opts.request,
+    ...(opts.finalizedStagedArtifactReference
+      ? { finalizedStagedArtifactReference: opts.finalizedStagedArtifactReference }
+      : {}),
     ...(opts.authorization ? { authorization: opts.authorization } : {}),
   });
   if (
@@ -78,9 +88,17 @@ export function assertArtifactChallengeBindingMatches(opts: {
     throw new Error("artifact submission challenge target binding mismatch");
   }
   if (
+    (opts.stored.finalizedStagedArtifactReference || null) !==
+    (expected.finalizedStagedArtifactReference || null)
+  ) {
+    throw new Error("artifact submission challenge staged-reference binding mismatch");
+  }
+  if (
     artifactBindingFingerprint(opts.stored.authorization || null) !==
     artifactBindingFingerprint(expected.authorization || null)
   ) {
-    throw new Error("artifact submission challenge authorization binding mismatch");
+    throw new DeploymentUnauthorizedError(
+      "artifact submission challenge authorization binding mismatch",
+    );
   }
 }

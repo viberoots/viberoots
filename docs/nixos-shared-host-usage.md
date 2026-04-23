@@ -304,8 +304,12 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
 The remote-profile and Jenkins commands use SSH for staging files and basic
 preflight work. The actual deployment request goes through the central
 deployment service recorded in the client profile. Protected/shared profiles
-must use HTTPS service URLs with certificate validation enabled and reviewed
-known-hosts or host-key pinning for SSH staging.
+must use HTTPS service URLs with certificate validation enabled, must provide
+the reviewed `BNX_DEPLOY_CONTROL_PLANE_TOKEN` bearer token for the hosted
+service, and must keep reviewed known-hosts or host-key pinning for SSH
+staging. If the hosted token is missing or rejected, the service fails the
+challenge or submit request closed and still cleans staged artifacts or records
+bounded janitor metadata itself.
 
 Do not pass `--control-plane-url`, `--apply-host`, or `--apply-host-dry-run`
 to those wrappers. They read that information from the installed profile.

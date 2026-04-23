@@ -8,7 +8,12 @@ import { resolveSubmitAuthorizationBoundary } from "./deployment-service-authori
 import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract.ts";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
 import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
+import {
+  assertProtectedSharedArtifactIdentityFields,
+  finalizedStagedArtifactReference,
+} from "./nixos-shared-host-artifact-submit-request.ts";
 import { cleanupThenRethrowRejectedNixosSubmit } from "./nixos-shared-host-control-plane-rejection-cleanup.ts";
+import { assertReviewedServiceBearerToken } from "./nixos-shared-host-control-plane-service-auth.ts";
 
 export async function handleControlPlaneArtifactChallenge(
   request: NixosSharedHostControlPlaneSubmitRequest,
@@ -16,9 +21,19 @@ export async function handleControlPlaneArtifactChallenge(
     paths: NixosSharedHostControlPlanePaths;
     backend: NixosSharedHostControlPlaneBackendTarget;
     serviceToken?: string;
+    authorizationHeader?: string | string[];
+    localFixture?: boolean;
+    env?: NodeJS.ProcessEnv;
   },
 ) {
   try {
+    assertReviewedServiceBearerToken({
+      authorizationHeader: opts.authorizationHeader,
+      serviceToken: opts.serviceToken,
+      localFixture: opts.localFixture,
+      env: opts.env,
+    });
+    assertProtectedSharedArtifactIdentityFields(request);
     const boundary = await resolveSubmitAuthorizationBoundary({
       recordsRoot: opts.paths.recordsRoot,
       deployment: request.deployment,
@@ -43,6 +58,7 @@ export async function handleControlPlaneArtifactChallenge(
       request,
       principalId: principal.principalId,
       keyId: principal.keyId,
+      finalizedStagedArtifactReference: finalizedStagedArtifactReference(request),
       ...(authorization ? { authorization } : {}),
     });
   } catch (error) {

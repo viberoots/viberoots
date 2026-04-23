@@ -32,9 +32,9 @@ import {
   type NixosSharedHostControlPlaneSubmitRequest,
 } from "./nixos-shared-host-control-plane-api-contract.ts";
 import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
-import { acceptChallengedNixosSharedHostSubmitWithRejectedCleanup } from "./nixos-shared-host-control-plane-challenged-submit.ts";
 import { prepareBackendNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-backend-prepare.ts";
 import { resolveServiceSubmitRequest } from "./nixos-shared-host-control-plane-service-submit.ts";
+import { handleProtectedChallengedNixosServiceSubmit } from "./nixos-shared-host-control-plane-service-protected-submit.ts";
 export {
   readControlPlaneRecord,
   readControlPlaneStatus,
@@ -55,6 +55,9 @@ export async function handleControlPlaneSubmit(
     backend: NixosSharedHostControlPlaneBackendTarget;
     serviceToken?: string;
     requireArtifactBinding?: boolean;
+    authorizationHeader?: string | string[];
+    localFixture?: boolean;
+    env?: NodeJS.ProcessEnv;
   },
 ) {
   if (
@@ -84,6 +87,25 @@ export async function handleControlPlaneSubmit(
     submittedAt: request.submittedAt,
   });
   const idempotencyKey = request.idempotencyKey || request.submissionId;
+  if (
+    opts.requireArtifactBinding &&
+    resolvedRequest.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA &&
+    (resolvedRequest.artifactDir || resolvedRequest.artifactDirsByComponentId)
+  ) {
+    return await handleProtectedChallengedNixosServiceSubmit({
+      workspaceRoot: opts.workspaceRoot,
+      paths: opts.paths,
+      backend: opts.backend,
+      serviceToken: opts.serviceToken,
+      authorizationHeader: opts.authorizationHeader,
+      localFixture: opts.localFixture,
+      env: opts.env,
+      request: request as NixosSharedHostControlPlaneSubmitRequest,
+      resolvedRequest: resolvedRequest as NixosSharedHostControlPlaneSubmitRequest,
+      requestFingerprint,
+      idempotencyKey,
+    });
+  }
   const boundary =
     request.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
       ? await resolveSubmitAuthorizationBoundary({
@@ -109,23 +131,6 @@ export async function handleControlPlaneSubmit(
         authorization: boundary.authorization,
       })
     : undefined;
-  if (
-    opts.requireArtifactBinding &&
-    resolvedRequest.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA &&
-    (resolvedRequest.artifactDir || resolvedRequest.artifactDirsByComponentId)
-  ) {
-    return await acceptChallengedNixosSharedHostSubmitWithRejectedCleanup({
-      workspaceRoot: opts.workspaceRoot,
-      paths: opts.paths,
-      backend: opts.backend,
-      serviceToken: opts.serviceToken,
-      resolvedRequest,
-      requestFingerprint,
-      idempotencyKey,
-      boundary,
-      ...(authorization ? { authorization } : {}),
-    });
-  }
   const dedupe = await resolveBackendIdempotency({
     backend: opts.backend,
     kind: "submit",

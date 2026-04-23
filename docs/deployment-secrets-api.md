@@ -136,11 +136,14 @@ Deployment-service routing:
 
 - `--control-plane-url <url>`: the deployment service URL
 - `--remote mini`: shorthand for the reviewed `mini` deployment service endpoint
-- `--control-plane-token <token>`: optional bearer token for the service
+- `--control-plane-token <token>`: required bearer token for reviewed hosted
+  protected/shared service requests; explicit local fixture flows may omit it
+  only when `BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1` marks the service as
+  non-production
 - `BNX_DEPLOY_CONTROL_PLANE_URL`: environment fallback for `--control-plane-url`
 - `BNX_DEPLOY_MINI_CONTROL_PLANE_URL`: optional override for `--remote mini`
 - `BNX_DEPLOY_CONTROL_PLANE_TOKEN`: environment fallback used by reviewed
-  service clients
+  service clients and hosted service processes
 
 Common example values:
 
@@ -163,7 +166,9 @@ Service-process configuration:
 - `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL`: environment fallback for backend
   service processes and backend-native read helpers
 - `BNX_DEPLOY_CONTROL_PLANE_TOKEN`: environment fallback for the deployment
-  service bearer token
+  service bearer token; the reviewed hosted service fails closed at startup
+  unless this or `--token` is set, and only explicit fixture mode may run
+  without it
 
 Common example values:
 
@@ -425,9 +430,11 @@ The current provider submit schemas are:
 
 Protected/shared `nixos-shared-host` upload submissions also carry:
 
-- `expectedArtifactIdentity` for single-component uploads
-- `expectedComponentArtifactIdentities` plus `expectedCompositeArtifactIdentity`
-  for multi-component uploads
+- challenge issuance rejects single-component uploads before persistence when
+  `expectedArtifactIdentity` is missing
+- challenge issuance rejects multi-component uploads before persistence when
+  `expectedComponentArtifactIdentities` or `expectedCompositeArtifactIdentity`
+  is missing
 - `artifactBindingProof` with schema `deployment-artifact-binding-proof@1`
   using reviewed `hmac-sha256` proof verification
 
@@ -435,8 +442,7 @@ The challenge binding records the authorized deployment principal and the proof
 binds the challenge id and nonce, deployment id and label, operation kind,
 publish behavior, provider target identity, service-authenticated client
 identity, proof key id, expected identity fields, source/replay selectors when
-present, idempotency key, and finalized staged artifact reference. The service
-first canonicalizes that reference under the configured staging root, requires
+present, idempotency key, and finalized staged artifact reference. The stored challenge binding and returned binding fingerprint both cover that finalized staged artifact reference, and final submit rejects staged-reference drift even when the proof MAC still verifies. The service first canonicalizes that reference under the configured staging root, requires
 the sidecar completion marker, rejects writable entries, traversal, symlinks,
 hardlinks, device files, sockets, FIFOs, and paths outside the staging root, and
 then hashes and copies only from that finalized tree into the admitted store.

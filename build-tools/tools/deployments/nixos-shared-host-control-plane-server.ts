@@ -20,6 +20,10 @@ import {
 } from "./deployment-auth-session-service.ts";
 import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
 import { createStaticWebappUploadSession } from "./static-webapp-upload-sessions.ts";
+import {
+  assertReviewedServiceTokenConfigured,
+  requestHasReviewedBearerToken,
+} from "./nixos-shared-host-control-plane-service-auth.ts";
 
 const MAX_REQUEST_BODY_BYTES = 60 * 1024 * 1024;
 
@@ -44,10 +48,19 @@ function writeJson(response: http.ServerResponse, statusCode: number, value: unk
   response.end(JSON.stringify(value, null, 2) + "\n");
 }
 
-function checkToken(request: http.IncomingMessage, token?: string) {
-  if (!token) return true;
-  const header = request.headers.authorization || "";
-  return header === `Bearer ${token}`;
+function requireReviewedBearerToken(
+  request: http.IncomingMessage,
+  response: http.ServerResponse,
+  opts: { token?: string; localFixture?: boolean; env?: NodeJS.ProcessEnv },
+): boolean {
+  const allowed = requestHasReviewedBearerToken({
+    authorizationHeader: request.headers.authorization,
+    serviceToken: opts.token,
+    localFixture: opts.localFixture,
+    env: opts.env,
+  });
+  if (!allowed) writeJson(response, 401, { error: "unauthorized" });
+  return allowed;
 }
 
 export async function startNixosSharedHostControlPlaneServer(opts: {
@@ -57,11 +70,16 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
   host?: string;
   port?: number;
   token?: string;
+  localFixture?: boolean;
+  env?: NodeJS.ProcessEnv;
 }) {
-  const backend = {
-    recordsRoot: opts.paths.recordsRoot,
-    databaseUrl: opts.backendDatabaseUrl,
-  };
+  assertReviewedServiceTokenConfigured({
+    serviceToken: opts.token,
+    context: "nixos-shared-host control-plane service",
+    localFixture: opts.localFixture,
+    env: opts.env,
+  });
+  const backend = { recordsRoot: opts.paths.recordsRoot, databaseUrl: opts.backendDatabaseUrl };
   const server = http.createServer(async (request, response) => {
     try {
       const url = new URL(request.url || "/", "http://127.0.0.1");
@@ -83,11 +101,8 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         );
         return;
       }
-      if (!checkToken(request, opts.token)) {
-        writeJson(response, 401, { error: "unauthorized" });
-        return;
-      }
       if (request.method === "GET" && url.pathname === "/healthz") {
+        if (!requireReviewedBearerToken(request, response, opts)) return;
         writeJson(response, 200, { ok: true });
         return;
       }
@@ -101,6 +116,9 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
             backend,
             serviceToken: opts.token,
             requireArtifactBinding: true,
+            authorizationHeader: request.headers.authorization,
+            localFixture: opts.localFixture,
+            env: opts.env,
           }),
         );
         return;
@@ -113,11 +131,15 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
             paths: opts.paths,
             backend,
             serviceToken: opts.token,
+            authorizationHeader: request.headers.authorization,
+            localFixture: opts.localFixture,
+            env: opts.env,
           }),
         );
         return;
       }
       if (request.method === "POST" && url.pathname === "/api/v1/artifact-uploads/static-webapp") {
+        if (!requireReviewedBearerToken(request, response, opts)) return;
         const submissionId = String(request.headers["x-bnx-submission-id"] || "").trim();
         if (!submissionId) {
           writeJson(response, 400, { error: "artifact upload requires x-bnx-submission-id" });
@@ -135,6 +157,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         return;
       }
       if (request.method === "POST" && url.pathname === "/api/v1/auth/login") {
+        if (!requireReviewedBearerToken(request, response, opts)) return;
         writeJson(
           response,
           200,
@@ -146,6 +169,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         return;
       }
       if (request.method === "GET" && url.pathname === "/api/v1/auth/session") {
+        if (!requireReviewedBearerToken(request, response, opts)) return;
         const sessionId = url.searchParams.get("sessionId") || "";
         const session = sessionId
           ? await readPublicDeploymentAuthSession(opts.paths.recordsRoot, sessionId)
@@ -158,6 +182,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         return;
       }
       if (request.method === "GET" && url.pathname === "/api/v1/status") {
+        if (!requireReviewedBearerToken(request, response, opts)) return;
         const submissionId = url.searchParams.get("submissionId") || "";
         const deployRunId = url.searchParams.get("deployRunId") || "";
         const submission = await readControlPlaneStatus(backend, {
@@ -172,6 +197,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         return;
       }
       if (request.method === "GET" && url.pathname === "/api/v1/records") {
+        if (!requireReviewedBearerToken(request, response, opts)) return;
         const submissionId = url.searchParams.get("submissionId") || "";
         const deployRunId = url.searchParams.get("deployRunId") || "";
         const record = await readControlPlaneRecord(backend, {
@@ -186,6 +212,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         return;
       }
       if (request.method === "POST" && url.pathname === "/api/v1/run-actions") {
+        if (!requireReviewedBearerToken(request, response, opts)) return;
         writeJson(
           response,
           200,

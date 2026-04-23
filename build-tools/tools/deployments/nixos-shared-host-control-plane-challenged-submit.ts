@@ -16,26 +16,15 @@ import type {
   NixosSharedHostControlPlaneSubmission,
 } from "./nixos-shared-host-control-plane-contract.ts";
 import { cleanupThenRethrowRejectedNixosSubmit } from "./nixos-shared-host-control-plane-rejection-cleanup.ts";
+import {
+  assertProtectedSharedArtifactIdentityFields,
+  finalizedStagedArtifactReference,
+} from "./nixos-shared-host-artifact-submit-request.ts";
 
 type Boundary = {
   requestedBy?: NixosSharedHostControlPlaneSubmission["requestedBy"];
   admissionEvidence?: DeploymentAdmissionEvidence;
 };
-
-function finalizedArtifactReference(request: NixosSharedHostControlPlaneSubmitRequest) {
-  return request.artifactDir || JSON.stringify(request.artifactDirsByComponentId);
-}
-
-function assertArtifactSubmissionHasExpectedIdentity(
-  request: NixosSharedHostControlPlaneSubmitRequest,
-) {
-  if (!request.artifactDir && !request.artifactDirsByComponentId) {
-    return;
-  }
-  if (!request.expectedArtifactIdentity && !request.expectedComponentArtifactIdentities) {
-    throw new Error("protected/shared artifact submit requires expected artifact identity");
-  }
-}
 
 export async function acceptChallengedNixosSharedHostSubmit(opts: {
   workspaceRoot: string;
@@ -48,7 +37,7 @@ export async function acceptChallengedNixosSharedHostSubmit(opts: {
   boundary: Boundary;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
 }) {
-  assertArtifactSubmissionHasExpectedIdentity(opts.resolvedRequest);
+  assertProtectedSharedArtifactIdentityFields(opts.resolvedRequest);
   const reusable = await readReusableChallengedArtifactSubmission({
     backend: opts.backend,
     idempotencyKey: opts.idempotencyKey,
@@ -61,7 +50,7 @@ export async function acceptChallengedNixosSharedHostSubmit(opts: {
     backend: opts.backend,
     request: opts.resolvedRequest,
     proof: opts.resolvedRequest.artifactBindingProof,
-    finalizedStagedArtifactReference: finalizedArtifactReference(opts.resolvedRequest),
+    finalizedStagedArtifactReference: finalizedStagedArtifactReference(opts.resolvedRequest),
     principalId: principal.principalId,
     keyId: proofKeyId,
     proofSecret: principal.proofSecret,
@@ -133,7 +122,7 @@ export async function acceptChallengedNixosSharedHostSubmit(opts: {
     requestFingerprint: opts.requestFingerprint,
     request: opts.resolvedRequest,
     proof: opts.resolvedRequest.artifactBindingProof,
-    finalizedStagedArtifactReference: finalizedArtifactReference(opts.resolvedRequest),
+    finalizedStagedArtifactReference: finalizedStagedArtifactReference(opts.resolvedRequest),
     principalId: principal.principalId,
     keyId: proofKeyId,
     proofSecret: principal.proofSecret,

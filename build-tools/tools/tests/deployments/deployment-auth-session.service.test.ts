@@ -58,6 +58,7 @@ test("deployment service owns PKCE login sessions and public OIDC callback", asy
         recordsRoot: `${tmp}/records`,
       },
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(`${tmp}/records`),
+      localFixture: true,
     });
     try {
       const login = await createDeploymentAuthLoginViaService({
@@ -102,6 +103,7 @@ test("deployment auth sessions fail closed for mismatches, replay, and expiry", 
         recordsRoot: `${tmp}/records`,
       },
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(`${tmp}/records`),
+      localFixture: true,
     });
     try {
       const login = await createDeploymentAuthLoginViaService({

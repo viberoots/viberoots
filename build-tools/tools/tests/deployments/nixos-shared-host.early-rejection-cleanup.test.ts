@@ -9,7 +9,6 @@ import {
   expectedNixosSharedHostArtifactIdentities,
 } from "../../deployments/deployment-artifact-binding.ts";
 import { deploymentServicePrincipalForToken } from "../../deployments/deployment-artifact-challenges.ts";
-import { serviceSubmissionAdmissionEvidence } from "../../deployments/deployment-service-client-contract.ts";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { queryBackend } from "../../deployments/nixos-shared-host-control-plane-backend-db.ts";
 import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../deployments/nixos-shared-host-control-plane-api-contract.ts";
@@ -22,14 +21,18 @@ import {
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture.ts";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
-import { authRequiredDeployment } from "./nixos-shared-host.service-auth-boundary.helpers.ts";
 import { readJson, writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers.ts";
+import {
+  authRequiredDeployment,
+  evidenceWithoutPrincipal,
+  writeAuthSession,
+} from "./nixos-shared-host.service-auth-boundary.helpers.ts";
 
-const TOKEN = "cleanup-token";
+const TOKEN = "early-cleanup-token";
 
 async function writeStagedArtifact(hostRoot: string, name: string) {
   const artifactDir = path.join(hostRoot, ".deploy-artifacts", "fixture", name);
-  await writeDemoArtifact(artifactDir);
+  await writeDemoArtifact(artifactDir, name);
   await fsp.writeFile(
     stagedUploadCompleteMarkerPath(artifactDir),
     '{"schemaVersion":"nixos-shared-host-staged-upload@1"}\n',
@@ -38,49 +41,33 @@ async function writeStagedArtifact(hostRoot: string, name: string) {
   return artifactDir;
 }
 
-async function baseRequest(deployment: any, artifactDir: string) {
-  return {
-    schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
-    submissionId: createNixosSharedHostSubmissionId(),
-    submittedAt: new Date().toISOString(),
-    deployment,
-    operationKind: "deploy",
-    artifactDir,
-    ...(await expectedNixosSharedHostArtifactIdentities({ deployment, artifactDir })),
-    admissionEvidence: serviceSubmissionAdmissionEvidence(
-      reviewedLaneAdmissionEvidenceFixture({ deployment }),
-    ),
-  };
-}
-
-async function janitorRecords(backend: any) {
+async function janitorRecords(recordsRoot: string) {
   return (
     await queryBackend<any>(
-      backend,
+      {
+        recordsRoot,
+        databaseUrl: localHarnessControlPlaneDatabaseUrl(recordsRoot),
+      },
       "SELECT document_json FROM artifact_cleanup_janitor_records ORDER BY created_at DESC",
     )
   ).rows.map((row) => row.document_json);
 }
 
-test("service removes rejected staged artifacts during challenge authorization failure", async () => {
-  await runInTemp("nixos-staged-cleanup-challenge", async (tmp, $) => {
-    const deployment = authRequiredDeployment();
+test("bearer-token rejection during challenge issuance still cleans staged artifacts", async () => {
+  await runInTemp("nixos-early-cleanup-token-rejection", async (tmp, $) => {
+    const deployment = nixosSharedHostDeploymentFixture();
     const paths = {
       statePath: path.join(tmp, "state.json"),
       hostRoot: path.join(tmp, "host"),
       recordsRoot: path.join(tmp, "records"),
     };
-    const backend = {
-      recordsRoot: paths.recordsRoot,
-      databaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
-    };
-    const artifactDir = await writeStagedArtifact(paths.hostRoot, "authz");
+    const artifactDir = await writeStagedArtifact(paths.hostRoot, "missing-token");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,
-      backendDatabaseUrl: backend.databaseUrl,
-      localFixture: true,
+      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
+      token: TOKEN,
     });
     try {
       const response = await fetch(
@@ -88,41 +75,69 @@ test("service removes rejected staged artifacts during challenge authorization f
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify(await baseRequest(deployment, artifactDir)),
+          body: JSON.stringify({
+            schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
+            submissionId: createNixosSharedHostSubmissionId(),
+            submittedAt: new Date().toISOString(),
+            deployment,
+            operationKind: "deploy",
+            artifactDir,
+            ...(await expectedNixosSharedHostArtifactIdentities({ deployment, artifactDir })),
+            admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
+          }),
         },
       );
-      assert.equal(response.status, 403);
+      assert.equal(response.status, 401);
       await assert.rejects(fsp.access(artifactDir));
-      assert.deepEqual(await janitorRecords(backend), []);
+      assert.deepEqual(await janitorRecords(paths.recordsRoot), []);
     } finally {
       await controlPlane.close();
     }
   });
 });
 
-test("service records redacted janitor metadata when rejected cleanup fails", async () => {
-  await runInTemp("nixos-staged-cleanup-janitor", async (tmp, $) => {
-    const deployment = nixosSharedHostDeploymentFixture();
+test("final-submit auth-boundary rejection still cleans staged artifacts before accept", async () => {
+  await runInTemp("nixos-early-cleanup-submit-auth", async (tmp, $) => {
+    const deployment = authRequiredDeployment();
     const paths = {
       statePath: path.join(tmp, "state.json"),
       hostRoot: path.join(tmp, "host"),
       recordsRoot: path.join(tmp, "records"),
     };
-    const backend = {
-      recordsRoot: paths.recordsRoot,
-      databaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
-    };
-    const artifactDir = await writeStagedArtifact(paths.hostRoot, "janitor-artifact");
+    const artifactDir = await writeStagedArtifact(paths.hostRoot, "submit-auth");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,
-      backendDatabaseUrl: backend.databaseUrl,
+      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
       token: TOKEN,
     });
-    const parent = path.dirname(artifactDir);
     try {
-      const request = await baseRequest(deployment, artifactDir);
+      const authA = await writeAuthSession({
+        recordsRoot: paths.recordsRoot,
+        deployment,
+        operationKind: "deploy",
+        principalId: "oidc:submitter-a",
+        role: "submitter",
+      });
+      const authB = await writeAuthSession({
+        recordsRoot: paths.recordsRoot,
+        deployment,
+        operationKind: "deploy",
+        principalId: "oidc:submitter-b",
+        role: "submitter",
+      });
+      const request = {
+        schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
+        submissionId: createNixosSharedHostSubmissionId(),
+        submittedAt: new Date().toISOString(),
+        deployment,
+        operationKind: "deploy",
+        authSessionId: authA,
+        artifactDir,
+        ...(await expectedNixosSharedHostArtifactIdentities({ deployment, artifactDir })),
+        admissionEvidence: evidenceWithoutPrincipal(deployment),
+      };
       const challenge = await readJson<any>(
         await fetch(new URL("/api/v1/submission-challenges/artifact", controlPlane.url), {
           method: "POST",
@@ -131,35 +146,26 @@ test("service records redacted janitor metadata when rejected cleanup fails", as
         }),
       );
       const principal = deploymentServicePrincipalForToken(TOKEN);
-      const badProof = createArtifactBindingProof(
+      const proof = createArtifactBindingProof(
         artifactBindingEnvelope({
           request,
           principalId: principal.principalId,
           keyId: challenge.keyId,
           challengeId: challenge.challengeId,
           nonce: challenge.nonce,
-          finalizedStagedArtifactReference: `${artifactDir}-different`,
+          finalizedStagedArtifactReference: artifactDir,
         }),
         principal.proofSecret,
       );
-      await fsp.chmod(parent, 0o500);
       const rejected = await fetch(new URL("/api/v1/submissions", controlPlane.url), {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
-        body: JSON.stringify({ ...request, artifactBindingProof: badProof }),
+        body: JSON.stringify({ ...request, authSessionId: authB, artifactBindingProof: proof }),
       });
-      assert.equal(rejected.ok, false);
-      const records = await janitorRecords(backend);
-      assert.equal(records.length, 1);
-      const recordText = JSON.stringify(records[0]);
-      assert.match(recordText, /submit_rejected/);
-      assert.doesNotMatch(
-        recordText,
-        new RegExp(artifactDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
-      );
-      assert.doesNotMatch(recordText, /cleanup-token|nonce|proof/i);
+      assert.equal(rejected.status, 403);
+      await assert.rejects(fsp.access(artifactDir));
+      assert.deepEqual(await janitorRecords(paths.recordsRoot), []);
     } finally {
-      await fsp.chmod(parent, 0o700).catch(() => {});
       await controlPlane.close();
     }
   });

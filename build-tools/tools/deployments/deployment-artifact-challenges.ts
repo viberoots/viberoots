@@ -26,6 +26,7 @@ import {
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend-db.ts";
 import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract.ts";
+import { finalizedStagedArtifactReference } from "./nixos-shared-host-artifact-submit-request.ts";
 
 const CHALLENGE_TTL_MS = 2 * 60_000;
 
@@ -61,6 +62,7 @@ export async function createDeploymentArtifactChallenge(opts: {
   request: DeploymentArtifactChallengeRequest;
   principalId: string;
   keyId: string;
+  finalizedStagedArtifactReference?: string;
   proofKeyRegistry?: DeploymentArtifactProofKeyRegistry;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
 }): Promise<DeploymentArtifactChallengeResponse> {
@@ -75,6 +77,9 @@ export async function createDeploymentArtifactChallenge(opts: {
   const expiresAtMs = Date.now() + CHALLENGE_TTL_MS;
   const binding = artifactChallengeBinding({
     request: opts.request,
+    finalizedStagedArtifactReference:
+      opts.finalizedStagedArtifactReference ||
+      finalizedStagedArtifactReference(opts.request as any),
     ...(opts.authorization ? { authorization: opts.authorization } : {}),
   });
   const bindingFingerprint = artifactBindingFingerprint({
@@ -155,6 +160,7 @@ async function verifyChallengeRow(opts: {
   assertArtifactChallengeBindingMatches({
     stored: binding,
     request: opts.request,
+    finalizedStagedArtifactReference: opts.finalizedStagedArtifactReference,
     ...(opts.authorization ? { authorization: opts.authorization } : {}),
   });
   verifyArtifactBindingProof({

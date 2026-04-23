@@ -32,6 +32,7 @@ test("auth-required protected/shared submissions derive principal from service s
       workspaceRoot: tmp,
       paths,
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
+      localFixture: true,
     });
     try {
       const authSessionId = await writeAuthSession({
@@ -79,6 +80,7 @@ test("auth-required protected/shared submissions reject missing, forged, bad-rol
       workspaceRoot: tmp,
       paths,
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
+      localFixture: true,
     });
     try {
       const base = {
@@ -164,6 +166,7 @@ test("auth-required run actions derive operator from service session", async () 
       workspaceRoot: tmp,
       paths,
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
+      localFixture: true,
     });
     try {
       const submitAuth = await writeAuthSession({
