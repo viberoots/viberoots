@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
+import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
 import {
   buildRemoteArtifactStageArgvWithFallback,
   buildRemoteCleanupScript,
@@ -22,6 +23,10 @@ import {
   requireServiceRecord,
   runCommand,
 } from "./nixos-shared-host-remote-execution-transport.ts";
+import {
+  createAndWaitForServiceOwnedAuthSession,
+  shouldUseServiceOwnedInteractiveAuth,
+} from "./deployment-service-auth-client.ts";
 import { requireServiceTokenFromEnv } from "./nixos-shared-host-service-client-config.ts";
 import { expectedNixosSharedHostArtifactIdentities } from "./deployment-artifact-binding.ts";
 import { stagedUploadTempPath } from "./nixos-shared-host-staged-artifact.ts";
@@ -56,6 +61,7 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
   plan: NixosSharedHostRemotePlan;
   localArtifactDir: string;
   retainRemoteArtifact: boolean;
+  vaultRuntimeInputs?: DeploymentVaultRuntimeInputs;
   admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: NixosSharedHostRemoteSmokeConnectOverride;
 }): Promise<NixosSharedHostRemoteDeploySummary> {
@@ -71,6 +77,18 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
     deployment: opts.deployment,
     artifactDir: opts.localArtifactDir,
   });
+  const authSessionId = shouldUseServiceOwnedInteractiveAuth({
+    deployment: opts.deployment,
+    inputs: opts.vaultRuntimeInputs,
+  })
+    ? await createAndWaitForServiceOwnedAuthSession({
+        controlPlaneUrl: opts.plan.serviceClient.controlPlaneUrl,
+        ...(controlPlaneToken ? { controlPlaneToken } : {}),
+        deployment: opts.deployment,
+        operationKind: "deploy",
+        inputs: opts.vaultRuntimeInputs,
+      })
+    : undefined;
   let stagePrepared = false;
   let pendingError: Error | null = null;
   let controlPlane: NixosSharedHostRemoteDeploySummary["controlPlane"] | null = null;
@@ -126,6 +144,7 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
         ...(controlPlaneToken ? { controlPlaneToken } : {}),
         deployment: opts.deployment,
         operationKind: "deploy",
+        ...(authSessionId ? { authSessionId } : {}),
         artifactDir: stagedArtifactPath,
         expectedArtifactIdentities,
         ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),

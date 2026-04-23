@@ -215,6 +215,7 @@ export async function runDeployCli(opts: {
       await maybeRunNixosSharedHostRemoteProfile({
         workspaceRoot: opts.workspaceRoot,
         deployment,
+        vaultRuntimeInputs: flags.vaultRuntimeInputs,
         ...(admissionEvidence ? { admissionEvidence } : {}),
       })
     ) {

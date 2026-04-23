@@ -160,7 +160,7 @@ export async function handleDeploymentAuthCallback(opts: {
     const claims = validateOidcToken({
       token,
       issuer: consumed.issuer,
-      audience: consumed.audience,
+      audience: [...new Set([consumed.audience, consumed.clientId].filter(Boolean))],
       clientId: consumed.clientId,
       boundClaims: consumed.boundClaims,
       humanClaim: consumed.humanClaim,

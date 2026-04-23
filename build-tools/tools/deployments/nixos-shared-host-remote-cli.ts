@@ -16,6 +16,7 @@ import {
 } from "./nixos-shared-host-remote-target.ts";
 import type { ClientInput } from "./nixos-shared-host-install-dev-machine.ts";
 import { requireServiceTokenFromEnv } from "./nixos-shared-host-service-client-config.ts";
+import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
 
 type RemoteOverrides = Partial<ClientInput>;
 
@@ -146,6 +147,7 @@ async function createPlan(
 export async function maybeRunNixosSharedHostRemoteProfile(opts: {
   workspaceRoot: string;
   deployment: NixosSharedHostDeployment;
+  vaultRuntimeInputs?: DeploymentVaultRuntimeInputs;
   admissionEvidence?: DeploymentAdmissionEvidence;
 }): Promise<boolean> {
   const profileRequested = hasFlag("profile") || hasFlag("profile-root");
@@ -202,6 +204,7 @@ export async function maybeRunNixosSharedHostRemoteProfile(opts: {
         plan,
         localArtifactDir: await resolveLocalArtifactDir(opts.workspaceRoot, opts.deployment),
         retainRemoteArtifact,
+        ...(opts.vaultRuntimeInputs ? { vaultRuntimeInputs: opts.vaultRuntimeInputs } : {}),
         ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
         ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
       }),

@@ -131,7 +131,7 @@ export function assertHumanClaim(claims: JwtClaims, requirement?: HumanClaimRequ
 export function validateOidcToken(opts: {
   token: string;
   issuer: string;
-  audience?: string | undefined;
+  audience?: string | string[] | undefined;
   clientId: string;
   boundClaims: Record<string, string>;
   humanClaim?: HumanClaimRequirement | undefined;

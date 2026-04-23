@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { spawn } from "node:child_process";
 import http from "node:http";
+import { launchBrowser } from "./deployment-browser-launch.ts";
 import {
   authorizationUrl,
   discoverOidc,
@@ -137,14 +137,6 @@ export async function startPkceCallbackListener(opts: {
   };
 }
 
-async function launchBrowser(url: string) {
-  const command =
-    process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
-  const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
-  const child = spawn(command, args, { detached: true, stdio: "ignore" });
-  child.unref();
-}
-
 export async function runPkceLogin(opts: PkceLoginOptions): Promise<string> {
   const discovery = await discoverOidc(opts.issuer);
   const state = randomSecret();
@@ -175,7 +167,14 @@ export async function runPkceLogin(opts: PkceLoginOptions): Promise<string> {
         );
       }
     } else {
-      await launchBrowser(url);
+      try {
+        await launchBrowser(url);
+      } catch (error) {
+        opts.prompt?.(
+          `Automatic browser launch failed: ${String((error as Error)?.message || error)}`,
+        );
+        opts.prompt?.("Continue by opening the deployment login URL above manually.");
+      }
     }
     const token = await exchangePkceCodeForToken({
       tokenEndpoint: discovery.tokenEndpoint,

@@ -143,3 +143,83 @@ test("protected shared-host clients select service-owned interactive auth instea
     true,
   );
 });
+
+test("deployment auth sessions tolerate IdPs that omit the requested Vault audience", async () => {
+  await runInTemp("deployment-auth-session-human-audience", async (tmp) => {
+    const oidc = await startFakeOidcServer({
+      claims: {
+        aud: "deployment-cli",
+        sub: "human-1",
+        preferred_username: "Ada",
+        groups: ["deployers"],
+      },
+    });
+    const target = deployment(oidc.issuer);
+    const controlPlane = await startNixosSharedHostControlPlaneServer({
+      workspaceRoot: tmp,
+      paths: {
+        statePath: `${tmp}/platform-state.json`,
+        hostRoot: `${tmp}/host`,
+        recordsRoot: `${tmp}/records`,
+      },
+      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(`${tmp}/records`),
+      localFixture: true,
+    });
+    try {
+      const login = await createDeploymentAuthLoginViaService({
+        controlPlaneUrl: controlPlane.url,
+        request: { deployment: target, operationKind: "deploy" },
+      });
+      assert.equal((await callback(controlPlane.url, login.loginUrl)).status, 200);
+      const status = await readDeploymentAuthSessionViaService({
+        controlPlaneUrl: controlPlane.url,
+        sessionId: login.sessionId,
+      });
+      assert.equal(status.status, "authenticated");
+      assert.equal(status.principal?.principalId, "oidc:human-1");
+    } finally {
+      await controlPlane.close();
+      await oidc.close();
+    }
+  });
+});
+
+test("deployment auth sessions still reject unrelated audiences", async () => {
+  await runInTemp("deployment-auth-session-wrong-audience", async (tmp) => {
+    const oidc = await startFakeOidcServer({
+      claims: {
+        aud: "account",
+        sub: "human-1",
+        preferred_username: "Ada",
+        groups: ["deployers"],
+      },
+    });
+    const target = deployment(oidc.issuer);
+    const controlPlane = await startNixosSharedHostControlPlaneServer({
+      workspaceRoot: tmp,
+      paths: {
+        statePath: `${tmp}/platform-state.json`,
+        hostRoot: `${tmp}/host`,
+        recordsRoot: `${tmp}/records`,
+      },
+      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(`${tmp}/records`),
+      localFixture: true,
+    });
+    try {
+      const login = await createDeploymentAuthLoginViaService({
+        controlPlaneUrl: controlPlane.url,
+        request: { deployment: target, operationKind: "deploy" },
+      });
+      assert.equal((await callback(controlPlane.url, login.loginUrl)).status, 400);
+      const status = await readDeploymentAuthSessionViaService({
+        controlPlaneUrl: controlPlane.url,
+        sessionId: login.sessionId,
+      });
+      assert.equal(status.status, "failed");
+      assert.match(status.failure || "", /audience mismatch/);
+    } finally {
+      await controlPlane.close();
+      await oidc.close();
+    }
+  });
+});

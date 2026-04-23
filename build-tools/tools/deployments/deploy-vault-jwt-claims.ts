@@ -3,7 +3,7 @@ export type JwtClaims = Record<string, unknown>;
 
 export type ClaimExpectations = {
   issuer: string;
-  audience?: string;
+  audience?: string | string[];
   clientId: string;
   boundClaims: Record<string, string>;
 };
@@ -18,9 +18,10 @@ function claimText(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-function audienceMatches(value: unknown, expected: string): boolean {
-  if (typeof value === "string") return value === expected;
-  return Array.isArray(value) && value.some((entry) => entry === expected);
+function audienceMatches(value: unknown, expected: string | string[]): boolean {
+  const allowed = Array.isArray(expected) ? expected : [expected];
+  if (typeof value === "string") return allowed.includes(value);
+  return Array.isArray(value) && value.some((entry) => allowed.includes(String(entry)));
 }
 
 export function decodeJwtPayload(token: string): JwtClaims {

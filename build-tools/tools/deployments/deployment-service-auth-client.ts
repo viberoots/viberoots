@@ -1,20 +1,12 @@
 #!/usr/bin/env zx-wrapper
-import { spawn } from "node:child_process";
 import type { DeploymentTarget } from "./contract.ts";
+import { launchBrowser } from "./deployment-browser-launch.ts";
 import {
   createDeploymentAuthLoginViaService,
   waitForDeploymentAuthSessionViaService,
 } from "./nixos-shared-host-control-plane-client.ts";
 import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan.ts";
 import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
-
-function launchBrowser(url: string) {
-  const command =
-    process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
-  const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
-  const child = spawn(command, args, { detached: true, stdio: "ignore" });
-  child.unref();
-}
 
 function authBlockingMissing(missing: string[]): string[] {
   return missing.filter(
@@ -70,7 +62,16 @@ export async function createAndWaitForServiceOwnedAuthSession(opts: {
     },
   });
   console.error(`Open this deployment login URL: ${login.loginUrl}`);
-  if (plan.selection.browserMode !== "print") launchBrowser(login.loginUrl);
+  if (plan.selection.browserMode !== "print") {
+    try {
+      await launchBrowser(login.loginUrl);
+    } catch (error) {
+      console.error(
+        `Automatic browser launch failed: ${String((error as Error)?.message || error)}`,
+      );
+      console.error("Continue by opening the deployment login URL above manually.");
+    }
+  }
   const status = await waitForDeploymentAuthSessionViaService({
     controlPlaneUrl: opts.controlPlaneUrl,
     token: opts.controlPlaneToken,
