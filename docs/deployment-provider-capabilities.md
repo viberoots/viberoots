@@ -223,6 +223,7 @@ Normative-source note:
 ### Protected/Shared Eligibility
 
 - `protection_class` defaults to `shared_nonprod`
+- protected/shared remote artifact submissions require service-issued one-time challenges, expected/admitted artifact identity binding, and server-side proof verification before worker queueing
 - the initial reviewed slice supports shared-dev metadata extraction, authoritative platform-state reconciliation, and deterministic host realization for static webapps plus the single-component reviewed SSR runtime slice on a NixOS host
 - protected/shared execution must stay inside the vetted built-in publisher, provisioner, smoke-runner, and reviewed built-in `release_actions` registry; package-local executable hooks are rejected on the normal control-plane path
 

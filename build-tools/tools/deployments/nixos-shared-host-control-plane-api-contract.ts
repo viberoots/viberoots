@@ -8,6 +8,10 @@ import type {
 } from "./deployment-admission-evidence.ts";
 import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract.ts";
 import type {
+  DeploymentArtifactBindingProof,
+  DeploymentExpectedArtifactIdentities,
+} from "./deployment-artifact-binding.ts";
+import type {
   NixosSharedHostControlPlaneOperationKind,
   NixosSharedHostPublishBehavior,
   NixosSharedHostSmokeConnectOverride,
@@ -17,7 +21,7 @@ import type { NixosSharedHostControlPlaneSourceSelection } from "./nixos-shared-
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA =
   "nixos-shared-host-control-plane-submit-request@1";
 
-export type NixosSharedHostControlPlaneSubmitRequest = {
+export type NixosSharedHostControlPlaneSubmitRequest = DeploymentExpectedArtifactIdentities & {
   schemaVersion: typeof NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA;
   submissionId: string;
   submittedAt: string;
@@ -41,4 +45,5 @@ export type NixosSharedHostControlPlaneSubmitRequest = {
   source?: NixosSharedHostControlPlaneSourceSelection;
   admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;
+  artifactBindingProof?: DeploymentArtifactBindingProof;
 };

@@ -19,6 +19,7 @@ import {
 import { createNixosSharedHostDeployRunId } from "./nixos-shared-host-records.ts";
 import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door.ts";
 import { requireServiceTokenFromEnv } from "./nixos-shared-host-service-client-config.ts";
+import { expectedNixosSharedHostArtifactIdentities } from "./deployment-artifact-binding.ts";
 
 const execFileAsync = promisify(execFile);
 const TRANSPORT_MAX_BUFFER = 10 * 1024 * 1024;
@@ -131,6 +132,10 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
     opts.plan.serviceClient.controlPlaneTokenEnv,
     `remote profile "${opts.plan.profileName}" deploy`,
   );
+  const expectedArtifactIdentities = await expectedNixosSharedHostArtifactIdentities({
+    deployment: opts.deployment,
+    artifactDir: opts.localArtifactDir,
+  });
   let stagePrepared = false;
   let pendingError: Error | null = null;
   let controlPlane: NixosSharedHostRemoteDeploySummary["controlPlane"] | null = null;
@@ -168,6 +173,7 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
         deployment: opts.deployment,
         operationKind: "deploy",
         artifactDir: stagedArtifactPath,
+        expectedArtifactIdentities,
         ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
         ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
       }).catch((error) => {

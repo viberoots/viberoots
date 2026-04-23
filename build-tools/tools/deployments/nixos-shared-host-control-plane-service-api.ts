@@ -32,6 +32,7 @@ import {
   type NixosSharedHostControlPlaneSubmitRequest,
 } from "./nixos-shared-host-control-plane-api-contract.ts";
 import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
+import { consumeRequiredArtifactBinding } from "./nixos-shared-host-control-plane-service-artifact-binding.ts";
 import { prepareBackendNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-backend-prepare.ts";
 import { resolveServiceSubmitRequest } from "./nixos-shared-host-control-plane-service-submit.ts";
 export {
@@ -52,6 +53,8 @@ export async function handleControlPlaneSubmit(
     workspaceRoot: string;
     paths: NixosSharedHostControlPlanePaths;
     backend: NixosSharedHostControlPlaneBackendTarget;
+    serviceToken?: string;
+    requireArtifactBinding?: boolean;
   },
 ) {
   if (
@@ -67,6 +70,25 @@ export async function handleControlPlaneSubmit(
   });
   if (isDeploymentProviderServiceSubmitRequest(request)) {
     return await queueDeploymentProviderControlPlaneSubmission(request, opts);
+  }
+  const resolvedRequest =
+    request.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
+      ? await resolveServiceSubmitRequest(request, opts)
+      : await resolveCloudflarePagesServiceSubmitRequest(request, {
+          workspaceRoot: opts.workspaceRoot,
+          recordsRoot: opts.paths.recordsRoot,
+          backendDatabaseUrl: opts.backend.databaseUrl,
+        });
+  if (
+    opts.requireArtifactBinding &&
+    resolvedRequest.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA &&
+    (resolvedRequest.artifactDir || resolvedRequest.artifactDirsByComponentId)
+  ) {
+    await consumeRequiredArtifactBinding({
+      backend: opts.backend,
+      request: resolvedRequest,
+      serviceToken: opts.serviceToken,
+    });
   }
   const requestFingerprint = fingerprintControlPlanePayload({
     ...request,
@@ -87,14 +109,6 @@ export async function handleControlPlaneSubmit(
     }
     return submitResponseFromSubmission(existing as any);
   }
-  const resolvedRequest =
-    request.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
-      ? await resolveServiceSubmitRequest(request, opts)
-      : await resolveCloudflarePagesServiceSubmitRequest(request, {
-          workspaceRoot: opts.workspaceRoot,
-          recordsRoot: opts.paths.recordsRoot,
-          backendDatabaseUrl: opts.backend.databaseUrl,
-        });
   const boundary =
     request.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
       ? await resolveSubmitAuthorizationBoundary({
@@ -145,6 +159,21 @@ export async function handleControlPlaneSubmit(
             ...(resolvedRequest.artifactDir ? { artifactDir: resolvedRequest.artifactDir } : {}),
             ...(resolvedRequest.artifactDirsByComponentId
               ? { artifactDirsByComponentId: resolvedRequest.artifactDirsByComponentId }
+              : {}),
+            ...(resolvedRequest.expectedArtifactIdentity
+              ? { expectedArtifactIdentity: resolvedRequest.expectedArtifactIdentity }
+              : {}),
+            ...(resolvedRequest.expectedComponentArtifactIdentities
+              ? {
+                  expectedComponentArtifactIdentities:
+                    resolvedRequest.expectedComponentArtifactIdentities,
+                }
+              : {}),
+            ...(resolvedRequest.expectedCompositeArtifactIdentity
+              ? {
+                  expectedCompositeArtifactIdentity:
+                    resolvedRequest.expectedCompositeArtifactIdentity,
+                }
               : {}),
             ...(resolvedRequest.artifact ? { artifact: resolvedRequest.artifact } : {}),
             ...(resolvedRequest.componentArtifacts

@@ -3,15 +3,13 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA } from "../../deployments/deployment-control-plane-contract.ts";
-import { serviceSubmissionAdmissionEvidence } from "../../deployments/deployment-service-client-contract.ts";
 import {
   localHarnessControlPlaneDatabaseUrl,
   readBackendSnapshotBySubmissionId,
 } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../deployments/nixos-shared-host-control-plane-api-contract.ts";
 import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
-import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-shared-host-control-plane-snapshot.ts";
 import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop.ts";
+export { submitServiceRequest } from "./nixos-shared-host.control-plane.artifact-binding.helpers.ts";
 
 export async function writeDemoArtifact(root: string, body = "demoapp"): Promise<void> {
   await fsp.mkdir(root, { recursive: true });
@@ -182,37 +180,6 @@ export async function readJson<T>(response: Response): Promise<T> {
   const body = await response.text();
   assert.equal(response.ok, true, body);
   return JSON.parse(body) as T;
-}
-
-export async function submitServiceRequest(opts: {
-  url: string;
-  deployment: any;
-  artifactDir?: string;
-  artifactDirsByComponentId?: Record<string, string>;
-  admissionEvidence?: unknown;
-  smokeConnectOverride?: unknown;
-}) {
-  return await readJson<any>(
-    await fetch(new URL("/api/v1/submissions", opts.url), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
-        submissionId: createNixosSharedHostSubmissionId(),
-        submittedAt: new Date().toISOString(),
-        deployment: opts.deployment,
-        operationKind: "deploy",
-        ...(opts.artifactDir ? { artifactDir: opts.artifactDir } : {}),
-        ...(opts.artifactDirsByComponentId
-          ? { artifactDirsByComponentId: opts.artifactDirsByComponentId }
-          : {}),
-        ...(serviceSubmissionAdmissionEvidence(opts.admissionEvidence as any)
-          ? { admissionEvidence: serviceSubmissionAdmissionEvidence(opts.admissionEvidence as any) }
-          : {}),
-        ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
-      }),
-    }),
-  );
 }
 
 export async function postCancelRunAction(url: string, submissionId: string) {

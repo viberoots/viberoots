@@ -7,6 +7,9 @@ import {
   createStaticWebappArtifactBundleBytes,
   STATIC_WEBAPP_ARTIFACT_BUNDLE_SCHEMA,
 } from "../../deployments/static-webapp-artifact-bundle.ts";
+import { expectedNixosSharedHostArtifactIdentities } from "../../deployments/deployment-artifact-binding.ts";
+import { artifactIdentityForNixosSharedHostDir } from "../../deployments/nixos-shared-host-artifacts.ts";
+import { compositeNixosSharedHostArtifactIdentity } from "../../deployments/nixos-shared-host-component-artifacts.ts";
 import {
   createStaticWebappUploadSession,
   admitStaticWebappUploadSession,
@@ -14,6 +17,7 @@ import {
 import { resolveCloudflarePagesArtifactInput } from "../../deployments/cloudflare-pages-artifact-input.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
 
 async function writeArtifact(root: string, body = "<html>ok</html>\n") {
   await fsp.mkdir(root, { recursive: true });
@@ -63,6 +67,75 @@ test("static-webapp bundles reject path traversal before storage", async () => {
       }),
     /unsafe path/,
   );
+});
+
+test("nixos-shared-host expected artifact identity matches service admission hashing", async () => {
+  await runInTemp("nixos-artifact-identity-parity", async (tmp) => {
+    const artifactDir = path.join(tmp, "artifact");
+    await writeArtifact(path.join(artifactDir, "b"), "b\n");
+    await writeArtifact(path.join(artifactDir, "a"), "a\n");
+    await fsp.chmod(path.join(artifactDir, "a", "index.html"), 0o755);
+    const deployment = nixosSharedHostDeploymentFixture();
+    const expected = await expectedNixosSharedHostArtifactIdentities({
+      deployment,
+      artifactDir,
+    });
+    assert.equal(
+      expected.expectedArtifactIdentity,
+      await artifactIdentityForNixosSharedHostDir(artifactDir, "static-webapp"),
+    );
+    await fsp.chmod(path.join(artifactDir, "a", "index.html"), 0o644);
+    assert.notEqual(
+      expected.expectedArtifactIdentity,
+      await artifactIdentityForNixosSharedHostDir(artifactDir, "static-webapp"),
+    );
+  });
+});
+
+test("multi-component expected identities include the composite artifact identity", async () => {
+  await runInTemp("nixos-composite-artifact-identity", async (tmp) => {
+    const frontend = path.join(tmp, "frontend");
+    const admin = path.join(tmp, "admin");
+    await writeArtifact(frontend, "front\n");
+    await writeArtifact(admin, "admin\n");
+    const deployment = nixosSharedHostDeploymentFixture({
+      components: [
+        {
+          id: "frontend",
+          kind: "static-webapp",
+          target: "//apps/frontend:app",
+          runtime: { appName: "frontend", containerPort: 3000 },
+          providerTarget: { targetGroup: "default", appName: "frontend" },
+        },
+        {
+          id: "admin",
+          kind: "static-webapp",
+          target: "//apps/admin:app",
+          runtime: { appName: "admin", containerPort: 3001 },
+          providerTarget: { targetGroup: "default", appName: "admin" },
+        },
+      ],
+    });
+    const expected = await expectedNixosSharedHostArtifactIdentities({
+      deployment,
+      artifactDirsByComponentId: { frontend, admin },
+    });
+    const components = Object.entries(expected.expectedComponentArtifactIdentities || {}).map(
+      ([componentId, identity]) => ({
+        componentId,
+        artifact: {
+          kind: "static-webapp" as const,
+          identity,
+          storedArtifactPath: "",
+          provenancePath: "",
+        },
+      }),
+    );
+    assert.equal(
+      expected.expectedCompositeArtifactIdentity,
+      compositeNixosSharedHostArtifactIdentity(components),
+    );
+  });
 });
 
 test("static-webapp upload sessions are bound to one submission", async () => {

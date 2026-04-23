@@ -250,7 +250,12 @@ direnv exec . build-tools/tools/bin/deploy \
 the reviewed profile workflow transports that folder to `mini` first, then the
 hosted deployment service works from the `mini`-side staged or admitted artifact.
 The service submission must not trust a laptop-local path as deployment
-authority.
+authority. The client computes the expected artifact identity before upload,
+requests a one-time service challenge, stages the artifact with strict SSH
+host-key verification, and submits a challenge-bound proof for the finalized
+staged path. The service consumes the challenge once, recomputes the admitted
+artifact identity from the finalized tree, and rejects proof, challenge, or
+identity mismatches before worker queueing.
 
 If you omit `--artifact-dir`, the deploy command uses the deployment target
 metadata to figure out which app target to build and where its artifact lives.
@@ -275,7 +280,9 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
 
 The remote-profile and Jenkins commands use SSH for staging files and basic
 preflight work. The actual deployment request goes through the central
-deployment service recorded in the client profile.
+deployment service recorded in the client profile. Protected/shared profiles
+must use HTTPS service URLs with certificate validation enabled and reviewed
+known-hosts or host-key pinning for SSH staging.
 
 Do not pass `--control-plane-url`, `--apply-host`, or `--apply-host-dry-run`
 to those wrappers. They read that information from the installed profile.
@@ -300,8 +307,9 @@ direnv exec . build-tools/tools/bin/deploy \
 
 The text response gives you the current phase, approval guidance when the run is
 waiting, and admitted artifact identity when the service has already admitted an
-artifact. For automation, omit `--text` to keep the machine-readable JSON
-response.
+artifact. Challenge details are summarized only as redacted proof status; tokens,
+nonces, and full staged paths are not operator-facing output. For automation,
+omit `--text` to keep the machine-readable JSON response.
 
 The response gives you two important IDs:
 

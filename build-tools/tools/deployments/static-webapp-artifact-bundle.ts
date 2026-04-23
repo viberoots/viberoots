@@ -51,6 +51,9 @@ async function scanDir(root: string, dir: string, files: StaticWebappArtifactDir
       throw new Error(`static-webapp artifact contains unsupported entry: ${rel}`);
     }
     const stat = await fsp.stat(abs);
+    if (stat.nlink > 1) {
+      throw new Error(`static-webapp artifact may not contain hardlinks: ${rel}`);
+    }
     files.push({
       rel,
       abs,

@@ -5,6 +5,7 @@ import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidenc
 import type { DeploymentControlPlaneStatus } from "./deployment-control-plane-contract.ts";
 import {
   readNixosSharedHostControlPlaneRecordViaService,
+  createNixosSharedHostArtifactChallengeViaService,
   submitNixosSharedHostControlPlaneViaService,
 } from "./nixos-shared-host-control-plane-client.ts";
 import type { NixosSharedHostControlPlaneOperationKind } from "./nixos-shared-host-control-plane-contract.ts";
@@ -13,6 +14,13 @@ import {
   type NixosSharedHostControlPlaneSubmitRequest,
 } from "./nixos-shared-host-control-plane-api-contract.ts";
 import { createNixosSharedHostSubmissionId } from "./nixos-shared-host-control-plane-snapshot.ts";
+import {
+  artifactBindingEnvelope,
+  createArtifactBindingProof,
+  expectedNixosSharedHostArtifactIdentities,
+  type DeploymentExpectedArtifactIdentities,
+} from "./deployment-artifact-binding.ts";
+import { deploymentServicePrincipalForToken } from "./deployment-artifact-challenges.ts";
 
 export type NixosSharedHostServiceFrontDoorResponse =
   | { kind: "result"; result: { record: any } }
@@ -91,6 +99,7 @@ export async function runNixosSharedHostDirectServiceMutation(opts: {
   authSessionId?: string;
   artifactDir?: string;
   artifactDirsByComponentId?: Record<string, string>;
+  expectedArtifactIdentities?: DeploymentExpectedArtifactIdentities;
   publishBehavior?: "publish-only" | "provision-only";
   sourceRunId?: string;
   rollback?: boolean;
@@ -103,6 +112,15 @@ export async function runNixosSharedHostDirectServiceMutation(opts: {
   };
 }) {
   const admissionEvidence = clientAdmissionEvidence(opts.admissionEvidence);
+  const expected =
+    opts.expectedArtifactIdentities ||
+    (await expectedNixosSharedHostArtifactIdentities({
+      deployment: opts.deployment,
+      ...(opts.artifactDir ? { artifactDir: opts.artifactDir } : {}),
+      ...(opts.artifactDirsByComponentId
+        ? { artifactDirsByComponentId: opts.artifactDirsByComponentId }
+        : {}),
+    }));
   const request: NixosSharedHostControlPlaneSubmitRequest = {
     schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
     submissionId: createNixosSharedHostSubmissionId(),
@@ -118,12 +136,33 @@ export async function runNixosSharedHostDirectServiceMutation(opts: {
           ),
         }
       : {}),
+    ...expected,
     ...(opts.publishBehavior ? { publishBehavior: opts.publishBehavior } : {}),
     ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
     ...(opts.rollback ? { rollback: true } : {}),
     ...(admissionEvidence ? { admissionEvidence } : {}),
     ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
   };
+  if (request.artifactDir || request.artifactDirsByComponentId) {
+    const challenge = await createNixosSharedHostArtifactChallengeViaService({
+      controlPlaneUrl: opts.controlPlaneUrl,
+      token: opts.controlPlaneToken,
+      request,
+    });
+    const principal = deploymentServicePrincipalForToken(opts.controlPlaneToken);
+    request.artifactBindingProof = createArtifactBindingProof(
+      artifactBindingEnvelope({
+        request,
+        principalId: principal.principalId,
+        keyId: challenge.keyId,
+        challengeId: challenge.challengeId,
+        nonce: challenge.nonce,
+        finalizedStagedArtifactReference:
+          request.artifactDir || JSON.stringify(request.artifactDirsByComponentId),
+      }),
+      principal.proofSecret,
+    );
+  }
   const { final } = await submitNixosSharedHostControlPlaneViaService({
     controlPlaneUrl: opts.controlPlaneUrl,
     token: opts.controlPlaneToken,

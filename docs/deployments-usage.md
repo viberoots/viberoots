@@ -81,6 +81,11 @@ specific build output folder as the client-side artifact source.
 For protected/shared service-backed runs, a local folder is only an artifact
 source. The CLI or reviewed profile workflow must upload, stage, or otherwise
 admit the artifact through `mini` before provider mutation. The service request
+computes the expected artifact identity, requests a short-lived one-time
+challenge from `mini`, then submits a proof bound to the finalized staged
+artifact reference. `mini` recomputes the admitted identity from the staged
+bytes and rejects missing proofs, replayed challenges, or identity drift before
+worker queueing.
 must not rely on a laptop-local path as authority.
 
 Use this when:
@@ -248,7 +253,9 @@ the login URL and records the approver from the authenticated service session.
 Do not pass laptop Vault tokens, Vault JWT files, secret fixture paths, or
 client-supplied principals to protected/shared service deployments. `mini`
 derives identity through its service session and the worker uses server-owned
-secret context for provider mutation.
+secret context for provider mutation. Use HTTPS service URLs and reviewed SSH
+known-host or pinning configuration for protected/shared remote profiles; local
+HTTP is only for explicit local test fixtures.
 
 ## Which Backend Am I Using
 

@@ -378,6 +378,13 @@ The service returns JSON on all endpoints.
 - accepts one submit request
 - returns `deployment-control-plane-submit-response@1`
 
+`POST /api/v1/submission-challenges/artifact`
+
+- accepts one protected/shared artifact challenge request
+- authenticates the service token before issuing a challenge
+- returns `deployment-artifact-challenge@1` with `challengeId`, `nonce`,
+  expiration, proof algorithm, key id, and a binding fingerprint
+
 `GET /api/v1/status?submissionId=<id>`
 `GET /api/v1/status?deployRunId=<id>`
 
@@ -409,6 +416,22 @@ The current provider submit schemas are:
 
 - `nixos-shared-host-control-plane-submit-request@1`
 - `cloudflare-pages-control-plane-submit-request@1`
+
+Protected/shared `nixos-shared-host` upload submissions also carry:
+
+- `expectedArtifactIdentity` for single-component uploads
+- `expectedComponentArtifactIdentities` plus `expectedCompositeArtifactIdentity`
+  for multi-component uploads
+- `artifactBindingProof` with schema `deployment-artifact-binding-proof@1`
+  using reviewed `hmac-sha256` proof verification
+
+The proof binds the challenge id and nonce, deployment id and label, operation
+kind, publish behavior, provider target identity, service-authenticated client
+identity, proof key id, expected identity fields, source/replay selectors when
+present, idempotency key, and finalized staged artifact reference. The service
+rejects missing, malformed, unsupported, mismatched, expired, or replayed
+proof/challenge data before snapshot creation, worker queueing, or provider
+mutation.
 
 ### Common Status Fields
 

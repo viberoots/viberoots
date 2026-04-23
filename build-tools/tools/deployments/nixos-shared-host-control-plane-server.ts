@@ -18,6 +18,10 @@ import {
   readPublicDeploymentAuthSession,
 } from "./deployment-auth-session-service.ts";
 import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
+import {
+  createDeploymentArtifactChallenge,
+  deploymentServicePrincipalForToken,
+} from "./deployment-artifact-challenges.ts";
 import { createStaticWebappUploadSession } from "./static-webapp-upload-sessions.ts";
 
 const MAX_REQUEST_BODY_BYTES = 60 * 1024 * 1024;
@@ -98,6 +102,22 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
             workspaceRoot: opts.workspaceRoot,
             paths: opts.paths,
             backend,
+            serviceToken: opts.token,
+            requireArtifactBinding: true,
+          }),
+        );
+        return;
+      }
+      if (request.method === "POST" && url.pathname === "/api/v1/submission-challenges/artifact") {
+        const principal = deploymentServicePrincipalForToken(opts.token);
+        writeJson(
+          response,
+          200,
+          await createDeploymentArtifactChallenge({
+            backend,
+            request: await readJsonBody(request),
+            principalId: principal.principalId,
+            keyId: principal.keyId,
           }),
         );
         return;

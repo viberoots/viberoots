@@ -80,6 +80,15 @@ async function initializeBackendSchema(pool: BackendPool) {
       target_id TEXT NOT NULL,
       PRIMARY KEY(kind, key_hash)
     );
+    CREATE TABLE IF NOT EXISTS artifact_challenges (
+      challenge_id TEXT PRIMARY KEY,
+      nonce TEXT NOT NULL,
+      expires_at_ms BIGINT NOT NULL,
+      used_at TIMESTAMPTZ,
+      principal_id TEXT NOT NULL,
+      key_id TEXT NOT NULL,
+      binding_json JSONB NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS run_actions (
       action_id TEXT PRIMARY KEY,
       submission_id TEXT NOT NULL,

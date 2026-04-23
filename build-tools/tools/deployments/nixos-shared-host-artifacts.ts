@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { copyTree } from "../lib/copy-tree.ts";
 import { sanitizeName } from "../lib/sanitize.ts";
+import { inspectStaticWebappArtifactDir } from "./static-webapp-artifact-bundle.ts";
 
 export const NIXOS_SHARED_HOST_ARTIFACT_PROVENANCE_SCHEMA =
   "nixos-shared-host-artifact-provenance@2";
@@ -17,25 +18,15 @@ export type NixosSharedHostAdmittedArtifact = {
 
 type ArtifactKind = NixosSharedHostAdmittedArtifact["kind"];
 
-async function walkFiles(root: string, dir = root): Promise<string[]> {
-  const entries = await fsp.readdir(dir, { withFileTypes: true });
-  const files: string[] = [];
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    const abs = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...(await walkFiles(root, abs)));
-      continue;
-    }
-    if (entry.isFile()) files.push(path.relative(root, abs));
-  }
-  return files;
-}
-
-async function artifactIdentityForDir(artifactDir: string, kind: ArtifactKind): Promise<string> {
+export async function artifactIdentityForNixosSharedHostDir(
+  artifactDir: string,
+  kind: ArtifactKind,
+): Promise<string> {
   const hash = crypto.createHash("sha256");
-  for (const rel of await walkFiles(artifactDir)) {
-    hash.update(`${rel}\n`);
-    hash.update(await fsp.readFile(path.join(artifactDir, rel)));
+  for (const file of await inspectStaticWebappArtifactDir(path.resolve(artifactDir))) {
+    hash.update(`${file.rel}\n`);
+    hash.update(file.executable ? "executable\n" : "file\n");
+    hash.update(await fsp.readFile(file.abs));
     hash.update("\n");
   }
   return `${kind}:${hash.digest("hex")}`;
@@ -105,7 +96,7 @@ export async function admitNixosSharedHostArtifact(opts: {
   kind: ArtifactKind;
 }): Promise<NixosSharedHostAdmittedArtifact> {
   const artifactDir = path.resolve(opts.artifactDir);
-  const identity = await artifactIdentityForDir(artifactDir, opts.kind);
+  const identity = await artifactIdentityForNixosSharedHostDir(artifactDir, opts.kind);
   const artifact: NixosSharedHostAdmittedArtifact = {
     kind: opts.kind,
     identity,
@@ -125,7 +116,7 @@ export async function admitNixosSharedHostStaticArtifact(opts: {
 }
 
 export async function artifactIdentityForStaticWebappDir(artifactDir: string): Promise<string> {
-  return await artifactIdentityForDir(path.resolve(artifactDir), "static-webapp");
+  return await artifactIdentityForNixosSharedHostDir(path.resolve(artifactDir), "static-webapp");
 }
 
 export async function requireNixosSharedHostAdmittedArtifactPath(

@@ -11372,6 +11372,384 @@ production-hardened.
 
 ---
 
+## PR-84: Atomic challenged-submit transaction and artifact-binding provenance closeout
+
+### Description
+
+I will close the transactional gap in PR-83's challenged submit path so a challenge is never consumed
+unless the matching idempotency state, admitted-artifact provenance, execution snapshot, and queue
+intent commit together. The service must resolve an idempotent retry before burning a one-time
+challenge, and an accepted submission must be recoverable when the client retries the same
+idempotency key, challenge, and request fingerprint after a lost response. The same change also makes
+the artifact-binding audit evidence durable: the records must show which challenge, proof key,
+canonical envelope, expected identity, and recomputed admitted identity were accepted without storing
+secret proof material.
+
+### Scope & Changes
+
+- Add a backend-owned `acceptChallengedArtifactSubmission` transaction or equivalent compare-and-set
+  primitive that covers:
+  - idempotency lookup and conflict detection
+  - challenge freshness, unused-state, principal/key-id match, and fingerprint match
+  - challenge consumption
+  - admitted artifact provenance persistence
+  - execution snapshot creation
+  - worker queue enqueue
+- Preserve idempotent retry semantics:
+  - same idempotency key + same challenge/request fingerprint returns the existing submission
+    without trying to consume the challenge again
+  - same idempotency key + different challenge, proof, expected identity, source, staged reference,
+    or canonical envelope fails as an idempotency conflict
+  - challenge reuse without a matching accepted idempotent submission fails as replay
+- Ensure process crashes cannot leave a consumed challenge without a recoverable accepted submission.
+  If artifact admission succeeds but the backend transaction fails, the retry path must still be able
+  to re-verify and either commit or reject without producing duplicate queue entries.
+- Persist secret-safe artifact-binding provenance with the accepted submission:
+  - challenge id
+  - authenticated principal/client identity and proof key id
+  - proof algorithm
+  - canonical envelope fingerprint
+  - expected artifact identity or component identities
+  - recomputed admitted artifact identity
+  - verification decision and timestamp
+  - admitted stored-artifact reference
+- Keep proof secrets, challenge nonces, bearer tokens, and full staged paths out of records and
+  diagnostics unless a field is explicitly redacted or hashed for audit.
+- Update status/result payloads to expose the redacted provenance summary needed to prove the
+  authenticated request and admitted bytes matched.
+
+### Tests (in this PR)
+
+- Add backend transaction tests proving a successful challenged submit commits idempotency state,
+  challenge consumption, provenance, snapshot, and queue intent atomically.
+- Add crash-window tests for failures after challenge verification but before backend commit; retries
+  with the same idempotency key/challenge/fingerprint must return or create exactly one accepted
+  submission.
+- Add concurrent submit tests for:
+  - identical requests racing on the same idempotency key
+  - different proofs or expected identities racing on the same idempotency key
+  - challenge replay without the accepted idempotency fingerprint
+  - queue uniqueness under repeated retries
+- Add provenance tests proving accepted submissions store expected identity, recomputed identity,
+  canonical envelope fingerprint, challenge id, proof algorithm/key id, and verification result.
+- Add redaction tests proving proof secrets, bearer tokens, nonces, and full staged paths are absent
+  from stored records and operator-facing output.
+
+### Docs (in this PR)
+
+- Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+  with the exact idempotent retry and replay behavior for challenged submissions.
+- Update [Deployments Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) with
+  the atomic accept semantics and provenance fields.
+- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  with the operator-facing retry behavior and redacted audit summary.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - challenged-submit backend transaction behavior
+  - idempotent retry after lost responses
+  - challenge replay rejection
+  - queue uniqueness under concurrency
+  - artifact-binding provenance persistence
+  - redaction snapshots
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR changes the protected/shared submit persistence boundary, idempotency semantics, queue
+  insertion, status output, and docs. Run full build-system verification unless deployment classifier
+  coverage proves all changed surfaces are deployment-owned.
+
+### Acceptance Criteria
+
+- A challenge cannot be consumed unless the accepted idempotency record, provenance, snapshot, and
+  queue intent are durably committed together.
+- Retrying the same idempotency key, challenge, and canonical request fingerprint returns the
+  existing accepted submission even after the one-time challenge is consumed.
+- Retrying the same idempotency key with any different artifact identity, proof, challenge, staged
+  reference, source, or canonical envelope fails as a conflict.
+- Replaying a consumed challenge without the accepted idempotency fingerprint fails closed.
+- Concurrent challenged submits cannot create duplicate snapshots or queue entries.
+- Accepted records contain enough redacted proof/admission provenance to audit that the authenticated
+  request and admitted bytes matched.
+
+### Risks
+
+The backend transaction boundary may need to span code that currently performs artifact admission,
+idempotency, and queueing in separate helpers, and poorly scoped locking could add latency or
+deadlocks under concurrent submit load.
+
+### Mitigation
+
+Keep artifact byte hashing outside long database locks where possible, then commit only the verified
+accept decision in a narrow transaction guarded by unique constraints for challenge id, idempotency
+fingerprint, snapshot id, and queue id.
+
+### Consequence of Not Implementing
+
+A process crash or lost response can burn a valid challenge without leaving an accepted submission
+for the client to recover, and audit records cannot prove which authenticated envelope and admitted
+bytes were accepted.
+
+### Downsides for Implementing
+
+Adds a backend transaction primitive, stricter uniqueness constraints, more provenance fields, and
+additional race/crash tests around the submit path.
+
+### Recommendation
+
+Implement before marking PR-83 complete or production-ready.
+
+---
+
+## PR-85: Protected/shared transport enforcement and immutable staged-upload closeout
+
+### Description
+
+I will make the PR-83 transport and staged-artifact assumptions executable rather than
+configuration-dependent. Protected/shared clients must fail closed unless service traffic uses
+validated HTTPS and SSH staging uses reviewed host-key verification. The uploaded artifact reference
+must also become a service-constrained, immutable staged object: clients upload to a temporary path,
+atomically finalize under a configured staging root, and the service admits only that finalized tree
+after canonicalization and filesystem safety checks.
+
+### Scope & Changes
+
+- Add protected/shared service URL validation before challenge or submit requests:
+  - require `https:` for non-fixture service URLs
+  - allow `http://127.0.0.1`, `http://localhost`, or equivalent only when an explicit local-fixture
+    profile marks the flow non-production
+  - fail closed when TLS validation is disabled or an insecure TLS override is present
+- Make remote SSH/rsync staging require reviewed host-key verification for protected/shared paths:
+  - require a configured known-hosts file, host key pin, or equivalent reviewed trust profile
+  - remove fallback to default SSH host-key behavior when the reviewed trust profile is absent
+  - keep local/dev fixtures explicit and visibly non-production
+- Replace direct rsync into the final artifact directory with temp-upload plus atomic finalize:
+  - create a unique temporary upload directory under the configured staging root
+  - upload only into the temporary directory
+  - write and verify a completion marker or manifest before finalization
+  - atomically rename to a finalized immutable staged directory
+  - prevent subsequent writes into the finalized directory
+- Add service-side staged-path admission checks:
+  - canonicalize with realpath semantics
+  - require the finalized path to live under the configured staging root
+  - reject relative paths, path traversal, symlinks, escaping hardlinks, device files, sockets, FIFOs,
+    and incomplete upload markers
+  - hash and copy only from the finalized tree into the admitted content-addressed store
+- Redact bearer tokens, proof material, nonces, and full staged paths from SSH, rsync, challenge, and
+  submit diagnostics.
+
+### Tests (in this PR)
+
+- Add client tests proving protected/shared challenge and submit requests reject plain HTTP,
+  non-local fixture HTTP, disabled TLS validation, and insecure TLS override flags.
+- Add remote-shell tests proving protected/shared staging rejects missing known-hosts or host-key
+  pins and uses strict SSH host-key options when configured.
+- Add upload-flow tests proving artifacts are uploaded to a temporary directory and finalized with an
+  atomic rename before proof submission.
+- Add service admission tests proving finalized paths must canonicalize under the configured staging
+  root and reject traversal, arbitrary server-visible paths, symlinks, escaping hardlinks, special
+  files, and incomplete uploads.
+- Add mutation-window tests proving the service hashes and stores only the finalized tree and workers
+  publish only the admitted stored artifact.
+- Add redaction tests for SSH/rsync command diagnostics and failed challenge/submit output.
+
+### Docs (in this PR)
+
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  with staging-root configuration, reviewed known-hosts/pinning setup, and local-fixture exceptions.
+- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  with HTTPS and SSH host-key requirements for protected/shared deploys.
+- Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+  with staged-upload lifecycle and redacted diagnostic rules.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - protected/shared HTTPS enforcement
+  - TLS-validation fail-closed behavior
+  - strict SSH host-key verification
+  - temp-upload and atomic-finalize behavior
+  - staging-root canonicalization
+  - filesystem safety rejection
+  - admitted-store-only worker execution
+  - command/output redaction
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR changes protected/shared remote-client transport validation, SSH/rsync staging behavior,
+  artifact admission, worker artifact references, and operator docs. Run full build-system
+  verification unless deployment classifier coverage proves all changed surfaces are
+  deployment-owned.
+
+### Acceptance Criteria
+
+- Protected/shared service clients cannot request challenges or submit artifacts over insecure HTTP
+  except explicitly marked local-only fixtures.
+- Protected/shared service clients fail closed when TLS validation is disabled.
+- Protected/shared SSH staging requires reviewed known-hosts or pinning and never silently falls back
+  to default SSH host-key behavior.
+- Final staged artifact references are canonicalized under the configured staging root.
+- The service admits only immutable finalized upload directories and rejects arbitrary
+  server-visible paths, mutable uploads, symlinks, escaping hardlinks, and special files.
+- Workers publish only admitted content-addressed artifacts, never transient staged upload paths.
+
+### Risks
+
+Operators may need to add explicit known-hosts, host-key pins, staging-root configuration, or local
+fixture flags before existing remote deploy tests and scripts continue to work.
+
+### Mitigation
+
+Provide precise diagnostics, docs, and fixture helpers that make the production path strict while
+keeping test-only insecure transport explicit and auditable.
+
+### Consequence of Not Implementing
+
+The design would rely on callers to choose secure URLs and SSH behavior correctly, and a proven
+artifact envelope could still name an arbitrary or mutable server-visible path.
+
+### Downsides for Implementing
+
+Requires remote-shell workflow changes, staging-root configuration, stricter fixture setup, and more
+filesystem safety tests.
+
+### Recommendation
+
+Implement before any protected/shared deployment-server upload path is used outside explicit local
+fixtures.
+
+---
+
+## PR-86: Authorized challenge issuance and proof-key binding closeout
+
+### Description
+
+I will make challenge issuance use the same deployment authorization boundary as final submit. A
+challenge is not just a nonce service; it is an authorization artifact for one authenticated
+principal, proof key, deployment, operation, target, source, publish behavior, idempotency intent, and
+expected artifact identity. The challenge endpoint must reject unauthorized requested operations
+before persisting any challenge, and final submit must prove that the active authenticated identity
+and proof key are the same ones that received the challenge.
+
+### Scope & Changes
+
+- Route challenge issuance through the same authorization boundary and operation authorization checks
+  used by protected/shared final submit.
+- Bind each challenge record to:
+  - authenticated principal/client identity
+  - proof verification key id
+  - deployment id and label
+  - operation kind and publish behavior
+  - provider target identity and lock scope
+  - source, replay, rollback, or promotion selection when present
+  - expected artifact identity or component identities
+  - idempotency-key semantics and canonical envelope fingerprint
+- Reject challenge requests before persistence when:
+  - the bearer token is missing, invalid, expired, or maps to no allowed deployment principal
+  - the caller lacks permission for the requested deployment, operation, target, source, or publish
+    behavior
+  - the proof key id is unknown, disabled, unreviewed, or not assigned to the authenticated principal
+  - the requested envelope cannot be canonicalized into the challenge fingerprint
+- Make final submit recompute the same authorization context and reject when the active token,
+  principal, proof key id, deployment envelope, or expected artifact identities differ from the
+  challenge binding.
+- Ensure unauthorized or malformed challenge requests do not create challenge rows, retained staged
+  artifacts, queue entries, snapshots, or janitor records except bounded secret-safe audit denials
+  where the backend already records rejected authorization attempts.
+- Keep diagnostics redacted while still distinguishing authentication failure, authorization denial,
+  unknown proof key, and binding mismatch.
+
+### Tests (in this PR)
+
+- Add challenge issuance tests proving unauthorized deployment ids, operations, provider targets,
+  source selections, publish behaviors, and expected identities are rejected before a challenge record
+  is persisted.
+- Add proof-key registry tests proving unknown, disabled, unassigned, or algorithm-mismatched key ids
+  are rejected at challenge issuance and final submit.
+- Add final-submit tests proving token/principal/key-id drift between challenge and submit fails
+  before artifact admission, snapshot creation, queueing, worker execution, or provider mutation.
+- Add binding tests proving challenges cannot be replayed across deployment, operation, target,
+  source, publish behavior, idempotency semantics, or expected artifact identity.
+- Add audit/redaction tests proving denied challenge attempts expose no tokens, nonces, proof
+  secrets, or full staged paths.
+
+### Docs (in this PR)
+
+- Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+  with challenge authorization requirements, proof-key registry behavior, and binding-mismatch
+  responses.
+- Update [Deployments Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) with
+  the challenge-as-authorized-envelope contract.
+- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+  and generated summaries so artifact challenge support implies authenticated and authorized
+  challenge issuance, not just final-submit authorization.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - authorized challenge issuance
+  - proof-key registry checks
+  - final-submit principal/key drift
+  - cross-deployment and cross-operation challenge replay
+  - no challenge persistence on denied issuance
+  - docs/capability parity
+  - redaction snapshots
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR changes protected/shared challenge issuance, authz integration, proof-key validation,
+  submit binding checks, generated capability text, and docs. Run full build-system verification
+  unless deployment classifier coverage proves all changed surfaces are deployment-owned.
+
+### Acceptance Criteria
+
+- Challenge issuance authenticates and authorizes the caller for the requested deployment operation
+  before persisting a challenge.
+- Unauthorized or malformed challenge requests persist no usable challenge.
+- Challenge records are bound to the authenticated principal/client identity and reviewed proof key
+  id for the requested envelope.
+- Final submit fails when the active authenticated identity or proof key differs from the challenge
+  recipient.
+- Challenges cannot be replayed across deployment, operation, provider target, source, publish
+  behavior, idempotency semantics, or expected artifact identity.
+- Capability docs and generated summaries do not imply that challenge issuance is merely
+  token-authenticated.
+
+### Risks
+
+The challenge endpoint may need more shared authorization plumbing than the current lightweight route,
+and fixtures that only supplied bearer-token authentication will need full operation authorization
+context.
+
+### Mitigation
+
+Reuse the existing final-submit authorization boundary, add small fixture helpers for authorized
+challenge issuance, and keep denied-challenge diagnostics specific but redacted.
+
+### Consequence of Not Implementing
+
+Attackers or misconfigured clients with any accepted service token could mint challenges for
+operations they are not authorized to request, leaving final submit as the only authorization gate and
+weakening the challenge's security meaning.
+
+### Downsides for Implementing
+
+Adds authorization wiring to the challenge route, proof-key registry validation, stricter fixtures,
+and more generated documentation parity checks.
+
+### Recommendation
+
+Implement before treating PR-83 challenge records as security-relevant authorization artifacts.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)

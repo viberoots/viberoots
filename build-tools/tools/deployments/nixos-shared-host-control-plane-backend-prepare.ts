@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { defaultRequestedBy } from "./deployment-admission-evidence.ts";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
 import { createAdmissionFailureSubmission } from "./nixos-shared-host-control-plane-admission-failure.ts";
 import { evaluateNixosSharedHostControlPlaneAdmission } from "./nixos-shared-host-control-plane-admission.ts";
 import { queueBackendSubmissionForLock } from "./nixos-shared-host-control-plane-backend-submit.ts";
@@ -17,10 +18,12 @@ import type {
 import type {
   NixosSharedHostControlPlaneOperationKind,
   NixosSharedHostControlPlanePaths,
+  NixosSharedHostControlPlaneSnapshot,
   NixosSharedHostControlPlaneSubmission,
   NixosSharedHostPublishBehavior,
   NixosSharedHostSmokeConnectOverride,
 } from "./nixos-shared-host-control-plane-contract.ts";
+import type { DeploymentExpectedArtifactIdentities } from "./deployment-artifact-binding.ts";
 import { ensureNoActiveProgressiveRun } from "./nixos-shared-host-control-plane-progressive-guard.ts";
 import { createNixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-submission.ts";
 import {
@@ -35,6 +38,41 @@ import {
 import { writeNixosSharedHostProvisionerPlan } from "./nixos-shared-host-provisioner-plan.ts";
 import { createNixosSharedHostDeployRunId } from "./nixos-shared-host-records.ts";
 
+function assertExpectedArtifactIdentities(
+  snapshot: NixosSharedHostControlPlaneSnapshot,
+  expected: DeploymentExpectedArtifactIdentities,
+) {
+  const publishInput = snapshot.action.kind === "deploy" ? snapshot.action.publishInput : undefined;
+  if (!publishInput) return;
+  if (publishInput.kind === "exact-artifact" && expected.expectedArtifactIdentity) {
+    if (publishInput.artifact.identity !== expected.expectedArtifactIdentity) {
+      throw new DeploymentAdmissionError(
+        "no_longer_admitted",
+        "admitted artifact identity does not match the challenged expected identity",
+      );
+    }
+  }
+  if (publishInput.kind !== "component-artifacts") return;
+  if (
+    expected.expectedCompositeArtifactIdentity &&
+    publishInput.compositeArtifactIdentity !== expected.expectedCompositeArtifactIdentity
+  ) {
+    throw new DeploymentAdmissionError(
+      "no_longer_admitted",
+      "admitted composite artifact identity does not match the challenged expected identity",
+    );
+  }
+  for (const component of publishInput.components) {
+    const expectedIdentity = expected.expectedComponentArtifactIdentities?.[component.componentId];
+    if (expectedIdentity && component.artifact.identity !== expectedIdentity) {
+      throw new DeploymentAdmissionError(
+        "no_longer_admitted",
+        `admitted artifact identity does not match challenged component ${component.componentId}`,
+      );
+    }
+  }
+}
+
 export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
   workspaceRoot: string;
   operationKind: NixosSharedHostControlPlaneOperationKind;
@@ -48,6 +86,9 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
   deployBatchId?: string;
   artifactDir?: string;
   artifactDirsByComponentId?: Record<string, string>;
+  expectedArtifactIdentity?: string;
+  expectedComponentArtifactIdentities?: Record<string, string>;
+  expectedCompositeArtifactIdentity?: string;
   artifact?: any;
   componentArtifacts?: any[];
   publishBehavior?: NixosSharedHostPublishBehavior;
@@ -75,6 +116,17 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
   };
   await writeBackendSnapshotDoc(opts.backend, snapshot, executionSnapshotPath);
   try {
+    assertExpectedArtifactIdentities(snapshot, {
+      ...(opts.expectedArtifactIdentity
+        ? { expectedArtifactIdentity: opts.expectedArtifactIdentity }
+        : {}),
+      ...(opts.expectedComponentArtifactIdentities
+        ? { expectedComponentArtifactIdentities: opts.expectedComponentArtifactIdentities }
+        : {}),
+      ...(opts.expectedCompositeArtifactIdentity
+        ? { expectedCompositeArtifactIdentity: opts.expectedCompositeArtifactIdentity }
+        : {}),
+    });
     await ensureNoActiveProgressiveRun(opts.paths.recordsRoot, snapshot.lockScope, submissionId, {
       backend: opts.backend,
     });
