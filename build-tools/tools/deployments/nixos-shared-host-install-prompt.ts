@@ -39,6 +39,8 @@ export type ClientPromptInput = {
   remoteRuntimeRoot?: string;
   remoteRecordsRoot?: string;
   sshMode?: string;
+  sshIdentityFile?: string;
+  sshKnownHostsFile?: string;
   controlPlaneUrl?: string;
   controlPlaneTokenEnv?: string;
 };
@@ -108,6 +110,8 @@ function clientPromptRules(repoRoot: string): JsonPromptRuleSet {
       "remoteRuntimeRoot",
       "remoteRecordsRoot",
       "sshMode",
+      "sshIdentityFile",
+      "sshKnownHostsFile",
       "controlPlaneUrl",
       "controlPlaneTokenEnv",
     ],
@@ -119,6 +123,8 @@ function clientPromptRules(repoRoot: string): JsonPromptRuleSet {
       remoteRuntimeRoot: "Remote runtime root",
       remoteRecordsRoot: "Remote records root",
       sshMode: "SSH mode",
+      sshIdentityFile: "SSH identity file",
+      sshKnownHostsFile: "SSH known hosts file",
       controlPlaneUrl: "Control-plane URL",
       controlPlaneTokenEnv: "Control-plane token env",
     },

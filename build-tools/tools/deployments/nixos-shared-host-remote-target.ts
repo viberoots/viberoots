@@ -11,6 +11,7 @@ import {
   type ClientInput,
 } from "./nixos-shared-host-install-dev-machine.ts";
 import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
+import type { ReviewedRemoteSshAuth } from "./nixos-shared-host-remote-ssh.ts";
 import { serviceClientPlanFromManifest } from "./nixos-shared-host-service-client-config.ts";
 
 export type NixosSharedHostRemoteArtifactSource =
@@ -39,6 +40,7 @@ export type NixosSharedHostRemotePlan = {
   remoteRuntimeRoot: string;
   remoteRecordsRoot: string;
   remoteArtifactStageRoot: string;
+  reviewedRemoteSshAuth?: ReviewedRemoteSshAuth;
   serviceClient: {
     mode: "control-plane-service";
     controlPlaneUrl: string;
@@ -222,6 +224,14 @@ export async function createNixosSharedHostRemotePlan(opts: {
     remoteRuntimeRoot: selected.remoteRuntimeRoot,
     remoteRecordsRoot: selected.remoteRecordsRoot,
     remoteArtifactStageRoot: remoteArtifactStageRootFor(selected.remoteRuntimeRoot),
+    ...(profile.manifest.sshAuth
+      ? {
+          reviewedRemoteSshAuth: {
+            identityFile: profile.manifest.sshAuth.identityFile,
+            knownHostsFile: profile.manifest.sshAuth.knownHostsFile,
+          },
+        }
+      : {}),
     serviceClient: serviceClientPlanFromManifest(profile.manifest),
     artifactSource: artifactSourceFor(opts.deployment, opts.artifactDir),
     stagedArtifactCleanup: {

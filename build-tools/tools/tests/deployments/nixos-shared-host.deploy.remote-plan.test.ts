@@ -14,11 +14,13 @@ async function installClientProfile(
   profileRoot: string,
   sshMode: string = "ssh",
   controlPlaneUrl: string = "http://127.0.0.1:7780",
+  sshIdentityFile?: string,
+  sshKnownHostsFile?: string,
 ): Promise<void> {
   process.env[LOCAL_FIXTURE_SERVICE_ENV] = "1";
   await $({
     env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
-  })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /etc/nixos/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ${sshMode} --control-plane-url ${controlPlaneUrl}`;
+  })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /etc/nixos/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ${sshMode} ${sshIdentityFile ? ["--ssh-identity-file", sshIdentityFile] : []} ${sshKnownHostsFile ? ["--ssh-known-hosts", sshKnownHostsFile] : []} --control-plane-url ${controlPlaneUrl}`;
 }
 
 async function installReviewedDeployment(workspaceRoot: string): Promise<string> {
@@ -70,6 +72,32 @@ test("deploy plan reads the reviewed remote profile deterministically", async ()
         remoteManagedRoot: "/etc/nixos/deployment-host",
       },
       hostApplyExpectedLater: true,
+    });
+  });
+});
+
+test("deploy plan surfaces reviewed SSH defaults stored in the client profile", async () => {
+  await runInTemp("nixos-shared-host-remote-plan-ssh-defaults", async (tmp, $) => {
+    const deploymentLabel = await installReviewedDeployment(tmp);
+    const profileRoot = `${tmp}/profiles`;
+    const sshIdentityFile = `${tmp}/mini_id`;
+    const sshKnownHostsFile = `${tmp}/mini_known_hosts`;
+    await fsp.writeFile(sshIdentityFile, "key\n", "utf8");
+    await fsp.writeFile(sshKnownHostsFile, "mini ssh-ed25519 AAAA\n", "utf8");
+    await installClientProfile(
+      $,
+      profileRoot,
+      "ssh",
+      "http://127.0.0.1:7780",
+      sshIdentityFile,
+      sshKnownHostsFile,
+    );
+    const result =
+      await $`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan`;
+    const summary = JSON.parse(String(result.stdout));
+    assert.deepEqual(summary.reviewedRemoteSshAuth, {
+      identityFile: sshIdentityFile,
+      knownHostsFile: sshKnownHostsFile,
     });
   });
 });

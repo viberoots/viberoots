@@ -572,6 +572,12 @@ The plan should show:
 Deploy from a dev machine:
 
 ```bash
+direnv exec . build-tools/tools/bin/nixos-shared-host-install \
+  client install \
+  --profile mini \
+  --ssh-identity-file "$HOME/.ssh/mini-deploy" \
+  --ssh-known-hosts "$HOME/.ssh/mini-known-hosts"
+
 direnv exec . build-tools/tools/bin/deploy \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
@@ -585,6 +591,17 @@ or admitted artifact before provider mutation.
 
 If you leave it out, the deploy command uses the deployment target metadata to
 build and locate the artifact automatically.
+
+If the reviewed client profile stores `--ssh-identity-file` and
+`--ssh-known-hosts`, remote-profile deploy uses those as explicit defaults.
+Client install can also infer those once from `~/.ssh/config` for the selected
+destination, or from a single standard `~/.ssh/id_ed25519`/`id_ecdsa`/`id_rsa`
+plus `~/.ssh/known_hosts` when the choice is unambiguous, and then persist the
+resolved paths into the reviewed profile.
+You can still override them for one run with
+`BNX_REMOTE_SSH_IDENTITY_FILE` and `BNX_REMOTE_SSH_KNOWN_HOSTS_FILE`.
+Deploy itself does not guess from generic `~/.ssh` defaults, and install fails
+closed when multiple plausible SSH files exist.
 
 Deploy from Jenkins:
 

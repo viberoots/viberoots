@@ -24,17 +24,35 @@ function authHeaders(token?: string) {
   return token ? { authorization: `Bearer ${token}` } : {};
 }
 
-function responseErrorMessage(body: string, status: number): string {
+function responseErrorMessage(
+  body: string,
+  status: number,
+  context?: { route?: string; controlPlaneUrl?: string },
+): string {
   const trimmed = body.trim();
-  if (!trimmed) return `request failed: ${status}`;
+  let parsedError = "";
   try {
     const parsed = JSON.parse(trimmed) as { error?: unknown };
-    if (typeof parsed.error === "string" && parsed.error.trim()) return parsed.error.trim();
+    if (typeof parsed.error === "string" && parsed.error.trim()) {
+      parsedError = parsed.error.trim();
+    }
   } catch {}
+  if (
+    status === 404 &&
+    parsedError === "not found" &&
+    context?.route === "/api/v1/submission-challenges/artifact"
+  ) {
+    return `control-plane service does not expose ${context.route}; ${String(context.controlPlaneUrl || "").trim() || "the selected service"} may be routed to an older deployment-service build`;
+  }
+  if (!trimmed) return `request failed: ${status}`;
+  if (parsedError) return parsedError;
   return trimmed;
 }
 
-async function readJson<T>(request: Promise<Response>): Promise<T> {
+async function readJson<T>(
+  request: Promise<Response>,
+  context?: { route?: string; controlPlaneUrl?: string },
+): Promise<T> {
   let response: Response;
   try {
     response = await request;
@@ -44,7 +62,7 @@ async function readJson<T>(request: Promise<Response>): Promise<T> {
   }
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(responseErrorMessage(body, response.status));
+    throw new Error(responseErrorMessage(body, response.status, context));
   }
   return (await response.json()) as T;
 }
@@ -60,6 +78,7 @@ export async function readNixosSharedHostControlPlaneStatusViaService(opts: {
   if (opts.deployRunId) url.searchParams.set("deployRunId", opts.deployRunId);
   return await readJson<DeploymentControlPlaneStatus>(
     fetch(url, { headers: { ...authHeaders(opts.token) } }),
+    { route: "/api/v1/status", controlPlaneUrl: opts.controlPlaneUrl },
   );
 }
 
@@ -72,7 +91,10 @@ export async function readNixosSharedHostControlPlaneRecordViaService(opts: {
   const url = new URL("/api/v1/records", opts.controlPlaneUrl);
   if (opts.submissionId) url.searchParams.set("submissionId", opts.submissionId);
   if (opts.deployRunId) url.searchParams.set("deployRunId", opts.deployRunId);
-  return await readJson<any>(fetch(url, { headers: { ...authHeaders(opts.token) } }));
+  return await readJson<any>(fetch(url, { headers: { ...authHeaders(opts.token) } }), {
+    route: "/api/v1/records",
+    controlPlaneUrl: opts.controlPlaneUrl,
+  });
 }
 
 export async function submitNixosSharedHostControlPlaneViaService(opts: {
@@ -91,6 +113,7 @@ export async function submitNixosSharedHostControlPlaneViaService(opts: {
       },
       body: JSON.stringify(opts.request),
     }),
+    { route: "/api/v1/submissions", controlPlaneUrl: opts.controlPlaneUrl },
   );
   if (!ACTIVE_LIFECYCLE_STATES.has(initial.lifecycleState)) {
     return { initial, final: initial };
@@ -127,6 +150,10 @@ export async function createNixosSharedHostArtifactChallengeViaService(opts: {
       },
       body: JSON.stringify(opts.request),
     }),
+    {
+      route: "/api/v1/submission-challenges/artifact",
+      controlPlaneUrl: opts.controlPlaneUrl,
+    },
   );
 }
 
@@ -149,6 +176,7 @@ export async function submitNixosSharedHostControlPlaneRunActionViaService(opts:
       },
       body: JSON.stringify(opts.request),
     }),
+    { route: "/api/v1/run-actions", controlPlaneUrl: opts.controlPlaneUrl },
   );
 }
 
@@ -166,6 +194,7 @@ export async function createDeploymentAuthLoginViaService(opts: {
       },
       body: JSON.stringify(opts.request),
     }),
+    { route: "/api/v1/auth/login", controlPlaneUrl: opts.controlPlaneUrl },
   );
 }
 
@@ -178,6 +207,7 @@ export async function readDeploymentAuthSessionViaService(opts: {
   url.searchParams.set("sessionId", opts.sessionId);
   return await readJson<DeploymentAuthSessionStatus>(
     fetch(url, { headers: { ...authHeaders(opts.token) } }),
+    { route: "/api/v1/auth/session", controlPlaneUrl: opts.controlPlaneUrl },
   );
 }
 

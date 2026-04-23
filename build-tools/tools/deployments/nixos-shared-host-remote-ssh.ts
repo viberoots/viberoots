@@ -11,15 +11,24 @@ export type ReviewedRemoteSshAuth = {
   knownHostsFile: string;
 };
 
+type ReviewedRemoteSshFallback = {
+  identityFile?: string;
+  knownHostsFile?: string;
+};
+
 function readEnvValue(env: ReviewedRemoteEnv, name: string): string {
   return String(env[name] || "").trim();
 }
 
 export function readReviewedRemoteSshAuth(
   env: ReviewedRemoteEnv = process.env,
+  fallback?: ReviewedRemoteSshFallback,
 ): ReviewedRemoteSshAuth | undefined {
-  const identityFile = readEnvValue(env, REMOTE_SSH_IDENTITY_FILE_ENV);
-  const knownHostsFile = readEnvValue(env, REMOTE_SSH_KNOWN_HOSTS_FILE_ENV);
+  const identityFile =
+    readEnvValue(env, REMOTE_SSH_IDENTITY_FILE_ENV) || String(fallback?.identityFile || "").trim();
+  const knownHostsFile =
+    readEnvValue(env, REMOTE_SSH_KNOWN_HOSTS_FILE_ENV) ||
+    String(fallback?.knownHostsFile || "").trim();
   if (!identityFile && !knownHostsFile) return undefined;
   if (!identityFile || !knownHostsFile) {
     throw new Error(
@@ -31,8 +40,9 @@ export function readReviewedRemoteSshAuth(
 
 export function requireReviewedRemoteSshAuth(
   env: ReviewedRemoteEnv = process.env,
+  fallback?: ReviewedRemoteSshFallback,
 ): ReviewedRemoteSshAuth {
-  const auth = readReviewedRemoteSshAuth(env);
+  const auth = readReviewedRemoteSshAuth(env, fallback);
   if (!auth) {
     throw new Error(
       `reviewed remote SSH auth requires ${REMOTE_SSH_IDENTITY_FILE_ENV} and ${REMOTE_SSH_KNOWN_HOSTS_FILE_ENV}`,
@@ -41,8 +51,11 @@ export function requireReviewedRemoteSshAuth(
   return auth;
 }
 
-export function buildReviewedRemoteSshArgvPrefix(env: ReviewedRemoteEnv = process.env): string[] {
-  const auth = requireReviewedRemoteSshAuth(env);
+export function buildReviewedRemoteSshArgvPrefix(
+  env: ReviewedRemoteEnv = process.env,
+  fallback?: ReviewedRemoteSshFallback,
+): string[] {
+  const auth = requireReviewedRemoteSshAuth(env, fallback);
   return [
     "ssh",
     "-o",
@@ -60,9 +73,10 @@ export function buildReviewedRemoteSshArgvPrefix(env: ReviewedRemoteEnv = proces
 
 export function buildReviewedRemoteRsyncShell(
   env: ReviewedRemoteEnv = process.env,
+  fallback?: ReviewedRemoteSshFallback,
 ): string | undefined {
-  requireReviewedRemoteSshAuth(env);
-  return buildReviewedRemoteSshArgvPrefix(env)
+  requireReviewedRemoteSshAuth(env, fallback);
+  return buildReviewedRemoteSshArgvPrefix(env, fallback)
     .map((arg) => shSingleQuote(arg))
     .join(" ");
 }

@@ -60,6 +60,8 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
           remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
           remoteRecordsRoot: "/var/lib/deployment-host/records",
           sshMode: "ssh",
+          sshIdentityFile: "/Users/me/.ssh/mini",
+          sshKnownHostsFile: "/Users/me/.ssh/known_hosts-mini",
           controlPlaneUrl: "http://127.0.0.1:7780",
           controlPlaneTokenEnv: "BNX_DEPLOY_CONTROL_PLANE_TOKEN",
         };
@@ -90,6 +92,8 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
   });
   assert.deepEqual(capturedInput, {});
   assert.equal(result.remoteRepoPath, "/srv/common");
+  assert.equal(result.sshIdentityFile, "/Users/me/.ssh/mini");
+  assert.equal(result.sshKnownHostsFile, "/Users/me/.ssh/known_hosts-mini");
   assert.equal(result.controlPlaneUrl, "http://127.0.0.1:7780");
 });
 

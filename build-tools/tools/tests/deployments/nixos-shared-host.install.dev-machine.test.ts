@@ -8,8 +8,12 @@ import { runInTemp } from "../lib/test-helpers";
 test("nixos-shared-host client install accepts required parameters by flags", async () => {
   await runInTemp("nixos-shared-host-client-flags", async (tmp, $) => {
     const outputRoot = path.join(tmp, "profiles");
+    const sshIdentityFile = path.join(tmp, "id_ed25519");
+    const sshKnownHostsFile = path.join(tmp, "known_hosts");
+    await fsp.writeFile(sshIdentityFile, "key\n", "utf8");
+    await fsp.writeFile(sshKnownHostsFile, "mini ssh-ed25519 AAAA\n", "utf8");
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --control-plane-url http://127.0.0.1:7780`;
+      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --ssh-identity-file ${sshIdentityFile} --ssh-known-hosts ${sshKnownHostsFile} --control-plane-url http://127.0.0.1:7780`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.manifest.profileName, "mini");
     assert.equal(summary.manifest.destination, "mini");
@@ -21,6 +25,8 @@ test("nixos-shared-host client install accepts required parameters by flags", as
     assert.equal(summary.manifest.remoteRuntimeRoot, "/var/lib/deployment-host/runtime");
     assert.equal(summary.manifest.remoteRecordsRoot, "/var/lib/deployment-host/records");
     assert.equal(summary.manifest.sshMode, "ssh");
+    assert.equal(summary.manifest.sshAuth.identityFile, sshIdentityFile);
+    assert.equal(summary.manifest.sshAuth.knownHostsFile, sshKnownHostsFile);
     assert.equal(
       summary.manifest.serviceClient.controlPlaneTokenEnv,
       "BNX_DEPLOY_CONTROL_PLANE_TOKEN",
@@ -32,6 +38,10 @@ test("nixos-shared-host client install accepts required parameters by flags", as
 test("nixos-shared-host client install accepts required parameters by stdin and applies declarative defaults when stdin is partial", async () => {
   await runInTemp("nixos-shared-host-client-stdin", async (tmp, $) => {
     const outputRoot = path.join(tmp, "profiles");
+    const sshIdentityFile = path.join(tmp, "id_ed25519");
+    const sshKnownHostsFile = path.join(tmp, "known_hosts");
+    await fsp.writeFile(sshIdentityFile, "key\n", "utf8");
+    await fsp.writeFile(sshKnownHostsFile, "mini ssh-ed25519 AAAA\n", "utf8");
     const payload = JSON.stringify({
       profileName: "mini",
       destination: "mini",
@@ -40,6 +50,8 @@ test("nixos-shared-host client install accepts required parameters by stdin and 
       remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
       remoteRecordsRoot: "/var/lib/deployment-host/records",
       sshMode: "ssh",
+      sshIdentityFile,
+      sshKnownHostsFile,
       controlPlaneUrl: "http://127.0.0.1:7780",
     });
     const ok = await $({
@@ -61,6 +73,7 @@ test("nixos-shared-host client install accepts required parameters by stdin and 
     assert.equal(partialSummary.manifest.remoteRuntimeRoot, "/var/lib/deployment-host/runtime");
     assert.equal(partialSummary.manifest.remoteRecordsRoot, "/var/lib/deployment-host/records");
     assert.equal(partialSummary.manifest.sshMode, "ssh");
+    assert.equal("sshAuth" in partialSummary.manifest, false);
     assert.equal(partialSummary.manifest.serviceClient.controlPlaneUrl, "http://127.0.0.1:7780");
     assert.equal(
       partialSummary.manifest.serviceClient.controlPlaneTokenEnv,
@@ -72,9 +85,13 @@ test("nixos-shared-host client install accepts required parameters by stdin and 
 test("nixos-shared-host client install ignores empty stdin", async () => {
   await runInTemp("nixos-shared-host-client-empty-stdin", async (tmp, $) => {
     const outputRoot = path.join(tmp, "profiles");
+    const sshIdentityFile = path.join(tmp, "id_ed25519");
+    const sshKnownHostsFile = path.join(tmp, "known_hosts");
+    await fsp.writeFile(sshIdentityFile, "key\n", "utf8");
+    await fsp.writeFile(sshKnownHostsFile, "mini ssh-ed25519 AAAA\n", "utf8");
     const result = await $({
       input: "",
-    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --control-plane-url http://127.0.0.1:7780`;
+    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --ssh-identity-file ${sshIdentityFile} --ssh-known-hosts ${sshKnownHostsFile} --control-plane-url http://127.0.0.1:7780`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.manifest.profileName, "mini");
     assert.equal(summary.manifest.destination, "mini");
@@ -86,6 +103,8 @@ test("nixos-shared-host client install ignores empty stdin", async () => {
     assert.equal(summary.manifest.remoteRuntimeRoot, "/var/lib/deployment-host/runtime");
     assert.equal(summary.manifest.remoteRecordsRoot, "/var/lib/deployment-host/records");
     assert.equal(summary.manifest.sshMode, "ssh");
+    assert.equal(summary.manifest.sshAuth.identityFile, sshIdentityFile);
+    assert.equal(summary.manifest.sshAuth.knownHostsFile, sshKnownHostsFile);
     assert.equal(
       summary.manifest.serviceClient.controlPlaneTokenEnv,
       "BNX_DEPLOY_CONTROL_PLANE_TOKEN",

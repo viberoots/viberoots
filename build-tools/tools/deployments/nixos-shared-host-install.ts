@@ -22,12 +22,14 @@ import {
   maybePromptClientInstallInput,
   maybePromptServerInstallInput,
 } from "./nixos-shared-host-install-prompt.ts";
+import { resolveClientInstallSshAuthDefaults } from "./nixos-shared-host-install-ssh-guess.ts";
 import { readStructuredInstallInputFromStdin } from "./nixos-shared-host-install-stdin.ts";
 import {
   installNixosSharedHost,
   statusNixosSharedHost,
   uninstallNixosSharedHost,
 } from "./nixos-shared-host-install-host.ts";
+import { clientOutputRoot } from "./nixos-shared-host-install-client-root.ts";
 import { detectDefaultConfigEntryPath } from "./nixos-shared-host-install-host-support.ts";
 
 type HostInstallInput = {
@@ -168,10 +170,17 @@ async function runClientInstall(repoRoot: string) {
     remoteRuntimeRoot: fromOptionalFlag("remote-runtime-root"),
     remoteRecordsRoot: fromOptionalFlag("remote-records-root"),
     sshMode: fromOptionalFlag("ssh-mode"),
+    sshIdentityFile: fromOptionalFlag("ssh-identity-file"),
+    sshKnownHostsFile: fromOptionalFlag("ssh-known-hosts"),
     controlPlaneUrl: fromOptionalFlag("control-plane-url"),
     controlPlaneTokenEnv: fromOptionalFlag("control-plane-token-env"),
   });
   const promptInput = await maybePromptClientInstallInput(repoRoot, mergedInstallInput);
+  const resolvedSshAuth = await resolveClientInstallSshAuthDefaults({
+    destination: String(promptInput.destination || ""),
+    sshIdentityFile: String(promptInput.sshIdentityFile || "") || undefined,
+    sshKnownHostsFile: String(promptInput.sshKnownHostsFile || "") || undefined,
+  });
   const result = await installNixosSharedHostClient({
     outputRoot: path.resolve(
       getFlagStr(
@@ -188,21 +197,14 @@ async function runClientInstall(repoRoot: string) {
       remoteRuntimeRoot: String(promptInput.remoteRuntimeRoot || ""),
       remoteRecordsRoot: String(promptInput.remoteRecordsRoot || ""),
       sshMode: String(promptInput.sshMode || ""),
+      sshIdentityFile: resolvedSshAuth.sshIdentityFile,
+      sshKnownHostsFile: resolvedSshAuth.sshKnownHostsFile,
       controlPlaneUrl: String(promptInput.controlPlaneUrl || ""),
       controlPlaneTokenEnv: String(promptInput.controlPlaneTokenEnv || "") || undefined,
     },
     dryRun: getFlagBool("dry-run"),
   });
   console.log(JSON.stringify(result, null, 2));
-}
-
-function clientOutputRoot(repoRoot: string): string {
-  return path.resolve(
-    getFlagStr(
-      "output-root",
-      path.join(repoRoot, ".local", "deployments", "nixos-shared-host", "clients"),
-    ),
-  );
 }
 
 async function runClientCommand(action: string, repoRoot: string) {

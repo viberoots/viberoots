@@ -22,8 +22,12 @@ function commandFlags(flags: string[]): string {
   return flags.map((flag) => `--${flag}`).join(" ");
 }
 
+function remoteBashCommand(script: string): string {
+  return `bash -lc ${shSingleQuote(script)}`;
+}
+
 export function buildRemoteSshArgv(destination: string, script: string): string[] {
-  return [...buildReviewedRemoteSshArgvPrefix(), destination, "bash", "-lc", script];
+  return [...buildReviewedRemoteSshArgvPrefix(process.env), destination, remoteBashCommand(script)];
 }
 
 export function buildRemoteArtifactStageArgv(
@@ -33,7 +37,38 @@ export function buildRemoteArtifactStageArgv(
 ): string[] {
   const source = localArtifactDir.endsWith("/") ? localArtifactDir : `${localArtifactDir}/`;
   const remoteTarget = `${destination}:${remoteArtifactPath.endsWith("/") ? remoteArtifactPath : `${remoteArtifactPath}/`}`;
-  const rsyncShell = buildReviewedRemoteRsyncShell();
+  const rsyncShell = buildReviewedRemoteRsyncShell(process.env);
+  return [
+    "rsync",
+    "-az",
+    "--delete",
+    ...(rsyncShell ? ["-e", rsyncShell] : []),
+    source,
+    remoteTarget,
+  ];
+}
+
+export function buildRemoteSshArgvWithFallback(
+  destination: string,
+  script: string,
+  fallback?: { identityFile?: string; knownHostsFile?: string },
+): string[] {
+  return [
+    ...buildReviewedRemoteSshArgvPrefix(process.env, fallback),
+    destination,
+    remoteBashCommand(script),
+  ];
+}
+
+export function buildRemoteArtifactStageArgvWithFallback(
+  localArtifactDir: string,
+  destination: string,
+  remoteArtifactPath: string,
+  fallback?: { identityFile?: string; knownHostsFile?: string },
+): string[] {
+  const source = localArtifactDir.endsWith("/") ? localArtifactDir : `${localArtifactDir}/`;
+  const remoteTarget = `${destination}:${remoteArtifactPath.endsWith("/") ? remoteArtifactPath : `${remoteArtifactPath}/`}`;
+  const rsyncShell = buildReviewedRemoteRsyncShell(process.env, fallback);
   return [
     "rsync",
     "-az",

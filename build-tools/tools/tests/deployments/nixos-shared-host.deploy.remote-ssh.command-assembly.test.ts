@@ -3,11 +3,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildRemoteArtifactStageArgv,
+  buildRemoteArtifactStageArgvWithFallback,
   buildRemoteCleanupScript,
   buildRemoteDeployScript,
   buildRemoteHostApplyScript,
   buildRemoteRepoPreflightScript,
   buildRemoteSshArgv,
+  buildRemoteSshArgvWithFallback,
   buildRemoteStageFinalizeScript,
   buildRemoteStagePrepareScript,
 } from "../../deployments/nixos-shared-host-remote-shell.ts";
@@ -16,54 +18,10 @@ import {
   REMOTE_SSH_KNOWN_HOSTS_FILE_ENV,
 } from "../../deployments/nixos-shared-host-remote-ssh.ts";
 import { createNixosSharedHostRemoteArtifactPath } from "../../deployments/nixos-shared-host-remote-target.ts";
-import type { NixosSharedHostRemotePlan } from "../../deployments/nixos-shared-host-remote-target.ts";
-
-const plan: NixosSharedHostRemotePlan = {
-  planMode: true,
-  remoteExecutionImplemented: true,
-  deploymentId: "pleomino-dev",
-  deploymentLabel: "//projects/deployments/pleomino-dev:deploy",
-  profileName: "mini",
-  destination: "mini",
-  transportMode: "ssh",
-  remoteRepoPath: "/srv/common",
-  remoteStatePath: "/etc/nixos/deployment-host/platform-state.json",
-  remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
-  remoteRecordsRoot: "/var/lib/deployment-host/records",
-  remoteArtifactStageRoot: "/var/lib/deployment-host/runtime/.deploy-artifacts",
-  artifactSource: {
-    kind: "explicit-artifact-dir",
-    localArtifactDir: "/tmp/local-artifact",
-    remoteTransportRequired: true,
-  },
-  stagedArtifactCleanup: {
-    defaultMode: "remove",
-    retainFlag: "--retain-remote-artifact",
-  },
-  hostApply: {
-    supported: true,
-    explicitOptInRequired: true,
-    selectedMode: "skip",
-    remoteConfigRoot: "/etc/nixos",
-    remoteManagedRoot: "/etc/nixos/deployment-host",
-  },
-  hostApplyExpectedLater: true,
-};
-
-function withReviewedSshEnv(fn: () => void) {
-  const previousIdentity = process.env[REMOTE_SSH_IDENTITY_FILE_ENV];
-  const previousKnownHosts = process.env[REMOTE_SSH_KNOWN_HOSTS_FILE_ENV];
-  process.env[REMOTE_SSH_IDENTITY_FILE_ENV] = "/tmp/jenkins-id";
-  process.env[REMOTE_SSH_KNOWN_HOSTS_FILE_ENV] = "/tmp/known-hosts";
-  try {
-    fn();
-  } finally {
-    if (previousIdentity == null) delete process.env[REMOTE_SSH_IDENTITY_FILE_ENV];
-    else process.env[REMOTE_SSH_IDENTITY_FILE_ENV] = previousIdentity;
-    if (previousKnownHosts == null) delete process.env[REMOTE_SSH_KNOWN_HOSTS_FILE_ENV];
-    else process.env[REMOTE_SSH_KNOWN_HOSTS_FILE_ENV] = previousKnownHosts;
-  }
-}
+import {
+  remoteSshCommandAssemblyPlan as plan,
+  withReviewedSshEnv,
+} from "./nixos-shared-host.remote-ssh.command-assembly.fixture.ts";
 
 test("remote SSH transport assembles reviewed preflight, staging, deploy, and cleanup commands", () => {
   withReviewedSshEnv(() => {
@@ -73,7 +31,8 @@ test("remote SSH transport assembles reviewed preflight, staging, deploy, and cl
       "/var/lib/deployment-host/runtime/.deploy-artifacts/projects-deployments-pleomino-dev-deploy/remote-123",
     );
     const preflight = buildRemoteSshArgv(plan.destination, buildRemoteRepoPreflightScript(plan));
-    assert.deepEqual(preflight.slice(-4, -1), ["mini", "bash", "-lc"]);
+    assert.equal(preflight.at(-2), "mini");
+    assert.match(preflight.at(-1) || "", /^bash -lc '/);
     assert.match(preflight.at(-1) || "", /missing reviewed remote repo checkout/);
     const stagePrepare = buildRemoteSshArgv(
       plan.destination,
@@ -109,10 +68,10 @@ test("remote SSH transport assembles reviewed preflight, staging, deploy, and cl
     assert.match(deploy.at(-1) || "", /direnv exec \. build-tools\/tools\/bin\/deploy/);
     assert.match(
       deploy.at(-1) || "",
-      /--artifact-dir '\/var\/lib\/deployment-host\/runtime\/\.deploy-artifacts/,
+      /--artifact-dir '"'"'\/var\/lib\/deployment-host\/runtime\/\.deploy-artifacts/,
     );
-    assert.match(deploy.at(-1) || "", /--smoke-connect-host '127\.0\.0\.1'/);
-    assert.match(deploy.at(-1) || "", /--smoke-connect-port '3443'/);
+    assert.match(deploy.at(-1) || "", /--smoke-connect-host '"'"'127\.0\.0\.1'"'"'/);
+    assert.match(deploy.at(-1) || "", /--smoke-connect-port '"'"'3443'"'"'/);
     const cleanup = buildRemoteSshArgv(
       plan.destination,
       buildRemoteCleanupScript(remoteArtifactPath),
@@ -136,11 +95,14 @@ test("remote SSH transport assembles reviewed host-apply commands for switch and
       buildRemoteHostApplyScript(switchPlan),
     );
     assert.match(switchApply.at(-1) || "", /nixos-shared-host-host-apply\.ts/);
-    assert.match(switchApply.at(-1) || "", /--config-root '\/etc\/nixos'/);
-    assert.match(switchApply.at(-1) || "", /--managed-root '\/etc\/nixos\/deployment-host'/);
+    assert.match(switchApply.at(-1) || "", /--config-root '"'"'\/etc\/nixos'"'"'/);
     assert.match(
       switchApply.at(-1) || "",
-      /--expected-state-path '\/etc\/nixos\/deployment-host\/platform-state\.json'/,
+      /--managed-root '"'"'\/etc\/nixos\/deployment-host'"'"'/,
+    );
+    assert.match(
+      switchApply.at(-1) || "",
+      /--expected-state-path '"'"'\/etc\/nixos\/deployment-host\/platform-state\.json'"'"'/,
     );
     const dryRunPlan: NixosSharedHostRemotePlan = {
       ...switchPlan,
@@ -174,6 +136,8 @@ test("remote SSH transport adds reviewed non-interactive auth options when Jenki
       "-i",
       "/tmp/jenkins-id",
     ]);
+    assert.equal(ssh.at(-2), "mini");
+    assert.equal(ssh.at(-1), "bash -lc 'echo ok'");
     const stage = buildRemoteArtifactStageArgv(
       "/tmp/local-artifact",
       plan.destination,
@@ -196,6 +160,50 @@ test("remote SSH transport rejects missing reviewed host-key configuration", () 
       () => buildRemoteSshArgv(plan.destination, "echo ok"),
       /reviewed remote SSH auth requires/,
     );
+  } finally {
+    if (previousIdentity != null) process.env[REMOTE_SSH_IDENTITY_FILE_ENV] = previousIdentity;
+    if (previousKnownHosts != null)
+      process.env[REMOTE_SSH_KNOWN_HOSTS_FILE_ENV] = previousKnownHosts;
+  }
+});
+
+test("remote SSH transport accepts reviewed profile defaults when env is unset", () => {
+  const previousIdentity = process.env[REMOTE_SSH_IDENTITY_FILE_ENV];
+  const previousKnownHosts = process.env[REMOTE_SSH_KNOWN_HOSTS_FILE_ENV];
+  delete process.env[REMOTE_SSH_IDENTITY_FILE_ENV];
+  delete process.env[REMOTE_SSH_KNOWN_HOSTS_FILE_ENV];
+  try {
+    const ssh = buildRemoteSshArgvWithFallback(plan.destination, "echo ok", {
+      identityFile: "/tmp/profile-id",
+      knownHostsFile: "/tmp/profile-known-hosts",
+    });
+    assert.deepEqual(ssh.slice(0, 11), [
+      "ssh",
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "IdentitiesOnly=yes",
+      "-o",
+      "StrictHostKeyChecking=yes",
+      "-o",
+      "UserKnownHostsFile=/tmp/profile-known-hosts",
+      "-i",
+      "/tmp/profile-id",
+    ]);
+    assert.equal(ssh.at(-2), "mini");
+    assert.equal(ssh.at(-1), "bash -lc 'echo ok'");
+    const stage = buildRemoteArtifactStageArgvWithFallback(
+      "/tmp/local-artifact",
+      plan.destination,
+      "/tmp/remote",
+      {
+        identityFile: "/tmp/profile-id",
+        knownHostsFile: "/tmp/profile-known-hosts",
+      },
+    );
+    assert.equal(stage[3], "-e");
+    assert.match(stage[4] || "", /UserKnownHostsFile=\/tmp\/profile-known-hosts/);
+    assert.match(stage[4] || "", /\/tmp\/profile-id/);
   } finally {
     if (previousIdentity != null) process.env[REMOTE_SSH_IDENTITY_FILE_ENV] = previousIdentity;
     if (previousKnownHosts != null)

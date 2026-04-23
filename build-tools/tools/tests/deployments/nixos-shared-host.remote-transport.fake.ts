@@ -34,8 +34,11 @@ if [[ -z "\${destination}" ]]; then
   echo "fake ssh expects a destination" >&2
   exit 98
 fi
+if [[ "$#" -eq 1 ]]; then
+  eval "set -- $1"
+fi
 if [[ "\${1:-}" != "bash" || "\${2:-}" != "-lc" ]]; then
-  echo "fake ssh only supports: ssh <destination> bash -lc <script>" >&2
+  echo "fake ssh only supports reviewed bash -lc remote commands" >&2
   exit 99
 fi
 script="\${3:-}"
