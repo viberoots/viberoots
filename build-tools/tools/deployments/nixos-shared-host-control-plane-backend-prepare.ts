@@ -98,6 +98,7 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
   smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;
   source?: NixosSharedHostControlPlaneSourceSelection;
   admissionEvidence?: DeploymentAdmissionEvidence;
+  persistMode?: "immediate" | "defer";
 }) {
   const submissionId = opts.submissionId || createNixosSharedHostSubmissionId();
   const requestedBy =
@@ -114,7 +115,10 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
     submissionPath,
     executionSnapshotPath,
   };
-  await writeBackendSnapshotDoc(opts.backend, snapshot, executionSnapshotPath);
+  const persistImmediately = opts.persistMode !== "defer";
+  if (persistImmediately) {
+    await writeBackendSnapshotDoc(opts.backend, snapshot, executionSnapshotPath);
+  }
   try {
     assertExpectedArtifactIdentities(snapshot, {
       ...(opts.expectedArtifactIdentity
@@ -140,8 +144,11 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
       artifactLineageId: opts.artifactLineageId,
       admissionEvidence: opts.admissionEvidence,
     });
-    await writeBackendSnapshotDoc(opts.backend, snapshot, executionSnapshotPath);
+    if (persistImmediately) {
+      await writeBackendSnapshotDoc(opts.backend, snapshot, executionSnapshotPath);
+    }
   } catch (error) {
+    if (!persistImmediately) throw error;
     const submission = createAdmissionFailureSubmission({
       error,
       snapshot,
@@ -155,22 +162,25 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
     await writeBackendSubmissionDoc(opts.backend, submission, refs);
     throw Object.assign(error, { submission });
   }
-  const submission = await queueBackendSubmissionForLock({
-    backend: opts.backend,
-    snapshot,
-    submission: createNixosSharedHostControlPlaneSubmission(snapshot, executionSnapshotPath, {
-      admission: { decision: "admitted", reason: "shared_nonprod" },
-      lifecycleState: "queued",
-      dedupe: opts.dedupe,
-      requestedBy,
-      authorization: opts.authorization,
-      ...(snapshot.progressiveRollout ? { progressiveRollout: snapshot.progressiveRollout } : {}),
-      deployRunId,
-    }),
-    refs,
+  const submission = createNixosSharedHostControlPlaneSubmission(snapshot, executionSnapshotPath, {
+    admission: { decision: "admitted", reason: "shared_nonprod" },
+    lifecycleState: "queued",
+    dedupe: opts.dedupe,
+    requestedBy,
+    authorization: opts.authorization,
+    ...(snapshot.progressiveRollout ? { progressiveRollout: snapshot.progressiveRollout } : {}),
+    deployRunId,
   });
+  const queuedSubmission = persistImmediately
+    ? await queueBackendSubmissionForLock({
+        backend: opts.backend,
+        snapshot,
+        submission,
+        refs,
+      })
+    : submission;
   return {
-    submission,
+    submission: queuedSubmission,
     submissionPath,
     executionSnapshotPath,
     lockScope: snapshot.lockScope,

@@ -32,7 +32,7 @@ import {
   type NixosSharedHostControlPlaneSubmitRequest,
 } from "./nixos-shared-host-control-plane-api-contract.ts";
 import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
-import { consumeRequiredArtifactBinding } from "./nixos-shared-host-control-plane-service-artifact-binding.ts";
+import { acceptChallengedNixosSharedHostSubmit } from "./nixos-shared-host-control-plane-challenged-submit.ts";
 import { prepareBackendNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-backend-prepare.ts";
 import { resolveServiceSubmitRequest } from "./nixos-shared-host-control-plane-service-submit.ts";
 export {
@@ -79,36 +79,11 @@ export async function handleControlPlaneSubmit(
           recordsRoot: opts.paths.recordsRoot,
           backendDatabaseUrl: opts.backend.databaseUrl,
         });
-  if (
-    opts.requireArtifactBinding &&
-    resolvedRequest.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA &&
-    (resolvedRequest.artifactDir || resolvedRequest.artifactDirsByComponentId)
-  ) {
-    await consumeRequiredArtifactBinding({
-      backend: opts.backend,
-      request: resolvedRequest,
-      serviceToken: opts.serviceToken,
-    });
-  }
   const requestFingerprint = fingerprintControlPlanePayload({
     ...request,
     submittedAt: request.submittedAt,
   });
   const idempotencyKey = request.idempotencyKey || request.submissionId;
-  const dedupe = await resolveBackendIdempotency({
-    backend: opts.backend,
-    kind: "submit",
-    key: idempotencyKey,
-    requestFingerprint,
-    targetId: request.submissionId,
-  });
-  if (dedupe.mode === "reused") {
-    const existing = await readBackendSubmissionBySubmissionId(opts.backend, dedupe.targetId);
-    if (!existing) {
-      throw new Error(`idempotent submission missing backend state: ${dedupe.targetId}`);
-    }
-    return submitResponseFromSubmission(existing as any);
-  }
   const boundary =
     request.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
       ? await resolveSubmitAuthorizationBoundary({
@@ -134,6 +109,37 @@ export async function handleControlPlaneSubmit(
         authorization: boundary.authorization,
       })
     : undefined;
+  if (
+    opts.requireArtifactBinding &&
+    resolvedRequest.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA &&
+    (resolvedRequest.artifactDir || resolvedRequest.artifactDirsByComponentId)
+  ) {
+    return await acceptChallengedNixosSharedHostSubmit({
+      workspaceRoot: opts.workspaceRoot,
+      paths: opts.paths,
+      backend: opts.backend,
+      serviceToken: opts.serviceToken,
+      resolvedRequest,
+      requestFingerprint,
+      idempotencyKey,
+      boundary,
+      ...(authorization ? { authorization } : {}),
+    });
+  }
+  const dedupe = await resolveBackendIdempotency({
+    backend: opts.backend,
+    kind: "submit",
+    key: idempotencyKey,
+    requestFingerprint,
+    targetId: request.submissionId,
+  });
+  if (dedupe.mode === "reused") {
+    const existing = await readBackendSubmissionBySubmissionId(opts.backend, dedupe.targetId);
+    if (!existing) {
+      throw new Error(`idempotent submission missing backend state: ${dedupe.targetId}`);
+    }
+    return submitResponseFromSubmission(existing as any);
+  }
   try {
     const prepared =
       request.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA

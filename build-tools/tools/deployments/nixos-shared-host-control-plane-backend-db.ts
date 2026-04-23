@@ -10,13 +10,13 @@ export type NixosSharedHostControlPlaneBackendTarget = {
   databaseUrl: string;
 };
 
-type BackendRow = Record<string, unknown>;
+export type BackendRow = Record<string, unknown>;
 
-type BackendQueryResult<T extends BackendRow = BackendRow> = {
+export type BackendQueryResult<T extends BackendRow = BackendRow> = {
   rows: T[];
 };
 
-type BackendQueryable = {
+export type BackendQueryable = {
   query<T extends BackendRow = BackendRow>(
     sql: string,
     params?: readonly unknown[],

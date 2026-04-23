@@ -20,6 +20,7 @@ import type {
   DeploymentPrincipal,
 } from "./deployment-admission-evidence.ts";
 import type { DeploymentWorkerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker.ts";
+import type { DeploymentArtifactBindingProvenance } from "./deployment-artifact-binding.ts";
 
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA =
   "nixos-shared-host-control-plane-snapshot@4";
@@ -117,6 +118,7 @@ export type NixosSharedHostControlPlaneSubmission = {
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
   approval?: DeploymentControlPlaneApprovalSummary;
   artifact?: DeploymentControlPlaneArtifactStatus;
+  artifactBinding?: DeploymentArtifactBindingProvenance;
   latestAction?: {
     actionId: string;
     action: "cancel" | "resume" | "abort" | "approve";

@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
+import type { DeploymentArtifactBindingProvenance } from "./deployment-artifact-binding.ts";
 import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
 import type { DeploymentTarget } from "./contract.ts";
 
@@ -189,6 +190,7 @@ export type DeploymentControlPlaneResponseBase = {
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
   approval?: DeploymentControlPlaneApprovalSummary;
   artifact?: DeploymentControlPlaneArtifactStatus;
+  artifactBinding?: DeploymentArtifactBindingProvenance;
   latestAction?: {
     actionId: string;
     action: DeploymentControlPlaneRunAction;

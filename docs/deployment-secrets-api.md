@@ -429,9 +429,22 @@ The proof binds the challenge id and nonce, deployment id and label, operation
 kind, publish behavior, provider target identity, service-authenticated client
 identity, proof key id, expected identity fields, source/replay selectors when
 present, idempotency key, and finalized staged artifact reference. The service
-rejects missing, malformed, unsupported, mismatched, expired, or replayed
-proof/challenge data before snapshot creation, worker queueing, or provider
-mutation.
+first resolves an already accepted matching idempotency key, then atomically
+consumes the challenge with the accepted submission, execution snapshot, and
+worker queue intent. Retrying the same idempotency key, challenge, proof, and
+request fingerprint returns the accepted submission; reusing the key with a
+different challenge, proof, expected identity, source, staged reference, or
+canonical envelope fails as an idempotency conflict. Challenge replay without
+that matching accepted idempotency fingerprint fails closed. Missing, malformed,
+unsupported, mismatched, expired, or replayed proof/challenge data is rejected
+before provider mutation.
+
+Accepted challenged submissions expose an `artifactBinding` summary on submit
+and status responses. The summary includes the challenge id, authenticated
+principal id, proof key id and algorithm, canonical envelope fingerprint,
+expected identity fields, recomputed admitted identity fields, verification
+decision and timestamp, and a redacted admitted artifact reference. It never
+includes proof MACs, nonces, bearer tokens, or full staged artifact paths.
 
 ### Common Status Fields
 

@@ -23,6 +23,19 @@ export type DeploymentExpectedArtifactIdentities = {
   expectedCompositeArtifactIdentity?: string;
 };
 
+export type DeploymentArtifactBindingProvenance = {
+  challengeId: string;
+  principalId: string;
+  keyId: string;
+  proofAlgorithm: typeof DEPLOYMENT_ARTIFACT_BINDING_ALGORITHM;
+  canonicalEnvelopeFingerprint: string;
+  expectedIdentities: DeploymentExpectedArtifactIdentities;
+  admittedIdentities: DeploymentExpectedArtifactIdentities;
+  verificationDecision: "accepted";
+  verifiedAt: string;
+  admittedStoredArtifactReference?: string;
+};
+
 export type DeploymentArtifactBindingProof = {
   schemaVersion: typeof DEPLOYMENT_ARTIFACT_BINDING_PROOF_SCHEMA;
   challengeId: string;

@@ -257,6 +257,16 @@ staged path. The service consumes the challenge once, recomputes the admitted
 artifact identity from the finalized tree, and rejects proof, challenge, or
 identity mismatches before worker queueing.
 
+If the client loses the submit response, it should retry the exact same
+submission id or idempotency key with the same challenge, proof, and request
+body. The service returns the existing accepted submission without trying to
+consume the one-time challenge again. A retry that changes the proof, expected
+identity, source, staged reference, or envelope is treated as an idempotency
+conflict, and replaying a consumed challenge under a different accepted
+fingerprint fails closed. Submit and status output include only the redacted
+artifact-binding audit summary; proof MACs, nonces, bearer tokens, and full
+staged paths are not operator-facing fields.
+
 If you omit `--artifact-dir`, the deploy command uses the deployment target
 metadata to figure out which app target to build and where its artifact lives.
 

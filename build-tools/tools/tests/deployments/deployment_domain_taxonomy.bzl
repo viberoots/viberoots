@@ -105,6 +105,8 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/s3-static.validation.test.ts": True,
     "build-tools/tools/tests/deployments/static-webapp-artifact-admission.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.artifact-binding.service.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.challenged-submit.helpers.ts": False,
+    "build-tools/tools/tests/deployments/nixos-shared-host.challenged-submit-transaction.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.control-plane.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.control-plane.direct-reject.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.control-plane.backend.test.ts": True,
