@@ -11075,6 +11075,303 @@ protected/shared production path rather than another optional mode.
 
 ---
 
+## PR-83: Artifact identity binding and one-time submission challenge for deployment-server uploads
+
+### Description
+
+I will harden remote artifact submission so an authenticated deployment request is cryptographically
+bound to the exact artifact bytes that the service admits. A naked `expectedArtifactIdentity` is not
+enough; it is only the canonical content digest. The hardened contract is an artifact-binding proof:
+the expected identity, deployment envelope, service-authenticated client identity, challenge id,
+nonce, and finalized staged upload reference are canonicalized and authenticated with a reviewed
+MAC/signature scheme before mutation. The laptop client may still build and upload artifacts, but the
+authenticated payload must include this challenge-bound proof. The service must issue a short-lived,
+single-use challenge only after authenticating and authorizing the caller, verify the proof under
+strict HTTPS and SSH host-key assumptions, atomically consume the challenge with submission creation,
+recompute the artifact identity from a constrained finalized upload, and reject mismatches or
+replayed challenges before queueing worker execution. Cleanup is service-owned; client cleanup is
+only an opportunistic fast path.
+
+```mermaid
+sequenceDiagram
+    participant Client as Laptop deploy client
+    participant SSH as SSH staging on host
+    participant Service as Deployment service
+    participant Store as Records/artifact store
+    participant Worker as Deployment worker
+
+    Client->>Client: Build artifact and compute canonical content identity
+    Client->>Service: HTTPS request challenge(auth token, deployment, operation, target, expected identity)
+    Service->>Service: Authenticate, authorize, bind principal/key id
+    Service->>Store: Persist short-lived unused challenge binding
+    Service-->>Client: challengeId, nonce, expiresAt
+    Client->>SSH: Upload artifact with strict SSH host-key verification
+    Client->>SSH: Finalize upload into immutable staged directory
+    Client->>Client: Sign/MAC challenge-bound artifact-binding envelope
+    Client->>Service: HTTPS submit(auth token, challenge, finalized staged path, identity proof)
+    Service->>Store: Transactionally consume challenge, idempotency key, snapshot, and enqueue intent
+    Service->>Service: Verify artifact-binding MAC/signature
+    Service->>SSH: Canonicalize and constrain finalized staged path
+    Service->>SSH: Reject symlinks, hardlinks, special files, and mutable upload state
+    Service->>SSH: Read finalized staged artifact bytes
+    Service->>Service: Recompute artifact identity
+    alt invalid proof, identity/challenge mismatch, or replay
+        Service-->>Client: Reject before snapshot, queue, or worker execution
+        Service->>SSH: Cleanup staged artifact or enqueue janitor cleanup
+    else identity matches and request is authorized
+        Service->>Store: Copy admitted artifact by content identity
+        Service->>Store: Persist snapshot with expected and admitted identities
+        Service->>Worker: Queue admitted submission
+        Worker->>Store: Load admitted stored artifact
+        Worker->>Worker: Publish/apply using stored artifact only
+        Worker-->>Service: Final status and deploy record
+        Service-->>Client: Final result with admitted artifact identity
+        Service->>SSH: Cleanup transient staged artifact or enqueue janitor cleanup
+    end
+```
+
+### Scope & Changes
+
+- Extend the protected/shared deployment-server submit contract with explicit artifact-binding data:
+  - single-component `expectedArtifactIdentity`
+  - multi-component `expectedComponentArtifactIdentities`
+  - top-level expected composite identity when applicable
+  - `artifactBindingProof` containing `challengeId`, nonce reference, proof algorithm/key id,
+    canonical payload fingerprint, and MAC/signature
+- Make remote clients compute expected artifact identities locally before upload using the same
+  canonical artifact hashing rules as server admission.
+- Add a reviewed proof algorithm for protected/shared clients. The implementation may use a
+  deployment-client HMAC secret or an asymmetric signing key, but it must not treat the digest string
+  alone as authorization. The proof must cover the immutable request envelope and be verified
+  server-side before admission or queueing.
+- Add a service-owned challenge flow for protected/shared submissions:
+  - client requests a challenge for deployment id, operation kind, provider target identity,
+    publish behavior, source/replay selection, and expected artifact identities
+  - service authenticates the request token, authorizes the deployment/operation, and binds the
+    challenge to the authenticated principal and verification key id
+  - service returns `challengeId`, nonce, expiration, and binding metadata
+  - client signs/MACs the challenge-bound artifact envelope and includes the proof in the
+    authenticated submit request
+  - service rejects final submit when the token/principal/key id differs from the identity that
+    received the challenge
+  - service consumes the challenge exactly once and rejects stale, already-used, binding-mismatched,
+    or principal-mismatched submissions
+- Define the challenge binding fingerprint over the immutable request envelope:
+  - schema version
+  - deployment id and label
+  - operation kind and publish behavior
+  - provider target identity / lock scope
+  - authenticated service principal/client identity
+  - proof verification key id
+  - expected artifact identity or component identities
+  - source run / rollback / promotion fields when present
+  - idempotency key semantics
+  - finalized staged upload reference
+  - challenge id and nonce
+- Reject submissions when the artifact-binding proof is missing, malformed, uses an unreviewed
+  algorithm/key id, fails verification, or verifies against a different canonical envelope.
+- Require strict transport security for protected/shared remote deployments:
+  - service URLs must be HTTPS unless an explicit local-only test fixture marks the path non-production
+  - TLS certificate validation must be enabled; insecure TLS flags fail closed for protected/shared
+    profiles
+  - SSH staging must use strict host-key verification through reviewed known-hosts/pinning behavior
+  - bearer tokens, nonces, proofs, and full staged paths must never be logged or echoed in command
+    diagnostics
+- Make challenge consumption, idempotency recording, execution snapshot creation, and queue enqueue
+  atomic. The implementation must use one backend transaction or equivalent unique constraints and
+  compare-and-set semantics so concurrent submits, process crashes, or retries cannot create duplicate
+  queue entries, lose accepted submissions, or reuse consumed challenges.
+- Harden staged upload handling:
+  - remote clients upload into a temporary directory and then atomically finalize to an immutable
+    staged directory referenced by the proof
+  - service canonicalizes the staged path and verifies it is under the configured artifact staging
+    root
+  - service rejects symlinks, hardlinks escaping the staged tree, device files, sockets, FIFOs, and
+    mutable/incomplete upload markers
+  - service hashes and copies from the finalized tree only, then publishes exclusively from the
+    admitted content-addressed store
+- Make service admission recompute the artifact identity from the staged upload and reject before
+  snapshot/queue creation if it differs from the expected identity in the challenged request.
+- Store expected identity, recomputed identity, canonical envelope fingerprint, challenge id, proof
+  algorithm/key id, and verification result in the admission/provenance record when they match, so
+  records can prove the authenticated request and admitted bytes were identical without leaking proof
+  secrets.
+- Ensure idempotency cannot mask artifact substitution:
+  - same idempotency key + same challenge/request fingerprint can return the existing submission
+  - same idempotency key + different expected artifact identity, proof, or challenge fails as a
+    conflict
+  - reused challenges fail even when the rest of the request body matches
+- Ensure rejected challenge, stale challenge, identity mismatch, and unauthorized submissions do not
+  leave retained staged artifacts by default; `--retain-remote-artifact` must not preserve artifacts
+  for auth/challenge/admission failures unless a future explicitly reviewed debug mode is added.
+- Move staging cleanup authority to the service:
+  - the service deletes rejected or accepted staged uploads after admission/failure whenever possible
+  - failed cleanup creates a bounded janitor record rather than depending on the client remaining
+    connected
+  - retention/debug overrides require server-side authorization and are recorded in audit output
+- Keep challenge records secret-safe and bounded by retention policy; never log bearer tokens,
+  nonces, or full artifact paths in operator-facing output.
+- Update hosted upload/admission status output to show the expected/admitted artifact identity and a
+  redacted challenge status summary.
+
+### Tests (in this PR)
+
+- Add artifact identity contract tests for local client hashing parity with service admission across:
+  - static-webapp artifacts
+  - SSR webapp artifacts
+  - executable-bit and path-order normalization cases
+  - multi-component composite identities
+- Add service-submit tests proving protected/shared submissions reject:
+  - missing expected artifact identity
+  - naked expected artifact identity without a binding proof
+  - malformed or unsigned artifact-binding proof
+  - proof signed/MACed over a different deployment, operation, source, staged path, or artifact
+    identity
+  - unsupported proof algorithm or unknown key id
+  - challenge requested without a valid service token
+  - final submit authenticated as a different principal/key id than the challenge request
+  - challenge request over insecure service transport
+  - submit over insecure service transport
+  - mismatched expected artifact identity
+  - missing challenge
+  - expired challenge
+  - reused challenge
+  - challenge bound to a different deployment, operation, source run, publish behavior, or artifact
+    identity
+  - same idempotency key with different challenge, proof, or expected artifact identity
+- Add backend race/crash tests proving challenge consumption, idempotency state, snapshot creation,
+  and queue enqueue are atomic under concurrent identical and conflicting submissions.
+- Add remote execution tests proving:
+  - the client computes the expected identity before SSH upload
+  - the authenticated request carries the expected identity, challenge fields, and artifact-binding
+    proof
+  - token, proof, challenge, and identity failures happen before worker queueing
+  - strict SSH host-key verification is used for staging
+  - insecure TLS or insecure SSH profiles fail closed for protected/shared deployments
+  - finalized staged uploads are canonicalized under the staging root
+  - symlinks, hardlinks escaping the staged tree, special files, and incomplete upload markers are
+    rejected before admission
+  - service-owned cleanup or janitor records handle rejected auth/challenge/admission paths
+  - `--retain-remote-artifact` does not retain rejected protected/shared artifacts unless the server
+    authorizes and audits a reviewed debug-retention mode
+- Add worker tests proving workers publish only server-admitted stored artifacts and never consume
+  transient staged upload paths from the client request.
+- Add redaction tests for challenge failures, artifact mismatch diagnostics, and status/result output.
+
+### Docs (in this PR)
+
+- Update [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md) with the
+  hardened remote upload flow: compute identity, request challenge, upload, submit, admission, and
+  cleanup.
+- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  with operator-facing explanations of expected artifact identity, artifact-binding proof, admitted
+  artifact identity, strict HTTPS/SSH host-key requirements, service-owned cleanup, and one-time
+  challenge failures.
+- Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+  with the challenge endpoint/request/response shape, artifact-binding proof schema, supported proof
+  algorithms/key ids, transport requirements, atomic consume/submit semantics, cleanup/janitor
+  records, and redaction rules.
+- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+  and generated summaries so protected/shared providers advertise artifact identity binding and
+  replay-resistant submission challenges.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - artifact identity parity
+  - artifact-binding proof generation and verification
+  - authenticated challenge issuance
+  - challenge issuance/consumption/replay rejection
+  - principal/key-id mismatch rejection
+  - proof-envelope tamper rejection
+  - strict HTTPS and SSH host-key guardrails
+  - transactional consume/snapshot/enqueue behavior
+  - finalized staging path canonicalization and TOCTOU guardrails
+  - service-side identity mismatch rejection
+  - idempotency conflict behavior
+  - service-owned cleanup and janitor behavior on rejected submissions
+  - worker stored-artifact-only execution
+  - docs/capability parity
+  - redaction snapshots
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR changes protected/shared service request schemas, remote client upload behavior, service
+  admission, artifact storage contracts, status output, cleanup rules, and operator docs. Run the
+  full build-system verify scope unless deployment classifier coverage proves all touched surfaces
+  are deployment-owned.
+
+### Acceptance Criteria
+
+- Protected/shared remote deployments cannot submit path-only uploaded artifacts.
+- Every protected/shared artifact submission includes expected artifact identity data in the
+  authenticated request.
+- Expected artifact identity is treated as a canonical content digest only; mutation requires a
+  valid challenge-bound artifact-binding proof over the immutable request envelope.
+- Challenge issuance requires an authenticated, authorized caller and binds the challenge to that
+  caller's principal/client identity and proof verification key id.
+- Final submit fails when the authenticated caller, key id, deployment envelope, source selection,
+  staged upload reference, or expected artifact identity differs from the challenge binding.
+- Protected/shared service calls require validated HTTPS, and protected/shared SSH staging requires
+  strict host-key verification.
+- The service verifies the proof before artifact admission, snapshot creation, queueing, worker
+  execution, provider mutation, or publish activation.
+- Challenge consumption, idempotency fingerprinting, snapshot creation, and queue enqueue are atomic
+  or protected by equivalent uniqueness/compare-and-set constraints.
+- Staged upload paths are finalized, canonicalized under the staging root, and rejected on symlinks,
+  escaping hardlinks, special files, or incomplete upload markers before hashing.
+- The service recomputes artifact identity from uploaded bytes and rejects mismatches before
+  snapshot creation, queueing, worker execution, provider mutation, or publish activation.
+- Every protected/shared submission consumes a short-lived service challenge exactly once.
+- Replayed, stale, unsigned, proof-tampered, cross-deployment, cross-operation, cross-source, and
+  cross-artifact challenge use fails closed with redacted diagnostics.
+- Idempotency cannot reuse a key for a different artifact identity, proof, or challenge binding.
+- Worker execution reads only service-admitted stored artifacts, never transient client upload paths.
+- Rejected auth/challenge/admission paths are cleaned up by the service or recorded for bounded
+  janitor cleanup; client cleanup is not required for security.
+- Records and status output expose enough expected/admitted identity evidence for audit without
+  leaking tokens, nonces, proof secrets, or sensitive paths.
+
+### Risks
+
+This raises the contract complexity for remote clients and service submissions. Hash parity bugs,
+challenge-expiration edge cases, backend transaction errors, SSH host-key setup mistakes, or staging
+canonicalization bugs could temporarily block valid deploys.
+
+### Mitigation
+
+Share the canonical artifact identity and artifact-binding envelope implementation between client
+and service paths, require reviewed TLS/SSH transport profiles, keep challenge TTL and backend
+atomicity behavior explicit in tests, make diagnostics precise and redacted, provide a service-owned
+cleanup janitor, and preserve normal idempotent retry only for byte-for-byte identical challenged
+requests.
+
+### Consequence of Not Implementing
+
+A valid service token would authenticate the request, and the service would compute an admitted
+artifact identity, but the authenticated payload would still name a staged server path and a naked
+digest instead of proving that the authorized client bound this challenge to these exact uploaded
+bytes. That leaves an avoidable substitution/replay gap between SSH upload and service admission.
+Without authenticated challenge issuance, strict transport assumptions, atomic challenge consumption,
+staging canonicalization, and service-owned cleanup, the system would still have MITM, race, TOCTOU,
+and retention footguns around the hardened artifact-binding path.
+
+### Downsides for Implementing
+
+Adds a new service endpoint, request-schema migration work, client-side artifact hashing,
+artifact-binding proof generation, challenge state storage, verification-key management, and stricter
+transport/staging/cleanup behavior that may require updating existing fixtures, host SSH trust
+configuration, backend persistence code, and operator scripts.
+
+### Recommendation
+
+Implement immediately after PR-82, before treating hosted protected/shared deployment-server flows as
+production-hardened.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
