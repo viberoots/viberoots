@@ -7,44 +7,10 @@ import { nodesFromCqueryJson } from "../../buck/exporter/cquery/nodes.ts";
 import { extractCloudflarePagesDeployments } from "../../deployments/contract.ts";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers.ts";
 
-const ATTRS = [
-  "name",
-  "rule_type",
-  "buck.type",
-  "provider",
-  "component",
-  "component_kind",
-  "publisher",
-  "publisher_config",
-  "protection_class",
-  "lane_policy",
-  "environment_stage",
-  "admission_policy",
-  "provider_target",
-  "vault_runtime",
-  "preview",
-  "prerequisites",
-  "secret_requirements",
-  "runtime_config_requirements",
-  "release_actions",
-  "target_exceptions",
-  "governance_policy",
-  "scm_backend",
-  "repository",
-  "branch_protections",
-  "stages",
-  "stage_branches",
-  "allowed_promotion_edges",
-  "artifact_reuse_mode",
-  "promotion_compatibility",
-  "allowed_refs",
-  "required_checks",
-  "required_approvals",
-  "retry_branch_policy",
-  "retry_approval_reuse",
-  "artifact_attestation_mode",
-  "labels",
-];
+const ATTRS =
+  "name,rule_type,buck.type,provider,component,component_kind,publisher,publisher_config,protection_class,lane_policy,environment_stage,admission_policy,provider_target,vault_runtime,preview,prerequisites,secret_requirements,runtime_config_requirements,release_actions,target_exceptions,governance_policy,scm_backend,repository,branch_protections,stages,stage_branches,allowed_promotion_edges,artifact_reuse_mode,promotion_compatibility,allowed_refs,required_checks,required_approvals,retry_branch_policy,retry_approval_reuse,artifact_attestation_mode,labels".split(
+    ",",
+  );
 
 function assertCloudflareApiTokenSteps(deployment: {
   secretRequirements: Array<{ name: string; step: string; contractId: string; required: boolean }>;
@@ -61,7 +27,7 @@ function assertCloudflareApiTokenSteps(deployment: {
   );
 }
 
-const EXPECTED_MINI_VAULT_RUNTIME = {
+const EXPECTED_MINI_VAULT_RUNTIME_BASE = {
   addr: "https://secrets.apps.kilty.io:8200",
   oidcIssuer: "https://identity.apps.kilty.io/realms/deployments",
   audience: "deployments-vault",
@@ -71,7 +37,6 @@ const EXPECTED_MINI_VAULT_RUNTIME = {
   deploymentEnvironment: "mini",
   roleName: "deploy-pleomino-read",
   requiredHumanClaim: "groups",
-  requiredHumanClaimValue: "deployers",
   pkceCallback: {
     mode: "public_host",
     externalScheme: "https",
@@ -81,6 +46,16 @@ const EXPECTED_MINI_VAULT_RUNTIME = {
     bindPort: "7780",
     bindPath: "/oidc/callback",
   },
+};
+
+const EXPECTED_PLEOMINO_PROD_VAULT_RUNTIME = {
+  ...EXPECTED_MINI_VAULT_RUNTIME_BASE,
+  requiredHumanClaimValue: "deployers-pleomino-prod",
+};
+
+const EXPECTED_PLEOMINO_STAGING_VAULT_RUNTIME = {
+  ...EXPECTED_MINI_VAULT_RUNTIME_BASE,
+  requiredHumanClaimValue: "deployers-pleomino-staging",
 };
 
 test("cloudflare-pages deployment extraction reads canonical metadata from TARGETS via cquery", async () => {
@@ -244,7 +219,9 @@ test("concrete Pleomino Cloudflare TARGETS emit publish and cleanup token requir
   assert.deepEqual(
     deployments
       .map((deployment) => deployment.vaultRuntime)
-      .sort((a, b) => (a?.roleName || "").localeCompare(b?.roleName || "")),
-    [EXPECTED_MINI_VAULT_RUNTIME, EXPECTED_MINI_VAULT_RUNTIME],
+      .sort((a, b) =>
+        (a?.requiredHumanClaimValue || "").localeCompare(b?.requiredHumanClaimValue || ""),
+      ),
+    [EXPECTED_PLEOMINO_PROD_VAULT_RUNTIME, EXPECTED_PLEOMINO_STAGING_VAULT_RUNTIME],
   );
 });
