@@ -1,6 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import { acceptChallengedArtifactSubmission } from "./deployment-artifact-submit-transaction.ts";
-import { deploymentServicePrincipalForToken } from "./deployment-artifact-challenges.ts";
+import { readReusableChallengedArtifactSubmission } from "./deployment-artifact-submit-idempotency.ts";
+import {
+  deploymentServicePrincipalForToken,
+  verifyDeploymentArtifactChallenge,
+} from "./deployment-artifact-challenges.ts";
 import { submitResponseFromSubmission } from "./deployment-control-plane-status.ts";
 import { prepareBackendNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-backend-prepare.ts";
 import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract.ts";
@@ -44,6 +48,24 @@ export async function acceptChallengedNixosSharedHostSubmit(opts: {
   authorization?: DeploymentControlPlaneAuthorizationDecision;
 }) {
   assertArtifactSubmissionHasExpectedIdentity(opts.resolvedRequest);
+  const reusable = await readReusableChallengedArtifactSubmission({
+    backend: opts.backend,
+    idempotencyKey: opts.idempotencyKey,
+    requestFingerprint: opts.requestFingerprint,
+  });
+  if (reusable) return submitResponseFromSubmission(reusable as any);
+  const principal = deploymentServicePrincipalForToken(opts.serviceToken);
+  const proofKeyId = opts.resolvedRequest.artifactBindingProof?.keyId || principal.keyId;
+  await verifyDeploymentArtifactChallenge({
+    backend: opts.backend,
+    request: opts.resolvedRequest,
+    proof: opts.resolvedRequest.artifactBindingProof,
+    finalizedStagedArtifactReference: finalizedArtifactReference(opts.resolvedRequest),
+    principalId: principal.principalId,
+    keyId: proofKeyId,
+    proofSecret: principal.proofSecret,
+    ...(opts.authorization ? { authorization: opts.authorization } : {}),
+  });
   const prepared = await prepareBackendNixosSharedHostControlPlaneRun({
     workspaceRoot: opts.workspaceRoot,
     operationKind: opts.resolvedRequest.operationKind,
@@ -104,7 +126,6 @@ export async function acceptChallengedNixosSharedHostSubmit(opts: {
       : {}),
     persistMode: "defer",
   });
-  const principal = deploymentServicePrincipalForToken(opts.serviceToken);
   const accepted = await acceptChallengedArtifactSubmission({
     backend: opts.backend,
     idempotencyKey: opts.idempotencyKey,
@@ -113,8 +134,9 @@ export async function acceptChallengedNixosSharedHostSubmit(opts: {
     proof: opts.resolvedRequest.artifactBindingProof,
     finalizedStagedArtifactReference: finalizedArtifactReference(opts.resolvedRequest),
     principalId: principal.principalId,
-    keyId: principal.keyId,
+    keyId: proofKeyId,
     proofSecret: principal.proofSecret,
+    ...(opts.authorization ? { authorization: opts.authorization } : {}),
     snapshot: prepared.snapshot,
     submission: prepared.submission,
     refs: {

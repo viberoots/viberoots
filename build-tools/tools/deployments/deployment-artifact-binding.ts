@@ -12,6 +12,7 @@ import {
 } from "./nixos-shared-host-component-artifacts.ts";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
 import type { NixosSharedHostControlPlaneOperationKind } from "./nixos-shared-host-control-plane-contract.ts";
+import type { NixosSharedHostControlPlaneSourceSelection } from "./nixos-shared-host-control-plane-snapshot.ts";
 
 export const DEPLOYMENT_ARTIFACT_BINDING_PROOF_SCHEMA = "deployment-artifact-binding-proof@1";
 export const DEPLOYMENT_ARTIFACT_CHALLENGE_SCHEMA = "deployment-artifact-challenge@1";
@@ -61,8 +62,11 @@ export type DeploymentArtifactChallengeRequest = DeploymentExpectedArtifactIdent
   operationKind: NixosSharedHostControlPlaneOperationKind;
   publishBehavior?: string;
   sourceRunId?: string;
+  source?: NixosSharedHostControlPlaneSourceSelection;
   rollback?: boolean;
   idempotencyKey?: string;
+  proofKeyId?: string;
+  proofAlgorithm?: string;
 };
 
 export type DeploymentArtifactBindingEnvelope = DeploymentArtifactChallengeRequest & {
@@ -187,6 +191,7 @@ export function baseArtifactChallengeRequest(
     operationKind: request.operationKind,
     publishBehavior: request.publishBehavior || "deploy",
     ...(request.sourceRunId ? { sourceRunId: request.sourceRunId } : {}),
+    ...(request.source ? { source: request.source } : {}),
     ...(request.rollback ? { rollback: true } : {}),
     ...(request.idempotencyKey ? { idempotencyKey: request.idempotencyKey } : {}),
     ...expectedFields(request),

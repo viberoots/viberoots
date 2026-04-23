@@ -197,11 +197,12 @@ export async function readPublicDeploymentAuthSession(recordsRoot: string, sessi
   return session ? publicDeploymentAuthSessionStatus(session) : undefined;
 }
 
-export async function consumeDeploymentAuthSessionAuthorization(opts: {
+async function resolveDeploymentAuthSessionAuthorization(opts: {
   recordsRoot: string;
   sessionId: string;
   deploymentId: string;
   operationKind: string;
+  consume: boolean;
 }) {
   const session = await readDeploymentAuthSession(opts.recordsRoot, opts.sessionId);
   if (!session) throw Object.assign(new Error("auth session not found"), { statusCode: 403 });
@@ -216,6 +217,26 @@ export async function consumeDeploymentAuthSessionAuthorization(opts: {
       statusCode: 403,
     });
   }
-  await writeDeploymentAuthSession(opts.recordsRoot, { ...session, status: "consumed" });
+  if (opts.consume) {
+    await writeDeploymentAuthSession(opts.recordsRoot, { ...session, status: "consumed" });
+  }
   return session.authorization;
+}
+
+export async function readDeploymentAuthSessionAuthorization(opts: {
+  recordsRoot: string;
+  sessionId: string;
+  deploymentId: string;
+  operationKind: string;
+}) {
+  return await resolveDeploymentAuthSessionAuthorization({ ...opts, consume: false });
+}
+
+export async function consumeDeploymentAuthSessionAuthorization(opts: {
+  recordsRoot: string;
+  sessionId: string;
+  deploymentId: string;
+  operationKind: string;
+}) {
+  return await resolveDeploymentAuthSessionAuthorization({ ...opts, consume: true });
 }

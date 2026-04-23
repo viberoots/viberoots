@@ -4,17 +4,28 @@ import {
   artifactBindingEnvelope,
   artifactBindingFingerprint,
   artifactBindingKeyId,
-  baseArtifactChallengeRequest,
   verifyArtifactBindingProof,
   type DeploymentArtifactBindingProof,
   type DeploymentArtifactChallengeRequest,
   type DeploymentArtifactChallengeResponse,
 } from "./deployment-artifact-binding.ts";
 import {
+  artifactChallengeBinding,
+  assertArtifactChallengeBindingMatches,
+  decodeArtifactChallengeBinding,
+} from "./deployment-artifact-challenge-binding.ts";
+import {
+  assertDeploymentArtifactProofKeyActive,
+  defaultDeploymentArtifactProofKeyRegistry,
+  resolveDeploymentArtifactProofKey,
+  type DeploymentArtifactProofKeyRegistry,
+} from "./deployment-artifact-proof-keys.ts";
+import {
   decodeBackendJson,
   queryBackend,
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend-db.ts";
+import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract.ts";
 
 const CHALLENGE_TTL_MS = 2 * 60_000;
 
@@ -50,22 +61,33 @@ export async function createDeploymentArtifactChallenge(opts: {
   request: DeploymentArtifactChallengeRequest;
   principalId: string;
   keyId: string;
+  proofKeyRegistry?: DeploymentArtifactProofKeyRegistry;
+  authorization?: DeploymentControlPlaneAuthorizationDecision;
 }): Promise<DeploymentArtifactChallengeResponse> {
+  const proofKey = resolveDeploymentArtifactProofKey({
+    request: opts.request,
+    principalId: opts.principalId,
+    fallbackKeyId: opts.keyId,
+    ...(opts.proofKeyRegistry ? { registry: opts.proofKeyRegistry } : {}),
+  });
   const challengeId = randomId("artifact-challenge");
   const nonce = crypto.randomBytes(16).toString("hex");
   const expiresAtMs = Date.now() + CHALLENGE_TTL_MS;
-  const binding = baseArtifactChallengeRequest(opts.request);
+  const binding = artifactChallengeBinding({
+    request: opts.request,
+    ...(opts.authorization ? { authorization: opts.authorization } : {}),
+  });
   const bindingFingerprint = artifactBindingFingerprint({
     ...binding,
     principalId: opts.principalId,
-    keyId: opts.keyId,
+    keyId: proofKey.keyId,
   });
   await queryBackend(
     opts.backend,
     `INSERT INTO artifact_challenges
        (challenge_id, nonce, expires_at_ms, used_at, principal_id, key_id, binding_json)
      VALUES ($1, $2, $3, NULL, $4, $5, $6::jsonb)`,
-    [challengeId, nonce, expiresAtMs, opts.principalId, opts.keyId, JSON.stringify(binding)],
+    [challengeId, nonce, expiresAtMs, opts.principalId, proofKey.keyId, JSON.stringify(binding)],
   );
   return {
     schemaVersion: "deployment-artifact-challenge@1",
@@ -73,7 +95,7 @@ export async function createDeploymentArtifactChallenge(opts: {
     nonce,
     expiresAt: new Date(expiresAtMs).toISOString(),
     algorithm: "hmac-sha256",
-    keyId: opts.keyId,
+    keyId: proofKey.keyId,
     bindingFingerprint,
   };
 }
@@ -93,6 +115,85 @@ async function readChallenge(
   return row;
 }
 
+export type DeploymentArtifactChallengeVerification = {
+  challengeId: string;
+  keyId: string;
+  canonicalPayloadFingerprint: string;
+};
+
+async function verifyChallengeRow(opts: {
+  row: ChallengeRow;
+  backend: NixosSharedHostControlPlaneBackendTarget;
+  request: DeploymentArtifactChallengeRequest;
+  proof?: DeploymentArtifactBindingProof;
+  finalizedStagedArtifactReference?: string;
+  principalId: string;
+  keyId: string;
+  proofSecret: string;
+  proofKeyRegistry?: DeploymentArtifactProofKeyRegistry;
+  authorization?: DeploymentControlPlaneAuthorizationDecision;
+}): Promise<DeploymentArtifactChallengeVerification> {
+  const row = opts.row;
+  if (row.used_at) throw new Error("artifact submission challenge was already used");
+  if (Number(row.expires_at_ms) <= Date.now()) {
+    throw new Error("artifact submission challenge expired");
+  }
+  if (row.principal_id !== opts.principalId || row.key_id !== opts.keyId) {
+    throw new Error("artifact submission challenge is bound to a different client identity");
+  }
+  assertDeploymentArtifactProofKeyActive({
+    registry:
+      opts.proofKeyRegistry ||
+      defaultDeploymentArtifactProofKeyRegistry({
+        principalId: opts.principalId,
+        keyId: opts.keyId,
+      }),
+    keyId: row.key_id,
+    principalId: opts.principalId,
+  });
+  const binding = decodeArtifactChallengeBinding(decodeBackendJson(row.binding_json));
+  assertArtifactChallengeBindingMatches({
+    stored: binding,
+    request: opts.request,
+    ...(opts.authorization ? { authorization: opts.authorization } : {}),
+  });
+  verifyArtifactBindingProof({
+    proof: opts.proof,
+    secret: opts.proofSecret,
+    envelope: artifactBindingEnvelope({
+      request: binding.request,
+      principalId: opts.principalId,
+      keyId: opts.keyId,
+      challengeId: row.challenge_id,
+      nonce: row.nonce,
+      finalizedStagedArtifactReference: opts.finalizedStagedArtifactReference,
+    }),
+  });
+  return {
+    challengeId: row.challenge_id,
+    keyId: row.key_id,
+    canonicalPayloadFingerprint: opts.proof.canonicalPayloadFingerprint,
+  };
+}
+
+export async function verifyDeploymentArtifactChallenge(opts: {
+  backend: NixosSharedHostControlPlaneBackendTarget;
+  request: DeploymentArtifactChallengeRequest;
+  proof?: DeploymentArtifactBindingProof;
+  finalizedStagedArtifactReference?: string;
+  principalId: string;
+  keyId: string;
+  proofSecret: string;
+  proofKeyRegistry?: DeploymentArtifactProofKeyRegistry;
+  authorization?: DeploymentControlPlaneAuthorizationDecision;
+}) {
+  if (!opts.proof?.challengeId) throw new Error("artifact submission challenge is required");
+  return await verifyChallengeRow({
+    ...opts,
+    row: await readChallenge(opts.backend, opts.proof.challengeId),
+  });
+}
+
 export async function consumeDeploymentArtifactChallenge(opts: {
   backend: NixosSharedHostControlPlaneBackendTarget;
   request: DeploymentArtifactChallengeRequest;
@@ -101,35 +202,12 @@ export async function consumeDeploymentArtifactChallenge(opts: {
   principalId: string;
   keyId: string;
   proofSecret: string;
+  proofKeyRegistry?: DeploymentArtifactProofKeyRegistry;
+  authorization?: DeploymentControlPlaneAuthorizationDecision;
 }) {
-  if (!opts.proof?.challengeId) throw new Error("artifact submission challenge is required");
-  const row = await readChallenge(opts.backend, opts.proof.challengeId);
+  const verified = await verifyDeploymentArtifactChallenge(opts);
+  const row = await readChallenge(opts.backend, verified.challengeId);
   if (row.used_at) throw new Error("artifact submission challenge was already used");
-  if (Number(row.expires_at_ms) <= Date.now()) {
-    throw new Error("artifact submission challenge expired");
-  }
-  if (row.principal_id !== opts.principalId || row.key_id !== opts.keyId) {
-    throw new Error("artifact submission challenge is bound to a different client identity");
-  }
-  const binding = decodeBackendJson<DeploymentArtifactChallengeRequest>(row.binding_json);
-  if (
-    artifactBindingFingerprint(binding) !==
-    artifactBindingFingerprint(baseArtifactChallengeRequest(opts.request))
-  ) {
-    throw new Error("artifact submission challenge does not match this request");
-  }
-  verifyArtifactBindingProof({
-    proof: opts.proof,
-    secret: opts.proofSecret,
-    envelope: artifactBindingEnvelope({
-      request: binding,
-      principalId: opts.principalId,
-      keyId: opts.keyId,
-      challengeId: row.challenge_id,
-      nonce: row.nonce,
-      finalizedStagedArtifactReference: opts.finalizedStagedArtifactReference,
-    }),
-  });
   const consumed = (
     await queryBackend<{ challenge_id?: string }>(
       opts.backend,
@@ -144,9 +222,5 @@ export async function consumeDeploymentArtifactChallenge(opts: {
   if (!consumed?.challenge_id) {
     throw new Error("artifact submission challenge was already used");
   }
-  return {
-    challengeId: row.challenge_id,
-    keyId: row.key_id,
-    canonicalPayloadFingerprint: opts.proof.canonicalPayloadFingerprint,
-  };
+  return verified;
 }

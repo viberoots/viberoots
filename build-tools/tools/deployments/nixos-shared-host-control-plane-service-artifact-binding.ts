@@ -16,6 +16,7 @@ export async function consumeRequiredArtifactBinding(opts: {
     throw new Error("protected/shared artifact submit requires expected artifact identity");
   }
   const principal = deploymentServicePrincipalForToken(opts.serviceToken);
+  const proofKeyId = opts.request.artifactBindingProof?.keyId || principal.keyId;
   await consumeDeploymentArtifactChallenge({
     backend: opts.backend,
     request: opts.request,
@@ -23,7 +24,7 @@ export async function consumeRequiredArtifactBinding(opts: {
     finalizedStagedArtifactReference:
       opts.request.artifactDir || JSON.stringify(opts.request.artifactDirsByComponentId),
     principalId: principal.principalId,
-    keyId: principal.keyId,
+    keyId: proofKeyId,
     proofSecret: principal.proofSecret,
   });
 }

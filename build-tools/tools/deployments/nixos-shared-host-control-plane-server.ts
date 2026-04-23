@@ -8,6 +8,7 @@ import {
   handleControlPlaneSubmit,
   type ServiceRunActionRequest,
 } from "./nixos-shared-host-control-plane-service-api.ts";
+import { handleControlPlaneArtifactChallenge } from "./nixos-shared-host-control-plane-service-challenge.ts";
 import {
   readControlPlaneRecord,
   readControlPlaneStatus,
@@ -18,10 +19,6 @@ import {
   readPublicDeploymentAuthSession,
 } from "./deployment-auth-session-service.ts";
 import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
-import {
-  createDeploymentArtifactChallenge,
-  deploymentServicePrincipalForToken,
-} from "./deployment-artifact-challenges.ts";
 import { createStaticWebappUploadSession } from "./static-webapp-upload-sessions.ts";
 
 const MAX_REQUEST_BODY_BYTES = 60 * 1024 * 1024;
@@ -109,15 +106,13 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         return;
       }
       if (request.method === "POST" && url.pathname === "/api/v1/submission-challenges/artifact") {
-        const principal = deploymentServicePrincipalForToken(opts.token);
         writeJson(
           response,
           200,
-          await createDeploymentArtifactChallenge({
+          await handleControlPlaneArtifactChallenge(await readJsonBody(request), {
+            paths: opts.paths,
             backend,
-            request: await readJsonBody(request),
-            principalId: principal.principalId,
-            keyId: principal.keyId,
+            serviceToken: opts.token,
           }),
         );
         return;

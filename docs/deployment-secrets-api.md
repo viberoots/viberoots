@@ -383,6 +383,11 @@ The service returns JSON on all endpoints.
 
 - accepts one protected/shared artifact challenge request
 - authenticates the service token before issuing a challenge
+- authorizes the requested deployment, operation, target, source, publish
+  behavior, expected identities, and active auth-session principal before
+  persisting the challenge
+- rejects unknown, disabled, unreviewed, unassigned, or algorithm-mismatched
+  proof-key ids before persisting the challenge
 - returns `deployment-artifact-challenge@1` with `challengeId`, `nonce`,
   expiration, proof algorithm, key id, and a binding fingerprint
 
@@ -426,8 +431,9 @@ Protected/shared `nixos-shared-host` upload submissions also carry:
 - `artifactBindingProof` with schema `deployment-artifact-binding-proof@1`
   using reviewed `hmac-sha256` proof verification
 
-The proof binds the challenge id and nonce, deployment id and label, operation
-kind, publish behavior, provider target identity, service-authenticated client
+The challenge binding records the authorized deployment principal and the proof
+binds the challenge id and nonce, deployment id and label, operation kind,
+publish behavior, provider target identity, service-authenticated client
 identity, proof key id, expected identity fields, source/replay selectors when
 present, idempotency key, and finalized staged artifact reference. The service
 first canonicalizes that reference under the configured staging root, requires
@@ -442,7 +448,10 @@ different challenge, proof, expected identity, source, staged reference, or
 canonical envelope fails as an idempotency conflict. Challenge replay without
 that matching accepted idempotency fingerprint fails closed. Missing, malformed,
 unsupported, mismatched, expired, or replayed proof/challenge data is rejected
-before provider mutation.
+before artifact admission, queueing, snapshot creation, or provider mutation.
+Final submit recomputes the authorization boundary and rejects token, principal,
+proof-key, envelope, source, publish behavior, idempotency, or expected-identity
+drift from the stored challenge binding.
 
 Accepted challenged submissions expose an `artifactBinding` summary on submit
 and status responses. The summary includes the challenge id, authenticated

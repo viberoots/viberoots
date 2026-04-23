@@ -8,7 +8,10 @@ import type {
 } from "./deployment-control-plane-contract.ts";
 import { authorizeControlPlaneRunAction } from "./deployment-control-plane-authz.ts";
 import { DeploymentUnauthorizedError } from "./deployment-control-plane-errors.ts";
-import { consumeDeploymentAuthSessionAuthorization } from "./deployment-auth-session-service.ts";
+import {
+  consumeDeploymentAuthSessionAuthorization,
+  readDeploymentAuthSessionAuthorization,
+} from "./deployment-auth-session-service.ts";
 
 type ClientAuthFields = {
   requestedBy?: unknown;
@@ -48,6 +51,7 @@ export async function resolveSubmitAuthorizationBoundary(opts: {
   authorization?: DeploymentControlPlaneAuthorization;
   requestedBy?: DeploymentControlPlaneAuthorization["requestedBy"];
   admissionEvidence?: DeploymentAdmissionEvidence;
+  consumeAuthSession?: boolean;
 }) {
   if (!requiresServerDerivedAuthorization(opts.deployment)) {
     return {
@@ -60,7 +64,11 @@ export async function resolveSubmitAuthorizationBoundary(opts: {
   if (!opts.authSessionId) {
     throw unauthorized("auth-required protected/shared submissions require authSessionId");
   }
-  const authorization = await consumeDeploymentAuthSessionAuthorization({
+  const resolveAuthorization =
+    opts.consumeAuthSession === false
+      ? readDeploymentAuthSessionAuthorization
+      : consumeDeploymentAuthSessionAuthorization;
+  const authorization = await resolveAuthorization({
     recordsRoot: opts.recordsRoot,
     sessionId: opts.authSessionId,
     deploymentId: opts.deployment.deploymentId,

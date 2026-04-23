@@ -111,7 +111,7 @@ export const NIXOS_SHARED_HOST_PROVIDER_CAPABILITY: DeploymentProviderCapability
   protectedSharedEligibility: [
     bullet("`protection_class` defaults to `shared_nonprod`"),
     bullet(
-      "protected/shared remote artifact submissions require service-issued one-time challenges, expected/admitted artifact identity binding, and server-side proof verification before worker queueing",
+      "protected/shared remote artifact submissions require service-issued authorized one-time challenges, reviewed proof-key binding, expected/admitted artifact identity binding, and server-side proof verification before worker queueing",
     ),
     bullet(
       "the initial reviewed slice supports shared-dev metadata extraction, authoritative platform-state reconciliation, and deterministic host realization for static webapps plus the single-component reviewed SSR runtime slice on a NixOS host",

@@ -1,18 +1,21 @@
 #!/usr/bin/env zx-wrapper
-import crypto from "node:crypto";
 import {
   type DeploymentArtifactBindingProof,
   type DeploymentArtifactChallengeRequest,
 } from "./deployment-artifact-binding.ts";
+import {
+  keyHash,
+  reuseChallengedArtifactSubmissionIfPresent,
+} from "./deployment-artifact-submit-idempotency.ts";
 import {
   admittedArtifactBindingIdentities,
   admittedStoredArtifactReference,
   verifyArtifactChallengeForSubmit,
   type ArtifactChallengeRow,
 } from "./deployment-artifact-submit-provenance.ts";
-import { DeploymentIdempotencyConflictError } from "./deployment-control-plane-errors.ts";
+import type { DeploymentArtifactProofKeyRegistry } from "./deployment-artifact-proof-keys.ts";
+import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract.ts";
 import {
-  decodeBackendJson,
   withBackendClient,
   type BackendQueryable,
   type NixosSharedHostControlPlaneBackendTarget,
@@ -21,46 +24,6 @@ import type {
   NixosSharedHostControlPlaneSnapshot,
   NixosSharedHostControlPlaneSubmission,
 } from "./nixos-shared-host-control-plane-contract.ts";
-
-function keyHash(value: string): string {
-  return crypto.createHash("sha256").update(value).digest("hex");
-}
-
-async function readExistingSubmission(
-  client: BackendQueryable,
-  submissionId: string,
-): Promise<NixosSharedHostControlPlaneSubmission> {
-  const row = (
-    await client.query<{ document_json?: unknown }>(
-      "SELECT document_json FROM submissions WHERE submission_id = $1",
-      [submissionId],
-    )
-  ).rows[0];
-  if (!row?.document_json) {
-    throw new Error(`idempotent submission missing backend state: ${submissionId}`);
-  }
-  return decodeBackendJson<NixosSharedHostControlPlaneSubmission>(row.document_json);
-}
-
-async function reuseIfPresent(opts: {
-  client: BackendQueryable;
-  keyHash: string;
-  requestFingerprint: string;
-}) {
-  const row = (
-    await opts.client.query<{ request_fingerprint?: string; target_id?: string }>(
-      "SELECT request_fingerprint, target_id FROM idempotency WHERE kind = $1 AND key_hash = $2",
-      ["submit", opts.keyHash],
-    )
-  ).rows[0];
-  if (!row) return null;
-  if (row.request_fingerprint !== opts.requestFingerprint) {
-    throw new DeploymentIdempotencyConflictError(
-      "submit idempotency key does not match the previous request",
-    );
-  }
-  return await readExistingSubmission(opts.client, String(row.target_id));
-}
 
 async function assertSubmissionSlotsFree(client: BackendQueryable, submissionId: string) {
   const [snapshots, submissions, queue] = await Promise.all([
@@ -124,6 +87,8 @@ export async function acceptChallengedArtifactSubmission(opts: {
   principalId: string;
   keyId: string;
   proofSecret: string;
+  proofKeyRegistry?: DeploymentArtifactProofKeyRegistry;
+  authorization?: DeploymentControlPlaneAuthorizationDecision;
   snapshot: NixosSharedHostControlPlaneSnapshot;
   submission: NixosSharedHostControlPlaneSubmission;
   refs: { submissionPath: string; executionSnapshotPath: string };
@@ -134,7 +99,7 @@ export async function acceptChallengedArtifactSubmission(opts: {
     let consumedChallenge: { id: string; usedAt: string } | undefined;
     try {
       const hashedKey = keyHash(opts.idempotencyKey);
-      const reused = await reuseIfPresent({
+      const reused = await reuseChallengedArtifactSubmissionIfPresent({
         client,
         keyHash: hashedKey,
         requestFingerprint: opts.requestFingerprint,
@@ -166,7 +131,7 @@ export async function acceptChallengedArtifactSubmission(opts: {
         )
       ).rows[0];
       if (!inserted?.target_id) {
-        const raced = await reuseIfPresent({
+        const raced = await reuseChallengedArtifactSubmissionIfPresent({
           client,
           keyHash: hashedKey,
           requestFingerprint: opts.requestFingerprint,

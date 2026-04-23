@@ -1,8 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import {
   artifactBindingEnvelope,
-  artifactBindingFingerprint,
-  baseArtifactChallengeRequest,
   expectedFields,
   verifyArtifactBindingProof,
   type DeploymentArtifactBindingProof,
@@ -10,7 +8,17 @@ import {
   type DeploymentArtifactChallengeRequest,
   type DeploymentExpectedArtifactIdentities,
 } from "./deployment-artifact-binding.ts";
+import {
+  assertArtifactChallengeBindingMatches,
+  decodeArtifactChallengeBinding,
+} from "./deployment-artifact-challenge-binding.ts";
+import {
+  assertDeploymentArtifactProofKeyActive,
+  defaultDeploymentArtifactProofKeyRegistry,
+  type DeploymentArtifactProofKeyRegistry,
+} from "./deployment-artifact-proof-keys.ts";
 import { decodeBackendJson } from "./nixos-shared-host-control-plane-backend-db.ts";
+import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract.ts";
 import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-control-plane-contract.ts";
 
 export type ArtifactChallengeRow = {
@@ -56,6 +64,8 @@ export function verifyArtifactChallengeForSubmit(opts: {
   principalId: string;
   keyId: string;
   proofSecret: string;
+  proofKeyRegistry?: DeploymentArtifactProofKeyRegistry;
+  authorization?: DeploymentControlPlaneAuthorizationDecision;
   verifiedAt: string;
 }): DeploymentArtifactBindingProvenance {
   if (!opts.proof?.challengeId) throw new Error("artifact submission challenge is required");
@@ -66,18 +76,27 @@ export function verifyArtifactChallengeForSubmit(opts: {
   if (opts.row.principal_id !== opts.principalId || opts.row.key_id !== opts.keyId) {
     throw new Error("artifact submission challenge is bound to a different client identity");
   }
-  const binding = decodeBackendJson<DeploymentArtifactChallengeRequest>(opts.row.binding_json);
-  if (
-    artifactBindingFingerprint(binding) !==
-    artifactBindingFingerprint(baseArtifactChallengeRequest(opts.request))
-  ) {
-    throw new Error("artifact submission challenge does not match this request");
-  }
+  assertDeploymentArtifactProofKeyActive({
+    registry:
+      opts.proofKeyRegistry ||
+      defaultDeploymentArtifactProofKeyRegistry({
+        principalId: opts.principalId,
+        keyId: opts.keyId,
+      }),
+    keyId: opts.row.key_id,
+    principalId: opts.principalId,
+  });
+  const binding = decodeArtifactChallengeBinding(decodeBackendJson(opts.row.binding_json));
+  assertArtifactChallengeBindingMatches({
+    stored: binding,
+    request: opts.request,
+    ...(opts.authorization ? { authorization: opts.authorization } : {}),
+  });
   verifyArtifactBindingProof({
     proof: opts.proof,
     secret: opts.proofSecret,
     envelope: artifactBindingEnvelope({
-      request: binding,
+      request: binding.request,
       principalId: opts.principalId,
       keyId: opts.keyId,
       challengeId: opts.row.challenge_id,
