@@ -14,6 +14,8 @@ import {
 import { readRecord, waitFor } from "./nixos-shared-host.control-plane.helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
+const CONTROL_PLANE_TOKEN = "test-control-plane-token";
+
 test("remote deploy fails closed on artifact staging failure and remote transport failure", async () => {
   await runInTemp("nixos-shared-host-remote-stage-failure", async (tmp, $) => {
     const {
@@ -37,6 +39,7 @@ test("remote deploy fails closed on artifact staging failure and remote transpor
         recordsRoot: remoteRecordsRoot,
       },
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+      token: CONTROL_PLANE_TOKEN,
     });
     await installClientProfile(
       $,
@@ -87,6 +90,7 @@ test("remote deploy propagates remote deploy failures and still writes reviewed 
         recordsRoot: remoteRecordsRoot,
       },
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+      token: CONTROL_PLANE_TOKEN,
     });
     const worker = startNixosSharedHostControlPlaneWorkerLoop({
       workspaceRoot: tmp,
@@ -118,7 +122,7 @@ test("remote deploy propagates remote deploy failures and still writes reviewed 
       assert.ok(deployRunId);
       const record = await waitFor(async () => {
         try {
-          return await readRecord(controlPlane.url, deployRunId);
+          return await readRecord(controlPlane.url, deployRunId, CONTROL_PLANE_TOKEN);
         } catch {
           return null;
         }

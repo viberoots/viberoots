@@ -13,6 +13,7 @@ import {
   authRequiredDeployment,
   evidenceWithoutPrincipal,
   postSubmission,
+  withArtifactBinding,
   writeAuthSession,
 } from "./nixos-shared-host.service-auth-boundary.helpers.ts";
 
@@ -41,16 +42,19 @@ test("auth-required protected/shared submissions derive principal from service s
         role: "submitter",
       });
       const submitted = await readJson<any>(
-        await postSubmission(controlPlane.url, {
-          schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
-          submissionId: createNixosSharedHostSubmissionId(),
-          submittedAt: new Date().toISOString(),
-          deployment,
-          operationKind: "deploy",
-          authSessionId,
-          artifactDir,
-          admissionEvidence: evidenceWithoutPrincipal(deployment),
-        }),
+        await postSubmission(
+          controlPlane.url,
+          await withArtifactBinding(controlPlane.url, {
+            schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
+            submissionId: createNixosSharedHostSubmissionId(),
+            submittedAt: new Date().toISOString(),
+            deployment,
+            operationKind: "deploy",
+            authSessionId,
+            artifactDir,
+            admissionEvidence: evidenceWithoutPrincipal(deployment),
+          }),
+        ),
       );
       assert.equal(submitted.requestedBy.principalId, "oidc:submitter");
       assert.equal(submitted.authorization.principal.principalId, "oidc:submitter");
@@ -86,8 +90,10 @@ test("auth-required protected/shared submissions reject missing, forged, bad-rol
         admissionEvidence: evidenceWithoutPrincipal(deployment),
       };
       const missing = await postSubmission(controlPlane.url, {
-        ...base,
-        submissionId: createNixosSharedHostSubmissionId(),
+        ...(await withArtifactBinding(controlPlane.url, {
+          ...base,
+          submissionId: createNixosSharedHostSubmissionId(),
+        })),
       });
       assert.equal(missing.status, 403);
       const forgedSession = await writeAuthSession({
@@ -98,10 +104,12 @@ test("auth-required protected/shared submissions reject missing, forged, bad-rol
         role: "submitter",
       });
       const forged = await postSubmission(controlPlane.url, {
-        ...base,
-        submissionId: createNixosSharedHostSubmissionId(),
-        authSessionId: forgedSession,
-        requestedBy: { principalId: "user:forged" },
+        ...(await withArtifactBinding(controlPlane.url, {
+          ...base,
+          submissionId: createNixosSharedHostSubmissionId(),
+          authSessionId: forgedSession,
+          requestedBy: { principalId: "user:forged" },
+        })),
       });
       assert.equal(forged.status, 403);
       const badRole = await writeAuthSession({
@@ -112,9 +120,11 @@ test("auth-required protected/shared submissions reject missing, forged, bad-rol
         role: "approver",
       });
       const unauthorized = await postSubmission(controlPlane.url, {
-        ...base,
-        submissionId: createNixosSharedHostSubmissionId(),
-        authSessionId: badRole,
+        ...(await withArtifactBinding(controlPlane.url, {
+          ...base,
+          submissionId: createNixosSharedHostSubmissionId(),
+          authSessionId: badRole,
+        })),
       });
       assert.equal(unauthorized.status, 403);
       const expiredSession = await writeAuthSession({
@@ -126,9 +136,11 @@ test("auth-required protected/shared submissions reject missing, forged, bad-rol
         expired: true,
       });
       const expired = await postSubmission(controlPlane.url, {
-        ...base,
-        submissionId: createNixosSharedHostSubmissionId(),
-        authSessionId: expiredSession,
+        ...(await withArtifactBinding(controlPlane.url, {
+          ...base,
+          submissionId: createNixosSharedHostSubmissionId(),
+          authSessionId: expiredSession,
+        })),
       });
       assert.equal(expired.status, 403);
     } finally {
@@ -162,16 +174,19 @@ test("auth-required run actions derive operator from service session", async () 
         role: "submitter",
       });
       const pending = await readJson<any>(
-        await postSubmission(controlPlane.url, {
-          schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
-          submissionId: createNixosSharedHostSubmissionId(),
-          submittedAt: new Date().toISOString(),
-          deployment,
-          operationKind: "deploy",
-          authSessionId: submitAuth,
-          artifactDir,
-          admissionEvidence: evidenceWithoutPrincipal(deployment),
-        }),
+        await postSubmission(
+          controlPlane.url,
+          await withArtifactBinding(controlPlane.url, {
+            schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
+            submissionId: createNixosSharedHostSubmissionId(),
+            submittedAt: new Date().toISOString(),
+            deployment,
+            operationKind: "deploy",
+            authSessionId: submitAuth,
+            artifactDir,
+            admissionEvidence: evidenceWithoutPrincipal(deployment),
+          }),
+        ),
       );
       assert(["queued", "waiting_for_lock"].includes(pending.lifecycleState));
       const cancelAuth = await writeAuthSession({

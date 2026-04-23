@@ -1,5 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import { providerTargetIdentityFor } from "../../deployments/contract.ts";
+import {
+  artifactBindingEnvelope,
+  createArtifactBindingProof,
+  expectedNixosSharedHostArtifactIdentities,
+} from "../../deployments/deployment-artifact-binding.ts";
+import { deploymentServicePrincipalForToken } from "../../deployments/deployment-artifact-challenges.ts";
 import type { DeploymentControlPlaneRole } from "../../deployments/deployment-control-plane-contract.ts";
 import {
   DEPLOYMENT_AUTH_SESSION_RECORD_SCHEMA,
@@ -84,4 +90,38 @@ export async function postSubmission(url: string, body: any) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+export async function withArtifactBinding(url: string, body: any) {
+  const expected = await expectedNixosSharedHostArtifactIdentities({
+    deployment: body.deployment,
+    ...(body.artifactDir ? { artifactDir: body.artifactDir } : {}),
+    ...(body.artifactDirsByComponentId
+      ? { artifactDirsByComponentId: body.artifactDirsByComponentId }
+      : {}),
+  });
+  const request = { ...body, ...expected };
+  const challenge = await (
+    await fetch(new URL("/api/v1/submission-challenges/artifact", url), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(request),
+    })
+  ).json();
+  const principal = deploymentServicePrincipalForToken();
+  return {
+    ...request,
+    artifactBindingProof: createArtifactBindingProof(
+      artifactBindingEnvelope({
+        request,
+        principalId: principal.principalId,
+        keyId: challenge.keyId,
+        challengeId: challenge.challengeId,
+        nonce: challenge.nonce,
+        finalizedStagedArtifactReference:
+          request.artifactDir || JSON.stringify(request.artifactDirsByComponentId),
+      }),
+      principal.proofSecret,
+    ),
+  };
 }

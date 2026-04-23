@@ -23,6 +23,8 @@ import {
 } from "./nixos-shared-host.jenkins.fixture.ts";
 import { readBackendSnapshot } from "./nixos-shared-host.control-plane.helpers.ts";
 
+const CONTROL_PLANE_TOKEN = "test-control-plane-token";
+
 test("jenkins wrapper stages the Pleomino artifact, submits through the control plane, and emits stable JSON", async () => {
   await runInTemp("nixos-shared-host-jenkins-exec", async (tmp, $) => {
     const deployment = pleominoDeploymentFixture();
@@ -47,6 +49,7 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
         recordsRoot: remoteRecordsRoot,
       },
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+      token: CONTROL_PLANE_TOKEN,
     });
     const worker = startNixosSharedHostControlPlaneWorkerLoop({
       workspaceRoot: tmp,

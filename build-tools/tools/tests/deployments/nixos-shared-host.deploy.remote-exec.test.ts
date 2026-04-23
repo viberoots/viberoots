@@ -17,6 +17,8 @@ import {
 import { readBackendSnapshot } from "./nixos-shared-host.control-plane.helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
+const CONTROL_PLANE_TOKEN = "test-control-plane-token";
+
 test("remote deploy stages the artifact, runs deploy remotely, writes remote records, and cleans up by default", async () => {
   await runInTemp("nixos-shared-host-remote-exec", async (tmp, $) => {
     const {
@@ -41,6 +43,7 @@ test("remote deploy stages the artifact, runs deploy remotely, writes remote rec
         recordsRoot: remoteRecordsRoot,
       },
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+      token: CONTROL_PLANE_TOKEN,
     });
     const worker = startNixosSharedHostControlPlaneWorkerLoop({
       workspaceRoot: tmp,
@@ -118,6 +121,7 @@ test("remote deploy retains the staged artifact when retention is requested expl
         recordsRoot: remoteRecordsRoot,
       },
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+      token: CONTROL_PLANE_TOKEN,
     });
     const worker = startNixosSharedHostControlPlaneWorkerLoop({
       workspaceRoot: tmp,

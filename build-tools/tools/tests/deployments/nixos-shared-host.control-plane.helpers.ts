@@ -205,8 +205,12 @@ export async function readStatus(url: string, submissionId: string) {
   return await readJson<any>(await fetch(requestUrl));
 }
 
-export async function readRecord(url: string, deployRunId: string) {
+export async function readRecord(url: string, deployRunId: string, token?: string) {
   const requestUrl = new URL("/api/v1/records", url);
   requestUrl.searchParams.set("deployRunId", deployRunId);
-  return await readJson<any>(await fetch(requestUrl));
+  return await readJson<any>(
+    await fetch(requestUrl, {
+      ...(token ? { headers: { authorization: `Bearer ${token}` } } : {}),
+    }),
+  );
 }
