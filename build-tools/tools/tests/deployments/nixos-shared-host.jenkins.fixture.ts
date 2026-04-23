@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { NixosSharedHostDeployment } from "../../deployments/contract.ts";
+import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy.ts";
 import { resolveDeploymentFromTarget } from "../../deployments/deployment-query.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
@@ -13,6 +14,7 @@ export function jenkinsExecEnv(env: Record<string, string>, extra: Record<string
   return {
     ...env,
     BNX_DEPLOY_CONTROL_PLANE_TOKEN: "test-control-plane-token",
+    [LOCAL_FIXTURE_SERVICE_ENV]: "1",
     IN_NIX_SHELL: "1",
     ...extra,
   };
@@ -56,7 +58,10 @@ export async function installClientProfile(
   remoteRecordsRoot: string,
   controlPlaneUrl: string = "http://127.0.0.1:65535",
 ): Promise<void> {
-  await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path ${remoteRepoPath} --remote-state-path ${remoteStatePath} --remote-runtime-root ${remoteRuntimeRoot} --remote-records-root ${remoteRecordsRoot} --ssh-mode ssh --control-plane-url ${controlPlaneUrl}`;
+  process.env[LOCAL_FIXTURE_SERVICE_ENV] = "1";
+  await $({
+    env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
+  })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path ${remoteRepoPath} --remote-state-path ${remoteStatePath} --remote-runtime-root ${remoteRuntimeRoot} --remote-records-root ${remoteRecordsRoot} --ssh-mode ssh --control-plane-url ${controlPlaneUrl}`;
 }
 
 export async function installReviewedPleominoTargets(tmp: string): Promise<void> {

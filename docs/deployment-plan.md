@@ -11750,6 +11750,131 @@ Implement before treating PR-83 challenge records as security-relevant authoriza
 
 ---
 
+## PR-87: Protected/shared cleanup authority and explicit local-fixture transport closeout
+
+### Description
+
+I will close the remaining protected/shared hardening gaps from PR-83 and PR-85 by making rejected
+remote staged-artifact cleanup service-owned and by requiring explicit local-fixture marking before
+any loopback HTTP control-plane URL is accepted. This PR removes the last convenience paths where a
+client-side retention flag or implicit localhost exception can weaken the reviewed deployment-server
+contract.
+
+### Scope & Changes
+
+- Move rejected protected/shared staged-artifact cleanup authority out of the ordinary laptop client
+  path:
+  - cleanup after auth, challenge, proof, identity, staging-admission, or queue-precondition failure
+    must be requested, performed, or durably recorded by the service
+  - client-side cleanup remains an opportunistic fast path only and is not relied on for security
+  - failed service cleanup creates a bounded janitor record with redacted staged-reference metadata
+  - accepted submissions may still clean up transient staging after admission, but admitted
+    content-addressed artifacts remain available through the reviewed retention model
+- Make `--retain-remote-artifact` inapplicable to protected/shared auth/challenge/admission
+  failures unless a future reviewed server-authorized debug-retention mode exists.
+- Ensure rejected-path retention is not controlled solely by the client request or CLI flag.
+- Tighten protected/shared service-client URL validation:
+  - remove implicit `allowLoopbackHttp` bypasses from manifest and flag resolution
+  - require `BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1` or an equivalent reviewed fixture profile before
+    accepting `http://127.0.0.1`, `http://localhost`, or equivalent loopback URLs
+  - keep HTTPS aliases such as `mini` unchanged
+  - preserve TLS-validation fail-closed behavior for all protected/shared profiles
+- Update any installer, prompt, Jenkins, remote-profile, and test fixture helpers that currently
+  rely on unmarked loopback HTTP so fixture intent is explicit in data or environment.
+
+### Tests (in this PR)
+
+- Add remote execution tests proving `--retain-remote-artifact` does not preserve staged artifacts
+  for protected/shared auth, challenge, proof, identity, or staged-admission failures.
+- Add service cleanup tests proving rejected staged artifacts are removed by the service when
+  possible, and failed cleanup creates a bounded redacted janitor record.
+- Add tests proving accepted submissions may clean transient staging while preserving admitted
+  content-addressed artifacts for retry, rollback, and audit.
+- Add client-config tests proving manifest and flag resolution reject loopback HTTP unless
+  `BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1` or a reviewed local fixture profile marks the flow
+  non-production.
+- Update existing fixture tests so local HTTP usage is visibly marked as fixture-only instead of
+  accepted by default.
+- Add redaction tests proving janitor records and cleanup diagnostics do not expose bearer tokens,
+  proof material, challenge nonces, or full staged paths.
+
+### Docs (in this PR)
+
+- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  to describe service-owned cleanup, janitor records, and the limits of
+  `--retain-remote-artifact` for protected/shared failures.
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  to document the explicit local-fixture marker required for loopback HTTP profiles.
+- Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+  with rejected-upload cleanup, janitor record, and debug-retention non-goal semantics.
+- Update [Deployments Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
+  with the invariant that protected/shared cleanup and fixture transport exceptions are
+  service-authorized or explicitly fixture-marked, not implicit client conveniences.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - rejected staged-artifact service cleanup
+  - janitor record creation and redaction
+  - `--retain-remote-artifact` rejection/ignore behavior on auth, challenge, proof, identity, and
+    admission failures
+  - admitted-artifact retention preservation for accepted submissions
+  - loopback HTTP rejection without explicit fixture marking
+  - fixture-marked loopback HTTP acceptance
+  - docs/contract parity
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR changes protected/shared remote execution cleanup, service-client transport validation,
+  fixture setup, operator docs, and contract text. Run full build-system verification unless the
+  deployment classifier proves all touched surfaces are deployment-owned.
+
+### Acceptance Criteria
+
+- Rejected protected/shared auth/challenge/admission paths do not leave retained staged artifacts
+  because of a client-side retention flag.
+- Cleanup of rejected staged artifacts is service-owned or represented by a bounded redacted janitor
+  record; it does not depend on the laptop client remaining connected.
+- `--retain-remote-artifact` cannot preserve protected/shared rejected artifacts without a future
+  reviewed server-authorized debug-retention mode.
+- Manifest and flag based service-client resolution reject loopback HTTP unless the flow is
+  explicitly marked as a local fixture.
+- Existing production aliases continue to resolve to validated HTTPS, and TLS-disable overrides still
+  fail closed.
+- Documentation, tests, and generated/operator-facing contracts describe the same cleanup and
+  local-fixture transport behavior.
+
+### Risks
+
+Tests and local workflows that used loopback HTTP implicitly will fail until their fixture intent is
+made explicit, and service cleanup introduces another persistence path that must stay redacted and
+bounded.
+
+### Mitigation
+
+Keep fixture marking small and obvious, update test helpers in the same PR, make janitor records
+minimal and secret-safe, and preserve accepted-artifact retention separately from transient staging
+cleanup.
+
+### Consequence of Not Implementing
+
+The protected/shared deployment-server path would still have two production hardening holes: failed
+artifact submissions could be retained by a client-controlled flag, and loopback HTTP could be used
+without the explicit non-production fixture marker required by the plan and docs.
+
+### Downsides for Implementing
+
+Adds service cleanup and janitor-record plumbing, tightens fixture setup, and intentionally breaks
+unmarked local HTTP shortcuts that may be convenient during development.
+
+### Recommendation
+
+Implement before considering the PR-83 through PR-86 deployment-server hardening sequence complete.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)

@@ -456,7 +456,8 @@ Common example values:
   `https://deploy.apps.kilty.io`
 - service URL on `mini` itself:
   `http://127.0.0.1:7780` only with `BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1`
-  for local fixture flows. Laptop and CI profiles use HTTPS.
+  for local fixture flows. Laptop and CI profiles use HTTPS, and manifest or
+  flag based loopback HTTP is rejected unless that fixture marker is present.
 
 ```bash
 export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'

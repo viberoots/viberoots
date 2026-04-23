@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA } from "../../deployments/deployment-control-plane-contract.ts";
+import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy.ts";
 import {
   localHarnessControlPlaneDatabaseUrl,
   readBackendSnapshotBySubmissionId,
@@ -105,6 +106,8 @@ export async function startControlPlaneHarness(opts: {
   recordsRoot?: string;
   hostConfigPath?: string;
 }) {
+  const previousLocalFixtureService = process.env[LOCAL_FIXTURE_SERVICE_ENV];
+  process.env[LOCAL_FIXTURE_SERVICE_ENV] = "1";
   const paths = {
     statePath: opts.statePath || path.join(opts.workspaceRoot, "platform-state.json"),
     hostRoot: opts.hostRoot,
@@ -112,29 +115,41 @@ export async function startControlPlaneHarness(opts: {
     ...(opts.hostConfigPath ? { hostConfigPath: opts.hostConfigPath } : {}),
   };
   const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(paths.recordsRoot);
-  const controlPlane = await startNixosSharedHostControlPlaneServer({
-    workspaceRoot: opts.workspaceRoot,
-    paths,
-    backendDatabaseUrl,
-  });
-  const worker = startNixosSharedHostControlPlaneWorkerLoop({
-    workspaceRoot: opts.workspaceRoot,
-    recordsRoot: paths.recordsRoot,
-    backendDatabaseUrl,
-    onError: (error) => {
-      console.error("[control-plane-harness worker]", error);
-    },
-  });
-  return {
-    paths,
-    backendDatabaseUrl,
-    controlPlane,
-    worker,
-    close: async () => {
-      await worker.close();
-      await controlPlane.close();
-    },
-  };
+  try {
+    const controlPlane = await startNixosSharedHostControlPlaneServer({
+      workspaceRoot: opts.workspaceRoot,
+      paths,
+      backendDatabaseUrl,
+    });
+    const worker = startNixosSharedHostControlPlaneWorkerLoop({
+      workspaceRoot: opts.workspaceRoot,
+      recordsRoot: paths.recordsRoot,
+      backendDatabaseUrl,
+      onError: (error) => {
+        console.error("[control-plane-harness worker]", error);
+      },
+    });
+    return {
+      paths,
+      backendDatabaseUrl,
+      controlPlane,
+      worker,
+      close: async () => {
+        try {
+          await worker.close();
+          await controlPlane.close();
+        } finally {
+          if (previousLocalFixtureService === undefined)
+            delete process.env[LOCAL_FIXTURE_SERVICE_ENV];
+          else process.env[LOCAL_FIXTURE_SERVICE_ENV] = previousLocalFixtureService;
+        }
+      },
+    };
+  } catch (error) {
+    if (previousLocalFixtureService === undefined) delete process.env[LOCAL_FIXTURE_SERVICE_ENV];
+    else process.env[LOCAL_FIXTURE_SERVICE_ENV] = previousLocalFixtureService;
+    throw error;
+  }
 }
 
 export async function assertFrozenSnapshotExecution(result: any): Promise<void> {

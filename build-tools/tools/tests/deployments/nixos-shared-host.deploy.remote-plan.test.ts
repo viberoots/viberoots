@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import {
   installNixosSharedHostTargets,
@@ -14,7 +15,10 @@ async function installClientProfile(
   sshMode: string = "ssh",
   controlPlaneUrl: string = "http://127.0.0.1:7780",
 ): Promise<void> {
-  await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /etc/nixos/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ${sshMode} --control-plane-url ${controlPlaneUrl}`;
+  process.env[LOCAL_FIXTURE_SERVICE_ENV] = "1";
+  await $({
+    env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
+  })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /etc/nixos/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ${sshMode} --control-plane-url ${controlPlaneUrl}`;
 }
 
 async function installReviewedDeployment(workspaceRoot: string): Promise<string> {

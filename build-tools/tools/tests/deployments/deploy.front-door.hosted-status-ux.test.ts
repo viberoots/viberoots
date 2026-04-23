@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import http from "node:http";
 import { test } from "node:test";
+import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy.ts";
 import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 
@@ -69,6 +70,7 @@ test("deploy --status --text summarizes hosted run phase, approval, and artifact
     try {
       const result = await $({
         cwd: tmp,
+        env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
         stdio: "pipe",
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --status --text --deploy-run-id deploy-run-hosted-ux --control-plane-url ${mock.url}`;
       const text = String(result.stdout);

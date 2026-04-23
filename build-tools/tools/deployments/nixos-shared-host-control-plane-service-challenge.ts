@@ -8,6 +8,7 @@ import { resolveSubmitAuthorizationBoundary } from "./deployment-service-authori
 import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract.ts";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
 import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
+import { cleanupThenRethrowRejectedNixosSubmit } from "./nixos-shared-host-control-plane-rejection-cleanup.ts";
 
 export async function handleControlPlaneArtifactChallenge(
   request: NixosSharedHostControlPlaneSubmitRequest,
@@ -17,30 +18,40 @@ export async function handleControlPlaneArtifactChallenge(
     serviceToken?: string;
   },
 ) {
-  const boundary = await resolveSubmitAuthorizationBoundary({
-    recordsRoot: opts.paths.recordsRoot,
-    deployment: request.deployment,
-    operationKind: request.operationKind,
-    authSessionId: request.authSessionId,
-    request,
-    authorization: request.authorization,
-    requestedBy: request.requestedBy,
-    admissionEvidence: request.admissionEvidence,
-    consumeAuthSession: false,
-  });
-  const authorization = boundary.authorization
-    ? authorizeControlPlaneSubmit({
-        deployment: request.deployment,
-        operationKind: request.operationKind,
-        authorization: boundary.authorization,
-      })
-    : undefined;
-  const principal = deploymentServicePrincipalForToken(opts.serviceToken);
-  return await createDeploymentArtifactChallenge({
-    backend: opts.backend,
-    request,
-    principalId: principal.principalId,
-    keyId: principal.keyId,
-    ...(authorization ? { authorization } : {}),
-  });
+  try {
+    const boundary = await resolveSubmitAuthorizationBoundary({
+      recordsRoot: opts.paths.recordsRoot,
+      deployment: request.deployment,
+      operationKind: request.operationKind,
+      authSessionId: request.authSessionId,
+      request,
+      authorization: request.authorization,
+      requestedBy: request.requestedBy,
+      admissionEvidence: request.admissionEvidence,
+      consumeAuthSession: false,
+    });
+    const authorization = boundary.authorization
+      ? authorizeControlPlaneSubmit({
+          deployment: request.deployment,
+          operationKind: request.operationKind,
+          authorization: boundary.authorization,
+        })
+      : undefined;
+    const principal = deploymentServicePrincipalForToken(opts.serviceToken);
+    return await createDeploymentArtifactChallenge({
+      backend: opts.backend,
+      request,
+      principalId: principal.principalId,
+      keyId: principal.keyId,
+      ...(authorization ? { authorization } : {}),
+    });
+  } catch (error) {
+    return await cleanupThenRethrowRejectedNixosSubmit({
+      error,
+      request,
+      paths: opts.paths,
+      backend: opts.backend,
+      reason: "challenge_rejected",
+    });
+  }
 }

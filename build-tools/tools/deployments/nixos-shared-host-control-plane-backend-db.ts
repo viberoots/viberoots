@@ -112,6 +112,14 @@ async function initializeBackendSchema(pool: BackendPool) {
     );
     CREATE INDEX IF NOT EXISTS deploy_records_by_submission_id
       ON deploy_records(submission_id);
+    CREATE TABLE IF NOT EXISTS artifact_cleanup_janitor_records (
+      record_id TEXT PRIMARY KEY,
+      submission_id TEXT,
+      deployment_id TEXT,
+      reason TEXT NOT NULL,
+      document_json JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL
+    );
   `);
 }
 

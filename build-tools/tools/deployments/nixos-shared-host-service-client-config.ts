@@ -35,7 +35,6 @@ export function serviceClientPlanFromManifest(
     ),
     context: `profile "${manifest.profileName}" control-plane service`,
     env,
-    allowLoopbackHttp: true,
   });
   return {
     mode: "control-plane-service",
@@ -105,7 +104,6 @@ export function resolveServiceClientFromFlags(opts: {
     ),
     context: opts.context,
     env,
-    allowLoopbackHttp: true,
   });
   const controlPlaneToken = String(opts.controlPlaneToken || "").trim();
   const envToken = String(env.BNX_DEPLOY_CONTROL_PLANE_TOKEN || "").trim();

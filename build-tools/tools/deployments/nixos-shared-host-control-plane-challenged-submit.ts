@@ -15,6 +15,7 @@ import type {
   NixosSharedHostControlPlanePaths,
   NixosSharedHostControlPlaneSubmission,
 } from "./nixos-shared-host-control-plane-contract.ts";
+import { cleanupThenRethrowRejectedNixosSubmit } from "./nixos-shared-host-control-plane-rejection-cleanup.ts";
 
 type Boundary = {
   requestedBy?: NixosSharedHostControlPlaneSubmission["requestedBy"];
@@ -145,4 +146,20 @@ export async function acceptChallengedNixosSharedHostSubmit(opts: {
     },
   });
   return submitResponseFromSubmission(accepted.submission as any);
+}
+
+export async function acceptChallengedNixosSharedHostSubmitWithRejectedCleanup(
+  opts: Parameters<typeof acceptChallengedNixosSharedHostSubmit>[0],
+) {
+  try {
+    return await acceptChallengedNixosSharedHostSubmit(opts);
+  } catch (error) {
+    return await cleanupThenRethrowRejectedNixosSubmit({
+      error,
+      request: opts.resolvedRequest,
+      paths: opts.paths,
+      backend: opts.backend,
+      reason: "submit_rejected",
+    });
+  }
 }

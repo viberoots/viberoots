@@ -25,6 +25,8 @@ import {
 import { externalPnpmStateDirs } from "../../../lib/pnpm-state-paths.ts";
 import { stableBuckIsolation } from "../../../lib/buck-command-env.ts";
 
+const LOCAL_FIXTURE_SERVICE_ENV = "BNX_DEPLOY_LOCAL_FIXTURE_SERVICE";
+
 let cachedDevEnvExport: Promise<string> | null = null;
 let cachedPinnedNixpkgsPath: Promise<string> | null = null;
 let cachedPinnedCacertPath: Promise<string> | null = null;
@@ -273,6 +275,7 @@ export async function runInTemp<T>(
     WORKSPACE_ROOT: tmp,
     BUCK_TEST_SRC: tmp,
     BUCK_NESTED_ISO: tempNestedIso,
+    [LOCAL_FIXTURE_SERVICE_ENV]: process.env[LOCAL_FIXTURE_SERVICE_ENV] || "1",
     BUCK_EXPORTER_REUSE_DAEMON: process.env.BUCK_EXPORTER_REUSE_DAEMON || "1",
     REPO_ROOT: process.cwd(),
     HOME: home,
@@ -385,6 +388,7 @@ export async function runInTemp<T>(
   exportEnv.WORKSPACE_ROOT = tmp;
   exportEnv.BUCK_TEST_SRC = tmp;
   exportEnv.BUCK_NESTED_ISO = tempNestedIso;
+  exportEnv[LOCAL_FIXTURE_SERVICE_ENV] = exportEnv[LOCAL_FIXTURE_SERVICE_ENV] || "1";
   exportEnv.BUCK_EXPORTER_REUSE_DAEMON = exportEnv.BUCK_EXPORTER_REUSE_DAEMON || "1";
   exportEnv.HOME = home;
   exportEnv.XDG_CACHE_HOME = exportEnv.XDG_CACHE_HOME || xdgCacheHome;

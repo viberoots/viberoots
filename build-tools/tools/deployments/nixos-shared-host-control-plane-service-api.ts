@@ -32,7 +32,7 @@ import {
   type NixosSharedHostControlPlaneSubmitRequest,
 } from "./nixos-shared-host-control-plane-api-contract.ts";
 import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
-import { acceptChallengedNixosSharedHostSubmit } from "./nixos-shared-host-control-plane-challenged-submit.ts";
+import { acceptChallengedNixosSharedHostSubmitWithRejectedCleanup } from "./nixos-shared-host-control-plane-challenged-submit.ts";
 import { prepareBackendNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-backend-prepare.ts";
 import { resolveServiceSubmitRequest } from "./nixos-shared-host-control-plane-service-submit.ts";
 export {
@@ -114,7 +114,7 @@ export async function handleControlPlaneSubmit(
     resolvedRequest.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA &&
     (resolvedRequest.artifactDir || resolvedRequest.artifactDirsByComponentId)
   ) {
-    return await acceptChallengedNixosSharedHostSubmit({
+    return await acceptChallengedNixosSharedHostSubmitWithRejectedCleanup({
       workspaceRoot: opts.workspaceRoot,
       paths: opts.paths,
       backend: opts.backend,

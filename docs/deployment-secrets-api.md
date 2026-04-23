@@ -453,6 +453,15 @@ Final submit recomputes the authorization boundary and rejects token, principal,
 proof-key, envelope, source, publish behavior, idempotency, or expected-identity
 drift from the stored challenge binding.
 
+Rejected protected/shared staged uploads are not retained by client request.
+Challenge, proof, identity, admission, and queue-precondition failures trigger
+service-side staged-tree cleanup when the reference is under the configured
+staging root. If cleanup cannot complete, the service writes a bounded janitor
+record containing redacted reference metadata and a structured cleanup failure
+code, not bearer tokens, proof material, challenge nonces, or full staged paths.
+There is no client-authorized debug-retention mode for rejected protected/shared
+uploads.
+
 Accepted challenged submissions expose an `artifactBinding` summary on submit
 and status responses. The summary includes the challenge id, authenticated
 principal id, proof key id and algorithm, canonical envelope fingerprint,

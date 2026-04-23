@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
+import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy.ts";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
@@ -44,6 +45,7 @@ async function runDeployCli(
 ) {
   return await $({
     cwd: tmp,
+    env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
     stdio: "pipe",
   })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --admission-evidence-json ${admissionEvidenceJson} ${extraArgs}`.nothrow();
 }

@@ -31,9 +31,18 @@ test("nixos shared-host service client resolves the reviewed mini remote alias",
     resolveServiceClientFromFlags({
       controlPlaneUrl: "http://127.0.0.1:7780",
       context: "deploy",
-      env: {},
+      env: { [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
     }).controlPlaneUrl,
     "http://127.0.0.1:7780",
+  );
+  assert.throws(
+    () =>
+      resolveServiceClientFromFlags({
+        controlPlaneUrl: "http://127.0.0.1:7780",
+        context: "deploy",
+        env: {},
+      }),
+    /LOCAL_FIXTURE_SERVICE/,
   );
 });
 

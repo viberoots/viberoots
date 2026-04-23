@@ -258,6 +258,13 @@ The service consumes the challenge once, canonicalizes the finalized path under
 the staging root, verifies the completion marker and immutable file modes,
 recomputes the admitted artifact identity from the finalized tree, and rejects
 proof, challenge, filesystem, or identity mismatches before worker queueing.
+When a protected/shared staged upload is rejected during challenge issuance,
+proof verification, identity admission, or queue preconditions, cleanup is a
+service responsibility. The service removes the finalized staged tree when it
+can; if cleanup fails, it records a bounded janitor item with only redacted
+staged-reference metadata. `--retain-remote-artifact` is a debug convenience
+for accepted remote-profile runs only and does not preserve rejected
+protected/shared staged uploads.
 
 If the client loses the submit response, it should retry the exact same
 submission id or idempotency key with the same challenge, proof, and request

@@ -197,7 +197,7 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
   } catch (error) {
     pendingError = error instanceof Error ? error : new Error(String(error));
   } finally {
-    if (stagePrepared && !opts.retainRemoteArtifact) {
+    if (stagePrepared && (!opts.retainRemoteArtifact || pendingError)) {
       const cleanup = await runCommand(
         buildRemoteSshArgv(opts.plan.destination, buildRemoteCleanupScript(stagedArtifactPath)),
       );
