@@ -11875,6 +11875,162 @@ Implement before considering the PR-83 through PR-86 deployment-server hardening
 
 ---
 
+## PR-88: Mandatory protected/shared service authentication + challenge-envelope parity closeout
+
+### Description
+
+I will close the remaining reviewed gaps in the protected/shared deployment-server path by making
+service-token enforcement mandatory for non-fixture protected/shared service endpoints, requiring
+artifact challenge issuance to carry expected artifact identity data before persistence, binding the
+stored challenge envelope to the finalized staged artifact reference, and ensuring rejected
+protected/shared auth-boundary failures trigger service-owned staged-artifact cleanup or bounded
+janitor recording. This PR turns the remaining hardening assumptions from PR-83 through PR-87 into
+fail-closed behavior in the ordinary hosted path instead of leaving them dependent on optional
+service configuration or client-side best effort.
+
+### Scope & Changes
+
+- Require reviewed bearer-token authentication for protected/shared deployment-service routes in
+  non-fixture mode:
+  - fail service startup or route initialization when the protected/shared deployment-server is
+    configured without a reviewed bearer-token requirement
+  - keep explicit local-fixture service modes visibly non-production and separate from the reviewed
+    protected/shared hosted path
+  - remove the implicit "missing token means allow all" behavior for protected/shared challenge and
+    submit routes
+- Make artifact challenge issuance reject protected/shared upload requests that omit:
+  - `expectedArtifactIdentity` for single-component submissions
+  - `expectedComponentArtifactIdentities` and `expectedCompositeArtifactIdentity` when the request
+    uses multi-component exact-artifact inputs
+  - any other required identity fields already implied by the reviewed exact-artifact contract
+- Extend the stored challenge binding and returned binding fingerprint so the authorized immutable
+  request envelope covers:
+  - the finalized staged artifact reference used by final submit
+  - the exact expected artifact identity fields
+  - the same source/publish/idempotency selectors already enforced at submit time
+- Make final-submit verification compare the stored staged-reference binding against the authenticated
+  submit payload so a challenge issued for one finalized staged tree cannot authorize a different one
+  even when the proof MAC verifies.
+- Ensure protected/shared rejected submissions clean up staged artifacts or persist a bounded janitor
+  record even when failure happens before the current challenged-submit cleanup wrapper:
+  - bearer-token rejection
+  - missing or invalid auth-session authorization boundary
+  - challenge issuance rejection after the service can identify the staged reference
+  - final-submit authorization rejection before the challenged accept path begins
+- Keep the cleanup authority service-owned:
+  - client-side remote cleanup remains opportunistic only
+  - the reviewed contract does not depend on the laptop client surviving long enough to clean up
+    failed protected/shared submissions
+- Update status and contract wording so the reviewed deployment-server flow no longer describes the
+  service token as optional for the protected/shared path.
+
+### Tests (in this PR)
+
+- Add service bootstrap and route tests proving protected/shared deployment-server challenge and
+  submit routes fail closed when the reviewed bearer-token requirement is missing.
+- Add service API tests proving challenge issuance rejects upload requests with missing expected
+  artifact identity fields before challenge persistence.
+- Add challenge/proof tests proving the stored challenge binding includes the finalized staged
+  artifact reference and that final submit rejects staged-reference drift even when other request
+  fields match.
+- Add protected/shared cleanup tests proving staged-artifact cleanup or bounded janitor recording
+  still happens when failure occurs:
+  - before request-body challenge persistence
+  - during auth-session or authorization-boundary resolution
+  - before the current challenged-submit acceptance wrapper runs
+- Add hosted remote-execution tests proving a bearer-token failure or early authorization failure does
+  not rely on laptop-side cleanup to avoid retained staged artifacts.
+- Add docs/contract parity tests proving protected/shared deployment-server docs no longer describe
+  the service token as optional and that challenge docs require expected artifact identities at
+  issuance time.
+
+### Docs (in this PR)
+
+- Update [Deployment Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
+  with mandatory protected/shared service-token enforcement, required expected-identity fields for
+  challenge issuance, and staged-reference challenge binding semantics.
+- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  so the reviewed hosted path treats the deployment-service token as required for protected/shared
+  service flows and explains the fail-closed behavior for missing identity fields or early auth
+  rejection.
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  to remove any ambiguity that an unconfigured hosted service can accept protected/shared traffic and
+  to clarify which paths remain fixture-only.
+- Update [Deployments Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) with
+  the invariant that the authorized challenge envelope covers the finalized staged reference and that
+  protected/shared rejected submissions are cleaned up or janitor-recorded by the service even on
+  early auth failures.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - protected/shared service-token fail-closed behavior
+  - missing expected-identity rejection at challenge issuance
+  - staged-reference binding parity between challenge and final submit
+  - no challenge persistence on malformed identity input
+  - early auth-failure cleanup or janitor recording
+  - hosted remote-exec retained-artifact fail-closed behavior
+  - docs/contract parity
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR changes protected/shared deployment-server auth requirements, challenge/request binding,
+  early rejection cleanup behavior, hosted remote-exec expectations, and operator docs. Run full
+  build-system verification unless deployment classifier coverage proves all changed surfaces are
+  deployment-owned.
+
+### Acceptance Criteria
+
+- The reviewed protected/shared deployment-server path cannot accept challenge or submit requests
+  without an active reviewed bearer-token requirement unless the flow is explicitly marked as a local
+  fixture.
+- Protected/shared challenge issuance fails closed when expected artifact identity fields are missing
+  for exact-artifact upload requests.
+- The stored challenge binding and returned binding fingerprint cover the finalized staged artifact
+  reference used by final submit.
+- Final submit fails when the finalized staged reference differs from the staged reference bound into
+  the authorized challenge envelope.
+- Rejected protected/shared auth or authorization failures do not rely on laptop-side cleanup to
+  avoid retained staged artifacts.
+- Service-owned cleanup or bounded janitor recording still applies when failure happens before the
+  current challenged-submit acceptance wrapper.
+- Documentation, tests, and contract text all describe the same mandatory protected/shared
+  service-auth and challenge-envelope behavior.
+
+### Risks
+
+This will intentionally break any leftover local or fixture setups that were still relying on an
+unconfigured hosted service token requirement or on challenge issuance without full expected-identity
+data, and the cleanup path may need more request-context plumbing for early rejection cases.
+
+### Mitigation
+
+Keep fixture-only service modes explicit, update the affected helpers and docs in the same PR, reuse
+the existing janitor path where possible, and make the early rejection diagnostics precise without
+leaking tokens, proofs, or staged paths.
+
+### Consequence of Not Implementing
+
+The plan would still overstate the protected/shared hardening of the hosted deployment-server path:
+operators could start the service without mandatory bearer-token enforcement, challenge issuance
+could persist requests without expected artifact identity data, the stored challenge binding would
+still omit the finalized staged reference, and some early auth failures would still depend on
+best-effort client cleanup instead of the service-owned cleanup contract.
+
+### Downsides for Implementing
+
+Adds stricter service configuration requirements, removes a permissive startup mode from the reviewed
+protected/shared path, expands challenge-binding persistence, and requires more early-failure cleanup
+coverage in tests and helpers.
+
+### Recommendation
+
+Implement before treating the PR-83 through PR-87 deployment-server hardening sequence as complete.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
