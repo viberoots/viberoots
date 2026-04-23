@@ -145,7 +145,8 @@ Deployment-service routing:
 Common example values:
 
 - `--control-plane-url http://127.0.0.1:7780`
-  Use only from `mini` itself or local test harnesses.
+  Use only for explicit local fixture flows with
+  `BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1`.
 - `--control-plane-url https://deploy.apps.kilty.io`
   Use the reviewed hosted `mini` deployment service endpoint from laptops and
   automation outside the host.
@@ -429,7 +430,11 @@ The proof binds the challenge id and nonce, deployment id and label, operation
 kind, publish behavior, provider target identity, service-authenticated client
 identity, proof key id, expected identity fields, source/replay selectors when
 present, idempotency key, and finalized staged artifact reference. The service
-first resolves an already accepted matching idempotency key, then atomically
+first canonicalizes that reference under the configured staging root, requires
+the sidecar completion marker, rejects writable entries, traversal, symlinks,
+hardlinks, device files, sockets, FIFOs, and paths outside the staging root, and
+then hashes and copies only from that finalized tree into the admitted store.
+It then resolves an already accepted matching idempotency key, then atomically
 consumes the challenge with the accepted submission, execution snapshot, and
 worker queue intent. Retrying the same idempotency key, challenge, proof, and
 request fingerprint returns the accepted submission; reusing the key with a

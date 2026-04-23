@@ -255,7 +255,10 @@ client-supplied principals to protected/shared service deployments. `mini`
 derives identity through its service session and the worker uses server-owned
 secret context for provider mutation. Use HTTPS service URLs and reviewed SSH
 known-host or pinning configuration for protected/shared remote profiles; local
-HTTP is only for explicit local test fixtures.
+HTTP is only for explicit local test fixtures marked with
+`BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1`. Remote-profile uploads finalize under the
+configured staging root before proof submission, and the service admits only the
+canonical finalized tree into the content-addressed store.
 
 ## Which Backend Am I Using
 

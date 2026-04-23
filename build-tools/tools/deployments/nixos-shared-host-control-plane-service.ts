@@ -21,6 +21,9 @@ async function main() {
   const hostRoot = path.resolve(
     getFlagStr("host-root", path.join(workspaceRoot, ".local", "deployments", "nixos-shared-host")),
   );
+  const artifactStagingRoot = path.resolve(
+    getFlagStr("artifact-staging-root", path.join(hostRoot, ".deploy-artifacts")),
+  );
   const port = Number(getFlagStr("port", "7780").trim() || "7780");
   const host = getFlagStr("host", "127.0.0.1").trim() || "127.0.0.1";
   const token = resolveControlPlaneServiceToken({ tokenFlag: getFlagStr("token", "") });
@@ -38,6 +41,7 @@ async function main() {
       statePath: path.resolve(getFlagStr("state", path.join(hostRoot, "platform-state.json"))),
       hostRoot,
       recordsRoot: path.resolve(getFlagStr("records-root", path.join(hostRoot, "records"))),
+      artifactStagingRoot,
       ...(getFlagStr("host-config-out", "").trim()
         ? { hostConfigPath: path.resolve(getFlagStr("host-config-out", "").trim()) }
         : {}),

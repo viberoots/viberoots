@@ -49,6 +49,7 @@ export type NixosSharedHostControlPlanePaths = {
   statePath: string;
   hostRoot: string;
   recordsRoot: string;
+  artifactStagingRoot?: string;
   hostConfigPath?: string;
 };
 

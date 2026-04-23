@@ -39,7 +39,6 @@ import {
 } from "./nixos-shared-host-control-plane-snapshot-helpers.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker.ts";
-
 export type NixosSharedHostControlPlaneSourceSelection = {
   record: NixosSharedHostDeployRecord | { deployRunId: string; deploymentId: string };
   replaySnapshotPath?: string;
@@ -78,7 +77,6 @@ export function createNixosSharedHostSubmissionId(): string {
 export function createNixosSharedHostWorkerId(submissionId: string): string {
   return `${submissionId}-worker`;
 }
-
 export async function createNixosSharedHostControlPlaneSnapshot(
   opts: NixosSharedHostControlPlaneSnapshotOpts,
   submissionId: string,
@@ -86,6 +84,7 @@ export async function createNixosSharedHostControlPlaneSnapshot(
   const submittedAt = new Date().toISOString();
   const multiComponent = isMultiComponentNixosSharedHostDeployment(opts.deployment);
   const lockScope = nixosSharedHostDeploymentTargetIdentity(opts.deployment);
+  const stagingRoot = opts.paths.artifactStagingRoot;
   if (
     (opts.operationKind === "retry" || opts.operationKind === "rollback") &&
     !hasReplaySnapshot(opts.source)
@@ -108,6 +107,7 @@ export async function createNixosSharedHostControlPlaneSnapshot(
               deployment: opts.deployment,
               recordsRoot: opts.paths.recordsRoot,
               artifactDirsByComponentId: opts.artifactDirsByComponentId,
+              ...(stagingRoot ? { stagingRoot } : {}),
             })
           : undefined)
       : undefined;
@@ -140,6 +140,7 @@ export async function createNixosSharedHostControlPlaneSnapshot(
               recordsRoot: opts.paths.recordsRoot,
               artifactDir: path.resolve(opts.artifactDir || ""),
               kind: opts.deployment.component.kind,
+              ...(stagingRoot ? { stagingRoot } : {}),
             }));
   const componentArtifacts =
     opts.operationKind !== "explicit_removal" && multiComponent
@@ -148,6 +149,7 @@ export async function createNixosSharedHostControlPlaneSnapshot(
           deployment: opts.deployment,
           recordsRoot: opts.paths.recordsRoot,
           artifactDirsByComponentId: opts.artifactDirsByComponentId || {},
+          ...(stagingRoot ? { stagingRoot } : {}),
         }))
       : undefined;
   const publishInput =
@@ -221,6 +223,7 @@ export async function createNixosSharedHostControlPlaneSnapshot(
       statePath: path.resolve(opts.paths.statePath),
       hostRoot: path.resolve(opts.paths.hostRoot),
       recordsRoot: path.resolve(opts.paths.recordsRoot),
+      ...(stagingRoot ? { artifactStagingRoot: path.resolve(stagingRoot) } : {}),
       ...(opts.paths.hostConfigPath
         ? { hostConfigPath: path.resolve(opts.paths.hostConfigPath) }
         : {}),

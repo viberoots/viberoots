@@ -141,6 +141,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/nixos-shared-host.service-auth-boundary.helpers.ts": False,
     "build-tools/tools/tests/deployments/nixos-shared-host.service-auth-boundary.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.service-client-config.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.staged-artifact-admission.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.install.dev-machine.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.install.dry-run-and-status.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.install.host-modes.test.ts": True,

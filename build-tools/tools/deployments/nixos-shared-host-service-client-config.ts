@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostClientManifest } from "./nixos-shared-host-install-contract.ts";
+import { validateProtectedSharedServiceTransport } from "./deployment-service-transport-policy.ts";
 
 export type NixosSharedHostServiceClientPlan = {
   mode: "control-plane-service";
@@ -25,13 +26,20 @@ function requireNonEmpty(value: string | undefined, message: string): string {
 
 export function serviceClientPlanFromManifest(
   manifest: NixosSharedHostClientManifest,
+  env: NodeJS.ProcessEnv = process.env,
 ): NixosSharedHostServiceClientPlan {
-  return {
-    mode: "control-plane-service",
+  const controlPlaneUrl = validateProtectedSharedServiceTransport({
     controlPlaneUrl: requireNonEmpty(
       manifest.serviceClient?.controlPlaneUrl,
       `profile "${manifest.profileName}" is missing serviceClient.controlPlaneUrl`,
     ),
+    context: `profile "${manifest.profileName}" control-plane service`,
+    env,
+    allowLoopbackHttp: true,
+  });
+  return {
+    mode: "control-plane-service",
+    controlPlaneUrl,
     ...(manifest.serviceClient.controlPlaneTokenEnv
       ? { controlPlaneTokenEnv: manifest.serviceClient.controlPlaneTokenEnv }
       : {}),
@@ -65,7 +73,7 @@ export function resolveServiceClientFromManifest(
   manifest: NixosSharedHostClientManifest,
   env: NodeJS.ProcessEnv = process.env,
 ): NixosSharedHostResolvedServiceClient {
-  const plan = serviceClientPlanFromManifest(manifest);
+  const plan = serviceClientPlanFromManifest(manifest, env);
   return {
     controlPlaneUrl: plan.controlPlaneUrl,
     ...(plan.controlPlaneTokenEnv
@@ -87,13 +95,18 @@ export function resolveServiceClientFromFlags(opts: {
   if (remote && !REMOTE_ALIASES[remote]) {
     throw new Error(`--remote ${remote} is not a known deployment service alias`);
   }
-  const controlPlaneUrl = requireNonEmpty(
-    opts.controlPlaneUrl ||
-      (remote === "mini"
-        ? String(env.BNX_DEPLOY_MINI_CONTROL_PLANE_URL || "").trim() || REMOTE_ALIASES.mini
-        : ""),
-    `${opts.context} requires --control-plane-url or BNX_DEPLOY_CONTROL_PLANE_URL (or --remote mini)`,
-  );
+  const controlPlaneUrl = validateProtectedSharedServiceTransport({
+    controlPlaneUrl: requireNonEmpty(
+      opts.controlPlaneUrl ||
+        (remote === "mini"
+          ? String(env.BNX_DEPLOY_MINI_CONTROL_PLANE_URL || "").trim() || REMOTE_ALIASES.mini
+          : ""),
+      `${opts.context} requires --control-plane-url or BNX_DEPLOY_CONTROL_PLANE_URL (or --remote mini)`,
+    ),
+    context: opts.context,
+    env,
+    allowLoopbackHttp: true,
+  });
   const controlPlaneToken = String(opts.controlPlaneToken || "").trim();
   const envToken = String(env.BNX_DEPLOY_CONTROL_PLANE_TOKEN || "").trim();
   return {

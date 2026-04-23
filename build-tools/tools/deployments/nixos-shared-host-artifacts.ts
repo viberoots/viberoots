@@ -5,6 +5,7 @@ import path from "node:path";
 import { copyTree } from "../lib/copy-tree.ts";
 import { sanitizeName } from "../lib/sanitize.ts";
 import { inspectStaticWebappArtifactDir } from "./static-webapp-artifact-bundle.ts";
+import { assertFinalizedStagedArtifactPath } from "./nixos-shared-host-staged-artifact.ts";
 
 export const NIXOS_SHARED_HOST_ARTIFACT_PROVENANCE_SCHEMA =
   "nixos-shared-host-artifact-provenance@2";
@@ -94,8 +95,14 @@ export async function admitNixosSharedHostArtifact(opts: {
   recordsRoot: string;
   artifactDir: string;
   kind: ArtifactKind;
+  stagingRoot?: string;
 }): Promise<NixosSharedHostAdmittedArtifact> {
-  const artifactDir = path.resolve(opts.artifactDir);
+  const artifactDir = opts.stagingRoot
+    ? await assertFinalizedStagedArtifactPath({
+        artifactDir: opts.artifactDir,
+        stagingRoot: opts.stagingRoot,
+      })
+    : path.resolve(opts.artifactDir);
   const identity = await artifactIdentityForNixosSharedHostDir(artifactDir, opts.kind);
   const artifact: NixosSharedHostAdmittedArtifact = {
     kind: opts.kind,
@@ -111,6 +118,7 @@ export async function admitNixosSharedHostArtifact(opts: {
 export async function admitNixosSharedHostStaticArtifact(opts: {
   recordsRoot: string;
   artifactDir: string;
+  stagingRoot?: string;
 }): Promise<NixosSharedHostAdmittedArtifact> {
   return await admitNixosSharedHostArtifact({ ...opts, kind: "static-webapp" });
 }

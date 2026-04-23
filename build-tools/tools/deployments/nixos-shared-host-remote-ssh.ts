@@ -29,9 +29,20 @@ export function readReviewedRemoteSshAuth(
   return { identityFile, knownHostsFile };
 }
 
-export function buildReviewedRemoteSshArgvPrefix(env: ReviewedRemoteEnv = process.env): string[] {
+export function requireReviewedRemoteSshAuth(
+  env: ReviewedRemoteEnv = process.env,
+): ReviewedRemoteSshAuth {
   const auth = readReviewedRemoteSshAuth(env);
-  if (!auth) return ["ssh"];
+  if (!auth) {
+    throw new Error(
+      `reviewed remote SSH auth requires ${REMOTE_SSH_IDENTITY_FILE_ENV} and ${REMOTE_SSH_KNOWN_HOSTS_FILE_ENV}`,
+    );
+  }
+  return auth;
+}
+
+export function buildReviewedRemoteSshArgvPrefix(env: ReviewedRemoteEnv = process.env): string[] {
+  const auth = requireReviewedRemoteSshAuth(env);
   return [
     "ssh",
     "-o",
@@ -50,8 +61,7 @@ export function buildReviewedRemoteSshArgvPrefix(env: ReviewedRemoteEnv = proces
 export function buildReviewedRemoteRsyncShell(
   env: ReviewedRemoteEnv = process.env,
 ): string | undefined {
-  const auth = readReviewedRemoteSshAuth(env);
-  if (!auth) return undefined;
+  requireReviewedRemoteSshAuth(env);
   return buildReviewedRemoteSshArgvPrefix(env)
     .map((arg) => shSingleQuote(arg))
     .join(" ");

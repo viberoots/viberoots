@@ -9,6 +9,7 @@ const SECRET_ASSIGNMENT_PATTERN =
   /\b(access_token|refresh_token|id_token|client_secret|code_verifier|device_code|user_code|code)=([^&\s"']+)/gi;
 const SECRET_JSON_FIELD_PATTERN =
   /"(access_token|refresh_token|id_token|client_secret|code_verifier|device_code|user_code|code|vault_token|vault_jwt|jenkins_secret)"\s*:\s*"[^"]*"/gi;
+const STAGED_ARTIFACT_PATH_PATTERN = /\/[^\s"']*\.deploy-artifacts\/[^\s"']+/g;
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -32,6 +33,7 @@ export function redactDeploymentAuthText(
     .replace(JWT_PATTERN, DEPLOYMENT_AUTH_REDACTION)
     .replace(VAULT_TOKEN_PATTERN, DEPLOYMENT_AUTH_REDACTION)
     .replace(BEARER_PATTERN, `Bearer ${DEPLOYMENT_AUTH_REDACTION}`)
+    .replace(STAGED_ARTIFACT_PATH_PATTERN, "[redacted:staged-artifact-path]")
     .replace(SECRET_ASSIGNMENT_PATTERN, (_match, key) => `${key}=${DEPLOYMENT_AUTH_REDACTION}`)
     .replace(SECRET_JSON_FIELD_PATTERN, (_match, key) => `"${key}":"${DEPLOYMENT_AUTH_REDACTION}"`);
 }

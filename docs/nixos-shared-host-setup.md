@@ -436,6 +436,10 @@ What the service and worker flags mean:
 - `--records-root /var/lib/deployment-host/records`
   The records directory on `mini`. This root also contains retained upload and
   admitted-artifact storage used by the hosted service.
+- `--artifact-staging-root /var/lib/deployment-host/runtime/.deploy-artifacts`
+  The only root from which protected/shared staged artifacts are admitted. The
+  service canonicalizes finalized artifact paths under this root and rejects
+  mutable, incomplete, or escaping trees before hashing and storage.
 - `--control-plane-database-url "$BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL"`
   The Postgres URL both processes use.
 - `--port 7780`
@@ -451,7 +455,8 @@ Common example values:
 - service URL from another machine:
   `https://deploy.apps.kilty.io`
 - service URL on `mini` itself:
-  `http://127.0.0.1:7780`
+  `http://127.0.0.1:7780` only with `BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1`
+  for local fixture flows. Laptop and CI profiles use HTTPS.
 
 ```bash
 export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
@@ -460,6 +465,7 @@ direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control
   --host-root /var/lib/deployment-host/runtime \
   --state /etc/nixos/deployment-host/platform-state.json \
   --records-root /var/lib/deployment-host/records \
+  --artifact-staging-root /var/lib/deployment-host/runtime/.deploy-artifacts \
   --host 127.0.0.1 \
   --port 7780
 ```
@@ -480,6 +486,9 @@ Required worker-side secret-source prep after PR-79 and later:
   tokens, provider tokens, PKCE verifiers, and client secrets out of both the
   protected/shared client submission and the worker process environment unless a
   reviewed server-local credential source explicitly names the variable
+- keep `NODE_TLS_REJECT_UNAUTHORIZED=0` and `BNX_DEPLOY_INSECURE_TLS=1` out of
+  protected/shared client environments. The client fails closed if TLS
+  validation is disabled.
 - rely on the service-owned auth session for the human principal; protected/shared
   service submissions reject client-supplied `requestedBy` and authorization
   grants
@@ -552,6 +561,7 @@ The plan should show:
 - the repo path on `mini`
 - the state, runtime, and records paths on `mini`
 - a `serviceClient` block with the deployment service URL and token env
+- an artifact stage root under the remote runtime root
 
 Deploy from a dev machine:
 
@@ -584,6 +594,10 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
 The remote-profile and Jenkins wrappers submit through the deployment service
 recorded in the client profile. They do not accept `--control-plane-url`,
 `--apply-host`, or `--apply-host-dry-run` on the wrapper command line.
+They require reviewed SSH trust material such as `--ssh-known-hosts` plus the
+identity file. The rsync upload lands in a temporary directory under the staging
+root, the remote side finalizes it with an atomic rename and completion marker,
+and the service admits only the finalized immutable tree.
 
 ## Approve An Existing Waiting Run
 

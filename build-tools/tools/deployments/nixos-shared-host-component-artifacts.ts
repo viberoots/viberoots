@@ -15,6 +15,7 @@ export async function admitNixosSharedHostComponentArtifacts(opts: {
   deployment: NixosSharedHostDeployment;
   recordsRoot: string;
   artifactDirsByComponentId: Record<string, string>;
+  stagingRoot?: string;
 }): Promise<NixosSharedHostResolvedComponentArtifact[]> {
   const resolved: NixosSharedHostResolvedComponentArtifact[] = [];
   for (const component of opts.deployment.components) {
@@ -28,6 +29,7 @@ export async function admitNixosSharedHostComponentArtifacts(opts: {
         recordsRoot: opts.recordsRoot,
         artifactDir,
         kind: component.kind,
+        ...(opts.stagingRoot ? { stagingRoot: opts.stagingRoot } : {}),
       }),
     });
   }

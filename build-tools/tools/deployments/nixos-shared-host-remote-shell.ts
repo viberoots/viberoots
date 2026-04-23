@@ -4,6 +4,7 @@ import {
   buildReviewedRemoteRsyncShell,
   buildReviewedRemoteSshArgvPrefix,
 } from "./nixos-shared-host-remote-ssh.ts";
+import { stagedUploadCompleteMarkerPath } from "./nixos-shared-host-staged-artifact.ts";
 import type { NixosSharedHostRemotePlan } from "./nixos-shared-host-remote-target.ts";
 
 export type NixosSharedHostRemoteSmokeConnectOverride = {
@@ -55,11 +56,36 @@ export function buildRemoteRepoPreflightScript(plan: NixosSharedHostRemotePlan):
 }
 
 export function buildRemoteStagePrepareScript(remoteArtifactPath: string): string {
-  return ["set -euo pipefail", `mkdir -p -- ${shSingleQuote(remoteArtifactPath)}`].join("; ");
+  return [
+    "set -euo pipefail",
+    `final=${shSingleQuote(remoteArtifactPath)}`,
+    'tmp="${final}.uploading"',
+    'if [ -e "$final" ]; then echo "finalized staged artifact already exists: $final" >&2; exit 1; fi',
+    'rm -rf -- "$tmp"',
+    'mkdir -p -- "$tmp"',
+  ].join("; ");
+}
+
+export function buildRemoteStageFinalizeScript(remoteArtifactPath: string): string {
+  const marker = stagedUploadCompleteMarkerPath(remoteArtifactPath);
+  return [
+    "set -euo pipefail",
+    `final=${shSingleQuote(remoteArtifactPath)}`,
+    'tmp="${final}.uploading"',
+    `marker=${shSingleQuote(marker)}`,
+    'test -d "$tmp"',
+    'mv -- "$tmp" "$final"',
+    'chmod -R a-w "$final"',
+    'printf \'{"schemaVersion":"nixos-shared-host-staged-upload@1"}\\n\' > "$marker"',
+  ].join("; ");
 }
 
 export function buildRemoteCleanupScript(remoteArtifactPath: string): string {
-  return ["set -euo pipefail", `rm -rf -- ${shSingleQuote(remoteArtifactPath)}`].join("; ");
+  return [
+    "set -euo pipefail",
+    `for path in ${shSingleQuote(remoteArtifactPath)} ${shSingleQuote(`${remoteArtifactPath}.uploading`)}; do if [ -e "$path" ]; then chmod -R u+w "$path"; fi; done`,
+    `rm -rf -- ${shSingleQuote(remoteArtifactPath)} ${shSingleQuote(`${remoteArtifactPath}.uploading`)} ${shSingleQuote(stagedUploadCompleteMarkerPath(remoteArtifactPath))}`,
+  ].join("; ");
 }
 
 export function buildRemoteDeployScript(opts: {

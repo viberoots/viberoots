@@ -1,6 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import {
+  REMOTE_SSH_IDENTITY_FILE_ENV,
+  REMOTE_SSH_KNOWN_HOSTS_FILE_ENV,
+} from "../../deployments/nixos-shared-host-remote-ssh.ts";
 
 const FAKE_SSH = `#!/usr/bin/env bash
 set -euo pipefail
@@ -113,18 +117,23 @@ export async function installFakeRemoteTransport(
   tmp: string,
 ): Promise<{ env: Record<string, string> }> {
   const binDir = path.join(tmp, "fake-remote-bin");
+  const identityFile = path.join(tmp, "fake-remote-identity");
+  const knownHostsFile = path.join(tmp, "fake-remote-known-hosts");
   await fsp.mkdir(binDir, { recursive: true });
   await fsp.writeFile(path.join(binDir, "ssh"), FAKE_SSH, "utf8");
   await fsp.writeFile(path.join(binDir, "direnv"), FAKE_DIRENV, "utf8");
   await fsp.writeFile(path.join(binDir, "rsync"), FAKE_RSYNC, "utf8");
   await fsp.writeFile(path.join(binDir, "sudo"), FAKE_SUDO, "utf8");
   await fsp.writeFile(path.join(binDir, "nixos-rebuild"), FAKE_NIXOS_REBUILD, "utf8");
+  await fsp.writeFile(identityFile, "fake-private-key\n", "utf8");
+  await fsp.writeFile(knownHostsFile, "mini ssh-ed25519 AAAATEST\n", "utf8");
   await Promise.all([
     fsp.chmod(path.join(binDir, "ssh"), 0o755),
     fsp.chmod(path.join(binDir, "direnv"), 0o755),
     fsp.chmod(path.join(binDir, "rsync"), 0o755),
     fsp.chmod(path.join(binDir, "sudo"), 0o755),
     fsp.chmod(path.join(binDir, "nixos-rebuild"), 0o755),
+    fsp.chmod(identityFile, 0o600),
   ]);
   return {
     env: {
@@ -134,6 +143,8 @@ export async function installFakeRemoteTransport(
         ),
       ),
       PATH: `${binDir}:${process.env.PATH || ""}`,
+      [REMOTE_SSH_IDENTITY_FILE_ENV]: identityFile,
+      [REMOTE_SSH_KNOWN_HOSTS_FILE_ENV]: knownHostsFile,
     },
   };
 }

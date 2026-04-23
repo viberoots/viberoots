@@ -9,6 +9,7 @@ import {
   buildRemoteCleanupScript,
   buildRemoteRepoPreflightScript,
   buildRemoteSshArgv,
+  buildRemoteStageFinalizeScript,
   buildRemoteStagePrepareScript,
   type NixosSharedHostRemoteSmokeConnectOverride,
 } from "./nixos-shared-host-remote-shell.ts";
@@ -20,6 +21,8 @@ import { createNixosSharedHostDeployRunId } from "./nixos-shared-host-records.ts
 import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door.ts";
 import { requireServiceTokenFromEnv } from "./nixos-shared-host-service-client-config.ts";
 import { expectedNixosSharedHostArtifactIdentities } from "./deployment-artifact-binding.ts";
+import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
+import { stagedUploadTempPath } from "./nixos-shared-host-staged-artifact.ts";
 
 const execFileAsync = promisify(execFile);
 const TRANSPORT_MAX_BUFFER = 10 * 1024 * 1024;
@@ -59,7 +62,7 @@ function commandFailure(step: string, result: CommandResult): Error {
   const details = [result.stderr.trim(), result.stdout.trim(), `exit=${result.exitCode}`]
     .filter(Boolean)
     .join("\n");
-  return new Error(`${step}\n${details}`.trim());
+  return new Error(redactDeploymentAuthText(`${step}\n${details}`.trim()));
 }
 
 async function runCommand(argv: string[]): Promise<CommandResult> {
@@ -128,6 +131,7 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
 }): Promise<NixosSharedHostRemoteDeploySummary> {
   const executionId = createNixosSharedHostDeployRunId("remote");
   const stagedArtifactPath = createNixosSharedHostRemoteArtifactPath(opts.plan, executionId);
+  const uploadPath = stagedUploadTempPath(stagedArtifactPath);
   const controlPlaneToken = requireServiceTokenFromEnv(
     opts.plan.serviceClient.controlPlaneTokenEnv,
     `remote profile "${opts.plan.profileName}" deploy`,
@@ -157,14 +161,16 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
     }
     stagePrepared = true;
     const stage = await runCommand(
-      buildRemoteArtifactStageArgv(
-        opts.localArtifactDir,
-        opts.plan.destination,
-        stagedArtifactPath,
-      ),
+      buildRemoteArtifactStageArgv(opts.localArtifactDir, opts.plan.destination, uploadPath),
     );
     if (stage.exitCode !== 0) {
       throw commandFailure("remote artifact staging failed", stage);
+    }
+    const finalize = await runCommand(
+      buildRemoteSshArgv(opts.plan.destination, buildRemoteStageFinalizeScript(stagedArtifactPath)),
+    );
+    if (finalize.exitCode !== 0) {
+      throw commandFailure("remote artifact staging finalize failed", finalize);
     }
     const record = requireServiceRecord(
       await runNixosSharedHostDirectServiceMutation({

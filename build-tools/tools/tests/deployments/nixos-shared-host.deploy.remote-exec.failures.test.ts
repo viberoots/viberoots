@@ -50,19 +50,22 @@ test("remote deploy fails closed on artifact staging failure and remote transpor
       remoteRecordsRoot,
       controlPlane.url,
     );
-    const stageFailure = await $({
-      cwd: tmp,
-      env: remoteExecEnv(env, { FAKE_RSYNC_FAIL: "1" }),
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
-    assert.notEqual(stageFailure.exitCode, 0);
-    assert.match(String(stageFailure.stderr), /remote artifact staging failed/);
-    const transportFailure = await $({
-      cwd: tmp,
-      env: remoteExecEnv(env, { FAKE_SSH_FAIL: "1" }),
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
-    assert.notEqual(transportFailure.exitCode, 0);
-    assert.match(String(transportFailure.stderr), /fake ssh transport failure/);
-    await controlPlane.close();
+    try {
+      const stageFailure = await $({
+        cwd: tmp,
+        env: remoteExecEnv(env, { FAKE_RSYNC_FAIL: "1" }),
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
+      assert.notEqual(stageFailure.exitCode, 0);
+      assert.match(String(stageFailure.stderr), /remote artifact staging failed/);
+      const transportFailure = await $({
+        cwd: tmp,
+        env: remoteExecEnv(env, { FAKE_SSH_FAIL: "1" }),
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
+      assert.notEqual(transportFailure.exitCode, 0);
+      assert.match(String(transportFailure.stderr), /fake ssh transport failure/);
+    } finally {
+      await controlPlane.close();
+    }
   });
 });
 
