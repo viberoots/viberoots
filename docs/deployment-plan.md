@@ -12468,6 +12468,136 @@ starts rejecting unauthorized evidence.
 
 ---
 
+## PR-92: Admission-requirement introspection + `--mark-check-passed` discoverability closeout
+
+### Description
+
+I will close the operator UX gap exposed by the current `--mark-check-passed` flow: the required
+check names are authoritative in reviewed deployment metadata, but the CLI currently expects users
+to already know them. This PR makes admission requirements discoverable through reviewed read-only
+surfaces and actionable diagnostics so operators do not need to inspect `TARGETS` files just to
+learn valid check names, approvals, or allowed refs for a deployment.
+
+The goal is to keep the repository metadata authoritative while making the normal user path
+self-describing:
+
+- deployment metadata remains the source of truth for `required_checks`, `required_approvals`, and
+  `allowed_refs`
+- read-only CLI output should surface those requirements directly for the selected deployment
+- `--mark-check-passed` errors should guide users toward the authoritative requirement names instead
+  of failing with a bare arity error
+
+### Scope & Changes
+
+- Add a reviewed read-only deploy introspection surface for admission requirements, for example:
+  - `deploy --describe`
+  - or an expanded `deploy --validate-only` / `deploy --print-json` response
+- Surface, at minimum, the authoritative deployment-specific values for:
+  - `admission_policy` ref
+  - `allowed_refs`
+  - `required_checks`
+  - `required_approvals`
+  - whether `--mark-check-passed` is relevant for the selected workflow
+- Make `--mark-check-passed` discoverable and self-correcting:
+  - if passed with no value, fail with actionable guidance
+  - when possible, include the deployment's required check names in that guidance
+  - when the deployment has no required checks, say so explicitly rather than implying a hidden
+    required value exists
+- Keep the checked-in deployment metadata authoritative:
+  - do not introduce a second registry of check names
+  - derive displayed values from the same extracted deployment/admission-policy data used for
+    admission enforcement
+- Extend explain/inspection UX where useful so operators can see the same requirement set through:
+  - deploy read-only output
+  - status / troubleshooting flows
+  - Jenkins or remote-profile wrappers when they surface admission guidance
+- Keep the UX clear about authorization boundaries:
+  - discovering a required check name does not imply the caller may report that check
+  - the output should distinguish "this check is required" from "this principal may assert it"
+
+### Tests (in this PR)
+
+- Add CLI tests proving the reviewed read-only introspection surface prints:
+  - `admission_policy`
+  - `allowed_refs`
+  - `required_checks`
+  - `required_approvals`
+- Add tests proving `--mark-check-passed` with no value fails with actionable diagnostics that
+  include the deployment's required check names when present.
+- Add tests proving deployments with zero required checks produce explicit "no required checks"
+  guidance instead of a misleading placeholder value.
+- Add wrapper tests proving remote-profile and Jenkins-facing surfaces preserve the same
+  discoverability guidance where they expose `--mark-check-passed` behavior.
+- Add docs-parity tests proving operator docs and CLI examples stay aligned on how required check
+  names are discovered.
+
+### Docs (in this PR)
+
+- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  with a concrete "how do I discover the right `--mark-check-passed` value?" workflow.
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  to document the read-only requirement-inspection path before the first protected/shared submit.
+- Update [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md)
+  so the global operator docs explain where required check names come from and how to inspect them.
+- Update [Deployments Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
+  to state that admission requirements remain metadata-derived and user-visible through reviewed
+  inspection surfaces.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - deploy admission introspection output
+  - `--mark-check-passed` missing-value diagnostics
+  - remote/Jenkins discoverability parity
+  - docs parity
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR should stay within reviewed deployment-owned CLI/read-only UX, wrapper behavior, and
+  operator docs. Under the deployment-only verify policy, default `v` / CI can run the reviewed
+  deployment suite unless implementation details force shared build-system selector changes.
+
+### Acceptance Criteria
+
+- Operators can discover the authoritative required check names for a deployment through a reviewed
+  read-only CLI path.
+- `--mark-check-passed` no longer fails with a non-actionable message when the missing value can be
+  derived from reviewed deployment metadata.
+- The CLI does not require users to inspect checked-in `TARGETS` files just to learn valid
+  admission requirement names.
+- The UX keeps authorization and discoverability distinct: users can see required checks without the
+  system implying they are authorized to report them.
+- Tests and docs describe the same discoverability workflow.
+
+### Risks
+
+If the introspection UX drifts from the actual admission metadata, operators may trust stale or
+incomplete guidance and submit the wrong evidence.
+
+### Mitigation
+
+Derive all displayed requirement values from the same extracted deployment/admission-policy data
+used by admission enforcement, and lock the behavior with docs-parity and CLI snapshot tests.
+
+### Consequence of Not Implementing
+
+Protected/shared deploy UX would remain unnecessarily opaque: users would keep hitting avoidable
+CLI errors or reading repo internals to discover valid admission inputs.
+
+### Downsides for Implementing
+
+This adds another read-only CLI/documentation surface that must stay synchronized with deployment
+metadata and admission behavior.
+
+### Recommendation
+
+Implement immediately after PR-91 so the repo not only enforces the `admission_reporter` boundary,
+but also tells operators how to discover the valid requirement names that boundary governs.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
