@@ -212,7 +212,11 @@ Common example values:
 - source run id:
   `deploy-run-2026-04-16-abc123`
 - target exception ref:
-  `//projects/deployments/pleomino-shared:retire_old_prod_target`
+  `//projects/deployments/<package>:<target-exception>`
+
+No default Pleomino target-transition exception is checked in today. Use a
+reviewed `deployment_target_exception(...)` label that matches the ownership
+change you are making.
 
 If a run returns `pending_approval`, do not submit it again. Approve the
 existing run using the same `deploy_run_id`.

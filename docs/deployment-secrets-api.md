@@ -127,10 +127,9 @@ Common example values:
   Use when a person is intentionally removing a preview.
 - `--cleanup-reason ttl_expired`
   Use when a preview is being removed because its lifetime ended.
-- `--target-exception-ref //projects/deployments/pleomino-shared:retire_old_prod_target`
-  Example of a checked-in exception object for target retirement.
-- `--target-exception-ref //projects/deployments/pleomino-shared:migrate_prod_pages_target`
-  Example of a checked-in exception object for target migration.
+- `--target-exception-ref //projects/deployments/<package>:<target-exception>`
+  Use a reviewed checked-in `deployment_target_exception(...)` label for the
+  target retirement or migration you are performing.
 
 Deployment-service routing:
 
