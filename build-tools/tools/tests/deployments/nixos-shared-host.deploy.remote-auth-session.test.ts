@@ -50,7 +50,11 @@ async function completePendingAuthSession(controlPlaneUrl: string, recordsRoot: 
 test("remote profile deploy creates a service-owned auth session for interactive protected runs", async () => {
   await runInTemp("nixos-shared-host-remote-auth-session", async (tmp, $) => {
     const oidc = await startFakeOidcServer({
-      claims: { sub: "human-1", preferred_username: "Ada", groups: ["deployers"] },
+      claims: {
+        sub: "human-1",
+        preferred_username: "Ada",
+        groups: ["deployers-pleomino-dev", "deploy-submitters-pleomino-dev"],
+      },
     });
     const {
       deployment,
@@ -75,7 +79,7 @@ test("remote profile deploy creates a service-owned auth session for interactive
         deploymentEnvironment: "mini",
         preferredCredentialSource: "interactive_pkce" as const,
         requiredHumanClaim: "groups",
-        requiredHumanClaimValue: "deployers",
+        requiredHumanClaimValue: "deployers-pleomino-dev",
         pkceCallback: {
           mode: "public_host",
           externalScheme: "https",

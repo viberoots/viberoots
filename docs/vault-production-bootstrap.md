@@ -975,8 +975,28 @@ One practical Keycloak admin-console path is:
    `kiltyj/bucknix-fresh`, JSON type `String`, and access token inclusion
    enabled.
 10. Create `deployment-cli` as a public client, require PKCE, allow loopback
-    redirect URIs for the CLI callback, and add a group/role mapper such as
-    `groups = ["deployers"]` for reviewed human deployers.
+    redirect URIs for the CLI callback, and add a `groups` mapper for reviewed
+    deploy auth sessions.
+
+Reviewed Keycloak group conventions for claim-to-grant mapping:
+
+- Keep `required_human_claim = "groups"` and set
+  `required_human_claim_value = "deployers-<project>-<env>"` as the baseline
+  human gate for the deployment being accessed.
+- Human deployment-scoped grants come from:
+  - `deploy-submitters-<project>-<env>`
+  - `deploy-approvers-<project>-<env>`
+  - `deploy-admission-reporters-<project>-<env>`
+- Automation grants stay broader and are bound to a reviewed automation
+  principal id such as `jenkins`:
+  - `deploy-automation-<principal>-submitters-project-<project>`
+  - `deploy-automation-<principal>-submitters-<env>`
+  - `deploy-automation-<principal>-approvers-<env>`
+  - `deploy-automation-<principal>-admission-reporters-project-<project>`
+  - `deploy-automation-<principal>-admission-reporters-all-deployments`
+- The deploy control plane derives a deterministic union of every reviewed grant
+  that matches the deployment context; malformed or unrelated groups do not
+  create implicit authorization.
 
 The `repository` claim should match the current repository identity used by the
 CI or deployment runner. If the repository is renamed, update that mapper and
@@ -1233,9 +1253,16 @@ vault_runtime = {
     "pkce_callback_bind_path": "/oidc/callback",
     "preferred_credential_source": "interactive_pkce",
     "required_human_claim": "groups",
-    "required_human_claim_value": "deployers",
+    "required_human_claim_value": "deployers-pleomino-dev",
 }
 ```
+
+The `required_human_claim_value` above is the baseline human gate. The deploy
+auth session may still derive multiple reviewed grants from the same token, for
+example `deploy-submitters-pleomino-dev` plus
+`deploy-admission-reporters-pleomino-dev`, or automation groups such as
+`deploy-automation-jenkins-submitters-dev` and
+`deploy-automation-jenkins-admission-reporters-all-deployments`.
 
 Credential-source choices:
 

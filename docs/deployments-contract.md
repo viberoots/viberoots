@@ -208,6 +208,7 @@ Current reviewed central control-plane implementation note:
 - Protected/shared routine authorization must preserve independent `submitter`, `approver`, and `admission_reporter` capabilities; `bootstrap` remains limited to deployment-system-owned bootstrap flows and is not routine deploy authority.
 - Reviewed `submitter` and `approver` grants may use `deployment_id`, `project`, or `environment_stage` scope. Reviewed `admission_reporter` grants may use `deployment_id`, `project`, `environment_stage`, or closed `admission_domain` values such as `all_deployments`.
 - Canonical `project`, `environment_stage`, and `admission_domain` scope values must come from reviewed repo-owned deployment metadata and closed reviewed contract values, not free-form IdP naming.
+- OIDC sessions may carry multiple reviewed grants at once, and repository / environment bound claims remain mandatory so claim-to-grant mapping stays tied to the reviewed deployment context.
 - Authorization snapshots and status payloads must preserve the full normalized grant set used for audit; matching one role for one action must not collapse sibling grants out of the persisted record.
 - Permission evaluation must be least-privilege and resource-scoped by default; CLI, API, and UI authorization decisions must use the same action vocabulary and scope semantics.
 

@@ -1,12 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { providerTargetIdentityFor, type DeploymentTarget } from "./contract.ts";
 import type { JwtClaims } from "./deploy-vault-jwt-claims.ts";
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
-import type {
-  DeploymentControlPlaneAuthorization,
-  DeploymentControlPlaneGrant,
-  DeploymentControlPlaneRole,
-} from "./deployment-control-plane-contract.ts";
+import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract.ts";
+import { oidcGrantsForDeployment } from "./deployment-auth-session-grants.ts";
+import type { DeploymentTarget } from "./contract.ts";
 import { grantsFor } from "./deployment-control-plane-authz.ts";
 
 function claimText(claim: unknown): string {
@@ -26,36 +23,12 @@ export function principalFromOidcClaims(claims: JwtClaims): DeploymentPrincipal 
   };
 }
 
-function roleForOperation(operationKind: string): DeploymentControlPlaneRole {
-  if (operationKind === "approve") return "approver";
-  if (["cancel", "resume", "abort"].includes(operationKind)) return "operator";
-  return operationKind === "explicit_removal" ||
-    operationKind === "preview_cleanup" ||
-    operationKind === "retire_target" ||
-    operationKind === "migrate_target"
-    ? "operator"
-    : "submitter";
-}
-
-function grantFor(
-  deployment: DeploymentTarget,
-  operationKind: string,
-): DeploymentControlPlaneGrant {
-  const role = roleForOperation(operationKind);
-  return role === "operator"
-    ? {
-        role,
-        scope: { kind: "provider_target_identity", value: providerTargetIdentityFor(deployment) },
-      }
-    : { role, scope: { kind: "deployment_id", value: deployment.deploymentId } };
-}
-
 export function authorizationForOidcPrincipal(opts: {
   deployment: DeploymentTarget;
-  operationKind: string;
   principal: DeploymentPrincipal;
+  claims: JwtClaims;
 }): DeploymentControlPlaneAuthorization {
-  return grantsFor(opts.principal, [grantFor(opts.deployment, opts.operationKind)]);
+  return grantsFor(opts.principal, oidcGrantsForDeployment(opts));
 }
 
 export function assertNonceIfPresent(claims: JwtClaims, nonce: string) {

@@ -23,6 +23,19 @@ These are all in-policy reviewed examples when grants use the same canonical rol
 - CI submitter + human approver
 - CI submitter + CI approver in lower-risk scopes
 
+Concrete policy examples:
+
+- human-only production approval:
+  `deploy-submitters-pleomino-prod` submits while `deploy-approvers-pleomino-prod` approves
+- CI dev auto-submit:
+  `deploy-automation-jenkins-submitters-dev` grants `submitter` for reviewed `dev` deployments
+- CI global evidence reporting:
+  `deploy-automation-jenkins-admission-reporters-all-deployments` grants
+  `admission_reporter` for the closed `all_deployments` domain
+- CI lower-environment auto-approval:
+  `deploy-automation-jenkins-approvers-dev` grants `approver` for reviewed
+  lower-risk `dev` deploys
+
 ## 1. Protected/Shared Normal Deploy
 
 Situation:

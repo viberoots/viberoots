@@ -172,8 +172,8 @@ export async function handleDeploymentAuthCallback(opts: {
     const principal = principalFromOidcClaims(claims);
     const authorization = authorizationForOidcPrincipal({
       deployment: consumed.deployment,
-      operationKind: consumed.operationKind,
       principal,
+      claims,
     });
     const authenticated = {
       ...consumed,

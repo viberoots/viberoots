@@ -499,6 +499,16 @@ Required worker-side secret-source prep after PR-79 and later:
   service submissions reject client-supplied `requestedBy` and authorization
   grants
 
+Deploy auth sessions derive multiple grants from reviewed OIDC claims instead
+of synthesizing one grant from the requested operation. Human deployment access
+uses `deployers-<project>-<env>` as the baseline group gate, then derives
+deployment-scoped grants from `deploy-submitters-<project>-<env>`,
+`deploy-approvers-<project>-<env>`, and
+`deploy-admission-reporters-<project>-<env>`. Reviewed automation principals
+such as Jenkins may also derive broader scoped grants from groups like
+`deploy-automation-<principal>-submitters-<env>` and
+`deploy-automation-<principal>-admission-reporters-all-deployments`.
+
 When you check status later, use the service and the IDs it returns:
 `submissionId` and `deployRunId`.
 
