@@ -4,12 +4,14 @@ import {
   DEPLOYMENT_CONTROL_PLANE_STATUS_SCHEMA,
   DEPLOYMENT_CONTROL_PLANE_SUBMIT_RESPONSE_SCHEMA,
   type DeploymentControlPlaneApprovalSummary,
+  type DeploymentControlPlaneAuthorization,
   type DeploymentControlPlaneResponseBase,
   type DeploymentControlPlaneRunAction,
   type DeploymentControlPlaneRunActionResponse,
   type DeploymentControlPlaneStatus,
   type DeploymentControlPlaneSubmitResponse,
 } from "./deployment-control-plane-contract.ts";
+import { normalizeAuthorizationSnapshot } from "./deployment-control-plane-authz.ts";
 
 type SubmissionLike = DeploymentControlPlaneResponseBase;
 
@@ -33,6 +35,12 @@ function toPublicApprovalSummary(
   };
 }
 
+function toPublicAuthorizationSnapshot(
+  authorization: DeploymentControlPlaneAuthorization,
+): DeploymentControlPlaneAuthorization {
+  return normalizeAuthorizationSnapshot(authorization);
+}
+
 function toStatusBase(submission: SubmissionLike): DeploymentControlPlaneResponseBase {
   return {
     submissionId: submission.submissionId,
@@ -52,12 +60,28 @@ function toStatusBase(submission: SubmissionLike): DeploymentControlPlaneRespons
     dedupe: submission.dedupe,
     ...(submission.requestedBy ? { requestedBy: submission.requestedBy } : {}),
     ...(submission.authorization ? { authorization: submission.authorization } : {}),
+    ...(submission.authorizationSnapshot
+      ? { authorizationSnapshot: toPublicAuthorizationSnapshot(submission.authorizationSnapshot) }
+      : {}),
     ...(submission.rejectionCode ? { rejectionCode: submission.rejectionCode } : {}),
     ...(submission.pendingReasonCode ? { pendingReasonCode: submission.pendingReasonCode } : {}),
     ...(submission.approval ? { approval: toPublicApprovalSummary(submission.approval) } : {}),
     ...(submission.artifact ? { artifact: submission.artifact } : {}),
     ...(submission.artifactBinding ? { artifactBinding: submission.artifactBinding } : {}),
-    ...(submission.latestAction ? { latestAction: submission.latestAction } : {}),
+    ...(submission.latestAction
+      ? {
+          latestAction: {
+            ...submission.latestAction,
+            ...(submission.latestAction.authorizationSnapshot
+              ? {
+                  authorizationSnapshot: toPublicAuthorizationSnapshot(
+                    submission.latestAction.authorizationSnapshot,
+                  ),
+                }
+              : {}),
+          },
+        }
+      : {}),
   };
 }
 

@@ -12,6 +12,7 @@ import {
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import type {
+  DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneRequestDedupe,
 } from "./deployment-control-plane-contract.ts";
@@ -83,6 +84,7 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
   dedupe: DeploymentControlPlaneRequestDedupe;
   requestedBy?: NixosSharedHostControlPlaneSubmission["requestedBy"];
   authorization?: DeploymentControlPlaneAuthorizationDecision;
+  authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   deployBatchId?: string;
   artifactDir?: string;
   artifactDirsByComponentId?: Record<string, string>;
@@ -157,6 +159,7 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
       dedupe: opts.dedupe,
       requestedBy,
       authorization: opts.authorization,
+      authorizationSnapshot: opts.authorizationSnapshot,
     });
     if (!submission) throw error;
     await writeBackendSubmissionDoc(opts.backend, submission, refs);
@@ -168,6 +171,7 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
     dedupe: opts.dedupe,
     requestedBy,
     authorization: opts.authorization,
+    authorizationSnapshot: opts.authorizationSnapshot,
     ...(snapshot.progressiveRollout ? { progressiveRollout: snapshot.progressiveRollout } : {}),
     deployRunId,
   });

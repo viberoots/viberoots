@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import {
+  authorizeControlPlaneAdmissionReport,
   authorizeControlPlaneBootstrap,
   authorizeControlPlaneRunAction,
   authorizeControlPlaneSubmit,
@@ -77,6 +78,88 @@ test("approve run actions require approver-scoped authority", () => {
             scope: { kind: "deployment_id", value: `${deployment.deploymentId}-other` },
           },
         ]),
+      }),
+    /not authorized/,
+  );
+});
+
+test("project and environment scopes authorize only matching deployment families and stages", () => {
+  const deployment = cloudflarePagesDeploymentFixture();
+  const projectScoped = grantsFor({ principalId: "app:ci-submit" }, [
+    { role: "submitter", scope: { kind: "project", value: "projects/deployments/pleomino" } },
+  ]);
+  const projectDecision = authorizeControlPlaneSubmit({
+    deployment,
+    operationKind: "deploy",
+    authorization: projectScoped,
+  });
+  assert.equal(projectDecision.role, "submitter");
+  assert.equal(projectDecision.scope.kind, "project");
+
+  const environmentScoped = grantsFor({ principalId: "user:reviewer" }, [
+    { role: "approver", scope: { kind: "environment_stage", value: "staging" } },
+  ]);
+  const environmentDecision = authorizeControlPlaneRunAction({
+    deployment,
+    action: "approve",
+    authorization: environmentScoped,
+  });
+  assert.equal(environmentDecision.role, "approver");
+  assert.equal(environmentDecision.scope.kind, "environment_stage");
+
+  assert.throws(
+    () =>
+      authorizeControlPlaneSubmit({
+        deployment,
+        operationKind: "deploy",
+        authorization: grantsFor({ principalId: "app:wrong-project" }, [
+          { role: "submitter", scope: { kind: "project", value: "projects/deployments/other" } },
+        ]),
+      }),
+    /not authorized/,
+  );
+  assert.throws(
+    () =>
+      authorizeControlPlaneRunAction({
+        deployment,
+        action: "approve",
+        authorization: grantsFor({ principalId: "user:wrong-stage" }, [
+          { role: "approver", scope: { kind: "environment_stage", value: "prod" } },
+        ]),
+      }),
+    /not authorized/,
+  );
+});
+
+test("admission reporters stay distinct from submitters and approvers", () => {
+  const deployment = cloudflarePagesDeploymentFixture();
+  const reporter = grantsFor({ principalId: "app:deploy-bot" }, [
+    {
+      role: "admission_reporter",
+      scope: { kind: "admission_domain", value: "all_deployments" },
+    },
+  ]);
+  const decision = authorizeControlPlaneAdmissionReport({
+    deployment,
+    authorization: reporter,
+  });
+  assert.equal(decision.role, "admission_reporter");
+  assert.equal(decision.scope.kind, "admission_domain");
+  assert.throws(
+    () =>
+      authorizeControlPlaneSubmit({
+        deployment,
+        operationKind: "deploy",
+        authorization: reporter,
+      }),
+    /not authorized/,
+  );
+  assert.throws(
+    () =>
+      authorizeControlPlaneRunAction({
+        deployment,
+        action: "approve",
+        authorization: reporter,
       }),
     /not authorized/,
   );

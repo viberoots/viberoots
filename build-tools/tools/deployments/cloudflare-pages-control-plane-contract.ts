@@ -8,6 +8,7 @@ import type {
 import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
 import type {
   DeploymentControlPlaneAuthorizationDecision,
+  DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneArtifactStatus,
   DeploymentControlPlaneLifecycleState,
   DeploymentControlPlaneRequestDedupe,
@@ -118,6 +119,7 @@ export type CloudflarePagesControlPlaneSubmission = {
   finalOutcome?: string;
   requestedBy?: DeploymentPrincipal;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
+  authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   rejectionCode?: DeploymentControlPlaneSubmitRejectionCode;
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
   artifact?: DeploymentControlPlaneArtifactStatus;
@@ -127,6 +129,7 @@ export type CloudflarePagesControlPlaneSubmission = {
     submittedAt: string;
     dedupe: DeploymentControlPlaneRequestDedupe;
     lifecycleState: DeploymentControlPlaneLifecycleState;
+    authorizationSnapshot?: DeploymentControlPlaneAuthorization;
     rejectionCode?: DeploymentControlPlaneSubmitRejectionCode | "not_resumable";
   };
   admission: CloudflarePagesControlPlaneAdmission;

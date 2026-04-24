@@ -13,6 +13,7 @@ export function createWaitTerminalSubmission(
     dedupe: NixosSharedHostControlPlaneSubmission["dedupe"];
     requestedBy?: NixosSharedHostControlPlaneSubmission["requestedBy"];
     authorization?: NixosSharedHostControlPlaneSubmission["authorization"];
+    authorizationSnapshot?: NixosSharedHostControlPlaneSubmission["authorizationSnapshot"];
     deployRunId?: string;
   },
 ): NixosSharedHostControlPlaneSubmission {
@@ -24,6 +25,7 @@ export function createWaitTerminalSubmission(
     dedupe: opts.dedupe,
     requestedBy: opts.requestedBy,
     authorization: opts.authorization,
+    authorizationSnapshot: opts.authorizationSnapshot,
     ...(snapshot.progressiveRollout ? { progressiveRollout: snapshot.progressiveRollout } : {}),
     ...(opts.deployRunId ? { deployRunId: opts.deployRunId } : {}),
   });
@@ -36,6 +38,7 @@ export function createLockConflictSubmission(
     dedupe: NixosSharedHostControlPlaneSubmission["dedupe"];
     requestedBy?: NixosSharedHostControlPlaneSubmission["requestedBy"];
     authorization?: NixosSharedHostControlPlaneSubmission["authorization"];
+    authorizationSnapshot?: NixosSharedHostControlPlaneSubmission["authorizationSnapshot"];
     deployRunId?: string;
   },
 ): NixosSharedHostControlPlaneSubmission {
@@ -46,6 +49,7 @@ export function createLockConflictSubmission(
     dedupe: opts.dedupe,
     requestedBy: opts.requestedBy,
     authorization: opts.authorization,
+    authorizationSnapshot: opts.authorizationSnapshot,
     rejectionCode: "lock_conflict",
     ...(snapshot.progressiveRollout ? { progressiveRollout: snapshot.progressiveRollout } : {}),
     ...(opts.deployRunId ? { deployRunId: opts.deployRunId } : {}),

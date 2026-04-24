@@ -4071,6 +4071,8 @@ Minimum protected/shared RBAC model:
     - may create normal deploy requests, preview-mode deploy requests, retry requests, or rollback requests within the policies already attached to a deployment
   - `approver`
     - may grant required human approval where the referenced admission policy requires it
+  - `admission_reporter`
+    - may report reviewed admission evidence such as CI checks without implicitly gaining submit or approval authority
   - `operator`
     - may execute or administer routine control-plane operations such as cancelling queued runs, inspecting run state, or invoking documented preview cleanup
   - `break_glass`
@@ -4084,9 +4086,10 @@ Minimum protected/shared RBAC scope model:
 
 - role names alone are insufficient; authorization must also be scoped to explicit repo-owned deployment boundaries
 - `submitter` permission must be granted per deployment id by default
-  - optional tighter constraints such as environment-stage restriction may narrow that scope further
+  - reviewed `project` or `environment_stage` scopes may broaden or narrow that authority intentionally
 - `approver` permission must be granted per deployment id by default
-  - optional tighter constraints such as protection-class or environment-stage restriction may narrow that scope further
+  - reviewed `project` or `environment_stage` scopes may broaden or narrow that authority intentionally
+- `admission_reporter` permission may be granted per deployment id, reviewed `project`, reviewed `environment_stage`, or a closed reviewed `admission_domain` such as `all_deployments`
 - `operator` permission must be granted per canonical provider-target identity or reviewed lane scope by default
   - it must not be repo-wide by default
   - a reviewed lane-scoped grant is appropriate when one operational team intentionally owns routine control-plane actions for a coordinated deployment family
@@ -4096,6 +4099,11 @@ Minimum protected/shared RBAC scope model:
 - this mixed-scope model is intentional:
   - release authority normally follows deployment ownership
   - operational and emergency authority normally follow live-target or lane blast radius
+- canonical scope values must come from reviewed deployment metadata:
+  - `deployment_id` from extracted deployment metadata
+  - `project` from reviewed deployment ownership family such as `projects/deployments/pleomino`
+  - `environment_stage` from explicit deployment metadata such as `dev`, `staging`, or `prod`
+  - `admission_domain` from closed reviewed values such as `all_deployments`
 - if one implementation stores grants by deployment id and another stores them by target identity, both must still evaluate to these same effective minimum scopes
 
 Approval semantics for protected/shared runs:

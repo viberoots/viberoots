@@ -164,6 +164,7 @@ export async function handleControlPlaneSubmit(
             },
             requestedBy: boundary.requestedBy,
             ...(authorization ? { authorization } : {}),
+            ...(boundary.authorization ? { authorizationSnapshot: boundary.authorization } : {}),
             ...(resolvedRequest.deployBatchId
               ? { deployBatchId: resolvedRequest.deployBatchId }
               : {}),
@@ -222,6 +223,7 @@ export async function handleControlPlaneSubmit(
                 : {}),
             },
             ...(authorization ? { authorization } : {}),
+            ...(boundary.authorization ? { authorizationSnapshot: boundary.authorization } : {}),
           });
     await enqueueBackendSubmission(
       opts.backend,

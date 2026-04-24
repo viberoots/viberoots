@@ -55,6 +55,9 @@ export async function handleControlPlaneRunActionService(
       action: request.action,
       idempotencyKey: request.idempotencyKey || request.actionId,
       ...(boundary.requestedBy ? { requestedBy: boundary.requestedBy } : {}),
+      ...(boundary.authorizationSnapshot
+        ? { authorizationSnapshot: boundary.authorizationSnapshot }
+        : {}),
       ...(request.approval ? { approval: request.approval } : {}),
     });
     await persistMaterializedSubmission({

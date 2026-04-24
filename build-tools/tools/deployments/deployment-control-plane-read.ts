@@ -1,6 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract.ts";
+import type {
+  DeploymentControlPlaneAuthorization,
+  DeploymentControlPlaneAuthorizationDecision,
+} from "./deployment-control-plane-contract.ts";
 import { statusFromSubmission } from "./deployment-control-plane-status.ts";
 import {
   readBackendSubmissionByDeployRunId,
@@ -38,6 +41,7 @@ type SubmissionRecord = {
   finalOutcome?: string;
   requestedBy?: { principalId: string; displayName?: string };
   authorization?: DeploymentControlPlaneAuthorizationDecision;
+  authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   rejectionCode?:
     | "lock_conflict"
     | "approval_required"
@@ -78,6 +82,7 @@ type SubmissionRecord = {
       | "cancelling"
       | "finished"
       | "cancelled";
+    authorizationSnapshot?: DeploymentControlPlaneAuthorization;
     rejectionCode?:
       | "lock_conflict"
       | "approval_required"

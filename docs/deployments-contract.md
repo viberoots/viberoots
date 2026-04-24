@@ -205,6 +205,10 @@ Current reviewed central control-plane implementation note:
 - Bootstrap mutation must use explicit bootstrap-scoped authorization, exact immutable admitted artifacts, explicit target-identity proof, and explicit ownership proof; it must fail closed when any proof is absent or mismatched.
 - Bootstrap records may start as pending reconciliation evidence, but once the normal control plane is available they must be ingested back into authoritative records and routine updates must return to the normal control-plane path.
 - Protected/shared authorization must use one explicit hierarchical scope model with repo-wide administrative scope, lane scope, deployment scope, and incident-bounded break-glass scope.
+- Protected/shared routine authorization must preserve independent `submitter`, `approver`, and `admission_reporter` capabilities; `bootstrap` remains limited to deployment-system-owned bootstrap flows and is not routine deploy authority.
+- Reviewed `submitter` and `approver` grants may use `deployment_id`, `project`, or `environment_stage` scope. Reviewed `admission_reporter` grants may use `deployment_id`, `project`, `environment_stage`, or closed `admission_domain` values such as `all_deployments`.
+- Canonical `project`, `environment_stage`, and `admission_domain` scope values must come from reviewed repo-owned deployment metadata and closed reviewed contract values, not free-form IdP naming.
+- Authorization snapshots and status payloads must preserve the full normalized grant set used for audit; matching one role for one action must not collapse sibling grants out of the persisted record.
 - Permission evaluation must be least-privilege and resource-scoped by default; CLI, API, and UI authorization decisions must use the same action vocabulary and scope semantics.
 
 ## Required Review Questions

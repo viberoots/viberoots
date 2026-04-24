@@ -15,7 +15,10 @@ import { createCloudflarePagesControlPlaneSubmission } from "./cloudflare-pages-
 import type { CloudflarePagesControlPlaneSubmitRequest } from "./cloudflare-pages-control-plane-api-contract.ts";
 import { type ResolvedCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit.ts";
 import { createCloudflarePagesDeployRunId } from "./cloudflare-pages-records.ts";
-import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract.ts";
+import type {
+  DeploymentControlPlaneAuthorization,
+  DeploymentControlPlaneAuthorizationDecision,
+} from "./deployment-control-plane-contract.ts";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
 import {
@@ -51,6 +54,7 @@ function admissionFailureSubmission(opts: {
   dedupe: RequestDedupe;
   requestedBy: ReturnType<typeof requestedByFor>;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
+  authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   error: DeploymentAdmissionError;
 }) {
   const pendingApproval =
@@ -74,6 +78,7 @@ function admissionFailureSubmission(opts: {
       dedupe: opts.dedupe,
       requestedBy: opts.requestedBy,
       ...(opts.authorization ? { authorization: opts.authorization } : {}),
+      ...(opts.authorizationSnapshot ? { authorizationSnapshot: opts.authorizationSnapshot } : {}),
       deployRunId: createCloudflarePagesDeployRunId(),
     },
   );
@@ -110,6 +115,7 @@ export async function prepareBackendCloudflarePagesControlPlaneRun(opts: {
   resolved: ResolvedCloudflarePagesServiceSubmitRequest;
   dedupe: RequestDedupe;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
+  authorizationSnapshot?: DeploymentControlPlaneAuthorization;
 }) {
   const snapshot = await buildCloudflarePagesBackendSnapshot(opts.resolved, {
     workspaceRoot: opts.workspaceRoot,
@@ -136,6 +142,9 @@ export async function prepareBackendCloudflarePagesControlPlaneRun(opts: {
         dedupe: opts.dedupe,
         requestedBy,
         ...(opts.authorization ? { authorization: opts.authorization } : {}),
+        ...(opts.authorizationSnapshot
+          ? { authorizationSnapshot: opts.authorizationSnapshot }
+          : {}),
         error,
       });
       await writeBackendSubmissionDoc(opts.backend, submission, refs);
@@ -161,6 +170,9 @@ export async function prepareBackendCloudflarePagesControlPlaneRun(opts: {
         dedupe: opts.dedupe,
         requestedBy,
         ...(opts.authorization ? { authorization: opts.authorization } : {}),
+        ...(opts.authorizationSnapshot
+          ? { authorizationSnapshot: opts.authorizationSnapshot }
+          : {}),
         ...(deployRunIdFor(snapshot) ? { deployRunId: deployRunIdFor(snapshot) } : {}),
       },
     ),

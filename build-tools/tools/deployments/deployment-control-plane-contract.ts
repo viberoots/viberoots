@@ -54,15 +54,21 @@ export type DeploymentControlPlaneRunActionRejectionCode =
   | "no_longer_admitted"
   | "not_paused";
 
+export type DeploymentControlPlaneAdmissionDomain = "all_deployments";
+
 export type DeploymentControlPlaneRole =
   | "submitter"
   | "approver"
+  | "admission_reporter"
   | "operator"
   | "break_glass"
   | "bootstrap";
 
 export type DeploymentControlPlaneScope =
   | { kind: "deployment_id"; value: string }
+  | { kind: "project"; value: string }
+  | { kind: "environment_stage"; value: string }
+  | { kind: "admission_domain"; value: DeploymentControlPlaneAdmissionDomain }
   | { kind: "provider_target_identity"; value: string }
   | { kind: "lane_policy"; value: string }
   | { kind: "break_glass_incident"; value: string }
@@ -184,6 +190,7 @@ export type DeploymentControlPlaneResponseBase = {
   dedupe: DeploymentControlPlaneRequestDedupe;
   requestedBy?: DeploymentPrincipal;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
+  authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   rejectionCode?:
     | DeploymentControlPlaneSubmitRejectionCode
     | DeploymentControlPlaneRunActionRejectionCode;
@@ -198,6 +205,7 @@ export type DeploymentControlPlaneResponseBase = {
     dedupe: DeploymentControlPlaneRequestDedupe;
     lifecycleState: DeploymentControlPlaneLifecycleState;
     requestedBy?: DeploymentPrincipal;
+    authorizationSnapshot?: DeploymentControlPlaneAuthorization;
     rejectionCode?: DeploymentControlPlaneRunActionRejectionCode;
   };
 };

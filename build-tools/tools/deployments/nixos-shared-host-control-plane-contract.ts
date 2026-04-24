@@ -9,6 +9,7 @@ import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-prov
 import type {
   DeploymentControlPlaneApprovalSummary,
   DeploymentControlPlaneArtifactStatus,
+  DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneLifecycleState,
   DeploymentControlPlaneRequestDedupe,
@@ -115,6 +116,7 @@ export type NixosSharedHostControlPlaneSubmission = {
   progressiveRollout?: NixosSharedHostProgressiveRollout;
   requestedBy?: DeploymentPrincipal;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
+  authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   rejectionCode?: DeploymentControlPlaneSubmitRejectionCode;
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
   approval?: DeploymentControlPlaneApprovalSummary;
@@ -127,6 +129,7 @@ export type NixosSharedHostControlPlaneSubmission = {
     dedupe: DeploymentControlPlaneRequestDedupe;
     lifecycleState: DeploymentControlPlaneLifecycleState;
     requestedBy?: DeploymentPrincipal;
+    authorizationSnapshot?: DeploymentControlPlaneAuthorization;
     rejectionCode?: DeploymentControlPlaneSubmitRejectionCode | "not_resumable" | "not_paused";
   };
   execution?: {

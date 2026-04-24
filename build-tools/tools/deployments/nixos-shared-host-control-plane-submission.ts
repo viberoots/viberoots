@@ -21,6 +21,7 @@ export function createNixosSharedHostControlPlaneSubmission(
     progressiveRollout?: NixosSharedHostControlPlaneSubmission["progressiveRollout"];
     requestedBy?: NixosSharedHostControlPlaneSubmission["requestedBy"];
     authorization?: NixosSharedHostControlPlaneSubmission["authorization"];
+    authorizationSnapshot?: NixosSharedHostControlPlaneSubmission["authorizationSnapshot"];
     rejectionCode?: NixosSharedHostControlPlaneSubmission["rejectionCode"];
     pendingReasonCode?: NixosSharedHostControlPlaneSubmission["pendingReasonCode"];
     approval?: NixosSharedHostControlPlaneSubmission["approval"];
@@ -53,6 +54,7 @@ export function createNixosSharedHostControlPlaneSubmission(
     ...(opts.progressiveRollout ? { progressiveRollout: opts.progressiveRollout } : {}),
     ...(opts.requestedBy ? { requestedBy: opts.requestedBy } : {}),
     ...(opts.authorization ? { authorization: opts.authorization } : {}),
+    ...(opts.authorizationSnapshot ? { authorizationSnapshot: opts.authorizationSnapshot } : {}),
     ...(opts.rejectionCode ? { rejectionCode: opts.rejectionCode } : {}),
     ...(opts.pendingReasonCode ? { pendingReasonCode: opts.pendingReasonCode } : {}),
     ...(opts.approval ? { approval: opts.approval } : {}),

@@ -29,6 +29,7 @@ import {
   authorizationForOidcPrincipal,
   principalFromOidcClaims,
 } from "./deployment-auth-session-principal.ts";
+import { normalizeAuthorizationSnapshot } from "./deployment-control-plane-authz.ts";
 
 const DEFAULT_SESSION_MS = 5 * 60 * 1000;
 
@@ -69,7 +70,9 @@ export function publicDeploymentAuthSessionStatus(session: DeploymentAuthSession
     operationKind: session.operationKind,
     credentialSource: session.credentialSource,
     ...(session.principal ? { principal: session.principal } : {}),
-    ...(session.authorization ? { authorization: session.authorization } : {}),
+    ...(session.authorization
+      ? { authorization: normalizeAuthorizationSnapshot(session.authorization) }
+      : {}),
     ...(session.failure ? { failure: redactDeploymentAuthText(session.failure) } : {}),
   };
 }

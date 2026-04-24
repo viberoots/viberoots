@@ -91,10 +91,11 @@ export async function resolveRunActionAuthorizationBoundary(opts: {
   requestedBy?: DeploymentControlPlaneAuthorization["requestedBy"];
 }): Promise<{
   decision?: DeploymentControlPlaneAuthorizationDecision;
+  authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   requestedBy?: DeploymentControlPlaneAuthorization["requestedBy"];
 }> {
   if (!requiresServerDerivedAuthorization(opts.deployment)) {
-    const authorization = opts.authorization
+    const decision = opts.authorization
       ? authorizeControlPlaneRunAction({
           deployment: opts.deployment,
           action: opts.action,
@@ -102,7 +103,8 @@ export async function resolveRunActionAuthorizationBoundary(opts: {
         })
       : undefined;
     return {
-      decision: authorization,
+      decision,
+      authorizationSnapshot: opts.authorization,
       requestedBy: opts.requestedBy || opts.authorization?.requestedBy,
     };
   }
@@ -122,6 +124,7 @@ export async function resolveRunActionAuthorizationBoundary(opts: {
       action: opts.action,
       authorization,
     }),
+    authorizationSnapshot: authorization,
     requestedBy: authorization.requestedBy,
   };
 }

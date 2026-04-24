@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { defaultRequestedBy, type DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 import {
   DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA,
+  type DeploymentControlPlaneAuthorization,
   type DeploymentControlPlaneApprovalGrantRequest,
   type DeploymentControlPlaneRunAction,
 } from "./deployment-control-plane-contract.ts";
@@ -79,6 +80,7 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
   action: DeploymentControlPlaneRunAction;
   idempotencyKey?: string;
   requestedBy?: DeploymentPrincipal;
+  authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   approval?: DeploymentControlPlaneApprovalGrantRequest;
 }) {
   const submission = await readControlPlaneJson<SubmissionRecord>(opts.submissionPath);
@@ -117,6 +119,9 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
             ...status.latestAction!.dedupe,
             mode: "reused",
           },
+          ...(opts.authorizationSnapshot
+            ? { authorizationSnapshot: opts.authorizationSnapshot }
+            : {}),
         },
       },
       actionId,
@@ -141,6 +146,7 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
         requestFingerprint,
         ...(opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : {}),
       },
+      ...(opts.authorizationSnapshot ? { authorizationSnapshot: opts.authorizationSnapshot } : {}),
       ...(opts.approval ? { approval: opts.approval } : {}),
     });
     await writeControlPlaneJson(opts.submissionPath, approved);
@@ -161,6 +167,7 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
         requestFingerprint,
         ...(opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : {}),
       },
+      ...(opts.authorizationSnapshot ? { authorizationSnapshot: opts.authorizationSnapshot } : {}),
     });
     const status = statusFromSubmission(
       await readControlPlaneJson<SubmissionRecord>(opts.submissionPath),
@@ -183,6 +190,7 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
       },
       lifecycleState: next.lifecycleState,
       requestedBy,
+      ...(opts.authorizationSnapshot ? { authorizationSnapshot: opts.authorizationSnapshot } : {}),
       ...(next.rejectionCode ? { rejectionCode: next.rejectionCode } : {}),
     },
     ...(next.lifecycleState === "cancelling"

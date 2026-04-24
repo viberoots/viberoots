@@ -14,6 +14,15 @@ Operator-command note:
   when you need the reviewed day-to-day operator path before the scenario-level
   policy detail
 
+## Workflow-Separated Authorization Shapes
+
+These are all in-policy reviewed examples when grants use the same canonical role and scope model:
+
+- human submitter + human approver
+- CI reporter + human submitter
+- CI submitter + human approver
+- CI submitter + CI approver in lower-risk scopes
+
 ## 1. Protected/Shared Normal Deploy
 
 Situation:

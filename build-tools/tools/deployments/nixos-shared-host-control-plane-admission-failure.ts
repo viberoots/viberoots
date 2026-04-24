@@ -4,6 +4,7 @@ import type {
   NixosSharedHostControlPlaneSubmission,
 } from "./nixos-shared-host-control-plane-contract.ts";
 import type {
+  DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneRequestDedupe,
 } from "./deployment-control-plane-contract.ts";
@@ -19,6 +20,7 @@ export function createAdmissionFailureSubmission(opts: {
   dedupe: DeploymentControlPlaneRequestDedupe;
   requestedBy?: NixosSharedHostControlPlaneSubmission["requestedBy"];
   authorization?: DeploymentControlPlaneAuthorizationDecision;
+  authorizationSnapshot?: DeploymentControlPlaneAuthorization;
 }) {
   if (!(opts.error instanceof DeploymentAdmissionError)) return undefined;
   const pending =
@@ -40,6 +42,7 @@ export function createAdmissionFailureSubmission(opts: {
       : {}),
     requestedBy: opts.requestedBy,
     authorization: opts.authorization,
+    authorizationSnapshot: opts.authorizationSnapshot,
     ...(pending ? { pendingReasonCode: opts.error.code } : { rejectionCode: opts.error.code }),
     ...(pending
       ? {}

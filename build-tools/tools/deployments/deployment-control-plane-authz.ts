@@ -11,6 +11,11 @@ import {
   type DeploymentControlPlaneScope,
 } from "./deployment-control-plane-contract.ts";
 import { DeploymentUnauthorizedError } from "./deployment-control-plane-errors.ts";
+import {
+  normalizeAuthorizationSnapshot,
+  projectScopeValueFor,
+} from "./deployment-control-plane-authorization-shared.ts";
+export { normalizeAuthorizationSnapshot } from "./deployment-control-plane-authorization-shared.ts";
 
 function defaultScopeForRole(
   deployment: DeploymentTarget,
@@ -19,7 +24,7 @@ function defaultScopeForRole(
   if (role === "bootstrap") {
     return { kind: "bootstrap_deployment", value: deployment.deploymentId };
   }
-  if (role === "submitter" || role === "approver") {
+  if (role === "submitter" || role === "approver" || role === "admission_reporter") {
     return { kind: "deployment_id", value: deployment.deploymentId };
   }
   return {
@@ -28,24 +33,42 @@ function defaultScopeForRole(
   };
 }
 
-function scopeMatches(deployment: DeploymentTarget, scope: DeploymentControlPlaneScope): boolean {
-  return (
-    (scope.kind === "deployment_id" && scope.value === deployment.deploymentId) ||
-    (scope.kind === "bootstrap_deployment" && scope.value === deployment.deploymentId) ||
-    (scope.kind === "provider_target_identity" &&
-      scope.value === providerTargetIdentityFor(deployment)) ||
-    (scope.kind === "lane_policy" && scope.value === deployment.lanePolicyRef)
-  );
+function scopeMatchesForRole(
+  deployment: DeploymentTarget,
+  role: DeploymentControlPlaneRole,
+  scope: DeploymentControlPlaneScope,
+): boolean {
+  if (role === "operator") {
+    return (
+      (scope.kind === "provider_target_identity" &&
+        scope.value === providerTargetIdentityFor(deployment)) ||
+      (scope.kind === "lane_policy" && scope.value === deployment.lanePolicyRef)
+    );
+  }
+  if (role === "submitter" || role === "approver" || role === "admission_reporter") {
+    return (
+      (scope.kind === "deployment_id" && scope.value === deployment.deploymentId) ||
+      (scope.kind === "project" && scope.value === projectScopeValueFor(deployment)) ||
+      (scope.kind === "environment_stage" && scope.value === deployment.environmentStage) ||
+      (role === "admission_reporter" &&
+        scope.kind === "admission_domain" &&
+        scope.value === "all_deployments")
+    );
+  }
+  if (role === "bootstrap") {
+    return scope.kind === "bootstrap_deployment" && scope.value === deployment.deploymentId;
+  }
+  return false;
 }
 
 function synthesizeAuthorization(
   deployment: DeploymentTarget,
   role: DeploymentControlPlaneRole,
 ): DeploymentControlPlaneAuthorization {
-  return {
+  return normalizeAuthorizationSnapshot({
     requestedBy: defaultRequestedBy(),
     grants: [{ role, scope: defaultScopeForRole(deployment, role) }],
-  };
+  });
 }
 
 function authorize(
@@ -53,20 +76,21 @@ function authorize(
   authorization: DeploymentControlPlaneAuthorization,
   requiredRoles: DeploymentControlPlaneRole[],
 ): DeploymentControlPlaneAuthorizationDecision {
+  const normalized = normalizeAuthorizationSnapshot(authorization);
   for (const role of requiredRoles) {
-    const grant = authorization.grants.find(
-      (entry) => entry.role === role && scopeMatches(deployment, entry.scope),
+    const grant = normalized.grants.find(
+      (entry) => entry.role === role && scopeMatchesForRole(deployment, role, entry.scope),
     );
     if (grant) {
       return {
-        principal: authorization.requestedBy,
+        principal: normalized.requestedBy,
         role: grant.role,
         scope: grant.scope,
       };
     }
   }
   throw new DeploymentUnauthorizedError(
-    `principal ${authorization.requestedBy.principalId} is not authorized for ${deployment.deploymentId}`,
+    `principal ${normalized.requestedBy.principalId} is not authorized for ${deployment.deploymentId}`,
   );
 }
 
@@ -99,7 +123,7 @@ export function authorizeControlPlaneStatus(opts: {
   return authorize(
     opts.deployment,
     opts.authorization || synthesizeAuthorization(opts.deployment, "submitter"),
-    ["submitter", "approver", "operator", "break_glass"],
+    ["submitter", "approver", "admission_reporter", "operator", "break_glass"],
   );
 }
 
@@ -163,9 +187,16 @@ export function authorizeControlPlaneBootstrap(opts: {
   };
 }
 
+export function authorizeControlPlaneAdmissionReport(opts: {
+  deployment: DeploymentTarget;
+  authorization: DeploymentControlPlaneAuthorization;
+}): DeploymentControlPlaneAuthorizationDecision {
+  return authorize(opts.deployment, opts.authorization, ["admission_reporter"]);
+}
+
 export function grantsFor(
   requestedBy: DeploymentControlPlaneAuthorization["requestedBy"],
   grants: DeploymentControlPlaneGrant[],
 ): DeploymentControlPlaneAuthorization {
-  return { requestedBy, grants };
+  return normalizeAuthorizationSnapshot({ requestedBy, grants });
 }

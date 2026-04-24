@@ -7,6 +7,7 @@ import type {
   DeploymentControlPlaneGrant,
   DeploymentControlPlaneRole,
 } from "./deployment-control-plane-contract.ts";
+import { grantsFor } from "./deployment-control-plane-authz.ts";
 
 function claimText(claim: unknown): string {
   return typeof claim === "string" ? claim.trim() : "";
@@ -54,10 +55,7 @@ export function authorizationForOidcPrincipal(opts: {
   operationKind: string;
   principal: DeploymentPrincipal;
 }): DeploymentControlPlaneAuthorization {
-  return {
-    requestedBy: opts.principal,
-    grants: [grantFor(opts.deployment, opts.operationKind)],
-  };
+  return grantsFor(opts.principal, [grantFor(opts.deployment, opts.operationKind)]);
 }
 
 export function assertNonceIfPresent(claims: JwtClaims, nonce: string) {

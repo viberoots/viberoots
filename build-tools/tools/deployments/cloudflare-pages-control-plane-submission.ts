@@ -2,6 +2,7 @@
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 import type {
   DeploymentControlPlaneArtifactStatus,
+  DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneRequestDedupe,
 } from "./deployment-control-plane-contract.ts";
@@ -58,6 +59,7 @@ export function createCloudflarePagesControlPlaneSubmission(
     finalOutcome?: string;
     requestedBy?: DeploymentPrincipal;
     authorization?: DeploymentControlPlaneAuthorizationDecision;
+    authorizationSnapshot?: DeploymentControlPlaneAuthorization;
     rejectionCode?: CloudflarePagesControlPlaneSubmission["rejectionCode"];
     pendingReasonCode?: CloudflarePagesControlPlaneSubmission["pendingReasonCode"];
   },
@@ -82,6 +84,7 @@ export function createCloudflarePagesControlPlaneSubmission(
     ...(opts.finalOutcome ? { finalOutcome: opts.finalOutcome } : {}),
     ...(opts.requestedBy ? { requestedBy: opts.requestedBy } : {}),
     ...(opts.authorization ? { authorization: opts.authorization } : {}),
+    ...(opts.authorizationSnapshot ? { authorizationSnapshot: opts.authorizationSnapshot } : {}),
     ...(opts.rejectionCode ? { rejectionCode: opts.rejectionCode } : {}),
     ...(opts.pendingReasonCode ? { pendingReasonCode: opts.pendingReasonCode } : {}),
     ...(artifactStatusFromSnapshot(snapshot)
@@ -100,6 +103,7 @@ export function createCloudflarePagesAdmittedTerminalSubmission(
     dedupe: DeploymentControlPlaneRequestDedupe;
     requestedBy?: DeploymentPrincipal;
     authorization?: DeploymentControlPlaneAuthorizationDecision;
+    authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   },
 ): CloudflarePagesControlPlaneSubmission {
   return createCloudflarePagesControlPlaneSubmission(deployment, snapshot, executionSnapshotPath, {
@@ -114,6 +118,7 @@ export function createCloudflarePagesAdmittedTerminalSubmission(
     dedupe: opts.dedupe,
     requestedBy: opts.requestedBy,
     authorization: opts.authorization,
+    authorizationSnapshot: opts.authorizationSnapshot,
   });
 }
 
@@ -125,6 +130,7 @@ export function createCloudflarePagesLockConflictSubmission(
     dedupe: DeploymentControlPlaneRequestDedupe;
     requestedBy?: DeploymentPrincipal;
     authorization?: DeploymentControlPlaneAuthorizationDecision;
+    authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   },
 ): CloudflarePagesControlPlaneSubmission {
   return createCloudflarePagesControlPlaneSubmission(deployment, snapshot, executionSnapshotPath, {
@@ -134,6 +140,7 @@ export function createCloudflarePagesLockConflictSubmission(
     dedupe: opts.dedupe,
     requestedBy: opts.requestedBy,
     authorization: opts.authorization,
+    authorizationSnapshot: opts.authorizationSnapshot,
     rejectionCode: "lock_conflict",
   });
 }

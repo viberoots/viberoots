@@ -13,6 +13,7 @@ import {
   type NixosSharedHostControlPlaneSnapshot,
 } from "./nixos-shared-host-control-plane-contract.ts";
 import type {
+  DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneRequestDedupe,
 } from "./deployment-control-plane-contract.ts";
@@ -45,6 +46,7 @@ export type PrepareNixosSharedHostControlPlaneRunOpts = {
   dedupe: DeploymentControlPlaneRequestDedupe;
   requestedBy?: NixosSharedHostControlPlaneSubmission["requestedBy"];
   authorization?: DeploymentControlPlaneAuthorizationDecision;
+  authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   deployBatchId?: string;
   artifactDir?: string;
   artifactDirsByComponentId?: Record<string, string>;
@@ -107,6 +109,7 @@ export async function prepareNixosSharedHostControlPlaneRun(
       dedupe: opts.dedupe,
       requestedBy,
       authorization: opts.authorization,
+      authorizationSnapshot: opts.authorizationSnapshot,
     });
     if (submission) {
       await writeControlPlaneJson(submissionPath, submission);
@@ -124,6 +127,7 @@ export async function prepareNixosSharedHostControlPlaneRun(
     dedupe: opts.dedupe,
     requestedBy,
     authorization: opts.authorization,
+    authorizationSnapshot: opts.authorizationSnapshot,
     ...(snapshot.progressiveRollout ? { progressiveRollout: snapshot.progressiveRollout } : {}),
     deployRunId,
   });

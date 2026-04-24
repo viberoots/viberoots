@@ -2,6 +2,7 @@
 import { evaluateNixosSharedHostControlPlaneAdmission } from "./nixos-shared-host-control-plane-admission.ts";
 import { queueSubmissionForLock } from "./deployment-control-plane-queue.ts";
 import type {
+  DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneApprovalGrantRequest,
   DeploymentControlPlaneRequestDedupe,
 } from "./deployment-control-plane-contract.ts";
@@ -99,6 +100,7 @@ function rejection(opts: {
   submittedAt: string;
   requestedBy: DeploymentPrincipal;
   dedupe: DeploymentControlPlaneRequestDedupe;
+  authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   rejectionCode:
     | "approval_required"
     | "approval_no_longer_valid"
@@ -114,6 +116,7 @@ function rejection(opts: {
       dedupe: opts.dedupe,
       lifecycleState: opts.submission.lifecycleState,
       requestedBy: opts.requestedBy,
+      ...(opts.authorizationSnapshot ? { authorizationSnapshot: opts.authorizationSnapshot } : {}),
       rejectionCode: opts.rejectionCode,
     },
   };
@@ -129,6 +132,7 @@ export async function approvePendingSubmission(opts: {
   submittedAt: string;
   requestedBy: DeploymentPrincipal;
   dedupe: DeploymentControlPlaneRequestDedupe;
+  authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   approval?: DeploymentControlPlaneApprovalGrantRequest;
 }) {
   if (opts.submission.lifecycleState !== "pending_approval" || !opts.submission.deployRunId) {
@@ -224,6 +228,7 @@ export async function approvePendingSubmission(opts: {
       dedupe: opts.dedupe,
       lifecycleState: "queued" as const,
       requestedBy: opts.requestedBy,
+      ...(opts.authorizationSnapshot ? { authorizationSnapshot: opts.authorizationSnapshot } : {}),
     },
   };
   return await queueSubmissionForLock({
