@@ -46,10 +46,12 @@ export async function writeAuthSession(opts: {
   deployment: any;
   operationKind: string;
   principalId: string;
-  role: DeploymentControlPlaneRole;
+  role?: DeploymentControlPlaneRole;
+  roles?: DeploymentControlPlaneRole[];
   expired?: boolean;
 }) {
   const sessionId = `auth-${opts.operationKind}-${opts.principalId.replace(/[^a-z0-9]+/gi, "-")}`;
+  const roles = opts.roles && opts.roles.length > 0 ? opts.roles : [opts.role || "submitter"];
   const session: DeploymentAuthSessionRecord = {
     schemaVersion: DEPLOYMENT_AUTH_SESSION_RECORD_SCHEMA,
     sessionId,
@@ -70,7 +72,7 @@ export async function writeAuthSession(opts: {
     principal: { principalId: opts.principalId },
     authorization: {
       requestedBy: { principalId: opts.principalId },
-      grants: [grantFor(opts.deployment, opts.role)],
+      grants: roles.map((role) => grantFor(opts.deployment, role)),
     },
   };
   await writeDeploymentAuthSession(opts.recordsRoot, session);

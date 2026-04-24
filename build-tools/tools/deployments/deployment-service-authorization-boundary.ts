@@ -6,7 +6,10 @@ import type {
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneRunAction,
 } from "./deployment-control-plane-contract.ts";
-import { authorizeControlPlaneRunAction } from "./deployment-control-plane-authz.ts";
+import {
+  authorizeControlPlaneAdmissionReport,
+  authorizeControlPlaneRunAction,
+} from "./deployment-control-plane-authz.ts";
 import { DeploymentUnauthorizedError } from "./deployment-control-plane-errors.ts";
 import {
   consumeDeploymentAuthSessionAuthorization,
@@ -42,6 +45,19 @@ function evidenceWithPrincipal(
   return { ...(evidence || {}), requestedBy: authorization.requestedBy };
 }
 
+function hasAdmissionCheckEvidence(evidence: DeploymentAdmissionEvidence | undefined): boolean {
+  return Array.isArray(evidence?.checks) && evidence.checks.length > 0;
+}
+
+function assertAdmissionCheckEvidenceAuthorization(
+  deployment: DeploymentTarget,
+  authorization: DeploymentControlPlaneAuthorization | undefined,
+  evidence: DeploymentAdmissionEvidence | undefined,
+) {
+  if (!authorization || !hasAdmissionCheckEvidence(evidence)) return;
+  authorizeControlPlaneAdmissionReport({ deployment, authorization });
+}
+
 export async function resolveSubmitAuthorizationBoundary(opts: {
   recordsRoot: string;
   deployment: DeploymentTarget;
@@ -54,6 +70,11 @@ export async function resolveSubmitAuthorizationBoundary(opts: {
   consumeAuthSession?: boolean;
 }) {
   if (!requiresServerDerivedAuthorization(opts.deployment)) {
+    assertAdmissionCheckEvidenceAuthorization(
+      opts.deployment,
+      opts.authorization,
+      opts.admissionEvidence,
+    );
     return {
       authorization: opts.authorization,
       requestedBy: opts.requestedBy || opts.admissionEvidence?.requestedBy,
@@ -74,6 +95,7 @@ export async function resolveSubmitAuthorizationBoundary(opts: {
     deploymentId: opts.deployment.deploymentId,
     operationKind: opts.operationKind,
   });
+  assertAdmissionCheckEvidenceAuthorization(opts.deployment, authorization, opts.admissionEvidence);
   return {
     authorization,
     requestedBy: authorization.requestedBy,

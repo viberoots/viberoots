@@ -250,6 +250,10 @@ If you are using the reviewed `nixos-shared-host` client profile workflow, use
 `--profile mini` instead of `--control-plane-url`.
 For auth-required protected/shared runs, the deployment service opens or prints
 the login URL and records the approver from the authenticated service session.
+`--mark-check-passed` remains an authorized shortcut for constructing
+`admissionEvidence.checks`, but it is not a local bypass: the same principal
+still needs `submitter` to request the deploy and `admission_reporter` to
+report submit-time checks for that scope.
 Do not pass laptop Vault tokens, Vault JWT files, secret fixture paths, or
 client-supplied principals to protected/shared service deployments. `mini`
 derives identity through its service session and the worker uses server-owned
@@ -259,6 +263,9 @@ HTTP is only for explicit local test fixtures marked with
 `BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1`. Remote-profile uploads finalize under the
 configured staging root before proof submission, and the service admits only the
 canonical finalized tree into the content-addressed store.
+When a service-backed request returns `unauthorized`, read the rejection text:
+submit failures now distinguish missing `submitter`, missing
+`admission_reporter`, and missing `approver` access.
 
 ## Which Backend Am I Using
 

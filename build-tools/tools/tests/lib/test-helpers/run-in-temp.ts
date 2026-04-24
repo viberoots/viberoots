@@ -275,6 +275,7 @@ export async function runInTemp<T>(
     WORKSPACE_ROOT: tmp,
     BUCK_TEST_SRC: tmp,
     BUCK_NESTED_ISO: tempNestedIso,
+    TEST_NO_BROWSER: process.env.TEST_NO_BROWSER || "1",
     [LOCAL_FIXTURE_SERVICE_ENV]: process.env[LOCAL_FIXTURE_SERVICE_ENV] || "1",
     BUCK_EXPORTER_REUSE_DAEMON: process.env.BUCK_EXPORTER_REUSE_DAEMON || "1",
     REPO_ROOT: process.cwd(),
@@ -388,6 +389,7 @@ export async function runInTemp<T>(
   exportEnv.WORKSPACE_ROOT = tmp;
   exportEnv.BUCK_TEST_SRC = tmp;
   exportEnv.BUCK_NESTED_ISO = tempNestedIso;
+  exportEnv.TEST_NO_BROWSER = exportEnv.TEST_NO_BROWSER || "1";
   exportEnv[LOCAL_FIXTURE_SERVICE_ENV] = exportEnv[LOCAL_FIXTURE_SERVICE_ENV] || "1";
   exportEnv.BUCK_EXPORTER_REUSE_DAEMON = exportEnv.BUCK_EXPORTER_REUSE_DAEMON || "1";
   exportEnv.HOME = home;

@@ -174,6 +174,14 @@ test("jenkins wrapper forwards mark-check-passed so bootstrap deploys can avoid 
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.ok, true);
       assert.equal(summary.remoteExecution.controlPlane.finalOutcome, "succeeded");
+      const snapshot = await readBackendSnapshot(
+        remoteRecordsRoot,
+        String(summary.remoteExecution.controlPlane.submissionId),
+      );
+      assert.equal(
+        snapshot.admittedContext.policyEvaluation.requiredChecks[0]?.reportingKind,
+        "ci_pipeline",
+      );
     } finally {
       await worker.close();
       await controlPlane.close();

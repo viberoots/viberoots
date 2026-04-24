@@ -318,6 +318,12 @@ Do not pass Vault JWT files, Vault tokens, fixture paths, provider credentials,
 or client-supplied principals through these client commands. For protected/shared
 `mini` runs, the deployment service derives the authenticated principal and the
 worker uses server-local Vault credential sources.
+`--mark-check-passed` is an authorized shortcut for constructing
+`admissionEvidence.checks`; it does not bypass service-side authorization. The
+same principal still needs `submitter` to request the deploy and
+`admission_reporter` to report those checks. If a submit fails with
+`unauthorized`, use the returned message to distinguish missing `submitter`
+access from missing `admission_reporter` access.
 
 ## Inspect Status And Results
 
@@ -406,4 +412,6 @@ URL and records the approver from the authenticated service session.
 Approval keeps the same `deploy_run_id` and continues the existing run. If you
 get `approval_no_longer_valid` or `unauthorized`, re-run `--status` on that
 same `deploy_run_id` and confirm the current approval fields before trying
-again.
+again. For submit-time evidence failures, `unauthorized` now distinguishes
+missing `submitter` access from missing `admission_reporter` access; approval
+failures still point at missing `approver` access.

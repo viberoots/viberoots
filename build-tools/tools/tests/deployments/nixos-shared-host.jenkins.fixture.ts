@@ -16,6 +16,8 @@ export function jenkinsExecEnv(env: Record<string, string>, extra: Record<string
     BNX_DEPLOY_CONTROL_PLANE_TOKEN: "test-control-plane-token",
     [LOCAL_FIXTURE_SERVICE_ENV]: "1",
     IN_NIX_SHELL: "1",
+    JENKINS_URL: "https://jenkins.example.invalid/job/pleomino",
+    JOB_NAME: "pleomino-deploy",
     ...extra,
   };
 }

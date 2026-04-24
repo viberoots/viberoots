@@ -21,12 +21,15 @@ export type DeploymentPrincipal = {
   displayName?: string;
 };
 
+export type DeploymentCheckReportingKind = "human_manual" | "ci_pipeline" | "external_status";
+
 export type DeploymentCheckEvidence = {
   name: string;
   subject: string;
   status: "passed" | "failed";
   checkedAt: string;
   recordRef?: string;
+  reportingKind?: DeploymentCheckReportingKind;
 };
 
 export type DeploymentApprovalEvidence = {
@@ -79,6 +82,7 @@ export type DeploymentAdmissionCheckFact = {
   subject: string;
   checkedAt: string;
   recordRef?: string;
+  reportingKind?: DeploymentCheckReportingKind;
 };
 
 export type DeploymentAdmissionApprovalFact = {
@@ -133,6 +137,12 @@ function normalizeList<T>(value: unknown, map: (entry: unknown) => T | undefined
   return Array.isArray(value) ? value.map(map).filter((entry): entry is T => !!entry) : [];
 }
 
+function normalizeCheckReportingKind(value: unknown): DeploymentCheckReportingKind | undefined {
+  return value === "human_manual" || value === "ci_pipeline" || value === "external_status"
+    ? value
+    : undefined;
+}
+
 export function defaultRequestedBy(): DeploymentPrincipal {
   return { principalId: "local:anonymous" };
 }
@@ -150,9 +160,10 @@ export function normalizeAdmissionEvidence(
     const checkedAt = typeof entry.checkedAt === "string" ? entry.checkedAt.trim() : "";
     if (!name || !subject || !status || !checkedAt) return undefined;
     const recordRef = typeof entry.recordRef === "string" ? entry.recordRef.trim() : "";
+    const reportingKind = normalizeCheckReportingKind(entry.reportingKind);
     return recordRef
-      ? { name, subject, status, checkedAt, recordRef }
-      : { name, subject, status, checkedAt };
+      ? { name, subject, status, checkedAt, recordRef, ...(reportingKind ? { reportingKind } : {}) }
+      : { name, subject, status, checkedAt, ...(reportingKind ? { reportingKind } : {}) };
   });
   const approvals = normalizeList(raw.approvals, (entry) => {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return undefined;

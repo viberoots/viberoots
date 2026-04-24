@@ -36,10 +36,44 @@ test("mark-check-passed infers the current HEAD subject and synthesizes passed c
           assert.equal(evidence.checks?.[0]?.status, "passed");
           assert.match(String(evidence.checks?.[0]?.checkedAt), /^\d{4}-\d{2}-\d{2}T/);
           assert.equal(evidence.checks?.[0]?.recordRef, "manual-check://deploy/pleomino-dev");
+          assert.equal(evidence.checks?.[0]?.reportingKind, "human_manual");
         },
       );
     } finally {
       process.chdir(oldCwd);
+    }
+  });
+});
+
+test("admission-evidence-json checks inherit ci_pipeline reporting in CI when kind is omitted", async () => {
+  await runInTemp("deployment-admission-cli-ci-reporting-kind", async (tmp) => {
+    const oldCwd = process.cwd();
+    const oldCi = process.env.CI;
+    try {
+      process.chdir(tmp);
+      process.env.CI = "1";
+      const evidencePath = path.join(tmp, "admission-evidence.json");
+      await fsp.writeFile(
+        evidencePath,
+        JSON.stringify({
+          checks: [
+            {
+              name: "deploy/pleomino-dev",
+              subject: "sha256:head",
+              status: "passed",
+              checkedAt: "2026-04-23T00:00:00.000Z",
+            },
+          ],
+        }),
+      );
+      await withSyntheticArgv(["--admission-evidence-json", evidencePath], async () => {
+        const evidence = await resolveDeploymentAdmissionEvidence();
+        assert.equal(evidence?.checks?.[0]?.reportingKind, "ci_pipeline");
+      });
+    } finally {
+      process.chdir(oldCwd);
+      if (oldCi === undefined) delete process.env.CI;
+      else process.env.CI = oldCi;
     }
   });
 });

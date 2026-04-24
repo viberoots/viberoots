@@ -3,6 +3,14 @@ import { spawn } from "node:child_process";
 
 export type BrowserSpawn = typeof spawn;
 
+function envFlagEnabled(value: string | undefined): boolean {
+  return /^(1|true|yes)$/i.test(String(value || "").trim());
+}
+
+export function shouldSuppressBrowserLaunch(env: NodeJS.ProcessEnv = process.env): boolean {
+  return envFlagEnabled(env.TEST_NO_BROWSER) || envFlagEnabled(env.BNX_TEST_NO_BROWSER);
+}
+
 export function browserLaunchCommand(url: string): { command: string; args: string[] } {
   if (process.platform === "darwin") return { command: "open", args: [url] };
   if (process.platform === "win32") return { command: "cmd", args: ["/c", "start", "", url] };
@@ -13,6 +21,7 @@ export async function launchBrowser(
   url: string,
   opts: { spawnImpl?: BrowserSpawn; settleMs?: number } = {},
 ): Promise<void> {
+  if (shouldSuppressBrowserLaunch()) return;
   const { command, args } = browserLaunchCommand(url);
   const spawnImpl = opts.spawnImpl || spawn;
   const settleMs = opts.settleMs ?? 1_000;

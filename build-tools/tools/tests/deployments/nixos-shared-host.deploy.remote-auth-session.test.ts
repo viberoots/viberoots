@@ -20,7 +20,6 @@ import { withEnvOverrides, waitFor } from "./nixos-shared-host.control-plane.hel
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 const CONTROL_PLANE_TOKEN = "test-control-plane-token";
-
 async function completePendingAuthSession(controlPlaneUrl: string, recordsRoot: string) {
   const session = await waitFor(async () => {
     const authDir = path.join(recordsRoot, "control-plane", "auth-sessions");
@@ -46,7 +45,6 @@ async function completePendingAuthSession(controlPlaneUrl: string, recordsRoot: 
   const response = await fetch(callbackUrl);
   assert.equal(response.status, 200, await response.text());
 }
-
 test("remote profile deploy creates a service-owned auth session for interactive protected runs", async () => {
   await runInTemp("nixos-shared-host-remote-auth-session", async (tmp, $) => {
     const oidc = await startFakeOidcServer({

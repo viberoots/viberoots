@@ -55,6 +55,7 @@ export function requiredCheckFacts(opts: {
       subject: check.subject,
       checkedAt: check.checkedAt,
       ...(check.recordRef ? { recordRef: check.recordRef } : {}),
+      ...(check.reportingKind ? { reportingKind: check.reportingKind } : {}),
     }));
   const carried = sourceAdmissionChecks(opts.sourceRecord).filter((check) =>
     subjects.has(check.subject),

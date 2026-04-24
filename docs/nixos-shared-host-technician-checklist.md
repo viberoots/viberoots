@@ -174,6 +174,9 @@ direnv exec . build-tools/tools/bin/deploy \
 
 For auth-required protected/shared runs, the service opens or prints the login
 URL and records the approver from the authenticated service session.
+Treat `--mark-check-passed` as an authorized shortcut, not a bypass:
+the same principal still needs `submitter` to start the deploy and
+`admission_reporter` to assert checks.
 
 Before approving, check at least:
 
@@ -188,6 +191,9 @@ for you.
 
 Approval keeps the same `deploy_run_id`. If you get
 `approval_no_longer_valid` or `unauthorized`, stop and investigate.
+For `unauthorized`, distinguish missing `submitter`, missing
+`admission_reporter`, and missing `approver` access from the rejection text
+before retrying anything.
 
 ## Final Handoff Check
 

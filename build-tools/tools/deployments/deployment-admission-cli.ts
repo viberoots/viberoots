@@ -3,10 +3,12 @@ import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import { promisify } from "node:util";
 import { getFlagList, getFlagStr, hasFlag } from "../lib/cli.ts";
+import { isCiSession } from "./deployment-credential-source-selection.ts";
 import {
   normalizeAdmissionEvidence,
   type DeploymentAdmissionEvidence,
   type DeploymentCheckEvidence,
+  type DeploymentCheckReportingKind,
 } from "./deployment-admission-evidence.ts";
 
 const execFileAsync = promisify(execFile);
@@ -45,15 +47,36 @@ function mergeCheckEvidence(
   return Array.from(merged.values());
 }
 
+function defaultCheckReportingKind(env: NodeJS.ProcessEnv): DeploymentCheckReportingKind {
+  return isCiSession(env) ? "ci_pipeline" : "human_manual";
+}
+
+function annotateCheckReportingKind(
+  evidence: DeploymentAdmissionEvidence | undefined,
+  reportingKind: DeploymentCheckReportingKind,
+): DeploymentAdmissionEvidence | undefined {
+  if (!evidence?.checks?.length) return evidence;
+  return {
+    ...evidence,
+    checks: evidence.checks.map((check) =>
+      check.reportingKind ? check : { ...check, reportingKind },
+    ),
+  };
+}
+
 export async function resolveDeploymentAdmissionEvidence(): Promise<
   DeploymentAdmissionEvidence | undefined
 > {
   const workspaceRoot = process.cwd();
   const evidenceJson = getFlagStr("admission-evidence-json", "").trim();
   const markedPassedChecks = readMarkedPassedChecks();
-  const baseEvidence = evidenceJson
-    ? normalizeAdmissionEvidence(JSON.parse(await fsp.readFile(evidenceJson, "utf8")))
-    : undefined;
+  const reportingKind = defaultCheckReportingKind(process.env);
+  const baseEvidence = annotateCheckReportingKind(
+    evidenceJson
+      ? normalizeAdmissionEvidence(JSON.parse(await fsp.readFile(evidenceJson, "utf8")))
+      : undefined,
+    reportingKind,
+  );
   if (evidenceJson && !baseEvidence) {
     throw new Error(`invalid --admission-evidence-json payload: ${evidenceJson}`);
   }
@@ -67,6 +90,7 @@ export async function resolveDeploymentAdmissionEvidence(): Promise<
       status: "passed",
       checkedAt,
       recordRef: `manual-check://${name}`,
+      reportingKind,
     }),
   );
   return {

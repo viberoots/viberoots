@@ -2,7 +2,10 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { test } from "node:test";
-import { launchBrowser } from "../../deployments/deployment-browser-launch.ts";
+import {
+  launchBrowser,
+  shouldSuppressBrowserLaunch,
+} from "../../deployments/deployment-browser-launch.ts";
 
 class FakeChild extends EventEmitter {
   unref() {}
@@ -58,4 +61,26 @@ test("browser launch resolves once the launcher survives the startup window", as
       settleMs: 5,
     }),
   );
+});
+
+test("browser launch is suppressed under the test harness flag", async () => {
+  const previous = process.env.TEST_NO_BROWSER;
+  let spawnCalls = 0;
+  process.env.TEST_NO_BROWSER = "1";
+  try {
+    assert.equal(shouldSuppressBrowserLaunch(), true);
+    await assert.doesNotReject(() =>
+      launchBrowser("https://example.com", {
+        spawnImpl: () => {
+          spawnCalls += 1;
+          return new FakeChild() as any;
+        },
+        settleMs: 5,
+      }),
+    );
+    assert.equal(spawnCalls, 0);
+  } finally {
+    if (previous === undefined) delete process.env.TEST_NO_BROWSER;
+    else process.env.TEST_NO_BROWSER = previous;
+  }
 });

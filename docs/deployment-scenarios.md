@@ -27,11 +27,17 @@ Concrete policy examples:
 
 - human-only production approval:
   `deploy-submitters-pleomino-prod` submits while `deploy-approvers-pleomino-prod` approves
+- human manual check reporting:
+  a reviewed human may use `--mark-check-passed` only when the same principal
+  also holds `admission_reporter` for that deployment scope
 - CI dev auto-submit:
   `deploy-automation-jenkins-submitters-dev` grants `submitter` for reviewed `dev` deployments
 - CI global evidence reporting:
   `deploy-automation-jenkins-admission-reporters-all-deployments` grants
   `admission_reporter` for the closed `all_deployments` domain
+- CI structured evidence after real validation:
+  the automation principal may attach `admissionEvidence.checks` only when it
+  holds both `submitter` and matching `admission_reporter` grants
 - CI lower-environment auto-approval:
   `deploy-automation-jenkins-approvers-dev` grants `approver` for reviewed
   lower-risk `dev` deploys

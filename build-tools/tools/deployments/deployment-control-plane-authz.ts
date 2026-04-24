@@ -71,10 +71,15 @@ function synthesizeAuthorization(
   });
 }
 
+function missingRoleFor(requiredRoles: DeploymentControlPlaneRole[]): DeploymentControlPlaneRole {
+  return requiredRoles.find((role) => role !== "break_glass") || requiredRoles[0] || "submitter";
+}
+
 function authorize(
   deployment: DeploymentTarget,
   authorization: DeploymentControlPlaneAuthorization,
   requiredRoles: DeploymentControlPlaneRole[],
+  actionDescription: string,
 ): DeploymentControlPlaneAuthorizationDecision {
   const normalized = normalizeAuthorizationSnapshot(authorization);
   for (const role of requiredRoles) {
@@ -90,7 +95,7 @@ function authorize(
     }
   }
   throw new DeploymentUnauthorizedError(
-    `principal ${normalized.requestedBy.principalId} is not authorized for ${deployment.deploymentId}`,
+    `principal ${normalized.requestedBy.principalId} is not authorized to ${actionDescription} on ${deployment.deploymentId}: missing ${missingRoleFor(requiredRoles)} grant`,
   );
 }
 
@@ -113,6 +118,7 @@ export function authorizeControlPlaneSubmit(opts: {
     opts.authorization ||
       synthesizeAuthorization(opts.deployment, requiredSubmitRoles(opts.operationKind)[0]),
     requiredSubmitRoles(opts.operationKind),
+    "submit a deploy",
   );
 }
 
@@ -124,6 +130,7 @@ export function authorizeControlPlaneStatus(opts: {
     opts.deployment,
     opts.authorization || synthesizeAuthorization(opts.deployment, "submitter"),
     ["submitter", "approver", "admission_reporter", "operator", "break_glass"],
+    "read deployment status",
   );
 }
 
@@ -142,6 +149,7 @@ export function authorizeControlPlaneRunAction(opts: {
     opts.deployment,
     opts.authorization || synthesizeAuthorization(opts.deployment, requiredRoles[0]),
     requiredRoles,
+    opts.action === "approve" ? "approve a deploy" : `${opts.action} a deploy`,
   );
 }
 
@@ -191,7 +199,12 @@ export function authorizeControlPlaneAdmissionReport(opts: {
   deployment: DeploymentTarget;
   authorization: DeploymentControlPlaneAuthorization;
 }): DeploymentControlPlaneAuthorizationDecision {
-  return authorize(opts.deployment, opts.authorization, ["admission_reporter"]);
+  return authorize(
+    opts.deployment,
+    opts.authorization,
+    ["admission_reporter"],
+    "report admission evidence",
+  );
 }
 
 export function grantsFor(
