@@ -12031,6 +12031,443 @@ Implement before treating the PR-83 through PR-87 deployment-server hardening se
 
 ---
 
+## PR-89: Workflow-separated control-plane roles and composable authorization scopes
+
+### Description
+
+I will extend the reviewed deployment authorization model so deploy submission, approval, and
+admission-evidence reporting become separate first-class capabilities instead of being implicitly
+coupled. This PR introduces a new `admission_reporter` role, keeps `submitter` and `approver`
+independent, preserves existing `operator` / `break_glass` / infrastructure `bootstrap` semantics,
+and adds richer scope kinds so each project can express human and automation policies per
+deployment, per environment, or more broadly where intended.
+
+The design goal is flexibility without precommitting to one release policy. After this PR, the same
+model can support:
+
+- humans submit + humans approve
+- CI reports checks + humans submit/approve
+- CI submits + humans approve
+- CI submits + CI approves in lower-risk scopes
+- project-specific policy differences
+- environment-specific policy differences
+
+without needing a new ad hoc role or claim shape for each workflow.
+
+### Scope & Changes
+
+- Add a new control-plane authorization role:
+  - `admission_reporter`
+- Preserve existing role separation:
+  - `submitter`
+  - `approver`
+  - `operator`
+  - `break_glass`
+  - `bootstrap` remains specific to deployment-system-owned bootstrap flows and is not reused for
+    routine deploy authorization
+- Extend reviewed authorization scope semantics beyond only `deployment_id` and
+  `provider_target_identity` so the model can express both narrow human grants and broader
+  automation grants:
+  - `deployment_id`
+  - `project`
+  - `environment_stage`
+  - `admission_domain`
+- Define canonical derivation rules for the new scope values so policy matching stays tied to
+  reviewed deployment metadata instead of IdP-local naming conventions:
+  - `deployment_id` comes from extracted deployment metadata
+  - `project` comes from reviewed deployment ownership metadata derived from the deployment package
+    or label family, not from branch names or free-form IdP strings
+  - `environment_stage` comes from reviewed deployment metadata such as `dev`, `staging`, or `prod`
+  - `admission_domain` values are enumerated reviewed contract values such as `all_deployments`,
+    not ad hoc wildcard text
+- Define explicit scope-matching rules for each role:
+  - `submitter` may match deployment, project, or environment scopes
+  - `approver` may match deployment, project, or environment scopes
+  - `admission_reporter` may match deployment, project, environment, or a reviewed admission-wide
+    scope such as `all_deployments`
+  - `operator` continues to match the provider target identity
+  - `break_glass` remains incident-scoped
+- Update authorization records, status payloads, and persisted session snapshots so multiple grants
+  can be carried and audited together instead of deriving a single implicit role from operation kind.
+- Document the intended policy interpretation:
+  - role assignment is orthogonal to deployment protection class
+  - policy choices such as "CI may submit prod but not approve prod" are expressed by grant shape,
+    not by hard-coded environment assumptions in the control plane
+
+### Tests (in this PR)
+
+- Add contract tests for the new `admission_reporter` role and expanded scope kinds.
+- Add authorization-matching tests proving:
+  - deployment-scoped grants authorize only the exact deployment
+  - project-scoped grants authorize all deployments in that project but not other projects
+  - environment-scoped grants authorize all deployments in that stage but not other stages
+  - admission-domain grants authorize admission reporting only, not submission or approval
+- Add negative tests proving:
+  - `admission_reporter` does not imply `submitter`
+  - `submitter` does not imply `approver`
+  - `submitter` does not imply `admission_reporter`
+  - wildcard-style scopes do not accidentally authorize unrelated roles
+- Add status/record contract tests proving multi-grant authorization snapshots serialize
+  deterministically and remain redacted where appropriate.
+
+### Docs (in this PR)
+
+- Update [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) with
+  the reviewed role model and scope semantics.
+- Update [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) to
+  document the new `admission_reporter` role, the preserved meaning of `bootstrap`, and the new
+  composable scope kinds.
+- Update [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md) with
+  example policy shapes:
+  - human submitter + human approver
+  - CI reporter + human submitter
+  - CI submitter + human approver
+  - CI submitter + CI approver in lower-risk scopes
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - control-plane authz scope matching
+  - multi-grant authorization serialization
+  - role-separation fail-closed behavior
+  - docs/contract parity
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR changes deployment authorization contracts, authz matching logic, and reviewed docs used
+  by both service and operator flows. Run full build-system verification unless deployment
+  classifier coverage proves all touched surfaces are deployment-owned.
+
+### Acceptance Criteria
+
+- The reviewed authorization model can represent independent `submitter`, `approver`, and
+  `admission_reporter` grants for the same principal.
+- Scope matching can express policy at deployment, project, environment, and admission-domain
+  levels without overloading one scope kind with wildcard string hacks.
+- Scope values are canonically derived from reviewed deployment metadata so IdP policy naming
+  cannot silently drift from repo truth.
+- Nothing in the contract forces CI or humans into one fixed workflow; policy remains grant-driven.
+- Documentation and tests describe the same role and scope semantics.
+
+### Risks
+
+If scope semantics are underspecified, later claim-mapping and service-enforcement work will drift
+or accidentally broaden authorization.
+
+### Mitigation
+
+Introduce the scope kinds and matching rules first, document their intended use explicitly, and add
+fail-closed tests before wiring them into IdP-derived grants.
+
+### Consequence of Not Implementing
+
+The repo would continue to treat routine submission and evidence reporting as effectively the same
+capability, making it impossible to express safe per-project workflows without ad hoc exceptions.
+
+### Downsides for Implementing
+
+This adds conceptual surface area to the authorization model before user-facing policy mapping is
+visible in Keycloak or the CLI.
+
+### Recommendation
+
+Implement first so later Keycloak mapping and service-enforcement work lands on an explicit,
+workflow-flexible authorization model.
+
+---
+
+## PR-90: OIDC / Keycloak claim-to-grant mapping for human and automation principals
+
+### Description
+
+I will replace the current "derive one grant from operation kind" auth-session behavior with
+reviewed claim-to-grant mapping that can emit multiple authorization grants for a single principal.
+This PR makes Keycloak the source of policy membership while keeping the control-plane grant model
+repo-owned and deterministic. The mapping must support both human user sessions and automation
+principals such as service accounts or OIDC clients, rather than assuming every grant comes from
+human `groups` membership alone.
+
+The design supports both narrow human groups and broader automation principals:
+
+- humans may receive deployment-scoped grants such as:
+  - `submitter` for `pleomino-dev`
+  - `approver` for `pleomino-prod`
+  - `admission_reporter` for `pleomino-staging`
+- CI may receive broader grants such as:
+  - `admission_reporter` for `all_deployments`
+  - `submitter` for `environment_stage=dev`
+  - optionally `approver` for `environment_stage=dev`
+
+This PR does not hard-code those policies. It implements a reviewed mapping system that can support
+them.
+
+### Scope & Changes
+
+- Replace single-grant auth-session derivation with multi-grant mapping from validated OIDC claims.
+- Use reviewed token claims already present in the deployment login flow:
+  - issuer / audience / client-id binding
+  - `groups`
+  - bound deployment claims such as `deployment_environment` and `repository`
+- Add a reviewed group-to-grant mapping scheme for human principals:
+  - `deploy-submitters-<project>-<env>`
+  - `deploy-approvers-<project>-<env>`
+  - `deploy-admission-reporters-<project>-<env>`
+- Add a reviewed mapping scheme for automation principals that can support broader scopes without
+  requiring per-deployment group churn:
+  - service-account or client-principal identity matching for reviewed automation subjects such as
+    Jenkins
+  - project-scoped automation grants
+  - environment-scoped automation grants
+  - admission-domain automation grants
+- Define mapping precedence and composition rules when both identity-derived automation grants and
+  group-derived human grants are present so one session can carry a deterministic union of reviewed
+  grants without accidental privilege escalation.
+- Make the auth-session authorization payload persist every derived grant so later service
+  boundaries can make independent decisions about submission, approval, and evidence reporting.
+- Keep the human-claim requirement and existing repository/environment bound-claim enforcement in
+  place so policy mapping remains tied to the reviewed deployment context rather than generic realm
+  membership.
+- Define reviewed Keycloak examples for:
+  - project/environment-scoped human groups
+  - service-account or client-principal mapping for CI identities
+  - environment-scoped CI submitter groups
+  - global or project-level CI admission-reporter groups
+  - optional CI approver groups for lower-risk environments
+
+### Tests (in this PR)
+
+- Add auth-session tests proving one authenticated principal can receive multiple grants at once.
+- Add mapping tests proving:
+  - human deployment-scoped groups become deployment-scoped grants
+  - automation principal identity claims become reviewed automation grants without requiring
+    per-deployment group membership
+  - CI environment groups become environment-scoped grants
+  - CI admission-wide groups become `admission_domain` grants
+  - unrelated groups do not create grants
+- Add fail-closed tests proving:
+  - missing `groups` claims do not produce implicit authorization
+  - malformed group names are ignored or rejected deterministically
+  - a valid human token without the relevant group still authenticates but does not receive the
+    corresponding control-plane capability
+- Add status-response tests proving authenticated session status exposes the derived grant set
+  consistently for operator diagnostics.
+
+### Docs (in this PR)
+
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  with the reviewed Keycloak group conventions for:
+  - submitters
+  - approvers
+  - admission reporters
+  - automation principals
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  to document the new group families and how deploy auth sessions derive multiple grants.
+- Update [Deployments Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
+  with the invariant that OIDC sessions may carry multiple reviewed grants and that repository /
+  environment bound claims remain mandatory.
+- Update [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md)
+  with concrete policy examples for:
+  - human-only production approval
+  - CI dev auto-submit
+  - CI global evidence reporting
+  - CI lower-environment auto-approval
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - auth-session grant derivation
+  - Keycloak group mapping conventions
+  - bound-claim fail-closed behavior
+  - status/diagnostics parity
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR changes deployment auth-session behavior, Keycloak mapping contracts, and operator docs
+  for login/session setup. Run full build-system verification unless deployment classifier coverage
+  proves all touched surfaces are deployment-owned.
+
+### Acceptance Criteria
+
+- A single authenticated deployment auth session can carry multiple reviewed grants.
+- Human and automation principals can be mapped to deployment-, project-, environment-, and
+  admission-domain-scoped grants using reviewed Keycloak conventions.
+- Automation principals do not have to rely on per-deployment group churn; reviewed service-account
+  or client-principal mappings can grant broader scoped capabilities deterministically.
+- The mapping model is flexible enough to support future per-project workflow differences without
+  changing the control-plane role model again.
+- Documentation and tests describe the same Keycloak mapping contract.
+
+### Risks
+
+If group naming or mapping precedence is ambiguous, operators may create principals that appear
+authenticated but receive surprising grant sets.
+
+### Mitigation
+
+Keep the mapping convention explicit and documented, add deterministic tests for ambiguous cases,
+and surface the resolved grant set in auth-session diagnostics.
+
+### Consequence of Not Implementing
+
+The control plane would have a more expressive authorization model on paper but no reviewed way to
+derive those grants from real Keycloak sessions.
+
+### Downsides for Implementing
+
+This requires additional Keycloak documentation and increases auth-session complexity compared with
+the current one-grant-per-operation shortcut.
+
+### Recommendation
+
+Implement second so service enforcement and CLI/Jenkins behavior can rely on real claim-derived
+grant sets instead of synthetic role assumptions.
+
+---
+
+## PR-91: Enforce admission-evidence authority and align human / CI reporting workflows
+
+### Description
+
+I will make the control plane enforce the distinction between "may submit a deploy" and "may report
+admission evidence." This PR closes the gap exposed by `--mark-check-passed`: the convenience flag
+and any future CI-generated check evidence will continue to use the same underlying
+`admissionEvidence` channel, but the service will reject `checks` evidence unless the authenticated
+principal also has an `admission_reporter` grant matching the deployment.
+
+This keeps the mechanism shared between humans and CI while allowing different UX:
+
+- humans may use `--mark-check-passed` as a convenience flag when authorized
+- CI should generally submit structured evidence produced by real verification steps
+- both routes are governed by the same `admission_reporter` authorization boundary
+
+This PR enforces that boundary on the current submit-time evidence path without foreclosing future
+standalone evidence-ingestion workflows. The same grant model must remain valid if the repo later
+adds a reviewed "report evidence now, submit later" flow.
+
+### Scope & Changes
+
+- Add a new service-side authorization decision for client-supplied admission checks:
+  - protected/shared submissions carrying `admissionEvidence.checks` must have an
+    `admission_reporter` grant matching the deployment
+- Keep existing submit authorization requirements independent:
+  - `submitter` still governs whether a deploy may be requested
+  - `approver` still governs approval actions
+  - `admission_reporter` governs whether check evidence may be asserted
+- Apply this boundary consistently across:
+  - direct hosted control-plane submissions
+  - remote-profile deploy flows
+  - Jenkins wrapper / automation paths
+- Keep the evidence-authorization model reusable for future standalone evidence ingestion:
+  - current enforcement applies to submit-time `admissionEvidence.checks`
+  - future reviewed evidence-only APIs must reuse the same `admission_reporter` authorization model
+    rather than inventing a parallel role
+- Keep the convenience UX but document it correctly:
+  - `--mark-check-passed` becomes an authorized shortcut for constructing check evidence, not an
+    unconditional local bypass
+- Clarify CI workflow expectations:
+  - CI may use the same evidence mechanism
+  - CI should normally report structured evidence after real validation rather than relying on the
+    human convenience flag
+- Extend audit/provenance fields for check evidence so the record can distinguish:
+  - human manual reporting
+  - CI pipeline reporting
+  - future imported external-status reporting
+- Update diagnostics so failures clearly say whether a request lacked `submitter`,
+  `admission_reporter`, or `approver`.
+
+### Tests (in this PR)
+
+- Add protected/shared service-boundary tests proving:
+  - a plain `submitter` cannot submit `admissionEvidence.checks`
+  - an `admission_reporter` without `submitter` still cannot submit a deploy
+  - a principal with both grants can submit a deploy with check evidence
+- Add remote-profile tests proving `--mark-check-passed` fails closed for authorized submitters
+  lacking `admission_reporter`.
+- Add Jenkins / automation tests proving structured evidence submission succeeds only when the
+  automation principal has `admission_reporter`.
+- Add diagnostics tests proving rejection messages distinguish:
+  - unauthorized deploy submission
+  - unauthorized check reporting
+  - unauthorized approval
+- Add audit/provenance tests proving stored evidence records can distinguish human and CI reporting
+  methods.
+
+### Docs (in this PR)
+
+- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  to explain that `--mark-check-passed` is an authorized reporting shortcut rather than a universal
+  local escape hatch.
+- Update [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md)
+  with reviewed examples of:
+  - human authorized manual check reporting
+  - CI-reported evidence after real validation
+  - CI submitter without approval
+  - CI submitter + CI approver in lower-risk scopes
+- Update [Deployments Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
+  so the admission-evidence boundary explicitly requires `admission_reporter`.
+- Update operator-facing setup and troubleshooting docs with the new rejection reasons and how to
+  distinguish missing submitter vs missing reporter access.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - service-boundary evidence authorization
+  - remote `--mark-check-passed` fail-closed behavior
+  - Jenkins / automation evidence authorization
+  - evidence provenance / audit fields
+  - diagnostics and docs parity
+
+### Expected Regression Scope
+
+- `mixed-build-system`
+- This PR changes protected/shared service authorization boundaries, remote/Jenkins deploy flows,
+  evidence persistence, diagnostics, and operator docs. Run full build-system verification unless
+  deployment classifier coverage proves all touched surfaces are deployment-owned.
+
+### Acceptance Criteria
+
+- Protected/shared deploy submission and admission-evidence reporting are enforced as distinct
+  capabilities.
+- `--mark-check-passed` only works when the authenticated principal has both the right to submit the
+  deploy and the right to report checks for that scope.
+- CI can use the same evidence mechanism through structured reporting without requiring a separate
+  hard-coded control-plane path.
+- The authorization model remains reusable for future standalone evidence-reporting flows even
+  though this PR only enforces the current submit-time evidence path.
+- Rejection diagnostics and docs make the missing capability clear.
+
+### Risks
+
+Existing local or automation flows that relied on "submitter implies evidence reporting" will begin
+failing until their grants are updated.
+
+### Mitigation
+
+Land precise diagnostics, update runbooks in the same PR, and add fixture coverage for both human
+and CI reporting paths so the migration behavior is obvious.
+
+### Consequence of Not Implementing
+
+Any authorized deploy submitter would still be able to self-assert passed checks, defeating the
+main purpose of separating deploy submission from admission evidence authority.
+
+### Downsides for Implementing
+
+This adds another authorization decision to protected/shared submit flows and requires more policy
+setup for both humans and automation.
+
+### Recommendation
+
+Implement after PR-89 and PR-90 so the new role and claim mapping already exist before the service
+starts rejecting unauthorized evidence.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)

@@ -13,7 +13,6 @@ import {
   JENKINS_DEPLOY_SCHEMA_VERSION,
   JenkinsDeployError,
   type JenkinsContext,
-  type HostApplyMode,
   createJenkinsEnvelope,
 } from "./nixos-shared-host-jenkins-contract.ts";
 import type { NixosSharedHostRemoteDeploySummary } from "./nixos-shared-host-remote-execution.ts";
@@ -53,7 +52,7 @@ function requireNoUnsupportedFlags() {
   }
 }
 
-function selectedHostApplyMode(): HostApplyMode {
+function assertNoHostApplyFlags() {
   const applyHost = getFlagBool("apply-host");
   const dryRun = getFlagBool("apply-host-dry-run");
   if (applyHost && dryRun) {
@@ -68,7 +67,6 @@ function selectedHostApplyMode(): HostApplyMode {
       "service-only Jenkins wrapper does not support --apply-host or --apply-host-dry-run",
     );
   }
-  return dryRun ? "dry-run" : applyHost ? "switch" : "skip";
 }
 
 async function requireExistingPath(flagName: string, kind: "file" | "directory"): Promise<string> {
@@ -160,6 +158,9 @@ function childArgs(ctx: JenkinsContext): string[] {
     ...(hasFlag("admission-evidence-json")
       ? ["--admission-evidence-json", requireFlagValue("admission-evidence-json")]
       : []),
+    ...(hasFlag("mark-check-passed")
+      ? ["--mark-check-passed", requireFlagValue("mark-check-passed")]
+      : []),
     "--profile",
     ctx.profileName,
     "--artifact-dir",
@@ -175,12 +176,13 @@ async function main() {
   let plan: NixosSharedHostRemotePlan | undefined;
   try {
     requireNoUnsupportedFlags();
+    assertNoHostApplyFlags();
     ctx = {
       deploymentLabel: requireFlagValue("deployment"),
       profileName: requireFlagValue("profile"),
       artifactDir: await requireExistingPath("artifact-dir", "directory"),
       planOnly: getFlagBool("plan"),
-      requestedHostApplyMode: selectedHostApplyMode(),
+      requestedHostApplyMode: "skip",
       sshIdentityFile: await requireExistingPath("ssh-identity-file", "file"),
       sshKnownHostsFile: await requireExistingPath("ssh-known-hosts", "file"),
       repoRoot: await findRepoRoot(process.cwd()),

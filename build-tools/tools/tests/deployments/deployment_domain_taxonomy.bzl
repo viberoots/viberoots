@@ -7,6 +7,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-preview-cleanup.docs.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-secret-fixture-docs.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admission.lane-governance.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-admission.cli.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admission.policy.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admission.prerequisites.helpers.ts": False,
     "build-tools/tools/tests/deployments/deployment-admission.prerequisites.test.ts": True,

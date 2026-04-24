@@ -104,3 +104,80 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
     }
   });
 });
+
+test("jenkins wrapper forwards mark-check-passed so bootstrap deploys can avoid hand-written evidence", async () => {
+  await runInTemp("nixos-shared-host-jenkins-exec-mark-check-passed", async (tmp, $) => {
+    const deployment = pleominoDeploymentFixture();
+    const { env } = await installFakeRemoteTransport(tmp);
+    const artifactDir = path.join(tmp, "artifact");
+    const profileRoot = path.join(tmp, "profiles");
+    const remoteRuntimeRoot = path.join(tmp, "remote-runtime");
+    const remoteRecordsRoot = path.join(tmp, "remote-records");
+    const remoteStatePath = path.join(tmp, "remote-state", "platform-state.json");
+    await installReviewedPleominoTargets(tmp);
+    const sharedTargetsPath = path.join(
+      tmp,
+      "projects",
+      "deployments",
+      "pleomino-shared",
+      "TARGETS",
+    );
+    await fsp.writeFile(
+      sharedTargetsPath,
+      (await fsp.readFile(sharedTargetsPath, "utf8"))
+        .replace('"required_checks": "",', '"required_checks": "deploy/pleomino-dev",')
+        .replace("    required_checks = [],", '    required_checks = ["deploy/pleomino-dev"],'),
+      "utf8",
+    );
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await prepareReviewedRemoteHostPaths({
+      remoteStatePath,
+      remoteRuntimeRoot,
+      remoteRecordsRoot,
+    });
+    const controlPlane = await startNixosSharedHostControlPlaneServer({
+      workspaceRoot: tmp,
+      paths: {
+        statePath: remoteStatePath,
+        hostRoot: remoteRuntimeRoot,
+        recordsRoot: remoteRecordsRoot,
+      },
+      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+      token: CONTROL_PLANE_TOKEN,
+    });
+    const worker = startNixosSharedHostControlPlaneWorkerLoop({
+      workspaceRoot: tmp,
+      recordsRoot: remoteRecordsRoot,
+      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+    });
+    await writeArtifact(artifactDir, { "index.html": "<html>bootstrap</html>\n", healthz: "ok\n" });
+    await installClientProfile(
+      $,
+      profileRoot,
+      tmp,
+      remoteStatePath,
+      remoteRuntimeRoot,
+      remoteRecordsRoot,
+      controlPlane.url,
+    );
+    const { admissionEvidencePath } = await writeReviewedPleominoAdmissionEvidence(tmp, $);
+    const auth = await writeJenkinsAuthFiles(tmp);
+    const server = await startNixosSharedHostPublicServer({
+      deployment,
+      hostRoot: remoteRuntimeRoot,
+    });
+    try {
+      const result = await $({
+        cwd: tmp,
+        env: jenkinsExecEnv(env),
+      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --admission-evidence-json ${admissionEvidencePath} --mark-check-passed deploy/pleomino-dev --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      const summary = JSON.parse(String(result.stdout));
+      assert.equal(summary.ok, true);
+      assert.equal(summary.remoteExecution.controlPlane.finalOutcome, "succeeded");
+    } finally {
+      await worker.close();
+      await controlPlane.close();
+      await server.close();
+    }
+  });
+});
