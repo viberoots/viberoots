@@ -671,6 +671,12 @@ URL and derives the approver from the authenticated service session.
 For submit-time check evidence, `--mark-check-passed` is only an authorized shortcut.
 The authenticated principal still needs `submitter` to request the deploy and
 `admission_reporter` to assert checks for that scope.
+Before the first protected/shared submit, run
+`direnv exec . build-tools/tools/bin/deploy --deployment <label> --validate-only`
+and inspect `admissionRequirements.admission_policy`, `allowed_refs`,
+`required_checks`, and `required_approvals`. That read-only output tells you
+which reviewed names the deployment expects; it does not grant
+`admission_reporter`.
 
 Approval keeps the same `deploy_run_id`. If you get
 `approval_no_longer_valid` or `unauthorized`, stop and investigate rather than

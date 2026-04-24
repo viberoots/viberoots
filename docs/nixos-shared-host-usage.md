@@ -324,6 +324,11 @@ same principal still needs `submitter` to request the deploy and
 `admission_reporter` to report those checks. If a submit fails with
 `unauthorized`, use the returned message to distinguish missing `submitter`
 access from missing `admission_reporter` access.
+To discover the reviewed check names for a target before you submit, run
+`direnv exec . build-tools/tools/bin/deploy --deployment <label> --validate-only`
+and inspect `admissionRequirements.admission_policy`, `allowed_refs`,
+`required_checks`, and `required_approvals`. That read-only output tells you
+which names the deployment expects; it does not grant `admission_reporter`.
 
 ## Inspect Status And Results
 

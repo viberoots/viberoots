@@ -258,6 +258,11 @@ the login URL and records the approver from the authenticated service session.
 `admissionEvidence.checks`, but it is not a local bypass: the same principal
 still needs `submitter` to request the deploy and `admission_reporter` to
 report submit-time checks for that scope.
+To discover the reviewed check names before you use `--mark-check-passed`, run
+`deploy --deployment <label> --validate-only` and inspect
+`admissionRequirements.admission_policy`, `allowed_refs`, `required_checks`,
+and `required_approvals` in the JSON response. That read-only output tells you
+which names the deployment expects; it does not grant `admission_reporter`.
 Do not pass laptop Vault tokens, Vault JWT files, secret fixture paths, or
 client-supplied principals to protected/shared service deployments. `mini`
 derives identity through its service session and the worker uses server-owned

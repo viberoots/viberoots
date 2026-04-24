@@ -3,6 +3,8 @@ import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import { promisify } from "node:util";
 import { getFlagList, getFlagStr, hasFlag } from "../lib/cli.ts";
+import type { DeploymentTarget } from "./contract.ts";
+import { missingMarkCheckPassedValueMessage } from "./deployment-admission-requirements.ts";
 import { isCiSession } from "./deployment-credential-source-selection.ts";
 import {
   normalizeAdmissionEvidence,
@@ -13,12 +15,16 @@ import {
 
 const execFileAsync = promisify(execFile);
 
-function readMarkedPassedChecks(): string[] {
+function readMarkedPassedChecks(deployment?: DeploymentTarget): string[] {
   const checks = getFlagList("mark-check-passed")
     .map((entry) => entry.trim())
     .filter(Boolean);
   if (hasFlag("mark-check-passed") && checks.length === 0) {
-    throw new Error("--mark-check-passed requires one or more check names");
+    throw new Error(
+      deployment
+        ? missingMarkCheckPassedValueMessage(deployment)
+        : "--mark-check-passed requires one or more check names",
+    );
   }
   return Array.from(new Set(checks));
 }
@@ -64,12 +70,14 @@ function annotateCheckReportingKind(
   };
 }
 
-export async function resolveDeploymentAdmissionEvidence(): Promise<
-  DeploymentAdmissionEvidence | undefined
-> {
+export async function resolveDeploymentAdmissionEvidence(
+  opts: {
+    deployment?: DeploymentTarget;
+  } = {},
+): Promise<DeploymentAdmissionEvidence | undefined> {
   const workspaceRoot = process.cwd();
   const evidenceJson = getFlagStr("admission-evidence-json", "").trim();
-  const markedPassedChecks = readMarkedPassedChecks();
+  const markedPassedChecks = readMarkedPassedChecks(opts.deployment);
   const reportingKind = defaultCheckReportingKind(process.env);
   const baseEvidence = annotateCheckReportingKind(
     evidenceJson

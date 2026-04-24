@@ -159,7 +159,9 @@ function childArgs(ctx: JenkinsContext): string[] {
       ? ["--admission-evidence-json", requireFlagValue("admission-evidence-json")]
       : []),
     ...(hasFlag("mark-check-passed")
-      ? ["--mark-check-passed", requireFlagValue("mark-check-passed")]
+      ? ((value) => (value ? ["--mark-check-passed", value] : ["--mark-check-passed"]))(
+          getFlagStr("mark-check-passed", "").trim(),
+        )
       : []),
     "--profile",
     ctx.profileName,

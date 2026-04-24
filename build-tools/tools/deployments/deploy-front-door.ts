@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { packagePathFromLabel } from "../lib/labels.ts";
 import { providerTargetIdentityFor, type DeploymentTarget } from "./contract.ts";
+import { deploymentAdmissionRequirementsForCli } from "./deployment-admission-requirements.ts";
 import { resolveAllDeployments } from "./deployment-query.ts";
 
 export const DEPLOY_LIST_SCHEMA = "deploy-list@1";
@@ -64,5 +65,6 @@ export async function validateDeploymentForCli(
     schemaVersion: DEPLOY_VALIDATE_SCHEMA,
     valid: true,
     deployment: listEntry(deployment),
+    admissionRequirements: deploymentAdmissionRequirementsForCli(deployment),
   };
 }

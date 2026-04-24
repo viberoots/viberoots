@@ -127,7 +127,7 @@ Current reviewed central control-plane implementation note:
 - `operation_kind` uses the canonical set: `deploy`, `retry`, `promotion`, `rollback`, `preview_cleanup`.
 - `--list` is the canonical non-mutating repo-level deployment discovery entry point and must keep one stable machine-readable output shape.
 - `--validate-only` is the canonical non-mutating repo-level deployment validation entry point and must not build, publish, or mutate external state.
-- `--validate-only` must reject reviewed provider-native config parse or semantic drift and reviewed target-kind mismatches before any mutating path can run.
+- `--validate-only` must reject reviewed provider-native config parse or semantic drift and reviewed target-kind mismatches before any mutating path can run, and it must surface metadata-derived `admission_policy`, `allowed_refs`, `required_checks`, and `required_approvals` for the selected deployment.
 - Public repo-level deploy, list, and validate flows must resolve authoritative deployment metadata from Buck / `TARGETS`, not from hand-authored deployment JSON documents.
 - `publish_mode` is a separate field from `operation_kind`.
 - `preview_cleanup` is a destructive housekeeping run against preview resources; it should preserve preview context in records rather than being treated as a normal publish.
@@ -209,6 +209,7 @@ Current reviewed central control-plane implementation note:
 - Reviewed `submitter` and `approver` grants may use `deployment_id`, `project`, or `environment_stage` scope. Reviewed `admission_reporter` grants may use `deployment_id`, `project`, `environment_stage`, or closed `admission_domain` values such as `all_deployments`.
 - Protected/shared submit-time `admissionEvidence.checks` must fail closed unless the authenticated principal also holds a matching `admission_reporter` grant; `submitter` alone is insufficient to self-assert passed checks.
 - `--mark-check-passed` is only a reviewed shortcut for constructing check evidence. It must use the same `admission_reporter` authorization boundary as structured human or CI-reported evidence rather than creating a parallel bypass path.
+- Discovering required check names through reviewed read-only CLI output does not grant `admission_reporter`; discoverability and authorization remain separate.
 - Canonical `project`, `environment_stage`, and `admission_domain` scope values must come from reviewed repo-owned deployment metadata and closed reviewed contract values, not free-form IdP naming.
 - OIDC sessions may carry multiple reviewed grants at once, and repository / environment bound claims remain mandatory so claim-to-grant mapping stays tied to the reviewed deployment context.
 - Authorization snapshots and status payloads must preserve the full normalized grant set used for audit; matching one role for one action must not collapse sibling grants out of the persisted record.
