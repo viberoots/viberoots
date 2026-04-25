@@ -26,6 +26,7 @@ export function createNixosSharedHostControlPlaneSubmission(
     pendingReasonCode?: NixosSharedHostControlPlaneSubmission["pendingReasonCode"];
     approval?: NixosSharedHostControlPlaneSubmission["approval"];
     artifactBinding?: NixosSharedHostControlPlaneSubmission["artifactBinding"];
+    serviceInstance?: NixosSharedHostControlPlaneSubmission["serviceInstance"];
     latestAction?: NixosSharedHostControlPlaneSubmission["latestAction"];
     execution?: NixosSharedHostControlPlaneSubmission["execution"];
     cancellationRequested?: NixosSharedHostControlPlaneSubmission["cancellationRequested"];
@@ -57,6 +58,7 @@ export function createNixosSharedHostControlPlaneSubmission(
     ...(opts.authorizationSnapshot ? { authorizationSnapshot: opts.authorizationSnapshot } : {}),
     ...(opts.rejectionCode ? { rejectionCode: opts.rejectionCode } : {}),
     ...(opts.pendingReasonCode ? { pendingReasonCode: opts.pendingReasonCode } : {}),
+    ...(opts.serviceInstance ? { serviceInstance: opts.serviceInstance } : {}),
     ...(opts.approval ? { approval: opts.approval } : {}),
     ...(opts.artifactBinding ? { artifactBinding: opts.artifactBinding } : {}),
     ...(opts.latestAction ? { latestAction: opts.latestAction } : {}),

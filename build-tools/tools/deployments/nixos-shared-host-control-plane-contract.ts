@@ -14,6 +14,7 @@ import type {
   DeploymentControlPlaneLifecycleState,
   DeploymentControlPlaneRequestDedupe,
   DeploymentControlPlaneSubmitRejectionCode,
+  DeploymentControlPlaneServiceInstance,
   DeploymentControlPlaneTerminationReason,
 } from "./deployment-control-plane-contract.ts";
 import type {
@@ -119,6 +120,7 @@ export type NixosSharedHostControlPlaneSubmission = {
   authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   rejectionCode?: DeploymentControlPlaneSubmitRejectionCode;
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
+  serviceInstance?: DeploymentControlPlaneServiceInstance;
   approval?: DeploymentControlPlaneApprovalSummary;
   artifact?: DeploymentControlPlaneArtifactStatus;
   artifactBinding?: DeploymentArtifactBindingProvenance;

@@ -6,6 +6,7 @@ import type {
 import type {
   DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
+  DeploymentControlPlaneServiceInstance,
   DeploymentControlPlaneRequestDedupe,
 } from "./deployment-control-plane-contract.ts";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
@@ -21,6 +22,7 @@ export function createAdmissionFailureSubmission(opts: {
   requestedBy?: NixosSharedHostControlPlaneSubmission["requestedBy"];
   authorization?: DeploymentControlPlaneAuthorizationDecision;
   authorizationSnapshot?: DeploymentControlPlaneAuthorization;
+  serviceInstance?: DeploymentControlPlaneServiceInstance;
 }) {
   if (!(opts.error instanceof DeploymentAdmissionError)) return undefined;
   const pending =
@@ -43,6 +45,7 @@ export function createAdmissionFailureSubmission(opts: {
     requestedBy: opts.requestedBy,
     authorization: opts.authorization,
     authorizationSnapshot: opts.authorizationSnapshot,
+    ...(opts.serviceInstance ? { serviceInstance: opts.serviceInstance } : {}),
     ...(pending ? { pendingReasonCode: opts.error.code } : { rejectionCode: opts.error.code }),
     ...(pending
       ? {}

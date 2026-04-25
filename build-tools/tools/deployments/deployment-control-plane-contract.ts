@@ -90,6 +90,16 @@ export type DeploymentControlPlaneAuthorizationDecision = {
   scope: DeploymentControlPlaneScope;
 };
 
+export type DeploymentControlPlaneServiceInstance = {
+  hostname: string;
+  workspaceRoot: string;
+  gitHead?: string;
+  reviewedRef?: string;
+  reviewedRepository?: string;
+  reviewedRemoteName?: string;
+  reviewedRemoteUrl?: string;
+};
+
 export type DeploymentControlPlaneRequestDedupe = {
   mode: "created" | "reused";
   requestFingerprint: string;
@@ -195,6 +205,7 @@ export type DeploymentControlPlaneResponseBase = {
     | DeploymentControlPlaneSubmitRejectionCode
     | DeploymentControlPlaneRunActionRejectionCode;
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
+  serviceInstance?: DeploymentControlPlaneServiceInstance;
   approval?: DeploymentControlPlaneApprovalSummary;
   artifact?: DeploymentControlPlaneArtifactStatus;
   artifactBinding?: DeploymentArtifactBindingProvenance;

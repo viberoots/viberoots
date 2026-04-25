@@ -65,6 +65,7 @@ function toStatusBase(submission: SubmissionLike): DeploymentControlPlaneRespons
       : {}),
     ...(submission.rejectionCode ? { rejectionCode: submission.rejectionCode } : {}),
     ...(submission.pendingReasonCode ? { pendingReasonCode: submission.pendingReasonCode } : {}),
+    ...(submission.serviceInstance ? { serviceInstance: submission.serviceInstance } : {}),
     ...(submission.approval ? { approval: toPublicApprovalSummary(submission.approval) } : {}),
     ...(submission.artifact ? { artifact: submission.artifact } : {}),
     ...(submission.artifactBinding ? { artifactBinding: submission.artifactBinding } : {}),

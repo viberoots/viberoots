@@ -3,6 +3,7 @@ import path from "node:path";
 import type {
   DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
+  DeploymentControlPlaneServiceInstance,
 } from "./deployment-control-plane-contract.ts";
 import { statusFromSubmission } from "./deployment-control-plane-status.ts";
 import {
@@ -51,6 +52,7 @@ type SubmissionRecord = {
     | "no_longer_admitted"
     | "not_resumable";
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
+  serviceInstance?: DeploymentControlPlaneServiceInstance;
   approval?: {
     state: "pending" | "granted" | "no_longer_valid";
     approvalNames: string[];

@@ -12,8 +12,23 @@ test("remote service submission error explains when the service requires a diffe
     },
   });
   const error = remoteServiceSubmissionError(
-    new Error(
-      "protected/shared admission requires check deploy/pleomino-dev for subject(s) 85e2c9ee8dd909fc041f693fe8e937e34e7b36ef",
+    Object.assign(
+      new Error(
+        "protected/shared admission requires check deploy/pleomino-dev for subject(s) 85e2c9ee8dd909fc041f693fe8e937e34e7b36ef",
+      ),
+      {
+        status: {
+          serviceInstance: {
+            hostname: "mini",
+            workspaceRoot: "/srv/common",
+            gitHead: "8f00f5cd723bed179a48847d2daeea3e0c2dcce1",
+            reviewedRef: "env/pleomino/dev",
+            reviewedRepository: "kiltyj/common",
+            reviewedRemoteName: "origin",
+            reviewedRemoteUrl: "git@github.com:kiltyj/common.git",
+          },
+        },
+      },
     ),
     {
       deployment,
@@ -43,4 +58,8 @@ test("remote service submission error explains when the service requires a diffe
     String(error.message),
     /--mark-check-for-commit 85e2c9ee8dd909fc041f693fe8e937e34e7b36ef/,
   );
+  assert.match(String(error.message), /service_hostname: mini/);
+  assert.match(String(error.message), /service_workspace_root: \/srv\/common/);
+  assert.match(String(error.message), /service_git_head: 8f00f5cd723bed179a48847d2daeea3e0c2dcce1/);
+  assert.match(String(error.message), /service_reviewed_remote: origin/);
 });

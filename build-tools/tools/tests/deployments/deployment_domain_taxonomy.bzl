@@ -35,6 +35,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-control-plane.redaction.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.recovery.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.response-boundary.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-control-plane.service-instance.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.restore.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.retention.policy.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.pr91.docs.test.ts": True,

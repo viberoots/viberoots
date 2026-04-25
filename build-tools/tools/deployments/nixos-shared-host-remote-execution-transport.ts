@@ -16,6 +16,16 @@ export type CommandResult = {
   stderr: string;
 };
 
+type ServiceInstanceLike = {
+  hostname?: string;
+  workspaceRoot?: string;
+  gitHead?: string;
+  reviewedRef?: string;
+  reviewedRepository?: string;
+  reviewedRemoteName?: string;
+  reviewedRemoteUrl?: string;
+};
+
 export function commandFailure(step: string, result: CommandResult): Error {
   const details = [result.stderr.trim(), result.stdout.trim(), `exit=${result.exitCode}`]
     .filter(Boolean)
@@ -96,6 +106,27 @@ function augmentRemoteAdmissionMismatchMessage(
   ].join("\n");
 }
 
+function serviceInstanceFrom(error: unknown): ServiceInstanceLike | undefined {
+  const status = (error as any)?.status;
+  const record = (error as any)?.record;
+  return status?.serviceInstance || record?.controlPlane?.serviceInstance;
+}
+
+function serviceInstanceLines(instance: ServiceInstanceLike | undefined): string[] {
+  if (!instance) return [];
+  return [
+    instance.hostname ? `service_hostname: ${instance.hostname}` : "",
+    instance.workspaceRoot ? `service_workspace_root: ${instance.workspaceRoot}` : "",
+    instance.gitHead ? `service_git_head: ${instance.gitHead}` : "",
+    instance.reviewedRef ? `service_reviewed_ref: ${instance.reviewedRef}` : "",
+    instance.reviewedRepository
+      ? `service_reviewed_repository: ${instance.reviewedRepository}`
+      : "",
+    instance.reviewedRemoteName ? `service_reviewed_remote: ${instance.reviewedRemoteName}` : "",
+    instance.reviewedRemoteUrl ? `service_reviewed_remote_url: ${instance.reviewedRemoteUrl}` : "",
+  ].filter(Boolean);
+}
+
 export function remoteServiceSubmissionError(
   error: unknown,
   opts?: {
@@ -116,9 +147,15 @@ export function remoteServiceSubmissionError(
   ]
     .filter(Boolean)
     .join(" ");
+  const serviceInstance = serviceInstanceFrom(error);
+  const serviceLines = serviceInstanceLines(serviceInstance);
   return Object.assign(
     new Error(
-      `remote service submission failed: ${augmentRemoteAdmissionMismatchMessage(base.message, opts)}${refs ? ` (${refs})` : ""}`,
+      [
+        `remote service submission failed: ${augmentRemoteAdmissionMismatchMessage(base.message, opts)}`,
+        ...serviceLines,
+        ...(refs ? [refs] : []),
+      ].join("\n"),
     ),
     {
       ...(error && typeof error === "object" ? error : {}),

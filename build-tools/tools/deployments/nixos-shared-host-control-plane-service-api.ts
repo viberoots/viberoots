@@ -14,8 +14,6 @@ import {
   queueDeploymentProviderControlPlaneSubmission,
   type DeploymentProviderServiceSubmitRequest,
 } from "./deployment-provider-control-plane-submit.ts";
-import { createServiceOwnedLaneGovernanceResolver } from "./deployment-lane-governance-service.ts";
-import { fingerprintControlPlanePayload } from "./deployment-control-plane-idempotency.ts";
 import { submitResponseFromSubmission } from "./deployment-control-plane-status.ts";
 import type {
   DeploymentControlPlaneAuthorization,
@@ -36,6 +34,7 @@ import { prepareBackendNixosSharedHostControlPlaneRun } from "./nixos-shared-hos
 import { reusedBackendSubmitResponse } from "./nixos-shared-host-control-plane-service-idempotency.ts";
 import { resolveServiceSubmitRequest } from "./nixos-shared-host-control-plane-service-submit.ts";
 import { handleProtectedChallengedNixosServiceSubmit } from "./nixos-shared-host-control-plane-service-protected-submit.ts";
+import { resolveNixosSharedHostSubmitContext } from "./nixos-shared-host-control-plane-submit-context.ts";
 export {
   readControlPlaneRecord,
   readControlPlaneStatus,
@@ -82,15 +81,14 @@ export async function handleControlPlaneSubmit(
           recordsRoot: opts.paths.recordsRoot,
           backendDatabaseUrl: opts.backend.databaseUrl,
         });
-  const requestFingerprint = fingerprintControlPlanePayload({
-    ...request,
-    submittedAt: request.submittedAt,
-  });
-  const governanceResolver = createServiceOwnedLaneGovernanceResolver({
-    env: opts.env,
-    localFixture: opts.localFixture,
-  });
-  const idempotencyKey = request.idempotencyKey || request.submissionId;
+  const { requestFingerprint, idempotencyKey, governanceResolver, serviceInstance } =
+    await resolveNixosSharedHostSubmitContext({
+      request,
+      resolvedRequest,
+      workspaceRoot: opts.workspaceRoot,
+      localFixture: opts.localFixture,
+      env: opts.env,
+    });
   if (
     opts.requireArtifactBinding &&
     resolvedRequest.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA &&
@@ -109,6 +107,7 @@ export async function handleControlPlaneSubmit(
       requestFingerprint,
       idempotencyKey,
       governanceResolver,
+      ...(serviceInstance ? { serviceInstance } : {}),
     });
   }
   const boundary =
@@ -212,6 +211,7 @@ export async function handleControlPlaneSubmit(
               ? { admissionEvidence: boundary.admissionEvidence }
               : {}),
             governanceResolver,
+            ...(serviceInstance ? { serviceInstance } : {}),
           })
         : await prepareBackendCloudflarePagesControlPlaneRun({
             workspaceRoot: opts.workspaceRoot,

@@ -15,6 +15,7 @@ import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governa
 import type {
   DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
+  DeploymentControlPlaneServiceInstance,
   DeploymentControlPlaneRequestDedupe,
 } from "./deployment-control-plane-contract.ts";
 import type {
@@ -108,6 +109,7 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
   admissionEvidence?: DeploymentAdmissionEvidence;
   governanceResolver?: DeploymentLaneGovernanceResolver;
   persistMode?: "immediate" | "defer";
+  serviceInstance?: DeploymentControlPlaneServiceInstance;
 }) {
   const submissionId = opts.submissionId || createNixosSharedHostSubmissionId();
   const requestedBy =
@@ -183,6 +185,7 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
       requestedBy,
       authorization: opts.authorization,
       authorizationSnapshot: opts.authorizationSnapshot,
+      serviceInstance: opts.serviceInstance,
     });
     if (!submission) throw error;
     await writeBackendSubmissionDoc(opts.backend, submission, refs);
@@ -196,6 +199,7 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
     requestedBy,
     authorization: opts.authorization,
     authorizationSnapshot: opts.authorizationSnapshot,
+    ...(opts.serviceInstance ? { serviceInstance: opts.serviceInstance } : {}),
     ...(snapshot.progressiveRollout ? { progressiveRollout: snapshot.progressiveRollout } : {}),
     deployRunId,
   });
