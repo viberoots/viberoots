@@ -14,6 +14,9 @@ type RevalidationContext = {
   targetEnvironment?: {
     targetRef?: string;
     targetRevision?: string;
+    reviewedSourceSnapshot?: {
+      snapshotRef?: string;
+    };
   };
   policyEvaluation?: DeploymentAdmissionPolicyEvaluation;
 };
@@ -79,6 +82,7 @@ export async function revalidateControlPlaneAdmission(opts: {
 }): Promise<void> {
   const evaluation = requirePolicyEvaluation(opts.admittedContext);
   const targetRef =
+    opts.admittedContext.targetEnvironment?.reviewedSourceSnapshot?.snapshotRef ||
     opts.admittedContext.targetEnvironment?.targetRef ||
     requiredDeploymentStageBranch(opts.deployment);
   const currentRevision = await gitStdout(opts.workspaceRoot, ["rev-parse", targetRef]);

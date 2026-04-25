@@ -6,7 +6,7 @@ import type {
   NixosSharedHostControlPlaneSnapshot,
   NixosSharedHostControlPlaneSubmission,
 } from "./nixos-shared-host-control-plane-contract.ts";
-import { createNixosSharedHostWorkerId } from "./nixos-shared-host-control-plane-snapshot.ts";
+import { createNixosSharedHostWorkerId } from "./nixos-shared-host-control-plane-snapshot-helpers.ts";
 import {
   acquireNixosSharedHostControlPlaneLocks,
   runNixosSharedHostControlPlaneWorker,
@@ -21,6 +21,7 @@ import {
   recoverControlPlaneSubmission,
 } from "./nixos-shared-host-control-plane-submit-finalize.ts";
 import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
+import { cleanupReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot.ts";
 
 export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
   submission: NixosSharedHostControlPlaneSubmission;
@@ -50,6 +51,9 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
     shouldAbort?: () => Promise<"cancelled" | "superseded" | "no_longer_admitted" | null>;
   }) => Promise<{ fencingToken?: string; release: () => Promise<void> }>;
 }) {
+  const cleanupReviewedSource = async () => {
+    await cleanupReviewedSourceSnapshot(opts.workspaceRoot, opts.snapshot);
+  };
   const writeSubmission = async (value: NixosSharedHostControlPlaneSubmission) => {
     await writeControlPlaneJson(opts.submissionPath, value);
     await opts.persistSubmission?.(value);
@@ -106,6 +110,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
         completedAt: new Date().toISOString(),
       };
       await writeSubmission(cancelled);
+      await cleanupReviewedSource();
       throw Object.assign(new Error("shared control-plane run cancelled before mutation"), {
         submission: cancelled,
       });
@@ -140,6 +145,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
             : {}),
         };
         await writeSubmission(noLongerAdmitted);
+        await cleanupReviewedSource();
         throw Object.assign(error, { submission: noLongerAdmitted });
       }
       throw error;
@@ -211,6 +217,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
       }
       await writeSubmission(finalized);
     }
+    await cleanupReviewedSource();
     return { submission: finalized, workerId, result };
   } catch (error) {
     if ((error as any)?.paused) {
@@ -229,6 +236,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
       await opts.persistRecord?.((error as any).record, (error as any).recordPath);
       const finalized = finalizeSubmissionFromRecordedError(submission, opts.deployRunId, error);
       await writeSubmission(finalized);
+      await cleanupReviewedSource();
       throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
         submission: finalized,
       });

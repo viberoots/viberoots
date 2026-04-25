@@ -3,7 +3,7 @@ import {
   acquireNixosSharedHostControlPlaneLocks,
   runNixosSharedHostControlPlaneWorker,
 } from "./nixos-shared-host-control-plane-execution.ts";
-import { createNixosSharedHostWorkerId } from "./nixos-shared-host-control-plane-snapshot.ts";
+import { createNixosSharedHostWorkerId } from "./nixos-shared-host-control-plane-snapshot-helpers.ts";
 import {
   readControlPlaneJson,
   writeControlPlaneJson,

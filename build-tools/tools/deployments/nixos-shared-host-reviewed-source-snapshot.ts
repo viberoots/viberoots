@@ -1,0 +1,156 @@
+#!/usr/bin/env zx-wrapper
+import type { NixosSharedHostDeployment } from "./contract.ts";
+import { requiredDeploymentStageBranch } from "./contract.ts";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+
+export type NixosSharedHostReviewedSourceSnapshot = {
+  reviewedRef: string;
+  snapshotRef: string;
+  sourceRevision: string;
+  remoteName: string;
+  repository: string;
+  snapshottedAt: string;
+};
+
+type ReviewedSourceCarrier =
+  | NixosSharedHostReviewedSourceSnapshot
+  | {
+      reviewedSourceSnapshot?: NixosSharedHostReviewedSourceSnapshot;
+      admittedContext?: {
+        targetEnvironment?: {
+          reviewedSourceSnapshot?: NixosSharedHostReviewedSourceSnapshot;
+        };
+      };
+      targetEnvironment?: {
+        reviewedSourceSnapshot?: NixosSharedHostReviewedSourceSnapshot;
+      };
+    };
+
+function trim(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+async function gitStdout(workspaceRoot: string, args: string[]): Promise<string> {
+  const out = await $({ cwd: workspaceRoot, stdio: "pipe" })`git ${args}`.nothrow();
+  if ((out as any).exitCode !== 0) {
+    throw new Error(String((out as any).stderr || "").trim() || `git ${args.join(" ")} failed`);
+  }
+  return String((out as any).stdout || "").trim();
+}
+
+function repositorySlug(remoteUrl: string): string {
+  return trim(remoteUrl)
+    .replace(/\.git$/i, "")
+    .replace(/^https?:\/\/[^/]+\//i, "")
+    .replace(/^ssh:\/\/[^@]+@[^/]+\//i, "")
+    .replace(/^[^@]+@[^:]+:/, "");
+}
+
+async function resolveReviewedRemoteName(
+  workspaceRoot: string,
+  deployment: NixosSharedHostDeployment,
+): Promise<string> {
+  const remotes = (
+    await gitStdout(workspaceRoot, ["remote"])
+      .then((value) =>
+        value
+          .split("\n")
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+      )
+      .catch(() => [])
+  ).filter(Boolean);
+  if (remotes.length === 0) {
+    throw new Error(
+      `control-plane repo is missing a git remote for reviewed source ${requiredDeploymentStageBranch(deployment)}`,
+    );
+  }
+  const expectedRepository = trim(deployment.lanePolicy.governance.repository);
+  if (expectedRepository) {
+    for (const remoteName of remotes) {
+      const remoteUrl = await gitStdout(workspaceRoot, ["remote", "get-url", remoteName]).catch(
+        () => "",
+      );
+      if (repositorySlug(remoteUrl) === expectedRepository) {
+        return remoteName;
+      }
+    }
+  }
+  if (remotes.includes("origin")) return "origin";
+  if (remotes.includes("github")) return "github";
+  if (remotes.length === 1) return remotes[0] || "";
+  throw new Error(
+    `could not resolve a reviewed git remote for ${expectedRepository || "<unknown repository>"}; available remotes: ${remotes.join(", ")}`,
+  );
+}
+
+function snapshotRefFor(submissionId: string, reviewedRef: string): string {
+  return `refs/bnx/reviewed-source/${submissionId}/${reviewedRef}`;
+}
+
+export async function snapshotReviewedSourceForSubmission(opts: {
+  workspaceRoot: string;
+  deployment: NixosSharedHostDeployment;
+  submissionId: string;
+  expectedSourceRevision?: string;
+}): Promise<NixosSharedHostReviewedSourceSnapshot> {
+  const reviewedRef = requiredDeploymentStageBranch(opts.deployment);
+  const remoteName = await resolveReviewedRemoteName(opts.workspaceRoot, opts.deployment);
+  const snapshotRef = snapshotRefFor(opts.submissionId, reviewedRef);
+  await gitStdout(opts.workspaceRoot, [
+    "fetch",
+    "--no-tags",
+    remoteName,
+    `${reviewedRef}:${snapshotRef}`,
+  ]);
+  const sourceRevision = await gitStdout(opts.workspaceRoot, [
+    "rev-parse",
+    `${snapshotRef}^{commit}`,
+  ]);
+  const expectedSourceRevision = trim(opts.expectedSourceRevision);
+  if (expectedSourceRevision && expectedSourceRevision !== sourceRevision) {
+    await $({ cwd: opts.workspaceRoot, stdio: "pipe" })`git update-ref -d ${snapshotRef}`.nothrow();
+    throw new DeploymentAdmissionError(
+      "no_longer_admitted",
+      [
+        `protected/shared reviewed source mismatch for ${reviewedRef}`,
+        `clientExpectedSourceRevision=${expectedSourceRevision}`,
+        `serviceReviewedSourceRevision=${sourceRevision}`,
+        `serviceRemote=${remoteName}`,
+        `Sync the service-side reviewed ref or rerun with --mark-check-for-commit ${sourceRevision} if ${sourceRevision} is intentionally the reviewed commit to deploy.`,
+      ].join("\n"),
+    );
+  }
+  return {
+    reviewedRef,
+    snapshotRef,
+    sourceRevision,
+    remoteName,
+    repository: trim(opts.deployment.lanePolicy.governance.repository),
+    snapshottedAt: new Date().toISOString(),
+  };
+}
+
+export function reviewedSourceSnapshotFrom(
+  value: ReviewedSourceCarrier | undefined,
+): NixosSharedHostReviewedSourceSnapshot | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  if ("snapshotRef" in value && trim((value as { snapshotRef?: unknown }).snapshotRef)) {
+    return value as NixosSharedHostReviewedSourceSnapshot;
+  }
+  return (
+    value.reviewedSourceSnapshot ||
+    value.targetEnvironment?.reviewedSourceSnapshot ||
+    value.admittedContext?.targetEnvironment?.reviewedSourceSnapshot
+  );
+}
+
+export async function cleanupReviewedSourceSnapshot(
+  workspaceRoot: string,
+  value: ReviewedSourceCarrier | undefined,
+): Promise<void> {
+  const snapshot = reviewedSourceSnapshotFrom(value);
+  const snapshotRef = trim(snapshot?.snapshotRef);
+  if (!snapshotRef) return;
+  await $({ cwd: workspaceRoot, stdio: "pipe" })`git update-ref -d ${snapshotRef}`.nothrow();
+}

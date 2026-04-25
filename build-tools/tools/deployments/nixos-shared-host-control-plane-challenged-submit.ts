@@ -93,6 +93,9 @@ export async function acceptChallengedNixosSharedHostSubmit(opts: {
           expectedCompositeArtifactIdentity: opts.resolvedRequest.expectedCompositeArtifactIdentity,
         }
       : {}),
+    ...(opts.resolvedRequest.expectedSourceRevision
+      ? { expectedSourceRevision: opts.resolvedRequest.expectedSourceRevision }
+      : {}),
     ...(opts.resolvedRequest.artifact ? { artifact: opts.resolvedRequest.artifact } : {}),
     ...(opts.resolvedRequest.componentArtifacts
       ? { componentArtifacts: opts.resolvedRequest.componentArtifacts }

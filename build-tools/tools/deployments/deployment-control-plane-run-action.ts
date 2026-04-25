@@ -25,6 +25,7 @@ import {
   runActionRequestPathFor,
   writeControlPlaneJson,
 } from "./nixos-shared-host-control-plane-store.ts";
+import { cleanupReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot.ts";
 type SubmissionRecord = {
   submissionId: string;
   executionSnapshotPath: string;
@@ -83,6 +84,15 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
   authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   approval?: DeploymentControlPlaneApprovalGrantRequest;
 }) {
+  const cleanupSnapshotIfTerminal = async () => {
+    if (!opts.workspaceRoot) return;
+    const latest = await readControlPlaneJson<SubmissionRecord>(opts.submissionPath);
+    if (latest.lifecycleState !== "finished" && latest.lifecycleState !== "cancelled") return;
+    const snapshot = await readControlPlaneJson<any>(latest.executionSnapshotPath).catch(
+      () => undefined,
+    );
+    await cleanupReviewedSourceSnapshot(opts.workspaceRoot, snapshot);
+  };
   const submission = await readControlPlaneJson<SubmissionRecord>(opts.submissionPath);
   const submittedAt = new Date().toISOString();
   const requestedBy = opts.requestedBy || defaultRequestedBy();
@@ -150,6 +160,7 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
       ...(opts.approval ? { approval: opts.approval } : {}),
     });
     await writeControlPlaneJson(opts.submissionPath, approved);
+    await cleanupSnapshotIfTerminal();
     const status = statusFromSubmission(approved as any);
     return runActionResponseFromSubmission(status, actionId, opts.action);
   }
@@ -227,6 +238,7 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
       updated,
     });
   }
+  await cleanupSnapshotIfTerminal();
   const status = statusFromSubmission(
     await readControlPlaneJson<SubmissionRecord>(opts.submissionPath),
   );

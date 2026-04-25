@@ -240,11 +240,16 @@ For the current `mini` shared-dev deployment path, that means:
 
 - source admission resolves the authoritative stage branch for the deployment's lane stage
   - today that is `env/pleomino/dev` for the concrete `pleomino-dev` deployment
-  - source admission records the admitted source revision and the exact artifact identity selected
-    for that revision
+  - the control plane fetches that reviewed ref from the configured SCM remote into a
+    submission-scoped snapshot ref instead of trusting one ambient long-lived local branch
+  - source admission records the fetched commit as the admitted source revision and the exact
+    artifact identity selected for that revision
+  - submit-time required checks bind to that fetched commit SHA, and client-supplied expected
+    revisions fail closed when they do not match the service-owned snapshot
 - target-environment run admission freezes the mutating execution snapshot before lock acquisition
   - this snapshot records the current lane-policy fingerprint, admission-policy fingerprint,
-    environment stage, target branch head revision, and canonical provider-target identity
+    environment stage, target branch head revision, canonical provider-target identity, and the
+    reviewed-source snapshot ref used for that submission
 - durable run records and replay snapshots preserve that admitted context so retry and rollback do
   not silently reinterpret current repo metadata as if it had been part of the original run
 - the lane also resolves one reviewed governance object for `env/pleomino/dev`,
@@ -256,8 +261,10 @@ For the current `mini` shared-dev deployment path, that means:
 Operationally, this keeps the current shared-dev provider narrow while still enforcing the core
 protected/shared model:
 
-- normal deploys use the lane stage branch as the source of truth instead of the operator's ambient
-  checkout
+- normal deploys use the service-owned reviewed snapshot of the lane stage branch instead of the
+  operator's ambient checkout
+- concurrent submissions can snapshot different commits of `env/pleomino/dev` without clobbering
+  one another's admission subject
 - `retry` reuses the recorded admitted source snapshot and exact artifact without rebuilding
 - `rollback` still reuses a prior admitted run, but only while that run remains authorized by the
   current branch-backed lane state

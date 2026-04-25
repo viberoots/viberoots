@@ -38,6 +38,10 @@ import {
 } from "./nixos-shared-host-control-plane-store.ts";
 import { writeNixosSharedHostProvisionerPlan } from "./nixos-shared-host-provisioner-plan.ts";
 import { createNixosSharedHostDeployRunId } from "./nixos-shared-host-records.ts";
+import {
+  cleanupReviewedSourceSnapshot,
+  snapshotReviewedSourceForSubmission,
+} from "./nixos-shared-host-reviewed-source-snapshot.ts";
 
 function assertExpectedArtifactIdentities(
   snapshot: NixosSharedHostControlPlaneSnapshot,
@@ -91,6 +95,7 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
   expectedArtifactIdentity?: string;
   expectedComponentArtifactIdentities?: Record<string, string>;
   expectedCompositeArtifactIdentity?: string;
+  expectedSourceRevision?: string;
   artifact?: any;
   componentArtifacts?: any[];
   publishBehavior?: NixosSharedHostPublishBehavior;
@@ -105,8 +110,23 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
   const submissionId = opts.submissionId || createNixosSharedHostSubmissionId();
   const requestedBy =
     opts.requestedBy || opts.admissionEvidence?.requestedBy || defaultRequestedBy();
+  const reviewedSourceSnapshot =
+    opts.operationKind !== "explicit_removal"
+      ? await snapshotReviewedSourceForSubmission({
+          workspaceRoot: opts.workspaceRoot,
+          deployment: opts.deployment,
+          submissionId,
+          ...(opts.expectedSourceRevision
+            ? { expectedSourceRevision: opts.expectedSourceRevision }
+            : {}),
+        })
+      : undefined;
   const snapshot = await createNixosSharedHostControlPlaneSnapshot(
-    { ...opts, deferSecretReferenceResolution: true },
+    {
+      ...opts,
+      deferSecretReferenceResolution: true,
+      ...(reviewedSourceSnapshot ? { reviewedSourceSnapshot } : {}),
+    },
     submissionId,
   );
   const deployRunId = createNixosSharedHostDeployRunId();
@@ -163,6 +183,7 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
     });
     if (!submission) throw error;
     await writeBackendSubmissionDoc(opts.backend, submission, refs);
+    await cleanupReviewedSourceSnapshot(opts.workspaceRoot, snapshot);
     throw Object.assign(error, { submission });
   }
   const submission = createNixosSharedHostControlPlaneSubmission(snapshot, executionSnapshotPath, {

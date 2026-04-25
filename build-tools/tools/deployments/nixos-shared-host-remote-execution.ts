@@ -57,6 +57,7 @@ export type NixosSharedHostRemoteDeploySummary = {
 };
 
 export async function runNixosSharedHostRemoteDeploy(opts: {
+  workspaceRoot: string;
   deployment: NixosSharedHostDeployment;
   plan: NixosSharedHostRemotePlan;
   localArtifactDir: string;
@@ -140,6 +141,7 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
     }
     const record = requireServiceRecord(
       await runNixosSharedHostDirectServiceMutation({
+        workspaceRoot: opts.workspaceRoot,
         controlPlaneUrl: opts.plan.serviceClient.controlPlaneUrl,
         ...(controlPlaneToken ? { controlPlaneToken } : {}),
         deployment: opts.deployment,
@@ -150,7 +152,10 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
         ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
         ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
       }).catch((error) => {
-        throw remoteServiceSubmissionError(error);
+        throw remoteServiceSubmissionError(error, {
+          deployment: opts.deployment,
+          ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
+        });
       }),
     );
     controlPlane = {

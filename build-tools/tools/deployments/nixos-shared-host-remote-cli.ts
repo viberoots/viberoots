@@ -200,6 +200,7 @@ export async function maybeRunNixosSharedHostRemoteProfile(opts: {
   console.log(
     JSON.stringify(
       await runNixosSharedHostRemoteDeploy({
+        workspaceRoot: opts.workspaceRoot,
         deployment: opts.deployment,
         plan,
         localArtifactDir: await resolveLocalArtifactDir(opts.workspaceRoot, opts.deployment),

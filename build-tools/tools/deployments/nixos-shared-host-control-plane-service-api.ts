@@ -187,6 +187,9 @@ export async function handleControlPlaneSubmit(
                     resolvedRequest.expectedCompositeArtifactIdentity,
                 }
               : {}),
+            ...(resolvedRequest.expectedSourceRevision
+              ? { expectedSourceRevision: resolvedRequest.expectedSourceRevision }
+              : {}),
             ...(resolvedRequest.artifact ? { artifact: resolvedRequest.artifact } : {}),
             ...(resolvedRequest.componentArtifacts
               ? { componentArtifacts: resolvedRequest.componentArtifacts }

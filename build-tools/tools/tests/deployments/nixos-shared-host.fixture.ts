@@ -143,6 +143,22 @@ export async function ensureNixosSharedHostStageBranch(
 ) {
   const branch = deployment.lanePolicy.stageBranches[deployment.environmentStage];
   await $({ cwd, stdio: "pipe" })`git branch -f ${branch} HEAD`;
+  const remoteRoot = `${cwd}/.tmp-reviewed-origin.git`;
+  const hasOrigin =
+    (await $({ cwd, stdio: "pipe" })`git remote get-url origin`.nothrow()).exitCode === 0;
+  if (
+    !(
+      await $({ cwd, stdio: "pipe" })`git -C ${remoteRoot} rev-parse --is-bare-repository`.nothrow()
+    ).stdout
+  ) {
+    await $({ cwd, stdio: "pipe" })`git init --bare ${remoteRoot}`.nothrow();
+  }
+  if (hasOrigin) {
+    await $({ cwd, stdio: "pipe" })`git remote set-url origin ${remoteRoot}`;
+  } else {
+    await $({ cwd, stdio: "pipe" })`git remote add origin ${remoteRoot}`;
+  }
+  await $({ cwd, stdio: "pipe" })`git push --force origin HEAD:${branch}`;
 }
 
 export function nixosSharedHostDeploymentFixture(

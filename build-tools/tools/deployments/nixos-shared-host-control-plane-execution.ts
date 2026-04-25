@@ -11,7 +11,7 @@ import {
 import { nixosSharedHostLockScopes } from "./nixos-shared-host-components.ts";
 import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
 import { withWorkerDeploymentVaultRuntime } from "./deployment-vault-runtime-worker.ts";
-import { resolveNixosSharedHostAdmittedSecretReferences } from "./nixos-shared-host-admission.ts";
+import { resolveNixosSharedHostAdmittedSecretReferences } from "./nixos-shared-host-admission-helpers.ts";
 import type { DeploymentSecretContext } from "./deployment-secret-context.ts";
 
 async function resolveWorkerAdmittedSecrets(opts: {

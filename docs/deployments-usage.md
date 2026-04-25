@@ -263,6 +263,14 @@ To discover the reviewed check names before you use `--mark-check-passed`, run
 `admissionRequirements.admission_policy`, `allowed_refs`, `required_checks`,
 and `required_approvals` in the JSON response. That read-only output tells you
 which names the deployment expects; it does not grant `admission_reporter`.
+For protected/shared service-backed runs, `--mark-check-passed` and
+`--mark-check-for-commit` only describe the commit the client believes it is
+submitting. Final admission still binds to the service-owned reviewed source
+snapshot for the deployment's authoritative stage ref. If the service returns a
+reviewed source mismatch, compare `clientExpectedSourceRevision` with
+`serviceReviewedSourceRevision`: either sync the service-side reviewed ref or
+rerun with `--mark-check-for-commit <serviceReviewedSourceRevision>` only when
+that fetched service revision is intentionally the reviewed commit to deploy.
 Do not pass laptop Vault tokens, Vault JWT files, secret fixture paths, or
 client-supplied principals to protected/shared service deployments. `mini`
 derives identity through its service session and the worker uses server-owned

@@ -39,3 +39,7 @@ export function hasReplaySnapshot(
 } {
   return !!source?.replaySnapshot;
 }
+
+export function createNixosSharedHostWorkerId(submissionId: string): string {
+  return `${submissionId}-worker`;
+}

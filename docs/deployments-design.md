@@ -85,6 +85,8 @@ Future edits should not weaken or silently contradict the following invariants w
 - preview is a publish mode, not a deployment identity and not a peer `operation_kind`; preview must publish only to an explicitly isolated preview target or be rejected.
 - protected/shared mutation must go through the shared control plane; trusted CI may build, attest, and trigger submissions, but it is not a peer mutating authority. Direct local mutation of `shared_nonprod` and `production_facing` targets is out of policy except for explicitly controlled emergency procedures.
 - every `shared_nonprod` and `production_facing` mutating run must freeze an immutable execution snapshot at admission before waiting, locking, or mutation; later execution revalidates only narrow current invariants instead of silently consuming drifted repo or provider config state.
+- for first-run protected/shared mutation, source admission must snapshot the authoritative reviewed stage ref from the configured SCM remote into a submission-scoped ref and bind the admitted `sourceRevision` to that fetched commit rather than to an operator workstation checkout or one mutable long-lived local branch
+- when a protected/shared client supplies the reviewed commit it expects, the service must compare that expectation against its freshly snapshotted reviewed ref and fail closed if they differ
 - for `shared_nonprod` and `production_facing`, the mutating publish phase must consume an admitted immutable artifact; a `--source-run-id` selector may nominate the earlier admitted run that provides the artifact or promoted source revision for that operation kind, but it does not authorize workstation builds or ad hoc mutating rebuilds.
 - protected/shared first-run deploys use two admission stages:
   - source admission determines the admissible revision and trusted artifact inputs
@@ -1202,9 +1204,12 @@ Control-plane worker responsibilities for protected/shared mutation:
 
 1. resolve source admission for the requested protected/shared operation
    - for first-run deploy, source admission determines the admissible revision and trusted artifact path
+   - it must fetch the reviewed stage ref from the configured SCM remote into a submission-scoped snapshot ref so concurrent submissions do not overwrite one another's admission subject
+   - the fetched commit becomes the authoritative admitted `sourceRevision` for submit-time checks, stored provenance, replay, and any later promotion flow that depends on that run's admitted source
    - for immutable-reuse flows, source admission validates the selected prior admitted run and its replay eligibility
 2. resolve target-environment run admission and freeze one immutable execution snapshot for that mutating run before any waiting or mutation begins
    - the snapshot should preserve the deployment metadata, immutable provider-config content or immutable provider-config references, resolved policy contents, selected artifact inputs when applicable, runner implementation identities for the built-in publisher, provisioner, smoke runner, and any built-in `release_actions` runner that materially influence execution, and any other non-secret execution inputs needed to replay the admitted decision faithfully
+   - when first-run source admission used a reviewed-ref snapshot, the frozen target-environment snapshot should preserve that submission-scoped snapshot reference so later revalidation continues to check the same reviewed source rather than silently following a newer branch head
    - for secret or runtime-config dependencies, the snapshot should preserve non-secret contract references, versions, selectors, or fingerprints rather than secret values
    - replay-sensitive secret or runtime-config references must resolve exactly to the admitted reference set for the run kind being executed; implementations must not silently substitute "latest", auto-rotated, or ambient defaults during retry or rollback
 3. when the run includes an infra-affecting protected/shared provisioner, generate the reviewable provisioner plan or diff from that frozen execution snapshot before any mutating step begins

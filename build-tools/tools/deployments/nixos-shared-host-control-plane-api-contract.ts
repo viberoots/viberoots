@@ -37,6 +37,7 @@ export type NixosSharedHostControlPlaneSubmitRequest = DeploymentExpectedArtifac
   artifact?: NixosSharedHostAdmittedArtifact;
   componentArtifacts?: NixosSharedHostResolvedComponentArtifact[];
   publishBehavior?: NixosSharedHostPublishBehavior;
+  expectedSourceRevision?: string;
   sourceRunId?: string;
   rollback?: boolean;
   parentRunId?: string;

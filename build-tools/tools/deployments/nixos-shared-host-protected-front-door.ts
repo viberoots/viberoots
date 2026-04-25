@@ -73,6 +73,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
   });
   const result = opts.remove
     ? await runNixosSharedHostDirectServiceMutation({
+        workspaceRoot: opts.workspaceRoot,
         controlPlaneUrl: serviceClient.controlPlaneUrl,
         ...(serviceClient.controlPlaneToken
           ? { controlPlaneToken: serviceClient.controlPlaneToken }
@@ -84,6 +85,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
       })
     : opts.provisionOnly
       ? await runNixosSharedHostDirectServiceMutation({
+          workspaceRoot: opts.workspaceRoot,
           controlPlaneUrl: serviceClient.controlPlaneUrl,
           ...(serviceClient.controlPlaneToken
             ? { controlPlaneToken: serviceClient.controlPlaneToken }
@@ -100,6 +102,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
         })
       : opts.publishOnly
         ? await runNixosSharedHostDirectServiceMutation({
+            workspaceRoot: opts.workspaceRoot,
             controlPlaneUrl: serviceClient.controlPlaneUrl,
             ...(serviceClient.controlPlaneToken
               ? { controlPlaneToken: serviceClient.controlPlaneToken }
@@ -116,6 +119,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
               : {}),
           })
         : await runNixosSharedHostDirectServiceMutation({
+            workspaceRoot: opts.workspaceRoot,
             controlPlaneUrl: serviceClient.controlPlaneUrl,
             ...(serviceClient.controlPlaneToken
               ? { controlPlaneToken: serviceClient.controlPlaneToken }
