@@ -12893,6 +12893,319 @@ admission-evidence chore from normal protected/shared deploys.
 
 ---
 
+## PR-95: Declarative Keycloak deploy-auth groups derived from deployment targets
+
+### Description
+
+I will remove the remaining operator-owned Keycloak group-shape drift by making the deployment repo
+the reviewed source of truth for deploy-auth group definitions and mapper expectations, while still
+keeping routine `deploy` flows read-only. Today the control plane derives human grants from
+deterministic group names such as `deploy-submitters-<project>-<env>` and
+`deploy-admission-reporters-<project>-<env>`, but operators must still create and maintain those
+groups manually in Keycloak even though the names are already derivable from reviewed deployment
+metadata.
+
+The reviewed model should become:
+
+- deployment targets remain the source of truth for which deploy-auth groups should exist
+- the repo can generate the reviewed Keycloak group/mapping shape from deployment metadata without
+  hardcoded per-deployment strings
+- NixOS/flake-driven Keycloak configuration on `mini` can import or reconcile that reviewed group
+  shape during rebuild or switch
+- the client CLI can derive and explain the expected group shape for one deployment or one failed
+  authorization without requiring operators to reverse-engineer naming conventions by hand
+- human or service-account membership assignment remains a separate reviewed identity-management
+  step rather than becoming a side effect of routine `deploy`
+
+### Scope & Changes
+
+- Add a reviewed deployment-auth group derivation layer that computes Keycloak group definitions
+  from deployment targets:
+  - derive `deploy-submitters-<project>-<env>`
+  - derive `deploy-approvers-<project>-<env>`
+  - derive `deploy-admission-reporters-<project>-<env>`
+  - derive the reviewed automation group patterns already supported by the control plane where that
+    improves declarative provisioning
+- Add a read-only deployment helper surface for operator diagnostics and generation:
+  - print the expected human and automation group names for one deployment or the reviewed
+    deployment set
+  - explain which reviewed groups are required for a specific action such as submit, approve, or
+    submit-time check reporting
+  - print reviewed example admin commands or next-step guidance derived from deployment metadata
+    instead of forcing operators to handcraft raw `kcadm.sh` arguments from memory
+  - generate reviewed Keycloak realm/group data without mutating Keycloak directly
+  - keep routine `deploy` read-only with respect to Keycloak and identity policy
+- Improve operator-facing authorization failures:
+  - when the control plane rejects a human principal for missing `submitter`, `approver`, or
+    `admission_reporter`, surface the derived reviewed group names in the CLI error
+  - point operators at the reviewed `deploy auth ...` or `deploy admin ...` helper surface rather
+    than only emitting a generic missing-grant message
+  - keep the failure read-only; diagnostics may suggest admin actions but must not mutate Keycloak
+    from the ordinary deploy path
+- Add a declarative Keycloak wiring path for `mini`:
+  - generate realm import material or another reviewed desired-state artifact from deployment
+    metadata
+  - feed that artifact into the existing Keycloak-on-NixOS configuration path during rebuild/switch
+  - support deterministic creation/update of deploy-auth groups and the `deployment-cli` group
+    mapper configuration
+- Keep identity membership separate from deployment-target metadata:
+  - do not encode individual user membership in deployment targets
+  - allow a separate reviewed identity file or reconciliation input to map humans and automation
+    principals into the derived groups
+  - make the split explicit in docs so operators understand “group shape” versus “group members”
+- Preserve fail-closed behavior:
+  - missing groups or missing membership must still result in authenticated-but-unauthorized
+    service behavior rather than broad fallback access
+  - malformed or ad hoc IdP groups must not create implicit authorization
+
+### Tests (in this PR)
+
+- Add derivation tests proving deployment metadata deterministically produces the expected Keycloak
+  group names for human and automation scopes.
+- Add CLI diagnostics tests proving:
+  - read-only helper commands print the expected group names for one deployment
+  - missing-grant failures surface the correct derived groups for submitter, approver, and
+    admission-reporter actions
+  - the suggested next-step commands stay aligned with the reviewed deployment metadata
+- Add generation tests proving the reviewed Keycloak realm/group artifact stays aligned with the
+  deployment target set and with the control-plane claim-to-grant mapping contract.
+- Add NixOS/module tests proving the `mini` Keycloak configuration can consume the generated
+  realm/group shape during evaluation or switch-time reconciliation.
+- Add docs-parity tests proving operator docs, generation output, and auth-session mapping examples
+  all describe the same group conventions.
+- Add fail-closed tests proving the generation path does not silently invent wildcard groups or
+  broaden scopes beyond the reviewed deployment metadata.
+
+### Docs (in this PR)
+
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  to describe Keycloak group creation as a declarative repo-derived step rather than manual string
+  assembly.
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  with the reviewed `mini` rebuild/switch path that provisions deploy-auth group definitions and
+  mappers from deployment metadata.
+- Update [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md) with the
+  new read-only helper command(s) for:
+  - inspecting expected Keycloak groups for a deployment
+  - understanding which groups are needed for a specific action
+  - interpreting missing-grant failures without dropping into raw IdP tooling
+- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  with the operator-facing workflow for:
+  - understanding which deploy-auth groups a reviewed deployment expects
+  - distinguishing missing group shape from missing user membership
+  - using the read-only CLI helpers before escalating to admin actions
+- Update [Deployments Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md) if
+  needed to document any reviewed metadata or generated-artifact contract introduced by the
+  derivation path.
+- Update troubleshooting docs/runbooks to distinguish:
+  - missing declaratively provisioned group shape
+  - missing user membership in an existing derived group
+  - missing or stale Keycloak client `groups` mapper configuration
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - Keycloak group derivation
+  - CLI authorization diagnostics
+  - generated realm/group artifact parity
+  - NixOS/Keycloak wiring for `mini`
+  - docs and diagnostics parity
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR stays within reviewed deployment metadata derivation, Keycloak provisioning helpers,
+  NixOS/Keycloak wiring, and operator docs. Under the deployment-only verify policy, default
+  `v` / CI can run the reviewed deployment suite unless implementation details force shared
+  build-system selector changes.
+
+### Acceptance Criteria
+
+- Reviewed deployment metadata deterministically defines the Keycloak deploy-auth groups that must
+  exist for each deployment/environment.
+- Operators no longer need to handcraft deploy-auth group names in Keycloak for new or changed
+  deployments.
+- `deploy` remains read-only with respect to Keycloak policy state, but operators have a reviewed
+  helper for inspecting or exporting the expected group shape and for understanding which groups are
+  required for a given action.
+- `mini` can provision or reconcile the reviewed deploy-auth group definitions and mapper shape via
+  NixOS/flake-driven configuration.
+- Human or automation membership assignment remains explicit and separate from the deployment-target
+  source of truth.
+
+### Risks
+
+Declarative IdP provisioning introduces a new coordination boundary between deployment metadata,
+generated Keycloak state, and the lifecycle of the host’s identity service.
+
+### Mitigation
+
+Keep the generated Keycloak shape narrowly scoped to group definitions and mapper expectations,
+preserve a strict separation between group shape and membership, and cover derivation/import parity
+with targeted tests and docs checks.
+
+### Consequence of Not Implementing
+
+Operators will continue to maintain Keycloak group definitions manually even though the required
+group shape is already derivable from reviewed deployment targets, leaving avoidable setup drift in
+the deploy-auth path.
+
+### Downsides for Implementing
+
+This adds one more generated deployment artifact and one more Keycloak-on-NixOS integration surface,
+which increases declarative identity-management complexity compared with today’s fully manual group
+setup.
+
+### Recommendation
+
+Implement immediately after PR-94 so the simplified capability-group auth model is paired with a
+repo-derived Keycloak provisioning path, eliminating the last manual group-shape chore without
+making routine deploy commands mutate identity policy.
+
+---
+
+## PR-96: Authorized `deploy admin` workflows for Keycloak identity mutations
+
+### Description
+
+I will close the remaining operator-experience asymmetry by keeping `deploy` as the single reviewed
+operator CLI while introducing a separate authorized `deploy admin` namespace for identity-policy
+mutation. Today the cleanest trust boundary is “routine `deploy` stays read-only, raw `kcadm.sh`
+handles admin changes,” but that still leaves operators switching mental models and tools. We want
+the same reviewed deployment metadata to drive both the read-only guidance path and the privileged
+admin path, without accidentally granting Keycloak-admin authority to ordinary deploy submitters.
+
+The reviewed model should become:
+
+- ordinary `deploy` commands stay read-only with respect to Keycloak
+- privileged identity operations live under `deploy admin ...` instead of raw `kcadm.sh`
+- `deploy admin` actions require their own reviewed admin grants derived from the same deployment
+  scope model, not the ordinary `submitter` / `approver` / `admission_reporter` groups
+- admin changes are auditable and explicit, with a reviewed plan/apply or explain/apply split
+
+### Scope & Changes
+
+- Add a reviewed `deploy admin` namespace for identity-management tasks related to deploy auth:
+  - `deploy admin keycloak plan`
+  - `deploy admin keycloak sync`
+  - `deploy admin keycloak grant-user` or an equivalent reviewed membership-assignment command
+  - any other minimal helper needed to keep operators inside the reviewed CLI instead of raw
+    `kcadm.sh`
+- Add a distinct admin authorization model:
+  - define separate admin capabilities such as Keycloak read/admin or group-shape-admin versus
+    membership-admin
+  - do not reuse ordinary deploy capability groups as permission to mutate Keycloak
+  - support the same reviewed scope model where appropriate, such as project-scoped,
+    environment-scoped, or global deploy-admin authority
+- Add reviewed Keycloak group conventions for admin capabilities:
+  - examples may include forms like `deploy-admin-keycloak-read-project-<project>` and
+    `deploy-admin-keycloak-write-project-<project>` or equivalent reviewed naming
+  - preserve least privilege so a human may administer only the parts of deploy auth they are meant
+    to own
+- Keep admin operations explicit and auditable:
+  - plan/explain commands show exactly which groups, mappers, or memberships would change
+  - apply commands require explicit reviewed admin authorization and record the acting principal,
+    scope, and requested mutation
+  - fail closed when admin credentials or grants are missing
+- Keep the derived deployment metadata contract central:
+  - the admin commands consume the same reviewed group-shape derivation introduced in PR-95
+  - no hardcoded per-deployment group names should live only in the admin path
+  - ordinary missing-grant failures can recommend `deploy admin ...` next steps without themselves
+    gaining mutation authority
+
+### Tests (in this PR)
+
+- Add authorization tests proving `deploy admin` capabilities are separate from ordinary deploy
+  capabilities.
+- Add scope tests proving an admin grant can be constrained by project, environment, or other
+  reviewed scope instead of implicitly becoming global.
+- Add plan/apply tests proving `deploy admin keycloak plan` is deterministic and that `sync` /
+  membership mutation paths fail closed without the required reviewed admin grant.
+- Add audit/provenance tests proving admin actions record the acting principal, granted scope, and
+  requested identity mutation.
+- Add docs-parity tests proving the `deploy admin` commands, Keycloak admin group conventions, and
+  troubleshooting guidance all describe the same reviewed contract.
+
+### Docs (in this PR)
+
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  to present `deploy admin` as the reviewed operator surface for Keycloak identity mutations,
+  replacing raw `kcadm.sh` as the primary human workflow.
+- Update [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md) with the
+  split between:
+  - ordinary read-only `deploy auth ...` diagnostics
+  - privileged `deploy admin ...` identity changes
+- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  with the reviewed operator/admin flow for:
+  - interpreting missing-grant and missing-admin-grant failures
+  - choosing between read-only `deploy auth ...` helpers and privileged `deploy admin ...`
+  - applying reviewed Keycloak membership or group-shape changes without dropping to raw IdP tools
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  with the reviewed admin-grant conventions and the expected host-side credential sources for
+  `deploy admin` operations.
+- Update troubleshooting docs so missing ordinary deploy access and missing deploy-admin access are
+  clearly distinguishable to operators.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - deploy-admin authorization separation
+  - scoped admin-grant matching
+  - plan/apply identity-mutation behavior
+  - audit/provenance parity
+  - docs and CLI parity
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR stays within deployment-domain CLI/admin authorization behavior, Keycloak admin workflow
+  design, audit/provenance, and docs. Under the deployment-only verify policy, default `v` / CI can
+  run the reviewed deployment suite unless implementation details force shared build-system selector
+  changes.
+
+### Acceptance Criteria
+
+- Operators can stay within the reviewed `deploy` CLI family for both deploy-auth diagnostics and
+  privileged Keycloak admin workflows.
+- Ordinary deploy capability groups do not grant Keycloak-admin authority.
+- `deploy admin` mutations require separate reviewed admin grants and fail closed when those grants
+  are absent.
+- Admin operations remain explicit, scoped, and auditable.
+- CLI guidance and docs no longer force operators to reconstruct raw IdP-admin commands from
+  scratch for common reviewed workflows.
+
+### Risks
+
+Adding a privileged admin namespace to `deploy` increases the blast radius of the CLI if its
+authorization boundary or credential handling is underspecified.
+
+### Mitigation
+
+Keep `deploy admin` authorization independent from ordinary deploy grants, require explicit admin
+credentials and grants for any mutation path, preserve plan/apply separation, and audit every admin
+mutation with the same rigor as deploy control-plane actions.
+
+### Consequence of Not Implementing
+
+Operators will continue to rely on raw IdP-admin tooling for membership and policy mutations even
+after PR-95 makes the desired group shape derivable from reviewed deployment metadata, leaving the
+CLI story asymmetric and harder to teach.
+
+### Downsides for Implementing
+
+This introduces another authorization vocabulary and another privileged CLI surface that must be
+maintained, tested, and documented carefully.
+
+### Recommendation
+
+Implement immediately after PR-95 so the repo-derived Keycloak provisioning story is paired with a
+reviewed, authorized, single-CLI admin workflow instead of leaving operators split between `deploy`
+and raw IdP tooling.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
