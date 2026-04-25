@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { hasFlag } from "../lib/cli.ts";
 import type { DeploymentTarget } from "./contract.ts";
 
 export type DeploymentAdmissionRequirementsForCli = {
@@ -29,13 +30,42 @@ export function deploymentAdmissionRequirementsForCli(
 
 export function missingMarkCheckPassedValueMessage(deployment: DeploymentTarget): string {
   const requirements = deploymentAdmissionRequirementsForCli(deployment);
+  const currentArgs = stripMarkCheckPassedFromCurrentArgs(deployment);
   return [
-    "--mark-check-passed requires one or more check names.",
-    `Inspect reviewed deployment requirements with: deploy --deployment ${deployment.label} --validate-only`,
+    "--mark-check-passed needs an explicit check name for this deployment.",
+    `deployment: ${deployment.label}`,
     `admission_policy: ${requirements.admission_policy}`,
     requirements.required_checks.length > 0
       ? `required_checks: ${requirements.required_checks.join(", ")}`
-      : `${deployment.label} has no required_checks in ${requirements.admission_policy}.`,
+      : "required_checks: none",
+    requirements.required_checks.length > 0
+      ? `Run this instead: ${renderDeployCommand([
+          ...currentArgs,
+          "--mark-check-passed",
+          requirements.required_checks.join(","),
+        ])}`
+      : `Run this instead: ${renderDeployCommand(currentArgs)}`,
+    `Inspect requirements only: ${renderDeployCommand(["--deployment", deployment.label, "--validate-only"])}`,
     "Discovering required check names does not grant admission_reporter authorization.",
   ].join("\n");
+}
+
+function stripMarkCheckPassedFromCurrentArgs(deployment: DeploymentTarget): string[] {
+  const raw = Array.isArray(process.argv) ? process.argv.slice(2) : [];
+  const kept: string[] = [];
+  for (let i = 0; i < raw.length; i += 1) {
+    const arg = raw[i] || "";
+    if (arg === "--mark-check-passed") {
+      const next = raw[i + 1] || "";
+      if (next && !next.startsWith("--")) i += 1;
+      continue;
+    }
+    if (arg.startsWith("--mark-check-passed=")) continue;
+    kept.push(arg);
+  }
+  return hasFlag("deployment") ? kept : ["--deployment", deployment.label, ...kept];
+}
+
+function renderDeployCommand(args: string[]): string {
+  return ["deploy", ...args].join(" ");
 }

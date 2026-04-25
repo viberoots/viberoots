@@ -57,7 +57,14 @@ test("deploy --mark-check-passed with no value suggests authoritative required c
       stdio: "pipe",
     })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-dev:deploy --mark-check-passed`.nothrow();
     assert.notEqual(result.exitCode, 0);
-    assert.match(String(result.stderr), /--validate-only/);
+    assert.match(
+      String(result.stderr),
+      /Run this instead: deploy --deployment \/\/sandbox\/deployments\/demo-dev:deploy --mark-check-passed deploy\/demo-dev/,
+    );
+    assert.match(
+      String(result.stderr),
+      /Inspect requirements only: deploy --deployment \/\/sandbox\/deployments\/demo-dev:deploy --validate-only/,
+    );
     assert.match(
       String(result.stderr),
       /admission_policy: \/\/sandbox\/deployments\/shared:dev_release/,
@@ -75,7 +82,11 @@ test("deploy --mark-check-passed with no value says when a deployment has no req
       stdio: "pipe",
     })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --mark-check-passed`.nothrow();
     assert.notEqual(result.exitCode, 0);
-    assert.match(String(result.stderr), /has no required_checks/);
-    assert.match(String(result.stderr), /--validate-only/);
+    assert.match(String(result.stderr), /required_checks: none/);
+    assert.match(
+      String(result.stderr),
+      /Run this instead: deploy --deployment \/\/sandbox\/deployments\/demo-staging:deploy/,
+    );
+    assert.doesNotMatch(String(result.stderr), /Run this instead: .*--mark-check-passed/);
   });
 });

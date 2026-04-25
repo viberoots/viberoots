@@ -43,7 +43,10 @@ test("remote profile deploy surface keeps missing mark-check guidance discoverab
     })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --artifact-dir ${fixture.artifactDir} --mark-check-passed`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /deploy\/pleomino-dev/);
-    assert.match(String(result.stderr), /--validate-only/);
+    assert.match(
+      String(result.stderr),
+      /Run this instead: deploy --deployment \/\/projects\/deployments\/pleomino-dev:deploy --profile mini .* --mark-check-passed deploy\/pleomino-dev/,
+    );
   });
 });
 
@@ -64,6 +67,9 @@ test("jenkins wrapper preserves missing mark-check guidance from the deploy fron
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.ok, false);
     assert.match(String(summary.error.message), /deploy\/pleomino-dev/);
-    assert.match(String(summary.error.message), /--validate-only/);
+    assert.match(
+      String(summary.error.message),
+      /Run this instead: deploy --deployment \/\/projects\/deployments\/pleomino-dev:deploy --profile mini .* --mark-check-passed deploy\/pleomino-dev/,
+    );
   });
 });
