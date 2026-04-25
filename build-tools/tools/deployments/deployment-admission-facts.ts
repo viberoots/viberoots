@@ -48,8 +48,11 @@ export function requiredCheckFacts(opts: {
   evidence?: DeploymentAdmissionEvidence;
 }): DeploymentAdmissionCheckFact[] {
   const subjects = new Set(requiredCheckSubjectsFor(opts.operationKind, opts.binding));
-  const current = (opts.evidence?.checks || [])
-    .filter((check) => check.status === "passed" && subjects.has(check.subject))
+  const currentEvidence = (opts.evidence?.checks || []).filter(
+    (check) => check.status === "passed",
+  );
+  const current = currentEvidence
+    .filter((check) => subjects.has(check.subject))
     .map((check) => ({
       name: check.name,
       subject: check.subject,
@@ -57,20 +60,53 @@ export function requiredCheckFacts(opts: {
       ...(check.recordRef ? { recordRef: check.recordRef } : {}),
       ...(check.reportingKind ? { reportingKind: check.reportingKind } : {}),
     }));
-  const carried = sourceAdmissionChecks(opts.sourceRecord).filter((check) =>
-    subjects.has(check.subject),
-  );
+  const carriedEvidence = sourceAdmissionChecks(opts.sourceRecord);
+  const carried = carriedEvidence.filter((check) => subjects.has(check.subject));
   return opts.deployment.admissionPolicy.requiredChecks.map((name) => {
     const hit =
       current.find((check) => check.name === name) || carried.find((check) => check.name === name);
     if (!hit) {
+      const mismatchedSubjects = Array.from(
+        new Set(
+          [...currentEvidence, ...carriedEvidence]
+            .filter((check) => check.name === name && !subjects.has(check.subject))
+            .map((check) => check.subject),
+        ),
+      );
+      const requiredSubjects = Array.from(subjects);
       throw new DeploymentAdmissionError(
         "no_longer_admitted",
-        `protected/shared admission requires check ${name} for subject(s) ${Array.from(subjects).join(", ")}`,
+        mismatchDetail({
+          operationKind: opts.operationKind,
+          name,
+          requiredSubjects,
+          mismatchedSubjects,
+        }),
       );
     }
     return hit;
   });
+}
+
+function mismatchDetail(opts: {
+  operationKind: DeploymentAdmissionOperationKind;
+  name: string;
+  requiredSubjects: string[];
+  mismatchedSubjects: string[];
+}) {
+  if (opts.operationKind === "deploy" && opts.requiredSubjects.length === 1) {
+    const requiredCommit = opts.requiredSubjects[0] || "";
+    if (opts.mismatchedSubjects.length === 1) {
+      return `protected/shared admission requires check ${opts.name} for commit ${requiredCommit}, but found passed ${opts.name} for commit ${opts.mismatchedSubjects[0]}. Mark the check passed for ${requiredCommit} and retry the deploy.`;
+    }
+    if (opts.mismatchedSubjects.length > 1) {
+      return `protected/shared admission requires check ${opts.name} for commit ${requiredCommit}, but found passed ${opts.name} for commits ${opts.mismatchedSubjects.join(", ")}. Mark the check passed for ${requiredCommit} and retry the deploy.`;
+    }
+  }
+  if (opts.mismatchedSubjects.length > 0) {
+    return `protected/shared admission requires check ${opts.name} for subject(s) ${opts.requiredSubjects.join(", ")}, but found passed ${opts.name} for subject(s) ${opts.mismatchedSubjects.join(", ")}. Re-run the check for the required subject and retry the deploy.`;
+  }
+  return `protected/shared admission requires check ${opts.name} for subject(s) ${opts.requiredSubjects.join(", ")}`;
 }
 
 const prerequisiteProviderMaps = new Map<string, Promise<Map<string, string>>>();

@@ -4,7 +4,11 @@ import * as fsp from "node:fs/promises";
 import { promisify } from "node:util";
 import { getFlagList, getFlagStr, hasFlag } from "../lib/cli.ts";
 import type { DeploymentTarget } from "./contract.ts";
-import { missingMarkCheckPassedValueMessage } from "./deployment-admission-requirements.ts";
+import {
+  markCheckSubjectMismatchMessage,
+  missingMarkCheckPassedValueMessage,
+  resolveDeploymentRequiredCheckSubject,
+} from "./deployment-admission-requirements.ts";
 import { isCiSession } from "./deployment-credential-source-selection.ts";
 import {
   normalizeAdmissionEvidence,
@@ -29,16 +33,32 @@ function readMarkedPassedChecks(deployment?: DeploymentTarget): string[] {
   return Array.from(new Set(checks));
 }
 
-async function resolveWorkspaceHeadRevision(workspaceRoot: string): Promise<string> {
+function readMarkedPassedCommitOverride(): string | undefined {
+  if (!hasFlag("mark-check-for-commit")) return undefined;
+  const value = getFlagStr("mark-check-for-commit", "").trim();
+  if (!value) throw new Error("--mark-check-for-commit requires a non-empty commit SHA or git rev");
+  return value;
+}
+
+async function resolveGitRevision(workspaceRoot: string, revision: string): Promise<string> {
+  const { stdout } = await execFileAsync("git", ["rev-parse", revision], { cwd: workspaceRoot });
+  const resolved = String(stdout || "").trim();
+  if (!resolved) throw new Error(`empty git revision for ${revision}`);
+  return resolved;
+}
+
+async function resolveMarkedPassedCheckSubject(
+  workspaceRoot: string,
+  revision?: string,
+): Promise<string> {
   try {
-    const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: workspaceRoot });
-    const revision = String(stdout || "").trim();
-    if (!revision) throw new Error("empty git revision");
-    return revision;
+    return await resolveGitRevision(workspaceRoot, revision || "HEAD");
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(
-      `--mark-check-passed requires a git workspace with a resolvable HEAD: ${detail}`,
+      revision
+        ? `--mark-check-for-commit requires a resolvable git revision (${revision}): ${detail}`
+        : `--mark-check-passed requires a git workspace with a resolvable HEAD: ${detail}`,
     );
   }
 }
@@ -73,11 +93,16 @@ function annotateCheckReportingKind(
 export async function resolveDeploymentAdmissionEvidence(
   opts: {
     deployment?: DeploymentTarget;
+    workspaceRoot?: string;
   } = {},
 ): Promise<DeploymentAdmissionEvidence | undefined> {
-  const workspaceRoot = process.cwd();
+  const workspaceRoot = opts.workspaceRoot || process.cwd();
   const evidenceJson = getFlagStr("admission-evidence-json", "").trim();
   const markedPassedChecks = readMarkedPassedChecks(opts.deployment);
+  const markedPassedCommitOverride = readMarkedPassedCommitOverride();
+  if (markedPassedCommitOverride && markedPassedChecks.length === 0) {
+    throw new Error("--mark-check-for-commit requires --mark-check-passed");
+  }
   const reportingKind = defaultCheckReportingKind(process.env);
   const baseEvidence = annotateCheckReportingKind(
     evidenceJson
@@ -89,7 +114,23 @@ export async function resolveDeploymentAdmissionEvidence(
     throw new Error(`invalid --admission-evidence-json payload: ${evidenceJson}`);
   }
   if (markedPassedChecks.length === 0) return baseEvidence;
-  const subject = await resolveWorkspaceHeadRevision(workspaceRoot);
+  const subject = await resolveMarkedPassedCheckSubject(workspaceRoot, markedPassedCommitOverride);
+  if (opts.deployment && opts.deployment.admissionPolicy.requiredChecks.length > 0) {
+    const required = await resolveDeploymentRequiredCheckSubject({
+      workspaceRoot,
+      deployment: opts.deployment,
+    });
+    if (required.sha !== subject) {
+      throw new Error(
+        markCheckSubjectMismatchMessage({
+          deployment: opts.deployment,
+          actualSha: subject,
+          actualSource: markedPassedCommitOverride ? "explicit" : "head",
+          required,
+        }),
+      );
+    }
+  }
   const checkedAt = new Date().toISOString();
   const inferredChecks = markedPassedChecks.map(
     (name): DeploymentCheckEvidence => ({

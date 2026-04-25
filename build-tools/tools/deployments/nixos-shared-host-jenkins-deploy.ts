@@ -44,29 +44,26 @@ function requireFlagValue(name: string): string {
 
 function requireNoUnsupportedFlags() {
   const hit = UNSUPPORTED_FLAGS.filter((flag) => hasFlag(flag));
-  if (hit.length > 0) {
+  if (hit.length > 0)
     throw new JenkinsDeployError(
       "unsupported_flag",
       `unsupported Jenkins wrapper flags: ${hit.map((flag) => `--${flag}`).join(", ")}`,
     );
-  }
 }
 
 function assertNoHostApplyFlags() {
   const applyHost = getFlagBool("apply-host");
   const dryRun = getFlagBool("apply-host-dry-run");
-  if (applyHost && dryRun) {
+  if (applyHost && dryRun)
     throw new JenkinsDeployError(
       "incompatible_flags",
       "--apply-host and --apply-host-dry-run cannot be combined",
     );
-  }
-  if (applyHost || dryRun) {
+  if (applyHost || dryRun)
     throw new JenkinsDeployError(
       "unsupported_flag",
       "service-only Jenkins wrapper does not support --apply-host or --apply-host-dry-run",
     );
-  }
 }
 
 async function requireExistingPath(flagName: string, kind: "file" | "directory"): Promise<string> {
@@ -162,6 +159,9 @@ function childArgs(ctx: JenkinsContext): string[] {
       ? ((value) => (value ? ["--mark-check-passed", value] : ["--mark-check-passed"]))(
           getFlagStr("mark-check-passed", "").trim(),
         )
+      : []),
+    ...(hasFlag("mark-check-for-commit")
+      ? ["--mark-check-for-commit", requireFlagValue("mark-check-for-commit")]
       : []),
     "--profile",
     ctx.profileName,

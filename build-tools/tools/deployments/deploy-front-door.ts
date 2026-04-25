@@ -65,6 +65,6 @@ export async function validateDeploymentForCli(
     schemaVersion: DEPLOY_VALIDATE_SCHEMA,
     valid: true,
     deployment: listEntry(deployment),
-    admissionRequirements: deploymentAdmissionRequirementsForCli(deployment),
+    admissionRequirements: await deploymentAdmissionRequirementsForCli(workspaceRoot, deployment),
   };
 }

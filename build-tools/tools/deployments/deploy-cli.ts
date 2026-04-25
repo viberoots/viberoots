@@ -73,7 +73,10 @@ export async function runDeployCli(opts: {
     deploymentJsonErrorMessage: opts.deploymentJsonErrorMessage,
   });
   const flags = readDeployCliReadonlyFlags();
-  const admissionEvidence = await resolveDeploymentAdmissionEvidence({ deployment });
+  const admissionEvidence = await resolveDeploymentAdmissionEvidence({
+    deployment,
+    workspaceRoot: opts.workspaceRoot,
+  });
   const smokeConnectOverride = resolveSmokeConnectOverride();
   assertDeployCliReadonlyGuardrails(flags);
   if (

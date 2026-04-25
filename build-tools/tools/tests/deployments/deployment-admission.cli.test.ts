@@ -4,6 +4,8 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { resolveDeploymentAdmissionEvidence } from "../../deployments/deployment-admission-cli.ts";
+import { resolveDeploymentForCli } from "../../deployments/deployment-cli-resolve.ts";
+import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 
 function withSyntheticArgv(args: string[], fn: () => Promise<void>): Promise<void> {
@@ -45,6 +47,25 @@ test("mark-check-passed infers the current HEAD subject and synthesizes passed c
   });
 });
 
+test("mark-check-passed accepts an explicit mark-check-for-commit override", async () => {
+  await runInTemp("deployment-admission-cli-mark-check-for-commit", async (tmp, $) => {
+    const oldCwd = process.cwd();
+    try {
+      process.chdir(tmp);
+      const head = String((await $({ cwd: tmp, stdio: "pipe" })`git rev-parse HEAD`).stdout).trim();
+      await withSyntheticArgv(
+        ["--mark-check-passed=deploy/pleomino-dev", "--mark-check-for-commit", head],
+        async () => {
+          const evidence = await resolveDeploymentAdmissionEvidence();
+          assert.equal(evidence?.checks?.[0]?.subject, head);
+        },
+      );
+    } finally {
+      process.chdir(oldCwd);
+    }
+  });
+});
+
 test("admission-evidence-json checks inherit ci_pipeline reporting in CI when kind is omitted", async () => {
   await runInTemp("deployment-admission-cli-ci-reporting-kind", async (tmp) => {
     const oldCwd = process.cwd();
@@ -74,6 +95,53 @@ test("admission-evidence-json checks inherit ci_pipeline reporting in CI when ki
       process.chdir(oldCwd);
       if (oldCi === undefined) delete process.env.CI;
       else process.env.CI = oldCi;
+    }
+  });
+});
+
+test("mark-check-passed fails closed when local HEAD does not match the deployment-required commit", async () => {
+  await runInTemp("deployment-admission-cli-mark-check-head-mismatch", async (tmp, $) => {
+    await writeTempListedDeploymentWorkspace(tmp);
+    await $({ cwd: tmp })`git init`;
+    await $({ cwd: tmp })`git config user.name Codex`;
+    await $({ cwd: tmp })`git config user.email codex@example.test`;
+    await $({ cwd: tmp })`git add .`;
+    await $({ cwd: tmp })`git commit -m initial`;
+    const requiredSha = String(
+      (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse HEAD`).stdout,
+    ).trim();
+    await $({ cwd: tmp })`git branch env/demo/dev ${requiredSha}`;
+    await fsp.writeFile(path.join(tmp, "local-only.txt"), "local-only\n", "utf8");
+    await $({ cwd: tmp })`git add local-only.txt`;
+    await $({ cwd: tmp })`git commit -m local-only`;
+    const oldCwd = process.cwd();
+    try {
+      process.chdir(tmp);
+      const deployment = await resolveDeploymentForCli(
+        tmp,
+        (name) => {
+          if (name === "deployment") return "//sandbox/deployments/demo-dev:deploy";
+          throw new Error(`missing required --${name}`);
+        },
+        {
+          deploymentJsonErrorMessage:
+            "--deployment-json is not supported; use --deployment <label>",
+        },
+      );
+      await withSyntheticArgv(["--mark-check-passed=deploy/demo-dev"], async () => {
+        await assert.rejects(
+          () =>
+            resolveDeploymentAdmissionEvidence({
+              deployment,
+              workspaceRoot: tmp,
+            }),
+          new RegExp(
+            `defaulted to local HEAD: [0-9a-f]{40}[\\s\\S]*requires checks for: ${requiredSha}[\\s\\S]*--mark-check-for-commit ${requiredSha}`,
+          ),
+        );
+      });
+    } finally {
+      process.chdir(oldCwd);
     }
   });
 });
