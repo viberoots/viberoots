@@ -14,6 +14,7 @@ import {
   queueDeploymentProviderControlPlaneSubmission,
   type DeploymentProviderServiceSubmitRequest,
 } from "./deployment-provider-control-plane-submit.ts";
+import { createServiceOwnedLaneGovernanceResolver } from "./deployment-lane-governance-service.ts";
 import { fingerprintControlPlanePayload } from "./deployment-control-plane-idempotency.ts";
 import { submitResponseFromSubmission } from "./deployment-control-plane-status.ts";
 import type {
@@ -23,7 +24,6 @@ import type {
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 import {
   enqueueBackendSubmission,
-  readBackendSubmissionBySubmissionId,
   resolveBackendIdempotency,
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend.ts";
@@ -33,6 +33,7 @@ import {
 } from "./nixos-shared-host-control-plane-api-contract.ts";
 import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
 import { prepareBackendNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-backend-prepare.ts";
+import { reusedBackendSubmitResponse } from "./nixos-shared-host-control-plane-service-idempotency.ts";
 import { resolveServiceSubmitRequest } from "./nixos-shared-host-control-plane-service-submit.ts";
 import { handleProtectedChallengedNixosServiceSubmit } from "./nixos-shared-host-control-plane-service-protected-submit.ts";
 export {
@@ -71,9 +72,8 @@ export async function handleControlPlaneSubmit(
     deployment: request.deployment,
     request,
   });
-  if (isDeploymentProviderServiceSubmitRequest(request)) {
+  if (isDeploymentProviderServiceSubmitRequest(request))
     return await queueDeploymentProviderControlPlaneSubmission(request, opts);
-  }
   const resolvedRequest =
     request.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
       ? await resolveServiceSubmitRequest(request, opts)
@@ -85,6 +85,10 @@ export async function handleControlPlaneSubmit(
   const requestFingerprint = fingerprintControlPlanePayload({
     ...request,
     submittedAt: request.submittedAt,
+  });
+  const governanceResolver = createServiceOwnedLaneGovernanceResolver({
+    env: opts.env,
+    localFixture: opts.localFixture,
   });
   const idempotencyKey = request.idempotencyKey || request.submissionId;
   if (
@@ -104,6 +108,7 @@ export async function handleControlPlaneSubmit(
       resolvedRequest: resolvedRequest as NixosSharedHostControlPlaneSubmitRequest,
       requestFingerprint,
       idempotencyKey,
+      governanceResolver,
     });
   }
   const boundary =
@@ -138,13 +143,8 @@ export async function handleControlPlaneSubmit(
     requestFingerprint,
     targetId: request.submissionId,
   });
-  if (dedupe.mode === "reused") {
-    const existing = await readBackendSubmissionBySubmissionId(opts.backend, dedupe.targetId);
-    if (!existing) {
-      throw new Error(`idempotent submission missing backend state: ${dedupe.targetId}`);
-    }
-    return submitResponseFromSubmission(existing as any);
-  }
+  if (dedupe.mode === "reused")
+    return await reusedBackendSubmitResponse(opts.backend, dedupe.targetId);
   try {
     const prepared =
       request.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
@@ -211,6 +211,7 @@ export async function handleControlPlaneSubmit(
             ...(boundary.admissionEvidence
               ? { admissionEvidence: boundary.admissionEvidence }
               : {}),
+            governanceResolver,
           })
         : await prepareBackendCloudflarePagesControlPlaneRun({
             workspaceRoot: opts.workspaceRoot,
@@ -227,6 +228,7 @@ export async function handleControlPlaneSubmit(
             },
             ...(authorization ? { authorization } : {}),
             ...(boundary.authorization ? { authorizationSnapshot: boundary.authorization } : {}),
+            governanceResolver,
           });
     await enqueueBackendSubmission(
       opts.backend,

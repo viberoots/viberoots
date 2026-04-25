@@ -4513,6 +4513,10 @@ Minimum branch-policy assumptions:
   - the reviewed emergency identities allowed to bypass the normal path during break-glass
 - protected/shared admission should fail closed when the reviewed governance object cannot be verified against current server-side policy
 - operator inspection output should preserve the latest successful governance verification facts so promotion authority is never implicit or prose-only
+- for supported SCM backends, the shared control-plane service should verify
+  live lane governance itself during admission and persist whether the admitted
+  fact was `service_verified` or `client_supplied` for an explicit
+  compatibility path
 
 Rollback policy for bad app releases:
 

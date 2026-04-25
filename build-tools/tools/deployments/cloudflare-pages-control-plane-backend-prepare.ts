@@ -21,6 +21,7 @@ import type {
 } from "./deployment-control-plane-contract.ts";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution.ts";
 import {
   buildCloudflarePagesBackendSnapshot,
   type CloudflarePagesBackendSnapshot,
@@ -89,6 +90,7 @@ async function backfillMissingAdmission(opts: {
   snapshot: CloudflarePagesControlPlaneSnapshot;
   workspaceRoot: string;
   recordsRoot: string;
+  governanceResolver?: DeploymentLaneGovernanceResolver;
 }) {
   if (!opts.snapshot.admittedContext || opts.snapshot.admittedContext.policyEvaluation) {
     return opts.snapshot;
@@ -102,6 +104,7 @@ async function backfillMissingAdmission(opts: {
       operationKind: opts.snapshot.operationKind as any,
       admittedContext: opts.snapshot.admittedContext,
       evidence: opts.request.admissionEvidence,
+      governanceResolver: opts.governanceResolver,
     }),
   };
   return opts.snapshot;
@@ -116,10 +119,12 @@ export async function prepareBackendCloudflarePagesControlPlaneRun(opts: {
   dedupe: RequestDedupe;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
   authorizationSnapshot?: DeploymentControlPlaneAuthorization;
+  governanceResolver?: DeploymentLaneGovernanceResolver;
 }) {
   const snapshot = await buildCloudflarePagesBackendSnapshot(opts.resolved, {
     workspaceRoot: opts.workspaceRoot,
     recordsRoot: opts.recordsRoot,
+    governanceResolver: opts.governanceResolver,
   });
   const refs = submissionRefs(opts.recordsRoot, opts.request.submissionId);
   const requestedBy = requestedByFor(opts.request);
@@ -131,6 +136,7 @@ export async function prepareBackendCloudflarePagesControlPlaneRun(opts: {
         snapshot: snapshot as CloudflarePagesControlPlaneSnapshot,
         workspaceRoot: opts.workspaceRoot,
         recordsRoot: opts.recordsRoot,
+        governanceResolver: opts.governanceResolver,
       });
       await writeBackendSnapshotDoc(opts.backend, snapshot, refs.executionSnapshotPath);
     } catch (error) {

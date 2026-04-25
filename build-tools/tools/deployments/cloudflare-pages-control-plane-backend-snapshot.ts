@@ -3,6 +3,10 @@ import { resolveSourceRunCloudflarePagesAdmittedContext } from "./cloudflare-pag
 import type { CloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-contract.ts";
 import { CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA } from "./cloudflare-pages-control-plane-contract.ts";
 import { createCloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-snapshot.ts";
+import {
+  resolveCloudflarePagesArtifactForSubmission,
+  vaultRuntimeForCloudflareDeployment,
+} from "./cloudflare-pages-control-plane-backend-support.ts";
 import type { ResolvedCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit.ts";
 import {
   cloudflarePagesPreviewIdentitySelector,
@@ -10,21 +14,15 @@ import {
 } from "./cloudflare-pages-preview.ts";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
-import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker.ts";
+import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution.ts";
 import { targetTransitionSnapshot } from "./cloudflare-pages-control-plane-backend-transition-snapshot.ts";
-import { resolveCloudflarePagesArtifactInput } from "./cloudflare-pages-artifact-input.ts";
 // prettier-ignore
 export type CloudflarePagesBackendSnapshot = CloudflarePagesControlPlaneSnapshot | Record<string, unknown>;
-function vaultRuntimeFor(
-  deployment: ResolvedCloudflarePagesServiceSubmitRequest["request"]["deployment"],
-) {
-  const vaultRuntime = workerVaultRuntimeMetadata({ deployment });
-  return vaultRuntime ? { vaultRuntime } : {};
-}
 async function previewSnapshot(
   resolved: Extract<ResolvedCloudflarePagesServiceSubmitRequest, { kind: "preview" }>,
   workspaceRoot: string,
   recordsRoot: string,
+  governanceResolver?: DeploymentLaneGovernanceResolver,
 ): Promise<CloudflarePagesControlPlaneSnapshot> {
   const sourceRunId = String(resolved.request.sourceRunId || "").trim();
   const effectiveRunTarget = deriveCloudflarePagesPreviewTarget(
@@ -47,6 +45,7 @@ async function previewSnapshot(
     sourceRecord: resolved.selection.sourceRecord,
     artifactLineageId: resolved.selection.artifactLineageId,
     evidence: resolved.request.admissionEvidence,
+    governanceResolver,
   });
   return {
     schemaVersion: CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA,
@@ -59,7 +58,7 @@ async function previewSnapshot(
     lockScope: resolved.request.deployment.providerTarget.providerTargetIdentity,
     deployment: resolved.request.deployment,
     admittedContext,
-    ...vaultRuntimeFor(resolved.request.deployment),
+    ...vaultRuntimeForCloudflareDeployment(resolved.request.deployment),
     paths: { workspaceRoot, recordsRoot },
     action: {
       kind: "deploy",
@@ -83,6 +82,7 @@ async function rollbackSnapshot(
   resolved: Extract<ResolvedCloudflarePagesServiceSubmitRequest, { kind: "rollback" }>,
   workspaceRoot: string,
   recordsRoot: string,
+  governanceResolver?: DeploymentLaneGovernanceResolver,
 ): Promise<CloudflarePagesControlPlaneSnapshot> {
   const admittedContext = await resolveSourceRunCloudflarePagesAdmittedContext({
     workspaceRoot,
@@ -100,6 +100,7 @@ async function rollbackSnapshot(
     sourceRecord: resolved.selection.sourceRecord,
     artifactLineageId: resolved.selection.artifactLineageId,
     evidence: resolved.request.admissionEvidence,
+    governanceResolver,
   });
   return {
     schemaVersion: CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA,
@@ -112,7 +113,7 @@ async function rollbackSnapshot(
     lockScope: resolved.request.deployment.providerTarget.providerTargetIdentity,
     deployment: resolved.request.deployment,
     admittedContext,
-    ...vaultRuntimeFor(resolved.request.deployment),
+    ...vaultRuntimeForCloudflareDeployment(resolved.request.deployment),
     paths: { workspaceRoot, recordsRoot },
     action: {
       kind: "deploy",
@@ -150,7 +151,7 @@ function previewCleanupSnapshot(
     lockScope: resolved.request.deployment.providerTarget.providerTargetIdentity,
     deployment: resolved.request.deployment,
     admittedContext: resolved.selection.sourceRecord.admittedContext,
-    ...vaultRuntimeFor(resolved.request.deployment),
+    ...vaultRuntimeForCloudflareDeployment(resolved.request.deployment),
     paths: { workspaceRoot, recordsRoot },
     action: {
       kind: "preview_cleanup",
@@ -174,23 +175,12 @@ function previewCleanupSnapshot(
     },
   };
 }
-async function artifactFromInput(
-  resolved: Extract<ResolvedCloudflarePagesServiceSubmitRequest, { kind: "deploy" | "promotion" }>,
-  opts: { workspaceRoot: string; recordsRoot: string },
-) {
-  return await resolveCloudflarePagesArtifactInput({
-    workspaceRoot: opts.workspaceRoot,
-    recordsRoot: opts.recordsRoot,
-    deployment: resolved.request.deployment,
-    submissionId: resolved.request.submissionId,
-    artifactInput: resolved.artifactInput!,
-  });
-}
 export async function buildCloudflarePagesBackendSnapshot(
   resolved: ResolvedCloudflarePagesServiceSubmitRequest,
   opts: {
     workspaceRoot: string;
     recordsRoot: string;
+    governanceResolver?: DeploymentLaneGovernanceResolver;
   },
 ): Promise<CloudflarePagesBackendSnapshot> {
   if (resolved.kind === "deploy") {
@@ -202,7 +192,7 @@ export async function buildCloudflarePagesBackendSnapshot(
         ...(resolved.request.deployBatchId
           ? { deployBatchId: resolved.request.deployBatchId }
           : {}),
-        artifact: await artifactFromInput(resolved, opts),
+        artifact: await resolveCloudflarePagesArtifactForSubmission(resolved, opts),
         ...(resolved.request.smokeConnectOverride
           ? { smokeConnectOverride: resolved.request.smokeConnectOverride }
           : {}),
@@ -220,7 +210,9 @@ export async function buildCloudflarePagesBackendSnapshot(
         ...(resolved.request.deployBatchId
           ? { deployBatchId: resolved.request.deployBatchId }
           : {}),
-        ...(resolved.artifactInput ? { artifact: await artifactFromInput(resolved, opts) } : {}),
+        ...(resolved.artifactInput
+          ? { artifact: await resolveCloudflarePagesArtifactForSubmission(resolved, opts) }
+          : {}),
         ...(resolved.artifact ? { artifact: resolved.artifact } : {}),
         operationKind: resolved.operationKind,
         publishBehavior: resolved.request.publishBehavior || "deploy",
@@ -237,9 +229,19 @@ export async function buildCloudflarePagesBackendSnapshot(
     );
   }
   if (resolved.kind === "preview")
-    return await previewSnapshot(resolved, opts.workspaceRoot, opts.recordsRoot);
+    return await previewSnapshot(
+      resolved,
+      opts.workspaceRoot,
+      opts.recordsRoot,
+      opts.governanceResolver,
+    );
   if (resolved.kind === "rollback")
-    return await rollbackSnapshot(resolved, opts.workspaceRoot, opts.recordsRoot);
+    return await rollbackSnapshot(
+      resolved,
+      opts.workspaceRoot,
+      opts.recordsRoot,
+      opts.governanceResolver,
+    );
   return resolved.kind === "preview_cleanup"
     ? previewCleanupSnapshot(resolved, opts.workspaceRoot, opts.recordsRoot)
     : targetTransitionSnapshot(resolved);

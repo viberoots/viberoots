@@ -11,6 +11,7 @@ export type DeploymentLaneGovernanceFact = {
   governanceRef: string;
   governanceFingerprint: string;
   verifiedAt: string;
+  verificationSource: "client_supplied" | "service_verified";
   scmBackend: DeploymentLaneGovernance["scmBackend"];
   repository: string;
   branchProtections: DeploymentLaneBranchGovernance[];
@@ -68,6 +69,8 @@ export function normalizeLaneGovernanceEvidence(
   const governanceFingerprint =
     typeof raw.governanceFingerprint === "string" ? raw.governanceFingerprint.trim() : "";
   const verifiedAt = typeof raw.verifiedAt === "string" ? raw.verifiedAt.trim() : "";
+  const verificationSource =
+    raw.verificationSource === "service_verified" ? "service_verified" : "client_supplied";
   const scmBackend =
     raw.scmBackend === "github" || raw.scmBackend === "gitlab" ? raw.scmBackend : "";
   const repository = typeof raw.repository === "string" ? raw.repository.trim() : "";
@@ -89,6 +92,7 @@ export function normalizeLaneGovernanceEvidence(
     governanceRef,
     governanceFingerprint,
     verifiedAt,
+    verificationSource,
     scmBackend,
     repository,
     branchProtections,
@@ -178,6 +182,7 @@ export function verifyLaneGovernanceSnapshot(opts: {
   lanePolicy: DeploymentLanePolicy;
   snapshot: DeploymentLaneGovernanceSnapshot;
   verifiedAt?: string;
+  verificationSource?: DeploymentLaneGovernanceFact["verificationSource"];
 }): DeploymentLaneGovernanceFact {
   if (opts.snapshot.scmBackend !== opts.lanePolicy.governance.scmBackend) {
     throw new Error(`lane governance backend mismatch: ${opts.snapshot.scmBackend}`);
@@ -209,6 +214,7 @@ export function verifyLaneGovernanceSnapshot(opts: {
     governanceRef: opts.lanePolicy.governanceRef,
     governanceFingerprint: opts.lanePolicy.governance.fingerprint,
     verifiedAt: opts.verifiedAt || new Date().toISOString(),
+    verificationSource: opts.verificationSource || "client_supplied",
     scmBackend: opts.snapshot.scmBackend,
     repository: opts.snapshot.repository,
     branchProtections: opts.snapshot.branchProtections,

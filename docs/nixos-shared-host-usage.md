@@ -235,6 +235,16 @@ The plan output should show:
 - remote records root `/var/lib/deployment-host/records`
 - a `serviceClient` block with the deployment service URL and token env
 
+Protected/shared `mini` deploys now use service-owned lane governance
+verification for supported SCM backends. In the normal reviewed workflow you do
+not hand-build `laneGovernance` JSON. The service verifies the live governance
+state itself, stores the admitted fact with
+`verificationSource = "service_verified"`, and fails closed on drift. For
+GitHub-backed lanes, the hosted service needs `BNX_DEPLOY_GITHUB_TOKEN` so it
+can read the live branch-protection state. If a deployment still uses an
+unsupported SCM backend, keep explicit lane-governance evidence in
+`--admission-evidence-json` only as a reviewed compatibility path.
+
 ## Run The Reviewed Remote Deploy
 
 From a dev machine, if `./dist` is your built app output folder:

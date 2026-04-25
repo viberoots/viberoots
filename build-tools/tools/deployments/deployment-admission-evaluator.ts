@@ -13,7 +13,6 @@ import {
   type DeploymentAdmissionEvidence,
   type DeploymentAdmissionPolicyEvaluation,
 } from "./deployment-admission-evidence.ts";
-import { evaluateLaneGovernanceFact } from "./deployment-admission-governance.ts";
 import { type DeploymentRunRecordLike } from "./deployment-admission-records.ts";
 import {
   prerequisiteFacts,
@@ -21,6 +20,10 @@ import {
   sourceRevisionFor,
   type AdmittedContextLike,
 } from "./deployment-admission-facts.ts";
+import {
+  resolveLaneGovernanceFact,
+  type DeploymentLaneGovernanceResolver,
+} from "./deployment-lane-governance-resolution.ts";
 import {
   evaluateAttestationPolicy,
   evaluateSbomPolicy,
@@ -38,6 +41,7 @@ export async function evaluateDeploymentAdmission(opts: {
   sourceRecord?: DeploymentRunRecordLike;
   artifactLineageId?: string;
   evidence?: DeploymentAdmissionEvidence;
+  governanceResolver?: DeploymentLaneGovernanceResolver;
 }): Promise<DeploymentAdmissionPolicyEvaluation> {
   requireBuiltInExecutionBoundary(opts.deployment);
   const requestedBy = opts.evidence?.requestedBy || defaultRequestedBy();
@@ -103,9 +107,10 @@ export async function evaluateDeploymentAdmission(opts: {
       prerequisiteProvidersByDeploymentId: opts.prerequisiteProvidersByDeploymentId,
       evidence: opts.evidence,
     }),
-    laneGovernance: evaluateLaneGovernanceFact({
+    laneGovernance: await resolveLaneGovernanceFact({
       deployment: opts.deployment,
       evidence: opts.evidence?.laneGovernance,
+      resolver: opts.governanceResolver,
     }),
     ...(attestation ? { attestation } : {}),
     ...(sbom ? { sbom } : {}),

@@ -103,6 +103,7 @@ export function reviewedLaneAdmissionEvidenceFixture(opts: {
       governanceRef: opts.deployment.lanePolicy.governanceRef,
       governanceFingerprint: opts.deployment.lanePolicy.governance.fingerprint,
       verifiedAt: "2026-04-06T12:00:00.000Z",
+      verificationSource: "client_supplied",
       scmBackend: opts.deployment.lanePolicy.governance.scmBackend,
       repository: opts.deployment.lanePolicy.governance.repository,
       branchProtections: opts.deployment.lanePolicy.governance.branchProtections,

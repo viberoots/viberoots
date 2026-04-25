@@ -9,6 +9,7 @@ import { submitResponseFromSubmission } from "./deployment-control-plane-status.
 import { prepareBackendNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-backend-prepare.ts";
 import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
+import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution.ts";
 import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract.ts";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
 import type {
@@ -36,6 +37,7 @@ export async function acceptChallengedNixosSharedHostSubmit(opts: {
   idempotencyKey: string;
   boundary: Boundary;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
+  governanceResolver?: DeploymentLaneGovernanceResolver;
 }) {
   assertProtectedSharedArtifactIdentityFields(opts.resolvedRequest);
   const reusable = await readReusableChallengedArtifactSubmission({
@@ -117,6 +119,7 @@ export async function acceptChallengedNixosSharedHostSubmit(opts: {
     ...(opts.boundary.admissionEvidence
       ? { admissionEvidence: opts.boundary.admissionEvidence }
       : {}),
+    ...(opts.governanceResolver ? { governanceResolver: opts.governanceResolver } : {}),
     persistMode: "defer",
   });
   const accepted = await acceptChallengedArtifactSubmission({

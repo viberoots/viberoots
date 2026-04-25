@@ -271,6 +271,16 @@ reviewed source mismatch, compare `clientExpectedSourceRevision` with
 `serviceReviewedSourceRevision`: either sync the service-side reviewed ref or
 rerun with `--mark-check-for-commit <serviceReviewedSourceRevision>` only when
 that fetched service revision is intentionally the reviewed commit to deploy.
+For supported SCM backends, protected/shared service-backed runs also use
+service-owned lane governance verification. The normal reviewed flow does not
+need client-supplied `laneGovernance` JSON; the service verifies live branch
+protection, required checks, and reviewed branch-advance identities before it
+admits the run, then stores the resulting fact with
+`verificationSource = "service_verified"`. If the hosted service is verifying a
+GitHub-backed lane, configure `BNX_DEPLOY_GITHUB_TOKEN` on the service host so
+it can read the live governance state. Unsupported SCM backends still fail
+closed unless you intentionally provide reviewed compatibility evidence through
+`--admission-evidence-json`.
 Do not pass laptop Vault tokens, Vault JWT files, secret fixture paths, or
 client-supplied principals to protected/shared service deployments. `mini`
 derives identity through its service session and the worker uses server-owned

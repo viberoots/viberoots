@@ -449,6 +449,11 @@ What the service and worker flags mean:
   through the reviewed HTTPS nginx vhost.
 - `BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'`
   Required for the reviewed hosted service. The service startup fails closed without a bearer token unless `BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1` explicitly marks a local fixture service.
+- `BNX_DEPLOY_GITHUB_TOKEN='replace-me'`
+  Required when the hosted service must verify GitHub-backed lane governance
+  automatically during protected/shared admission. The service reads live
+  branch-protection state with this token and fails closed if governance
+  verification is required but the token is unavailable.
 
 Common example values:
 
@@ -464,6 +469,7 @@ Common example values:
 ```bash
 export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
 export BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
+export BNX_DEPLOY_GITHUB_TOKEN='replace-me'
 direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts \
   --host-root /var/lib/deployment-host/runtime \
   --state /etc/nixos/deployment-host/platform-state.json \
@@ -484,6 +490,9 @@ Required worker-side secret-source prep after PR-79 and later:
 - set `BNX_DEPLOY_CONTROL_PLANE_TOKEN` or pass `--token` for the reviewed
   hosted service; unconfigured hosted protected/shared routes fail closed, and
   tokenless startup is reserved for explicit fixture mode only
+- set `BNX_DEPLOY_GITHUB_TOKEN` when the hosted service must verify GitHub lane
+  governance automatically; unsupported SCM backends still require reviewed
+  explicit governance evidence through `--admission-evidence-json`
 - set the server-local credential variable referenced by `vault_runtime`, for
   example `BNX_DEPLOYER_CLIENT_SECRET` for a reviewed service-account client
   secret, or `BNX_DEPLOYMENT_OIDC_TOKEN` for an external workload identity

@@ -7,6 +7,7 @@ import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-contr
 import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract.ts";
 import { cleanupThenRethrowRejectedNixosSubmit } from "./nixos-shared-host-control-plane-rejection-cleanup.ts";
 import { assertReviewedServiceBearerToken } from "./nixos-shared-host-control-plane-service-auth.ts";
+import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution.ts";
 
 export async function handleProtectedChallengedNixosServiceSubmit(opts: {
   workspaceRoot: string;
@@ -20,6 +21,7 @@ export async function handleProtectedChallengedNixosServiceSubmit(opts: {
   resolvedRequest: NixosSharedHostControlPlaneSubmitRequest;
   requestFingerprint: string;
   idempotencyKey: string;
+  governanceResolver?: DeploymentLaneGovernanceResolver;
 }) {
   try {
     assertReviewedServiceBearerToken({
@@ -54,6 +56,7 @@ export async function handleProtectedChallengedNixosServiceSubmit(opts: {
       requestFingerprint: opts.requestFingerprint,
       idempotencyKey: opts.idempotencyKey,
       boundary,
+      ...(opts.governanceResolver ? { governanceResolver: opts.governanceResolver } : {}),
       ...(authorization ? { authorization } : {}),
     });
   } catch (error) {

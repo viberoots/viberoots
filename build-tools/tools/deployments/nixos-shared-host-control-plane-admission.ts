@@ -2,6 +2,7 @@
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution.ts";
 import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-control-plane-contract.ts";
 import type { NixosSharedHostControlPlaneSourceSelection } from "./nixos-shared-host-control-plane-snapshot.ts";
 
@@ -38,6 +39,7 @@ export async function evaluateNixosSharedHostControlPlaneAdmission(opts: {
   source?: NixosSharedHostControlPlaneSourceSelection;
   artifactLineageId?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
+  governanceResolver?: DeploymentLaneGovernanceResolver;
 }) {
   const destructiveError = destructivePlanError(opts.snapshot);
   if (destructiveError) throw destructiveError;
@@ -54,6 +56,7 @@ export async function evaluateNixosSharedHostControlPlaneAdmission(opts: {
       sourceRecord: opts.source?.record as any,
       artifactLineageId: opts.artifactLineageId,
       evidence: mergedEvidence(opts.admissionEvidence, opts.snapshot),
+      governanceResolver: opts.governanceResolver,
     }),
   };
 }

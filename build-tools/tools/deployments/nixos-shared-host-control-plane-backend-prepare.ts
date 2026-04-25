@@ -11,6 +11,7 @@ import {
 } from "./nixos-shared-host-control-plane-backend.ts";
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
+import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution.ts";
 import type {
   DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
@@ -105,6 +106,7 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
   smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;
   source?: NixosSharedHostControlPlaneSourceSelection;
   admissionEvidence?: DeploymentAdmissionEvidence;
+  governanceResolver?: DeploymentLaneGovernanceResolver;
   persistMode?: "immediate" | "defer";
 }) {
   const submissionId = opts.submissionId || createNixosSharedHostSubmissionId();
@@ -165,6 +167,7 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
       source: opts.source,
       artifactLineageId: opts.artifactLineageId,
       admissionEvidence: opts.admissionEvidence,
+      governanceResolver: opts.governanceResolver,
     });
     if (persistImmediately) {
       await writeBackendSnapshotDoc(opts.backend, snapshot, executionSnapshotPath);
