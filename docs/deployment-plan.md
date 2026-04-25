@@ -12747,6 +12747,153 @@ the client and control plane happen to have locally.
 
 ---
 
+## PR-94: Service-owned lane-governance verification and operator-transparent evidence synthesis
+
+### Description
+
+I will close the remaining protected/shared governance UX gap by keeping lane-governance
+verification as a required admission boundary while removing the need for humans to hand-assemble
+`admissionEvidence.laneGovernance` JSON during normal reviewed deploy flows. Today the system has a
+verifier, but the common operator path still requires a separate manual governance-evidence step
+even when the deployment service is already in the best position to verify and record the live SCM
+protection state.
+
+The reviewed model should become:
+
+- protected/shared admission still fails closed when lane governance cannot be verified
+- the deployment service performs the normal governance verification itself for supported SCM
+  backends instead of expecting operators to construct the fact by hand
+- the verified governance fact is recorded in admission output and stored run provenance so the
+  boundary remains explicit and auditable
+- explicit `--admission-evidence-json` governance input remains available only for exceptional or
+  compatibility paths where automatic service-owned verification is not available
+
+### Scope & Changes
+
+- Add a service-owned lane-governance verification path for protected/shared service-backed
+  submissions:
+  - resolve the deployment's authoritative lane-governance metadata from the reviewed repo
+  - fetch the live SCM protection state for the governed repository/branch set from the supported
+    backend
+  - verify that live state against the reviewed lane policy before queueing the submission
+- Make governance verification operator-transparent for the normal `deploy --profile mini` and
+  hosted control-plane submit paths:
+  - do not require operators to hand-build `laneGovernance` JSON for the standard reviewed flow
+  - synthesize the admitted governance fact inside the service when verification succeeds
+  - fail closed with actionable drift diagnostics when verification fails
+- Keep governance evidence explicit even when it is automatic:
+  - store the verified governance fact in the admitted policy evaluation
+  - surface it through status, record, and troubleshooting paths
+  - preserve the distinction between "the service verified governance" and "a client supplied
+    governance evidence"
+- Define backend support boundaries explicitly:
+  - start with the SCM backend(s) already modeled in reviewed deployment metadata
+  - reject unsupported backends with clear guidance instead of silently skipping governance
+    verification
+  - keep the current explicit-evidence escape hatch only where automatic verification is genuinely
+    unavailable
+- Improve submit-time UX:
+  - standard protected/shared deploys should need only the normal submission inputs plus check or
+    approval evidence already required by policy
+  - manual governance-evidence assembly should move out of the day-to-day operator workflow
+- Preserve testability and determinism:
+  - factor the live-governance snapshot lookup behind reviewed interfaces that can be mocked in
+    deployment tests
+  - keep the verification output shape aligned with the existing `DeploymentLaneGovernanceFact`
+    contract
+
+### Tests (in this PR)
+
+- Add control-plane tests proving protected/shared service-backed submissions succeed without a
+  client-supplied `laneGovernance` evidence payload when the service can verify governance itself.
+- Add failure tests proving submissions still fail closed when:
+  - branch protections drift from reviewed policy
+  - the SCM backend is unsupported for automatic verification
+  - the service cannot fetch the live governance snapshot
+- Add status/record tests proving the stored policy evaluation still contains the verified
+  lane-governance fact after automatic synthesis.
+- Add compatibility tests proving explicit governance evidence remains supported only for the
+  reviewed exceptional paths that still require it.
+- Add docs-parity and operator-flow tests proving the normal deploy workflow no longer instructs
+  users to hand-assemble governance evidence for supported service-backed flows.
+
+### Docs (in this PR)
+
+- Update [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md) to
+  describe governance verification as a service-owned admission step for normal protected/shared
+  deploys, rather than a manual evidence-construction chore.
+- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  with the simplified operator workflow and the remaining cases, if any, where explicit governance
+  evidence is still needed.
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  so first-time operators understand which governance prerequisites the service verifies
+  automatically and what credentials/config the service needs to do so.
+- Update [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) to
+  state that the security value is in verification of live governance state, not in requiring
+  humans to manually serialize the fact.
+- Update troubleshooting docs/runbooks with the new failure modes and remediation guidance for live
+  governance drift or SCM lookup failures.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - automatic service-owned governance verification
+  - governance drift rejection
+  - unsupported-backend fail-closed behavior
+  - admitted-record/status governance provenance
+  - docs and operator-flow parity
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR stays within reviewed deployment service admission behavior, SCM-governance verification
+  plumbing, operator UX, and deployment docs. Under the deployment-only verify policy, default
+  `v` / CI can run the reviewed deployment suite unless implementation details force shared
+  build-system selector changes.
+
+### Acceptance Criteria
+
+- Normal protected/shared service-backed deploys no longer require operators to hand-build
+  governance evidence for supported SCM backends.
+- The deployment service still fails closed when live lane governance cannot be verified or does not
+  match the reviewed lane policy.
+- Stored admission/status output preserves the verified governance fact so the boundary remains
+  explicit and auditable.
+- Unsupported or degraded verification paths produce clear guidance rather than silently weakening
+  governance enforcement.
+- Tests and docs describe the same simplified operator workflow.
+
+### Risks
+
+Moving governance verification into the service introduces new dependencies on live SCM-policy
+lookup, backend credentials, and backend-specific failure handling.
+
+### Mitigation
+
+Keep the backend interface narrow, fail closed on lookup or verification errors, start with the
+reviewed SCM backend set already modeled in deployment metadata, and cover success/failure behavior
+with targeted service tests.
+
+### Consequence of Not Implementing
+
+Protected/shared deploys will keep imposing a manual governance-evidence step that is operationally
+redundant, easy to misuse, and out of proportion to the actual security value of the check.
+
+### Downsides for Implementing
+
+The deployment service becomes responsible for one more live policy lookup and one more
+backend-integration surface, which increases admission complexity compared with today's
+operator-supplied evidence model.
+
+### Recommendation
+
+Implement immediately after PR-93 so the new service-owned reviewed-source snapshot model is
+matched by a service-owned governance-verification path, eliminating the remaining manual
+admission-evidence chore from normal protected/shared deploys.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
