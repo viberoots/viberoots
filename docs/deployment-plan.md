@@ -12598,6 +12598,155 @@ but also tells operators how to discover the valid requirement names that bounda
 
 ---
 
+## PR-93: Control-plane reviewed-ref snapshotting and client/service source-revision parity
+
+### Description
+
+I will close the remaining protected/shared admission gap where the client and the control plane can
+disagree about the reviewed deployment source revision. Today the client may construct
+`--mark-check-passed` evidence against its local view of the stage ref while the control plane
+admits the deploy against a different commit in its own repo state. This PR makes the control plane
+authoritative for the reviewed source snapshot while keeping that authority explicit, auditable, and
+safe for concurrent submissions.
+
+The reviewed model should become:
+
+- the deployment metadata still determines which stage ref is authoritative
+- the control plane snapshots that reviewed ref for each submission instead of relying on ambient
+  long-lived local branch state
+- admission binds required checks to the snapshotted commit SHA for that submission
+- clients may provide an expected source revision, but the service must fail closed if the fetched
+  reviewed ref does not match that expectation
+
+### Scope & Changes
+
+- Add a reviewed control-plane source snapshot step for protected/shared submissions:
+  - derive the authoritative stage ref from deployment metadata
+  - fetch only that reviewed ref from the configured SCM remote
+  - store it in a submission-scoped namespace instead of mutating shared long-lived refs or the
+    checked-out worktree
+- Make the fetched commit SHA the authoritative `sourceRevision` for admission binding, replay
+  snapshots, and stored run provenance.
+- Keep the fetch model concurrency-safe:
+  - different submissions may snapshot different commits of the same reviewed ref
+  - different services may snapshot different reviewed refs concurrently
+  - no submission should overwrite another submission's snapshotted ref
+- Avoid unsafe repo mutation on the control-plane host:
+  - do not `git pull` a checked-out worktree during submission handling
+  - do not trust arbitrary user-supplied refs as admission source-of-truth
+  - do not reuse one mutable local branch ref as the admission subject for all submissions
+- Add explicit client/service source-parity support:
+  - allow the client to send the expected reviewed source revision it believes it is deploying
+  - require the service to compare that expectation against the freshly snapshotted reviewed ref
+  - reject when they differ, with diagnostics that show both SHAs and the reviewed stage ref
+- Make remote-profile and direct service submissions converge on the same source-of-truth model so
+  `--mark-check-passed`, artifact provenance, retry, and rollback all refer to the same reviewed
+  source snapshot.
+- Keep local prechecks useful but not authoritative:
+  - local CLI guidance may still inspect the local repo for operator convenience
+  - final admission authority must come from the service-owned reviewed-ref snapshot
+- Define retention and cleanup for submission-scoped snapshot refs so the service does not leak
+  unbounded ref state over time.
+
+### Tests (in this PR)
+
+- Add control-plane tests proving the service snapshots the reviewed stage ref into a
+  submission-scoped namespace and binds admission to that fetched commit SHA.
+- Add concurrency tests proving multiple submissions can snapshot:
+  - different reviewed refs concurrently
+  - different commits of the same reviewed ref concurrently
+  - without cross-talk or ref clobbering
+- Add client/service parity tests proving a submission fails closed when:
+  - the client expects commit `A`
+  - the service snapshots reviewed commit `B`
+  - and the rejection surfaces both values clearly
+- Add remote-profile tests proving stale generic service rejections are replaced by actionable
+  client-visible diagnostics that explain local-vs-service reviewed-commit mismatch.
+- Add replay / provenance tests proving stored `sourceRevision` comes from the service-owned
+  reviewed snapshot rather than ambient worktree state.
+- Add cleanup tests proving submission-scoped snapshot refs are retained only as long as reviewed
+  control-plane policy requires.
+
+### Docs (in this PR)
+
+- Update [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md) to
+  describe the control-plane-side reviewed-ref snapshot model and why protected/shared admission is
+  bound to that snapshotted commit rather than a human operator's ambient checkout.
+- Update [Mini Shared-Dev Deployment Design](/Users/kiltyj/Code/bucknix-fresh/docs/mini-deployment.md)
+  with the reviewed `env/pleomino/dev` snapshot flow for `mini`, including how concurrent
+  submissions remain isolated.
+- Update [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md) with
+  operator guidance for diagnosing client/service source-revision mismatch and when
+  `--mark-check-for-commit` is appropriate.
+- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  to explain that protected/shared admission is finalized against the service-owned reviewed source
+  snapshot, not implicitly against the operator's local checkout.
+- Update troubleshooting/runbook docs with the new mismatch diagnostic and the safe remediation
+  steps: sync the service-side reviewed ref or intentionally submit against the reviewed commit the
+  service requires.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - control-plane reviewed-ref snapshotting
+  - submission-scoped ref isolation
+  - client/service expected-source mismatch rejection
+  - remote-profile diagnostics
+  - replay/provenance parity
+  - docs parity
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR stays within reviewed deployment service behavior, control-plane admission snapshotting,
+  remote-profile diagnostics, and deployment docs. Under the deployment-only verify policy, default
+  `v` / CI can run the reviewed deployment suite unless implementation details force shared
+  build-system selector changes.
+
+### Acceptance Criteria
+
+- Protected/shared admission binds required checks to a service-owned reviewed source snapshot for
+  the submission.
+- The control plane no longer depends on ambient long-lived local branch state for the authoritative
+  source revision of a submission.
+- Concurrent submissions can safely snapshot different reviewed refs or different commits of the
+  same reviewed ref without mutating each other's admission source.
+- Client/service source-revision mismatches fail closed with diagnostics that clearly explain the
+  reviewed stage ref, the service-required commit, and the client-submitted commit.
+- Retry, rollback, replay, and stored provenance all continue to use the same authoritative
+  snapshotted source revision.
+
+### Risks
+
+Adding service-side SCM fetch/snapshot logic introduces new failure modes around SCM connectivity,
+snapshot cleanup, and ref retention policy on the control-plane host.
+
+### Mitigation
+
+Keep the fetch scope narrow to the reviewed deployment ref, use submission-scoped snapshot refs,
+fail closed on fetch or parity mismatch, and cover concurrency/cleanup behavior with targeted
+control-plane tests.
+
+### Consequence of Not Implementing
+
+Protected/shared deploys will continue to suffer from ambiguous local-vs-service source-of-truth
+behavior, leaving operators to discover commit mismatches only after the service rejects the
+submission.
+
+### Downsides for Implementing
+
+This adds SCM snapshot bookkeeping and a new expected-source parity contract to protected/shared
+submissions, which makes the control plane more stateful than a simple ambient-worktree design.
+
+### Recommendation
+
+Implement immediately after PR-92 so the improved `--mark-check-passed` UX is backed by one
+consistent service-owned reviewed source snapshot instead of still depending on whichever repo state
+the client and control plane happen to have locally.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)

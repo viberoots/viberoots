@@ -156,6 +156,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/nixos-shared-host.host-render.contract.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.host-render.duplicate-hostname.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.host-render.partial-slice-preserves.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.remote-execution-transport.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.service-modules.nix-eval.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.service-auth-boundary.helpers.ts": False,
     "build-tools/tools/tests/deployments/nixos-shared-host.service-auth-boundary.test.ts": True,

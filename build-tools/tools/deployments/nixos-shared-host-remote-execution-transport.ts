@@ -1,6 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract.ts";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import { scrubDeploymentSecretEnv } from "./deployment-secret-env.ts";
 import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
 import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door.ts";
@@ -55,7 +57,51 @@ export function requireServiceRecord(
   return serviceResult.result.record;
 }
 
-export function remoteServiceSubmissionError(error: unknown) {
+function augmentRemoteAdmissionMismatchMessage(
+  baseMessage: string,
+  opts?: {
+    deployment?: DeploymentTarget;
+    admissionEvidence?: DeploymentAdmissionEvidence;
+  },
+): string {
+  const match = baseMessage.match(
+    /protected\/shared admission requires check (\S+) for subject\(s\) ([0-9a-f]{7,40})/,
+  );
+  if (!match) return baseMessage;
+  const checkName = match[1] || "";
+  const requiredSubject = match[2] || "";
+  const submittedSubjects = Array.from(
+    new Set(
+      (opts?.admissionEvidence?.checks || [])
+        .filter((check) => check.status === "passed" && check.name === checkName)
+        .map((check) => String(check.subject || "").trim())
+        .filter(Boolean),
+    ),
+  );
+  const mismatchedSubjects = submittedSubjects.filter((subject) => subject !== requiredSubject);
+  if (mismatchedSubjects.length === 0) return baseMessage;
+  const deploymentSourceRef = opts?.deployment
+    ? requiredDeploymentStageBranch(opts.deployment)
+    : undefined;
+  const submittedLine =
+    mismatchedSubjects.length === 1
+      ? `this client submitted passed ${checkName} for commit ${mismatchedSubjects[0]}`
+      : `this client submitted passed ${checkName} for commits ${mismatchedSubjects.join(", ")}`;
+  return [
+    `protected/shared admission requires check ${checkName} for commit ${requiredSubject}, but ${submittedLine}.`,
+    ...(deploymentSourceRef ? [`deployment_source_ref: ${deploymentSourceRef}`] : []),
+    "This usually means the remote control-plane repo state does not match your local git workspace.",
+    `Sync the reviewed deployment ref on the service-side repo, or rerun with --mark-check-for-commit ${requiredSubject} if ${requiredSubject} is intentionally the reviewed commit to deploy.`,
+  ].join("\n");
+}
+
+export function remoteServiceSubmissionError(
+  error: unknown,
+  opts?: {
+    deployment?: DeploymentTarget;
+    admissionEvidence?: DeploymentAdmissionEvidence;
+  },
+) {
   const base = error instanceof Error ? error : new Error(String(error));
   const record = (error as any)?.record;
   const status = (error as any)?.status;
@@ -70,7 +116,9 @@ export function remoteServiceSubmissionError(error: unknown) {
     .filter(Boolean)
     .join(" ");
   return Object.assign(
-    new Error(`remote service submission failed: ${base.message}${refs ? ` (${refs})` : ""}`),
+    new Error(
+      `remote service submission failed: ${augmentRemoteAdmissionMismatchMessage(base.message, opts)}${refs ? ` (${refs})` : ""}`,
+    ),
     {
       ...(error && typeof error === "object" ? error : {}),
     },
