@@ -117,6 +117,7 @@ export async function snapshotReviewedSourceForSubmission(opts: {
         `clientExpectedSourceRevision=${expectedSourceRevision}`,
         `serviceReviewedSourceRevision=${sourceRevision}`,
         `serviceRemote=${remoteName}`,
+        "Make sure the deployment branch is up to date and pushed before retrying.",
         `Sync the service-side reviewed ref or rerun with --mark-check-for-commit ${sourceRevision} if ${sourceRevision} is intentionally the reviewed commit to deploy.`,
       ].join("\n"),
     );

@@ -38,6 +38,7 @@ test("remote service submission error explains when the service requires a diffe
     String(error.message),
     /remote control-plane repo state does not match your local git workspace/,
   );
+  assert.match(String(error.message), /deployment branch is up to date and pushed before retrying/);
   assert.match(
     String(error.message),
     /--mark-check-for-commit 85e2c9ee8dd909fc041f693fe8e937e34e7b36ef/,

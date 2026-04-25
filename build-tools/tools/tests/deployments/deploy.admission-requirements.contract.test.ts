@@ -133,6 +133,10 @@ test("deploy --mark-check-passed defaults to HEAD and fails closed when the depl
     assert.match(String(result.stderr), /deployment_source_ref: env\/demo\/dev/);
     assert.match(
       String(result.stderr),
+      /deployment branch is up to date and pushed before retrying/,
+    );
+    assert.match(
+      String(result.stderr),
       new RegExp(`--mark-check-for-commit ${stageRevision.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
     );
   });

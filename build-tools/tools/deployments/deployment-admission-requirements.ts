@@ -163,6 +163,7 @@ export function markCheckSubjectMismatchMessage(opts: {
     actualSourceLine,
     `But this deploy currently requires checks for: ${opts.required.sha}`,
     `deployment_source_ref: ${opts.required.ref}`,
+    "Make sure the deployment branch is up to date and pushed before retrying.",
     `Run this instead: ${renderDeployCommand([
       ...currentArgs,
       "--mark-check-for-commit",
