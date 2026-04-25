@@ -3,7 +3,6 @@ import {
   discoverOidc,
   postFormJson,
   validateOidcToken,
-  type HumanClaimRequirement,
 } from "./deployment-credential-source-oidc.ts";
 
 export type DeviceLoginOptions = {
@@ -11,7 +10,6 @@ export type DeviceLoginOptions = {
   clientId: string;
   audience?: string | undefined;
   boundClaims: Record<string, string>;
-  humanClaim?: HumanClaimRequirement | undefined;
   timeoutMs?: number | undefined;
   prompt?: (message: string) => void;
 };
@@ -114,7 +112,6 @@ export async function runDeviceLogin(opts: DeviceLoginOptions): Promise<string> 
     audience: opts.audience,
     clientId: opts.clientId,
     boundClaims: opts.boundClaims,
-    humanClaim: opts.humanClaim,
   });
   return token;
 }

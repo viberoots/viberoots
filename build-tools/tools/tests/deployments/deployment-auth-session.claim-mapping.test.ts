@@ -19,7 +19,6 @@ test("human deployment groups derive deployment-scoped grants", () => {
     principal: { principalId: "oidc:human-1" },
     claims: {
       groups: [
-        "deployers-pleomino-dev",
         "deploy-submitters-pleomino-dev",
         "deploy-admission-reporters-pleomino-dev",
         "deploy-approvers-pleomino-prod",

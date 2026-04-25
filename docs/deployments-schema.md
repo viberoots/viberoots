@@ -85,9 +85,6 @@ Optional keys:
   used only by the front-door credential-source adapter.
 - `external_oidc_token_env`: Jenkins/workload-identity token variable used only
   by the front-door credential-source adapter.
-- `required_human_claim`: human deployer claim name, such as `groups` or a
-  flat realm-role/client-role mapper claim.
-- `required_human_claim_value`: required value for `required_human_claim`.
 - `pkce_callback_mode`: `loopback` or `public_host`.
 - `pkce_callback_external_scheme`: browser-facing redirect scheme, `http` or
   `https`.

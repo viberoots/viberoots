@@ -20,7 +20,6 @@ export type DeploymentWorkerVaultRuntimeMetadata = {
   credentialSource?: string;
   clientSecretEnv?: string;
   externalOidcTokenEnv?: string;
-  requiredHumanClaim?: { name: string; value?: string | undefined };
 };
 
 function serverModeCredentialError(source: string): Error {
@@ -63,7 +62,6 @@ export function workerVaultRuntimeMetadata(opts: {
     ...(plan.selection ? { credentialSource: plan.selection.source } : {}),
     ...(plan.clientSecretEnv ? { clientSecretEnv: plan.clientSecretEnv } : {}),
     ...(plan.externalOidcTokenEnv ? { externalOidcTokenEnv: plan.externalOidcTokenEnv } : {}),
-    ...(plan.humanClaim ? { requiredHumanClaim: plan.humanClaim } : {}),
   };
 }
 

@@ -51,7 +51,7 @@ test("remote profile deploy creates a service-owned auth session for interactive
       claims: {
         sub: "human-1",
         preferred_username: "Ada",
-        groups: ["deployers-pleomino-dev", "deploy-submitters-pleomino-dev"],
+        groups: ["deploy-submitters-pleomino-dev"],
       },
     });
     const {
@@ -76,8 +76,6 @@ test("remote profile deploy creates a service-owned auth session for interactive
         cliPublicClientId: "deployment-cli",
         deploymentEnvironment: "mini",
         preferredCredentialSource: "interactive_pkce" as const,
-        requiredHumanClaim: "groups",
-        requiredHumanClaimValue: "deployers-pleomino-dev",
         pkceCallback: {
           mode: "public_host",
           externalScheme: "https",

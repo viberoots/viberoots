@@ -9,11 +9,6 @@ export type OidcDiscovery = {
   deviceAuthorizationEndpoint?: string;
 };
 
-export type HumanClaimRequirement = {
-  name: string;
-  value?: string | undefined;
-};
-
 export function trimIssuer(value: string): string {
   return value.replace(/\/+$/, "");
 }
@@ -113,28 +108,12 @@ export async function exchangePkceCodeForToken(opts: {
   return token;
 }
 
-function claimValues(claim: unknown): string[] {
-  if (typeof claim === "string") return [claim];
-  return Array.isArray(claim)
-    ? claim.filter((entry): entry is string => typeof entry === "string")
-    : [];
-}
-
-export function assertHumanClaim(claims: JwtClaims, requirement?: HumanClaimRequirement) {
-  if (!requirement?.name) return;
-  const values = claimValues(claims[requirement.name]);
-  if (requirement.value ? !values.includes(requirement.value) : values.length === 0) {
-    throw new Error(`human deploy token missing required claim: ${requirement.name}`);
-  }
-}
-
 export function validateOidcToken(opts: {
   token: string;
   issuer: string;
   audience?: string | string[] | undefined;
   clientId: string;
   boundClaims: Record<string, string>;
-  humanClaim?: HumanClaimRequirement | undefined;
 }) {
   const claims = decodeJwtPayload(opts.token);
   assertJwtClaims(claims, {
@@ -143,6 +122,5 @@ export function validateOidcToken(opts: {
     clientId: opts.clientId,
     boundClaims: opts.boundClaims,
   });
-  assertHumanClaim(claims, opts.humanClaim);
   return claims;
 }

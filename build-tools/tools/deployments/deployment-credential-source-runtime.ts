@@ -2,10 +2,7 @@
 import type { JwtClaims } from "./deploy-vault-jwt-claims.ts";
 import { mintDeployVaultJwt } from "./deploy-vault-jwt.ts";
 import { runDeviceLogin } from "./deployment-credential-source-device.ts";
-import {
-  validateOidcToken,
-  type HumanClaimRequirement,
-} from "./deployment-credential-source-oidc.ts";
+import { validateOidcToken } from "./deployment-credential-source-oidc.ts";
 import { runPkceLogin } from "./deployment-credential-source-pkce.ts";
 import type { DeploymentCredentialSource } from "./deployment-credential-source-selection.ts";
 import type { DeploymentPkceCallbackProfileInput } from "./deployment-pkce-callback-profile.ts";
@@ -22,7 +19,6 @@ export type CredentialSourceRuntimeOptions = {
   serviceClientId: string;
   clientSecretEnv: string;
   externalOidcTokenEnv: string;
-  humanClaim?: HumanClaimRequirement | undefined;
   env: NodeJS.ProcessEnv;
   openBrowser: boolean;
   pkceCallback?: DeploymentPkceCallbackProfileInput | undefined;
@@ -89,7 +85,6 @@ async function readInteractiveToken(opts: CredentialSourceRuntimeOptions): Promi
       clientId: opts.humanClientId,
       audience: opts.audience,
       boundClaims: boundClaims(opts),
-      humanClaim: opts.humanClaim,
       timeoutMs: opts.timeoutMs,
       prompt: opts.prompt,
     });
@@ -99,7 +94,6 @@ async function readInteractiveToken(opts: CredentialSourceRuntimeOptions): Promi
     clientId: opts.humanClientId,
     audience: opts.audience,
     boundClaims: boundClaims(opts),
-    humanClaim: opts.humanClaim,
     openBrowser: opts.openBrowser && opts.source === "interactive_pkce",
     callbackProfile: opts.pkceCallback,
     timeoutMs: opts.timeoutMs,

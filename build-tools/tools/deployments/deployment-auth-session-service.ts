@@ -118,7 +118,6 @@ export async function createDeploymentAuthLoginSession(opts: {
       deployment_environment: plan.deploymentEnvironment,
       repository: plan.repository,
     },
-    ...(plan.humanClaim ? { humanClaim: plan.humanClaim } : {}),
   };
   await writeDeploymentAuthSession(opts.recordsRoot, session);
   return {
@@ -166,7 +165,6 @@ export async function handleDeploymentAuthCallback(opts: {
       audience: [...new Set([consumed.audience, consumed.clientId].filter(Boolean))],
       clientId: consumed.clientId,
       boundClaims: consumed.boundClaims,
-      humanClaim: consumed.humanClaim,
     });
     assertNonceIfPresent(claims, consumed.nonce);
     const principal = principalFromOidcClaims(claims);

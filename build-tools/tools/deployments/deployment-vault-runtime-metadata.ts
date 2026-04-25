@@ -29,10 +29,6 @@ export function readVaultRuntimeConfig(node: GraphNode): DeploymentVaultRuntimeC
       ? { jenkinsClientSecretEnv: raw.jenkins_client_secret_env }
       : {}),
     ...(raw.external_oidc_token_env ? { externalOidcTokenEnv: raw.external_oidc_token_env } : {}),
-    ...(raw.required_human_claim ? { requiredHumanClaim: raw.required_human_claim } : {}),
-    ...(raw.required_human_claim_value
-      ? { requiredHumanClaimValue: raw.required_human_claim_value }
-      : {}),
     ...(pkceCallback ? { pkceCallback } : {}),
   };
 }

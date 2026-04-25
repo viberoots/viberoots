@@ -36,7 +36,6 @@ const EXPECTED_MINI_VAULT_RUNTIME_BASE = {
   serviceAccountClientId: "deployment-runner",
   deploymentEnvironment: "mini",
   roleName: "deploy-pleomino-read",
-  requiredHumanClaim: "groups",
   pkceCallback: {
     mode: "public_host",
     externalScheme: "https",
@@ -47,16 +46,8 @@ const EXPECTED_MINI_VAULT_RUNTIME_BASE = {
     bindPath: "/oidc/callback",
   },
 };
-
-const EXPECTED_PLEOMINO_PROD_VAULT_RUNTIME = {
-  ...EXPECTED_MINI_VAULT_RUNTIME_BASE,
-  requiredHumanClaimValue: "deployers-pleomino-prod",
-};
-
-const EXPECTED_PLEOMINO_STAGING_VAULT_RUNTIME = {
-  ...EXPECTED_MINI_VAULT_RUNTIME_BASE,
-  requiredHumanClaimValue: "deployers-pleomino-staging",
-};
+const EXPECTED_PLEOMINO_PROD_VAULT_RUNTIME = EXPECTED_MINI_VAULT_RUNTIME_BASE;
+const EXPECTED_PLEOMINO_STAGING_VAULT_RUNTIME = EXPECTED_MINI_VAULT_RUNTIME_BASE;
 
 test("cloudflare-pages deployment extraction reads canonical metadata from TARGETS via cquery", async () => {
   await runInTemp("cloudflare-pages-cquery-extraction", async (tmp, _$) => {
@@ -219,9 +210,7 @@ test("concrete Pleomino Cloudflare TARGETS emit publish and cleanup token requir
   assert.deepEqual(
     deployments
       .map((deployment) => deployment.vaultRuntime)
-      .sort((a, b) =>
-        (a?.requiredHumanClaimValue || "").localeCompare(b?.requiredHumanClaimValue || ""),
-      ),
+      .sort((a, b) => String(a?.roleName || "").localeCompare(String(b?.roleName || ""))),
     [EXPECTED_PLEOMINO_PROD_VAULT_RUNTIME, EXPECTED_PLEOMINO_STAGING_VAULT_RUNTIME],
   );
 });

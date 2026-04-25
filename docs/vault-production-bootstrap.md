@@ -980,9 +980,6 @@ One practical Keycloak admin-console path is:
 
 Reviewed Keycloak group conventions for claim-to-grant mapping:
 
-- Keep `required_human_claim = "groups"` and set
-  `required_human_claim_value = "deployers-<project>-<env>"` as the baseline
-  human gate for the deployment being accessed.
 - Human deployment-scoped grants come from:
   - `deploy-submitters-<project>-<env>`
   - `deploy-approvers-<project>-<env>`
@@ -1252,14 +1249,11 @@ vault_runtime = {
     "pkce_callback_bind_port": "7780",
     "pkce_callback_bind_path": "/oidc/callback",
     "preferred_credential_source": "interactive_pkce",
-    "required_human_claim": "groups",
-    "required_human_claim_value": "deployers-pleomino-dev",
 }
 ```
 
-The `required_human_claim_value` above is the baseline human gate. The deploy
-auth session may still derive multiple reviewed grants from the same token, for
-example `deploy-submitters-pleomino-dev` plus
+The deploy auth session may derive multiple reviewed grants from the same
+token, for example `deploy-submitters-pleomino-dev` plus
 `deploy-admission-reporters-pleomino-dev`, or automation groups such as
 `deploy-automation-jenkins-submitters-dev` and
 `deploy-automation-jenkins-admission-reporters-all-deployments`.

@@ -29,8 +29,6 @@ function deployment(issuer: string) {
       cliPublicClientId: "deployment-cli",
       deploymentEnvironment: "mini",
       preferredCredentialSource: "interactive_pkce" as const,
-      requiredHumanClaim: "groups",
-      requiredHumanClaimValue: "deployers",
       pkceCallback: {
         mode: "public_host",
         externalScheme: "https",
@@ -47,7 +45,11 @@ function deployment(issuer: string) {
 test("deployment service owns PKCE login sessions and public OIDC callback", async () => {
   await runInTemp("deployment-auth-session-service", async (tmp) => {
     const oidc = await startFakeOidcServer({
-      claims: { sub: "human-1", preferred_username: "Ada", groups: ["deployers"] },
+      claims: {
+        sub: "human-1",
+        preferred_username: "Ada",
+        groups: ["deploy-submitters-pleomino-dev"],
+      },
     });
     const target = deployment(oidc.issuer);
     const controlPlane = await startNixosSharedHostControlPlaneServer({
@@ -93,7 +95,9 @@ test("deployment service owns PKCE login sessions and public OIDC callback", asy
 
 test("deployment auth sessions fail closed for mismatches, replay, and expiry", async () => {
   await runInTemp("deployment-auth-session-fail-closed", async (tmp) => {
-    const oidc = await startFakeOidcServer({ claims: { groups: ["deployers"] } });
+    const oidc = await startFakeOidcServer({
+      claims: { groups: ["deploy-submitters-pleomino-dev"] },
+    });
     const target = deployment(oidc.issuer);
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
@@ -151,7 +155,7 @@ test("deployment auth sessions tolerate IdPs that omit the requested Vault audie
         aud: "deployment-cli",
         sub: "human-1",
         preferred_username: "Ada",
-        groups: ["deployers"],
+        groups: ["deploy-submitters-pleomino-dev"],
       },
     });
     const target = deployment(oidc.issuer);
@@ -191,7 +195,7 @@ test("deployment auth sessions still reject unrelated audiences", async () => {
         aud: "account",
         sub: "human-1",
         preferred_username: "Ada",
-        groups: ["deployers"],
+        groups: ["deploy-submitters-pleomino-dev"],
       },
     });
     const target = deployment(oidc.issuer);

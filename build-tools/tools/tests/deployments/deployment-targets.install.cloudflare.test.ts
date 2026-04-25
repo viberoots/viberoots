@@ -23,8 +23,6 @@ test("Cloudflare target install preserves reviewed vault runtime metadata", asyn
         roleName: "deploy-pleomino-read",
         clientSecretEnv: "BNX_DEPLOYER_CLIENT_SECRET",
         jenkinsClientSecretEnv: "JENKINS_DEPLOYMENT_CLIENT_SECRET",
-        requiredHumanClaim: "groups",
-        requiredHumanClaimValue: "deployers",
         pkceCallback: {
           mode: "public_host",
           externalScheme: "https",
@@ -48,8 +46,6 @@ test("Cloudflare target install preserves reviewed vault runtime metadata", asyn
       '"cli_public_client_id": "deployment-cli"',
       '"service_account_client_id": "deployment-runner"',
       '"jenkins_client_secret_env": "JENKINS_DEPLOYMENT_CLIENT_SECRET"',
-      '"required_human_claim": "groups"',
-      '"required_human_claim_value": "deployers"',
       '"pkce_callback_mode": "public_host"',
       '"pkce_callback_external_host": "deploy-auth.apps.kilty.io"',
       '"pkce_callback_bind_port": "7780"',

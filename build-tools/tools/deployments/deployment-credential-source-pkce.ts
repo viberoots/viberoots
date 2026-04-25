@@ -7,7 +7,6 @@ import {
   exchangePkceCodeForToken,
   randomSecret,
   validateOidcToken,
-  type HumanClaimRequirement,
 } from "./deployment-credential-source-oidc.ts";
 import {
   normalizeDeploymentPkceCallbackProfile,
@@ -21,7 +20,6 @@ export type PkceLoginOptions = {
   clientId: string;
   audience?: string | undefined;
   boundClaims: Record<string, string>;
-  humanClaim?: HumanClaimRequirement | undefined;
   openBrowser: boolean;
   callbackProfile?: DeploymentPkceCallbackProfileInput | undefined;
   timeoutMs?: number | undefined;
@@ -189,7 +187,6 @@ export async function runPkceLogin(opts: PkceLoginOptions): Promise<string> {
       audience: opts.audience,
       clientId: opts.clientId,
       boundClaims: opts.boundClaims,
-      humanClaim: opts.humanClaim,
     });
     return token;
   } finally {

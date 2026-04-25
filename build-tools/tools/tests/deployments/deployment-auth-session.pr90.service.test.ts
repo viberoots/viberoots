@@ -33,8 +33,6 @@ function deployment(issuer: string) {
       cliPublicClientId: "deployment-cli",
       deploymentEnvironment: "mini",
       preferredCredentialSource: "interactive_pkce" as const,
-      requiredHumanClaim: "groups",
-      requiredHumanClaimValue: "deployers-pleomino-dev",
       pkceCallback: {
         mode: "public_host",
         externalScheme: "https",
@@ -55,7 +53,6 @@ test("auth session status exposes every derived grant for the authenticated depl
         sub: "human-1",
         preferred_username: "Ada",
         groups: [
-          "deployers-pleomino-dev",
           "deploy-submitters-pleomino-dev",
           "deploy-approvers-pleomino-dev",
           "deploy-admission-reporters-pleomino-dev",

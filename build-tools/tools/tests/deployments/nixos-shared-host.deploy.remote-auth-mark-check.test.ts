@@ -48,7 +48,7 @@ test("remote profile mark-check-passed fails closed when the authenticated submi
       claims: {
         sub: "human-1",
         preferred_username: "Ada",
-        groups: ["deployers-pleomino-dev", "deploy-submitters-pleomino-dev"],
+        groups: ["deploy-submitters-pleomino-dev"],
       },
     });
     const fixture = await prepareRemoteExecFixture({
@@ -83,8 +83,6 @@ test("remote profile mark-check-passed fails closed when the authenticated submi
           '        "cli_public_client_id": "deployment-cli",',
           '        "deployment_environment": "mini",',
           '        "preferred_credential_source": "interactive_pkce",',
-          '        "required_human_claim": "groups",',
-          '        "required_human_claim_value": "deployers-pleomino-dev",',
           '        "pkce_callback_mode": "public_host",',
           '        "pkce_callback_external_scheme": "https",',
           '        "pkce_callback_external_host": "deploy-auth.apps.kilty.io",',

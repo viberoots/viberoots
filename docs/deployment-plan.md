@@ -10328,7 +10328,6 @@ own the PKCE callback listener for shared/protected `mini` deployment workflows.
   - issuer
   - repository claim
   - deployment environment claim
-  - optional human group/role claim from `vault_runtime.required_human_claim`
 - Record only a redacted authenticated principal and authorization decision in control-plane
   submissions; never persist OIDC auth codes, PKCE verifiers, access tokens, refresh tokens,
   workload JWTs, Vault tokens, or provider credentials.

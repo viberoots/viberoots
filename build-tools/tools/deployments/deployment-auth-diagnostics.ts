@@ -86,7 +86,6 @@ export function buildDeploymentAuthDoctor(deployment: DeploymentTarget, env = pr
       deploymentEnvironment: plan.deploymentEnvironment,
       repository: plan.repository,
       boundClaimKeys: ["deployment_environment", "repository"],
-      humanClaim: plan.humanClaim?.name,
       pkceCallback: callbackProfile,
     },
   });

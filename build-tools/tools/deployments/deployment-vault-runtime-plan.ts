@@ -44,7 +44,6 @@ export type DeploymentVaultRuntimePlan = {
   externalOidcTokenEnv: string;
   repository: string;
   selection?: CredentialSourceSelection;
-  humanClaim?: { name: string; value?: string | undefined };
 };
 
 function readEnv(env: NodeJS.ProcessEnv, name: string): string {
@@ -229,13 +228,5 @@ export function resolveDeploymentVaultRuntimePlan(opts: {
     externalOidcTokenEnv,
     repository,
     ...(selection ? { selection } : {}),
-    ...(metadata?.requiredHumanClaim
-      ? {
-          humanClaim: {
-            name: metadata.requiredHumanClaim,
-            value: metadata.requiredHumanClaimValue,
-          },
-        }
-      : {}),
   };
 }

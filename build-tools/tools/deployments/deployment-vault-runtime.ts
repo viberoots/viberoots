@@ -74,7 +74,6 @@ export async function prepareDeploymentVaultRuntime(opts: {
     audience: plan.audience,
     deploymentEnvironment: plan.deploymentEnvironment,
     repository: plan.repository,
-    humanClaim: plan.humanClaim,
     env,
     openBrowser: plan.selection.source === "interactive_pkce",
     pkceCallback: plan.selection.source.startsWith("interactive")

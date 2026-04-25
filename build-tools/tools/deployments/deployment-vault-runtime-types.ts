@@ -16,7 +16,5 @@ export type DeploymentVaultRuntimeConfig = {
   preferredCredentialSource?: DeploymentCredentialSource;
   jenkinsClientSecretEnv?: string;
   externalOidcTokenEnv?: string;
-  requiredHumanClaim?: string;
-  requiredHumanClaimValue?: string;
   pkceCallback?: DeploymentPkceCallbackProfileInput;
 };

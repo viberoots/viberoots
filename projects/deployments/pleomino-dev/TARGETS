@@ -22,8 +22,6 @@ nixos_shared_host_static_webapp_deployment(
         "pkce_callback_bind_host": "127.0.0.1",
         "pkce_callback_bind_port": "7780",
         "pkce_callback_bind_path": "/oidc/callback",
-        "required_human_claim": "groups",
-        "required_human_claim_value": "deployers-pleomino-dev",
     },
     secret_requirements = [],
     runtime_config_requirements = [],

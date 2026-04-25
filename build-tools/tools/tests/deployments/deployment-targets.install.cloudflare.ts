@@ -39,8 +39,6 @@ function renderVaultRuntime(deployment: CloudflarePagesDeployment): Record<strin
     ["preferred_credential_source", config.preferredCredentialSource],
     ["jenkins_client_secret_env", config.jenkinsClientSecretEnv],
     ["external_oidc_token_env", config.externalOidcTokenEnv],
-    ["required_human_claim", config.requiredHumanClaim],
-    ["required_human_claim_value", config.requiredHumanClaimValue],
     ["pkce_callback_mode", callback?.mode],
     ["pkce_callback_external_scheme", callback?.externalScheme],
     ["pkce_callback_external_host", callback?.externalHost],
