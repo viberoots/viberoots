@@ -1036,18 +1036,24 @@ can update those same config-root artifacts and optionally apply them:
 deploy admin keycloak sync \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
-  --acting-principal <principal> \
-  --admin-group deploy-admin-keycloak-shape-admin-project-pleomino \
   --apply-host-dry-run
 deploy admin keycloak grant-user \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
   --action submit \
+  --apply-host
+deploy admin keycloak grant-user \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --action submit \
   --user-email alice@example.com \
-  --acting-principal <principal> \
-  --admin-group deploy-admin-keycloak-membership-admin-project-pleomino \
   --apply-host
 ```
+
+The reviewed login session supplies the acting principal and deploy-admin
+Keycloak scope automatically. Omit `--user-email` when the operator is granting
+the reviewed capability to themself, and add `--user-email alice@example.com`
+only for cross-user onboarding or break-glass recovery.
 
 Deploy-admin Keycloak grants are intentionally distinct from ordinary deploy
 grants. Typical reviewed examples are:

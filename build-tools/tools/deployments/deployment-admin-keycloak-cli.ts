@@ -73,8 +73,6 @@ export async function maybeHandleDeploymentAdminCli(workspaceRoot: string): Prom
           workspaceRoot,
           deployment,
           command: "sync",
-          actingPrincipal: requireFlag("acting-principal"),
-          adminGroups: adminGroups(),
           automationPrincipalIds: automationPrincipalIds(),
         }),
       );
@@ -101,9 +99,6 @@ export async function maybeHandleDeploymentAdminCli(workspaceRoot: string): Prom
           deployment,
           command: "grant-user",
           action,
-          userEmail: requireFlag("user-email"),
-          actingPrincipal: requireFlag("acting-principal"),
-          adminGroups: adminGroups(),
           automationPrincipalIds: automationPrincipalIds(),
         }),
       );

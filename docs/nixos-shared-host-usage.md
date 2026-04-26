@@ -369,17 +369,19 @@ For the normal client-driven `mini` workflow, skip manual SSH edits and run:
 direnv exec . build-tools/tools/bin/deploy admin keycloak sync \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
-  --acting-principal <principal> \
-  --admin-group deploy-admin-keycloak-shape-admin-project-pleomino \
   --apply-host-dry-run
 
 direnv exec . build-tools/tools/bin/deploy admin keycloak grant-user \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
   --action submit \
+  --apply-host
+
+direnv exec . build-tools/tools/bin/deploy admin keycloak grant-user \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --action submit \
   --user-email alice@example.com \
-  --acting-principal <principal> \
-  --admin-group deploy-admin-keycloak-membership-admin-project-pleomino \
   --apply-host
 ```
 
@@ -390,7 +392,11 @@ the host config workspace as mutable generated files, then optionally runs the
 same reviewed host-apply preflight and dry-run/switch helper the ordinary
 remote deploy path uses. Keep those files gitignored; the identity-provider
 module bootstraps and runtime-links them instead of expecting flake-visible
-tracked paths.
+tracked paths. On this happy path, the reviewed login session already supplies
+the acting principal and the deploy-admin Keycloak group scope, so `--profile
+mini` no longer needs `--acting-principal`, `--admin-group`, `--realm-file`, or
+`--membership-file`. Omit `--user-email` to grant yourself the reviewed
+capability; add `--user-email alice@example.com` only for a cross-user grant.
 To discover the reviewed check names for a target before you submit, run
 `direnv exec . build-tools/tools/bin/deploy --deployment <label> --validate-only`
 and inspect `admissionRequirements.admission_policy`, `allowed_refs`,

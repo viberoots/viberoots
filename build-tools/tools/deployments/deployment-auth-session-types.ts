@@ -43,6 +43,8 @@ export type DeploymentAuthSessionStatus = {
   operationKind: string;
   credentialSource: DeploymentCredentialSource;
   principal?: DeploymentPrincipal;
+  principalEmail?: string;
+  reviewedKeycloakAdminGroups?: string[];
   authorization?: DeploymentControlPlaneAuthorization;
   failure?: string;
 };
@@ -68,6 +70,8 @@ export type DeploymentAuthSessionRecord = {
   callbackConsumedAt?: string;
   authenticatedAt?: string;
   principal?: DeploymentPrincipal;
+  principalEmail?: string;
+  reviewedKeycloakAdminGroups?: string[];
   authorization?: DeploymentControlPlaneAuthorization;
   failure?: string;
 };

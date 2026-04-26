@@ -8,9 +8,9 @@ import {
 } from "./deployment-credential-source-oidc.ts";
 import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan.ts";
 import {
-  normalizeDeploymentPkceCallbackProfile,
-  urlHost,
-} from "./deployment-pkce-callback-profile.ts";
+  authBlockingMissing,
+  publicRedirectUri,
+} from "./deployment-auth-session-service-helpers.ts";
 import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
 import {
   DEPLOYMENT_AUTH_LOGIN_RESPONSE_SCHEMA,
@@ -29,35 +29,16 @@ import {
   authorizationForOidcPrincipal,
   principalFromOidcClaims,
 } from "./deployment-auth-session-principal.ts";
+import {
+  principalEmailFromOidcClaims,
+  reviewedKeycloakAdminGroupsFromOidcClaims,
+} from "./deployment-auth-session-reviewed-identity.ts";
 import { normalizeAuthorizationSnapshot } from "./deployment-control-plane-authz.ts";
 
 const DEFAULT_SESSION_MS = 5 * 60 * 1000;
 
-function authBlockingMissing(missing: string[]): string[] {
-  return missing.filter(
-    (entry) =>
-      entry.includes("Vault JWT auth") || entry.includes("lane governance repository metadata"),
-  );
-}
-
 function redirectUriFor(session: DeploymentAuthSessionRecord): string {
   return session.redirectUri;
-}
-
-function publicRedirectUri(input: DeploymentAuthLoginRequest): string {
-  const profile = normalizeDeploymentPkceCallbackProfile(
-    input.deployment.vaultRuntime?.pkceCallback || {
-      mode: "public_host",
-      externalScheme: "https",
-      externalHost: "deploy-auth.apps.kilty.io",
-      externalPath: "/oidc/callback",
-      bindHost: "127.0.0.1",
-      bindPort: 7780,
-      bindPath: "/oidc/callback",
-    },
-  );
-  const port = profile.externalPort ? `:${profile.externalPort}` : "";
-  return `${profile.externalScheme}://${urlHost(profile.externalHost)}${port}${profile.externalPath}`;
 }
 
 export function publicDeploymentAuthSessionStatus(session: DeploymentAuthSessionRecord) {
@@ -70,6 +51,10 @@ export function publicDeploymentAuthSessionStatus(session: DeploymentAuthSession
     operationKind: session.operationKind,
     credentialSource: session.credentialSource,
     ...(session.principal ? { principal: session.principal } : {}),
+    ...(session.principalEmail ? { principalEmail: session.principalEmail } : {}),
+    ...(session.reviewedKeycloakAdminGroups
+      ? { reviewedKeycloakAdminGroups: session.reviewedKeycloakAdminGroups }
+      : {}),
     ...(session.authorization
       ? { authorization: normalizeAuthorizationSnapshot(session.authorization) }
       : {}),
@@ -168,6 +153,8 @@ export async function handleDeploymentAuthCallback(opts: {
     });
     assertNonceIfPresent(claims, consumed.nonce);
     const principal = principalFromOidcClaims(claims);
+    const principalEmail = principalEmailFromOidcClaims(claims);
+    const reviewedKeycloakAdminGroups = reviewedKeycloakAdminGroupsFromOidcClaims(claims);
     const authorization = authorizationForOidcPrincipal({
       deployment: consumed.deployment,
       principal,
@@ -178,6 +165,8 @@ export async function handleDeploymentAuthCallback(opts: {
       status: "authenticated" as const,
       authenticatedAt: new Date().toISOString(),
       principal,
+      ...(principalEmail ? { principalEmail } : {}),
+      ...(reviewedKeycloakAdminGroups.length > 0 ? { reviewedKeycloakAdminGroups } : {}),
       authorization,
     };
     await writeDeploymentAuthSession(opts.recordsRoot, authenticated);

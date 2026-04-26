@@ -89,6 +89,10 @@ function roleLabel(role: DeploymentKeycloakAdminRole): string {
       : "membership mutation";
 }
 
+export function normalizeReviewedDeployAdminGroups(groups: string[]): string[] {
+  return [...new Set(groups.map(normalized).filter((group) => !!parseAdminGroup(group)))].sort();
+}
+
 export function reviewedDeployAdminGroupName(
   role: DeploymentKeycloakAdminRole,
   scope: DeploymentKeycloakAdminScope,
@@ -113,13 +117,30 @@ export function reviewedDeployAdminGroupsByCapability(deployment: DeploymentTarg
   };
 }
 
+function preferredAdminGroups(
+  deployment: DeploymentTarget,
+  role: DeploymentKeycloakAdminRole,
+  adminGroups: string[],
+): string[] {
+  const normalizedGroups = new Set(normalizeReviewedDeployAdminGroups(adminGroups));
+  const expected = reviewedDeployAdminGroupsByCapability(deployment);
+  const preferred =
+    role === "read"
+      ? expected.read
+      : role === "shape_admin"
+        ? expected.shapeAdmin
+        : expected.membershipAdmin;
+  const matched = preferred.filter((group) => normalizedGroups.has(group));
+  return matched.length > 0 ? matched : [...normalizedGroups];
+}
+
 export function authorizeDeploymentKeycloakAdmin(opts: {
   deployment: DeploymentTarget;
   principalId: string;
   adminGroups: string[];
   role: DeploymentKeycloakAdminRole;
 }): DeploymentKeycloakAdminDecision {
-  const grant = opts.adminGroups
+  const grant = preferredAdminGroups(opts.deployment, opts.role, opts.adminGroups)
     .map(parseAdminGroup)
     .filter((entry): entry is DeploymentKeycloakAdminGrant => !!entry)
     .find((entry) => entry.role === opts.role && scopeMatches(opts.deployment, entry.scope));

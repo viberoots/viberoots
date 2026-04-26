@@ -414,24 +414,30 @@ manual SSH session:
 direnv exec . build-tools/tools/bin/deploy admin keycloak sync \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
-  --acting-principal <principal> \
-  --admin-group deploy-admin-keycloak-shape-admin-project-pleomino \
   --apply-host-dry-run
 
 direnv exec . build-tools/tools/bin/deploy admin keycloak grant-user \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
   --action submit \
+  --apply-host
+
+direnv exec . build-tools/tools/bin/deploy admin keycloak grant-user \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --action submit \
   --user-email alice@example.com \
-  --acting-principal <principal> \
-  --admin-group deploy-admin-keycloak-membership-admin-project-pleomino \
   --apply-host
 ```
 
 That reviewed remote path writes the authoritative realm files under the host
 config root, keeps flake evaluation pure, and then optionally runs the
 preflighted host-apply helper instead of relying on hand-edited files under
-`/srv/common`.
+`/srv/common`. The reviewed auth session already identifies the logged-in
+operator and their deploy-admin Keycloak scope, so the normal `--profile mini`
+path omits `--acting-principal`, `--admin-group`, `--realm-file`, and
+`--membership-file`. Omit `--user-email` for a self-service grant to the
+current login; add it only when granting access to another human.
 
 The reviewed deploy-admin Keycloak grants stay separate from ordinary deploy
 grants. Typical examples are:

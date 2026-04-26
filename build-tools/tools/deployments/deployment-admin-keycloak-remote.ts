@@ -1,7 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagBool, getFlagList, getFlagStr, hasFlag } from "../lib/cli.ts";
+import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
 import type { DeploymentAuthAction } from "./deployment-auth-groups.ts";
 import { deploymentAdminKeycloakArtifactPaths } from "./deployment-admin-keycloak-artifacts.ts";
+import { resolveRemoteKeycloakAdminInputs } from "./deployment-admin-keycloak-remote-auth.ts";
 import { commandFailure, runCommand } from "./nixos-shared-host-remote-execution-transport.ts";
 import {
   buildRemoteDeployAdminKeycloakGrantUserScript,
@@ -115,9 +116,6 @@ export async function runDeploymentAdminKeycloakRemoteProfile(opts: {
   deployment: DeploymentTarget;
   command: "sync" | "grant-user";
   action?: DeploymentAuthAction;
-  userEmail?: string;
-  actingPrincipal: string;
-  adminGroups: string[];
   automationPrincipalIds: string[];
 }) {
   const deployment = assertRemoteProfileDeployment(opts.deployment);
@@ -131,6 +129,12 @@ export async function runDeploymentAdminKeycloakRemoteProfile(opts: {
       : `${opts.workspaceRoot}/.local/deployments/nixos-shared-host/clients`,
     overrides: remoteOverrides(),
     hostApply: hostApplySelection(),
+  });
+  const resolvedInputs = await resolveRemoteKeycloakAdminInputs({
+    deployment,
+    plan,
+    command: opts.command,
+    ...(opts.action ? { action: opts.action } : {}),
   });
   const artifacts = deploymentAdminKeycloakArtifactPaths({
     configRoot: plan.hostApply.remoteConfigRoot,
@@ -155,18 +159,18 @@ export async function runDeploymentAdminKeycloakRemoteProfile(opts: {
           plan,
           deploymentLabel: deployment.label,
           realmFile: artifacts.realmFile,
-          actingPrincipal: opts.actingPrincipal,
-          adminGroups: opts.adminGroups,
+          actingPrincipal: resolvedInputs.actingPrincipal,
+          adminGroups: resolvedInputs.adminGroups,
           automationPrincipalIds: opts.automationPrincipalIds,
         })
       : buildRemoteDeployAdminKeycloakGrantUserScript({
           plan,
           deploymentLabel: deployment.label,
           action: String(opts.action || ""),
-          userEmail: String(opts.userEmail || ""),
+          userEmail: String(resolvedInputs.userEmail || ""),
           membershipFile: artifacts.membershipFile,
-          actingPrincipal: opts.actingPrincipal,
-          adminGroups: opts.adminGroups,
+          actingPrincipal: resolvedInputs.actingPrincipal,
+          adminGroups: resolvedInputs.adminGroups,
         });
   const mutationResult = await runCommand(
     buildRemoteSshArgvWithFallback(plan.destination, mutationScript, plan.reviewedRemoteSshAuth),
@@ -210,6 +214,24 @@ export async function runDeploymentAdminKeycloakRemoteProfile(opts: {
       ...mutation,
       audit: {
         ...(mutation.audit || {}),
+        inputResolution: {
+          actingPrincipal: {
+            principalId: resolvedInputs.actingPrincipal,
+            source: resolvedInputs.actingPrincipalSource,
+          },
+          adminGroups: {
+            values: resolvedInputs.adminGroups,
+            source: resolvedInputs.adminGroupsSource,
+          },
+          ...(resolvedInputs.userEmail
+            ? {
+                targetUser: {
+                  userEmail: resolvedInputs.userEmail,
+                  source: resolvedInputs.userEmailSource,
+                },
+              }
+            : {}),
+        },
         requestedMutation: {
           ...((mutation.audit && mutation.audit.requestedMutation) || {}),
           remoteProfile: plan.profileName,

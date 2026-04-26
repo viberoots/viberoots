@@ -301,16 +301,17 @@ profile flow instead of SSHing in to edit those files by hand:
 deploy admin keycloak sync \
   --deployment <label> \
   --profile mini \
-  --acting-principal <principal> \
-  --admin-group deploy-admin-keycloak-shape-admin-project-<project> \
   --apply-host-dry-run
 deploy admin keycloak grant-user \
   --deployment <label> \
   --profile mini \
   --action submit \
-  --user-email <user@example.com> \
-  --acting-principal <principal> \
-  --admin-group deploy-admin-keycloak-membership-admin-project-<project> \
+  --apply-host
+deploy admin keycloak grant-user \
+  --deployment <label> \
+  --profile mini \
+  --action submit \
+  --user-email alice@example.com \
   --apply-host
 ```
 
@@ -318,7 +319,13 @@ That reviewed remote path writes the authoritative Keycloak JSON inputs under
 the host config root as mutable generated files, and the reviewed
 identity-provider module bootstraps and runtime-links them for Keycloak during
 activation. No commit or staging step is required before the optional reviewed
-host-apply dry-run or switch contract runs.
+host-apply dry-run or switch contract runs. The reviewed login session derives
+the acting principal and deploy-admin Keycloak scope automatically, so the
+normal `--profile mini` path does not require `--acting-principal`,
+`--admin-group`, `--realm-file`, or `--membership-file`. Omit `--user-email`
+for self-service grants to the logged-in human, and add it only when granting a
+reviewed capability to another user. Keep the explicit file and principal/group
+flags for intentionally local or non-remote workflows only.
 For protected/shared service-backed runs, `--mark-check-passed` and
 `--mark-check-for-commit` only describe the commit the client believes it is
 submitting. Final admission still binds to the service-owned reviewed source

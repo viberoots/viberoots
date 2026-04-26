@@ -96,7 +96,10 @@ test("deploy admin keycloak remote profile still enforces separate admin grants"
       env: remoteExecEnv(env),
     })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak sync --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${configRoot} --acting-principal user:submitter-only --admin-group ${reviewedHumanGroupName(pleominoDeploymentFixture(), "submitter")}`.nothrow();
     assert.notEqual(result.exitCode, 0);
-    assert.match(String(result.stderr), /not authorized for Keycloak group-shape sync/i);
+    assert.match(
+      String(result.stderr),
+      /lacks reviewed Keycloak group-shape admin|ask an authorized operator to run: deploy admin keycloak sync/i,
+    );
   });
 });
 
