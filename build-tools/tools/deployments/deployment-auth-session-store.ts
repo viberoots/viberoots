@@ -5,6 +5,7 @@ import {
   DEPLOYMENT_AUTH_SESSION_RECORD_SCHEMA,
   type DeploymentAuthSessionRecord,
 } from "./deployment-auth-session-types.ts";
+import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
 
 function authSessionDir(recordsRoot: string): string {
   return path.join(recordsRoot, "control-plane", "auth-sessions");
@@ -31,11 +32,7 @@ export async function writeDeploymentAuthSession(
   recordsRoot: string,
   session: DeploymentAuthSessionRecord,
 ) {
-  await fsp.mkdir(authSessionDir(recordsRoot), { recursive: true });
-  await fsp.writeFile(
-    authSessionPath(recordsRoot, session.sessionId),
-    JSON.stringify(session, null, 2),
-  );
+  await writeControlPlaneJson(authSessionPath(recordsRoot, session.sessionId), session);
 }
 
 export async function readDeploymentAuthSession(recordsRoot: string, sessionId: string) {

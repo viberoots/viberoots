@@ -1010,14 +1010,14 @@ deploy auth explain-groups \
 deploy admin keycloak plan --deployment //projects/deployments/pleomino-dev:deploy
 deploy admin keycloak sync \
   --deployment //projects/deployments/pleomino-dev:deploy \
-  --realm-file /srv/common/deployment-auth-realm.json \
+  --realm-file ./deployment-host/identity-provider/deployment-auth-realm.json \
   --acting-principal <principal> \
   --admin-group deploy-admin-keycloak-shape-admin-project-pleomino
 deploy admin keycloak grant-user \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --action submit \
   --user-email alice@example.com \
-  --membership-file /srv/common/deployment-auth-memberships.json \
+  --membership-file ./deployment-host/identity-provider/deployment-auth-memberships.json \
   --acting-principal <principal> \
   --admin-group deploy-admin-keycloak-membership-admin-project-pleomino
 ```
@@ -1026,7 +1026,28 @@ Those helpers keep group shape separate from membership. Ordinary read-only
 `deploy auth ...` explains the expected shape; privileged `deploy admin ...`
 applies reviewed changes. The generated `deployment-auth-realm.json` contains
 reviewed group and mapper shape only. Human membership lives in the separate
-reviewed `/srv/common/deployment-auth-memberships.json` input.
+reviewed `./deployment-host/identity-provider/deployment-auth-memberships.json`
+input.
+
+When the operator is working from a client machine, the reviewed `mini` profile
+can update those same config-root artifacts and optionally apply them:
+
+```bash
+deploy admin keycloak sync \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --acting-principal <principal> \
+  --admin-group deploy-admin-keycloak-shape-admin-project-pleomino \
+  --apply-host-dry-run
+deploy admin keycloak grant-user \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --action submit \
+  --user-email alice@example.com \
+  --acting-principal <principal> \
+  --admin-group deploy-admin-keycloak-membership-admin-project-pleomino \
+  --apply-host
+```
 
 Deploy-admin Keycloak grants are intentionally distinct from ordinary deploy
 grants. Typical reviewed examples are:

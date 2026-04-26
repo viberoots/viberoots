@@ -350,8 +350,8 @@ deploymentHost.identityProvider = {
   hostname = "identity.apps.kilty.io";
   keycloakHttpPort = 8091;
   realmFiles = [
-    /srv/common/deployment-auth-realm.json
-    /srv/common/deployment-auth-memberships.json
+    ./deployment-host/identity-provider/deployment-auth-realm.json
+    ./deployment-host/identity-provider/deployment-auth-memberships.json
   ];
   manageNginx = false;
   manageAcme = false;
@@ -385,7 +385,7 @@ Before you rebuild, generate the reviewed Keycloak group shape with:
 ```bash
 direnv exec . build-tools/tools/bin/deploy admin keycloak sync \
   --deployment //projects/deployments/pleomino-dev:deploy \
-  --realm-file /srv/common/deployment-auth-realm.json \
+  --realm-file ./deployment-host/identity-provider/deployment-auth-realm.json \
   --acting-principal <principal> \
   --admin-group deploy-admin-keycloak-shape-admin-project-pleomino
 ```
@@ -394,7 +394,7 @@ direnv exec . build-tools/tools/bin/deploy admin keycloak sync \
 surface for feeding that artifact into Keycloak during rebuild or switch.
 Treat the generated realm file as group shape and mapper configuration only;
 keep human and automation membership in a separate reviewed identity-management
-input such as `/srv/common/deployment-auth-memberships.json`.
+input such as `./deployment-host/identity-provider/deployment-auth-memberships.json`.
 One reviewed membership grant example is:
 
 ```bash
@@ -402,10 +402,36 @@ direnv exec . build-tools/tools/bin/deploy admin keycloak grant-user \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --action submit \
   --user-email alice@example.com \
-  --membership-file /srv/common/deployment-auth-memberships.json \
+  --membership-file ./deployment-host/identity-provider/deployment-auth-memberships.json \
   --acting-principal <principal> \
   --admin-group deploy-admin-keycloak-membership-admin-project-pleomino
 ```
+
+From a reviewed client machine, the same artifacts can be updated without a
+manual SSH session:
+
+```bash
+direnv exec . build-tools/tools/bin/deploy admin keycloak sync \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --acting-principal <principal> \
+  --admin-group deploy-admin-keycloak-shape-admin-project-pleomino \
+  --apply-host-dry-run
+
+direnv exec . build-tools/tools/bin/deploy admin keycloak grant-user \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --action submit \
+  --user-email alice@example.com \
+  --acting-principal <principal> \
+  --admin-group deploy-admin-keycloak-membership-admin-project-pleomino \
+  --apply-host
+```
+
+That reviewed remote path writes the authoritative realm files under the host
+config root, keeps flake evaluation pure, and then optionally runs the
+preflighted host-apply helper instead of relying on hand-edited files under
+`/srv/common`.
 
 The reviewed deploy-admin Keycloak grants stay separate from ordinary deploy
 grants. Typical examples are:

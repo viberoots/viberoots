@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { getFlagList, getFlagStr, getPositionals } from "../lib/cli.ts";
+import { resolveAllDeployments } from "./deployment-query.ts";
 import { resolveDeploymentForCli } from "./deployment-cli-resolve.ts";
 import {
   buildDeploymentAdminKeycloakPlan,
@@ -7,6 +8,10 @@ import {
   printDeploymentAdminKeycloakResult,
   syncDeploymentAdminKeycloakRealm,
 } from "./deployment-admin-keycloak.ts";
+import {
+  hasDeploymentAdminKeycloakRemoteProfileFlags,
+  runDeploymentAdminKeycloakRemoteProfile,
+} from "./deployment-admin-keycloak-remote.ts";
 import type { DeploymentAuthAction } from "./deployment-auth-groups.ts";
 
 function requireFlag(name: string): string {
@@ -48,6 +53,11 @@ export async function maybeHandleDeploymentAdminCli(workspaceRoot: string): Prom
   });
   const command = commandName();
   if (command === "plan") {
+    if (hasDeploymentAdminKeycloakRemoteProfileFlags()) {
+      throw new Error(
+        'deploy admin keycloak plan is read-only and does not support reviewed remote profile flags; use "sync" or "grant-user" with --profile <name>',
+      );
+    }
     printDeploymentAdminKeycloakResult(
       buildDeploymentAdminKeycloakPlan({
         deployment,
@@ -57,9 +67,23 @@ export async function maybeHandleDeploymentAdminCli(workspaceRoot: string): Prom
     return true;
   }
   if (command === "sync") {
+    if (hasDeploymentAdminKeycloakRemoteProfileFlags()) {
+      printDeploymentAdminKeycloakResult(
+        await runDeploymentAdminKeycloakRemoteProfile({
+          workspaceRoot,
+          deployment,
+          command: "sync",
+          actingPrincipal: requireFlag("acting-principal"),
+          adminGroups: adminGroups(),
+          automationPrincipalIds: automationPrincipalIds(),
+        }),
+      );
+      return true;
+    }
     printDeploymentAdminKeycloakResult(
       await syncDeploymentAdminKeycloakRealm({
         deployment,
+        deploymentsForRealm: await resolveAllDeployments(workspaceRoot),
         automationPrincipalIds: automationPrincipalIds(),
         realmFile: requireFlag("realm-file"),
         actingPrincipal: requireFlag("acting-principal"),
@@ -69,10 +93,26 @@ export async function maybeHandleDeploymentAdminCli(workspaceRoot: string): Prom
     return true;
   }
   if (command === "grant-user") {
+    const action = requireAction();
+    if (hasDeploymentAdminKeycloakRemoteProfileFlags()) {
+      printDeploymentAdminKeycloakResult(
+        await runDeploymentAdminKeycloakRemoteProfile({
+          workspaceRoot,
+          deployment,
+          command: "grant-user",
+          action,
+          userEmail: requireFlag("user-email"),
+          actingPrincipal: requireFlag("acting-principal"),
+          adminGroups: adminGroups(),
+          automationPrincipalIds: automationPrincipalIds(),
+        }),
+      );
+      return true;
+    }
     printDeploymentAdminKeycloakResult(
       await grantDeploymentAdminKeycloakUser({
         deployment,
-        action: requireAction(),
+        action,
         userEmail: requireFlag("user-email"),
         membershipFile: requireFlag("membership-file"),
         actingPrincipal: requireFlag("acting-principal"),

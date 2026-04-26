@@ -22,6 +22,10 @@ function commandFlags(flags: string[]): string {
   return flags.map((flag) => `--${flag}`).join(" ");
 }
 
+function commandListArgs(flag: string, values: string[]): string {
+  return values.map((value) => `--${flag} ${shSingleQuote(value)}`).join(" ");
+}
+
 function remoteBashCommand(script: string): string {
   return `bash -lc ${shSingleQuote(script)}`;
 }
@@ -176,5 +180,58 @@ export function buildRemoteHostApplyScript(plan: NixosSharedHostRemotePlan): str
     "set -euo pipefail",
     `cd ${shSingleQuote(plan.remoteRepoPath)}`,
     `exec direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-host-apply.ts ${suffix}`,
+  ].join("; ");
+}
+
+export function buildRemoteDeployAdminKeycloakSyncScript(opts: {
+  plan: NixosSharedHostRemotePlan;
+  deploymentLabel: string;
+  realmFile: string;
+  actingPrincipal: string;
+  adminGroups: string[];
+  automationPrincipalIds: string[];
+}): string {
+  const fixedArgs: Array<[string, string]> = [
+    ["deployment", opts.deploymentLabel],
+    ["realm-file", opts.realmFile],
+    ["acting-principal", opts.actingPrincipal],
+  ];
+  const suffix = [
+    commandArgs(fixedArgs),
+    commandListArgs("admin-group", opts.adminGroups),
+    commandListArgs("automation-principal", opts.automationPrincipalIds),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return [
+    "set -euo pipefail",
+    `cd ${shSingleQuote(opts.plan.remoteRepoPath)}`,
+    `exec direnv exec . build-tools/tools/bin/deploy admin keycloak sync ${suffix}`,
+  ].join("; ");
+}
+
+export function buildRemoteDeployAdminKeycloakGrantUserScript(opts: {
+  plan: NixosSharedHostRemotePlan;
+  deploymentLabel: string;
+  action: string;
+  userEmail: string;
+  membershipFile: string;
+  actingPrincipal: string;
+  adminGroups: string[];
+}): string {
+  const fixedArgs: Array<[string, string]> = [
+    ["deployment", opts.deploymentLabel],
+    ["action", opts.action],
+    ["user-email", opts.userEmail],
+    ["membership-file", opts.membershipFile],
+    ["acting-principal", opts.actingPrincipal],
+  ];
+  const suffix = [commandArgs(fixedArgs), commandListArgs("admin-group", opts.adminGroups)]
+    .filter(Boolean)
+    .join(" ");
+  return [
+    "set -euo pipefail",
+    `cd ${shSingleQuote(opts.plan.remoteRepoPath)}`,
+    `exec direnv exec . build-tools/tools/bin/deploy admin keycloak grant-user ${suffix}`,
   ].join("; ");
 }

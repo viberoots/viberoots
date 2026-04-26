@@ -136,12 +136,14 @@ test("deploy admin sync and grant-user keep audit provenance and idempotent writ
     const membershipFile = path.join(tmp, "deployment-auth-memberships.json");
     const firstSync = await syncDeploymentAdminKeycloakRealm({
       deployment,
+      deploymentsForRealm: [deployment],
       realmFile,
       actingPrincipal: "user:shape-admin",
       adminGroups: [shapeAdmin],
     });
     const secondSync = await syncDeploymentAdminKeycloakRealm({
       deployment,
+      deploymentsForRealm: [deployment],
       realmFile,
       actingPrincipal: "user:shape-admin",
       adminGroups: [shapeAdmin],
@@ -165,5 +167,29 @@ test("deploy admin sync and grant-user keep audit provenance and idempotent writ
     assert.equal(granted.audit.requestedMutation.kind, "keycloak_membership_grant");
     assert.equal(granted.grantedUser.group, "deploy-approvers-pleomino-staging");
     assert.match(await fsp.readFile(membershipFile, "utf8"), /reviewer@example\.com/);
+  });
+});
+
+test("deploy admin sync can refresh an authoritative shared realm artifact", async () => {
+  const staging = cloudflarePagesDeploymentFixture();
+  const dev = cloudflarePagesDeploymentFixture({
+    deploymentId: "pleomino-dev",
+    label: "//projects/deployments/pleomino-dev:deploy",
+    environmentStage: "dev",
+    admissionPolicyRef: "//projects/deployments/pleomino-shared:dev_release",
+  });
+  const shapeAdmin = adminGroup("shape_admin", { kind: "project", value: "pleomino" });
+  await withTempDir("deploy-admin-keycloak-shared-realm", async (tmp) => {
+    const realmFile = path.join(tmp, "deployment-auth-realm.json");
+    const synced = await syncDeploymentAdminKeycloakRealm({
+      deployment: staging,
+      deploymentsForRealm: [staging, dev],
+      realmFile,
+      actingPrincipal: "user:shape-admin",
+      adminGroups: [shapeAdmin],
+    });
+    assert.equal(synced.renderedDeploymentCount, 2);
+    assert.match(await fsp.readFile(realmFile, "utf8"), /deploy-submitters-pleomino-dev/);
+    assert.match(await fsp.readFile(realmFile, "utf8"), /deploy-submitters-pleomino-staging/);
   });
 });

@@ -277,14 +277,14 @@ Start with:
 deploy admin keycloak plan --deployment <label>
 deploy admin keycloak sync \
   --deployment <label> \
-  --realm-file /srv/common/deployment-auth-realm.json \
+  --realm-file ./deployment-host/identity-provider/deployment-auth-realm.json \
   --acting-principal <principal> \
   --admin-group deploy-admin-keycloak-shape-admin-project-<project>
 deploy admin keycloak grant-user \
   --deployment <label> \
   --action submit \
   --user-email <user@example.com> \
-  --membership-file /srv/common/deployment-auth-memberships.json \
+  --membership-file ./deployment-host/identity-provider/deployment-auth-memberships.json \
   --acting-principal <principal> \
   --admin-group deploy-admin-keycloak-membership-admin-project-<project>
 ```
@@ -294,6 +294,29 @@ the realm file. `deploy admin keycloak grant-user` stages human membership in a
 separate reviewed input. Both fail closed unless the acting principal presents
 the separate deploy-admin Keycloak grant; ordinary `submitter`, `approver`, and
 `admission_reporter` groups do not authorize Keycloak mutation.
+When you are operating `mini` from a client machine, use the reviewed remote
+profile flow instead of SSHing in to edit those files by hand:
+
+```bash
+deploy admin keycloak sync \
+  --deployment <label> \
+  --profile mini \
+  --acting-principal <principal> \
+  --admin-group deploy-admin-keycloak-shape-admin-project-<project> \
+  --apply-host-dry-run
+deploy admin keycloak grant-user \
+  --deployment <label> \
+  --profile mini \
+  --action submit \
+  --user-email <user@example.com> \
+  --acting-principal <principal> \
+  --admin-group deploy-admin-keycloak-membership-admin-project-<project> \
+  --apply-host
+```
+
+That reviewed remote path writes the authoritative Keycloak JSON inputs under
+the host config root, keeps them flake-visible, and then optionally runs the
+existing reviewed host-apply dry-run or switch contract.
 For protected/shared service-backed runs, `--mark-check-passed` and
 `--mark-check-for-commit` only describe the commit the client believes it is
 submitting. Final admission still binds to the service-owned reviewed source

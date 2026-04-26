@@ -348,14 +348,14 @@ reviewed admin flow is:
 deploy admin keycloak plan --deployment <label>
 deploy admin keycloak sync \
   --deployment <label> \
-  --realm-file /srv/common/deployment-auth-realm.json \
+  --realm-file ./deployment-host/identity-provider/deployment-auth-realm.json \
   --acting-principal <principal> \
   --admin-group deploy-admin-keycloak-shape-admin-project-<project>
 deploy admin keycloak grant-user \
   --deployment <label> \
   --action submit \
   --user-email <user@example.com> \
-  --membership-file /srv/common/deployment-auth-memberships.json \
+  --membership-file ./deployment-host/identity-provider/deployment-auth-memberships.json \
   --acting-principal <principal> \
   --admin-group deploy-admin-keycloak-membership-admin-project-<project>
 ```
@@ -363,6 +363,31 @@ deploy admin keycloak grant-user \
 Those deploy-admin groups are intentionally separate from ordinary
 `submitter`/`approver`/`admission_reporter` access. A missing ordinary deploy
 grant and a missing deploy-admin grant are different failures on purpose.
+For the normal client-driven `mini` workflow, skip manual SSH edits and run:
+
+```bash
+direnv exec . build-tools/tools/bin/deploy admin keycloak sync \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --acting-principal <principal> \
+  --admin-group deploy-admin-keycloak-shape-admin-project-pleomino \
+  --apply-host-dry-run
+
+direnv exec . build-tools/tools/bin/deploy admin keycloak grant-user \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --action submit \
+  --user-email alice@example.com \
+  --acting-principal <principal> \
+  --admin-group deploy-admin-keycloak-membership-admin-project-pleomino \
+  --apply-host
+```
+
+The reviewed remote-profile flow updates
+`./deployment-host/identity-provider/deployment-auth-realm.json` and
+`./deployment-host/identity-provider/deployment-auth-memberships.json` inside
+the host config workspace, then optionally runs the same reviewed host-apply
+preflight and dry-run/switch helper the ordinary remote deploy path uses.
 To discover the reviewed check names for a target before you submit, run
 `direnv exec . build-tools/tools/bin/deploy --deployment <label> --validate-only`
 and inspect `admissionRequirements.admission_policy`, `allowed_refs`,

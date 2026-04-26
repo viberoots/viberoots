@@ -1,5 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentTarget } from "./contract.ts";
+import {
+  reviewedDeploymentAdminMembershipFileExample,
+  reviewedDeploymentAdminRealmFileExample,
+} from "./deployment-admin-keycloak-artifacts.ts";
 import { reviewedDeployAdminGroupsByCapability } from "./deployment-admin-keycloak-auth.ts";
 import {
   deploymentAuthActionCommand,
@@ -62,7 +66,7 @@ export function buildDeploymentAuthGroupSummary(
     adminGroupConventions: adminGroups,
     exampleAdminCommands: [
       `deploy admin keycloak plan --deployment ${deployment.label}`,
-      `deploy admin keycloak sync --deployment ${deployment.label} --realm-file /srv/common/deployment-auth-realm.json --acting-principal <principal> --admin-group ${adminGroups.shapeAdmin[0]}`,
+      `deploy admin keycloak sync --deployment ${deployment.label} --realm-file ${reviewedDeploymentAdminRealmFileExample()} --acting-principal <principal> --admin-group ${adminGroups.shapeAdmin[0]}`,
     ],
     nextStep: deploymentAuthActionCommand(deployment, "submit"),
   };
@@ -89,7 +93,7 @@ export function buildDeploymentAuthActionSummary(
     automationGroupsByPrincipal: automationGroupsByPrincipal(deployment, automationPrincipalIds),
     exampleAdminCommands: [
       `deploy admin keycloak plan --deployment ${deployment.label}`,
-      `deploy admin keycloak grant-user --deployment ${deployment.label} --action ${action} --user-email <user@example.com> --membership-file /srv/common/deployment-auth-memberships.json --acting-principal <principal> --admin-group ${adminGroups.membershipAdmin[0]}`,
+      `deploy admin keycloak grant-user --deployment ${deployment.label} --action ${action} --user-email <user@example.com> --membership-file ${reviewedDeploymentAdminMembershipFileExample()} --acting-principal <principal> --admin-group ${adminGroups.membershipAdmin[0]}`,
     ],
     nextStep: deploymentAuthActionCommand(deployment, action),
   };

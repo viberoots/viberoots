@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import type { DeploymentTarget } from "./contract.ts";
+import { reviewedDeploymentAdminMembershipFileExample } from "./deployment-admin-keycloak-artifacts.ts";
 import { projectScopeValueFor } from "./deployment-control-plane-authorization-shared.ts";
 import type { DeploymentControlPlaneRole } from "./deployment-control-plane-contract.ts";
 
@@ -132,7 +133,7 @@ function exampleHumanGrantCommand(
   deployment: DeploymentTarget,
   action: DeploymentAuthAction,
 ): string {
-  return `deploy admin keycloak grant-user --deployment ${deployment.label} --action ${action} --user-email <user@example.com> --membership-file /srv/common/deployment-auth-memberships.json --acting-principal <principal> --admin-group <deploy-admin-keycloak-membership-admin-...>`;
+  return `deploy admin keycloak grant-user --deployment ${deployment.label} --action ${action} --user-email <user@example.com> --membership-file ${reviewedDeploymentAdminMembershipFileExample()} --acting-principal <principal> --admin-group <deploy-admin-keycloak-membership-admin-...>`;
 }
 
 export function deploymentAuthMissingGrantHint(opts: {

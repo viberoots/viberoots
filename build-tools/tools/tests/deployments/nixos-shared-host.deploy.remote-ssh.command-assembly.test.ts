@@ -17,7 +17,10 @@ import {
   REMOTE_SSH_IDENTITY_FILE_ENV,
   REMOTE_SSH_KNOWN_HOSTS_FILE_ENV,
 } from "../../deployments/nixos-shared-host-remote-ssh.ts";
-import { createNixosSharedHostRemoteArtifactPath } from "../../deployments/nixos-shared-host-remote-target.ts";
+import {
+  createNixosSharedHostRemoteArtifactPath,
+  type NixosSharedHostRemotePlan,
+} from "../../deployments/nixos-shared-host-remote-target.ts";
 import {
   remoteSshCommandAssemblyPlan as plan,
   withReviewedSshEnv,
