@@ -315,8 +315,10 @@ deploy admin keycloak grant-user \
 ```
 
 That reviewed remote path writes the authoritative Keycloak JSON inputs under
-the host config root, keeps them flake-visible, and then optionally runs the
-existing reviewed host-apply dry-run or switch contract.
+the host config root as mutable generated files, and the reviewed
+identity-provider module bootstraps and runtime-links them for Keycloak during
+activation. No commit or staging step is required before the optional reviewed
+host-apply dry-run or switch contract runs.
 For protected/shared service-backed runs, `--mark-check-passed` and
 `--mark-check-for-commit` only describe the commit the client believes it is
 submitting. Final admission still binds to the service-owned reviewed source

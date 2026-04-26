@@ -386,8 +386,11 @@ direnv exec . build-tools/tools/bin/deploy admin keycloak grant-user \
 The reviewed remote-profile flow updates
 `./deployment-host/identity-provider/deployment-auth-realm.json` and
 `./deployment-host/identity-provider/deployment-auth-memberships.json` inside
-the host config workspace, then optionally runs the same reviewed host-apply
-preflight and dry-run/switch helper the ordinary remote deploy path uses.
+the host config workspace as mutable generated files, then optionally runs the
+same reviewed host-apply preflight and dry-run/switch helper the ordinary
+remote deploy path uses. Keep those files gitignored; the identity-provider
+module bootstraps and runtime-links them instead of expecting flake-visible
+tracked paths.
 To discover the reviewed check names for a target before you submit, run
 `direnv exec . build-tools/tools/bin/deploy --deployment <label> --validate-only`
 and inspect `admissionRequirements.admission_policy`, `allowed_refs`,

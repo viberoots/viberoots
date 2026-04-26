@@ -6,6 +6,30 @@ let
   keycloakHttpPort = if cfg.keycloakHttpPort == null then 0 else cfg.keycloakHttpPort;
   publicUrl = "https://${hostname}";
   proxyUrl = "http://${localHost}:${toString keycloakHttpPort}";
+  generatedImportDir = "/run/keycloak/data/import";
+  generatedRealmFile =
+    if cfg.generatedRealmFile != null then
+      cfg.generatedRealmFile
+    else
+      "${cfg.generatedImportRoot}/deployment-auth-realm.json";
+  generatedMembershipFile =
+    if cfg.generatedMembershipFile != null then
+      cfg.generatedMembershipFile
+    else
+      "${cfg.generatedImportRoot}/deployment-auth-memberships.json";
+  generatedRealmImportName = builtins.baseNameOf generatedRealmFile;
+  generatedMembershipImportName = builtins.baseNameOf generatedMembershipFile;
+  generatedRealmBootstrapJson = builtins.toJSON {
+    realm = "deployments";
+    enabled = true;
+    groups = [ ];
+    clients = [ ];
+  };
+  generatedMembershipBootstrapJson = builtins.toJSON {
+    realm = "deployments";
+    enabled = true;
+    users = [ ];
+  };
 in
 {
   options.deploymentHost.identityProvider = {
@@ -39,6 +63,30 @@ in
       default = [ ];
       description = "Reviewed Keycloak realm import files to apply during rebuild or switch.";
     };
+    generatedImportRoot = lib.mkOption {
+      type = lib.types.str;
+      default = "/etc/nixos/deployment-host/identity-provider";
+      description = ''
+        Absolute host path used for mutable generated Keycloak import JSON. Keep this outside
+        services.keycloak.realmFiles so flake evaluation does not depend on gitignored artifacts.
+      '';
+    };
+    generatedRealmFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Absolute host path for the mutable deployment-auth realm shape import. Null derives
+        ${"deployment-auth-realm.json"} under generatedImportRoot.
+      '';
+    };
+    generatedMembershipFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Absolute host path for the mutable deployment-auth membership import. Null derives
+        ${"deployment-auth-memberships.json"} under generatedImportRoot.
+      '';
+    };
     manageNginx = lib.mkOption {
       type = lib.types.bool;
       default = false;
@@ -70,6 +118,26 @@ in
         assertion = !cfg.manageAcme || cfg.acmeEmail != null;
         message = "deploymentHost.identityProvider.acmeEmail must be set when manageAcme is true.";
       }
+      {
+        assertion = lib.hasPrefix "/" cfg.generatedImportRoot;
+        message = "deploymentHost.identityProvider.generatedImportRoot must be an absolute host path.";
+      }
+      {
+        assertion = cfg.generatedRealmFile == null || lib.hasPrefix "/" cfg.generatedRealmFile;
+        message = "deploymentHost.identityProvider.generatedRealmFile must be an absolute host path when set.";
+      }
+      {
+        assertion =
+          cfg.generatedMembershipFile == null || lib.hasPrefix "/" cfg.generatedMembershipFile;
+        message = "deploymentHost.identityProvider.generatedMembershipFile must be an absolute host path when set.";
+      }
+      {
+        assertion = !(cfg.realmFiles != [ ] && generatedRealmFile != null);
+        message = ''
+          deploymentHost.identityProvider.realmFiles is for static flake-visible imports; use
+          generatedRealmFile for mutable generated deployment-auth realm JSON instead.
+        '';
+      }
     ];
 
     services.keycloak = {
@@ -90,6 +158,43 @@ in
       };
       realmFiles = lib.mkDefault cfg.realmFiles;
     };
+
+    systemd.tmpfiles.rules =
+      [
+        "d ${generatedImportDir} 0755 keycloak keycloak -"
+      ]
+      ++ lib.optionals (generatedRealmFile != null) [
+        "L+ ${generatedImportDir}/${generatedRealmImportName} - - - - ${generatedRealmFile}"
+      ]
+      ++ lib.optionals (generatedMembershipFile != null) [
+        "L+ ${generatedImportDir}/${generatedMembershipImportName} - - - - ${generatedMembershipFile}"
+      ];
+
+    systemd.services.deployment-host-keycloak-generated-import-bootstrap = lib.mkIf
+      (generatedRealmFile != null || generatedMembershipFile != null)
+      {
+        description = "Bootstrap mutable generated Keycloak import files";
+        before = [ "keycloak.service" ];
+        requiredBy = [ "keycloak.service" ];
+        serviceConfig.Type = "oneshot";
+        script = ''
+          install -d -m 0755 ${lib.escapeShellArg cfg.generatedImportRoot}
+          ${lib.optionalString (generatedRealmFile != null) ''
+            if [ ! -f ${lib.escapeShellArg generatedRealmFile} ]; then
+              cat >${lib.escapeShellArg generatedRealmFile} <<'EOF'
+${generatedRealmBootstrapJson}
+EOF
+            fi
+          ''}
+          ${lib.optionalString (generatedMembershipFile != null) ''
+            if [ ! -f ${lib.escapeShellArg generatedMembershipFile} ]; then
+              cat >${lib.escapeShellArg generatedMembershipFile} <<'EOF'
+${generatedMembershipBootstrapJson}
+EOF
+            fi
+          ''}
+        '';
+      };
 
     services.nginx = lib.mkIf cfg.manageNginx {
       enable = lib.mkDefault true;

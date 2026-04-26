@@ -19,6 +19,8 @@ test("shared-host identity provider module forwards reviewed realm files to Keyc
               enable = true;
               hostname = "identity.example.test";
               keycloakHttpPort = 8091;
+              generatedRealmFile = null;
+              generatedMembershipFile = null;
               realmFiles = [ ./reviewed-realm.json ];
             };
           };

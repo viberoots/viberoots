@@ -1026,8 +1026,8 @@ Those helpers keep group shape separate from membership. Ordinary read-only
 `deploy auth ...` explains the expected shape; privileged `deploy admin ...`
 applies reviewed changes. The generated `deployment-auth-realm.json` contains
 reviewed group and mapper shape only. Human membership lives in the separate
-reviewed `./deployment-host/identity-provider/deployment-auth-memberships.json`
-input.
+generated `./deployment-host/identity-provider/deployment-auth-memberships.json`
+input. Keep both files gitignored.
 
 When the operator is working from a client machine, the reviewed `mini` profile
 can update those same config-root artifacts and optionally apply them:
@@ -1098,12 +1098,13 @@ Do not configure routine deploys to consume `/tmp/mini-workload.jwt`;
 PR-73+ deploys use credential-source adapters and an in-memory Vault credential
 context instead of JWT files.
 
-The NixOS Keycloak module also supports `services.keycloak.realmFiles` for
-declarative realm imports, and the reviewed shared-host wrapper exposes that as
-`deploymentHost.identityProvider.realmFiles`. Use that wiring for
-`deployment-auth-realm.json` once the shape is reviewed, but do not put
-generated client secrets or bootstrap admin passwords in a realm JSON file that
-will enter the Nix store.
+The NixOS Keycloak module still supports `services.keycloak.realmFiles` for
+static declarative imports, and the reviewed shared-host wrapper exposes that as
+`deploymentHost.identityProvider.realmFiles`. Reserve that path-only surface for
+checked-in flake-visible files. For the generated deployment-auth realm and
+membership JSON above, use `deploymentHost.identityProvider.generatedImportRoot`
+instead so activation bootstraps and runtime-links the mutable files without
+requiring them to be committed or staged into the flake source snapshot.
 
 ### Step 5C: Point Vault At The `mini` Issuer
 

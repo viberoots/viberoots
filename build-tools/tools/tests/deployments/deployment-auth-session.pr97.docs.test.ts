@@ -23,11 +23,16 @@ test("pr97 docs keep reviewed remote keycloak admin flow aligned across operator
   }
   assert.match(
     setupDoc,
-    /realmFiles = \[[\s\S]*\.\/deployment-host\/identity-provider\/deployment-auth-realm\.json/i,
+    /generatedImportRoot = "\/srv\/common\/deployment-host\/identity-provider"/i,
   );
   assert.match(
     setupDoc,
     /flake evaluation pure|keeps flake evaluation pure/i,
     "setup guide must explain the pure-flake config-root reason for the reviewed artifact placement",
+  );
+  assert.match(
+    setupDoc,
+    /gitignored[\s\S]*runtime-links|runtime-links[\s\S]*gitignored/i,
+    "setup guide must explain that generated Keycloak JSON stays gitignored and is linked at runtime",
   );
 });

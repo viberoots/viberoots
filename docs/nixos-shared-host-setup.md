@@ -349,10 +349,7 @@ deploymentHost.identityProvider = {
   enable = true;
   hostname = "identity.apps.kilty.io";
   keycloakHttpPort = 8091;
-  realmFiles = [
-    ./deployment-host/identity-provider/deployment-auth-realm.json
-    ./deployment-host/identity-provider/deployment-auth-memberships.json
-  ];
+  generatedImportRoot = "/srv/common/deployment-host/identity-provider";
   manageNginx = false;
   manageAcme = false;
   openFirewall = false;
@@ -390,11 +387,14 @@ direnv exec . build-tools/tools/bin/deploy admin keycloak sync \
   --admin-group deploy-admin-keycloak-shape-admin-project-pleomino
 ```
 
-`deploymentHost.identityProvider.realmFiles` is the reviewed host-module
-surface for feeding that artifact into Keycloak during rebuild or switch.
-Treat the generated realm file as group shape and mapper configuration only;
-keep human and automation membership in a separate reviewed identity-management
-input such as `./deployment-host/identity-provider/deployment-auth-memberships.json`.
+`deploymentHost.identityProvider.generatedImportRoot` is the reviewed
+host-module surface for these mutable generated files. The module bootstraps
+empty JSON if the files do not exist yet, then runtime-links them into
+Keycloak's import directory during activation. Keep both files gitignored; do not
+list them in `deploymentHost.identityProvider.realmFiles`, which is reserved
+for static flake-visible imports. Treat the generated realm file as group shape
+and mapper configuration only; keep human and automation membership in the
+separate generated input `./deployment-host/identity-provider/deployment-auth-memberships.json`.
 One reviewed membership grant example is:
 
 ```bash
