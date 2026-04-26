@@ -67,8 +67,12 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function waitFor<T>(fn: () => Promise<T | null>, message: string): Promise<T> {
-  const deadline = Date.now() + 5_000;
+export async function waitFor<T>(
+  fn: () => Promise<T | null>,
+  message: string,
+  timeoutMs = 5_000,
+): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const value = await fn();
     if (value) return value;

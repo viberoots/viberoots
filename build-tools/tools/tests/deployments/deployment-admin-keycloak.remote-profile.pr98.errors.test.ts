@@ -67,8 +67,11 @@ test("remote profile grant-user fails closed with concise authz guidance", async
       );
       assert.match(
         String(result.stderr),
-        /deploy admin keycloak grant-user --deployment .* --profile mini --action submit --user-email ada@example\.com/i,
+        /deploy admin keycloak grant-user --deployment .* --profile mini --action submit --user-email ada@example\.com --apply-host/i,
       );
+      assert.doesNotMatch(String(result.stderr), /--acting-principal/i);
+      assert.doesNotMatch(String(result.stderr), /--admin-group/i);
+      assert.doesNotMatch(String(result.stderr), /--membership-file/i);
     } finally {
       await controlPlane.close();
       await oidc.close();

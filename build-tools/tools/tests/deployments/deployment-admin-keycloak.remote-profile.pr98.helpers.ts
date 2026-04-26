@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { waitFor } from "./nixos-shared-host.control-plane.helpers.ts";
 
 export const CONTROL_PLANE_TOKEN = "test-control-plane-token";
 
@@ -48,25 +49,33 @@ export async function enableInteractivePkceVaultRuntime(tmp: string, issuer: str
 }
 
 export async function completePendingAuthSession(controlPlaneUrl: string, recordsRoot: string) {
-  const authDir = path.join(recordsRoot, "control-plane", "auth-sessions");
-  for (let attempt = 0; attempt < 200; attempt += 1) {
-    try {
-      for (const entry of await fsp.readdir(authDir)) {
-        if (!entry.endsWith(".json")) continue;
-        const parsed = JSON.parse(await fsp.readFile(path.join(authDir, entry), "utf8")) as {
-          status?: string;
-          state?: string;
-        };
-        if (parsed.status !== "pending" || !parsed.state) continue;
-        const callbackUrl = new URL("/oidc/callback", controlPlaneUrl);
-        callbackUrl.searchParams.set("code", "login-code");
-        callbackUrl.searchParams.set("state", parsed.state);
-        const response = await fetch(callbackUrl);
-        assert.equal(response.status, 200, await response.text());
-        return;
+  const sessionState = await waitFor(
+    async () => {
+      const authDir = path.join(recordsRoot, "control-plane", "auth-sessions");
+      let entries: string[] = [];
+      try {
+        entries = await fsp.readdir(authDir);
+      } catch {
+        return null;
       }
-    } catch {}
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-  throw new Error("timed out waiting for pending auth session");
+      for (const entry of entries) {
+        if (!entry.endsWith(".json")) continue;
+        try {
+          const parsed = JSON.parse(await fsp.readFile(path.join(authDir, entry), "utf8")) as {
+            status?: string;
+            state?: string;
+          };
+          if (parsed.status === "pending" && parsed.state) return parsed.state;
+        } catch {}
+      }
+      return null;
+    },
+    "timed out waiting for pending auth session",
+    30_000,
+  );
+  const callbackUrl = new URL("/oidc/callback", controlPlaneUrl);
+  callbackUrl.searchParams.set("code", "login-code");
+  callbackUrl.searchParams.set("state", sessionState);
+  const response = await fetch(callbackUrl);
+  assert.equal(response.status, 200, await response.text());
 }

@@ -1,14 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentTarget } from "./contract.ts";
-import {
-  reviewedDeploymentAdminMembershipFileExample,
-  reviewedDeploymentAdminRealmFileExample,
-} from "./deployment-admin-keycloak-artifacts.ts";
 import { reviewedDeployAdminGroupsByCapability } from "./deployment-admin-keycloak-auth.ts";
 import {
   deploymentAuthActionCommand,
   deploymentAuthActionRole,
   type DeploymentAuthAction,
+  reviewedRemoteKeycloakGrantUserCommand,
+  reviewedRemoteKeycloakSyncCommand,
   reviewedAutomationGroupPatternsForDeployment,
   reviewedAutomationGroupsForPrincipal,
   reviewedHumanGroupName,
@@ -66,7 +64,7 @@ export function buildDeploymentAuthGroupSummary(
     adminGroupConventions: adminGroups,
     exampleAdminCommands: [
       `deploy admin keycloak plan --deployment ${deployment.label}`,
-      `deploy admin keycloak sync --deployment ${deployment.label} --realm-file ${reviewedDeploymentAdminRealmFileExample()} --acting-principal <principal> --admin-group ${adminGroups.shapeAdmin[0]}`,
+      reviewedRemoteKeycloakSyncCommand(deployment, { applyMode: "apply-host" }),
     ],
     nextStep: deploymentAuthActionCommand(deployment, "submit"),
   };
@@ -93,7 +91,11 @@ export function buildDeploymentAuthActionSummary(
     automationGroupsByPrincipal: automationGroupsByPrincipal(deployment, automationPrincipalIds),
     exampleAdminCommands: [
       `deploy admin keycloak plan --deployment ${deployment.label}`,
-      `deploy admin keycloak grant-user --deployment ${deployment.label} --action ${action} --user-email <user@example.com> --membership-file ${reviewedDeploymentAdminMembershipFileExample()} --acting-principal <principal> --admin-group ${adminGroups.membershipAdmin[0]}`,
+      reviewedRemoteKeycloakGrantUserCommand(deployment, action, { applyMode: "apply-host" }),
+      reviewedRemoteKeycloakGrantUserCommand(deployment, action, {
+        userEmail: "<user@example.com>",
+        applyMode: "apply-host",
+      }),
     ],
     nextStep: deploymentAuthActionCommand(deployment, action),
   };

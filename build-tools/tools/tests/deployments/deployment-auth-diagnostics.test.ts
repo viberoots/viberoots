@@ -127,7 +127,18 @@ test("auth action summary and realm export stay aligned on reviewed group names"
   ]);
   assert.equal(realm.clients[0]?.clientId, "deployment-cli");
   assert.equal(realm.clients[0]?.protocolMappers[0]?.config["claim.name"], "groups");
-  assert.match(action.exampleAdminCommands.join("\n"), /deploy admin keycloak grant-user/);
+  const commands = action.exampleAdminCommands.join("\n");
+  assert.match(
+    commands,
+    /deploy admin keycloak grant-user --deployment .* --profile mini --action approve --apply-host/i,
+  );
+  assert.match(
+    commands,
+    /deploy admin keycloak grant-user --deployment .* --profile mini --action approve --user-email <user@example\.com> --apply-host/i,
+  );
+  assert.doesNotMatch(commands, /--membership-file/i);
+  assert.doesNotMatch(commands, /--acting-principal/i);
+  assert.doesNotMatch(commands, /--admin-group/i);
 });
 
 test("auth docs advertise the same diagnostic command and Jenkins source names", async () => {

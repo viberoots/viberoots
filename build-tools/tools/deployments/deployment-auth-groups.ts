@@ -1,7 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import type { DeploymentTarget } from "./contract.ts";
-import { reviewedDeploymentAdminMembershipFileExample } from "./deployment-admin-keycloak-artifacts.ts";
 import { projectScopeValueFor } from "./deployment-control-plane-authorization-shared.ts";
 import type { DeploymentControlPlaneRole } from "./deployment-control-plane-contract.ts";
 
@@ -49,6 +48,39 @@ export function deploymentAuthActionCommand(
   action: DeploymentAuthAction,
 ): string {
   return `deploy auth explain-groups --deployment ${deployment.label} --action ${action}`;
+}
+
+export function reviewedRemoteKeycloakSyncCommand(
+  deployment: DeploymentTarget,
+  opts: { profileName?: string; applyMode?: "apply-host" | "apply-host-dry-run" | "skip" } = {},
+): string {
+  const parts = [
+    "deploy admin keycloak sync",
+    `--deployment ${deployment.label}`,
+    `--profile ${opts.profileName || "mini"}`,
+  ];
+  if (opts.applyMode && opts.applyMode !== "skip") parts.push(`--${opts.applyMode}`);
+  return parts.join(" ");
+}
+
+export function reviewedRemoteKeycloakGrantUserCommand(
+  deployment: DeploymentTarget,
+  action: DeploymentAuthAction | "<submit|approve|report_checks>",
+  opts: {
+    profileName?: string;
+    userEmail?: string;
+    applyMode?: "apply-host" | "apply-host-dry-run" | "skip";
+  } = {},
+): string {
+  const parts = [
+    "deploy admin keycloak grant-user",
+    `--deployment ${deployment.label}`,
+    `--profile ${opts.profileName || "mini"}`,
+    `--action ${action}`,
+  ];
+  if (opts.userEmail) parts.push(`--user-email ${opts.userEmail}`);
+  if (opts.applyMode && opts.applyMode !== "skip") parts.push(`--${opts.applyMode}`);
+  return parts.join(" ");
 }
 
 export function deploymentAuthGroupSuffix(deployment: DeploymentTarget): string {
@@ -133,7 +165,10 @@ function exampleHumanGrantCommand(
   deployment: DeploymentTarget,
   action: DeploymentAuthAction,
 ): string {
-  return `deploy admin keycloak grant-user --deployment ${deployment.label} --action ${action} --user-email <user@example.com> --membership-file ${reviewedDeploymentAdminMembershipFileExample()} --acting-principal <principal> --admin-group <deploy-admin-keycloak-membership-admin-...>`;
+  return reviewedRemoteKeycloakGrantUserCommand(deployment, action, {
+    userEmail: "<user@example.com>",
+    applyMode: "apply-host",
+  });
 }
 
 export function deploymentAuthMissingGrantHint(opts: {
@@ -150,7 +185,10 @@ export function deploymentAuthMissingGrantHint(opts: {
     return ` expected automation groups include ${groups}; inspect ${command}`;
   }
   const group = reviewedHumanGroupName(opts.deployment, opts.role);
-  return ` expected human group ${group}; example admin command: ${exampleHumanGrantCommand(opts.deployment, action)}; inspect ${command}`;
+  const selfService = reviewedRemoteKeycloakGrantUserCommand(opts.deployment, action, {
+    applyMode: "apply-host",
+  });
+  return ` expected human group ${group}; self-service: ${selfService}; grant another human: ${exampleHumanGrantCommand(opts.deployment, action)}; inspect ${command}`;
 }
 
 function roleAction(role: DeploymentAuthRole): DeploymentAuthAction {

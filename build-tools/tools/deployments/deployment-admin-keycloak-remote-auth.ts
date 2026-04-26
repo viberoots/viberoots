@@ -6,7 +6,11 @@ import {
   reviewedDeployAdminGroupsByCapability,
   type DeploymentKeycloakAdminRole,
 } from "./deployment-admin-keycloak-auth.ts";
-import type { DeploymentAuthAction } from "./deployment-auth-groups.ts";
+import {
+  reviewedRemoteKeycloakGrantUserCommand,
+  reviewedRemoteKeycloakSyncCommand,
+  type DeploymentAuthAction,
+} from "./deployment-auth-groups.ts";
 import {
   createAndWaitForServiceOwnedAuthSession,
   shouldUseServiceOwnedInteractiveAuth,
@@ -55,14 +59,20 @@ function nextCommand(opts: {
   userEmail?: string;
 }) {
   if (opts.command === "sync") {
-    return `deploy admin keycloak sync --deployment ${opts.deployment.label} --profile ${opts.profileName}`;
+    return reviewedRemoteKeycloakSyncCommand(opts.deployment, {
+      profileName: opts.profileName,
+      applyMode: "apply-host",
+    });
   }
-  return [
-    `deploy admin keycloak grant-user --deployment ${opts.deployment.label}`,
-    `--profile ${opts.profileName}`,
-    `--action ${String(opts.action || "")}`,
-    `--user-email ${String(opts.userEmail || "")}`,
-  ].join(" ");
+  return reviewedRemoteKeycloakGrantUserCommand(
+    opts.deployment,
+    (opts.action || "submit") as DeploymentAuthAction,
+    {
+      profileName: opts.profileName,
+      ...(opts.userEmail ? { userEmail: opts.userEmail } : {}),
+      applyMode: "apply-host",
+    },
+  );
 }
 
 function authorizationFailure(opts: {
