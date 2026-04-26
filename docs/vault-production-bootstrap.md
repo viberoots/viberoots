@@ -999,6 +999,22 @@ The `repository` claim should match the current repository identity used by the
 CI or deployment runner. If the repository is renamed, update that mapper and
 the Vault role's `bound_claims` at the same time.
 
+Before you create or troubleshoot groups by hand, inspect the reviewed shape
+derived from deployment metadata:
+
+```bash
+deploy auth print-groups --deployment //projects/deployments/pleomino-dev:deploy
+deploy auth explain-groups \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --action submit
+deploy auth print-keycloak-realm > deployment-auth-realm.json
+```
+
+Those helpers keep group shape separate from membership. The generated
+`deployment-auth-realm.json` contains reviewed group and mapper shape only; map
+humans and automation principals into those groups through a separate reviewed
+identity-management step.
+
 After creating the realm, verify the issuer metadata:
 
 ```bash
@@ -1041,9 +1057,11 @@ PR-73+ deploys use credential-source adapters and an in-memory Vault credential
 context instead of JWT files.
 
 The NixOS Keycloak module also supports `services.keycloak.realmFiles` for
-declarative realm imports. That is useful once the shape is stable, but do not
-put generated client secrets or bootstrap admin passwords in a realm JSON file
-that will enter the Nix store.
+declarative realm imports, and the reviewed shared-host wrapper exposes that as
+`deploymentHost.identityProvider.realmFiles`. Use that wiring for
+`deployment-auth-realm.json` once the shape is reviewed, but do not put
+generated client secrets or bootstrap admin passwords in a realm JSON file that
+will enter the Nix store.
 
 ### Step 5C: Point Vault At The `mini` Issuer
 

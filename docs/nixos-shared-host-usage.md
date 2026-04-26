@@ -334,6 +334,12 @@ same principal still needs `submitter` to request the deploy and
 `admission_reporter` to report those checks. If a submit fails with
 `unauthorized`, use the returned message to distinguish missing `submitter`
 access from missing `admission_reporter` access.
+Use `deploy auth print-groups --deployment <label>` to inspect the reviewed
+Keycloak group shape for one deployment, and
+`deploy auth explain-groups --deployment <label> --action submit|approve|report_checks`
+to map one action to the reviewed group name. That helper surface explains
+group shape only; user and automation membership remain a separate reviewed
+identity-management step.
 To discover the reviewed check names for a target before you submit, run
 `direnv exec . build-tools/tools/bin/deploy --deployment <label> --validate-only`
 and inspect `admissionRequirements.admission_policy`, `allowed_refs`,
@@ -436,4 +442,6 @@ get `approval_no_longer_valid` or `unauthorized`, re-run `--status` on that
 same `deploy_run_id` and confirm the current approval fields before trying
 again. For submit-time evidence failures, `unauthorized` now distinguishes
 missing `submitter` access from missing `admission_reporter` access; approval
-failures still point at missing `approver` access.
+failures still point at missing `approver` access. Keep the follow-up flow
+read-only first: use `deploy auth explain-groups` to confirm the expected group
+shape before changing Keycloak membership.

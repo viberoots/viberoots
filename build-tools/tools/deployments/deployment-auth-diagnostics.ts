@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagStr, getPositionals } from "../lib/cli.ts";
+import { getFlagList, getFlagStr, getPositionals } from "../lib/cli.ts";
 import { printDeployJson } from "./deploy-front-door.ts";
 import { resolveDeploymentForCli } from "./deployment-cli-resolve.ts";
 import { readDeploymentVaultRuntimeInputsFromFlags } from "./deployment-vault-runtime-inputs.ts";
@@ -8,6 +8,12 @@ import { redactDeploymentAuthJson, redactDeploymentAuthText } from "./deployment
 import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan.ts";
 import type { DeploymentTarget } from "./contract.ts";
 import { resolveDeploymentPkceCallbackProfile } from "./deployment-pkce-callback-profile.ts";
+import {
+  buildDeploymentAuthActionSummary,
+  buildDeploymentAuthGroupSummary,
+  buildDeploymentAuthKeycloakRealm,
+} from "./deployment-auth-readonly.ts";
+import { resolveAllDeployments } from "./deployment-query.ts";
 
 export const DEPLOYMENT_AUTH_DOCTOR_SCHEMA = "deployment-auth-doctor@1";
 export const DEPLOYMENT_AUTH_EXPLAIN_VAULT_ROLE_SCHEMA = "deployment-auth-vault-role@1";
@@ -30,6 +36,10 @@ function requireFlag(name: string): string {
 function commandName(): string {
   const [, command = ""] = getPositionals();
   return command;
+}
+
+function automationPrincipalIds(): string[] {
+  return getFlagList("automation-principal");
 }
 
 function selectionStatus(plan: ReturnType<typeof resolveDeploymentVaultRuntimePlan>) {
@@ -169,10 +179,31 @@ async function authDeployment(workspaceRoot: string) {
 export async function maybeHandleDeploymentAuthCli(workspaceRoot: string): Promise<boolean> {
   const [group] = getPositionals();
   if (group !== "auth") return false;
-  const deployment = await authDeployment(workspaceRoot);
   const command = commandName();
+  if (command === "print-keycloak-realm") {
+    printDeployJson(
+      buildDeploymentAuthKeycloakRealm(
+        await resolveAllDeployments(workspaceRoot),
+        automationPrincipalIds(),
+      ),
+    );
+    return true;
+  }
+  const deployment = await authDeployment(workspaceRoot);
   if (command === "doctor") {
     printDeployJson(buildDeploymentAuthDoctor(deployment));
+    return true;
+  }
+  if (command === "print-groups") {
+    printDeployJson(buildDeploymentAuthGroupSummary(deployment, automationPrincipalIds()));
+    return true;
+  }
+  if (command === "explain-groups") {
+    const action = getFlagStr("action", "").trim() as "submit" | "approve" | "report_checks";
+    if (!["submit", "approve", "report_checks"].includes(action)) {
+      throw new Error("--action must be one of submit, approve, report_checks");
+    }
+    printDeployJson(buildDeploymentAuthActionSummary(deployment, action, automationPrincipalIds()));
     return true;
   }
   if (command === "explain-vault-role") {
@@ -196,6 +227,6 @@ export async function maybeHandleDeploymentAuthCli(workspaceRoot: string): Promi
     return true;
   }
   throw new Error(
-    "deploy auth command must be one of doctor, explain-vault-role, print-login, print-jenkins-help, credential-source-matrix",
+    "deploy auth command must be one of doctor, print-groups, explain-groups, print-keycloak-realm, explain-vault-role, print-login, print-jenkins-help, credential-source-matrix",
   );
 }

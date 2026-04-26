@@ -349,6 +349,7 @@ deploymentHost.identityProvider = {
   enable = true;
   hostname = "identity.apps.kilty.io";
   keycloakHttpPort = 8091;
+  realmFiles = [ /srv/common/deployment-auth-realm.json ];
   manageNginx = false;
   manageAcme = false;
   openFirewall = false;
@@ -375,6 +376,19 @@ deploymentHost.deployAuthCallback = {
   openFirewall = false;
 };
 ```
+
+Before you rebuild, generate the reviewed Keycloak group shape with:
+
+```bash
+direnv exec . build-tools/tools/bin/deploy auth print-keycloak-realm \
+  > /srv/common/deployment-auth-realm.json
+```
+
+`deploymentHost.identityProvider.realmFiles` is the reviewed host-module
+surface for feeding that artifact into Keycloak during rebuild or switch.
+Treat the generated realm file as group shape and mapper configuration only;
+keep human and automation membership in a separate reviewed identity-management
+input.
 
 With that shape, add `8200` to the existing
 `networking.firewall.allowedTCPPorts` expression and add host-owned nginx

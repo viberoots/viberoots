@@ -4,9 +4,14 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import { resolveDeploymentFromTarget } from "../../deployments/deployment-query.ts";
 import {
-  buildDeploymentAuthDoctor,
-  buildDeploymentAuthLoginInstructions,
-  buildDeploymentVaultRoleExplanation,
+  buildDeploymentAuthActionSummary,
+  buildDeploymentAuthGroupSummary,
+  buildDeploymentAuthKeycloakRealm,
+} from "../../deployments/deployment-auth-readonly.ts";
+import {
+  buildDeploymentAuthDoctor as buildDoctor,
+  buildDeploymentAuthLoginInstructions as buildLoginInstructions,
+  buildDeploymentVaultRoleExplanation as buildVaultRole,
 } from "../../deployments/deployment-auth-diagnostics.ts";
 import { deploymentAuthFailureDiagnostic } from "../../deployments/deployment-auth-failure-diagnostics.ts";
 import {
@@ -25,7 +30,7 @@ async function fixtureDeployment() {
 
 test("auth doctor reports source selection and missing Jenkins binding without minting", async () => {
   const deployment = await fixtureDeployment();
-  const doctor = buildDeploymentAuthDoctor(deployment, {
+  const doctor = buildDoctor(deployment, {
     CI: "true",
     JENKINS_URL: "https://jenkins.example",
   });
@@ -39,14 +44,14 @@ test("auth doctor reports source selection and missing Jenkins binding without m
 
 test("auth doctor fails closed for unsupported CI without interactive auth", async () => {
   const deployment = await fixtureDeployment();
-  const doctor = buildDeploymentAuthDoctor(deployment, { CI: "true" });
+  const doctor = buildDoctor(deployment, { CI: "true" });
   assert.match(doctor.credentialSource.error, /non-interactive credential source/);
   assert.equal(doctor.secretValuesRead, false);
 });
 
 test("vault role explanation exposes routing metadata without secret material", async () => {
   const deployment = await fixtureDeployment();
-  const explanation = buildDeploymentVaultRoleExplanation(deployment);
+  const explanation = buildVaultRole(deployment);
   assert.equal(explanation.schemaVersion, "deployment-auth-vault-role@1");
   assert.equal(explanation.vault.expectedAudience, "deployments-vault");
   assert.equal(explanation.vault.roleName, "deploy-pleomino-read");
@@ -56,7 +61,7 @@ test("vault role explanation exposes routing metadata without secret material", 
 
 test("print-login instructions are browserless and memory-only", async () => {
   const deployment = await fixtureDeployment();
-  const login = buildDeploymentAuthLoginInstructions(deployment, { SSH_TTY: "/dev/pts/1" });
+  const login = buildLoginInstructions(deployment, { SSH_TTY: "/dev/pts/1" });
   assert.equal(login.browserLaunched, false);
   assert.equal(login.tokensMinted, false);
   assert.equal(login.sessionPolicy.persistentCache, false);
@@ -68,7 +73,7 @@ test("print-login instructions are browserless and memory-only", async () => {
 
 test("auth doctor lets CLI/env callback profile overrides win over metadata", async () => {
   const deployment = await fixtureDeployment();
-  const doctor = buildDeploymentAuthDoctor(deployment, {
+  const doctor = buildDoctor(deployment, {
     BNX_DEPLOYMENT_PKCE_CALLBACK_MODE: "public_host",
     BNX_DEPLOYMENT_PKCE_CALLBACK_EXTERNAL_SCHEME: "http",
     BNX_DEPLOYMENT_PKCE_CALLBACK_HOST: "override.example.test",
@@ -89,6 +94,39 @@ test("Jenkins help and matrix share the reviewed credential env names", async ()
   assert.match(help, /BNX_DEPLOYER_CLIENT_SECRET/);
   assert.match(help, /withCredentials/);
   assert.doesNotMatch(help, /secret-value/);
+});
+
+test("auth group summary prints reviewed human groups and automation patterns", async () => {
+  const deployment = await fixtureDeployment();
+  const groups = buildDeploymentAuthGroupSummary(deployment, ["jenkins"]);
+  assert.equal(groups.schemaVersion, "deployment-auth-groups@1");
+  assert.deepEqual(groups.humanGroups, [
+    "deploy-submitters-pleomino-staging",
+    "deploy-approvers-pleomino-staging",
+    "deploy-admission-reporters-pleomino-staging",
+  ]);
+  assert.match(groups.automationGroupPatterns.join("\n"), /deploy-automation-<principal>/);
+  assert.deepEqual(groups.automationGroupsByPrincipal[0]?.groups.slice(0, 2), [
+    "deploy-automation-jenkins-submitters-project-pleomino",
+    "deploy-automation-jenkins-approvers-project-pleomino",
+  ]);
+});
+
+test("auth action summary and realm export stay aligned on reviewed group names", async () => {
+  const deployment = await fixtureDeployment();
+  const action = buildDeploymentAuthActionSummary(deployment, "approve", ["jenkins"]);
+  const realm = buildDeploymentAuthKeycloakRealm([deployment], ["jenkins"]);
+  assert.equal(action.requiredRole, "approver");
+  assert.equal(action.humanGroup, "deploy-approvers-pleomino-staging");
+  assert.match(action.nextStep, /deploy auth explain-groups/);
+  assert.deepEqual(realm.groups.map((group) => group.name).slice(0, 4), [
+    "deploy-admission-reporters-pleomino-staging",
+    "deploy-approvers-pleomino-staging",
+    "deploy-automation-jenkins-admission-reporters-all-deployments",
+    "deploy-automation-jenkins-admission-reporters-project-pleomino",
+  ]);
+  assert.equal(realm.clients[0]?.clientId, "deployment-cli");
+  assert.equal(realm.clients[0]?.protocolMappers[0]?.config["claim.name"], "groups");
 });
 
 test("auth docs advertise the same diagnostic command and Jenkins source names", async () => {

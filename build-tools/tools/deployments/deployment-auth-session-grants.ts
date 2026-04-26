@@ -1,7 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import path from "node:path";
 import type { DeploymentTarget } from "./contract.ts";
 import type { JwtClaims } from "./deploy-vault-jwt-claims.ts";
+import {
+  deploymentAuthProjectSlug,
+  reviewedAutomationGroupName,
+  reviewedHumanGroupName,
+} from "./deployment-auth-groups.ts";
 import { projectScopeValueFor } from "./deployment-control-plane-authorization-shared.ts";
 import type {
   DeploymentControlPlaneGrant,
@@ -21,14 +25,6 @@ function claimValues(value: unknown): string[] {
     : [];
 }
 
-function projectSlugFor(deployment: DeploymentTarget): string {
-  return path.posix.basename(projectScopeValueFor(deployment));
-}
-
-function deploymentGroupSuffix(deployment: DeploymentTarget): string {
-  return `${projectSlugFor(deployment)}-${deployment.environmentStage}`;
-}
-
 function humanGrant(
   deployment: DeploymentTarget,
   role: "submitter" | "approver" | "admission_reporter",
@@ -43,11 +39,14 @@ function humanGrantsForGroups(
   deployment: DeploymentTarget,
   groups: Set<string>,
 ): DeploymentControlPlaneGrant[] {
-  const suffix = deploymentGroupSuffix(deployment);
   const matched: Array<DeploymentControlPlaneGrant | undefined> = [
-    groups.has(`deploy-submitters-${suffix}`) ? humanGrant(deployment, "submitter") : undefined,
-    groups.has(`deploy-approvers-${suffix}`) ? humanGrant(deployment, "approver") : undefined,
-    groups.has(`deploy-admission-reporters-${suffix}`)
+    groups.has(reviewedHumanGroupName(deployment, "submitter"))
+      ? humanGrant(deployment, "submitter")
+      : undefined,
+    groups.has(reviewedHumanGroupName(deployment, "approver"))
+      ? humanGrant(deployment, "approver")
+      : undefined,
+    groups.has(reviewedHumanGroupName(deployment, "admission_reporter"))
       ? humanGrant(deployment, "admission_reporter")
       : undefined,
   ];
@@ -79,20 +78,6 @@ function automationPrincipalIds(claims: JwtClaims): string[] {
   return [...identities];
 }
 
-function automationGroupName(
-  principalId: string,
-  role: "submitter" | "approver" | "admission_reporter",
-  scope: "project" | "environment" | "admission_domain",
-  value: string,
-): string {
-  const roleToken =
-    role === "submitter" ? "submitters" : role === "approver" ? "approvers" : "admission-reporters";
-  if (scope === "project") {
-    return `deploy-automation-${principalId}-${roleToken}-project-${value}`;
-  }
-  return `deploy-automation-${principalId}-${roleToken}-${value}`;
-}
-
 function automationGrant(
   deployment: DeploymentTarget,
   role: DeploymentControlPlaneRole,
@@ -121,29 +106,36 @@ function automationGrantsForPrincipal(
   groups: Set<string>,
   principalId: string,
 ): DeploymentControlPlaneGrant[] {
-  const project = projectSlugFor(deployment);
+  const project = deploymentAuthProjectSlug(deployment);
   const environment = deployment.environmentStage;
   const matched: Array<DeploymentControlPlaneGrant | undefined> = [
-    groups.has(automationGroupName(principalId, "submitter", "project", project))
+    groups.has(reviewedAutomationGroupName(principalId, "submitter", "project", project))
       ? automationGrant(deployment, "submitter", "project")
       : undefined,
-    groups.has(automationGroupName(principalId, "approver", "project", project))
+    groups.has(reviewedAutomationGroupName(principalId, "approver", "project", project))
       ? automationGrant(deployment, "approver", "project")
       : undefined,
-    groups.has(automationGroupName(principalId, "admission_reporter", "project", project))
+    groups.has(reviewedAutomationGroupName(principalId, "admission_reporter", "project", project))
       ? automationGrant(deployment, "admission_reporter", "project")
       : undefined,
-    groups.has(automationGroupName(principalId, "submitter", "environment", environment))
+    groups.has(reviewedAutomationGroupName(principalId, "submitter", "environment", environment))
       ? automationGrant(deployment, "submitter", "environment_stage")
       : undefined,
-    groups.has(automationGroupName(principalId, "approver", "environment", environment))
+    groups.has(reviewedAutomationGroupName(principalId, "approver", "environment", environment))
       ? automationGrant(deployment, "approver", "environment_stage")
       : undefined,
-    groups.has(automationGroupName(principalId, "admission_reporter", "environment", environment))
+    groups.has(
+      reviewedAutomationGroupName(principalId, "admission_reporter", "environment", environment),
+    )
       ? automationGrant(deployment, "admission_reporter", "environment_stage")
       : undefined,
     groups.has(
-      automationGroupName(principalId, "admission_reporter", "admission_domain", "all-deployments"),
+      reviewedAutomationGroupName(
+        principalId,
+        "admission_reporter",
+        "admission_domain",
+        "all-deployments",
+      ),
     )
       ? automationGrant(deployment, "admission_reporter", "admission_domain")
       : undefined,

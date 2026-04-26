@@ -23,7 +23,7 @@ test("authorization diagnostics distinguish missing submitter, admission_reporte
           },
         ]),
       }),
-    /submitter/,
+    /submitter[\s\S]*deploy auth explain-groups/,
   );
   assert.throws(
     () =>
@@ -33,7 +33,7 @@ test("authorization diagnostics distinguish missing submitter, admission_reporte
           { role: "submitter", scope: { kind: "deployment_id", value: deployment.deploymentId } },
         ]),
       }),
-    /admission_reporter/,
+    /admission_reporter[\s\S]*deploy-admission-reporters-pleomino-staging/,
   );
   assert.throws(
     () =>
@@ -44,6 +44,6 @@ test("authorization diagnostics distinguish missing submitter, admission_reporte
           { role: "submitter", scope: { kind: "deployment_id", value: deployment.deploymentId } },
         ]),
       }),
-    /approver/,
+    /approver[\s\S]*deploy-approvers-pleomino-staging/,
   );
 });

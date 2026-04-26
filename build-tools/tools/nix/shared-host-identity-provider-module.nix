@@ -34,6 +34,11 @@ in
       default = "/var/lib/deployment-host-secrets/keycloak-db-password";
       description = "Out-of-store file containing the local Keycloak database password.";
     };
+    realmFiles = lib.mkOption {
+      type = lib.types.listOf lib.types.path;
+      default = [ ];
+      description = "Reviewed Keycloak realm import files to apply during rebuild or switch.";
+    };
     manageNginx = lib.mkOption {
       type = lib.types.bool;
       default = false;
@@ -83,6 +88,7 @@ in
         proxy-headers = lib.mkDefault "xforwarded";
         hostname-backchannel-dynamic = lib.mkDefault true;
       };
+      realmFiles = lib.mkDefault cfg.realmFiles;
     };
 
     services.nginx = lib.mkIf cfg.manageNginx {

@@ -263,6 +263,12 @@ To discover the reviewed check names before you use `--mark-check-passed`, run
 `admissionRequirements.admission_policy`, `allowed_refs`, `required_checks`,
 and `required_approvals` in the JSON response. That read-only output tells you
 which names the deployment expects; it does not grant `admission_reporter`.
+For reviewed Keycloak diagnostics, keep group shape and membership separate:
+`deploy auth print-groups --deployment <label>` prints the deployment-derived
+group shape, and `deploy auth explain-groups --deployment <label> --action
+submit|approve|report_checks` explains which reviewed group is required for one
+action. Those commands describe the expected Keycloak group shape; they do not
+add user or automation membership.
 For protected/shared service-backed runs, `--mark-check-passed` and
 `--mark-check-for-commit` only describe the commit the client believes it is
 submitting. Final admission still binds to the service-owned reviewed source
@@ -292,7 +298,9 @@ configured staging root before proof submission, and the service admits only the
 canonical finalized tree into the content-addressed store.
 When a service-backed request returns `unauthorized`, read the rejection text:
 submit failures now distinguish missing `submitter`, missing
-`admission_reporter`, and missing `approver` access.
+`admission_reporter`, and missing `approver` access. Follow the suggested
+`deploy auth explain-groups --deployment <label> --action ...` command before
+editing Keycloak by hand.
 
 ## Which Backend Am I Using
 

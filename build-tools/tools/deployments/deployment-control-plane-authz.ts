@@ -2,6 +2,7 @@
 import type { DeploymentTarget } from "./contract.ts";
 import { providerTargetIdentityFor } from "./contract.ts";
 import { defaultRequestedBy } from "./deployment-admission-evidence.ts";
+import { deploymentAuthMissingGrantHint } from "./deployment-auth-groups.ts";
 import {
   type DeploymentControlPlaneAuthorization,
   type DeploymentControlPlaneAuthorizationDecision,
@@ -75,6 +76,28 @@ function missingRoleFor(requiredRoles: DeploymentControlPlaneRole[]): Deployment
   return requiredRoles.find((role) => role !== "break_glass") || requiredRoles[0] || "submitter";
 }
 
+function missingGrantMessage(opts: {
+  deployment: DeploymentTarget;
+  authorization: DeploymentControlPlaneAuthorization;
+  requiredRoles: DeploymentControlPlaneRole[];
+  actionDescription: string;
+}): string {
+  const missingRole = missingRoleFor(opts.requiredRoles);
+  const normalized = normalizeAuthorizationSnapshot(opts.authorization);
+  const base =
+    `principal ${normalized.requestedBy.principalId} is not authorized to ${opts.actionDescription} ` +
+    `on ${opts.deployment.deploymentId}: missing ${missingRole} grant`;
+  return missingRole === "submitter" ||
+    missingRole === "approver" ||
+    missingRole === "admission_reporter"
+    ? `${base};${deploymentAuthMissingGrantHint({
+        deployment: opts.deployment,
+        role: missingRole,
+        principalId: normalized.requestedBy.principalId,
+      })}`
+    : base;
+}
+
 function authorize(
   deployment: DeploymentTarget,
   authorization: DeploymentControlPlaneAuthorization,
@@ -95,7 +118,12 @@ function authorize(
     }
   }
   throw new DeploymentUnauthorizedError(
-    `principal ${normalized.requestedBy.principalId} is not authorized to ${actionDescription} on ${deployment.deploymentId}: missing ${missingRoleFor(requiredRoles)} grant`,
+    missingGrantMessage({
+      deployment,
+      authorization: normalized,
+      requiredRoles,
+      actionDescription,
+    }),
   );
 }
 
