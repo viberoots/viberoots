@@ -13206,6 +13206,159 @@ and raw IdP tooling.
 
 ---
 
+## PR-97: Reviewed remote-profile apply for declarative Keycloak admin changes
+
+### Description
+
+I will close the remaining operational gap in the reviewed Keycloak admin flow by letting an
+authorized client command stage declarative identity changes and then trigger the existing reviewed
+host-apply path on `mini`, without requiring an operator to SSH in and hand-edit host files. After
+PR-96, operators can stay inside `deploy admin ...` for reviewed planning and local artifact
+generation, but the final application step still assumes direct host access or an out-of-band
+rebuild workflow. We want the same reviewed `--profile mini` model that already exists for remote
+deploys to cover declarative Keycloak membership and group-shape updates too, while preserving pure
+flake evaluation and the existing fail-closed host-apply guardrails.
+
+The reviewed model should become:
+
+- Keycloak group shape and membership remain declarative reviewed inputs rather than live
+  laptop-to-Keycloak mutation
+- an authorized client can run a reviewed `deploy admin ... --profile mini` flow that updates the
+  reviewed identity artifact in the remote config workspace
+- host application stays explicit, dry-runnable, preflighted, and auditable instead of becoming an
+  implicit side effect
+- operators no longer need interactive SSH sessions just to apply reviewed deploy-auth membership
+  changes on `mini`
+
+### Scope & Changes
+
+- Extend the reviewed `deploy admin keycloak` surface with a remote-profile apply path for managed
+  shared hosts:
+  - support `--profile <name>` for the reviewed `mini` workflow
+  - support explicit host-apply selection such as `--apply-host` and `--apply-host-dry-run` or an
+    equivalent reviewed opt-in
+  - reject unsafe or ambiguous combinations the same way the reviewed remote deploy path does
+- Keep the remote mutation declarative:
+  - update reviewed Keycloak JSON inputs in the remote config workspace or equivalent reviewed
+    managed path
+  - do not turn `deploy admin` into a laptop-driven live Keycloak mutation client
+  - preserve pure flake evaluation by keeping the applied artifacts under the reviewed flake/config
+    root rather than relying on impure absolute paths outside it
+- Reuse the existing reviewed remote host-apply guardrails wherever possible:
+  - require the target to be a managed `nixos-shared-host` install
+  - keep preflight checks for wiring, state path, runtime root, and records root
+  - keep dry-run support and explicit apply opt-in
+  - run the reviewed host-apply command rather than arbitrary remote shell mutation
+- Keep authorization and audit boundaries strict:
+  - remote profile transport alone must not authorize Keycloak mutation
+  - the acting principal must still hold the separate reviewed deploy-admin Keycloak grant required
+    for shape or membership mutation
+  - record both the requested identity change and whether a reviewed remote host-apply dry-run or
+    switch was requested
+- Close the aggregate-shape/operator-flow gap introduced by the local-only PR-96 implementation:
+  - ensure the reviewed remote path can update the authoritative shared realm-shape artifact rather
+    than only a one-deployment scratch file when the host imports a repo-wide realm definition
+  - keep the reviewed workflow coherent for both shape and membership artifacts under one
+    client-driven admin model
+
+### Tests (in this PR)
+
+- Add remote-profile CLI tests proving the reviewed Keycloak admin path accepts `--profile <name>`
+  only for supported managed-host workflows and rejects unsafe flag combinations.
+- Add fixture-based tests proving remote Keycloak admin updates preserve pure config-root artifact
+  placement and do not require impure absolute host paths.
+- Add command-assembly tests proving the reviewed admin path reuses the explicit remote host-apply
+  dry-run/switch contract rather than inventing an ad hoc SSH mutation path.
+- Add authorization tests proving possession of remote-profile transport details is insufficient
+  without the separate reviewed deploy-admin Keycloak grant.
+- Add audit/provenance tests proving the resulting record captures the acting principal, requested
+  identity mutation, remote profile target, and whether host apply was dry-run or switch.
+- Add docs-parity tests proving the `deploy admin ... --profile mini` guidance, pure-flake config
+  expectations, and troubleshooting all describe the same reviewed contract.
+
+### Docs (in this PR)
+
+- Update [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md) with the
+  reviewed client-driven Keycloak admin flow, including when to use local artifact generation
+  versus `--profile mini` remote application.
+- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  to document the no-manual-SSH reviewed path for applying deploy-auth membership and group-shape
+  changes from a client machine.
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  to document the expected pure config-root layout for reviewed Keycloak realm artifacts and how
+  the remote admin path updates them safely.
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  so the reviewed bootstrap/admin story no longer implies that operators must log into `mini` to
+  apply routine reviewed Keycloak membership changes.
+- Update troubleshooting docs to distinguish:
+  - missing deploy-admin Keycloak grant
+  - missing reviewed remote profile or SSH trust material
+  - remote host-apply preflight failure
+  - pure-flake config artifact placement mistakes
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - reviewed remote-profile Keycloak admin CLI behavior
+  - remote host-apply command assembly and preflight reuse
+  - authorization and audit parity
+  - pure-flake artifact placement
+  - docs and operator-flow parity
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR stays within deployment-domain reviewed admin CLI behavior, remote-profile orchestration,
+  managed-host apply integration, pure-flake Keycloak artifact handling, and docs. Under the
+  deployment-only verify policy, default `v` / CI can run the reviewed deployment suite unless
+  implementation details force shared build-system selector changes.
+
+### Acceptance Criteria
+
+- Operators can apply reviewed Keycloak membership and group-shape changes to `mini` from a client
+  machine without interactive SSH editing.
+- The reviewed remote admin path keeps Keycloak mutation declarative and compatible with pure flake
+  evaluation.
+- Host apply remains explicit, preflighted, dry-runnable, and fail-closed.
+- Remote-profile access does not weaken the separate deploy-admin Keycloak authorization boundary.
+- The reviewed docs describe one coherent client-driven operator workflow for deploy-auth shape and
+  membership changes on managed shared hosts.
+
+### Risks
+
+Combining Keycloak admin mutation with remote host-apply orchestration could accidentally blur the
+boundary between declarative reviewed changes and live remote mutation, or could widen the blast
+radius of a client-side admin command if transport, apply, and authorization semantics are not kept
+strictly separate.
+
+### Mitigation
+
+Keep the remote admin flow declarative, require explicit host-apply opt-in, reuse the existing
+managed-host preflight contract, preserve separate deploy-admin authorization, and cover the path
+with fixture-based tests plus docs-parity checks before recommending it as the normal operator
+workflow.
+
+### Consequence of Not Implementing
+
+Operators will keep falling back to manual SSH sessions, impure host-local file paths, or ad hoc
+out-of-band rebuild steps to finish reviewed Keycloak membership changes, leaving the PR-96 admin
+story operationally incomplete for the main `mini` workflow.
+
+### Downsides for Implementing
+
+This adds another reviewed remote orchestration surface to the deployment domain and requires
+careful coordination between remote profile transport, declarative config artifact ownership, and
+managed host-apply semantics.
+
+### Recommendation
+
+Implement immediately after PR-96 so the reviewed Keycloak admin CLI becomes fully usable for the
+normal `mini` workflow, closing the last manual-SSH/operator-friction gap without abandoning pure
+flake evaluation or the reviewed host-apply safety model.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
