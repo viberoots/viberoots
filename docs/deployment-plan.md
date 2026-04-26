@@ -13359,6 +13359,162 @@ flake evaluation or the reviewed host-apply safety model.
 
 ---
 
+## PR-98: Opinionated reviewed Keycloak admin UX defaults
+
+### Description
+
+I will close the operator UX gap that remains after PR-97 by making the reviewed `deploy admin
+keycloak` flow derive the internal Keycloak-admin details it already knows, instead of requiring
+operators to reconstruct them manually on the command line. After PR-97, the reviewed workflow is
+authorized and end-to-end, but the common operator path still demands low-level inputs such as
+`--acting-principal`, `--admin-group`, explicit artifact locations, and an awkward distinction
+between "grant this to me" versus "grant this to another user". In practice that means the CLI
+still exposes internal authorization plumbing instead of presenting the smallest reviewed command a
+human operator should need.
+
+The reviewed model should become:
+
+- the operator supplies the deployment, the requested capability, and optionally the target user
+- reviewed remote-profile execution derives the authenticated acting principal from the same login
+  session already required for the mutation
+- reviewed deployment metadata and command kind derive the expected admin-group scope instead of
+  requiring operators to know internal group names
+- common self-service flows default to the logged-in user identity while still allowing explicit
+  cross-user grants when needed
+- escape hatches stay available for unusual workflows, but the happy-path command is short,
+  teachable, and obvious
+
+### Scope & Changes
+
+- Simplify the reviewed `deploy admin keycloak` CLI contract for the common remote-profile path:
+  - derive `actingPrincipal` from the authenticated reviewed session instead of requiring
+    `--acting-principal` for normal `--profile <name>` execution
+  - derive the expected reviewed admin-group name from `--deployment` plus command/action instead
+    of requiring `--admin-group` on the happy path
+  - keep explicit overrides only where they are genuinely needed for exceptional workflows or
+    testing
+- Add opinionated self-service membership flows:
+  - support a first-class `grant-self` flow or an equivalent default where `grant-user` infers the
+    current logged-in email/principal when no explicit target user is provided
+  - keep explicit `--user-email` support for authorized operators granting access to another human
+  - ensure the resulting UX cleanly distinguishes "grant me this reviewed capability" from
+    "grant another user this reviewed capability"
+- Hide reviewed artifact-path details on the happy path:
+  - keep reviewed remote-profile realm and membership artifact locations implicit
+  - prevent operators from needing to reason about `realm-file`, `membership-file`, or mutable
+    generated-file placement during the normal `--profile mini` flow
+  - preserve the explicit local-artifact path only for intentionally local/non-remote admin
+    workflows
+- Improve error recovery and next-step guidance:
+  - when authorization fails, print the minimal next reviewed command rather than placeholders such
+    as `<membership-admin-principal>`
+  - if the acting session lacks the required reviewed admin grant, explain the missing grant in
+    terms of the current user and requested action
+  - if a self-service grant is impossible, tell the operator which minimal explicit input is still
+    required and why
+- Preserve the fail-closed security model while simplifying UX:
+  - inferred defaults must not broaden authority or silently choose a broader admin scope than the
+    deployment/action requires
+  - remote-profile transport must continue to require reviewed authentication and separate reviewed
+    deploy-admin grants
+  - audit output must record which values were inferred versus explicitly supplied
+
+### Tests (in this PR)
+
+- Add CLI tests proving the reviewed remote-profile happy path no longer requires
+  `--acting-principal` or `--admin-group` when the command has enough information to infer them.
+- Add tests proving self-service grant flows default to the logged-in user identity while
+  preserving explicit cross-user grants.
+- Add authorization tests proving inferred defaults do not weaken the separate reviewed
+  deploy-admin Keycloak grant boundary or broaden scope matching.
+- Add error-guidance tests proving missing authorization or missing target-user data surfaces
+  concise, actionable commands without leaking placeholder-heavy internal vocabulary.
+- Add audit/provenance tests proving inferred acting principal, inferred admin-group scope, and
+  explicit overrides are all recorded clearly.
+- Add docs-parity tests proving the operator-facing examples and troubleshooting now reflect the
+  shortened happy-path UX.
+
+### Docs (in this PR)
+
+- Update [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md) with the
+  minimal reviewed Keycloak admin commands for self-service and cross-user grants.
+- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  to document the simplified `--profile mini` operator flow and when explicit overrides are still
+  required.
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  so the reviewed bootstrap/runbook guidance no longer expects operators to know internal
+  Keycloak-admin principal or group names for routine flows.
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  to show the reduced-input reviewed admin commands used during human onboarding and break-glass
+  recovery.
+- Update troubleshooting docs to distinguish:
+  - inferred happy-path success
+  - missing reviewed deploy-admin grant
+  - missing explicit target-user override for cross-user workflows
+  - unusual local-artifact workflows that still require advanced flags
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - reviewed Keycloak admin CLI default inference
+  - self-service versus cross-user grant behavior
+  - authorization and scope fail-closed behavior
+  - audit/provenance parity for inferred values
+  - docs and operator-flow parity
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR stays within deployment-domain reviewed admin CLI ergonomics, session-derived identity
+  inference, scoped authorization guidance, audit/provenance, and docs. Under the deployment-only
+  verify policy, default `v` / CI can run the reviewed deployment suite unless implementation
+  details force shared build-system selector changes.
+
+### Acceptance Criteria
+
+- Operators can perform the common reviewed Keycloak admin flow without knowing or typing internal
+  `acting-principal` or `admin-group` values.
+- The normal reviewed `--profile mini` flow requires only deployment, action, and optionally a
+  target user when granting to someone else.
+- Self-service reviewed grants have a clear, minimal UX that defaults to the logged-in user where
+  appropriate.
+- Inferred defaults remain narrow, explicit in audit output, and fail closed when the acting
+  session lacks the required reviewed authority.
+- Docs, help text, and error guidance present one teachable happy-path command for the common
+  operator workflow.
+
+### Risks
+
+Reducing the number of required flags could accidentally hide important authorization boundaries,
+infer the wrong target identity, or make advanced workflows harder to reason about if the CLI stops
+being explicit in the wrong places.
+
+### Mitigation
+
+Infer only values that are already authoritative in the reviewed session or deployment metadata,
+record every inferred value in audit output, preserve explicit overrides for exceptional workflows,
+and require tests proving the happy path stays narrow without weakening any reviewed authorization
+checks.
+
+### Consequence of Not Implementing
+
+Even after PR-97, operators will continue to face a command surface that feels like internal
+plumbing rather than a reviewed product workflow, slowing routine onboarding and making common
+deploy-auth recovery steps harder to teach and trust.
+
+### Downsides for Implementing
+
+This adds another layer of CLI inference and demands careful documentation so advanced operators can
+still tell which values were inferred, overridden, or denied.
+
+### Recommendation
+
+Implement immediately after PR-97 so the newly completed reviewed remote Keycloak admin path is
+also genuinely usable by humans, not just technically complete.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
