@@ -1007,13 +1007,34 @@ deploy auth print-groups --deployment //projects/deployments/pleomino-dev:deploy
 deploy auth explain-groups \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --action submit
-deploy auth print-keycloak-realm > deployment-auth-realm.json
+deploy admin keycloak plan --deployment //projects/deployments/pleomino-dev:deploy
+deploy admin keycloak sync \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --realm-file /srv/common/deployment-auth-realm.json \
+  --acting-principal <principal> \
+  --admin-group deploy-admin-keycloak-shape-admin-project-pleomino
+deploy admin keycloak grant-user \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --action submit \
+  --user-email alice@example.com \
+  --membership-file /srv/common/deployment-auth-memberships.json \
+  --acting-principal <principal> \
+  --admin-group deploy-admin-keycloak-membership-admin-project-pleomino
 ```
 
-Those helpers keep group shape separate from membership. The generated
-`deployment-auth-realm.json` contains reviewed group and mapper shape only; map
-humans and automation principals into those groups through a separate reviewed
-identity-management step.
+Those helpers keep group shape separate from membership. Ordinary read-only
+`deploy auth ...` explains the expected shape; privileged `deploy admin ...`
+applies reviewed changes. The generated `deployment-auth-realm.json` contains
+reviewed group and mapper shape only. Human membership lives in the separate
+reviewed `/srv/common/deployment-auth-memberships.json` input.
+
+Deploy-admin Keycloak grants are intentionally distinct from ordinary deploy
+grants. Typical reviewed examples are:
+
+- `deploy-admin-keycloak-read-project-pleomino`
+- `deploy-admin-keycloak-shape-admin-project-pleomino`
+- `deploy-admin-keycloak-membership-admin-project-pleomino`
+- `deploy-admin-keycloak-read-environment-dev`
 
 After creating the realm, verify the issuer metadata:
 

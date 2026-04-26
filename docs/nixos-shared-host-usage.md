@@ -340,6 +340,29 @@ Keycloak group shape for one deployment, and
 to map one action to the reviewed group name. That helper surface explains
 group shape only; user and automation membership remain a separate reviewed
 identity-management step.
+Keep the split clear: read-only `deploy auth ...` explains the expected shape,
+while privileged `deploy admin ...` applies reviewed Keycloak changes. The
+reviewed admin flow is:
+
+```bash
+deploy admin keycloak plan --deployment <label>
+deploy admin keycloak sync \
+  --deployment <label> \
+  --realm-file /srv/common/deployment-auth-realm.json \
+  --acting-principal <principal> \
+  --admin-group deploy-admin-keycloak-shape-admin-project-<project>
+deploy admin keycloak grant-user \
+  --deployment <label> \
+  --action submit \
+  --user-email <user@example.com> \
+  --membership-file /srv/common/deployment-auth-memberships.json \
+  --acting-principal <principal> \
+  --admin-group deploy-admin-keycloak-membership-admin-project-<project>
+```
+
+Those deploy-admin groups are intentionally separate from ordinary
+`submitter`/`approver`/`admission_reporter` access. A missing ordinary deploy
+grant and a missing deploy-admin grant are different failures on purpose.
 To discover the reviewed check names for a target before you submit, run
 `direnv exec . build-tools/tools/bin/deploy --deployment <label> --validate-only`
 and inspect `admissionRequirements.admission_policy`, `allowed_refs`,
@@ -444,4 +467,7 @@ again. For submit-time evidence failures, `unauthorized` now distinguishes
 missing `submitter` access from missing `admission_reporter` access; approval
 failures still point at missing `approver` access. Keep the follow-up flow
 read-only first: use `deploy auth explain-groups` to confirm the expected group
-shape before changing Keycloak membership.
+shape. If the reviewed shape or membership is genuinely missing, switch to
+`deploy admin keycloak plan --deployment <label>` and then apply the reviewed
+`deploy admin keycloak sync` or `deploy admin keycloak grant-user` step instead
+of dropping to raw IdP tooling.

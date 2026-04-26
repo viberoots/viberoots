@@ -269,6 +269,31 @@ group shape, and `deploy auth explain-groups --deployment <label> --action
 submit|approve|report_checks` explains which reviewed group is required for one
 action. Those commands describe the expected Keycloak group shape; they do not
 add user or automation membership.
+Keep the split explicit: read-only `deploy auth ...` explains the expected
+shape, while privileged `deploy admin ...` applies reviewed Keycloak changes.
+Start with:
+
+```bash
+deploy admin keycloak plan --deployment <label>
+deploy admin keycloak sync \
+  --deployment <label> \
+  --realm-file /srv/common/deployment-auth-realm.json \
+  --acting-principal <principal> \
+  --admin-group deploy-admin-keycloak-shape-admin-project-<project>
+deploy admin keycloak grant-user \
+  --deployment <label> \
+  --action submit \
+  --user-email <user@example.com> \
+  --membership-file /srv/common/deployment-auth-memberships.json \
+  --acting-principal <principal> \
+  --admin-group deploy-admin-keycloak-membership-admin-project-<project>
+```
+
+`deploy admin keycloak sync` stages reviewed group shape and mapper updates in
+the realm file. `deploy admin keycloak grant-user` stages human membership in a
+separate reviewed input. Both fail closed unless the acting principal presents
+the separate deploy-admin Keycloak grant; ordinary `submitter`, `approver`, and
+`admission_reporter` groups do not authorize Keycloak mutation.
 For protected/shared service-backed runs, `--mark-check-passed` and
 `--mark-check-for-commit` only describe the commit the client believes it is
 submitting. Final admission still binds to the service-owned reviewed source
@@ -299,8 +324,11 @@ canonical finalized tree into the content-addressed store.
 When a service-backed request returns `unauthorized`, read the rejection text:
 submit failures now distinguish missing `submitter`, missing
 `admission_reporter`, and missing `approver` access. Follow the suggested
-`deploy auth explain-groups --deployment <label> --action ...` command before
-editing Keycloak by hand.
+`deploy auth explain-groups --deployment <label> --action ...` command first.
+If membership or group shape is genuinely missing, switch to the privileged
+reviewed `deploy admin keycloak plan --deployment <label>` flow and then apply
+the matching `deploy admin keycloak sync` or `deploy admin keycloak grant-user`
+step instead of editing Keycloak by hand.
 
 ## Which Backend Am I Using
 

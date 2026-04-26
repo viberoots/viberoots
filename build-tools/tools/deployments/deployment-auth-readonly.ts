@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentTarget } from "./contract.ts";
+import { reviewedDeployAdminGroupsByCapability } from "./deployment-admin-keycloak-auth.ts";
 import {
   deploymentAuthActionCommand,
   deploymentAuthActionRole,
@@ -27,12 +28,6 @@ function uniqueSorted(values: string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort();
 }
 
-function exampleGroupCommands(groups: string[]): string[] {
-  return groups.map(
-    (group) => `kcadm.sh create groups -r deployments -s name=${JSON.stringify(group)}`,
-  );
-}
-
 function roleToken(role: ReturnType<typeof deploymentAuthActionRole>): string {
   return role === "submitter"
     ? "submitters"
@@ -56,6 +51,7 @@ export function buildDeploymentAuthGroupSummary(
   automationPrincipalIds: string[] = [],
 ) {
   const humanGroups = reviewedHumanGroupsForDeployment(deployment);
+  const adminGroups = reviewedDeployAdminGroupsByCapability(deployment);
   return {
     schemaVersion: DEPLOYMENT_AUTH_GROUPS_SCHEMA,
     readOnly: true,
@@ -63,7 +59,11 @@ export function buildDeploymentAuthGroupSummary(
     humanGroups,
     automationGroupPatterns: reviewedAutomationGroupPatternsForDeployment(deployment),
     automationGroupsByPrincipal: automationGroupsByPrincipal(deployment, automationPrincipalIds),
-    exampleAdminCommands: exampleGroupCommands(humanGroups),
+    adminGroupConventions: adminGroups,
+    exampleAdminCommands: [
+      `deploy admin keycloak plan --deployment ${deployment.label}`,
+      `deploy admin keycloak sync --deployment ${deployment.label} --realm-file /srv/common/deployment-auth-realm.json --acting-principal <principal> --admin-group ${adminGroups.shapeAdmin[0]}`,
+    ],
     nextStep: deploymentAuthActionCommand(deployment, "submit"),
   };
 }
@@ -75,6 +75,7 @@ export function buildDeploymentAuthActionSummary(
 ) {
   const role = deploymentAuthActionRole(action);
   const humanGroup = reviewedHumanGroupName(deployment, role);
+  const adminGroups = reviewedDeployAdminGroupsByCapability(deployment);
   return {
     schemaVersion: DEPLOYMENT_AUTH_ACTION_SCHEMA,
     readOnly: true,
@@ -87,8 +88,8 @@ export function buildDeploymentAuthActionSummary(
     ),
     automationGroupsByPrincipal: automationGroupsByPrincipal(deployment, automationPrincipalIds),
     exampleAdminCommands: [
-      `kcadm.sh create groups -r deployments -s name=${JSON.stringify(humanGroup)}`,
-      `deploy auth print-keycloak-realm > deployment-auth-realm.json`,
+      `deploy admin keycloak plan --deployment ${deployment.label}`,
+      `deploy admin keycloak grant-user --deployment ${deployment.label} --action ${action} --user-email <user@example.com> --membership-file /srv/common/deployment-auth-memberships.json --acting-principal <principal> --admin-group ${adminGroups.membershipAdmin[0]}`,
     ],
     nextStep: deploymentAuthActionCommand(deployment, action),
   };

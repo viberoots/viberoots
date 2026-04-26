@@ -128,8 +128,11 @@ export function isAutomationLikePrincipal(principalId: string): boolean {
   return normalized.startsWith("oidc:service-account-") || normalized.startsWith("app:");
 }
 
-function exampleHumanGrantCommand(group: string): string {
-  return `kcadm.sh create groups -r deployments -s name=${JSON.stringify(group)}`;
+function exampleHumanGrantCommand(
+  deployment: DeploymentTarget,
+  action: DeploymentAuthAction,
+): string {
+  return `deploy admin keycloak grant-user --deployment ${deployment.label} --action ${action} --user-email <user@example.com> --membership-file /srv/common/deployment-auth-memberships.json --acting-principal <principal> --admin-group <deploy-admin-keycloak-membership-admin-...>`;
 }
 
 export function deploymentAuthMissingGrantHint(opts: {
@@ -137,7 +140,8 @@ export function deploymentAuthMissingGrantHint(opts: {
   role: DeploymentAuthRole;
   principalId: string;
 }): string {
-  const command = deploymentAuthActionCommand(opts.deployment, roleAction(opts.role));
+  const action = roleAction(opts.role);
+  const command = deploymentAuthActionCommand(opts.deployment, action);
   if (isAutomationLikePrincipal(opts.principalId)) {
     const groups = reviewedAutomationGroupsForPrincipal(opts.deployment, opts.principalId).join(
       ", ",
@@ -145,7 +149,7 @@ export function deploymentAuthMissingGrantHint(opts: {
     return ` expected automation groups include ${groups}; inspect ${command}`;
   }
   const group = reviewedHumanGroupName(opts.deployment, opts.role);
-  return ` expected human group ${group}; example admin command: ${exampleHumanGrantCommand(group)}; inspect ${command}`;
+  return ` expected human group ${group}; example admin command: ${exampleHumanGrantCommand(opts.deployment, action)}; inspect ${command}`;
 }
 
 function roleAction(role: DeploymentAuthRole): DeploymentAuthAction {
