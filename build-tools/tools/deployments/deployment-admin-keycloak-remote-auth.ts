@@ -49,7 +49,7 @@ function roleFor(command: "sync" | "grant-user"): DeploymentKeycloakAdminRole {
 }
 
 function operationKind(command: "sync" | "grant-user"): string {
-  return command === "sync" ? "deploy-admin-keycloak-sync" : "deploy-admin-keycloak-grant-user";
+  return command === "sync" ? "deploy-admin-identity-sync" : "deploy-admin-identity-grant-user";
 }
 
 function nextCommand(opts: {
@@ -98,7 +98,7 @@ function authorizationFailure(opts: {
     : opts.principalId;
   const actionLabel = opts.command === "grant-user" ? ` for ${String(opts.action || "")}` : "";
   return new Error(
-    `current login ${identity} lacks reviewed Keycloak ${role === "shape_admin" ? "group-shape admin" : "membership admin"}${actionLabel} on ${opts.deployment.label}; expected one of ${groups.join(", ")}; ask an authorized operator to run: ${nextCommand(opts)}`,
+    `current login ${identity} lacks reviewed identity ${role === "shape_admin" ? "group-shape admin" : "membership admin"}${actionLabel} on ${opts.deployment.label}; expected one of ${groups.join(", ")}; ask an authorized operator to run: ${nextCommand(opts)}`,
   );
 }
 
@@ -110,12 +110,12 @@ async function resolveSessionBackedInputs(opts: {
 }): Promise<ResolvedRemoteKeycloakAdminInputs> {
   if (hasFlag("acting-principal") || adminGroups().length > 0) {
     throw new Error(
-      "reviewed remote Keycloak admin derives --acting-principal and --admin-group from the authenticated session; keep only --user-email for explicit cross-user grants",
+      "reviewed remote identity admin derives --acting-principal and --admin-group from the authenticated session; keep only --user-email for explicit cross-user grants",
     );
   }
   const controlPlaneToken = requireServiceTokenFromEnv(
     opts.plan.serviceClient.controlPlaneTokenEnv,
-    `remote profile "${opts.plan.profileName}" Keycloak admin`,
+    `remote profile "${opts.plan.profileName}" identity admin`,
   );
   const sessionId = await createAndWaitForServiceOwnedAuthSession({
     controlPlaneUrl: opts.plan.serviceClient.controlPlaneUrl,
@@ -141,7 +141,7 @@ async function resolveSessionBackedInputs(opts: {
       actingPrincipal,
       principalEmail: status.principalEmail,
       actingPrincipalSource: "session",
-      adminGroups: status.reviewedKeycloakAdminGroups || [],
+      adminGroups: status.reviewedIdentityAdminGroups || [],
       adminGroupsSource: "session",
     };
   }
@@ -150,7 +150,7 @@ async function resolveSessionBackedInputs(opts: {
     actingPrincipal,
     principalEmail: status.principalEmail,
     actingPrincipalSource: "session",
-    adminGroups: status.reviewedKeycloakAdminGroups || [],
+    adminGroups: status.reviewedIdentityAdminGroups || [],
     adminGroupsSource: "session",
     userEmail,
     userEmailSource: explicitUserEmail ? "explicit" : "session",
@@ -162,7 +162,7 @@ function resolveExplicitInputs(opts: {
 }): ResolvedRemoteKeycloakAdminInputs {
   const groups = adminGroups();
   if (groups.length === 0) {
-    throw new Error("reviewed remote Keycloak admin fallback requires at least one --admin-group");
+    throw new Error("reviewed remote identity admin fallback requires at least one --admin-group");
   }
   return {
     actingPrincipal: requireFlag("acting-principal"),

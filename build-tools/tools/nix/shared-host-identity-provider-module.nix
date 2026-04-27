@@ -1,6 +1,11 @@
 { lib, config, pkgs, ... }:
 let
   cfg = config.deploymentHost.identityProvider;
+  bootstrap = import ./shared-host-identity-provider-bootstrap.nix {
+    inherit lib;
+    bootstrapFirstOperatorEmail = cfg.bootstrapFirstOperatorEmail;
+    bootstrapClientRedirectUris = cfg.bootstrapClientRedirectUris;
+  };
   localHost = "127.0.0.1";
   hostname = if cfg.hostname == null then "_disabled.invalid" else cfg.hostname;
   keycloakHttpPort = if cfg.keycloakHttpPort == null then 0 else cfg.keycloakHttpPort;
@@ -19,17 +24,8 @@ let
       "${cfg.generatedImportRoot}/deployment-auth-memberships.json";
   generatedRealmImportName = builtins.baseNameOf generatedRealmFile;
   generatedMembershipImportName = builtins.baseNameOf generatedMembershipFile;
-  generatedRealmBootstrapJson = builtins.toJSON {
-    realm = "deployments";
-    enabled = true;
-    groups = [ ];
-    clients = [ ];
-  };
-  generatedMembershipBootstrapJson = builtins.toJSON {
-    realm = "deployments";
-    enabled = true;
-    users = [ ];
-  };
+  generatedRealmBootstrapJson = builtins.toJSON bootstrap.realmImport;
+  generatedMembershipBootstrapJson = builtins.toJSON bootstrap.membershipImport;
 in
 {
   options.deploymentHost.identityProvider = {
@@ -87,6 +83,23 @@ in
         ${"deployment-auth-memberships.json"} under generatedImportRoot.
       '';
     };
+    bootstrapClientRedirectUris = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = ''
+        Reviewed redirect URIs bootstrapped for the public human deploy-auth client before the
+        normal identity sync flow runs. Set this explicitly for the reviewed browser-facing
+        callback host you route to the deployment service.
+      '';
+    };
+    bootstrapFirstOperatorEmail = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Optional first trusted human email to seed into the mutable bootstrap membership import
+        with reviewed identity-admin rights.
+      '';
+    };
     manageNginx = lib.mkOption {
       type = lib.types.bool;
       default = false;
@@ -130,6 +143,13 @@ in
         assertion =
           cfg.generatedMembershipFile == null || lib.hasPrefix "/" cfg.generatedMembershipFile;
         message = "deploymentHost.identityProvider.generatedMembershipFile must be an absolute host path when set.";
+      }
+      {
+        assertion = cfg.bootstrapClientRedirectUris != [ ];
+        message = ''
+          deploymentHost.identityProvider.bootstrapClientRedirectUris must include at least one
+          reviewed callback URI.
+        '';
       }
       {
         assertion = !(cfg.realmFiles != [ ] && generatedRealmFile != null);

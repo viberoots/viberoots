@@ -32,7 +32,7 @@ import {
 import {
   principalEmailFromOidcClaims,
   reviewedPrincipalEmailRequirementMessage,
-  reviewedKeycloakAdminGroupsFromOidcClaims,
+  reviewedIdentityAdminGroupsFromOidcClaims,
 } from "./deployment-auth-session-reviewed-identity.ts";
 import { normalizeAuthorizationSnapshot } from "./deployment-control-plane-authz.ts";
 
@@ -53,8 +53,8 @@ export function publicDeploymentAuthSessionStatus(session: DeploymentAuthSession
     credentialSource: session.credentialSource,
     ...(session.principal ? { principal: session.principal } : {}),
     ...(session.principalEmail ? { principalEmail: session.principalEmail } : {}),
-    ...(session.reviewedKeycloakAdminGroups
-      ? { reviewedKeycloakAdminGroups: session.reviewedKeycloakAdminGroups }
+    ...(session.reviewedIdentityAdminGroups
+      ? { reviewedIdentityAdminGroups: session.reviewedIdentityAdminGroups }
       : {}),
     ...(session.authorization
       ? { authorization: normalizeAuthorizationSnapshot(session.authorization) }
@@ -158,7 +158,7 @@ export async function handleDeploymentAuthCallback(opts: {
     if (consumed.credentialSource.startsWith("interactive_") && !principalEmail) {
       throw new Error(reviewedPrincipalEmailRequirementMessage(principal.principalId));
     }
-    const reviewedKeycloakAdminGroups = reviewedKeycloakAdminGroupsFromOidcClaims(claims);
+    const reviewedIdentityAdminGroups = reviewedIdentityAdminGroupsFromOidcClaims(claims);
     const authorization = authorizationForOidcPrincipal({
       deployment: consumed.deployment,
       principal,
@@ -170,7 +170,7 @@ export async function handleDeploymentAuthCallback(opts: {
       authenticatedAt: new Date().toISOString(),
       principal,
       ...(principalEmail ? { principalEmail } : {}),
-      ...(reviewedKeycloakAdminGroups.length > 0 ? { reviewedKeycloakAdminGroups } : {}),
+      ...(reviewedIdentityAdminGroups.length > 0 ? { reviewedIdentityAdminGroups } : {}),
       authorization,
     };
     await writeDeploymentAuthSession(opts.recordsRoot, authenticated);

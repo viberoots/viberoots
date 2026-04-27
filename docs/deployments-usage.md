@@ -263,51 +263,51 @@ To discover the reviewed check names before you use `--mark-check-passed`, run
 `admissionRequirements.admission_policy`, `allowed_refs`, `required_checks`,
 and `required_approvals` in the JSON response. That read-only output tells you
 which names the deployment expects; it does not grant `admission_reporter`.
-For reviewed Keycloak diagnostics, keep group shape and membership separate:
+For reviewed identity diagnostics, keep group shape and membership separate:
 `deploy auth print-groups --deployment <label>` prints the deployment-derived
 group shape, and `deploy auth explain-groups --deployment <label> --action
 submit|approve|report_checks` explains which reviewed group is required for one
-action. Those commands describe the expected Keycloak group shape; they do not
+action. Those commands describe the expected identity group shape; they do not
 add user or automation membership.
 Keep the split explicit: read-only `deploy auth ...` explains the expected
-shape, while privileged `deploy admin ...` applies reviewed Keycloak changes.
+shape, while privileged `deploy admin ...` applies reviewed identity changes.
 Start with:
 
 ```bash
-deploy admin keycloak plan --deployment <label>
-deploy admin keycloak sync \
+deploy admin identity plan --deployment <label>
+deploy admin identity sync \
   --deployment <label> \
   --realm-file ./deployment-host/identity-provider/deployment-auth-realm.json \
   --acting-principal <principal> \
-  --admin-group deploy-admin-keycloak-shape-admin-project-<project>
-deploy admin keycloak grant-user \
+  --admin-group deploy-admin-identity-shape-admin-project-<project>
+deploy admin identity grant-user \
   --deployment <label> \
   --action submit \
   --user-email <user@example.com> \
   --membership-file ./deployment-host/identity-provider/deployment-auth-memberships.json \
   --acting-principal <principal> \
-  --admin-group deploy-admin-keycloak-membership-admin-project-<project>
+  --admin-group deploy-admin-identity-membership-admin-project-<project>
 ```
 
-`deploy admin keycloak sync` stages reviewed group shape and mapper updates in
-the realm file. `deploy admin keycloak grant-user` stages human membership in a
+`deploy admin identity sync` stages reviewed group shape and mapper updates in
+the realm file. `deploy admin identity grant-user` stages human membership in a
 separate reviewed input. Both fail closed unless the acting principal presents
-the separate deploy-admin Keycloak grant; ordinary `submitter`, `approver`, and
-`admission_reporter` groups do not authorize Keycloak mutation.
+the separate deploy-admin identity grant; ordinary `submitter`, `approver`, and
+`admission_reporter` groups do not authorize identity-admin mutation.
 When you are operating `mini` from a client machine, use the reviewed remote
 profile flow instead of SSHing in to edit those files by hand:
 
 ```bash
-deploy admin keycloak sync \
+deploy admin identity sync \
   --deployment <label> \
   --profile mini \
   --apply-host-dry-run
-deploy admin keycloak grant-user \
+deploy admin identity grant-user \
   --deployment <label> \
   --profile mini \
   --action submit \
   --apply-host
-deploy admin keycloak grant-user \
+deploy admin identity grant-user \
   --deployment <label> \
   --profile mini \
   --action submit \
@@ -315,19 +315,19 @@ deploy admin keycloak grant-user \
   --apply-host
 ```
 
-That reviewed remote path writes the authoritative Keycloak JSON inputs under
+That reviewed remote path writes the authoritative identity JSON inputs under
 the host config root as mutable generated files, and the reviewed
 identity-provider module bootstraps and runtime-links them for Keycloak during
 activation. No commit or staging step is required before the optional reviewed
 host-apply dry-run or switch contract runs. The reviewed login session derives
-the acting principal and deploy-admin Keycloak scope automatically, so the
+the acting principal and deploy-admin identity scope automatically, so the
 normal `--profile mini` path does not require `--acting-principal`,
 `--admin-group`, `--realm-file`, or `--membership-file`. Omit `--user-email`
 for self-service grants to the logged-in human, and add it only when granting a
 reviewed capability to another user. That happy path also requires the reviewed
 interactive login session to include an authoritative email for the current
 human, usually via the IdP's standard `email` claim; if the session omits it,
-fix the Keycloak mapper before retrying. Keep the explicit file and
+fix the reviewed identity mapper before retrying. Keep the explicit file and
 principal/group flags for intentionally local or non-remote workflows only.
 For protected/shared service-backed runs, `--mark-check-passed` and
 `--mark-check-for-commit` only describe the commit the client believes it is
@@ -361,8 +361,8 @@ submit failures now distinguish missing `submitter`, missing
 `admission_reporter`, and missing `approver` access. Follow the suggested
 `deploy auth explain-groups --deployment <label> --action ...` command first.
 If membership or group shape is genuinely missing, switch to the privileged
-reviewed `deploy admin keycloak plan --deployment <label>` flow and then apply
-the matching `deploy admin keycloak sync` or `deploy admin keycloak grant-user`
+reviewed `deploy admin identity plan --deployment <label>` flow and then apply
+the matching `deploy admin identity sync` or `deploy admin identity grant-user`
 step instead of editing Keycloak by hand.
 
 ## Which Backend Am I Using

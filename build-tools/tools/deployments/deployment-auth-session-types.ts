@@ -44,7 +44,7 @@ export type DeploymentAuthSessionStatus = {
   credentialSource: DeploymentCredentialSource;
   principal?: DeploymentPrincipal;
   principalEmail?: string;
-  reviewedKeycloakAdminGroups?: string[];
+  reviewedIdentityAdminGroups?: string[];
   authorization?: DeploymentControlPlaneAuthorization;
   failure?: string;
 };
@@ -71,7 +71,7 @@ export type DeploymentAuthSessionRecord = {
   authenticatedAt?: string;
   principal?: DeploymentPrincipal;
   principalEmail?: string;
-  reviewedKeycloakAdminGroups?: string[];
+  reviewedIdentityAdminGroups?: string[];
   authorization?: DeploymentControlPlaneAuthorization;
   failure?: string;
 };

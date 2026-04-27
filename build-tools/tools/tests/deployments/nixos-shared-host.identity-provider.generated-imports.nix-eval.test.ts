@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers.ts";
 
-test("shared-host identity provider module bootstraps generated Keycloak imports", async () => {
+test("shared-host identity provider module bootstraps generated identity imports", async () => {
   const modulePath = path.join(
     process.cwd(),
     "build-tools",
@@ -32,6 +32,8 @@ test("shared-host identity provider module bootstraps generated Keycloak imports
               acmeEmail = "ops@example.test";
               keycloakHttpPort = 8091;
               generatedImportRoot = "/srv/common/deployment-host/identity-provider";
+              bootstrapClientRedirectUris = [ "https://deploy-auth.example.test/oidc/callback" ];
+              bootstrapFirstOperatorEmail = "ops@example.test";
               manageNginx = true;
               manageAcme = true;
               openFirewall = true;
@@ -58,6 +60,8 @@ test("shared-host identity provider module bootstraps generated Keycloak imports
         hasBootstrapService =
           builtins.hasAttr "deployment-host-keycloak-generated-import-bootstrap"
           system.config.systemd.services;
+        bootstrapScript =
+          system.config.systemd.services.deployment-host-keycloak-generated-import-bootstrap.script;
         nginxEnabled = system.config.services.nginx.enable;
         forceSSL = vhost.forceSSL;
         enableACME = vhost.enableACME;
@@ -80,6 +84,7 @@ test("shared-host identity provider module bootstraps generated Keycloak imports
       generatedRealmFile: string | null;
       generatedMembershipFile: string | null;
       hasBootstrapService: boolean;
+      bootstrapScript: string;
       nginxEnabled: boolean;
       forceSSL: boolean;
       enableACME: boolean;
@@ -99,6 +104,10 @@ test("shared-host identity provider module bootstraps generated Keycloak imports
     assert.equal(out.generatedRealmFile, null);
     assert.equal(out.generatedMembershipFile, null);
     assert.equal(out.hasBootstrapService, true);
+    assert.match(out.bootstrapScript, /deployment-cli/);
+    assert.match(out.bootstrapScript, /"claim\.name":"email"/);
+    assert.match(out.bootstrapScript, /deploy-admin-identity-shape-admin-global/);
+    assert.match(out.bootstrapScript, /ops@example\.test/);
     assert.equal(out.nginxEnabled, true);
     assert.equal(out.forceSSL, true);
     assert.equal(out.enableACME, true);

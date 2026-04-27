@@ -349,7 +349,9 @@ deploymentHost.identityProvider = {
   enable = true;
   hostname = "identity.apps.kilty.io";
   keycloakHttpPort = 8091;
+  bootstrapClientRedirectUris = [ "https://deploy-auth.apps.kilty.io/oidc/callback" ];
   generatedImportRoot = "/srv/common/deployment-host/identity-provider";
+  bootstrapFirstOperatorEmail = "ops@example.com";
   manageNginx = false;
   manageAcme = false;
   openFirewall = false;
@@ -377,52 +379,54 @@ deploymentHost.deployAuthCallback = {
 };
 ```
 
-Before you rebuild, generate the reviewed Keycloak group shape with:
+Before you rebuild, generate the reviewed identity group shape with:
 
 ```bash
-direnv exec . build-tools/tools/bin/deploy admin keycloak sync \
+direnv exec . build-tools/tools/bin/deploy admin identity sync \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --realm-file ./deployment-host/identity-provider/deployment-auth-realm.json \
   --acting-principal <principal> \
-  --admin-group deploy-admin-keycloak-shape-admin-project-pleomino
+  --admin-group deploy-admin-identity-shape-admin-project-pleomino
 ```
 
 `deploymentHost.identityProvider.generatedImportRoot` is the reviewed
 host-module surface for these mutable generated files. The module bootstraps
-empty JSON if the files do not exist yet, then runtime-links them into
-Keycloak's import directory during activation. Keep both files gitignored; do not
-list them in `deploymentHost.identityProvider.realmFiles`, which is reserved
-for static flake-visible imports. Treat the generated realm file as group shape
-and mapper configuration only; keep human and automation membership in the
-separate generated input `./deployment-host/identity-provider/deployment-auth-memberships.json`.
+the reviewed interactive client contract, the reviewed email mapper, the
+bootstrap admin-group shape, and the optional first trusted operator membership
+when the files do not exist yet, then runtime-links them into Keycloak's import
+directory during activation. Keep both files gitignored; do not list them in
+`deploymentHost.identityProvider.realmFiles`, which is reserved for static
+flake-visible imports. Treat the generated realm file as group shape and mapper
+configuration only; keep human and automation membership in the separate
+generated input `./deployment-host/identity-provider/deployment-auth-memberships.json`.
 One reviewed membership grant example is:
 
 ```bash
-direnv exec . build-tools/tools/bin/deploy admin keycloak grant-user \
+direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --action submit \
   --user-email alice@example.com \
   --membership-file ./deployment-host/identity-provider/deployment-auth-memberships.json \
   --acting-principal <principal> \
-  --admin-group deploy-admin-keycloak-membership-admin-project-pleomino
+  --admin-group deploy-admin-identity-membership-admin-project-pleomino
 ```
 
 From a reviewed client machine, the same artifacts can be updated without a
 manual SSH session:
 
 ```bash
-direnv exec . build-tools/tools/bin/deploy admin keycloak sync \
+direnv exec . build-tools/tools/bin/deploy admin identity sync \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
   --apply-host-dry-run
 
-direnv exec . build-tools/tools/bin/deploy admin keycloak grant-user \
+direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
   --action submit \
   --apply-host
 
-direnv exec . build-tools/tools/bin/deploy admin keycloak grant-user \
+direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
   --action submit \
@@ -434,20 +438,20 @@ That reviewed remote path writes the authoritative realm files under the host
 config root, keeps flake evaluation pure, and then optionally runs the
 preflighted host-apply helper instead of relying on hand-edited files under
 `/srv/common`. The reviewed auth session already identifies the logged-in
-operator and their deploy-admin Keycloak scope, so the normal `--profile mini`
+operator and their deploy-admin identity scope, so the normal `--profile mini`
 path omits `--acting-principal`, `--admin-group`, `--realm-file`, and
 `--membership-file`. Omit `--user-email` for a self-service grant to the
 current login; add it only when granting access to another human. The same
 reviewed auth session must carry an authoritative email for that human,
-normally through the Keycloak `email` claim. If the interactive login omits it,
+normally through the identity-provider `email` claim. If the interactive login omits it,
 fix the reviewed mapper contract before retrying the self-service flow.
 
-The reviewed deploy-admin Keycloak grants stay separate from ordinary deploy
+The reviewed deploy-admin identity grants stay separate from ordinary deploy
 grants. Typical examples are:
 
-- `deploy-admin-keycloak-read-project-pleomino`
-- `deploy-admin-keycloak-shape-admin-project-pleomino`
-- `deploy-admin-keycloak-membership-admin-project-pleomino`
+- `deploy-admin-identity-read-project-pleomino`
+- `deploy-admin-identity-shape-admin-project-pleomino`
+- `deploy-admin-identity-membership-admin-project-pleomino`
 
 With that shape, add `8200` to the existing
 `networking.firewall.allowedTCPPorts` expression and add host-owned nginx

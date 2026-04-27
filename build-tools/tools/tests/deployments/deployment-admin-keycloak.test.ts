@@ -32,7 +32,7 @@ function adminGroup(
   return reviewedDeployAdminGroupName(role, scope);
 }
 
-test("deploy admin keycloak plan stays deterministic and advertises separate admin groups", () => {
+test("deploy admin identity plan stays deterministic and advertises separate admin groups", () => {
   const deployment = cloudflarePagesDeploymentFixture();
   const first = buildDeploymentAdminKeycloakPlan({
     deployment,
@@ -43,12 +43,12 @@ test("deploy admin keycloak plan stays deterministic and advertises separate adm
     automationPrincipalIds: ["jenkins"],
   });
   assert.deepEqual(first, second);
-  assert.match(first.adminGroupConventions.shapeAdmin[0], /deploy-admin-keycloak-shape-admin-/);
-  assert.match(first.nextSteps.sync, /deploy admin keycloak sync --deployment/);
+  assert.match(first.adminGroupConventions.shapeAdmin[0], /deploy-admin-identity-shape-admin-/);
+  assert.match(first.nextSteps.sync, /deploy admin identity sync --deployment/);
   assert.ok(first.plannedMutations.groups.includes("deploy-submitters-pleomino-staging"));
 });
 
-test("ordinary deploy groups do not authorize deploy admin keycloak sync", async () => {
+test("ordinary deploy groups do not authorize deploy admin identity sync", async () => {
   const deployment = cloudflarePagesDeploymentFixture();
   await withTempDir("deploy-admin-keycloak-unauthorized-sync", async (tmp) => {
     await assert.rejects(
@@ -152,7 +152,7 @@ test("deploy admin sync and grant-user keep audit provenance and idempotent writ
     assert.equal(secondSync.changed, false);
     assert.equal(firstSync.audit.actingPrincipal.principalId, "user:shape-admin");
     assert.equal(firstSync.audit.grantedScope.kind, "project");
-    assert.equal(firstSync.audit.requestedMutation.kind, "keycloak_group_shape_sync");
+    assert.equal(firstSync.audit.requestedMutation.kind, "identity_group_shape_sync");
     assert.match(await fsp.readFile(realmFile, "utf8"), /deploy-approvers-pleomino-staging/);
     assert.match(await fsp.readFile(realmFile, "utf8"), /"claim\.name": "email"/);
     assert.match(await fsp.readFile(realmFile, "utf8"), /oidc-usermodel-property-mapper/);
@@ -166,7 +166,7 @@ test("deploy admin sync and grant-user keep audit provenance and idempotent writ
       adminGroups: [membershipAdmin],
     });
     assert.equal(granted.audit.actingPrincipal.principalId, "user:membership-admin");
-    assert.equal(granted.audit.requestedMutation.kind, "keycloak_membership_grant");
+    assert.equal(granted.audit.requestedMutation.kind, "identity_membership_grant");
     assert.equal(granted.grantedUser.group, "deploy-approvers-pleomino-staging");
     assert.match(await fsp.readFile(membershipFile, "utf8"), /reviewer@example\.com/);
   });

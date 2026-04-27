@@ -12,7 +12,7 @@ function docHasAny(doc: string, patterns: RegExp[]) {
   return patterns.some((pattern) => pattern.test(doc));
 }
 
-test("pr98 docs shorten the reviewed remote Keycloak admin happy path", async () => {
+test("pr98 docs shorten the reviewed remote identity admin happy path", async () => {
   const [usageDoc, sharedHostUsageDoc, setupDoc, bootstrapDoc] = await Promise.all([
     read("docs/deployments-usage.md"),
     read("docs/nixos-shared-host-usage.md"),
@@ -20,10 +20,10 @@ test("pr98 docs shorten the reviewed remote Keycloak admin happy path", async ()
     read("docs/vault-production-bootstrap.md"),
   ]);
   for (const doc of [usageDoc, sharedHostUsageDoc, setupDoc, bootstrapDoc]) {
-    assert.match(doc, /deploy admin keycloak sync[\s\S]*--profile mini/i);
+    assert.match(doc, /deploy admin identity sync[\s\S]*--profile mini/i);
     assert.match(
       doc,
-      /deploy admin keycloak grant-user[\s\S]*--profile mini[\s\S]*--action submit/i,
+      /deploy admin identity grant-user[\s\S]*--profile mini[\s\S]*--action submit/i,
     );
     assert.match(doc, /omit `--user-email`/i);
     assert.ok(
@@ -51,27 +51,27 @@ test("pr98 docs shorten the reviewed remote Keycloak admin happy path", async ()
     );
     assert.doesNotMatch(
       doc,
-      /deploy admin keycloak sync[\s\S]{0,220}--profile mini[\s\S]{0,220}--acting-principal/i,
+      /deploy admin identity sync[\s\S]{0,220}--profile mini[\s\S]{0,220}--acting-principal/i,
     );
     assert.doesNotMatch(
       doc,
-      /deploy admin keycloak sync[\s\S]{0,220}--profile mini[\s\S]{0,220}--admin-group/i,
+      /deploy admin identity sync[\s\S]{0,220}--profile mini[\s\S]{0,220}--admin-group/i,
     );
     assert.doesNotMatch(
       doc,
-      /deploy admin keycloak sync[\s\S]{0,220}--profile mini[\s\S]{0,220}--realm-file/i,
+      /deploy admin identity sync[\s\S]{0,220}--profile mini[\s\S]{0,220}--realm-file/i,
     );
     assert.doesNotMatch(
       doc,
-      /deploy admin keycloak grant-user[\s\S]{0,260}--profile mini[\s\S]{0,260}--membership-file/i,
+      /deploy admin identity grant-user[\s\S]{0,260}--profile mini[\s\S]{0,260}--membership-file/i,
     );
     assert.doesNotMatch(
       doc,
-      /deploy admin keycloak grant-user[\s\S]{0,260}--profile mini[\s\S]{0,260}--acting-principal/i,
+      /deploy admin identity grant-user[\s\S]{0,260}--profile mini[\s\S]{0,260}--acting-principal/i,
     );
     assert.doesNotMatch(
       doc,
-      /deploy admin keycloak grant-user[\s\S]{0,260}--profile mini[\s\S]{0,260}--admin-group/i,
+      /deploy admin identity grant-user[\s\S]{0,260}--profile mini[\s\S]{0,260}--admin-group/i,
     );
   }
 });

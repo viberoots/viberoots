@@ -13,7 +13,7 @@ function relativeToConfigRoot(configRoot: string, managedRoot: string): string {
   const relative = path.posix.relative(configRoot, managedRoot);
   if (relative === ".." || relative.startsWith("../") || path.posix.isAbsolute(relative)) {
     throw new Error(
-      `reviewed Keycloak admin artifacts must stay under the reviewed config root: ${managedRoot}`,
+      `reviewed identity-admin artifacts must stay under the reviewed config root: ${managedRoot}`,
     );
   }
   return relative;

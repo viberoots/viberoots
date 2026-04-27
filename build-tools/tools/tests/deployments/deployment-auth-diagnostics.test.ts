@@ -135,11 +135,11 @@ test("auth action summary and realm export stay aligned on reviewed group names"
   const commands = action.exampleAdminCommands.join("\n");
   assert.match(
     commands,
-    /deploy admin keycloak grant-user --deployment .* --profile mini --action approve --apply-host/i,
+    /deploy admin identity grant-user --deployment .* --profile mini --action approve --apply-host/i,
   );
   assert.match(
     commands,
-    /deploy admin keycloak grant-user --deployment .* --profile mini --action approve --user-email <user@example\.com> --apply-host/i,
+    /deploy admin identity grant-user --deployment .* --profile mini --action approve --user-email <user@example\.com> --apply-host/i,
   );
   assert.doesNotMatch(commands, /--membership-file/i);
   assert.doesNotMatch(commands, /--acting-principal/i);

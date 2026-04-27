@@ -41,6 +41,7 @@ The initial deployment-owned build-system boundary is intentionally narrow:
 - `build-tools/tools/deployments/**`
 - `build-tools/tools/tests/deployments/**`
 - reviewed deployment-owned support files outside those primary prefixes:
+  - `build-tools/tools/nix/shared-host-identity-provider-bootstrap.nix`
   - `build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
   - `build-tools/tools/nix/shared-host-identity-provider-module.nix`
   - `build-tools/tools/nix/shared-host-postgres-module.nix`
@@ -140,6 +141,7 @@ inside the repo-wide owner-local methodology gate:
   - `build-tools/tools/deployments/**`
   - `build-tools/tools/tests/deployments/**`
   - `build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
+  - `build-tools/tools/nix/shared-host-identity-provider-bootstrap.nix`
   - `build-tools/tools/nix/shared-host-identity-provider-module.nix`
   - `build-tools/tools/nix/shared-host-postgres-module.nix`
   - `build-tools/tools/nix/shared-host-vault-module.nix`

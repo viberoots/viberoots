@@ -833,6 +833,8 @@ existing `virtualHosts = (...) // { ... };` expression:
     enable = true;
     hostname = identityDomain;
     keycloakHttpPort = keycloakHttpPort;
+    bootstrapClientRedirectUris = [ "https://deploy-auth.apps.kilty.io/oidc/callback" ];
+    bootstrapFirstOperatorEmail = "ops@example.com";
     databasePasswordFile = "/var/lib/deployment-host-secrets/keycloak-db-password";
 
     # The existing host file already owns nginx, ACME, and firewall ports.
@@ -1008,19 +1010,19 @@ deploy auth print-groups --deployment //projects/deployments/pleomino-dev:deploy
 deploy auth explain-groups \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --action submit
-deploy admin keycloak plan --deployment //projects/deployments/pleomino-dev:deploy
-deploy admin keycloak sync \
+deploy admin identity plan --deployment //projects/deployments/pleomino-dev:deploy
+deploy admin identity sync \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --realm-file ./deployment-host/identity-provider/deployment-auth-realm.json \
   --acting-principal <principal> \
-  --admin-group deploy-admin-keycloak-shape-admin-project-pleomino
-deploy admin keycloak grant-user \
+  --admin-group deploy-admin-identity-shape-admin-project-pleomino
+deploy admin identity grant-user \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --action submit \
   --user-email alice@example.com \
   --membership-file ./deployment-host/identity-provider/deployment-auth-memberships.json \
   --acting-principal <principal> \
-  --admin-group deploy-admin-keycloak-membership-admin-project-pleomino
+  --admin-group deploy-admin-identity-membership-admin-project-pleomino
 ```
 
 Those helpers keep group shape separate from membership. Ordinary read-only
@@ -1034,16 +1036,16 @@ When the operator is working from a client machine, the reviewed `mini` profile
 can update those same config-root artifacts and optionally apply them:
 
 ```bash
-deploy admin keycloak sync \
+deploy admin identity sync \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
   --apply-host-dry-run
-deploy admin keycloak grant-user \
+deploy admin identity grant-user \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
   --action submit \
   --apply-host
-deploy admin keycloak grant-user \
+deploy admin identity grant-user \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
   --action submit \
@@ -1052,20 +1054,20 @@ deploy admin keycloak grant-user \
 ```
 
 The reviewed login session supplies the acting principal and deploy-admin
-Keycloak scope automatically. Omit `--user-email` when the operator is granting
+identity scope automatically. Omit `--user-email` when the operator is granting
 the reviewed capability to themself, and add `--user-email alice@example.com`
 only for cross-user onboarding or break-glass recovery.
 That self-service path also requires the interactive human login to include an
 authoritative email claim. If the reviewed session omits it, update the
-Keycloak mapper before retrying.
+reviewed identity mapper before retrying.
 
-Deploy-admin Keycloak grants are intentionally distinct from ordinary deploy
+Deploy-admin identity grants are intentionally distinct from ordinary deploy
 grants. Typical reviewed examples are:
 
-- `deploy-admin-keycloak-read-project-pleomino`
-- `deploy-admin-keycloak-shape-admin-project-pleomino`
-- `deploy-admin-keycloak-membership-admin-project-pleomino`
-- `deploy-admin-keycloak-read-environment-dev`
+- `deploy-admin-identity-read-project-pleomino`
+- `deploy-admin-identity-shape-admin-project-pleomino`
+- `deploy-admin-identity-membership-admin-project-pleomino`
+- `deploy-admin-identity-read-environment-dev`
 
 After creating the realm, verify the issuer metadata:
 

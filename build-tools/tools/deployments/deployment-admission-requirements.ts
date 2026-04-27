@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { getFlagStr, hasFlag } from "../lib/cli.ts";
+import { getArgvTokens, getFlagStr, hasFlag } from "../lib/cli.ts";
 import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract.ts";
 
 const execFileAsync = promisify(execFile);
@@ -70,7 +70,7 @@ async function renderFetchReviewedRefCommand(workspaceRoot: string, ref: string)
 }
 
 function currentDeployCommandArgs(deployment: DeploymentTarget): string[] {
-  const raw = Array.isArray(process.argv) ? process.argv.slice(2) : [];
+  const raw = getArgvTokens();
   return hasFlag("deployment") ? raw : ["--deployment", deployment.label, ...raw];
 }
 
@@ -174,7 +174,7 @@ export function markCheckSubjectMismatchMessage(opts: {
 }
 
 function stripMarkCheckPassedFromCurrentArgs(deployment: DeploymentTarget): string[] {
-  const raw = Array.isArray(process.argv) ? process.argv.slice(2) : [];
+  const raw = getArgvTokens();
   const kept: string[] = [];
   for (let i = 0; i < raw.length; i += 1) {
     const arg = raw[i] || "";

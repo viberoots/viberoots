@@ -55,7 +55,7 @@ export function reviewedRemoteKeycloakSyncCommand(
   opts: { profileName?: string; applyMode?: "apply-host" | "apply-host-dry-run" | "skip" } = {},
 ): string {
   const parts = [
-    "deploy admin keycloak sync",
+    "deploy admin identity sync",
     `--deployment ${deployment.label}`,
     `--profile ${opts.profileName || "mini"}`,
   ];
@@ -73,7 +73,7 @@ export function reviewedRemoteKeycloakGrantUserCommand(
   } = {},
 ): string {
   const parts = [
-    "deploy admin keycloak grant-user",
+    "deploy admin identity grant-user",
     `--deployment ${deployment.label}`,
     `--profile ${opts.profileName || "mini"}`,
     `--action ${action}`,

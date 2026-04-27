@@ -206,7 +206,7 @@ export function buildRemoteDeployAdminKeycloakSyncScript(opts: {
   return [
     "set -euo pipefail",
     `cd ${shSingleQuote(opts.plan.remoteRepoPath)}`,
-    `exec direnv exec . build-tools/tools/bin/deploy admin keycloak sync ${suffix}`,
+    `exec direnv exec . build-tools/tools/bin/deploy admin identity sync ${suffix}`,
   ].join("; ");
 }
 
@@ -232,6 +232,6 @@ export function buildRemoteDeployAdminKeycloakGrantUserScript(opts: {
   return [
     "set -euo pipefail",
     `cd ${shSingleQuote(opts.plan.remoteRepoPath)}`,
-    `exec direnv exec . build-tools/tools/bin/deploy admin keycloak grant-user ${suffix}`,
+    `exec direnv exec . build-tools/tools/bin/deploy admin identity grant-user ${suffix}`,
   ].join("; ");
 }

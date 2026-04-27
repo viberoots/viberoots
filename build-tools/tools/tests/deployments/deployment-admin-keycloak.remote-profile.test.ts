@@ -26,11 +26,11 @@ import {
 } from "./nixos-shared-host.deploy.remote-exec.helpers.ts";
 
 function shapeAdminGroup() {
-  return "deploy-admin-keycloak-shape-admin-project-pleomino";
+  return "deploy-admin-identity-shape-admin-project-pleomino";
 }
 
 function membershipAdminGroup() {
-  return "deploy-admin-keycloak-membership-admin-project-pleomino";
+  return "deploy-admin-identity-membership-admin-project-pleomino";
 }
 
 function configRootFor(tmp: string) {
@@ -55,7 +55,7 @@ function membershipFileFor(configRoot: string) {
   );
 }
 
-test("deploy admin keycloak sync writes reviewed remote artifacts under the config root", async () => {
+test("deploy admin identity sync writes reviewed remote artifacts under the config root", async () => {
   await runInTemp("deploy-admin-keycloak-remote-sync", async (tmp, $) => {
     const { env, profileRoot } = await prepareRemoteExecFixture({
       tmp,
@@ -66,7 +66,7 @@ test("deploy admin keycloak sync writes reviewed remote artifacts under the conf
     const result = await $({
       cwd: tmp,
       env: remoteExecEnv(env),
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak sync --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${configRoot} --acting-principal user:shape-admin --admin-group ${shapeAdminGroup()}`;
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts admin identity sync --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${configRoot} --acting-principal user:shape-admin --admin-group ${shapeAdminGroup()}`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.executionMode, "remote-profile");
     assert.equal(
@@ -83,7 +83,7 @@ test("deploy admin keycloak sync writes reviewed remote artifacts under the conf
   });
 });
 
-test("deploy admin keycloak remote profile still enforces separate admin grants", async () => {
+test("deploy admin identity remote profile still enforces separate admin grants", async () => {
   await runInTemp("deploy-admin-keycloak-remote-authz", async (tmp, $) => {
     const { env, profileRoot } = await prepareRemoteExecFixture({
       tmp,
@@ -94,23 +94,23 @@ test("deploy admin keycloak remote profile still enforces separate admin grants"
     const result = await $({
       cwd: tmp,
       env: remoteExecEnv(env),
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak sync --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${configRoot} --acting-principal user:submitter-only --admin-group ${reviewedHumanGroupName(pleominoDeploymentFixture(), "submitter")}`.nothrow();
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts admin identity sync --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${configRoot} --acting-principal user:submitter-only --admin-group ${reviewedHumanGroupName(pleominoDeploymentFixture(), "submitter")}`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(
       String(result.stderr),
-      /lacks reviewed Keycloak group-shape admin|ask an authorized operator to run: deploy admin keycloak sync/i,
+      /lacks reviewed identity group-shape admin|ask an authorized operator to run: deploy admin identity sync/i,
     );
   });
 });
 
-test("deploy admin keycloak remote profile rejects unsupported deployment providers", async () => {
+test("deploy admin identity remote profile rejects unsupported deployment providers", async () => {
   await runInTemp("deploy-admin-keycloak-remote-provider", async (tmp, $) => {
     const deployment = cloudflarePagesDeploymentFixture();
     await installCloudflarePagesTargets(tmp, [deployment]);
     const result = await $({
       cwd: tmp,
       env: remoteExecEnv(process.env as Record<string, string>),
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak sync --deployment ${deployment.label} --profile mini --acting-principal user:shape-admin --admin-group ${shapeAdminGroup()}`.nothrow();
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts admin identity sync --deployment ${deployment.label} --profile mini --acting-principal user:shape-admin --admin-group ${shapeAdminGroup()}`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(
       String(result.stderr),
@@ -119,7 +119,7 @@ test("deploy admin keycloak remote profile rejects unsupported deployment provid
   });
 });
 
-test("deploy admin keycloak remote profile reuses reviewed host-apply dry-run", async () => {
+test("deploy admin identity remote profile reuses reviewed host-apply dry-run", async () => {
   await runInTemp("deploy-admin-keycloak-remote-host-apply", async (tmp, $) => {
     const { env, profileRoot, remoteRecordsRoot, remoteRuntimeRoot, remoteStatePath } =
       await prepareRemoteExecFixture({
@@ -174,7 +174,7 @@ test("deploy admin keycloak remote profile reuses reviewed host-apply dry-run", 
     const result = await $({
       cwd: tmp,
       env: remoteExecEnv(env, { FAKE_NIXOS_REBUILD_LOG: rebuildLog }),
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${configRoot} --apply-host-dry-run --action submit --user-email alice@example.com --acting-principal user:membership-admin --admin-group ${membershipAdminGroup()}`;
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts admin identity grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${configRoot} --apply-host-dry-run --action submit --user-email alice@example.com --acting-principal user:membership-admin --admin-group ${membershipAdminGroup()}`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.hostApply.requestedMode, "dry-run");
     assert.equal(summary.hostApply.result.mode, "dry-run");

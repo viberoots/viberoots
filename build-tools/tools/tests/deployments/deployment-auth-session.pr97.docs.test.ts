@@ -16,8 +16,8 @@ test("pr97 docs keep reviewed remote keycloak admin flow aligned across operator
     read("docs/vault-production-bootstrap.md"),
   ]);
   for (const doc of [usageDoc, sharedHostUsageDoc, setupDoc, bootstrapDoc]) {
-    assert.match(doc, /deploy admin keycloak sync[\s\S]*--profile mini/i);
-    assert.match(doc, /deploy admin keycloak grant-user[\s\S]*--profile mini/i);
+    assert.match(doc, /deploy admin identity sync[\s\S]*--profile mini/i);
+    assert.match(doc, /deploy admin identity grant-user[\s\S]*--profile mini/i);
     assert.match(doc, /deployment-host\/identity-provider\/deployment-auth-realm\.json/i);
     assert.match(doc, /deployment-host\/identity-provider\/deployment-auth-memberships\.json/i);
   }

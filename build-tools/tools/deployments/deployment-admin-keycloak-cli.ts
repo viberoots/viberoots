@@ -30,8 +30,10 @@ function requireAction(): DeploymentAuthAction {
 
 function commandName(): string {
   const [, scope = "", command = ""] = getPositionals();
-  if (scope !== "keycloak") {
-    throw new Error('deploy admin currently supports only the "keycloak" namespace');
+  if (!["identity", "keycloak"].includes(scope)) {
+    throw new Error(
+      'deploy admin currently supports the "identity" namespace (the deprecated "keycloak" alias still works)',
+    );
   }
   return command;
 }
@@ -55,7 +57,7 @@ export async function maybeHandleDeploymentAdminCli(workspaceRoot: string): Prom
   if (command === "plan") {
     if (hasDeploymentAdminKeycloakRemoteProfileFlags()) {
       throw new Error(
-        'deploy admin keycloak plan is read-only and does not support reviewed remote profile flags; use "sync" or "grant-user" with --profile <name>',
+        'deploy admin identity plan is read-only and does not support reviewed remote profile flags; use "sync" or "grant-user" with --profile <name>',
       );
     }
     printDeploymentAdminKeycloakResult(
@@ -116,5 +118,5 @@ export async function maybeHandleDeploymentAdminCli(workspaceRoot: string): Prom
     );
     return true;
   }
-  throw new Error("deploy admin keycloak command must be one of plan, sync, grant-user");
+  throw new Error("deploy admin identity command must be one of plan, sync, grant-user");
 }

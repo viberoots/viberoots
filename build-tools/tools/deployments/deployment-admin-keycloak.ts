@@ -24,9 +24,9 @@ import {
 import { buildDeploymentAuthKeycloakRealmImport } from "./deployment-auth-keycloak-realm.ts";
 import { writeJsonDocument } from "./nixos-shared-host-io.ts";
 
-export const DEPLOYMENT_ADMIN_KEYCLOAK_PLAN_SCHEMA = "deploy-admin-keycloak-plan@1";
-export const DEPLOYMENT_ADMIN_KEYCLOAK_SYNC_SCHEMA = "deploy-admin-keycloak-sync@1";
-export const DEPLOYMENT_ADMIN_KEYCLOAK_GRANT_USER_SCHEMA = "deploy-admin-keycloak-grant-user@1";
+export const DEPLOYMENT_ADMIN_KEYCLOAK_PLAN_SCHEMA = "deploy-admin-identity-plan@1";
+export const DEPLOYMENT_ADMIN_KEYCLOAK_SYNC_SCHEMA = "deploy-admin-identity-sync@1";
+export const DEPLOYMENT_ADMIN_KEYCLOAK_GRANT_USER_SCHEMA = "deploy-admin-identity-grant-user@1";
 
 function deploymentSummary(deployment: DeploymentTarget) {
   return {
@@ -38,11 +38,11 @@ function deploymentSummary(deployment: DeploymentTarget) {
 }
 
 function syncCommand(deployment: DeploymentTarget): string {
-  return `deploy admin keycloak sync --deployment ${deployment.label} --realm-file ${reviewedDeploymentAdminRealmFileExample()} --acting-principal <principal> --admin-group <deploy-admin-keycloak-shape-admin-...>`;
+  return `deploy admin identity sync --deployment ${deployment.label} --realm-file ${reviewedDeploymentAdminRealmFileExample()} --acting-principal <principal> --admin-group <deploy-admin-identity-shape-admin-...>`;
 }
 
 function grantUserCommand(deployment: DeploymentTarget, action: DeploymentAuthAction): string {
-  return `deploy admin keycloak grant-user --deployment ${deployment.label} --action ${action} --user-email <user@example.com> --membership-file ${reviewedDeploymentAdminMembershipFileExample()} --acting-principal <principal> --admin-group <deploy-admin-keycloak-membership-admin-...>`;
+  return `deploy admin identity grant-user --deployment ${deployment.label} --action ${action} --user-email <user@example.com> --membership-file ${reviewedDeploymentAdminMembershipFileExample()} --acting-principal <principal> --admin-group <deploy-admin-identity-membership-admin-...>`;
 }
 
 function auditRecord(
@@ -129,7 +129,7 @@ export async function syncDeploymentAdminKeycloakRealm(opts: {
     renderedDeploymentCount: (opts.deploymentsForRealm || [opts.deployment]).length,
     realmImport: desiredRealmImport,
     audit: auditRecord(opts.actingPrincipal, authorization, {
-      kind: "keycloak_group_shape_sync",
+      kind: "identity_group_shape_sync",
       deploymentLabel: opts.deployment.label,
       realmFile: opts.realmFile,
     }),
@@ -173,7 +173,7 @@ export async function grantDeploymentAdminKeycloakUser(opts: {
       requiredRole: role,
     },
     audit: auditRecord(opts.actingPrincipal, authorization, {
-      kind: "keycloak_membership_grant",
+      kind: "identity_membership_grant",
       deploymentLabel: opts.deployment.label,
       membershipFile: opts.membershipFile,
     }),

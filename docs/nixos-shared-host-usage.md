@@ -341,23 +341,23 @@ to map one action to the reviewed group name. That helper surface explains
 group shape only; user and automation membership remain a separate reviewed
 identity-management step.
 Keep the split clear: read-only `deploy auth ...` explains the expected shape,
-while privileged `deploy admin ...` applies reviewed Keycloak changes. The
+while privileged `deploy admin ...` applies reviewed identity changes. The
 reviewed admin flow is:
 
 ```bash
-deploy admin keycloak plan --deployment <label>
-deploy admin keycloak sync \
+deploy admin identity plan --deployment <label>
+deploy admin identity sync \
   --deployment <label> \
   --realm-file ./deployment-host/identity-provider/deployment-auth-realm.json \
   --acting-principal <principal> \
-  --admin-group deploy-admin-keycloak-shape-admin-project-<project>
-deploy admin keycloak grant-user \
+  --admin-group deploy-admin-identity-shape-admin-project-<project>
+deploy admin identity grant-user \
   --deployment <label> \
   --action submit \
   --user-email <user@example.com> \
   --membership-file ./deployment-host/identity-provider/deployment-auth-memberships.json \
   --acting-principal <principal> \
-  --admin-group deploy-admin-keycloak-membership-admin-project-<project>
+  --admin-group deploy-admin-identity-membership-admin-project-<project>
 ```
 
 Those deploy-admin groups are intentionally separate from ordinary
@@ -366,18 +366,18 @@ grant and a missing deploy-admin grant are different failures on purpose.
 For the normal client-driven `mini` workflow, skip manual SSH edits and run:
 
 ```bash
-direnv exec . build-tools/tools/bin/deploy admin keycloak sync \
+direnv exec . build-tools/tools/bin/deploy admin identity sync \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
   --apply-host-dry-run
 
-direnv exec . build-tools/tools/bin/deploy admin keycloak grant-user \
+direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
   --action submit \
   --apply-host
 
-direnv exec . build-tools/tools/bin/deploy admin keycloak grant-user \
+direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
   --deployment //projects/deployments/pleomino-dev:deploy \
   --profile mini \
   --action submit \
@@ -393,13 +393,13 @@ same reviewed host-apply preflight and dry-run/switch helper the ordinary
 remote deploy path uses. Keep those files gitignored; the identity-provider
 module bootstraps and runtime-links them instead of expecting flake-visible
 tracked paths. On this happy path, the reviewed login session already supplies
-the acting principal and the deploy-admin Keycloak group scope, so `--profile
+the acting principal and the deploy-admin identity group scope, so `--profile
 mini` no longer needs `--acting-principal`, `--admin-group`, `--realm-file`, or
 `--membership-file`. Omit `--user-email` to grant yourself the reviewed
 capability; add `--user-email alice@example.com` only for a cross-user grant.
 The same reviewed login session must also carry an authoritative email for the
 current human, typically through the IdP's standard `email` claim. If it does
-not, update the reviewed Keycloak mapper before retrying the self-service flow.
+not, update the reviewed identity mapper before retrying the self-service flow.
 To discover the reviewed check names for a target before you submit, run
 `direnv exec . build-tools/tools/bin/deploy --deployment <label> --validate-only`
 and inspect `admissionRequirements.admission_policy`, `allowed_refs`,
@@ -505,6 +505,6 @@ missing `submitter` access from missing `admission_reporter` access; approval
 failures still point at missing `approver` access. Keep the follow-up flow
 read-only first: use `deploy auth explain-groups` to confirm the expected group
 shape. If the reviewed shape or membership is genuinely missing, switch to
-`deploy admin keycloak plan --deployment <label>` and then apply the reviewed
-`deploy admin keycloak sync` or `deploy admin keycloak grant-user` step instead
+`deploy admin identity plan --deployment <label>` and then apply the reviewed
+`deploy admin identity sync` or `deploy admin identity grant-user` step instead
 of dropping to raw IdP tooling.

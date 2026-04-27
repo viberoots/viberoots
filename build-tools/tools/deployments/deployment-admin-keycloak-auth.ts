@@ -46,26 +46,25 @@ function environmentScope(deployment: DeploymentTarget): string {
 
 function parseAdminGroup(group: string): DeploymentKeycloakAdminGrant | undefined {
   const value = normalized(group);
-  const globalMatch = /^deploy-admin-keycloak-(read|shape-admin|membership-admin)-global$/.exec(
-    value,
-  );
+  const globalMatch =
+    /^deploy-admin-(identity|keycloak)-(read|shape-admin|membership-admin)-global$/.exec(value);
   if (globalMatch) {
     return {
-      role: parseRole(globalMatch[1]),
+      role: parseRole(globalMatch[2]),
       scope: { kind: "global", value: "all-deployments" },
     };
   }
   const scopedMatch =
-    /^deploy-admin-keycloak-(read|shape-admin|membership-admin)-(project|environment)-(.+)$/.exec(
+    /^deploy-admin-(identity|keycloak)-(read|shape-admin|membership-admin)-(project|environment)-(.+)$/.exec(
       value,
     );
   if (!scopedMatch) return undefined;
   return {
-    role: parseRole(scopedMatch[1]),
+    role: parseRole(scopedMatch[2]),
     scope:
-      scopedMatch[2] === "project"
-        ? { kind: "project", value: scopedMatch[3] }
-        : { kind: "environment_stage", value: scopedMatch[3] },
+      scopedMatch[3] === "project"
+        ? { kind: "project", value: scopedMatch[4] }
+        : { kind: "environment_stage", value: scopedMatch[4] },
   };
 }
 
@@ -90,14 +89,21 @@ function roleLabel(role: DeploymentKeycloakAdminRole): string {
 }
 
 export function normalizeReviewedDeployAdminGroups(groups: string[]): string[] {
-  return [...new Set(groups.map(normalized).filter((group) => !!parseAdminGroup(group)))].sort();
+  return [
+    ...new Set(
+      groups
+        .map(parseAdminGroup)
+        .filter((group): group is DeploymentKeycloakAdminGrant => !!group)
+        .map((group) => reviewedDeployAdminGroupName(group.role, group.scope)),
+    ),
+  ].sort();
 }
 
 export function reviewedDeployAdminGroupName(
   role: DeploymentKeycloakAdminRole,
   scope: DeploymentKeycloakAdminScope,
 ): string {
-  return `deploy-admin-keycloak-${roleToken(role)}-${scopeToken(scope)}`;
+  return `deploy-admin-identity-${roleToken(role)}-${scopeToken(scope)}`;
 }
 
 export function reviewedDeployAdminGroupsByCapability(deployment: DeploymentTarget) {
@@ -153,7 +159,7 @@ export function authorizeDeploymentKeycloakAdmin(opts: {
           ? expected.shapeAdmin
           : expected.membershipAdmin;
     throw new Error(
-      `principal ${opts.principalId} is not authorized for Keycloak ${roleLabel(opts.role)} on ${opts.deployment.label}; expected admin groups include ${examples.join(", ")}; inspect deploy admin keycloak plan --deployment ${opts.deployment.label}`,
+      `principal ${opts.principalId} is not authorized for reviewed identity ${roleLabel(opts.role)} on ${opts.deployment.label}; expected admin groups include ${examples.join(", ")}; inspect deploy admin identity plan --deployment ${opts.deployment.label}`,
     );
   }
   return { principalId: opts.principalId, role: opts.role, scope: grant.scope };

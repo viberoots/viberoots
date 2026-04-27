@@ -11,7 +11,7 @@ import {
   withReviewedSshEnv,
 } from "./nixos-shared-host.remote-ssh.command-assembly.fixture.ts";
 
-test("remote SSH transport assembles reviewed deploy admin keycloak sync commands", () => {
+test("remote SSH transport assembles reviewed deploy admin identity sync commands", () => {
   withReviewedSshEnv(() => {
     const sync = buildRemoteSshArgv(
       plan.destination,
@@ -20,11 +20,11 @@ test("remote SSH transport assembles reviewed deploy admin keycloak sync command
         deploymentLabel: plan.deploymentLabel,
         realmFile: "/etc/nixos/deployment-host/identity-provider/deployment-auth-realm.json",
         actingPrincipal: "user:shape-admin",
-        adminGroups: ["deploy-admin-keycloak-shape-admin-project-pleomino"],
+        adminGroups: ["deploy-admin-identity-shape-admin-project-pleomino"],
         automationPrincipalIds: ["app:deploy-bot"],
       }),
     );
-    assert.match(sync.at(-1) || "", /build-tools\/tools\/bin\/deploy admin keycloak sync/);
+    assert.match(sync.at(-1) || "", /build-tools\/tools\/bin\/deploy admin identity sync/);
     assert.match(
       sync.at(-1) || "",
       /--realm-file '"'"'\/etc\/nixos\/deployment-host\/identity-provider\/deployment-auth-realm\.json'"'"'/,
@@ -33,7 +33,7 @@ test("remote SSH transport assembles reviewed deploy admin keycloak sync command
   });
 });
 
-test("remote SSH transport assembles reviewed deploy admin keycloak grant-user commands", () => {
+test("remote SSH transport assembles reviewed deploy admin identity grant-user commands", () => {
   withReviewedSshEnv(() => {
     const grant = buildRemoteSshArgv(
       plan.destination,
@@ -45,10 +45,10 @@ test("remote SSH transport assembles reviewed deploy admin keycloak grant-user c
         membershipFile:
           "/etc/nixos/deployment-host/identity-provider/deployment-auth-memberships.json",
         actingPrincipal: "user:membership-admin",
-        adminGroups: ["deploy-admin-keycloak-membership-admin-project-pleomino"],
+        adminGroups: ["deploy-admin-identity-membership-admin-project-pleomino"],
       }),
     );
-    assert.match(grant.at(-1) || "", /build-tools\/tools\/bin\/deploy admin keycloak grant-user/);
+    assert.match(grant.at(-1) || "", /build-tools\/tools\/bin\/deploy admin identity grant-user/);
     assert.match(grant.at(-1) || "", /--user-email .*alice@example\.com/);
     assert.match(grant.at(-1) || "", /--membership-file .*deployment-auth-memberships\.json/);
   });

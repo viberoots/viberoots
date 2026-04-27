@@ -63,7 +63,7 @@ export function buildDeploymentAuthGroupSummary(
     automationGroupsByPrincipal: automationGroupsByPrincipal(deployment, automationPrincipalIds),
     adminGroupConventions: adminGroups,
     exampleAdminCommands: [
-      `deploy admin keycloak plan --deployment ${deployment.label}`,
+      `deploy admin identity plan --deployment ${deployment.label}`,
       reviewedRemoteKeycloakSyncCommand(deployment, { applyMode: "apply-host" }),
     ],
     nextStep: deploymentAuthActionCommand(deployment, "submit"),
@@ -90,7 +90,7 @@ export function buildDeploymentAuthActionSummary(
     ),
     automationGroupsByPrincipal: automationGroupsByPrincipal(deployment, automationPrincipalIds),
     exampleAdminCommands: [
-      `deploy admin keycloak plan --deployment ${deployment.label}`,
+      `deploy admin identity plan --deployment ${deployment.label}`,
       reviewedRemoteKeycloakGrantUserCommand(deployment, action, { applyMode: "apply-host" }),
       reviewedRemoteKeycloakGrantUserCommand(deployment, action, {
         userEmail: "<user@example.com>",

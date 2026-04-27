@@ -19,7 +19,7 @@ async function callback(url: string, loginUrl: string) {
   return await fetch(request);
 }
 
-test("auth session status exposes reviewed Keycloak admin groups and principal email", async () => {
+test("auth session status exposes reviewed identity admin groups and principal email", async () => {
   await runInTemp("deployment-auth-session-pr98-service", async (tmp) => {
     const oidc = await startFakeOidcServer({
       claims: {
@@ -60,7 +60,7 @@ test("auth session status exposes reviewed Keycloak admin groups and principal e
     try {
       const login = await createDeploymentAuthLoginViaService({
         controlPlaneUrl: controlPlane.url,
-        request: { deployment, operationKind: "deploy-admin-keycloak-sync" },
+        request: { deployment, operationKind: "deploy-admin-identity-sync" },
       });
       assert.equal((await callback(controlPlane.url, login.loginUrl)).status, 200);
       const status = await readDeploymentAuthSessionViaService({
@@ -69,9 +69,9 @@ test("auth session status exposes reviewed Keycloak admin groups and principal e
       });
       assert.equal(status.principal?.principalId, "oidc:human-1");
       assert.equal(status.principalEmail, "ada@example.com");
-      assert.deepEqual(status.reviewedKeycloakAdminGroups, [
-        "deploy-admin-keycloak-membership-admin-project-pleomino",
-        "deploy-admin-keycloak-shape-admin-global",
+      assert.deepEqual(status.reviewedIdentityAdminGroups, [
+        "deploy-admin-identity-membership-admin-project-pleomino",
+        "deploy-admin-identity-shape-admin-global",
       ]);
     } finally {
       await controlPlane.close();

@@ -88,7 +88,7 @@ function reviewedRemoteFlagsRequested(): boolean {
 
 function requireRemoteProfileName(): string {
   const profileName = getFlagStr("profile", "").trim();
-  if (!profileName) throw new Error("reviewed remote Keycloak admin execution requires --profile");
+  if (!profileName) throw new Error("reviewed remote identity admin execution requires --profile");
   return profileName;
 }
 
@@ -176,11 +176,11 @@ export async function runDeploymentAdminKeycloakRemoteProfile(opts: {
     buildRemoteSshArgvWithFallback(plan.destination, mutationScript, plan.reviewedRemoteSshAuth),
   );
   if (mutationResult.exitCode !== 0) {
-    throw commandFailure(`remote reviewed Keycloak admin ${opts.command} failed`, mutationResult);
+    throw commandFailure(`remote reviewed identity admin ${opts.command} failed`, mutationResult);
   }
   const mutation = parseJson<any>(
     mutationResult.stdout,
-    `remote reviewed Keycloak admin ${opts.command}`,
+    `remote reviewed identity admin ${opts.command}`,
   );
   const hostApply =
     plan.hostApply.selectedMode === "skip"
@@ -199,8 +199,8 @@ export async function runDeploymentAdminKeycloakRemoteProfile(opts: {
   return {
     schemaVersion:
       opts.command === "sync"
-        ? "deploy-admin-keycloak-sync-remote@1"
-        : "deploy-admin-keycloak-grant-user-remote@1",
+        ? "deploy-admin-identity-sync-remote@1"
+        : "deploy-admin-identity-grant-user-remote@1",
     executionMode: "remote-profile",
     profileName: plan.profileName,
     destination: plan.destination,

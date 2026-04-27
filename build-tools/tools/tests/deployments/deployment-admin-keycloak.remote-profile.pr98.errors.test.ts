@@ -63,11 +63,11 @@ test("remote profile grant-user fails closed with concise authz guidance", async
       assert.notEqual(result.exitCode, 0);
       assert.match(
         String(result.stderr),
-        /current login oidc:human-1 \(ada@example\.com\) lacks reviewed Keycloak membership admin for submit/i,
+        /current login oidc:human-1 \(ada@example\.com\) lacks reviewed identity membership admin for submit/i,
       );
       assert.match(
         String(result.stderr),
-        /deploy admin keycloak grant-user --deployment .* --profile mini --action submit --user-email ada@example\.com --apply-host/i,
+        /deploy admin identity grant-user --deployment .* --profile mini --action submit --user-email ada@example\.com --apply-host/i,
       );
       assert.doesNotMatch(String(result.stderr), /--acting-principal/i);
       assert.doesNotMatch(String(result.stderr), /--admin-group/i);
@@ -126,7 +126,10 @@ test("remote profile grant-user fails closed when the reviewed auth session omit
         String(result.stderr),
         /interactive deployment auth requires an authoritative email/i,
       );
-      assert.match(String(result.stderr), /update the IdP mapper to include email and retry/i);
+      assert.match(
+        String(result.stderr),
+        /update the reviewed identity claim mapper to include email and retry/i,
+      );
     } finally {
       await controlPlane.close();
       await oidc.close();

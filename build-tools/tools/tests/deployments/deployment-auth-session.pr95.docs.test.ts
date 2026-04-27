@@ -20,12 +20,12 @@ test("pr95 docs keep deploy auth group helpers and declarative realm wiring alig
     assert.match(doc, /deploy auth explain-groups --deployment/i);
     assert.match(doc, /group shape[\s\S]*membership/i);
   }
-  assert.match(bootstrapDoc, /deploy admin keycloak sync[\s\S]*deployment-auth-realm\.json/i);
+  assert.match(bootstrapDoc, /deploy admin identity sync[\s\S]*deployment-auth-realm\.json/i);
   assert.match(bootstrapDoc, /deploymentHost\.identityProvider\.realmFiles/i);
   assert.match(
     bootstrapDoc,
     /deploy-submitters-<project>-<env>[\s\S]*deploy-admission-reporters-<project>-<env>/i,
   );
   assert.match(setupDoc, /deploymentHost\.identityProvider\.realmFiles/i);
-  assert.match(setupDoc, /deploy admin keycloak sync[\s\S]*deployment-auth-realm\.json/i);
+  assert.match(setupDoc, /deploy admin identity sync[\s\S]*deployment-auth-realm\.json/i);
 });
