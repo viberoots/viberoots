@@ -975,8 +975,9 @@ One practical Keycloak admin-console path is:
    `kiltyj/bucknix-fresh`, JSON type `String`, and access token inclusion
    enabled.
 10. Create `deployment-cli` as a public client, require PKCE, allow loopback
-    redirect URIs for the CLI callback, and add a `groups` mapper for reviewed
-    deploy auth sessions.
+    redirect URIs for the CLI callback, add a `groups` mapper for reviewed
+    deploy auth sessions, and ensure reviewed human logins emit an
+    authoritative `email` claim.
 
 Reviewed Keycloak group conventions for claim-to-grant mapping:
 
@@ -1054,6 +1055,9 @@ The reviewed login session supplies the acting principal and deploy-admin
 Keycloak scope automatically. Omit `--user-email` when the operator is granting
 the reviewed capability to themself, and add `--user-email alice@example.com`
 only for cross-user onboarding or break-glass recovery.
+That self-service path also requires the interactive human login to include an
+authoritative email claim. If the reviewed session omits it, update the
+Keycloak mapper before retrying.
 
 Deploy-admin Keycloak grants are intentionally distinct from ordinary deploy
 grants. Typical reviewed examples are:

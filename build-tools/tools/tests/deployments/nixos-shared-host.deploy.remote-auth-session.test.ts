@@ -50,6 +50,7 @@ test("remote profile deploy creates a service-owned auth session for interactive
     const oidc = await startFakeOidcServer({
       claims: {
         sub: "human-1",
+        email: "ada@example.com",
         preferred_username: "Ada",
         groups: ["deploy-submitters-pleomino-dev"],
       },

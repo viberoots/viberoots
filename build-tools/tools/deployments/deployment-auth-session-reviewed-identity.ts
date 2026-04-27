@@ -30,6 +30,14 @@ export function principalEmailFromOidcClaims(claims: JwtClaims): string | undefi
   return undefined;
 }
 
+export function reviewedPrincipalEmailRequirementMessage(principalId: string): string {
+  return (
+    `interactive deployment auth requires an authoritative email for human logins; ` +
+    `${principalId} did not provide an email claim, an email-like preferred_username, ` +
+    "or an email subject. Update the IdP mapper to include email and retry."
+  );
+}
+
 export function reviewedKeycloakAdminGroupsFromOidcClaims(claims: JwtClaims): string[] {
   return normalizeReviewedDeployAdminGroups(claimValues(claims.groups));
 }

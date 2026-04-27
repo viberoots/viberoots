@@ -47,6 +47,7 @@ test("remote profile mark-check-passed fails closed when the authenticated submi
     const oidc = await startFakeOidcServer({
       claims: {
         sub: "human-1",
+        email: "ada@example.com",
         preferred_username: "Ada",
         groups: ["deploy-submitters-pleomino-dev"],
       },

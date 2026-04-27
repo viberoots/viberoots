@@ -154,6 +154,8 @@ test("deploy admin sync and grant-user keep audit provenance and idempotent writ
     assert.equal(firstSync.audit.grantedScope.kind, "project");
     assert.equal(firstSync.audit.requestedMutation.kind, "keycloak_group_shape_sync");
     assert.match(await fsp.readFile(realmFile, "utf8"), /deploy-approvers-pleomino-staging/);
+    assert.match(await fsp.readFile(realmFile, "utf8"), /"claim\.name": "email"/);
+    assert.match(await fsp.readFile(realmFile, "utf8"), /oidc-usermodel-property-mapper/);
 
     const granted = await grantDeploymentAdminKeycloakUser({
       deployment,

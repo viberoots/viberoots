@@ -48,7 +48,11 @@ export async function enableInteractivePkceVaultRuntime(tmp: string, issuer: str
   );
 }
 
-export async function completePendingAuthSession(controlPlaneUrl: string, recordsRoot: string) {
+export async function completePendingAuthSession(
+  controlPlaneUrl: string,
+  recordsRoot: string,
+  expectedStatus = 200,
+) {
   const sessionState = await waitFor(
     async () => {
       const authDir = path.join(recordsRoot, "control-plane", "auth-sessions");
@@ -77,5 +81,5 @@ export async function completePendingAuthSession(controlPlaneUrl: string, record
   callbackUrl.searchParams.set("code", "login-code");
   callbackUrl.searchParams.set("state", sessionState);
   const response = await fetch(callbackUrl);
-  assert.equal(response.status, 200, await response.text());
+  assert.equal(response.status, expectedStatus, await response.text());
 }

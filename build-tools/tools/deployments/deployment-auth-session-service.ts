@@ -31,6 +31,7 @@ import {
 } from "./deployment-auth-session-principal.ts";
 import {
   principalEmailFromOidcClaims,
+  reviewedPrincipalEmailRequirementMessage,
   reviewedKeycloakAdminGroupsFromOidcClaims,
 } from "./deployment-auth-session-reviewed-identity.ts";
 import { normalizeAuthorizationSnapshot } from "./deployment-control-plane-authz.ts";
@@ -154,6 +155,9 @@ export async function handleDeploymentAuthCallback(opts: {
     assertNonceIfPresent(claims, consumed.nonce);
     const principal = principalFromOidcClaims(claims);
     const principalEmail = principalEmailFromOidcClaims(claims);
+    if (consumed.credentialSource.startsWith("interactive_") && !principalEmail) {
+      throw new Error(reviewedPrincipalEmailRequirementMessage(principal.principalId));
+    }
     const reviewedKeycloakAdminGroups = reviewedKeycloakAdminGroupsFromOidcClaims(claims);
     const authorization = authorizationForOidcPrincipal({
       deployment: consumed.deployment,

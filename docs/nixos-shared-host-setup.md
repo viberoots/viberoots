@@ -437,7 +437,10 @@ preflighted host-apply helper instead of relying on hand-edited files under
 operator and their deploy-admin Keycloak scope, so the normal `--profile mini`
 path omits `--acting-principal`, `--admin-group`, `--realm-file`, and
 `--membership-file`. Omit `--user-email` for a self-service grant to the
-current login; add it only when granting access to another human.
+current login; add it only when granting access to another human. The same
+reviewed auth session must carry an authoritative email for that human,
+normally through the Keycloak `email` claim. If the interactive login omits it,
+fix the reviewed mapper contract before retrying the self-service flow.
 
 The reviewed deploy-admin Keycloak grants stay separate from ordinary deploy
 grants. Typical examples are:

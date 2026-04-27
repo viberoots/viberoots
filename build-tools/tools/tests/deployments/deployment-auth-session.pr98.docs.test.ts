@@ -39,6 +39,16 @@ test("pr98 docs shorten the reviewed remote Keycloak admin happy path", async ()
     assert.ok(
       docHasAny(doc, [/cross-user/i, /another user/i, /another human/i, /break-glass recovery/i]),
     );
+    assert.match(doc, /authoritative email/i);
+    assert.ok(
+      docHasAny(doc, [
+        /email claim/i,
+        /`email` claim/i,
+        /Keycloak mapper/i,
+        /mapper contract/i,
+        /IdP's standard `email` claim/i,
+      ]),
+    );
     assert.doesNotMatch(
       doc,
       /deploy admin keycloak sync[\s\S]{0,220}--profile mini[\s\S]{0,220}--acting-principal/i,

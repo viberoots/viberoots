@@ -47,6 +47,7 @@ test("deployment service owns PKCE login sessions and public OIDC callback", asy
     const oidc = await startFakeOidcServer({
       claims: {
         sub: "human-1",
+        email: "ada@example.com",
         preferred_username: "Ada",
         groups: ["deploy-submitters-pleomino-dev"],
       },
@@ -96,7 +97,11 @@ test("deployment service owns PKCE login sessions and public OIDC callback", asy
 test("deployment auth sessions fail closed for mismatches, replay, and expiry", async () => {
   await runInTemp("deployment-auth-session-fail-closed", async (tmp) => {
     const oidc = await startFakeOidcServer({
-      claims: { groups: ["deploy-submitters-pleomino-dev"] },
+      claims: {
+        sub: "human-1",
+        email: "ada@example.com",
+        groups: ["deploy-submitters-pleomino-dev"],
+      },
     });
     const target = deployment(oidc.issuer);
     const controlPlane = await startNixosSharedHostControlPlaneServer({
@@ -154,6 +159,7 @@ test("deployment auth sessions tolerate IdPs that omit the requested Vault audie
       claims: {
         aud: "deployment-cli",
         sub: "human-1",
+        email: "ada@example.com",
         preferred_username: "Ada",
         groups: ["deploy-submitters-pleomino-dev"],
       },
@@ -194,6 +200,7 @@ test("deployment auth sessions still reject unrelated audiences", async () => {
       claims: {
         aud: "account",
         sub: "human-1",
+        email: "ada@example.com",
         preferred_username: "Ada",
         groups: ["deploy-submitters-pleomino-dev"],
       },

@@ -6,6 +6,7 @@ import {
   reviewedDeployAdminGroupsByCapability,
   type DeploymentKeycloakAdminRole,
 } from "./deployment-admin-keycloak-auth.ts";
+import { reviewedPrincipalEmailRequirementMessage } from "./deployment-auth-session-reviewed-identity.ts";
 import {
   reviewedRemoteKeycloakGrantUserCommand,
   reviewedRemoteKeycloakSyncCommand,
@@ -131,25 +132,23 @@ async function resolveSessionBackedInputs(opts: {
   if (!actingPrincipal) {
     throw new Error("reviewed auth session completed without an authenticated principal");
   }
+  if (!status.principalEmail) {
+    throw new Error(reviewedPrincipalEmailRequirementMessage(actingPrincipal));
+  }
   const explicitUserEmail = getFlagStr("user-email", "").trim().toLowerCase();
   if (opts.command !== "grant-user") {
     return {
       actingPrincipal,
-      ...(status.principalEmail ? { principalEmail: status.principalEmail } : {}),
+      principalEmail: status.principalEmail,
       actingPrincipalSource: "session",
       adminGroups: status.reviewedKeycloakAdminGroups || [],
       adminGroupsSource: "session",
     };
   }
-  const userEmail = explicitUserEmail || status.principalEmail || "";
-  if (!userEmail) {
-    throw new Error(
-      `self-service grant could not infer a user email for ${actingPrincipal}; rerun with --user-email <user@example.com> to make the target explicit`,
-    );
-  }
+  const userEmail = explicitUserEmail || status.principalEmail;
   return {
     actingPrincipal,
-    ...(status.principalEmail ? { principalEmail: status.principalEmail } : {}),
+    principalEmail: status.principalEmail,
     actingPrincipalSource: "session",
     adminGroups: status.reviewedKeycloakAdminGroups || [],
     adminGroupsSource: "session",

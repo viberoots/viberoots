@@ -397,6 +397,9 @@ the acting principal and the deploy-admin Keycloak group scope, so `--profile
 mini` no longer needs `--acting-principal`, `--admin-group`, `--realm-file`, or
 `--membership-file`. Omit `--user-email` to grant yourself the reviewed
 capability; add `--user-email alice@example.com` only for a cross-user grant.
+The same reviewed login session must also carry an authoritative email for the
+current human, typically through the IdP's standard `email` claim. If it does
+not, update the reviewed Keycloak mapper before retrying the self-service flow.
 To discover the reviewed check names for a target before you submit, run
 `direnv exec . build-tools/tools/bin/deploy --deployment <label> --validate-only`
 and inspect `admissionRequirements.admission_policy`, `allowed_refs`,

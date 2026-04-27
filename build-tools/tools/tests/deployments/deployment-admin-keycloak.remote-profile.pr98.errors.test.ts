@@ -79,7 +79,7 @@ test("remote profile grant-user fails closed with concise authz guidance", async
   });
 });
 
-test("remote profile self-service grant explains when an explicit target user is still required", async () => {
+test("remote profile grant-user fails closed when the reviewed auth session omits email", async () => {
   await runInTemp("deploy-admin-keycloak-pr98-missing-email", async (tmp, $) => {
     const oidc = await startFakeOidcServer({
       claims: {
@@ -119,11 +119,14 @@ test("remote profile self-service grant explains when an explicit target user is
         env: remoteExecEnv(fixture.env),
         stdio: "pipe",
       })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)} --action submit`.nothrow();
-      await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);
+      await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot, 400);
       const result = await resultPromise;
       assert.notEqual(result.exitCode, 0);
-      assert.match(String(result.stderr), /self-service grant could not infer a user email/i);
-      assert.match(String(result.stderr), /rerun with --user-email <user@example\.com>/i);
+      assert.match(
+        String(result.stderr),
+        /interactive deployment auth requires an authoritative email/i,
+      );
+      assert.match(String(result.stderr), /update the IdP mapper to include email and retry/i);
     } finally {
       await controlPlane.close();
       await oidc.close();

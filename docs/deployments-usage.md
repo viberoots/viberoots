@@ -324,8 +324,11 @@ the acting principal and deploy-admin Keycloak scope automatically, so the
 normal `--profile mini` path does not require `--acting-principal`,
 `--admin-group`, `--realm-file`, or `--membership-file`. Omit `--user-email`
 for self-service grants to the logged-in human, and add it only when granting a
-reviewed capability to another user. Keep the explicit file and principal/group
-flags for intentionally local or non-remote workflows only.
+reviewed capability to another user. That happy path also requires the reviewed
+interactive login session to include an authoritative email for the current
+human, usually via the IdP's standard `email` claim; if the session omits it,
+fix the Keycloak mapper before retrying. Keep the explicit file and
+principal/group flags for intentionally local or non-remote workflows only.
 For protected/shared service-backed runs, `--mark-check-passed` and
 `--mark-check-for-commit` only describe the commit the client believes it is
 submitting. Final admission still binds to the service-owned reviewed source

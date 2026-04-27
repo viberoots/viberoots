@@ -126,7 +126,12 @@ test("auth action summary and realm export stay aligned on reviewed group names"
     "deploy-automation-jenkins-admission-reporters-project-pleomino",
   ]);
   assert.equal(realm.clients[0]?.clientId, "deployment-cli");
+  assert.deepEqual(
+    realm.clients[0]?.protocolMappers.map((mapper) => mapper.name),
+    ["groups", "email"],
+  );
   assert.equal(realm.clients[0]?.protocolMappers[0]?.config["claim.name"], "groups");
+  assert.equal(realm.clients[0]?.protocolMappers[1]?.config["claim.name"], "email");
   const commands = action.exampleAdminCommands.join("\n");
   assert.match(
     commands,

@@ -52,6 +52,23 @@ function keycloakGroupsMapper() {
   };
 }
 
+function keycloakEmailMapper() {
+  return {
+    name: "email",
+    protocol: "openid-connect",
+    protocolMapper: "oidc-usermodel-property-mapper",
+    consentRequired: false,
+    config: {
+      "user.attribute": "email",
+      "claim.name": "email",
+      "jsonType.label": "String",
+      "id.token.claim": "true",
+      "access.token.claim": "true",
+      "userinfo.token.claim": "true",
+    },
+  };
+}
+
 function keycloakClient(deployments: DeploymentTarget[], clientId: string) {
   const redirectUris = uniqueSorted(
     deployments
@@ -66,7 +83,7 @@ function keycloakClient(deployments: DeploymentTarget[], clientId: string) {
     protocol: "openid-connect",
     directAccessGrantsEnabled: true,
     redirectUris,
-    protocolMappers: [keycloakGroupsMapper()],
+    protocolMappers: [keycloakGroupsMapper(), keycloakEmailMapper()],
   };
 }
 
