@@ -26,6 +26,18 @@ let
   generatedMembershipImportName = builtins.baseNameOf generatedMembershipFile;
   generatedRealmBootstrapJson = builtins.toJSON bootstrap.realmImport;
   generatedMembershipBootstrapJson = builtins.toJSON bootstrap.membershipImport;
+  migration = import ./shared-host-identity-provider-migration.nix {
+    inherit
+      lib
+      config
+      pkgs
+      generatedRealmFile
+      generatedMembershipFile
+      generatedRealmBootstrapJson
+      generatedMembershipBootstrapJson
+      ;
+    generatedImportRoot = cfg.generatedImportRoot;
+  };
 in
 {
   options.deploymentHost.identityProvider = {
@@ -197,24 +209,12 @@ in
         before = [ "keycloak.service" ];
         requiredBy = [ "keycloak.service" ];
         serviceConfig.Type = "oneshot";
-        script = ''
-          install -d -m 0755 ${lib.escapeShellArg cfg.generatedImportRoot}
-          ${lib.optionalString (generatedRealmFile != null) ''
-            if [ ! -f ${lib.escapeShellArg generatedRealmFile} ]; then
-              cat >${lib.escapeShellArg generatedRealmFile} <<'EOF'
-${generatedRealmBootstrapJson}
-EOF
-            fi
-          ''}
-          ${lib.optionalString (generatedMembershipFile != null) ''
-            if [ ! -f ${lib.escapeShellArg generatedMembershipFile} ]; then
-              cat >${lib.escapeShellArg generatedMembershipFile} <<'EOF'
-${generatedMembershipBootstrapJson}
-EOF
-            fi
-          ''}
-        '';
+        script = migration.bootstrapManagedFilesScript;
       };
+
+    systemd.services.keycloak.path = lib.mkAfter (with pkgs; [ coreutils jq ]);
+    systemd.services.keycloak.preStart = lib.mkAfter migration.bootstrapAdminPreStart;
+    systemd.services.keycloak.postStart = lib.mkAfter migration.bootstrapRealmMigrationPostStart;
 
     services.nginx = lib.mkIf cfg.manageNginx {
       enable = lib.mkDefault true;

@@ -393,12 +393,17 @@ direnv exec . build-tools/tools/bin/deploy admin identity sync \
 host-module surface for these mutable generated files. The module bootstraps
 the reviewed interactive client contract, the reviewed email mapper, the
 bootstrap admin-group shape, and the optional first trusted operator membership
-when the files do not exist yet, then runtime-links them into Keycloak's import
-directory during activation. Keep both files gitignored; do not list them in
-`deploymentHost.identityProvider.realmFiles`, which is reserved for static
-flake-visible imports. Treat the generated realm file as group shape and mapper
-configuration only; keep human and automation membership in the separate
-generated input `./deployment-host/identity-provider/deployment-auth-memberships.json`.
+when the files do not exist yet, then reconciles the live persisted Keycloak
+realm during host reconciliation by using a temporary local recovery admin plus
+Keycloak partial import. That same reviewed path covers both fresh installs and
+existing persisted realms, so upgrades no longer require manual admin-console
+repair before the first reviewed login. Keep both files gitignored and let the
+host module runtime-links them into `/srv/common/deployment-host/identity-provider`;
+do not list them in `deploymentHost.identityProvider.realmFiles`, which is
+reserved for static flake-visible imports. Treat the generated realm file as
+group shape and mapper configuration only; keep human and automation membership
+in the separate generated input
+`./deployment-host/identity-provider/deployment-auth-memberships.json`.
 One reviewed membership grant example is:
 
 ```bash
@@ -437,7 +442,10 @@ direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
 That reviewed remote path writes the authoritative realm files under the host
 config root, keeps flake evaluation pure, and then optionally runs the
 preflighted host-apply helper instead of relying on hand-edited files under
-`/srv/common`. The reviewed auth session already identifies the logged-in
+`/srv/common`. During host reconciliation, the identity-provider module applies
+that reviewed bootstrap delta to both fresh installs and existing persisted
+realms before the steady-state human operator flow begins. The reviewed auth
+session already identifies the logged-in
 operator and their deploy-admin identity scope, so the normal `--profile mini`
 path omits `--acting-principal`, `--admin-group`, `--realm-file`, and
 `--membership-file`. Omit `--user-email` for a self-service grant to the

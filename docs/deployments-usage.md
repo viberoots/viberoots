@@ -293,7 +293,11 @@ deploy admin identity grant-user \
 the realm file. `deploy admin identity grant-user` stages human membership in a
 separate reviewed input. Both fail closed unless the acting principal presents
 the separate deploy-admin identity grant; ordinary `submitter`, `approver`, and
-`admission_reporter` groups do not authorize identity-admin mutation.
+`admission_reporter` groups do not authorize identity-admin mutation. On shared
+hosts, the reviewed identity-provider module reconciles those bootstrap
+artifacts into the live persisted realm during host reconciliation for both
+fresh installs and upgrades of an existing realm, while `deploy admin identity
+...` remains the steady-state human operator path after login is aligned.
 When you are operating `mini` from a client machine, use the reviewed remote
 profile flow instead of SSHing in to edit those files by hand:
 

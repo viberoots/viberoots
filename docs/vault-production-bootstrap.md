@@ -1030,7 +1030,10 @@ Those helpers keep group shape separate from membership. Ordinary read-only
 applies reviewed changes. The generated `deployment-auth-realm.json` contains
 reviewed group and mapper shape only. Human membership lives in the separate
 generated `./deployment-host/identity-provider/deployment-auth-memberships.json`
-input. Keep both files gitignored.
+input. Keep both files gitignored. During host reconciliation, the shared-host
+identity-provider module uses those generated artifacts to reconcile both fresh
+installs and existing persisted realms, so normal recovery no longer depends on
+manual admin-console bootstrap repair.
 
 When the operator is working from a client machine, the reviewed `mini` profile
 can update those same config-root artifacts and optionally apply them:
@@ -1115,8 +1118,10 @@ static declarative imports, and the reviewed shared-host wrapper exposes that as
 `deploymentHost.identityProvider.realmFiles`. Reserve that path-only surface for
 checked-in flake-visible files. For the generated deployment-auth realm and
 membership JSON above, use `deploymentHost.identityProvider.generatedImportRoot`
-instead so activation bootstraps and runtime-links the mutable files without
-requiring them to be committed or staged into the flake source snapshot.
+instead so activation bootstraps missing files and then reconciles the live
+persisted realm with Keycloak partial import during host reconciliation, without
+requiring those mutable artifacts to be committed or staged into the flake
+source snapshot.
 
 ### Step 5C: Point Vault At The `mini` Issuer
 

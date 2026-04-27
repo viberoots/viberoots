@@ -19,6 +19,8 @@ test("shared-host identity provider module bootstraps generated identity imports
   assert.match(moduleText, /generatedMembershipFile/);
   assert.match(moduleText, /L\+ \$\{generatedImportDir\}\/\$\{generatedRealmImportName\}/);
   assert.match(moduleText, /L\+ \$\{generatedImportDir\}\/\$\{generatedMembershipImportName\}/);
+  assert.match(moduleText, /systemd\.services\.keycloak\.preStart/);
+  assert.match(moduleText, /systemd\.services\.keycloak\.postStart/);
   await runInTemp("shared-host-identity-provider-generated-imports-eval", async (tmp, $) => {
     const expr = `
       let
@@ -62,6 +64,8 @@ test("shared-host identity provider module bootstraps generated identity imports
           system.config.systemd.services;
         bootstrapScript =
           system.config.systemd.services.deployment-host-keycloak-generated-import-bootstrap.script;
+        keycloakPreStart = system.config.systemd.services.keycloak.preStart or "";
+        keycloakPostStart = system.config.systemd.services.keycloak.postStart or "";
         nginxEnabled = system.config.services.nginx.enable;
         forceSSL = vhost.forceSSL;
         enableACME = vhost.enableACME;
@@ -85,6 +89,8 @@ test("shared-host identity provider module bootstraps generated identity imports
       generatedMembershipFile: string | null;
       hasBootstrapService: boolean;
       bootstrapScript: string;
+      keycloakPreStart: string;
+      keycloakPostStart: string;
       nginxEnabled: boolean;
       forceSSL: boolean;
       enableACME: boolean;
@@ -108,6 +114,14 @@ test("shared-host identity provider module bootstraps generated identity imports
     assert.match(out.bootstrapScript, /"claim\.name":"email"/);
     assert.match(out.bootstrapScript, /deploy-admin-identity-shape-admin-global/);
     assert.match(out.bootstrapScript, /ops@example\.test/);
+    assert.match(out.keycloakPreStart, /kc\.sh bootstrap-admin service/);
+    assert.match(out.keycloakPreStart, /deployment-host-bootstrap-admin/);
+    assert.match(out.keycloakPreStart, /temporary recovery admin/i);
+    assert.match(out.keycloakPostStart, /kcadm\.sh create partialImport/);
+    assert.match(out.keycloakPostStart, /ifResourceExists=OVERWRITE/);
+    assert.match(out.keycloakPostStart, /live bootstrap realm shape/);
+    assert.match(out.keycloakPostStart, /first-operator bootstrap membership binding/);
+    assert.match(out.keycloakPostStart, /kcadm\.sh delete "clients\/\$client_id"/);
     assert.equal(out.nginxEnabled, true);
     assert.equal(out.forceSSL, true);
     assert.equal(out.enableACME, true);

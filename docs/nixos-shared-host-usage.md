@@ -391,8 +391,12 @@ The reviewed remote-profile flow updates
 the host config workspace as mutable generated files, then optionally runs the
 same reviewed host-apply preflight and dry-run/switch helper the ordinary
 remote deploy path uses. Keep those files gitignored; the identity-provider
-module bootstraps and runtime-links them instead of expecting flake-visible
-tracked paths. On this happy path, the reviewed login session already supplies
+module bootstraps missing files and reconciles the live persisted realm during
+host reconciliation instead of expecting flake-visible tracked paths. That
+reviewed migration path is the same for fresh installs and existing persisted
+realms, so `deploy admin identity ...` remains the steady-state human operator
+path after login is aligned. On this happy path, the reviewed login session
+already supplies
 the acting principal and the deploy-admin identity group scope, so `--profile
 mini` no longer needs `--acting-principal`, `--admin-group`, `--realm-file`, or
 `--membership-file`. Omit `--user-email` to grant yourself the reviewed
