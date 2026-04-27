@@ -13851,6 +13851,148 @@ declarative for both fresh installs and upgrades, not just for brand-new hosts.
 
 ---
 
+## PR-101: Declarative host-secret handling for identity bootstrap migration
+
+### Description
+
+I will close the follow-on gap exposed during PR-100 rollout by making the reviewed identity
+bootstrap migration compatible with declarative host-managed secrets, instead of depending on
+manual file-permission fixes for the Keycloak database password. On `mini`, the reviewed migration
+hooks now need to read `deploymentHost.identityProvider.databasePasswordFile` before the unprivileged
+Keycloak service starts, but the long-standing reviewed bootstrap guidance still creates
+`/var/lib/deployment-host-secrets/keycloak-db-password` as a root-owned `0600` host secret.
+That mismatch is especially important in this repo because the host already runs Vault and has been
+using `secretspec` as the reviewed secret-contract layer, while concrete secret files remain a
+host-runtime concern rather than a repo-managed artifact.
+
+The reviewed design should be:
+
+- host-managed secret files stay owned and protected by the host secret system
+- reviewed service migration hooks that must read those secrets do so through a declarative systemd
+  privilege boundary, not through ad hoc chmod/chgrp instructions
+- the main identity-provider process remains unprivileged
+- reviewed docs and tests describe portable `nixos-rebuild switch` host reconciliation behavior,
+  not a local shell alias such as `pull-switch`
+- `secretspec` remains the stable repo-level contract for deployment secrets, while the host module
+  cleanly consumes host-managed runtime secret paths for its own bootstrap dependencies
+
+### Scope & Changes
+
+- Update the shared-host identity-provider module so the reviewed pre-start/post-start migration
+  hooks can read `databasePasswordFile` without requiring operators to loosen secret permissions or
+  depend on a stable static `keycloak` user/group ownership contract.
+- Keep the reviewed host-secret contract narrow and explicit:
+  - the database password file remains a host-managed out-of-store secret path
+  - root-only or similarly restricted file ownership remains supported
+  - the main Keycloak runtime should remain unprivileged after startup
+  - the reviewed migration path should not require manual `chmod`, `chgrp`, or console repair
+- Make the systemd boundary declarative:
+  - ensure only the startup/migration steps that truly need secret access receive it
+  - preserve fail-closed behavior when the secret path is missing, unreadable for the intended
+    startup boundary, or misconfigured
+  - avoid coupling module correctness to whether the host exposes a resolvable static `keycloak`
+    account versus a dynamic runtime identity
+- Align the reviewed secret story with the repo's existing secret architecture:
+  - keep `secretspec` as the stable repo contract/interface
+  - treat Vault or another host secret backend as the concrete host-side provider
+  - allow `deploymentHost.identityProvider.databasePasswordFile` to point at a host-managed secret
+    path produced by the reviewed host secret system
+- Remove local-environment assumptions from operator guidance and tests:
+  - do not rely on `pull-switch` in docs or verification
+  - describe host reconciliation in terms of portable `nixos-rebuild switch` usage or equivalent
+    reviewed host rebuild flows
+
+### Tests (in this PR)
+
+- Add module/systemd tests proving the identity-provider startup and migration path succeeds when
+  `databasePasswordFile` is a root-owned restricted secret file.
+- Add regression tests proving the reviewed migration hooks do not require manual permission
+  changes or static `keycloak` passwd/group entries.
+- Add host-module tests covering:
+  - host-managed secret path configuration for `databasePasswordFile`
+  - startup/migration success with restricted secret permissions
+  - fail-closed behavior when the secret path is missing or misconfigured
+  - preservation of the unprivileged main Keycloak runtime
+- Add docs-parity tests proving the reviewed setup/runbook guidance uses portable host rebuild
+  commands rather than the `pull-switch` alias.
+- Add deployment-domain regression tests proving PR-100 existing-realm bootstrap migration still
+  works end-to-end when the database secret remains host-protected.
+
+### Docs (in this PR)
+
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  to document the reviewed host-secret contract for the identity-provider database password without
+  requiring manual permission relaxation.
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  so the reviewed bootstrap path is compatible with host-managed secrets, Vault-backed operator
+  expectations, and restricted secret-file permissions.
+- Update any related secret/runtime docs to clarify that:
+  - `secretspec` remains the repo-level secret contract
+  - concrete host secret files are supplied by the host secret system
+  - reviewed identity bootstrap migration consumes those paths declaratively
+- Replace `pull-switch` references in affected setup or test-oriented docs with portable rebuild
+  guidance such as `nixos-rebuild switch --flake ...` or equivalent reviewed host commands.
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain and host-module tests covering:
+  - restricted host-secret startup behavior
+  - existing-realm identity bootstrap migration
+  - docs parity for portable rebuild guidance
+  - reviewed secret-contract and host-runtime boundary behavior
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR stays within deployment-domain shared-host identity-provider startup privileges,
+  host-secret consumption, existing-realm migration reliability, and docs. Under the
+  deployment-only verify policy, default `v` / CI can run the reviewed deployment suite unless
+  implementation details force shared build-system selector changes.
+
+### Acceptance Criteria
+
+- A host with a root-owned restricted `databasePasswordFile` can complete reviewed identity
+  bootstrap migration with no manual permission changes.
+- The reviewed identity-provider module supports host-managed secret paths cleanly, including the
+  current Vault-oriented/shared-host secret-management approach used on `mini`.
+- The main Keycloak runtime remains unprivileged even though the reviewed startup/migration path
+  can read the required host secret declaratively.
+- Operators do not need to understand or repair `keycloak` file ownership details to complete
+  reviewed bootstrap or upgrade flows.
+- Docs and tests use portable host rebuild guidance rather than relying on the local `pull-switch`
+  alias.
+
+### Risks
+
+Changing the systemd privilege boundary around Keycloak startup could accidentally broaden runtime
+privileges or obscure which parts of the reviewed flow are allowed to read host secrets.
+
+### Mitigation
+
+Keep elevated secret access limited to the minimal startup/migration boundary, preserve the
+unprivileged main service process, add targeted tests for restricted secret files and failure
+cases, and document the host-secret contract explicitly in the reviewed runbooks.
+
+### Consequence of Not Implementing
+
+Even with PR-100, operators will still hit non-declarative host-secret permission failures during
+identity bootstrap migration and will be forced into one-off manual fixes that conflict with the
+repo's `secretspec`/Vault-oriented secret-management philosophy.
+
+### Downsides for Implementing
+
+This adds more subtle systemd/startup-boundary reasoning to the host module and requires careful
+testing so the reviewed privilege fix does not accidentally widen long-lived service access.
+
+### Recommendation
+
+Implement immediately after PR-100 so the reviewed identity bootstrap upgrade path becomes
+compatible with declarative host-managed secrets and portable host rebuild flows, not just with
+manually repaired local setups.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
