@@ -13692,6 +13692,165 @@ fully aligned reviewed bootstrap path instead of depending on one-off console re
 
 ---
 
+## PR-100: Declarative existing-realm identity bootstrap migration
+
+### Description
+
+I will close the remaining upgrade gap exposed immediately after PR-99 by making existing shared-
+host identity-provider installations converge to the reviewed bootstrap contract without requiring
+manual admin-console edits. PR-99 made fresh installs substantially better by generating a minimal
+reviewed bootstrap shape on disk and by renaming the public operator CLI to provider-agnostic
+identity-admin commands. But an installation whose persisted provider realm already exists can
+still remain on the old live shape even after `pull-switch`, because the current bootstrap path is
+seed-only and the normal reviewed `deploy admin identity sync` flow still depends on the login
+contract already being correct.
+
+That leaves an unacceptable chicken-and-egg failure mode for upgrades: the repo and host module
+may already know the reviewed bootstrap contract, including authoritative human email emission and
+bootstrap identity-admin groups, but the live persisted realm can still lack those fields until an
+operator performs out-of-band vendor-console surgery. The reviewed design should instead be:
+
+- host-local rebuild/update can reconcile the reviewed bootstrap identity contract on both fresh
+  installs and existing persisted realms
+- the first human interactive login contract becomes declarative host state rather than a manual
+  repair step
+- the reviewed provider-agnostic `deploy admin identity ...` flow remains the steady-state human
+  operator path, but it no longer has to bootstrap itself through a broken live login contract
+- provider-specific migration mechanics remain internal implementation details behind the host
+  module or adapter seam
+
+### Scope & Changes
+
+- Add a reviewed existing-realm migration/apply path that can reconcile the live persisted
+  identity-provider realm to the reviewed bootstrap contract during host upgrade, not just on
+  first-install file seeding.
+- Keep the reviewed bootstrap contract narrow and deterministic:
+  - interactive human client redirect/callback contract
+  - authoritative human email claim emission required for reviewed self-service flows
+  - reviewed bootstrap global identity-admin groups
+  - optional host-local first-operator bootstrap membership binding
+- Ensure the migration path is safe for already-running hosts:
+  - detect whether the reviewed bootstrap contract is missing or stale in the live realm
+  - apply only the reviewed bootstrap delta needed to restore the login/admin contract
+  - preserve unrelated reviewed steady-state membership and deployment-derived state
+  - make the operation idempotent across repeated `switch` / upgrade runs
+- Keep the layering explicit:
+  - repo-owned reviewed shape still defines the bootstrap contract
+  - host-local config still defines the optional first trusted operator binding
+  - steady-state human onboarding and deployment-specific group grants still flow through
+    `deploy admin identity sync` and `deploy admin identity grant-user`
+  - provider-specific APIs, import/update mechanisms, or persistence details remain internal
+- Fix the current shared-host operational seam where generated bootstrap files can exist on disk
+  but not actually become effective live provider state on an already-initialized host.
+- Provide explicit reviewed upgrade behavior:
+  - a previously initialized host should be able to move from pre-PR-99 state to the new
+    authoritative-email bootstrap contract with no manual admin-console edits
+  - diagnostics should clearly distinguish bootstrap migration failure from steady-state human
+    authorization failure
+
+### Tests (in this PR)
+
+- Add upgrade-path tests proving an existing persisted reviewed identity-provider realm created
+  before PR-99 can be reconciled to the new bootstrap contract without manual console changes.
+- Add host/module tests covering:
+  - fresh install bootstrap seeding
+  - existing-realm bootstrap migration
+  - idempotent repeated activation/switch behavior
+  - safe preservation of unrelated reviewed state
+- Add integration tests proving that, after upgrade migration:
+  - human interactive login emits authoritative reviewed email
+  - the bootstrap operator can run `deploy admin identity sync`
+  - the bootstrap operator can run `deploy admin identity grant-user`
+  - no out-of-band vendor-console repair is required
+- Add diagnostics tests proving reviewed failure messages distinguish:
+  - live bootstrap contract missing or stale
+  - first-operator binding missing
+  - steady-state identity-admin authorization missing
+  - provider-internal migration/apply failure
+- Add regression tests for any host tmpfiles/runtime-linking or activation behavior required to
+  make generated reviewed bootstrap artifacts reliably become live provider input on upgraded
+  systems.
+
+### Docs (in this PR)
+
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  to describe one declarative path that covers both fresh installs and upgrades of existing
+  reviewed identity-provider realms.
+- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  to clarify that provider bootstrap migration happens during host reconciliation and that
+  `deploy admin identity ...` remains the steady-state human operator path after login is aligned.
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  to remove any remaining manual admin-console upgrade steps from the normal reviewed recovery
+  story.
+- Update [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md) and any
+  related troubleshooting docs so upgrade guidance clearly separates:
+  - declarative bootstrap migration during host reconciliation
+  - steady-state reviewed identity sync
+  - ordinary human membership onboarding
+  - unusual provider-internal break-glass debugging
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - existing-realm bootstrap migration
+  - fresh-install bootstrap regression protection
+  - interactive reviewed login contract after upgrade
+  - bootstrap operator reconciliation and grant flows
+  - diagnostics and operator-runbook parity
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR stays within deployment-domain reviewed identity bootstrap ownership, shared-host
+  reconciliation behavior, live realm migration/apply seams, operator diagnostics, and docs. Under
+  the deployment-only verify policy, default `v` / CI can run the reviewed deployment suite unless
+  implementation details force shared build-system selector changes.
+
+### Acceptance Criteria
+
+- A shared-host installation with an already-existing persisted reviewed identity-provider realm
+  can upgrade to the PR-99 bootstrap contract without manual admin-console edits.
+- After host reconciliation, human interactive login emits the authoritative reviewed email needed
+  for provider-agnostic self-service admin flows.
+- The first trusted operator can proceed directly into the reviewed `deploy admin identity sync`
+  and `deploy admin identity grant-user` flow after upgrade, rather than performing out-of-band
+  vendor-specific repair.
+- Fresh-install bootstrap remains working, and repeated upgrades remain idempotent.
+- Docs describe one coherent reviewed bootstrap-and-upgrade story that does not require operators
+  to understand provider-specific console recovery for normal installations.
+
+### Risks
+
+Applying bootstrap deltas to an already-live persisted realm could accidentally overwrite reviewed
+state that should remain host- or operator-managed, or could create a brittle migration seam if
+provider-specific update mechanics are not kept sharply internal and idempotent.
+
+### Mitigation
+
+Keep the reviewed migration contract intentionally narrow, reconcile only the bootstrap fields
+required for human login and first-operator admin authority, preserve unrelated state, require
+idempotent tests for repeated activation, and make diagnostics clearly identify whether failure is
+in bootstrap migration or later steady-state operator authorization.
+
+### Consequence of Not Implementing
+
+Even after PR-99, existing shared-host installations will still need manual vendor-console repair
+to adopt the reviewed bootstrap contract, leaving the upgrade story inconsistent with the repo's
+declarative philosophy and slowing every future bootstrap-contract evolution.
+
+### Downsides for Implementing
+
+This adds another reconciliation seam to the host/module layer and requires careful testing against
+live persisted provider state, not just generated import artifacts on disk.
+
+### Recommendation
+
+Implement immediately after PR-99 so the reviewed identity-admin bootstrap story becomes genuinely
+declarative for both fresh installs and upgrades, not just for brand-new hosts.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
