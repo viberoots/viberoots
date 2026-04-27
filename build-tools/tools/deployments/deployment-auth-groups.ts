@@ -161,16 +161,6 @@ export function isAutomationLikePrincipal(principalId: string): boolean {
   return normalized.startsWith("oidc:service-account-") || normalized.startsWith("app:");
 }
 
-function exampleHumanGrantCommand(
-  deployment: DeploymentTarget,
-  action: DeploymentAuthAction,
-): string {
-  return reviewedRemoteKeycloakGrantUserCommand(deployment, action, {
-    userEmail: "<user@example.com>",
-    applyMode: "apply-host",
-  });
-}
-
 export function deploymentAuthMissingGrantHint(opts: {
   deployment: DeploymentTarget;
   role: DeploymentAuthRole;
@@ -185,10 +175,13 @@ export function deploymentAuthMissingGrantHint(opts: {
     return ` expected automation groups include ${groups}; inspect ${command}`;
   }
   const group = reviewedHumanGroupName(opts.deployment, opts.role);
-  const selfService = reviewedRemoteKeycloakGrantUserCommand(opts.deployment, action, {
+  const grantYourself = reviewedRemoteKeycloakGrantUserCommand(opts.deployment, action, {
     applyMode: "apply-host",
   });
-  return ` expected human group ${group}; self-service: ${selfService}; grant another human: ${exampleHumanGrantCommand(opts.deployment, action)}; inspect ${command}`;
+  return (
+    ` expected human group ${group}; grant yourself: ${grantYourself};` +
+    " add --user-email <user@example.com> to grant another human"
+  );
 }
 
 function roleAction(role: DeploymentAuthRole): DeploymentAuthAction {

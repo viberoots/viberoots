@@ -3,6 +3,10 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
+import {
+  deploymentAuthMissingGrantHint,
+  type DeploymentAuthRole,
+} from "./deployment-auth-groups.ts";
 import { scrubDeploymentSecretEnv } from "./deployment-secret-env.ts";
 import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
 import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door.ts";
@@ -106,6 +110,26 @@ function augmentRemoteAdmissionMismatchMessage(
   ].join("\n");
 }
 
+function rewriteLegacyMissingGrantMessage(
+  baseMessage: string,
+  deployment?: DeploymentTarget,
+): string {
+  if (!deployment) return baseMessage;
+  const principalId = baseMessage.match(/^principal (\S+)/)?.[1];
+  const role = baseMessage.match(/missing (submitter|approver|admission_reporter) grant/)?.[1] as
+    | DeploymentAuthRole
+    | undefined;
+  const prefix = baseMessage.match(
+    /^(principal \S+ is not authorized [\s\S]*?: missing (submitter|approver|admission_reporter) grant)(?:;[\s\S]*)?$/,
+  )?.[1];
+  if (!principalId || !role || !prefix) return baseMessage;
+  return `${prefix};${deploymentAuthMissingGrantHint({
+    deployment,
+    role,
+    principalId,
+  })}`;
+}
+
 function serviceInstanceFrom(error: unknown): ServiceInstanceLike | undefined {
   const status = (error as any)?.status;
   const record = (error as any)?.record;
@@ -135,6 +159,7 @@ export function remoteServiceSubmissionError(
   },
 ) {
   const base = error instanceof Error ? error : new Error(String(error));
+  const normalizedBase = rewriteLegacyMissingGrantMessage(base.message, opts?.deployment);
   const record = (error as any)?.record;
   const status = (error as any)?.status;
   const refs = [
@@ -152,7 +177,7 @@ export function remoteServiceSubmissionError(
   return Object.assign(
     new Error(
       [
-        `remote service submission failed: ${augmentRemoteAdmissionMismatchMessage(base.message, opts)}`,
+        `remote service submission failed: ${augmentRemoteAdmissionMismatchMessage(normalizedBase, opts)}`,
         ...serviceLines,
         ...(refs ? [refs] : []),
       ].join("\n"),

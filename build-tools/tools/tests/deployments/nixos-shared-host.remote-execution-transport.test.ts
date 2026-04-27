@@ -63,3 +63,22 @@ test("remote service submission error explains when the service requires a diffe
   assert.match(String(error.message), /service_git_head: 8f00f5cd723bed179a48847d2daeea3e0c2dcce1/);
   assert.match(String(error.message), /service_reviewed_remote: origin/);
 });
+
+test("remote service submission error rewrites legacy human missing-grant admin commands", () => {
+  const deployment = nixosSharedHostDeploymentFixture({
+    deploymentId: "pleomino-dev",
+    label: "//projects/deployments/pleomino-dev:deploy",
+    environmentStage: "dev",
+  });
+  const error = remoteServiceSubmissionError(
+    new Error(
+      "principal oidc:187bf26e-ee7b-4163-aed3-2440aa706bbf is not authorized to report admission evidence on pleomino-dev: missing admission_reporter grant; expected human group deploy-admission-reporters-pleomino-dev; example admin command: deploy admin keycloak grant-user --deployment //projects/deployments/pleomino-dev:deploy --action report_checks --user-email <user@example.com> --membership-file ./deployment-host/identity-provider/deployment-auth-memberships.json --acting-principal <principal> --admin-group <deploy-admin-keycloak-membership-admin-...>; inspect deploy auth explain-groups --deployment //projects/deployments/pleomino-dev:deploy --action report_checks",
+    ),
+    { deployment },
+  );
+  assert.match(
+    String(error.message),
+    /missing admission_reporter grant; expected human group deploy-admission-reporters-pleomino-dev; grant yourself: deploy admin keycloak grant-user --deployment \/\/projects\/deployments\/pleomino-dev:deploy --profile mini --action report_checks --apply-host; add --user-email <user@example\.com> to grant another human/,
+  );
+  assert.doesNotMatch(String(error.message), /--membership-file|--acting-principal|--admin-group/);
+});
