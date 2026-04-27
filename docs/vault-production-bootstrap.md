@@ -873,7 +873,13 @@ existing `virtualHosts = (...) // { ... };` expression:
 
 The module enables Keycloak with a local PostgreSQL database, binds the HTTP
 listener to `127.0.0.1`, and keeps the database password file as an out-of-store
-path. It renders Keycloak's `hostname` setting as
+host-managed secret path. Keep `secretspec` as the reviewed repo-level contract
+for deployment secrets, while Vault or another reviewed host secret system owns
+the concrete runtime file at
+`deploymentHost.identityProvider.databasePasswordFile`. The bootstrap migration
+can read a root-owned restricted file declaratively during service startup
+without changing ownership for the unprivileged Keycloak runtime. It renders
+Keycloak's `hostname` setting as
 `https://${identityDomain}` while keeping `identityDomain` as the bare nginx
 virtual-host name; this is required because Keycloak requires a full URL when
 `hostname-backchannel-dynamic` is enabled. It does not own nginx in this host
@@ -887,9 +893,10 @@ it, and duplicate exact names can make ACME reject the order. If the existing
 AdGuard rewrites include `"*.apps.kilty.io"`, no additional DNS rewrite is
 needed for the LAN path.
 
-Before rebuilding, create the database password file on the host. Keep this file
-out of git and replace this manual step with the host's reviewed secret
-management system when one is available:
+Before rebuilding, create the database password file on the host if the reviewed
+host secret system has not already materialized it. Keep this file out of git,
+root-owned, and restricted; do not loosen the mode or `chgrp` it for the
+`keycloak` runtime user:
 
 ```bash
 sudo install -d -m 0700 /var/lib/deployment-host-secrets

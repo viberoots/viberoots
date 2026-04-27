@@ -349,6 +349,7 @@ deploymentHost.identityProvider = {
   enable = true;
   hostname = "identity.apps.kilty.io";
   keycloakHttpPort = 8091;
+  databasePasswordFile = "/var/lib/deployment-host-secrets/keycloak-db-password";
   bootstrapClientRedirectUris = [ "https://deploy-auth.apps.kilty.io/oidc/callback" ];
   generatedImportRoot = "/srv/common/deployment-host/identity-provider";
   bootstrapFirstOperatorEmail = "ops@example.com";
@@ -415,6 +416,13 @@ direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
   --acting-principal <principal> \
   --admin-group deploy-admin-identity-membership-admin-project-pleomino
 ```
+
+`deploymentHost.identityProvider.databasePasswordFile` is a host-managed secret
+path, not a repo-managed artifact. Keep `secretspec` as the reviewed repo-level
+secret contract for deployment flows, and let Vault or another reviewed host
+secret system provide the concrete runtime file. The identity-provider module
+can run its bootstrap migration with a root-owned restricted database password
+file; do not loosen the mode or `chgrp` it for the `keycloak` runtime user.
 
 From a reviewed client machine, the same artifacts can be updated without a
 manual SSH session:
