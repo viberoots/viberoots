@@ -13515,6 +13515,183 @@ also genuinely usable by humans, not just technically complete.
 
 ---
 
+## PR-99: Provider-agnostic identity admin surface and first-install bootstrap
+
+### Description
+
+I will close the design gap exposed by PR-98 by removing the IdP implementation name from the
+reviewed operator CLI and by making fresh-install bootstrap work without ad hoc console repair.
+Today the operator story still says `deploy admin keycloak ...`, which leaks the current backing
+implementation into the public reviewed contract even though the underlying workflow is really
+"reconcile reviewed identity-provider shape" and "grant reviewed human membership". That naming
+would make a future non-Keycloak implementation look like a breaking conceptual mismatch even if
+the reviewed workflow stayed the same.
+
+At the same time, the current fresh-install bootstrap path still has a chicken-and-egg failure
+mode: the reviewed remote admin path now correctly requires an authoritative human email in the
+interactive auth session, but a brand-new installation can still start with an identity-provider
+shape that does not emit that email claim yet. The long-term reviewed design should be:
+
+- operator CLI talks about reviewed identity-provider shape and reviewed human membership, not a
+  specific implementation brand
+- provider-specific artifacts, import JSON, or host services remain internal implementation details
+- first-install bootstrap brings up the minimal reviewed interactive-login contract before any
+  reviewed remote admin command depends on it
+- the reviewed repo and host config own deterministic bootstrap shape, while host-local config owns
+  the first trusted operator binding
+- after bootstrap, the normal reviewed admin flow is the same teachable operator path used for all
+  future reconciliation and onboarding
+
+### Scope & Changes
+
+- Replace the public reviewed CLI namespace that currently names Keycloak with a provider-agnostic
+  reviewed identity-admin surface, for example:
+  - `deploy admin identity plan`
+  - `deploy admin identity sync`
+  - `deploy admin identity grant-user`
+  - or an equivalent reviewed naming that clearly expresses "identity-provider shape and
+    membership" without committing to a vendor
+- Preserve the current reviewed workflow semantics while hiding implementation choice:
+  - `plan` remains read-only and explains reviewed identity-provider shape and admin conventions
+  - `sync` reconciles reviewed provider shape, client contract, and mapper/claim expectations
+  - `grant-user` mutates reviewed human membership
+  - internal implementation adapters may still target Keycloak-generated JSON today, but the
+    public CLI, docs, and audit schema stop calling that out as the operator-facing concept
+- Introduce a reviewed first-install bootstrap contract in the host/module layer so a fresh
+  installation starts with a minimal working human login path:
+  - bootstrap the reviewed public human client contract needed for interactive deploy auth
+  - bootstrap the reviewed claim contract required for self-service admin flows, including
+    authoritative human email emission
+  - bootstrap the reviewed admin-group shape needed to authorize the first operator to reconcile
+    fuller provider shape later
+  - keep the first trusted operator binding in host-local config or host-local mutable input rather
+    than in a repo-global shared membership artifact
+- Make bootstrap deterministic and provider-agnostic at the reviewed layer:
+  - the host module should no longer seed an empty provider realm/import artifact when it can seed
+    a minimal reviewed identity bootstrap shape instead
+  - the reviewed bootstrap shape should be derived from the same repo-owned conventions the normal
+    `sync` flow uses wherever possible
+  - provider-specific JSON field names, mapper spellings, or realm import quirks remain internal
+    to the implementation adapter
+- Keep steady-state ownership clear:
+  - repo-managed reviewed shape defines the provider-agnostic contract for clients, claims, groups,
+    and deploy-admin scope conventions
+  - host-local bootstrap config defines which first human is trusted to complete reconciliation
+  - normal operator workflows after bootstrap use the same reviewed `deploy admin identity ...`
+    commands as ongoing maintenance
+- Provide a compatibility and migration story:
+  - either keep `deploy admin keycloak ...` as a deprecated alias for one transition window or add
+    an equally explicit migration/fail message that points operators to the new provider-agnostic
+    command family
+  - update any remote-profile transport, diagnostics, and error-recovery text so happy-path
+    commands and next-step hints use the new namespace consistently
+
+### Tests (in this PR)
+
+- Add CLI tests proving the reviewed public admin namespace no longer exposes the current IdP
+  vendor name in help text, errors, JSON schemas, or happy-path commands.
+- Add compatibility tests for any temporary deprecated alias so existing operator scripts fail
+  predictably or migrate cleanly.
+- Add module/bootstrap tests proving a fresh reviewed identity-provider installation starts with:
+  - the minimal interactive human login client contract
+  - authoritative human email claim emission in the reviewed contract
+  - bootstrap deploy-admin group shape
+  - no repo-stored first-human secret or shared personal membership artifact
+- Add integration tests proving a fresh-install bootstrap operator can:
+  - authenticate through the reviewed interactive flow
+  - run the provider-agnostic reviewed `sync` command
+  - grant reviewed human membership through the provider-agnostic reviewed `grant-user` command
+  - do so without out-of-band console edits
+- Add regression tests proving provider-specific implementation details remain behind adapters and
+  do not leak back into public CLI text, diagnostics, or docs.
+- Add docs-parity tests proving first-install and steady-state operator runbooks use the new
+  provider-agnostic command family consistently.
+
+### Docs (in this PR)
+
+- Update [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md) to use
+  the provider-agnostic reviewed identity-admin command family everywhere the public operator
+  workflow is described.
+- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
+  to describe the reviewed first-install bootstrap story and the steady-state provider-agnostic
+  operator commands.
+- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
+  so a new installation can follow one reviewed bootstrap path without console-only IdP repair.
+- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+  to replace implementation-branded admin commands with provider-agnostic ones and to document the
+  host-local first-operator bootstrap contract.
+- Update troubleshooting docs to distinguish:
+  - fresh-install bootstrap alignment
+  - steady-state reviewed shape reconciliation
+  - first-operator binding issues
+  - ordinary human membership onboarding
+  - provider-specific implementation debugging that remains internal or advanced-only
+
+### Verification Commands
+
+- `v`
+- targeted deployment-domain tests covering:
+  - provider-agnostic admin CLI naming
+  - bootstrap module/install flow
+  - first-operator authentication and reconciliation
+  - steady-state identity shape and human membership workflows
+  - docs and operator-flow parity
+
+### Expected Regression Scope
+
+- `deployment-only`
+- This PR stays within deployment-domain reviewed admin CLI naming, identity-provider bootstrap
+  ownership, remote-profile onboarding flow, implementation-adapter boundaries, and docs. Under the
+  deployment-only verify policy, default `v` / CI can run the reviewed deployment suite unless
+  implementation details force shared build-system selector changes.
+
+### Acceptance Criteria
+
+- The reviewed public operator CLI no longer names Keycloak or any other specific IdP
+  implementation family.
+- A fresh reviewed shared-host installation can bootstrap the first trusted human operator without
+  out-of-band console edits just to make the interactive login contract usable.
+- After bootstrap, operators use one provider-agnostic reviewed command family for both ongoing
+  identity-provider shape reconciliation and human membership grants.
+- Provider-specific implementation details remain internal adapters, artifacts, or module internals
+  rather than public operator concepts.
+- Docs describe one coherent fresh-install plus steady-state story that should remain stable even if
+  the backing IdP implementation changes later.
+
+### Risks
+
+Generalizing the public CLI without a clear internal adapter boundary could produce vague naming,
+half-migrated docs, or a reviewed bootstrap path that still secretly depends on implementation-
+specific console knowledge. Combining the naming change with bootstrap ownership also risks making
+the PR too broad unless the public contract and the host bootstrap seam are kept very explicit.
+
+### Mitigation
+
+Define one clear reviewed provider-agnostic command family, keep the existing implementation behind
+an adapter, derive bootstrap shape from the same reviewed conventions as steady-state sync, keep
+the first-operator binding host-local, and require tests proving a fresh install can reach the
+normal reviewed operator workflow with no out-of-band console repair.
+
+### Consequence of Not Implementing
+
+The reviewed deployment admin story will remain tied to one specific IdP brand in its public
+contract, and future installations will keep carrying a fragile bootstrap gap where the first human
+operator may need manual implementation-specific repair before the reviewed workflow can even begin.
+
+### Downsides for Implementing
+
+This introduces a user-visible command migration and requires careful separation between reviewed
+public concepts and the current Keycloak-backed internals. It also adds bootstrap ownership
+requirements to the host/module layer that will need disciplined documentation and testing.
+
+### Recommendation
+
+Implement next, before expanding the reviewed identity admin workflow further, so the public
+operator contract becomes implementation-agnostic and future shared-host installs start from a
+fully aligned reviewed bootstrap path instead of depending on one-off console repair.
+
+---
+
 ## Companion Docs
 
 - [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
