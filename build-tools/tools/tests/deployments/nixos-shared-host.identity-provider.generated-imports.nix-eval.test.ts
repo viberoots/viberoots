@@ -117,7 +117,11 @@ test("shared-host identity provider module bootstraps generated identity imports
     assert.match(out.keycloakPreStart, /kc\.sh bootstrap-admin service/);
     assert.match(out.keycloakPreStart, /deployment-host-bootstrap-admin/);
     assert.match(out.keycloakPreStart, /temporary recovery admin/i);
-    assert.match(out.keycloakPreStart, /cd .*keycloak-/);
+    assert.match(out.keycloakPreStart, /bootstrap_runtime_dir="\$\(mktemp -d\)"/);
+    assert.match(out.keycloakPreStart, /KC_HOME_DIR="\$bootstrap_runtime_dir"/);
+    assert.match(out.keycloakPreStart, /KC_CONF_DIR="\$bootstrap_runtime_dir\/conf"/);
+    assert.match(out.keycloakPreStart, /ln -s .*keycloak-.*\/providers/);
+    assert.match(out.keycloakPreStart, /ln -s .*keycloak-.*\/lib/);
     assert.doesNotMatch(out.keycloakPreStart, /bootstrap-admin service[\s\S]*--optimized/);
     assert.match(out.keycloakPreStart, /--db-username/);
     assert.match(out.keycloakPreStart, /--db-password/);

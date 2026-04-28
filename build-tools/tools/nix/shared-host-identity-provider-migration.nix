@@ -11,8 +11,17 @@
 let
   keycloak = config.services.keycloak;
   database = keycloak.database;
-  keycloakHome = toString keycloak.package;
-  keycloakBin = "${keycloak.package}/bin";
+  bootstrapKeycloakBuild = keycloak.package.override {
+    plugins =
+      keycloak.package.enabledPlugins
+      ++ keycloak.plugins
+      ++ (with keycloak.package.plugins; [
+        quarkus-systemd-notify
+        quarkus-systemd-notify-deployment
+      ]);
+  };
+  keycloakHome = toString bootstrapKeycloakBuild;
+  keycloakBin = "${bootstrapKeycloakBuild}/bin";
   escape = lib.escapeShellArg;
   bootstrapAdminClientId = "deployment-host-bootstrap-admin";
   bootstrapAdminSecretFile =
@@ -129,8 +138,13 @@ EOF
       exit 0
     fi
     export BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET="$(tr -d '\n' < ${escape bootstrapAdminSecretFile})"
-    cd ${escape keycloakHome}
-    if ! ${keycloakBin}/kc.sh bootstrap-admin service \
+    bootstrap_runtime_dir="$(mktemp -d)"
+    trap 'rm -rf "$bootstrap_runtime_dir"' EXIT
+    install -d -m 0700 "$bootstrap_runtime_dir/conf"
+    ln -s ${escape keycloakHome}/providers "$bootstrap_runtime_dir/providers"
+    ln -s ${escape keycloakHome}/lib "$bootstrap_runtime_dir/lib"
+    if ! KC_HOME_DIR="$bootstrap_runtime_dir" KC_CONF_DIR="$bootstrap_runtime_dir/conf" \
+      ${keycloakBin}/kc.sh bootstrap-admin service \
       "''${db_args[@]}" \
       --client-id ${escape bootstrapAdminClientId} \
       --client-secret:env=BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET \
