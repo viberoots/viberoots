@@ -66,7 +66,7 @@ test("identity-provider migration reads restricted host secrets through startup 
     assert.match(out.preStart, /<\$?\{?['"]?\/run\/secrets\/keycloak-db-password/);
     assert.match(out.preStart, /set -o errexit/);
     assert.match(out.preStart, /cd .*keycloak-/);
-    assert.match(out.preStart, /bootstrap-admin service[\s\S]*--optimized/);
+    assert.doesNotMatch(out.preStart, /bootstrap-admin service[\s\S]*--optimized/);
     assert.match(out.preStart, /--db-username/);
     assert.match(out.preStart, /--db-password/);
     assert.match(out.preStart, /--db-url(?:\b|-host|-database|-port|-properties)/);

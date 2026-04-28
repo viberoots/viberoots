@@ -131,7 +131,6 @@ EOF
     export BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET="$(tr -d '\n' < ${escape bootstrapAdminSecretFile})"
     cd ${escape keycloakHome}
     if ! ${keycloakBin}/kc.sh bootstrap-admin service \
-      --optimized \
       "''${db_args[@]}" \
       --client-id ${escape bootstrapAdminClientId} \
       --client-secret:env=BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET \
