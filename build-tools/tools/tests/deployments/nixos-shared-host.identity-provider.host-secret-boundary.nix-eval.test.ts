@@ -69,6 +69,8 @@ test("identity-provider migration reads restricted host secrets through startup 
     assert.match(out.preStart, /--db-password/);
     assert.match(out.preStart, /--db-url(?:\b|-host|-database|-port|-properties)/);
     assert.doesNotMatch(out.preStart, /(^|[[:space:]])--db([[:space:]]|$)/);
+    assert.match(out.preStart, /--client-secret:env=BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET/);
+    assert.doesNotMatch(out.preStart, /(^|[[:space:]])--optimized([[:space:]]|$)/);
     assert.doesNotMatch(out.preStart, /chmod|chgrp|sudo/);
     assert.doesNotMatch(out.postStart, /chmod|chgrp|sudo/);
   });

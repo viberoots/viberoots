@@ -121,6 +121,8 @@ test("shared-host identity provider module bootstraps generated identity imports
     assert.match(out.keycloakPreStart, /--db-password/);
     assert.match(out.keycloakPreStart, /--db-url(?:\b|-host|-database|-port|-properties)/);
     assert.doesNotMatch(out.keycloakPreStart, /(^|[[:space:]])--db([[:space:]]|$)/);
+    assert.match(out.keycloakPreStart, /--client-secret:env=BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET/);
+    assert.doesNotMatch(out.keycloakPreStart, /(^|[[:space:]])--optimized([[:space:]]|$)/);
     assert.match(out.keycloakPostStart, /kcadm\.sh create partialImport/);
     assert.match(out.keycloakPostStart, /ifResourceExists=OVERWRITE/);
     assert.match(out.keycloakPostStart, /live bootstrap realm shape/);

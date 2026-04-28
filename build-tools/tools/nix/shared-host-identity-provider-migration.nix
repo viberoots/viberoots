@@ -129,10 +129,9 @@ EOF
     fi
     export BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET="$(tr -d '\n' < ${escape bootstrapAdminSecretFile})"
     if ! ${keycloakBin}/kc.sh bootstrap-admin service \
-      --optimized \
       "''${db_args[@]}" \
       --client-id ${escape bootstrapAdminClientId} \
-      --client-secret:env BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET \
+      --client-secret:env=BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET \
       --no-prompt; then
       echo "bootstrap identity migration failed while creating the temporary recovery admin" >&2
       exit 1
