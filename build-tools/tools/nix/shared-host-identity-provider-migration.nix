@@ -22,7 +22,6 @@ let
     if database.createLocally && database.host == "localhost" then "keycloak" else database.name;
   databaseUser =
     if database.createLocally && database.host == "localhost" then "keycloak" else database.username;
-  databaseVendor = if database.type == "postgresql" then "postgres" else database.type;
   databaseProps =
     if database.type == "postgresql" then
       lib.concatStringsSep "&" (
@@ -54,7 +53,6 @@ let
   '';
   databaseArgsScript = ''
     db_args=(
-      --db ${escape databaseVendor}
       --db-username ${escape databaseUser}
     )
     ${lib.optionalString (database.passwordFile != null) ''
