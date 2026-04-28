@@ -27,7 +27,8 @@ test("verify-log-status: formatVerifyStatusText renders multiline (not one-line 
   assert.match(out, /\n  Skip:\s+1\n/);
   assert.match(out, /\nTests remaining:\s+7\n/);
   assert.match(out, /\nGC detected:\s+yes\n/);
-  assert.match(out, /\nLog:\s+\/tmp\/verify\.log/);
+  assert.match(out, /\n\/tmp\/verify\.log/);
+  assert.doesNotMatch(out, /\nLog:\s+\/tmp\/verify\.log/);
 
   // The tail-log legacy formatter used a single line like:
   // "Tests so far:   Pass X. Fail Y. ..."

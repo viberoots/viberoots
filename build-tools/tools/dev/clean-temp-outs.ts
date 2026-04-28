@@ -4,7 +4,7 @@
  * Best-effort cleanup of ephemeral Buck/Nix temp artifacts to avoid GC roots/bloat.
  *
  * - Removes buck-out/tmp/buck-impure-* directories older than N minutes (default 30).
- * - Removes dead one-shot buck-out/devbuild-* isolation directories immediately.
+ * - Removes dead owned Buck isolation directories immediately.
  * - Removes buck-out/tmp/node-v8-coverage/v-* directories older than N minutes (default 30).
  * - Removes buck-out/tmp/verify-logs/verify-* log files older than N minutes (default 30).
  * - Optionally removes a repo-root "result" symlink if present and dangling.
@@ -13,7 +13,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { getFlagStr } from "../lib/cli.ts";
-import { pruneDeadDevBuildIsolationDirs } from "./clean-temp-outs-lib.ts";
+import { pruneDeadOwnedBuckIsolationDirs } from "./clean-temp-outs-lib.ts";
 
 type Args = { minutes?: string };
 
@@ -60,10 +60,10 @@ async function main() {
     }
   }
 
-  // 1.5) Remove dead one-shot dev-build isolation dirs under buck-out.
-  // These are per-run scratch Buck state directories and can explode Linux watcher counts
-  // if they accumulate between runs.
-  await pruneDeadDevBuildIsolationDirs(repoRoot).catch(() => []);
+  // 1.5) Remove dead owned Buck isolation dirs under buck-out.
+  // These are per-run scratch Buck state directories and can explode watcher counts
+  // if they accumulate between runs. Shared daemon isolations are intentionally preserved.
+  await pruneDeadOwnedBuckIsolationDirs(repoRoot).catch(() => []);
 
   // 2) Remove stale per-verify raw coverage dirs under buck-out/tmp/node-v8-coverage
   const v8covParent = path.join(tmpDir, "node-v8-coverage");
@@ -83,13 +83,17 @@ async function main() {
 
   // 2.5) Remove stale verify logs under buck-out/tmp/verify-logs
   const verifyLogsDir = path.join(tmpDir, "verify-logs");
+  const verifyLogRetentionMin = Math.max(
+    30,
+    Number.parseInt(String(process.env.VERIFY_LOG_RETENTION_MINUTES || "10080"), 10) || 10080,
+  );
+  const verifyLogCutoffMs = Date.now() - verifyLogRetentionMin * 60 * 1000;
   try {
     const logNames = await fsp.readdir(verifyLogsDir);
-    // Keep a small number of the newest verify logs even if old.
+    // Keep enough of the newest verify logs even if old.
     // Rationale: we want verify logs to be available for debugging failures from the last few runs,
     // but still bounded to avoid disk growth.
-    const KEEP_VERIFY_LOGS = 10;
-
+    const KEEP_VERIFY_LOGS = 50;
     const entries: Array<{ name: string; mtime: number }> = [];
     for (const name of logNames) {
       if (!/^verify-/.test(name)) continue;
@@ -105,7 +109,7 @@ async function main() {
 
     for (const { name, mtime } of entries) {
       if (keep.has(name)) continue;
-      if (mtime < cutoffMs) {
+      if (mtime < verifyLogCutoffMs) {
         await rmRf(path.join(verifyLogsDir, name));
       }
     }
@@ -121,7 +125,7 @@ async function main() {
       const st = await safeLstat(p);
       if (!st) continue;
       const mtime = st.mtimeMs || st.ctimeMs || 0;
-      if (mtime > 0 && mtime < cutoffMs) {
+      if (mtime > 0 && mtime < verifyLogCutoffMs) {
         await rmRf(p);
       }
     }

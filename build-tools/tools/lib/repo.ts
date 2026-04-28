@@ -13,21 +13,28 @@ export async function pathExists(p: string): Promise<boolean> {
 }
 
 export async function findRepoRoot(start: string): Promise<string> {
-  let dir = path.resolve(start);
-  for (;;) {
-    if (await pathExists(path.join(dir, "flake.nix"))) return dir;
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
+  const candidates = [
+    (process.env.WORKSPACE_ROOT || "").trim(),
+    (process.env.LIVE_ROOT || "").trim(),
+    start,
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    let dir = path.resolve(candidate);
+    for (;;) {
+      if (await pathExists(path.join(dir, "flake.nix"))) return dir;
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
   }
   try {
     const { stdout } = await $({
       stdio: "pipe",
-    })`git -C ${start} rev-parse --show-toplevel`.nothrow();
+    })`git -C ${candidates[0] || start} rev-parse --show-toplevel`.nothrow();
     const p = String(stdout || "").trim();
     if (p) return p;
   } catch {}
-  return path.resolve(start);
+  return path.resolve(candidates[0] || start);
 }
 
 // Lightweight, synchronous repo root resolver used by zx scripts and helpers.

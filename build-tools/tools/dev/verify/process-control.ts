@@ -82,10 +82,13 @@ export async function startBuckWatchdog(opts: {
   root: string;
   zxInitPath: string;
   iso: string;
+  logFile?: string | null;
 }): Promise<void> {
   const watchdog = path.join(opts.root, "build-tools", "tools", "dev", "buck-watchdog.ts");
+  const quote = (value: string) => JSON.stringify(value);
+  const logFileArg = opts.logFile ? `--log-file ${quote(opts.logFile)}` : "";
   await $({
     stdio: "ignore",
     cwd: opts.root,
-  })`bash --noprofile --norc -c ${`node --experimental-top-level-await --experimental-strip-types --disable-warning=ExperimentalWarning --import ${opts.zxInitPath} ${watchdog} --parent ${process.pid} --iso ${opts.iso} --patterns v-,verify-nested- >/dev/null 2>&1 & disown`}`.nothrow();
+  })`bash --noprofile --norc -c ${`node --experimental-top-level-await --experimental-strip-types --disable-warning=ExperimentalWarning --import ${quote(opts.zxInitPath)} ${quote(watchdog)} --parent ${process.pid} --iso ${quote(opts.iso)} --patterns v-,verify-nested- --sweep-while-parent-alive 0 ${logFileArg} >/dev/null 2>&1 & disown`}`.nothrow();
 }

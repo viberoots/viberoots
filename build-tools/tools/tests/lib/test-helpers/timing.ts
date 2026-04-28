@@ -3,27 +3,32 @@ import { performance } from "node:perf_hooks";
 
 type TimingAgg = { msTotal: number; count: number };
 
-const TIMING_MODE = String(process.env.TEST_TIMING || "").trim();
-const ENABLE_TIMING = TIMING_MODE === "1" || TIMING_MODE === "summary";
-const ENABLE_TIMING_DETAIL = TIMING_MODE === "1";
-const ENABLE_TIMING_SUMMARY = TIMING_MODE === "summary" || process.env.TEST_TIMING_SUMMARY === "1";
-
 const timingAgg: Map<string, TimingAgg> = new Map();
 
+function timingMode(): string {
+  return String(process.env.TEST_TIMING || "").trim();
+}
+
+function shouldRecordTiming(): boolean {
+  const mode = timingMode();
+  return mode === "1" || mode === "summary" || process.env.TEST_TIMING_SUMMARY === "1";
+}
+
 function recordTiming(label: string, ms: number) {
-  if (!ENABLE_TIMING) return;
+  const mode = timingMode();
+  if (!shouldRecordTiming()) return;
   const cur = timingAgg.get(label) || { msTotal: 0, count: 0 };
   cur.msTotal += ms;
   cur.count += 1;
   timingAgg.set(label, cur);
-  if (!ENABLE_TIMING_DETAIL) return;
+  if (mode !== "1") return;
   try {
     console.error(`[timing] ${label}: ${ms.toFixed(1)}ms`);
   } catch {}
 }
 
 process.on("exit", () => {
-  if (!ENABLE_TIMING_SUMMARY) return;
+  if (timingMode() !== "summary" && process.env.TEST_TIMING_SUMMARY !== "1") return;
   try {
     const rows = Array.from(timingAgg.entries())
       .map(([label, agg]) => ({

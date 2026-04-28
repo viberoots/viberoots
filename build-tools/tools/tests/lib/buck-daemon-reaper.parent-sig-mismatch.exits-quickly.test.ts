@@ -40,9 +40,15 @@ test("buck-daemon-reaper: does not wait when parent-sig mismatches (pid reuse gu
       "lib",
       "buck-daemon-reaper.ts",
     );
+    const zxInit = path.join(repoRoot, "build-tools", "tools", "dev", "zx-init.mjs");
     const reaper = spawn(
-      "zx-wrapper",
+      process.execPath,
       [
+        "--experimental-top-level-await",
+        "--experimental-strip-types",
+        "--disable-warning=ExperimentalWarning",
+        "--import",
+        zxInit,
         reaperPath,
         "--parent",
         String(process.pid),

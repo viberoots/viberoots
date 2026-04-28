@@ -96,6 +96,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/cloudflare-pages.contract.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.control-plane.service.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-targets.install.cloudflare.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-targets.install.fragments.no-inherited-kill.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.deploy.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.extraction.from-targets.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.preview.e2e.test.ts": True,

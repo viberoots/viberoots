@@ -11,6 +11,7 @@
 let
   keycloak = config.services.keycloak;
   database = keycloak.database;
+  keycloakHome = toString keycloak.package;
   keycloakBin = "${keycloak.package}/bin";
   escape = lib.escapeShellArg;
   bootstrapAdminClientId = "deployment-host-bootstrap-admin";
@@ -128,7 +129,9 @@ EOF
       exit 0
     fi
     export BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET="$(tr -d '\n' < ${escape bootstrapAdminSecretFile})"
+    cd ${escape keycloakHome}
     if ! ${keycloakBin}/kc.sh bootstrap-admin service \
+      --optimized \
       "''${db_args[@]}" \
       --client-id ${escape bootstrapAdminClientId} \
       --client-secret:env=BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET \

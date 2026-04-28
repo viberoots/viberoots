@@ -89,7 +89,7 @@ const src = `export async function resolve(specifier, context, nextResolve) {
     const isRelOrAbs = specifier.startsWith('./') || specifier.startsWith('../') || specifier.startsWith('/');
     if (isRelOrAbs) {
       const last = new URL(specifier, base).pathname.split('/').pop() || '';
-      if (!/\\.[a-zA-Z0-9]+$/.test(last)) {
+      if (!/\\.(?:cjs|js|json|mjs|node|ts|tsx)$/.test(last)) {
         const withTs = new URL(specifier + '.ts', base).href;
         return await nextResolve(withTs, context);
       }
@@ -155,5 +155,34 @@ register(
     WORKSPACE_ROOT_FIXED.endsWith("/") ? WORKSPACE_ROOT_FIXED : WORKSPACE_ROOT_FIXED + "/",
   ),
 );
+
+const verifyProcessStateFile = String(process.env.BNX_VERIFY_PROCESS_STATE_FILE || "").trim();
+const verifyLogFile = String(process.env.BNX_VERIFY_LOG_FILE || "").trim();
+const verifyTarget = String(process.env.BUCK_TEST_TARGET || "").trim();
+const shouldRegisterVerifyProcess =
+  String(process.env.BNX_VERIFY_REGISTER_PROCESS || "").trim() === "1";
+if (shouldRegisterVerifyProcess) {
+  // Treat registration as a one-shot marker for this process. Child processes
+  // inherit process.env by default, so leaving this set would make opt-in
+  // contagious and recreate the suite-wide registration storm.
+  delete process.env.BNX_VERIFY_REGISTER_PROCESS;
+}
+if (
+  shouldRegisterVerifyProcess &&
+  verifyProcessStateFile &&
+  verifyLogFile &&
+  verifyTarget &&
+  !globalThis.__bnxVerifyProcessRegistered
+) {
+  try {
+    globalThis.__bnxVerifyProcessRegistered = true;
+    const ownedState = await import("./verify/owned-process-state");
+    await ownedState.registerCurrentVerifyProcess({
+      stateFile: verifyProcessStateFile,
+      logFile: verifyLogFile,
+      target: verifyTarget,
+    });
+  } catch {}
+}
 
 //

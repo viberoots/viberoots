@@ -3,6 +3,7 @@ import "zx/globals";
 import { getFlagStr } from "../lib/cli.ts";
 import { resolveToolPath } from "../lib/tool-paths.ts";
 import { ownerPidForIsolation } from "./buck-watchdog-lib.ts";
+import * as fsp from "node:fs/promises";
 
 function isPidAlive(pid: number): boolean {
   try {
@@ -21,8 +22,14 @@ async function killBuck2dByPid(pid: number): Promise<void> {
   } catch {}
 }
 
-async function tryBuckKillIsolation(iso: string): Promise<void> {
+async function appendLog(logFile: string, line: string): Promise<void> {
+  if (!logFile) return;
+  await fsp.appendFile(logFile, line.endsWith("\n") ? line : line + "\n", "utf8").catch(() => {});
+}
+
+async function tryBuckKillIsolation(iso: string, logFile: string, reason: string): Promise<void> {
   if (!iso) return;
+  await appendLog(logFile, `[watchdog] buck2 kill iso=${iso} reason=${reason}`);
   await $({
     stdio: "ignore",
     reject: false,
@@ -31,7 +38,7 @@ async function tryBuckKillIsolation(iso: string): Promise<void> {
   })`buck2 --isolation-dir ${iso} kill`;
 }
 
-async function sweepOrphans(patterns: RegExp) {
+async function sweepOrphans(patterns: RegExp, logFile: string, reason: string) {
   try {
     const psPath = await resolveToolPath("ps");
     const { stdout } = await $({ stdio: "pipe" })`${psPath} -A -o pid=,command=`;
@@ -45,7 +52,7 @@ async function sweepOrphans(patterns: RegExp) {
       if (!patterns.test(iso)) continue;
       const ownerPid = ownerPidForIsolation(iso);
       if (!Number.isFinite(ownerPid) || ownerPid == null || isPidAlive(ownerPid)) continue;
-      await tryBuckKillIsolation(iso);
+      await tryBuckKillIsolation(iso, logFile, `${reason}:owner-pid-${ownerPid}-dead`);
       await new Promise((r) => setTimeout(r, 250));
       await killBuck2dByPid(pidFromLine);
     }
@@ -56,6 +63,8 @@ async function main() {
   const parentPid = Number(getFlagStr("parent", "0"));
   const iso = getFlagStr("iso", "");
   const patternsRaw = getFlagStr("patterns", "zxtest-,exporter-,devbuild-");
+  const logFile = getFlagStr("log-file", "");
+  const sweepWhileParentAlive = getFlagStr("sweep-while-parent-alive", "1") !== "0";
   const pat = new RegExp(
     `^(?:${patternsRaw
       .split(",")
@@ -66,15 +75,17 @@ async function main() {
   if (!Number.isFinite(parentPid) || parentPid <= 1) return;
 
   while (isPidAlive(parentPid)) {
-    await sweepOrphans(pat);
+    if (sweepWhileParentAlive) {
+      await sweepOrphans(pat, logFile, "parent-alive-sweep");
+    }
     await new Promise((r) => setTimeout(r, 1000));
   }
 
   // Parent exited: kill the main isolation and sweep once more
   if (iso) {
-    await tryBuckKillIsolation(iso);
+    await tryBuckKillIsolation(iso, logFile, "parent-exited-main-isolation");
   }
-  await sweepOrphans(pat);
+  await sweepOrphans(pat, logFile, "parent-exited-sweep");
 }
 
 main().catch(() => process.exit(0));

@@ -4,6 +4,16 @@ import path from "node:path";
 import process from "node:process";
 import { resolveToolPath } from "../../lib/tool-paths.ts";
 import { activeNixGcProcesses } from "./preflight.ts";
+import { writeVerifySafetyRailsTriggerSnapshot } from "./safety-rails-snapshot";
+import {
+  formatLoadAvg,
+  formatProcessCounts,
+  makeThrottledProcessSampler,
+  summarizeVerifySafetyRailsTelemetry,
+  type ProcessCounts,
+} from "./safety-rails-telemetry";
+
+export { summarizeVerifySafetyRailsTelemetry, writeVerifySafetyRailsTriggerSnapshot };
 
 function parseNum(s: string | undefined): number | null {
   const raw = String(s ?? "").trim();
@@ -40,31 +50,6 @@ async function appendLine(p: string, line: string): Promise<void> {
   await fsp.appendFile(p, line.endsWith("\n") ? line : line + "\n", "utf8").catch(() => {});
 }
 
-export type VerifySafetyRailsSnapshotDeps = {
-  sampleDfText: () => Promise<string>;
-};
-
-export async function writeVerifySafetyRailsTriggerSnapshot(
-  dir: string,
-  reason: string,
-  deps?: Partial<VerifySafetyRailsSnapshotDeps>,
-): Promise<void> {
-  const out = path.join(dir, "trigger-snapshot.txt");
-  await appendLine(out, `[verify] safety-rails trigger: ${reason}\n`);
-  const sampleDfText =
-    deps?.sampleDfText ??
-    (async () => {
-      try {
-        const res = await $({ stdio: "pipe", reject: false })`df -Pk . /nix/store`;
-        return String(res.stdout || "");
-      } catch {
-        return "";
-      }
-    });
-  const dfText = await sampleDfText();
-  if (dfText.trim()) await appendLine(out, dfText);
-}
-
 export type VerifySafetyRailsDecision = {
   shouldStop: boolean;
   reason: string;
@@ -94,6 +79,7 @@ export function decideVerifySafetyRailsTrigger(opts: {
 
 export type VerifySafetyRailsPollDeps = {
   freeGiBForPath: (p: string) => Promise<number | null>;
+  sampleProcessCounts?: () => Promise<ProcessCounts | null>;
   writeSnapshot: (dir: string, reason: string) => Promise<void>;
   onTrigger: (reason: string) => Promise<void>;
   killProcessGroup: (processGroupIdToKill: number, signal: NodeJS.Signals) => void;
@@ -112,7 +98,13 @@ export async function pollVerifySafetyRailsOnce(opts: {
 }): Promise<VerifySafetyRailsDecision | null> {
   const cur = await opts.deps.freeGiBForPath("/nix/store");
   if (cur == null) return null;
-  await appendLine(opts.telemetryPath, `${Date.now()} freeGiB=${cur}`);
+  const processCounts = opts.deps.sampleProcessCounts
+    ? await opts.deps.sampleProcessCounts().catch(() => null)
+    : null;
+  await appendLine(
+    opts.telemetryPath,
+    `${Date.now()} freeGiB=${cur} ${formatLoadAvg()} ${formatProcessCounts(processCounts)}`,
+  );
 
   const activeGc = await opts.deps.activeNixGcProcesses();
   if (activeGc.length > 0) {
@@ -151,19 +143,28 @@ export async function startVerifySafetyRails(opts: {
   analysisDir: string;
   processGroupIdToKill: number;
   onTrigger?: (reason: string) => Promise<void>;
-}): Promise<{ stop: () => void }> {
+}): Promise<{ stop: () => void; telemetryPath: string | null }> {
   const lowSpace = defaultOrNonNegative(parseNum(process.env.VERIFY_LOW_SPACE_GB), 5);
   const dropBudget = defaultOrNonNegative(parseNum(process.env.VERIFY_NIX_DROP_BUDGET_GB), 40);
   const intervalSec = defaultOrAtLeast(parseNum(process.env.VERIFY_SAFETY_RAILS_POLL_SECS), 5, 1);
+  const processSampleSec = defaultOrAtLeast(
+    parseNum(process.env.VERIFY_SAFETY_RAILS_PROCESS_SAMPLE_SECS),
+    60,
+    5,
+  );
 
   const base = await freeGiBForPath("/nix/store");
   if (base == null) {
-    return { stop: () => {} };
+    return { stop: () => {}, telemetryPath: null };
   }
 
   await fsp.mkdir(opts.analysisDir, { recursive: true }).catch(() => {});
   const telemetry = path.join(opts.analysisDir, "nix-store-telemetry.log");
   await appendLine(telemetry, `[verify] safety-rails baseline /nix/store free ~${base}GiB`);
+  await appendLine(
+    telemetry,
+    `${Date.now()} freeGiB=${base} ${formatLoadAvg()} ${formatProcessCounts(null)}`,
+  );
 
   if ((process.env.VERIFY_ANALYSIS_STORE_TOTALS || "").trim() === "1") {
     const timeoutPath = await resolveToolPath("timeout");
@@ -178,11 +179,12 @@ export async function startVerifySafetyRails(opts: {
 
   let stopped = false;
   let pollInFlight = false;
+  const throttledProcessSample = makeThrottledProcessSampler(processSampleSec);
   const timer = setInterval(() => {
     void (async () => {
+      if (stopped) return;
       if (pollInFlight) return;
       pollInFlight = true;
-      if (stopped) return;
       try {
         if (stopped) return;
         const decision = await pollVerifySafetyRailsOnce({
@@ -199,6 +201,7 @@ export async function startVerifySafetyRails(opts: {
             onTrigger: async (reason) => {
               await opts.onTrigger?.(reason);
             },
+            sampleProcessCounts: throttledProcessSample,
             killProcessGroup: (pgid, signal) => {
               process.kill(-pgid, signal);
             },
@@ -217,6 +220,7 @@ export async function startVerifySafetyRails(opts: {
   timer.unref?.();
 
   return {
+    telemetryPath: telemetry,
     stop: () => {
       stopped = true;
       clearInterval(timer);

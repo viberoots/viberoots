@@ -1,7 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import process from "node:process";
 import { test } from "node:test";
-import { isLikelyEphemeralIsolation } from "../../dev/verify/buck-orphan-cleanup.ts";
+import { isLikelyEphemeralIsolation } from "../../dev/verify/buck-orphan-cleanup";
+import {
+  liveOwnerPidFromEphemeralIsolation,
+  ownerPidFromEphemeralIsolation,
+} from "../../dev/verify/buck-orphan-cleanup-lib";
 
 test("orphan buck cleanup: matches ephemeral verify/debug/test isolations only", () => {
   const yes = [
@@ -24,4 +29,15 @@ test("orphan buck cleanup: matches ephemeral verify/debug/test isolations only",
   ];
   for (const iso of yes) assert.equal(isLikelyEphemeralIsolation(iso), true, iso);
   for (const iso of no) assert.equal(isLikelyEphemeralIsolation(iso), false, iso);
+});
+
+test("orphan buck cleanup: live verify owner isolations are protected", () => {
+  const current = `v-${process.pid}-1772235882`;
+  const currentNested = `verify-nested-${process.pid}-deadbeefcafe`;
+  assert.equal(ownerPidFromEphemeralIsolation(current), process.pid);
+  assert.equal(ownerPidFromEphemeralIsolation(currentNested), process.pid);
+  assert.equal(liveOwnerPidFromEphemeralIsolation(current), process.pid);
+  assert.equal(liveOwnerPidFromEphemeralIsolation(currentNested), process.pid);
+  assert.equal(liveOwnerPidFromEphemeralIsolation("v-999999999-1772235882"), null);
+  assert.equal(liveOwnerPidFromEphemeralIsolation("verify-nested-deadbeefcafe"), null);
 });

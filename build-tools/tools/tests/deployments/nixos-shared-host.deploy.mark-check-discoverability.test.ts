@@ -6,6 +6,7 @@ import { test } from "node:test";
 import {
   REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
   prepareRemoteExecFixture,
+  requirePleominoDevCheck,
   remoteExecEnv,
 } from "./nixos-shared-host.deploy.remote-exec.helpers.ts";
 import {
@@ -16,17 +17,6 @@ import {
 } from "./nixos-shared-host.jenkins.fixture.ts";
 import { installFakeRemoteTransport } from "./nixos-shared-host.remote-transport.fake.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
-
-async function requirePleominoDevCheck(tmp: string) {
-  const sharedTargetsPath = path.join(tmp, "projects", "deployments", "pleomino-shared", "TARGETS");
-  await fsp.writeFile(
-    sharedTargetsPath,
-    (await fsp.readFile(sharedTargetsPath, "utf8"))
-      .replace('"required_checks": "",', '"required_checks": "deploy/pleomino-dev",')
-      .replace("    required_checks = [],", '    required_checks = ["deploy/pleomino-dev"],'),
-    "utf8",
-  );
-}
 
 test("remote profile deploy surface keeps missing mark-check guidance discoverable", async () => {
   await runInTemp("nixos-shared-host-remote-mark-check-discoverability", async (tmp, $) => {

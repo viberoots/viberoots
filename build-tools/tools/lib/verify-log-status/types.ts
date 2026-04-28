@@ -14,6 +14,9 @@ export type VerifyStatus = {
   elapsed?: string;
   gcDetected: boolean;
   source: VerifyStatusSource;
+  passName?: string;
+  passIndex?: number;
+  passTotal?: number;
 };
 
 const ANSI_RE = /\x1b\[[0-9;?]*[A-Za-z]/g;

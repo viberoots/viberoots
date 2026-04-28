@@ -1,5 +1,4 @@
 import * as fsp from "node:fs/promises";
-import { spawnSync } from "node:child_process";
 import path from "node:path";
 import type {
   CloudflarePagesDeployment,
@@ -127,28 +126,6 @@ async function writeTargetsManifest(
   );
 }
 
-function killActiveSyntheticBuckView(workspaceRoot: string): void {
-  if (process.env.BUCK_NO_ISOLATION === "1") return;
-  const isolationDir = String(
-    process.env.BUCK_ISOLATION_DIR ||
-      process.env.BUCK_ISOLATION_DIR_EXPORTER ||
-      process.env.BUCK_NESTED_ISO ||
-      "",
-  ).trim();
-  if (!isolationDir) return;
-  try {
-    spawnSync("buck2", ["--isolation-dir", isolationDir, "kill"], {
-      cwd: workspaceRoot,
-      stdio: "ignore",
-      env: {
-        ...process.env,
-        HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
-        SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
-      },
-    });
-  } catch {}
-}
-
 export async function writeTargetsFragments(
   workspaceRoot: string,
   newFragments: Map<string, TargetsFileFragment>,
@@ -167,9 +144,6 @@ export async function writeTargetsFragments(
     }),
   );
   await writeTargetsManifest(workspaceRoot, fragments);
-  // Synthetic TARGETS are rewritten after earlier cqueries in the same temp repo. Restart the
-  // active isolation so subsequent CLI invocations do not reuse a stale package view.
-  killActiveSyntheticBuckView(workspaceRoot);
 }
 
 export async function synchronizeInstalledDeployments(

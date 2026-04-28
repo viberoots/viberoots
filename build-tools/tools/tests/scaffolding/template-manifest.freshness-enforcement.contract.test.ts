@@ -8,9 +8,12 @@ async function read(relPath: string): Promise<string> {
 }
 
 test("verify enforcement: verify runner checks template-manifest generator freshness", async () => {
-  const src = await read("build-tools/tools/dev/verify/run-verify.ts");
-  assert.match(src, /gen-template-manifest-artifacts\.ts/);
-  assert.match(src, /--check/);
+  const runnerSrc = await read("build-tools/tools/dev/verify/run-verify.ts");
+  const helperSrc = await read("build-tools/tools/dev/verify/template-manifest-check.ts");
+
+  assert.match(runnerSrc, /runTemplateManifestCheck/);
+  assert.match(helperSrc, /gen-template-manifest-artifacts\.ts/);
+  assert.match(helperSrc, /--check/);
 });
 
 test("CI enforcement: prebuild-guard stage checks template-manifest generator freshness", async () => {

@@ -3,9 +3,22 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { shouldRunNixStoreOptimizeForRequestedTargets } from "../../dev/verify/housekeeping.ts";
 
-test("nix store optimize runs only for full-suite verify target set", () => {
-  assert.equal(shouldRunNixStoreOptimizeForRequestedTargets(["//..."]), true);
-  assert.equal(shouldRunNixStoreOptimizeForRequestedTargets(["//projects/apps/my-app/..."]), false);
-  assert.equal(shouldRunNixStoreOptimizeForRequestedTargets(["//projects/apps/my-app:app"]), false);
-  assert.equal(shouldRunNixStoreOptimizeForRequestedTargets([]), false);
+test("nix store optimize is opt-in even for full-suite verify target sets", () => {
+  assert.equal(shouldRunNixStoreOptimizeForRequestedTargets(["//..."], {}), false);
+  assert.equal(
+    shouldRunNixStoreOptimizeForRequestedTargets(["//projects/apps/my-app/..."], {
+      VERIFY_NIX_OPTIMISE: "1",
+    }),
+    true,
+  );
+  assert.equal(
+    shouldRunNixStoreOptimizeForRequestedTargets(["//projects/apps/my-app:app"], {
+      VERIFY_NIX_OPTIMIZE: "true",
+    }),
+    true,
+  );
+  assert.equal(
+    shouldRunNixStoreOptimizeForRequestedTargets([], { VERIFY_NIX_OPTIMISE: "0" }),
+    false,
+  );
 });

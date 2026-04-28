@@ -16,6 +16,9 @@ export function formatVerifyStatusJsonLine(st: VerifyStatus): string {
     gc_detected: st.gcDetected,
     log: st.logPath,
     source: st.source,
+    pass_name: st.passName ?? null,
+    pass_index: st.passIndex ?? null,
+    pass_total: st.passTotal ?? null,
   };
   return JSON.stringify(out);
 }
@@ -61,6 +64,11 @@ export function formatVerifyStatusText(
 
   const lines: string[] = [];
   lines.push(`${label("Time elapsed:")}    ${val(elapsed)}`);
+  if (st.passName && st.passIndex && st.passTotal) {
+    lines.push(
+      `${label("Pass group:")}      ${val(`${st.passName} (${st.passIndex}/${st.passTotal})`)}`,
+    );
+  }
   lines.push(`${label(st.done ? "Tests finished:" : "Tests so far:")}`);
   lines.push(`  ${val(`Pass:          ${st.pass}`)}`);
   lines.push(`  ${val(`Fail:          ${st.fail}`)}`);
@@ -70,7 +78,7 @@ export function formatVerifyStatusText(
   lines.push(`${label("----------------------")}`);
   lines.push(`${label("Tests remaining:")} ${val(remaining)}`);
   lines.push(`${label("GC detected:")} ${val(st.gcDetected ? "yes" : "no")}`);
-  lines.push(`${label("Log:")} ${st.logPath}`);
+  lines.push(st.logPath);
 
   if (st.failed.length > 0) {
     const cap = 10;

@@ -11,9 +11,11 @@ import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers.ts";
 import {
   installClientProfile,
   prepareRemoteExecFixture,
+  requirePleominoDevCheck,
   remoteExecEnv,
   REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
 } from "./nixos-shared-host.deploy.remote-exec.helpers.ts";
+import { enableInteractivePkceVaultRuntime } from "./deployment-admin-keycloak.remote-profile.pr98.helpers.ts";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
 
 const CONTROL_PLANE_TOKEN = "test-control-plane-token";
@@ -57,45 +59,8 @@ test("remote profile mark-check-passed fails closed when the authenticated submi
       $,
       artifactFiles: { "index.html": "<html>pleomino</html>\n", healthz: "ok\n" },
     });
-    const sharedTargetsPath = path.join(
-      tmp,
-      "projects",
-      "deployments",
-      "pleomino-shared",
-      "TARGETS",
-    );
-    const deployTargetsPath = path.join(tmp, "projects", "deployments", "pleomino-dev", "TARGETS");
-    await fsp.writeFile(
-      sharedTargetsPath,
-      (await fsp.readFile(sharedTargetsPath, "utf8"))
-        .replace('"required_checks": "",', '"required_checks": "deploy/pleomino-dev",')
-        .replace("    required_checks = [],", '    required_checks = ["deploy/pleomino-dev"],'),
-      "utf8",
-    );
-    await fsp.writeFile(
-      deployTargetsPath,
-      (await fsp.readFile(deployTargetsPath, "utf8")).replace(
-        '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",\n',
-        [
-          '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",',
-          "    vault_runtime = {",
-          `        "oidc_issuer": ${JSON.stringify(oidc.issuer)},`,
-          '        "audience": "deployments-vault",',
-          '        "cli_public_client_id": "deployment-cli",',
-          '        "deployment_environment": "mini",',
-          '        "preferred_credential_source": "interactive_pkce",',
-          '        "pkce_callback_mode": "public_host",',
-          '        "pkce_callback_external_scheme": "https",',
-          '        "pkce_callback_external_host": "deploy-auth.apps.kilty.io",',
-          '        "pkce_callback_external_path": "/oidc/callback",',
-          '        "pkce_callback_bind_host": "127.0.0.1",',
-          '        "pkce_callback_bind_port": "7780",',
-          '        "pkce_callback_bind_path": "/oidc/callback",',
-          "    },",
-        ].join("\n"),
-      ),
-      "utf8",
-    );
+    await requirePleominoDevCheck(tmp);
+    await enableInteractivePkceVaultRuntime(tmp, oidc.issuer);
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths: {

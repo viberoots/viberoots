@@ -53,16 +53,21 @@ export function parseRemaining(lines: string[]): number | undefined {
 }
 
 export function collectFailedLabels(lines: string[]): string[] {
-  const failRe = /(?:^|.*\s)✗\s*Fail:\s*(.+)$/;
-  const failAltRe = /(?:^|.*\s)Fail:\s*(.+)$/;
+  const failAltRe = /(?:^|\s)Fail:\s*(.+)$/;
   const seen = new Set<string>();
   const out: string[] = [];
   for (const raw of lines) {
     const { normalized: line, isComment } = parseLineForMatching(raw);
     if (isComment) continue;
     let m: RegExpExecArray | null = null;
-    if ((m = failRe.exec(line)) || (m = failAltRe.exec(line))) {
-      const label = (m[1] || "").replace(/\s+\([^)]*\)\s*$/, "").trim();
+    const markerIdx = line.indexOf("✗ Fail:");
+    const markerLabel =
+      markerIdx >= 0 && (markerIdx === 0 || /\s/.test(line[markerIdx - 1] || ""))
+        ? line.slice(markerIdx + "✗ Fail:".length).trim()
+        : "";
+    const rawLabel = markerLabel || ((m = failAltRe.exec(line)) ? m[1] || "" : "");
+    if (rawLabel) {
+      const label = rawLabel.replace(/\s+\([^)]*\)\s*$/, "").trim();
       const key = label || line;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -107,11 +112,14 @@ export function parseFinalFailedTargetsBlock(lines: string[]): string[] {
 }
 
 export function findLastFullSuiteWindowStart(lines: string[]): number {
-  // Best-effort: prefer an explicit verify marker emitted by build-tools/tools/bin/verify.
+  // Best-effort: prefer the full-run marker so timing analysis includes pre-buck phases.
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const { normalized } = parseLineForMatching(lines[i]);
+    if (normalized.startsWith("[verify] begin iso=")) return i;
+  }
   for (let i = lines.length - 1; i >= 0; i--) {
     const { normalized } = parseLineForMatching(lines[i]);
     if (normalized.startsWith("[verify] buck2 test begin iso=")) return i;
-    if (normalized.startsWith("[verify] begin iso=")) return i;
   }
   // Fallback: look for a stable header block from the full-suite buck2 test:
   //   Loading targets. Remaining ...
@@ -148,13 +156,21 @@ export function parseBuck2ExitMarker(lines: string[]): {
 export function parseVerifyBeginEpochSec(lines: string[]): number | undefined {
   // Prefer the earliest verify-run start marker when available so elapsed includes
   // preflight/setup time before buck2 test execution begins.
-  const res = [
-    /^\[verify\]\s+begin iso=.*\s+start_s=(\d+)/,
-    /^\[verify\]\s+buck2 test begin iso=.*\s+start_s=(\d+)/,
-  ];
+  const res = [/^\[verify\]\s+begin iso=.*\s+start_s=(\d+)/];
+  const fallbackRes = [/^\[verify\]\s+buck2 test begin iso=.*\s+start_s=(\d+)/];
+  for (const re of res) {
+    for (const raw of lines) {
+      const { normalized } = parseLineForMatching(raw);
+      const m = re.exec(normalized);
+      if (m) {
+        const s = Number(m[1]);
+        if (Number.isFinite(s) && s > 0) return s;
+      }
+    }
+  }
   for (let i = lines.length - 1; i >= 0; i--) {
     const { normalized } = parseLineForMatching(lines[i]);
-    for (const re of res) {
+    for (const re of fallbackRes) {
       const m = re.exec(normalized);
       if (m) {
         const s = Number(m[1]);

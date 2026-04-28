@@ -1,7 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { spawnVerifyBuck2Tests } from "./buck2-test.ts";
-import { startVerifySafetyRails } from "./safety-rails.ts";
+import { spawnVerifyBuck2Tests } from "./buck2-test";
+import { startVerifySafetyRails, summarizeVerifySafetyRailsTelemetry } from "./safety-rails.ts";
 import {
   assertVerifyTargetPlanNotEmpty,
   resolveVerifyTargetPlan,
@@ -46,9 +46,10 @@ export async function runVerifyBuckPasses(opts: {
   }
 
   for (const [index, pass] of passes.entries()) {
+    const passAnalysisDir = path.join(opts.analysisDir, `pass-${index + 1}`);
     await appendVerifyPassLog(
       opts.logFile,
-      `[verify] target pass begin name=${pass.name} index=${index + 1}/${passes.length} targets=${pass.targets.join(" ")}`,
+      `[verify] target pass begin name=${pass.name} index=${index + 1}/${passes.length} target_count=${pass.targets.length} targets=${pass.targets.join(" ")}`,
     );
     const spawned = spawnVerifyBuck2Tests({
       root: opts.root,
@@ -59,11 +60,12 @@ export async function runVerifyBuckPasses(opts: {
       zxNodeModulesOut: opts.zxNodeModulesOut,
       threadsOverride: pass.threadsOverride,
       passName: pass.name,
+      analysisDir: passAnalysisDir,
     });
     opts.onPgid(spawned.pgid);
     const rails = await startVerifySafetyRails({
       root: opts.root,
-      analysisDir: path.join(opts.analysisDir, `pass-${index + 1}`),
+      analysisDir: passAnalysisDir,
       processGroupIdToKill: spawned.pgid,
       onTrigger: async (reason) =>
         appendVerifyPassLog(
@@ -75,6 +77,19 @@ export async function runVerifyBuckPasses(opts: {
     });
     const status = await spawned.wait();
     rails.stop();
+    if (rails.telemetryPath) {
+      const summary = await summarizeVerifySafetyRailsTelemetry(rails.telemetryPath).catch(
+        () => null,
+      );
+      if (summary && summary.samples > 0) {
+        const fmt = (value: number | null) =>
+          value == null ? "?" : Number.isInteger(value) ? String(value) : value.toFixed(2);
+        await appendVerifyPassLog(
+          opts.logFile,
+          `[verify] resource summary pass=${pass.name} samples=${summary.samples} max_load1=${fmt(summary.maxLoad1)} max_load5=${fmt(summary.maxLoad5)} max_processes=${fmt(summary.maxProcessCount)} max_node=${fmt(summary.maxNodeCount)} max_buck=${fmt(summary.maxBuckCount)} max_nix=${fmt(summary.maxNixCount)} max_verify_env=${fmt(summary.maxVerifyEnvCount)}`,
+        );
+      }
+    }
     await appendVerifyPassLog(
       opts.logFile,
       `[verify] target pass end name=${pass.name} index=${index + 1}/${passes.length} status=${status}`,

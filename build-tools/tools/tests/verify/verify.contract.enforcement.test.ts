@@ -7,6 +7,7 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
   const tmpRoot = await fsp.readFile("build-tools/tools/dev/verify/tmp-root.ts", "utf8");
   const coverage = await fsp.readFile("build-tools/tools/dev/verify/coverage.ts", "utf8");
   const housekeeping = await fsp.readFile("build-tools/tools/dev/verify/housekeeping.ts", "utf8");
+  const runVerify = await fsp.readFile("build-tools/tools/dev/verify/run-verify.ts", "utf8");
 
   assert.ok(
     tmpRoot.includes('process.platform === "linux"'),
@@ -33,5 +34,10 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
   assert.ok(
     coverage.includes("NODE_V8_COVERAGE") && coverage.includes("enabled"),
     "expected verify coverage to gate raw V8 coverage output behind explicit coverage mode",
+  );
+
+  assert.ok(
+    !runVerify.includes("process.env.TEST_TIMING_SUMMARY ="),
+    "expected verify not to force per-test timing summaries into Buck event streams",
   );
 });

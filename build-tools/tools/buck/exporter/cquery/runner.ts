@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { getImporterRootsContract } from "../../../lib/importer-roots.ts";
+import { withSharedBuckIsolationStartupLock } from "../../../lib/shared-buck-isolation-lock";
 import { isRetryableCqueryError, resetBuckDaemon } from "./retry.ts";
 
 export type CqueryRunnerOptions = {
@@ -158,11 +159,15 @@ export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record
       HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
       SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
     };
-    const { stdout } = await $({
-      cwd,
-      stdio: "pipe",
-      env: buckEnv,
-    })`buck2 ${isolationFlags} cquery ${platformFlags} ${query} --json ${flags}`.quiet();
+    const runBuck = async () => {
+      const { stdout } = await $({
+        cwd,
+        stdio: "pipe",
+        env: buckEnv,
+      })`buck2 ${isolationFlags} cquery ${platformFlags} ${query} --json ${flags}`.quiet();
+      return stdout;
+    };
+    const stdout = await withSharedBuckIsolationStartupLock(cwd, iso, runBuck);
     return JSON.parse(String(stdout)) as Record<string, any>;
   };
 

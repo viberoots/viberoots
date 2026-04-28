@@ -1,15 +1,21 @@
 import type { VerifyStatus } from "./types.ts";
 import { collectFailedLabels, parseLineFromBuckLogForMatching, parseRemaining } from "./parsing.ts";
 
+function labelAfterMarker(line: string, marker: string): string | null {
+  const idx = line.indexOf(marker);
+  if (idx < 0) return null;
+  if (idx > 0 && !/\s/.test(line[idx - 1] || "")) return null;
+  const label = line.slice(idx + marker.length).trim();
+  return label ? label : null;
+}
+
 export function deriveInProgressCounts(lines: string[]): Omit<VerifyStatus, "logPath"> {
   // Buck emits completion lines that are stable (unlike superconsole repaint frames).
   // We only count these and dedupe by status+label or status+line.
-  const passRe = /(?:^|.*\s)✓\s*Pass:\s*(.+)$/;
-  const failRe = /(?:^|.*\s)✗\s*Fail:\s*(.+)$/;
-  const passAltRe = /(?:^|.*\s)Pass:\s*(.+)$/;
-  const failAltRe = /(?:^|.*\s)Fail:\s*(.+)$/;
-  const fatalRe = /(?:^|.*\s)Fatal:\s*(.+)$/;
-  const skipRe = /(?:^|.*\s)(?:Skip|Skipped):\s*(.+)$/;
+  const passAltRe = /(?:^|\s)Pass:\s*(.+)$/;
+  const failAltRe = /(?:^|\s)Fail:\s*(.+)$/;
+  const fatalRe = /(?:^|\s)Fatal:\s*(.+)$/;
+  const skipRe = /(?:^|\s)(?:Skip|Skipped):\s*(.+)$/;
 
   const seen = new Set<string>();
   let pass = 0,
@@ -27,12 +33,14 @@ export function deriveInProgressCounts(lines: string[]): Omit<VerifyStatus, "log
     let label = "";
 
     let m: RegExpExecArray | null;
-    if ((m = passRe.exec(line))) {
+    const passLabel = labelAfterMarker(line, "✓ Pass:");
+    const failLabel = labelAfterMarker(line, "✗ Fail:");
+    if (passLabel) {
       status = "pass";
-      label = m[1];
-    } else if ((m = failRe.exec(line))) {
+      label = passLabel;
+    } else if (failLabel) {
       status = "fail";
-      label = m[1];
+      label = failLabel;
     } else if ((m = passAltRe.exec(line))) {
       status = "pass";
       label = m[1];

@@ -14,15 +14,23 @@ import {
   type TargetTimingBreakdown,
   type TimingBucket,
 } from "./analyze-verify-timing-helpers.ts";
+import {
+  collectPhaseTimings,
+  collectResourceSummaries,
+  type VerifyPhaseTiming,
+  type VerifyResourceSummary,
+} from "./analyze-verify-log-extras.ts";
 
 export type VerifyTimingAnalysis = {
   logPath: string;
   wallSec?: number;
   beginEpochSec?: number;
   endEpochSec?: number;
+  phases: VerifyPhaseTiming[];
   testsWithDurations: number;
   sumTestDurationsSec: number;
   effectiveParallelism?: number;
+  resourceSummaries: VerifyResourceSummary[];
   buckets: TimingBucket[];
   targetTimings: TargetTimingBreakdown[];
 };
@@ -52,9 +60,11 @@ export function analyzeVerifyTimingFromLogText(opts: {
     wallSec,
     beginEpochSec: begin,
     endEpochSec: end,
+    phases: collectPhaseTimings(window),
     testsWithDurations: durationStats.testsWithDurations,
     sumTestDurationsSec: durationStats.sumTestDurationsSec,
     effectiveParallelism,
+    resourceSummaries: collectResourceSummaries(window),
     buckets: stats.buckets,
     targetTimings: stats.targetTimings,
   };
@@ -96,6 +106,17 @@ export function formatVerifyTimingAnalysisText(
       a.effectiveParallelism === undefined ? "?" : fmtNum(a.effectiveParallelism)
     }`,
   );
+  for (const r of a.resourceSummaries) {
+    lines.push(
+      `${prefix}[timing] resource pass=${r.pass} samples=${r.samples} max_load1=${r.maxLoad1 === undefined ? "?" : fmtNum(r.maxLoad1)} max_processes=${r.maxProcesses ?? "?"} max_node=${r.maxNode ?? "?"} max_buck=${r.maxBuck ?? "?"} max_nix=${r.maxNix ?? "?"} max_verify_env=${r.maxVerifyEnv ?? "?"}`,
+    );
+  }
+  if (a.phases.length > 0) {
+    lines.push(`${prefix}[timing] verify_phases_sorted_by_duration:`);
+    for (const phase of [...a.phases].sort((a, b) => b.durationMs - a.durationMs).slice(0, 15)) {
+      lines.push(`${prefix}[timing] phase ${(phase.durationMs / 1000).toFixed(2)}s: ${phase.name}`);
+    }
+  }
 
   if (a.buckets.length === 0) {
     lines.push(`${prefix}[timing] aggregate: buckets=0 (no [timing] summary lines found)`);

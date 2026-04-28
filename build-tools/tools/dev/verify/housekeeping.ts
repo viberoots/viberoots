@@ -48,8 +48,14 @@ exit 0
 `}`.nothrow();
 }
 
-export function shouldRunNixStoreOptimizeForRequestedTargets(requestedTargets: string[]): boolean {
-  return requestedTargets.length === 1 && requestedTargets[0] === "//...";
+export function shouldRunNixStoreOptimizeForRequestedTargets(
+  _requestedTargets: string[],
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const raw = String(env.VERIFY_NIX_OPTIMISE || env.VERIFY_NIX_OPTIMIZE || "")
+    .trim()
+    .toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
 }
 
 async function runBoundedGc(root: string, maxFreed: string, secs: number): Promise<void> {
@@ -101,13 +107,11 @@ export async function runVerifyHousekeeping(opts: {
     process.stderr.write(`[verify] after purge: ~${free}GiB\n`);
   }
 
-  if (opts.runNixStoreOptimize !== false) {
+  if (opts.runNixStoreOptimize === true) {
     await runBoundedNixOptimise(root, 60);
     free = await freeGiBAtPath(root);
   } else {
-    process.stderr.write(
-      "[verify] housekeeping: skipping nix store optimise for scoped verify run\n",
-    );
+    process.stderr.write("[verify] housekeeping: skipping nix store optimise by default\n");
   }
 
   if (free < target) {

@@ -5,13 +5,16 @@ import {
   isPidAlive,
   isTempRepoRoot,
   listIsolationDirs,
+  liveOwnerPidFromEphemeralIsolation,
   parsePsLine,
   pathExists,
   psLines,
   tryRepoRootFromStateDir,
 } from "./buck-orphan-cleanup-lib";
 import type { ForkserverProc } from "./buck-orphan-cleanup-lib";
+import { parseVerifyOwnedState } from "./owned-process-state";
 import { cleanupTempRepoProcesses } from "./temp-repo-process-cleanup";
+import { cleanupOrphanVerifyProcesses, etimeToSeconds } from "./verify-owned-orphan-cleanup";
 
 function parseForkservers(lines: string[]): ForkserverProc[] {
   const forks: ForkserverProc[] = [];
@@ -43,27 +46,6 @@ function parseBuckDaemons(lines: string[]): BuckDaemonProc[] {
   return daemons;
 }
 
-function etimeToSeconds(etime: string): number {
-  const raw = String(etime || "").trim();
-  if (!raw) return 0;
-  const dm = raw.match(/^(\d+)-(.+)$/);
-  const days = dm ? Number(dm[1]) : 0;
-  const clock = dm ? dm[2] : raw;
-  const parts = clock
-    .split(":")
-    .map((x) => Number(x))
-    .filter((n) => Number.isFinite(n) && n >= 0);
-  if (parts.length === 3) {
-    const [h, m, s] = parts;
-    return days * 86400 + h * 3600 + m * 60 + s;
-  }
-  if (parts.length === 2) {
-    const [m, s] = parts;
-    return days * 86400 + m * 60 + s;
-  }
-  return days * 86400;
-}
-
 export function isLikelyEphemeralIsolation(iso: string): boolean {
   const s = String(iso || "").trim();
   if (!s) return false;
@@ -80,10 +62,11 @@ export async function cleanupOrphanBuckDaemons(opts: {
   maxKills?: number;
 }): Promise<{ scanned: number; candidates: number; killed: number }> {
   const maxKills = Math.max(0, opts.maxKills ?? 50);
-  const staleGraceSec = Math.max(
-    0,
-    Number.parseInt(String(process.env.BNX_BUCK_ORPHAN_STALE_GRACE_SECS || "120"), 10) || 120,
+  const staleGraceRaw = Number.parseInt(
+    String(process.env.BNX_BUCK_ORPHAN_STALE_GRACE_SECS || "120"),
+    10,
   );
+  const staleGraceSec = Math.max(0, Number.isFinite(staleGraceRaw) ? staleGraceRaw : 120);
   const lines = await psLines(2000);
   const forks = parseForkservers(lines);
   let killed = 0;
@@ -123,6 +106,15 @@ export async function cleanupOrphanBuckDaemons(opts: {
     const orphan = d.ppid <= 1 || !isPidAlive(d.ppid);
     if (!orphan) continue;
     if (!isLikelyEphemeralIsolation(d.iso)) continue;
+    const liveOwnerPid = liveOwnerPidFromEphemeralIsolation(d.iso);
+    if (liveOwnerPid) {
+      if (opts.log) {
+        await opts.log(
+          `[verify] buck2 orphan cleanup: skipped live-owner daemon pid=${d.pid} ppid=${d.ppid} etime=${d.etime} iso=${d.iso} owner_pid=${liveOwnerPid}`,
+        );
+      }
+      continue;
+    }
     if (etimeToSeconds(d.etime) < staleGraceSec) continue;
     candidates++;
     if (killed >= maxKills) continue;
@@ -137,7 +129,16 @@ export async function cleanupOrphanBuckDaemons(opts: {
       );
     }
   }
-  return { scanned: forks.length + daemons.length, candidates, killed };
+  const verifyProcRes = await cleanupOrphanVerifyProcesses(opts).catch(() => ({
+    scanned: 0,
+    candidates: 0,
+    killed: 0,
+  }));
+  return {
+    scanned: forks.length + daemons.length + verifyProcRes.scanned,
+    candidates: candidates + verifyProcRes.candidates,
+    killed: killed + verifyProcRes.killed,
+  };
 }
 
 export async function cleanupRegisteredTempRepos(opts: {
@@ -149,8 +150,8 @@ export async function cleanupRegisteredTempRepos(opts: {
   const stateFile = String(opts.stateFile || "").trim();
   if (!stateFile) return { roots: 0, killed: 0 };
   const txt = await fsp.readFile(stateFile, "utf8").catch(() => "");
-  const roots = String(txt || "")
-    .split(/\r?\n/)
+  const parsed = parseVerifyOwnedState(txt);
+  const roots = parsed.roots
     .map((l) => l.trim())
     .filter(Boolean)
     .map((p) => path.resolve(p))

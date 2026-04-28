@@ -1,8 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import http from "node:http";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { waitFor } from "./nixos-shared-host.control-plane.helpers.ts";
+import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
+import { shouldUseServiceOwnedInteractiveAuth } from "../../deployments/deployment-service-auth-client";
+import { waitFor } from "./nixos-shared-host.control-plane.helpers";
+import { REVIEWED_PLEOMINO_DEPLOYMENT_LABEL } from "./nixos-shared-host.deploy.remote-exec.helpers";
 
 export const CONTROL_PLANE_TOKEN = "test-control-plane-token";
 
@@ -19,32 +23,75 @@ export function membershipFileFor(configRoot: string) {
   );
 }
 
+async function allocateLoopbackPort(): Promise<number> {
+  const server = http.createServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const address = server.address();
+  await new Promise<void>((resolve, reject) =>
+    server.close((error) => (error ? reject(error) : resolve())),
+  );
+  if (!address || typeof address === "string") {
+    throw new Error("failed to allocate PKCE callback bind port");
+  }
+  return address.port;
+}
+
 export async function enableInteractivePkceVaultRuntime(tmp: string, issuer: string) {
   const deployTargetsPath = path.join(tmp, "projects", "deployments", "pleomino-dev", "TARGETS");
   const source = await fsp.readFile(deployTargetsPath, "utf8");
-  await fsp.writeFile(
-    deployTargetsPath,
-    source.replace(
-      '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",\n',
-      [
-        '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",',
-        "    vault_runtime = {",
-        `        "oidc_issuer": ${JSON.stringify(issuer)},`,
-        '        "audience": "deployments-vault",',
-        '        "cli_public_client_id": "deployment-cli",',
-        '        "deployment_environment": "mini",',
-        '        "preferred_credential_source": "interactive_pkce",',
-        '        "pkce_callback_mode": "public_host",',
-        '        "pkce_callback_external_scheme": "https",',
-        '        "pkce_callback_external_host": "deploy-auth.apps.kilty.io",',
-        '        "pkce_callback_external_path": "/oidc/callback",',
-        '        "pkce_callback_bind_host": "127.0.0.1",',
-        '        "pkce_callback_bind_port": "7780",',
-        '        "pkce_callback_bind_path": "/oidc/callback",',
-        "    },",
-      ].join("\n"),
-    ),
-    "utf8",
+  const bindPort = await allocateLoopbackPort();
+  const vaultRuntimeBlock = [
+    "    vault_runtime = {",
+    `        "oidc_issuer": ${JSON.stringify(issuer)},`,
+    '        "audience": "deployments-vault",',
+    '        "cli_public_client_id": "deployment-cli",',
+    '        "deployment_environment": "mini",',
+    '        "preferred_credential_source": "interactive_pkce",',
+    '        "pkce_callback_mode": "public_host",',
+    '        "pkce_callback_external_scheme": "https",',
+    '        "pkce_callback_external_host": "deploy-auth.apps.kilty.io",',
+    '        "pkce_callback_external_path": "/oidc/callback",',
+    '        "pkce_callback_bind_host": "127.0.0.1",',
+    `        "pkce_callback_bind_port": "${bindPort}",`,
+    '        "pkce_callback_bind_path": "/oidc/callback",',
+    "    },",
+  ].join("\n");
+  const nextSource = source.includes("vault_runtime = {")
+    ? source.replace(/vault_runtime\s*=\s*\{[\s\S]*?\n\s*\},/m, vaultRuntimeBlock)
+    : source.replace(
+        '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",\n',
+        [
+          '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",',
+          vaultRuntimeBlock,
+        ].join("\n"),
+      );
+  if (nextSource === source) {
+    throw new Error(
+      "interactive PKCE vault runtime fixture update did not match pleomino-dev TARGETS",
+    );
+  }
+  await fsp.writeFile(deployTargetsPath, nextSource, "utf8");
+  const written = await fsp.readFile(deployTargetsPath, "utf8");
+  assert.match(written, new RegExp(`"oidc_issuer":\\s*${JSON.stringify(issuer)}`));
+  assert.match(written, /"preferred_credential_source": "interactive_pkce"/);
+  assert.match(written, new RegExp(`"pkce_callback_bind_port":\\s*"${bindPort}"`));
+  await waitFor(
+    async () => {
+      try {
+        const deployment = await resolveDeploymentFromTarget(
+          tmp,
+          REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+        );
+        return deployment.vaultRuntime?.oidcIssuer === issuer &&
+          shouldUseServiceOwnedInteractiveAuth({ deployment })
+          ? deployment
+          : null;
+      } catch {
+        return null;
+      }
+    },
+    "timed out waiting for deployment query to reflect interactive PKCE vault runtime",
+    30_000,
   );
 }
 

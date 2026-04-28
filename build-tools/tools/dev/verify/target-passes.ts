@@ -44,7 +44,18 @@ function isPatternVerifyTarget(target: string): boolean {
   return trimmed === "//..." || (trimmed.startsWith("//") && trimmed.endsWith("/..."));
 }
 
-export function planVerifyTargetPasses(targets: readonly VerifyTargetLabels[]): VerifyTargetPass[] {
+type IsolatedPassMode = "batch" | "per-target";
+
+function isolatedPassMode(env: NodeJS.ProcessEnv = process.env): IsolatedPassMode {
+  return String(env.BNX_VERIFY_ISOLATED_PASS_MODE || "").trim() === "per-target"
+    ? "per-target"
+    : "batch";
+}
+
+export function planVerifyTargetPasses(
+  targets: readonly VerifyTargetLabels[],
+  opts?: { isolatedMode?: IsolatedPassMode },
+): VerifyTargetPass[] {
   const sharedTargets: string[] = [];
   const isolatedTargets: string[] = [];
 
@@ -56,11 +67,23 @@ export function planVerifyTargetPasses(targets: readonly VerifyTargetLabels[]): 
     sharedTargets.push(entry.target);
   }
 
-  const passes: VerifyTargetPass[] = isolatedTargets.map((target) => ({
-    name: `isolated:${normalizeTargetLabel(target)}`,
-    targets: [target],
-    threadsOverride: 1,
-  }));
+  const mode = opts?.isolatedMode || isolatedPassMode();
+  const passes: VerifyTargetPass[] =
+    mode === "per-target"
+      ? isolatedTargets.map((target) => ({
+          name: `isolated:${normalizeTargetLabel(target)}`,
+          targets: [target],
+          threadsOverride: 1,
+        }))
+      : isolatedTargets.length > 0
+        ? [
+            {
+              name: "isolated",
+              targets: isolatedTargets,
+              threadsOverride: 1,
+            },
+          ]
+        : [];
   if (sharedTargets.length > 0) {
     passes.push({ name: "shared", targets: sharedTargets });
   }
@@ -68,9 +91,9 @@ export function planVerifyTargetPasses(targets: readonly VerifyTargetLabels[]): 
 }
 
 export function summarizeVerifyTargetPlan(plan: VerifyTargetPlan): VerifyTargetExpansionSummary {
-  const isolatedPassCount = plan.passes.filter((pass) => pass.name.startsWith("isolated:")).length;
+  const isolatedPassCount = plan.passes.filter((pass) => pass.name.startsWith("isolated")).length;
   const isolatedTargetCount = plan.passes
-    .filter((pass) => pass.name.startsWith("isolated:"))
+    .filter((pass) => pass.name.startsWith("isolated"))
     .reduce((total, pass) => total + pass.targets.length, 0);
   const sharedTargetCount = plan.passes.find((pass) => pass.name === "shared")?.targets.length ?? 0;
   return {

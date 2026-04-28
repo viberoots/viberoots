@@ -44,6 +44,7 @@ The initial deployment-owned build-system boundary is intentionally narrow:
   - `build-tools/tools/nix/shared-host-identity-provider-bootstrap.nix`
   - `build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
   - `build-tools/tools/nix/shared-host-identity-provider-module.nix`
+  - `build-tools/tools/nix/shared-host-identity-provider-migration.nix`
   - `build-tools/tools/nix/shared-host-postgres-module.nix`
   - `build-tools/tools/nix/shared-host-vault-module.nix`
   - `build-tools/tools/nix/nixos-shared-host-module.nix`
@@ -143,6 +144,7 @@ inside the repo-wide owner-local methodology gate:
   - `build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
   - `build-tools/tools/nix/shared-host-identity-provider-bootstrap.nix`
   - `build-tools/tools/nix/shared-host-identity-provider-module.nix`
+  - `build-tools/tools/nix/shared-host-identity-provider-migration.nix`
   - `build-tools/tools/nix/shared-host-postgres-module.nix`
   - `build-tools/tools/nix/shared-host-vault-module.nix`
   - `build-tools/tools/nix/nixos-shared-host-module.nix`

@@ -37,7 +37,7 @@ test("verify target pass loading expands package scopes before isolating labeled
   const passes = planVerifyTargetPasses(targets);
   assert.deepEqual(passes, [
     {
-      name: "isolated://projects/apps/pleomino:pr14_latency",
+      name: "isolated",
       targets: ["//projects/apps/pleomino:pr14_latency"],
       threadsOverride: 1,
     },
@@ -72,34 +72,13 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
   );
 
   const passes = planVerifyTargetPasses(targets);
-  const isolatedPassNames = passes
-    .filter((pass) => pass.name.startsWith("isolated:"))
-    .map((pass) => pass.name)
-    .sort();
-  assert.deepEqual(isolatedPassNames, [
-    "isolated://:scaffolding_webapp_dev_server_running",
-    "isolated://:scaffolding_webapp_ssr_next_contracts",
-    "isolated://:scaffolding_webapp_ssr_next_dev_hmr_local_ts_dep",
-    "isolated://:scaffolding_webapp_ssr_next_dev_reload_wasm_producer",
-    "isolated://:scaffolding_webapp_ssr_next_dev_runtime_consistency",
-    "isolated://:scaffolding_webapp_ssr_scaffold_contract_and_runtime_smoke",
-    "isolated://:scaffolding_webapp_ssr_vite_dev_hmr_local_ts_dep",
-    "isolated://:scaffolding_webapp_ssr_vite_dev_reload_wasm_producer",
-    "isolated://:scaffolding_webapp_ssr_vite_dev_runtime_consistency_phase3",
-    "isolated://:scaffolding_webapp_ssr_vite_runnable_contracts",
-    "isolated://:scaffolding_webapp_static_dev_hmr_local_ts_dep",
-    "isolated://:scaffolding_webapp_static_dev_reload_wasm_producer",
-    "isolated://:scaffolding_webapp_static_pwa_dev_hmr_local_ts_dep",
-    "isolated://projects/apps/pleomino:pr14_latency",
-  ]);
-  const isolatedPass = passes.find(
-    (pass) => pass.name === "isolated://projects/apps/pleomino:pr14_latency",
+  const isolatedPass = passes.find((pass) => pass.name === "isolated");
+  assert.ok(isolatedPass, "expected wildcard expansion to keep an isolated serial batch");
+  assert.ok(
+    isolatedPass.targets.includes("//projects/apps/pleomino:pr14_latency"),
+    "expected isolated project test to remain in the isolated batch",
   );
-  assert.deepEqual(isolatedPass, {
-    name: "isolated://projects/apps/pleomino:pr14_latency",
-    targets: ["//projects/apps/pleomino:pr14_latency"],
-    threadsOverride: 1,
-  });
+  assert.equal(isolatedPass.threadsOverride, 1);
   const sharedPass = passes.find((pass) => pass.name === "shared");
   assert.ok(sharedPass, "expected wildcard expansion to keep a shared verify pass");
   assert.ok(
@@ -108,9 +87,9 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
   );
   assert.deepEqual(summarizeVerifyTargetPlan({ targetLabels: targets, passes }), {
     expandedTargetCount: targets.length,
-    isolatedPassCount: 14,
+    isolatedPassCount: 1,
     isolatedTargetCount: 14,
     sharedTargetCount: sharedPass?.targets.length ?? 0,
-    passCount: 15,
+    passCount: 2,
   });
 });

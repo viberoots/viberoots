@@ -88,6 +88,20 @@ export function isPidAlive(pid: number): boolean {
   }
 }
 
+export function ownerPidFromEphemeralIsolation(iso: string): number | null {
+  const s = String(iso || "").trim();
+  const match = s.match(/^v-(\d+)-\d+$/) || s.match(/^verify-nested-(\d+)-[a-f0-9]{12}$/);
+  if (!match?.[1]) return null;
+  const pid = Number(match[1]);
+  return Number.isFinite(pid) && pid > 1 ? pid : null;
+}
+
+export function liveOwnerPidFromEphemeralIsolation(iso: string): number | null {
+  const ownerPid = ownerPidFromEphemeralIsolation(iso);
+  if (!ownerPid || !isPidAlive(ownerPid)) return null;
+  return ownerPid;
+}
+
 export async function buck2Kill(repoRoot: string, iso: string, timeoutMs: number): Promise<void> {
   const buck2Path = resolveToolPathSync("buck2");
   await new Promise<void>((resolve) => {

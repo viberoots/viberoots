@@ -6,6 +6,7 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   pollVerifySafetyRailsOnce,
+  summarizeVerifySafetyRailsTelemetry,
   writeVerifySafetyRailsTriggerSnapshot,
 } from "../../dev/verify/safety-rails.ts";
 
@@ -130,4 +131,29 @@ test("verify safety rails: active nix gc is logged as notice and does not stop v
     telemetry,
     /\[verify\] safety-rails notice: active nix gc process detected during verify/,
   );
+});
+
+test("verify safety rails: telemetry summary captures load and process-count peaks", async () => {
+  const analysisDir = await fsp.mkdtemp(path.join(os.tmpdir(), "bnx-safety-rails-summary-"));
+  const telemetryPath = path.join(analysisDir, "telemetry.log");
+  await fsp.writeFile(
+    telemetryPath,
+    [
+      "[verify] safety-rails baseline /nix/store free ~100GiB",
+      "111 freeGiB=99 load1=10.25 load5=8.00 load15=7.00 processes=200 node=80 buck=5 nix=2 verify_env=60",
+      "222 freeGiB=98 load1=12.50 load5=9.25 load15=7.50 processes=250 node=90 buck=7 nix=4 verify_env=70",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+
+  const summary = await summarizeVerifySafetyRailsTelemetry(telemetryPath);
+  assert.equal(summary.samples, 2);
+  assert.equal(summary.maxLoad1, 12.5);
+  assert.equal(summary.maxLoad5, 9.25);
+  assert.equal(summary.maxProcessCount, 250);
+  assert.equal(summary.maxNodeCount, 90);
+  assert.equal(summary.maxBuckCount, 7);
+  assert.equal(summary.maxNixCount, 4);
+  assert.equal(summary.maxVerifyEnvCount, 70);
 });

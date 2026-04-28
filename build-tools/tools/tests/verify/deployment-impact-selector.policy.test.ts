@@ -44,6 +44,7 @@ test("deployment-impact: deployment taxonomy-only edits stay deployment-only", (
 test("deployment-impact: reviewed shared-host service modules stay deployment-only", () => {
   const result = resolveDeploymentImpactSelection(
     [
+      "build-tools/tools/nix/shared-host-identity-provider-migration.nix",
       "build-tools/tools/nix/shared-host-postgres-module.nix",
       "build-tools/tools/nix/shared-host-vault-module.nix",
     ],
@@ -52,6 +53,7 @@ test("deployment-impact: reviewed shared-host service modules stay deployment-on
 
   assert.equal(result.mode, "deployment-only");
   assert.deepEqual(result.diagnostics.deploymentOwnedPaths, [
+    "build-tools/tools/nix/shared-host-identity-provider-migration.nix",
     "build-tools/tools/nix/shared-host-postgres-module.nix",
     "build-tools/tools/nix/shared-host-vault-module.nix",
   ]);

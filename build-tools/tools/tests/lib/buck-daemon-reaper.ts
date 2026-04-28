@@ -3,6 +3,10 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { resolveToolPathSync } from "../../lib/tool-paths.ts";
 import { cwdIsInsideTempRepo } from "./buck-daemon-reaper-utils.ts";
+import {
+  cleanupRegisteredVerifyProcesses,
+  parseVerifyOwnedState,
+} from "../../dev/verify/owned-process-state";
 
 type Args = {
   parent?: string;
@@ -358,12 +362,10 @@ async function main() {
         if (stateFile) {
           try {
             const txt = await (await import("node:fs/promises")).readFile(stateFile, "utf8");
-            for (const ln of String(txt || "").split(/\r?\n/)) {
-              const p = ln.trim();
-              if (p) tmpRoots.push(p);
-            }
+            tmpRoots.push(...parseVerifyOwnedState(txt).roots);
           } catch {}
         }
+        await cleanupRegisteredVerifyProcesses({ stateFile, maxKills: 200 }).catch(() => {});
         const seen = new Set<string>();
         for (const r of tmpRoots) {
           const abs = path.resolve(r);
@@ -394,12 +396,10 @@ async function main() {
     if (stateFile) {
       try {
         const txt = await (await import("node:fs/promises")).readFile(stateFile, "utf8");
-        for (const ln of String(txt || "").split(/\r?\n/)) {
-          const p = ln.trim();
-          if (p) tmpRoots.push(p);
-        }
+        tmpRoots.push(...parseVerifyOwnedState(txt).roots);
       } catch {}
     }
+    await cleanupRegisteredVerifyProcesses({ stateFile, maxKills: 200 }).catch(() => {});
     const seen = new Set<string>();
     for (const r of tmpRoots) {
       const abs = path.resolve(r);

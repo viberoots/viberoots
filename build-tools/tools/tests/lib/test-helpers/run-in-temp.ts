@@ -246,7 +246,7 @@ async function removeTreeWithWritableFallback(target: string, $: any): Promise<v
 export async function runInTemp<T>(
   name: string,
   fn: (tmp: string, $: any) => Promise<T>,
-  opts?: { git?: boolean },
+  opts?: { git?: boolean; workspace?: "seeded" | "scratch" },
 ): Promise<T> {
   const realHome = String(process.env.HOME || os.homedir() || "").trim();
   const tmp = await mktemp(name + "-");
@@ -261,6 +261,54 @@ export async function runInTemp<T>(
     "runInTemp resolveTestHome",
     async () => await resolveTestHome(),
   );
+  if (opts?.workspace === "scratch") {
+    const xdgCacheHome = await timeAsync(
+      "runInTemp stableXdgCacheRoot",
+      async () => await stableXdgCacheRoot(),
+    );
+    const exportEnv: Record<string, string> = {};
+    for (const [k, v] of Object.entries(process.env)) {
+      if (typeof v === "string") exportEnv[k] = v;
+    }
+    exportEnv.WORKSPACE_ROOT = tmp;
+    exportEnv.BUCK_TEST_SRC = tmp;
+    exportEnv.REPO_ROOT = tmp;
+    exportEnv.TEST_NO_BROWSER = exportEnv.TEST_NO_BROWSER || "1";
+    exportEnv[LOCAL_FIXTURE_SERVICE_ENV] = exportEnv[LOCAL_FIXTURE_SERVICE_ENV] || "1";
+    exportEnv.HOME = home;
+    exportEnv.XDG_CACHE_HOME = exportEnv.XDG_CACHE_HOME || xdgCacheHome;
+    if (!exportEnv.BUCK2_REAL_HOME && realHome) {
+      exportEnv.BUCK2_REAL_HOME = realHome;
+    }
+    if (!exportEnv.XDG_CONFIG_HOME) {
+      exportEnv.XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+    }
+    exportEnv.ZX_INIT = zxInitPathFromWorkspace();
+    const nodeOpts = ["--experimental-strip-types", `--import ${exportEnv.ZX_INIT}`];
+    exportEnv.NODE_OPTIONS = [nodeOpts.join(" "), exportEnv.NODE_OPTIONS || ""]
+      .filter(Boolean)
+      .join(" ");
+    const _$ = $({ cwd: tmp, env: exportEnv });
+    try {
+      return await timeAsync("runInTemp testBody", async () => {
+        return await withTempProcessEnv(exportEnv, async () => await fn(tmp, _$));
+      });
+    } finally {
+      if (process.env.TEST_KEEP_TMP === "1") {
+        try {
+          console.error(`KEEP_TMP ${tmp}`);
+          await fsp
+            .appendFile(path.join(process.cwd(), "test-tmp-paths.log"), tmp + "\n", "utf8")
+            .catch(() => {});
+        } catch {}
+      } else {
+        await removeTreeWithWritableFallback(tmp, $);
+      }
+      if (removeHome) {
+        await removeTreeWithWritableFallback(home, $);
+      }
+    }
+  }
   const xdgCacheHome = await timeAsync(
     "runInTemp stableXdgCacheRoot",
     async () => await stableXdgCacheRoot(),
@@ -540,4 +588,11 @@ export async function runInTemp<T>(
       await removeTreeWithWritableFallback(home, $);
     }
   }
+}
+
+export async function runInScratchTemp<T>(
+  name: string,
+  fn: (tmp: string, $: any) => Promise<T>,
+): Promise<T> {
+  return await runInTemp(name, fn, { workspace: "scratch", git: false });
 }

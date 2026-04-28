@@ -5,8 +5,8 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { cleanupRegisteredTempRepos } from "../../dev/verify/buck-orphan-cleanup.ts";
-import { resolveToolPath } from "../../lib/tool-paths.ts";
+import { cleanupRegisteredTempRepos } from "../../dev/verify/buck-orphan-cleanup";
+import { resolveToolPath } from "../../lib/tool-paths";
 function psForkserversForToken(token: string): Promise<string[]> {
   return new Promise(async (resolve) => {
     const psPath = await resolveToolPath("ps").catch(() => "ps");
@@ -274,3 +274,36 @@ test(
     }
   },
 );
+
+test("verify cleanup: process state records are not treated as temp repo roots", async () => {
+  const ownedTmp = await fsp.mkdtemp(path.join(os.tmpdir(), "verify-owned-root-"));
+  const stateDir = await fsp.mkdtemp(path.join(os.tmpdir(), "buck-cleanup-state-"));
+  try {
+    await fsp.writeFile(path.join(ownedTmp, "owned.txt"), "owned\n", "utf8");
+    const stateFile = path.join(stateDir, "state.txt");
+    const processRecord = {
+      pid: 999_999,
+      pgid: 999_999,
+      startSig: "Mon Apr 27 00:00:00 2026",
+      logFile: path.join(stateDir, "verify.log"),
+      target: "root//:example",
+    };
+    await fsp.writeFile(
+      stateFile,
+      `${ownedTmp}\nprocess\t${JSON.stringify(processRecord)}\n`,
+      "utf8",
+    );
+
+    const result = await cleanupRegisteredTempRepos({
+      stateFile,
+      maxKills: 10,
+      removeRoots: true,
+    });
+
+    assert.equal(result.roots, 1);
+    await assert.rejects(fsp.access(ownedTmp));
+  } finally {
+    await fsp.rm(stateDir, { recursive: true, force: true }).catch(() => {});
+    await fsp.rm(ownedTmp, { recursive: true, force: true }).catch(() => {});
+  }
+});

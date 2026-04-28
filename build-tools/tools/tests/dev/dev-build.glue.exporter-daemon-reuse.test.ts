@@ -24,6 +24,9 @@ test("dev-build glue config enables stable exporter daemon reuse", async () => {
   if (!runner.includes("stableExporterIsolation(cwd)")) {
     throw new Error("cquery runner must derive stable shared exporter isolation per workspace");
   }
+  if (!runner.includes("withSharedBuckIsolationStartupLock(cwd, iso")) {
+    throw new Error("cquery runner must guard shared exporter daemon startup with a lock");
+  }
   if (!runner.includes("if (reuse) return await fn();")) {
     throw new Error("cquery runner must skip daemon cleanup when reuse is enabled");
   }

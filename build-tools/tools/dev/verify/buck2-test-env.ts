@@ -41,6 +41,8 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
     "--env",
     `BNX_BUCK_REAPER_STATE_FILE=${process.env.BNX_BUCK_REAPER_STATE_FILE || ""}`,
     "--env",
+    `BNX_VERIFY_PROCESS_STATE_FILE=${process.env.BNX_VERIFY_PROCESS_STATE_FILE || ""}`,
+    "--env",
     `BNX_VERIFY_LOCK_DIR=${process.env.BNX_VERIFY_LOCK_DIR || ""}`,
     "--env",
     `BNX_VERIFY_LOG_FILE=${process.env.BNX_VERIFY_LOG_FILE || ""}`,

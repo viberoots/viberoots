@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { resolveToolPath } from "../../../lib/tool-paths.ts";
+import { zxInitPathFromWorkspace } from "./zx-init-probe";
 
 let buckReaperStateFile: string | null = null;
 let buckReaperStarted = false;
@@ -60,7 +61,11 @@ export async function ensureBuckReaperStarted(tmp: string, $: any): Promise<void
     const child = spawn(
       process.execPath,
       [
+        "--experimental-top-level-await",
         "--experimental-strip-types",
+        "--disable-warning=ExperimentalWarning",
+        "--import",
+        zxInitPathFromWorkspace(),
         reaper,
         "--parent",
         parentPid,
