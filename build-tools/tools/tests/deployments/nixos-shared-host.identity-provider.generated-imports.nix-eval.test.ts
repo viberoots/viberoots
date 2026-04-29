@@ -138,6 +138,9 @@ test("shared-host identity provider module bootstraps generated identity imports
     assert.match(out.bootstrapScript, /deploy-admin-identity-shape-admin-global/);
     assert.match(out.bootstrapScript, /ops@example\.test/);
     assert.match(out.keycloakPreStart, /kc\.sh bootstrap-admin service/);
+    assert.match(out.keycloakPreStart, /generated_realm_tmp="\$\(mktemp\)"/);
+    assert.match(out.keycloakPreStart, /cmp -s "\$generated_realm_tmp"/);
+    assert.match(out.keycloakPreStart, /install -m 0644 "\$generated_realm_tmp"/);
     assert.match(out.keycloakPreStart, /deployment-host-bootstrap-admin/);
     assert.match(out.keycloakPreStart, /temporary recovery admin/i);
     assert.match(out.keycloakPreStart, /bootstrap_runtime_dir="\$\(mktemp -d\)"/);

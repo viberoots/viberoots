@@ -143,7 +143,10 @@ in
 
     systemd.services.keycloak.path = lib.mkAfter (with pkgs; [ coreutils jq ]);
     systemd.services.keycloak.serviceConfig.PermissionsStartOnly = true;
-    systemd.services.keycloak.preStart = lib.mkAfter migration.bootstrapAdminPreStart;
+    systemd.services.keycloak.preStart = lib.mkAfter ''
+      ${migration.bootstrapManagedFilesScript}
+      ${migration.bootstrapAdminPreStart}
+    '';
     systemd.services.keycloak.postStart = lib.mkAfter migration.bootstrapRealmMigrationPostStart;
 
     services.nginx = lib.mkIf cfg.manageNginx {
