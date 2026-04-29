@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { pathToFileURL } from "node:url";
 import {
   deriveNixosSharedHostProviderTarget,
   NIXOS_SHARED_HOST_PROVIDER,
@@ -136,10 +137,7 @@ export function nixosSharedHostAdmissionPolicyNodeFixture(
 export async function ensureNixosSharedHostStageBranch(
   cwd: string,
   $: any,
-  deployment: {
-    lanePolicy: { stageBranches: Record<string, string> };
-    environmentStage: string;
-  },
+  deployment: Pick<NixosSharedHostDeployment, "lanePolicy" | "environmentStage">,
 ) {
   const branch = deployment.lanePolicy.stageBranches[deployment.environmentStage];
   await $({ cwd, stdio: "pipe" })`git branch -f ${branch} HEAD`;
@@ -159,6 +157,13 @@ export async function ensureNixosSharedHostStageBranch(
     await $({ cwd, stdio: "pipe" })`git remote add origin ${remoteRoot}`;
   }
   await $({ cwd, stdio: "pipe" })`git push --force origin HEAD:${branch}`;
+  const { repository = "", scmBackend = "" } = deployment.lanePolicy.governance || {};
+  if (scmBackend.toLowerCase() === "github" && repository) {
+    await $({
+      cwd,
+      stdio: "pipe",
+    })`git config ${`url.${pathToFileURL(remoteRoot).href}.insteadOf`} ${`git@github.com:${repository}.git`}`;
+  }
 }
 
 export function nixosSharedHostDeploymentFixture(

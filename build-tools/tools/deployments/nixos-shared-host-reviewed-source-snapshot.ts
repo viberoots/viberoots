@@ -13,6 +13,9 @@ const GITHUB_KNOWN_HOSTS = [
   "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=",
 ].join("\n");
 
+const REVIEWED_SOURCE_SSH_KEY_FILE_ENV = "BNX_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE";
+const REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE_ENV = "BNX_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE";
+
 export type NixosSharedHostReviewedSourceSnapshot = {
   reviewedRef: string;
   snapshotRef: string;
@@ -58,6 +61,22 @@ function repositorySlug(remoteUrl: string): string {
     .replace(/^https?:\/\/[^/]+\//i, "")
     .replace(/^ssh:\/\/[^@]+@[^/]+\//i, "")
     .replace(/^[^@]+@[^:]+:/, "");
+}
+
+function githubSshRemoteForRepository(repository: string): string {
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
+    throw new Error(`github governance repository must be owner/repo: ${repository}`);
+  }
+  return `git@github.com:${repository}.git`;
+}
+
+function reviewedFetchTargetFor(deployment: NixosSharedHostDeployment, remoteName: string): string {
+  const scmBackend = trim(deployment.lanePolicy.governance.scmBackend).toLowerCase();
+  const repository = trim(deployment.lanePolicy.governance.repository);
+  if (scmBackend === "github" && repository) {
+    return githubSshRemoteForRepository(repository);
+  }
+  return remoteName;
 }
 
 async function resolveReviewedRemoteName(
@@ -109,32 +128,45 @@ function isGithubSshRemote(remoteUrl: string): boolean {
   );
 }
 
+function isRemoteUrl(value: string): boolean {
+  return /^(?:https?|ssh):\/\//i.test(value) || /^[^@]+@[^:]+:/i.test(value);
+}
+
 async function gitFetchEnvForReviewedRemote(
   workspaceRoot: string,
-  remoteName: string,
+  fetchTarget: string,
 ): Promise<{ env?: NodeJS.ProcessEnv; cleanup: () => Promise<void> }> {
   if (String(process.env.GIT_SSH_COMMAND || "").trim()) {
     return { cleanup: async () => {} };
   }
-  const remoteUrl = await gitStdout(workspaceRoot, ["remote", "get-url", remoteName]).catch(
-    () => "",
-  );
+  const remoteUrl = isRemoteUrl(fetchTarget)
+    ? fetchTarget
+    : await gitStdout(workspaceRoot, ["remote", "get-url", fetchTarget]).catch(() => "");
   if (!isGithubSshRemote(remoteUrl)) return { cleanup: async () => {} };
-  const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), "bnx-github-known-hosts-"));
-  const knownHostsFile = path.join(tmpDir, "known_hosts");
-  await fsp.writeFile(knownHostsFile, `${GITHUB_KNOWN_HOSTS}\n`, "utf8");
+  const configuredKnownHostsFile = trim(process.env[REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE_ENV]);
+  const tmpDir = configuredKnownHostsFile
+    ? ""
+    : await fsp.mkdtemp(path.join(os.tmpdir(), "bnx-github-known-hosts-"));
+  const knownHostsFile = configuredKnownHostsFile || path.join(tmpDir, "known_hosts");
+  if (!configuredKnownHostsFile) {
+    await fsp.writeFile(knownHostsFile, `${GITHUB_KNOWN_HOSTS}\n`, "utf8");
+  }
+  const sshKeyFile = trim(process.env[REVIEWED_SOURCE_SSH_KEY_FILE_ENV]);
   return {
     env: {
       ...process.env,
       GIT_SSH_COMMAND: [
         "ssh",
         "-o BatchMode=yes",
+        ...(sshKeyFile ? [`-i ${shSingleQuote(sshKeyFile)}`, "-o IdentitiesOnly=yes"] : []),
         "-o StrictHostKeyChecking=yes",
         `-o UserKnownHostsFile=${shSingleQuote(knownHostsFile)}`,
       ].join(" "),
     },
     cleanup: async () => {
-      await fsp.rm(tmpDir, { recursive: true, force: true });
+      if (tmpDir) {
+        await fsp.rm(tmpDir, { recursive: true, force: true });
+      }
     },
   };
 }
@@ -148,11 +180,12 @@ export async function snapshotReviewedSourceForSubmission(opts: {
   const reviewedRef = requiredDeploymentStageBranch(opts.deployment);
   const remoteName = await resolveReviewedRemoteName(opts.workspaceRoot, opts.deployment);
   const snapshotRef = snapshotRefFor(opts.submissionId, reviewedRef);
-  const fetchEnv = await gitFetchEnvForReviewedRemote(opts.workspaceRoot, remoteName);
+  const fetchTarget = reviewedFetchTargetFor(opts.deployment, remoteName);
+  const fetchEnv = await gitFetchEnvForReviewedRemote(opts.workspaceRoot, fetchTarget);
   try {
     await gitStdout(
       opts.workspaceRoot,
-      ["fetch", "--no-tags", "--no-write-fetch-head", remoteName, `${reviewedRef}:${snapshotRef}`],
+      ["fetch", "--no-tags", "--no-write-fetch-head", fetchTarget, `${reviewedRef}:${snapshotRef}`],
       fetchEnv.env,
     );
   } finally {

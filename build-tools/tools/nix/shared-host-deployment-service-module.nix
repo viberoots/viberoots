@@ -3,6 +3,17 @@ let
   cfg = config.deploymentHost.deploymentService;
   hostname = if cfg.hostname == null then "_disabled.invalid" else cfg.hostname;
   proxyPass = "http://${cfg.localBindHost}:${toString cfg.localBindPort}";
+  reviewedSourceSsh = cfg.reviewedSourceSsh;
+  reviewedSourceSshEnvironmentEnabled = reviewedSourceSsh.privateKeyFile != null;
+  githubKnownHostsPath = "/etc/deployment-host/github-known-hosts";
+  reviewedSourceSshEnvironmentEtcPath = lib.removePrefix "/etc/" reviewedSourceSsh.environmentFile;
+  reviewedSourceKnownHostsFile =
+    if reviewedSourceSsh.knownHostsFile == null then githubKnownHostsPath else reviewedSourceSsh.knownHostsFile;
+  githubKnownHosts = ''
+    github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+    github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+    github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+  '';
 in
 {
   options.deploymentHost.deploymentService = {
@@ -46,6 +57,33 @@ in
       default = false;
       description = "Whether this module opens HTTP and HTTPS for the reverse proxy.";
     };
+    reviewedSourceSsh = {
+      privateKeyFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = ''
+          Runtime path to the SSH private key the deployment service and worker use
+          when fetching reviewed GitHub source for private repositories.
+        '';
+      };
+      knownHostsFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = ''
+          Runtime path to the SSH known_hosts file used for reviewed GitHub source
+          fetches. When unset, this module writes GitHub's pinned host keys under
+          /etc/deployment-host/github-known-hosts.
+        '';
+      };
+      environmentFile = lib.mkOption {
+        type = lib.types.str;
+        default = "/etc/deployment-host/reviewed-source-ssh.env";
+        description = ''
+          Host-local environment file consumed by deployment service and worker
+          systemd units for reviewed-source SSH fetch credentials.
+        '';
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -61,6 +99,10 @@ in
       {
         assertion = !cfg.manageAcme || cfg.acmeEmail != null;
         message = "deploymentHost.deploymentService.acmeEmail must be set when manageAcme is true.";
+      }
+      {
+        assertion = lib.hasPrefix "/etc/" reviewedSourceSsh.environmentFile;
+        message = "deploymentHost.deploymentService.reviewedSourceSsh.environmentFile must live under /etc.";
       }
     ];
 
@@ -92,5 +134,23 @@ in
       enable = lib.mkDefault true;
       allowedTCPPorts = [ 80 443 ];
     };
+
+    environment.etc = lib.mkMerge [
+      (lib.mkIf (reviewedSourceSshEnvironmentEnabled && reviewedSourceSsh.knownHostsFile == null) {
+        "deployment-host/github-known-hosts" = {
+          text = githubKnownHosts;
+          mode = "0444";
+        };
+      })
+      (lib.mkIf reviewedSourceSshEnvironmentEnabled {
+        ${reviewedSourceSshEnvironmentEtcPath} = {
+          text = ''
+            BNX_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE=${reviewedSourceSsh.privateKeyFile}
+            BNX_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE=${reviewedSourceKnownHostsFile}
+          '';
+          mode = "0440";
+        };
+      })
+    ];
   };
 }

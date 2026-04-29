@@ -141,6 +141,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/nixos-shared-host.control-plane.direct-reject.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.control-plane.backend.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.control-plane.governance.service.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.control-plane.reviewed-source.github-ssh.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.control-plane.reviewed-source.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.control-plane-client.errors.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.early-rejection-cleanup.test.ts": True,

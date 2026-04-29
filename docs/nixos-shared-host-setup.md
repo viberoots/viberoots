@@ -357,7 +357,7 @@ deploymentHost.identityProvider = {
     "/var/lib/deployment-host-secrets/bootstrap-first-operator-password";
   bootstrapTokenClaims = {
     deployment_environment = "mini";
-    repository = "kiltyj/bucknix-fresh";
+    repository = "kiltyj/common";
   };
   manageNginx = false;
   manageAcme = false;
@@ -372,6 +372,8 @@ deploymentHost.deploymentService = {
   manageNginx = false;
   manageAcme = false;
   openFirewall = false;
+  reviewedSourceSsh.privateKeyFile =
+    config.sops.secrets."deployment-host/github-reviewed-source-key".path;
 };
 
 deploymentHost.deployAuthCallback = {
@@ -562,6 +564,15 @@ What the service and worker flags mean:
   automatically during protected/shared admission. The service reads live
   branch-protection state with this token and fails closed if governance
   verification is required but the token is unavailable.
+- `BNX_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE=/run/secrets/...`
+  Required for private GitHub repositories. The deployment service snapshots the
+  reviewed branch by fetching `git@github.com:<owner>/<repo>.git`; point this at
+  a deploy key or machine key that has read access to the governed repository.
+- `BNX_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE=/etc/deployment-host/github-known-hosts`
+  Pins GitHub's SSH host keys for reviewed-source fetches. The deployment
+  service module writes this file automatically when
+  `deploymentHost.deploymentService.reviewedSourceSsh.privateKeyFile` is set and
+  no custom known-hosts file is configured.
 
 Common example values:
 
@@ -578,6 +589,9 @@ Common example values:
 export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
 export BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
 export BNX_DEPLOY_GITHUB_TOKEN='replace-me'
+set -a
+. /etc/deployment-host/reviewed-source-ssh.env
+set +a
 direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts \
   --host-root /var/lib/deployment-host/runtime \
   --state /etc/nixos/deployment-host/platform-state.json \
@@ -601,6 +615,10 @@ Required worker-side secret-source prep after PR-79 and later:
 - set `BNX_DEPLOY_GITHUB_TOKEN` when the hosted service must verify GitHub lane
   governance automatically; unsupported SCM backends still require reviewed
   explicit governance evidence through `--admission-evidence-json`
+- set `deploymentHost.deploymentService.reviewedSourceSsh.privateKeyFile` to a
+  host-secret path and load `/etc/deployment-host/reviewed-source-ssh.env` into
+  both the service and worker systemd units so reviewed-source snapshots can
+  fetch the private GitHub repository over SSH
 - set the server-local credential variable referenced by `vault_runtime`, for
   example `BNX_DEPLOYER_CLIENT_SECRET` for a reviewed service-account client
   secret, or `BNX_DEPLOYMENT_OIDC_TOKEN` for an external workload identity

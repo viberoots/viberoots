@@ -21,6 +21,7 @@ test("shared-host deployment service module routes hosted HTTPS to a private ser
               manageAcme = true;
               acmeEmail = "ops@example.test";
               openFirewall = true;
+              reviewedSourceSsh.privateKeyFile = "/run/secrets/github-reviewed-source-key";
             };
           };
         };
@@ -34,6 +35,10 @@ test("shared-host deployment service module routes hosted HTTPS to a private ser
         hasArtifactAlias = builtins.hasAttr "/artifacts" vhost.locations;
         acmeEmail = system.config.security.acme.defaults.email;
         firewallPorts = system.config.networking.firewall.allowedTCPPorts;
+        reviewedSourceEnv =
+          system.config.environment.etc."deployment-host/reviewed-source-ssh.env".text;
+        githubKnownHosts =
+          system.config.environment.etc."deployment-host/github-known-hosts".text;
       }
     `;
     const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;
@@ -45,6 +50,8 @@ test("shared-host deployment service module routes hosted HTTPS to a private ser
       hasArtifactAlias: boolean;
       acmeEmail: string;
       firewallPorts: number[];
+      reviewedSourceEnv: string;
+      githubKnownHosts: string;
     };
     assert.equal(out.nginxEnabled, true);
     assert.equal(out.forceSSL, true);
@@ -53,6 +60,15 @@ test("shared-host deployment service module routes hosted HTTPS to a private ser
     assert.equal(out.hasArtifactAlias, false);
     assert.equal(out.acmeEmail, "ops@example.test");
     assert.deepEqual(out.firewallPorts, [80, 443]);
+    assert.match(
+      out.reviewedSourceEnv,
+      /BNX_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE=\/run\/secrets\/github-reviewed-source-key/,
+    );
+    assert.match(
+      out.reviewedSourceEnv,
+      /BNX_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE=\/etc\/deployment-host\/github-known-hosts/,
+    );
+    assert.match(out.githubKnownHosts, /github\.com ssh-ed25519 /);
   });
 });
 

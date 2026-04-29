@@ -98,6 +98,9 @@ Run on `mini` from `/srv/common`:
 ```bash
 export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
 export BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
+set -a
+. /etc/deployment-host/reviewed-source-ssh.env
+set +a
 direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts \
   --host-root /var/lib/deployment-host/runtime \
   --state /etc/nixos/deployment-host/platform-state.json \
@@ -116,6 +119,8 @@ What success looks like:
 - the service binds successfully
 - the worker stays running
 - both processes use the same Postgres URL
+- both processes load `/etc/deployment-host/reviewed-source-ssh.env`, which
+  points at the host-managed GitHub SSH deploy key for the private reviewed repo
 - worker-side Vault credential variables are present only on `mini`, and
   fixture paths or laptop Vault token/JWT variables are not exported into the
   service submission path
