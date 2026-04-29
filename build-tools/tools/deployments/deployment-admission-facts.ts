@@ -134,11 +134,18 @@ export async function prerequisiteFacts(opts: {
   evidence?: DeploymentAdmissionEvidence;
 }): Promise<DeploymentPrerequisiteFact[]> {
   const facts: DeploymentPrerequisiteFact[] = [];
-  const providerMap = await prerequisiteProvidersForWorkspace(opts.workspaceRoot);
-  for (const prerequisite of opts.deployment.prerequisites) {
+  const prerequisites = opts.deployment.prerequisites;
+  if (prerequisites.length === 0) return facts;
+  const explicitProviders = opts.prerequisiteProvidersByDeploymentId || {};
+  const needsWorkspaceDiscovery = prerequisites.some(
+    (prerequisite) => !explicitProviders[prerequisite.deploymentId],
+  );
+  const providerMap = needsWorkspaceDiscovery
+    ? await prerequisiteProvidersForWorkspace(opts.workspaceRoot)
+    : new Map<string, string>();
+  for (const prerequisite of prerequisites) {
     const prerequisiteProvider =
-      opts.prerequisiteProvidersByDeploymentId?.[prerequisite.deploymentId] ||
-      providerMap.get(prerequisite.deploymentId);
+      explicitProviders[prerequisite.deploymentId] || providerMap.get(prerequisite.deploymentId);
     const hit = await latestSuccessfulDeploymentRecord({
       workspaceRoot: opts.workspaceRoot,
       recordsRoot: opts.recordsRoot,

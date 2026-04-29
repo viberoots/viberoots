@@ -18,4 +18,13 @@ test("managed-command starts parent-lifecycle watchdog for spawned process group
       "managed-command.ts watchdog must terminate child process group on parent death",
     );
   }
+  if (
+    !txt.includes("watchdogEnvFor") ||
+    !txt.includes("delete scrubbed.BUCK_TEST_TARGET") ||
+    !txt.includes("delete scrubbed.BNX_VERIFY_LOG_FILE") ||
+    !txt.includes("delete scrubbed.BNX_VERIFY_PROCESS_STATE_FILE") ||
+    !txt.includes("delete scrubbed.BNX_BUCK_REAPER_STATE_FILE")
+  ) {
+    throw new Error("managed-command.ts watchdog must not inherit verify ownership env");
+  }
 });

@@ -22,4 +22,9 @@ test("linting: zx_test exports a stable nested buck isolation for child buck com
     /zxtest-shared-/,
     "expected zx_test to derive a shared nested isolation name from the workspace root",
   );
+  assert.match(
+    txt,
+    /env -u BUCK_TEST_TARGET -u BNX_VERIFY_LOG_FILE -u BNX_VERIFY_PROCESS_STATE_FILE -u BNX_BUCK_REAPER_STATE_FILE/,
+    "expected nested buck2 shim to scrub per-test verify env before starting reusable buckd",
+  );
 });

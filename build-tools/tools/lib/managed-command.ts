@@ -20,6 +20,15 @@ export type ManagedCommandActivity = {
   outputChunks?: number;
 };
 
+function watchdogEnvFor(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const scrubbed = { ...env };
+  delete scrubbed.BUCK_TEST_TARGET;
+  delete scrubbed.BNX_VERIFY_LOG_FILE;
+  delete scrubbed.BNX_VERIFY_PROCESS_STATE_FILE;
+  delete scrubbed.BNX_BUCK_REAPER_STATE_FILE;
+  return scrubbed;
+}
+
 export async function runManagedCommand(opts: {
   command: string;
   args: string[];
@@ -112,26 +121,21 @@ export async function runManagedCommand(opts: {
     ].join("\n");
     try {
       const debugWatchdog = String(env.MANAGED_COMMAND_DEBUG_WATCHDOG || "") === "1";
-      const wd = spawn(
-        shell,
-        [
-          "--noprofile",
-          "--norc",
-          "-c",
-          script,
-          "watchdog",
-          String(parentPid),
-          String(pid),
-          String(pid),
-          String(graceSec),
-        ],
-        {
-          cwd: opts.cwd,
-          env: opts.env || process.env,
-          stdio: debugWatchdog ? ["ignore", "pipe", "pipe"] : "ignore",
-          detached: true,
-        },
-      );
+      const watchdogEnv = watchdogEnvFor(env);
+      const watchdogArgs = [
+        "--noprofile",
+        "--norc",
+        "-c",
+        script,
+        "watchdog",
+        ...[parentPid, pid, pid, graceSec].map(String),
+      ];
+      const wd = spawn(shell, watchdogArgs, {
+        cwd: opts.cwd,
+        env: watchdogEnv,
+        stdio: debugWatchdog ? ["ignore", "pipe", "pipe"] : "ignore",
+        detached: true,
+      });
       watchdogPid = wd.pid || 0;
       wd.once("error", (err) => {
         if (!debugWatchdog) return;
@@ -178,9 +182,7 @@ export async function runManagedCommand(opts: {
     }, killGraceMs);
   };
 
-  const onInterrupt = (): void => {
-    requestStop();
-  };
+  const onInterrupt = (): void => requestStop();
 
   process.once("SIGINT", onInterrupt);
   process.once("SIGTERM", onInterrupt);
