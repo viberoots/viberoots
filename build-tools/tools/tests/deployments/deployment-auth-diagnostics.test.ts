@@ -126,9 +126,14 @@ test("auth action summary and realm export stay aligned on reviewed group names"
     "deploy-automation-jenkins-admission-reporters-project-pleomino",
   ]);
   assert.equal(realm.clients[0]?.clientId, "deployment-cli");
+  assert.equal(realm.clients[1]?.clientId, "deployment-runner");
   assert.deepEqual(
     realm.clients[0]?.protocolMappers.map((mapper) => mapper.name),
     ["groups", "email", "audience", "deployment_environment", "repository"],
+  );
+  assert.deepEqual(
+    realm.clients[1]?.protocolMappers.map((mapper) => mapper.name),
+    ["audience", "deployment_environment", "repository"],
   );
   assert.equal(realm.clients[0]?.protocolMappers[0]?.config["claim.name"], "groups");
   assert.equal(realm.clients[0]?.protocolMappers[1]?.config["claim.name"], "email");
@@ -138,6 +143,7 @@ test("auth action summary and realm export stay aligned on reviewed group names"
   );
   assert.equal(realm.clients[0]?.protocolMappers[3]?.config["claim.value"], "mini");
   assert.equal(realm.clients[0]?.protocolMappers[4]?.config["claim.value"], "kiltyj/common");
+  assert.equal(realm.clients[1]?.protocolMappers[2]?.config["claim.value"], "kiltyj/common");
   const commands = action.exampleAdminCommands.join("\n");
   assert.match(
     commands,

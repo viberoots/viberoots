@@ -21,6 +21,13 @@ function cliPublicClientId(deployment: DeploymentTarget): string {
   return deployment.vaultRuntime?.cliPublicClientId?.trim() || DEFAULT_CLIENT_ID;
 }
 
+function serviceAccountClientId(deployment: DeploymentTarget): string | undefined {
+  const metadata = deployment.vaultRuntime;
+  return (
+    metadata?.serviceAccountClientId?.trim() || metadata?.deploymentClientId?.trim() || undefined
+  );
+}
+
 function redirectUriFor(deployment: DeploymentTarget): string {
   const profile = normalizeDeploymentPkceCallbackProfile(
     deployment.vaultRuntime?.pkceCallback || {
@@ -106,11 +113,19 @@ function singleValue(values: string[]): string | undefined {
   return unique.length === 1 ? unique[0] : undefined;
 }
 
-function keycloakClient(deployments: DeploymentTarget[], clientId: string) {
+function keycloakClient(
+  deployments: DeploymentTarget[],
+  clientId: string,
+  clientKind: "public-cli" | "service-account",
+) {
   const clientDeployments = deployments.filter(
-    (deployment) => cliPublicClientId(deployment) === clientId,
+    (deployment) =>
+      (clientKind === "public-cli"
+        ? cliPublicClientId(deployment)
+        : serviceAccountClientId(deployment)) === clientId,
   );
-  const redirectUris = uniqueSorted(clientDeployments.map(redirectUriFor));
+  const redirectUris =
+    clientKind === "public-cli" ? uniqueSorted(clientDeployments.map(redirectUriFor)) : [];
   const audience = singleValue(
     clientDeployments.map((deployment) => deployment.vaultRuntime?.audience || DEFAULT_AUDIENCE),
   );
@@ -124,13 +139,20 @@ function keycloakClient(deployments: DeploymentTarget[], clientId: string) {
     clientId,
     name: clientId,
     enabled: true,
-    publicClient: true,
     protocol: "openid-connect",
-    directAccessGrantsEnabled: true,
+    publicClient: clientKind === "public-cli",
+    directAccessGrantsEnabled: clientKind === "public-cli",
+    ...(clientKind === "service-account"
+      ? {
+          clientAuthenticatorType: "client-secret",
+          serviceAccountsEnabled: true,
+          standardFlowEnabled: false,
+          implicitFlowEnabled: false,
+        }
+      : {}),
     redirectUris,
     protocolMappers: [
-      keycloakGroupsMapper(),
-      keycloakEmailMapper(),
+      ...(clientKind === "public-cli" ? [keycloakGroupsMapper(), keycloakEmailMapper()] : []),
       ...(audience ? [keycloakAudienceMapper(audience)] : []),
       ...(deploymentEnvironment
         ? [keycloakHardcodedClaimMapper("deployment_environment", deploymentEnvironment)]
@@ -163,10 +185,18 @@ export function buildDeploymentAuthKeycloakRealmImport(opts: {
   const deployments = opts.deployments;
   const automationPrincipalIds = uniqueSorted(opts.automationPrincipalIds || []);
   const clientIds = uniqueSorted(deployments.map(cliPublicClientId));
+  const serviceClientIds = uniqueSorted(
+    deployments.map(serviceAccountClientId).filter((value): value is string => Boolean(value)),
+  ).filter((clientId) => !clientIds.includes(clientId));
   return {
     realm: opts.realm || DEFAULT_REALM,
     enabled: true,
     groups: keycloakGroups(deployments, automationPrincipalIds),
-    clients: clientIds.map((clientId) => keycloakClient(deployments, clientId)),
+    clients: [
+      ...clientIds.map((clientId) => keycloakClient(deployments, clientId, "public-cli")),
+      ...serviceClientIds.map((clientId) =>
+        keycloakClient(deployments, clientId, "service-account"),
+      ),
+    ],
   };
 }

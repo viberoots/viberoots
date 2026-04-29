@@ -34,7 +34,13 @@ function adminGroup(
 
 test("deploy admin identity plan stays deterministic and advertises separate admin groups", () => {
   const deployment = cloudflarePagesDeploymentFixture({
-    vaultRuntime: { audience: "deployments-vault", deploymentEnvironment: "mini" },
+    vaultRuntime: {
+      audience: "deployments-vault",
+      deploymentEnvironment: "mini",
+      deploymentClientId: "deployment-runner",
+      serviceAccountClientId: "deployment-runner",
+      cliPublicClientId: "deployment-cli",
+    },
   });
   const first = buildDeploymentAdminKeycloakPlan({
     deployment,
@@ -48,6 +54,10 @@ test("deploy admin identity plan stays deterministic and advertises separate adm
   assert.match(first.adminGroupConventions.shapeAdmin[0], /deploy-admin-identity-shape-admin-/);
   assert.match(first.nextSteps.sync, /deploy admin identity sync --deployment/);
   assert.ok(first.plannedMutations.groups.includes("deploy-submitters-pleomino-staging"));
+  assert.deepEqual(
+    first.plannedMutations.clients.map((client) => client.clientId),
+    ["deployment-cli", "deployment-runner"],
+  );
   assert.deepEqual(first.plannedMutations.clients[0]?.protocolMappers, [
     "groups",
     "email",
@@ -55,6 +65,12 @@ test("deploy admin identity plan stays deterministic and advertises separate adm
     "deployment_environment",
     "repository",
   ]);
+  assert.deepEqual(first.plannedMutations.clients[1]?.protocolMappers, [
+    "audience",
+    "deployment_environment",
+    "repository",
+  ]);
+  assert.deepEqual(first.plannedMutations.clients[1]?.redirectUris, []);
 });
 
 test("ordinary deploy groups do not authorize deploy admin identity sync", async () => {
@@ -138,7 +154,13 @@ test("project and environment scoped deploy admin groups stay narrow", async () 
 
 test("deploy admin sync and grant-user keep audit provenance and idempotent writes", async () => {
   const deployment = cloudflarePagesDeploymentFixture({
-    vaultRuntime: { audience: "deployments-vault", deploymentEnvironment: "mini" },
+    vaultRuntime: {
+      audience: "deployments-vault",
+      deploymentEnvironment: "mini",
+      deploymentClientId: "deployment-runner",
+      serviceAccountClientId: "deployment-runner",
+      cliPublicClientId: "deployment-cli",
+    },
   });
   const shapeAdmin = adminGroup("shape_admin", { kind: "project", value: "pleomino" });
   const membershipAdmin = adminGroup("membership_admin", { kind: "project", value: "pleomino" });
@@ -174,6 +196,8 @@ test("deploy admin sync and grant-user keep audit provenance and idempotent writ
     );
     assert.match(await fsp.readFile(realmFile, "utf8"), /"claim\.name": "deployment_environment"/);
     assert.match(await fsp.readFile(realmFile, "utf8"), /"claim\.value": "kiltyj\/bucknix-fresh"/);
+    assert.match(await fsp.readFile(realmFile, "utf8"), /"clientId": "deployment-runner"/);
+    assert.match(await fsp.readFile(realmFile, "utf8"), /"serviceAccountsEnabled": true/);
 
     const granted = await grantDeploymentAdminKeycloakUser({
       deployment,

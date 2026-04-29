@@ -117,7 +117,7 @@ in
       cat >"$generated_realm_tmp" <<'EOF'
 ${generatedRealmBootstrapJson}
 EOF
-      if [ ! -f ${escape generatedRealmFile} ] || ! ${pkgs.diffutils}/bin/cmp -s "$generated_realm_tmp" ${escape generatedRealmFile}; then
+      if [ ! -f ${escape generatedRealmFile} ]; then
         install -m 0644 "$generated_realm_tmp" ${escape generatedRealmFile}
       fi
       rm -f "$generated_realm_tmp"
