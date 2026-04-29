@@ -162,6 +162,11 @@ test("shared-host identity provider module bootstraps generated identity imports
     assert.match(out.keycloakPostStart, /kcadm\.sh create groups/);
     assert.match(out.keycloakPostStart, /del\(\.groups\)/);
     assert.match(out.keycloakPostStart, /kcadm\.sh create partialImport/);
+    assert.match(out.keycloakPostStart, /live bootstrap realm shape after partial import/);
+    assert.match(
+      out.keycloakPostStart,
+      /create partialImport[\s\S]*live bootstrap realm shape after partial import[\s\S]*users\/\$live_user_id\/groups\/\$group_id/,
+    );
     assert.match(out.keycloakPostStart, /realms\/master\/\.well-known\/openid-configuration/);
     assert.match(out.keycloakPostStart, /local Keycloak endpoint did not become ready/);
     assert.match(out.keycloakPostStart, /ifResourceExists=OVERWRITE/);

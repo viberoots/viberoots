@@ -23,6 +23,15 @@ export function membershipFileFor(configRoot: string) {
   );
 }
 
+export function realmFileFor(configRoot: string) {
+  return path.join(
+    configRoot,
+    "deployment-host",
+    "identity-provider",
+    "deployment-auth-realm.json",
+  );
+}
+
 async function allocateLoopbackPort(): Promise<number> {
   const server = http.createServer();
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));

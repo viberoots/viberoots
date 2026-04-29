@@ -18,10 +18,6 @@ function commandArgs(args: Array<[string, string]>): string {
   return args.map(([flag, value]) => `--${flag} ${shSingleQuote(value)}`).join(" ");
 }
 
-function commandFlags(flags: string[]): string {
-  return flags.map((flag) => `--${flag}`).join(" ");
-}
-
 function commandListArgs(flag: string, values: string[]): string {
   return values.map((value) => `--${flag} ${shSingleQuote(value)}`).join(" ");
 }
@@ -57,11 +53,8 @@ export function buildRemoteSshArgvWithFallback(
   script: string,
   fallback?: { identityFile?: string; knownHostsFile?: string },
 ): string[] {
-  return [
-    ...buildReviewedRemoteSshArgvPrefix(process.env, fallback),
-    destination,
-    remoteBashCommand(script),
-  ];
+  const prefix = buildReviewedRemoteSshArgvPrefix(process.env, fallback);
+  return [...prefix, destination, remoteBashCommand(script)];
 }
 
 export function buildRemoteArtifactStageArgvWithFallback(
@@ -166,10 +159,6 @@ export function buildRemoteDeployScript(opts: {
   ].join("; ");
 }
 
-export function buildRemoteHostApplyScript(plan: NixosSharedHostRemotePlan): string {
-  return buildRemoteHostApplyScriptWithOptions(plan);
-}
-
 export function buildRemoteHostApplyScriptWithOptions(
   plan: NixosSharedHostRemotePlan,
   opts: { restartServices?: string[] } = {},
@@ -184,7 +173,7 @@ export function buildRemoteHostApplyScriptWithOptions(
   const flags = plan.hostApply.selectedMode === "dry-run" ? ["dry-run"] : [];
   const suffix = [
     commandArgs(args),
-    commandFlags(flags),
+    flags.map((flag) => `--${flag}`).join(" "),
     commandListArgs("restart-service", opts.restartServices || []),
   ]
     .filter(Boolean)
@@ -195,6 +184,8 @@ export function buildRemoteHostApplyScriptWithOptions(
     `exec direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-host-apply.ts ${suffix}`,
   ].join("; ");
 }
+
+export const buildRemoteHostApplyScript = buildRemoteHostApplyScriptWithOptions;
 
 export function buildRemoteDeployAdminKeycloakSyncScript(opts: {
   plan: NixosSharedHostRemotePlan;
@@ -229,17 +220,24 @@ export function buildRemoteDeployAdminKeycloakGrantUserScript(opts: {
   action: string;
   userEmail: string;
   membershipFile: string;
+  realmFile: string;
   actingPrincipal: string;
   adminGroups: string[];
+  automationPrincipalIds: string[];
 }): string {
   const fixedArgs: Array<[string, string]> = [
     ["deployment", opts.deploymentLabel],
     ["action", opts.action],
     ["user-email", opts.userEmail],
     ["membership-file", opts.membershipFile],
+    ["realm-file", opts.realmFile],
     ["acting-principal", opts.actingPrincipal],
   ];
-  const suffix = [commandArgs(fixedArgs), commandListArgs("admin-group", opts.adminGroups)]
+  const suffix = [
+    commandArgs(fixedArgs),
+    commandListArgs("admin-group", opts.adminGroups),
+    commandListArgs("automation-principal", opts.automationPrincipalIds),
+  ]
     .filter(Boolean)
     .join(" ");
   return [

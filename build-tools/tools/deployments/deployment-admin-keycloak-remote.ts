@@ -170,8 +170,10 @@ export async function runDeploymentAdminKeycloakRemoteProfile(opts: {
           action: String(opts.action || ""),
           userEmail: String(resolvedInputs.userEmail || ""),
           membershipFile: artifacts.membershipFile,
+          realmFile: artifacts.realmFile,
           actingPrincipal: resolvedInputs.actingPrincipal,
           adminGroups: resolvedInputs.adminGroups,
+          automationPrincipalIds: opts.automationPrincipalIds,
         });
   const mutationResult = await runCommand(
     buildRemoteSshArgvWithFallback(plan.destination, mutationScript, plan.reviewedRemoteSshAuth),

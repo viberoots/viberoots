@@ -180,6 +180,7 @@ test("deploy admin sync and grant-user keep audit provenance and idempotent writ
       action: "approve",
       userEmail: "reviewer@example.com",
       membershipFile,
+      realmFile,
       actingPrincipal: "user:membership-admin",
       adminGroups: [membershipAdmin],
     });

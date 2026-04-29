@@ -48,6 +48,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-auth-session.pr98.service.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-auth-session.claim-mapping.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admin-keycloak.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-admin-keycloak.realm-shape.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admin-keycloak.remote-profile.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admin-keycloak.remote-profile.pr98.helpers.ts": False,
     "build-tools/tools/tests/deployments/deployment-admin-keycloak.remote-profile.pr98.happy-path.test.ts": True,

@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
 import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
@@ -18,6 +19,7 @@ import {
   CONTROL_PLANE_TOKEN,
   enableInteractivePkceVaultRuntime,
   membershipFileFor,
+  realmFileFor,
 } from "./deployment-admin-keycloak.remote-profile.pr98.helpers.ts";
 
 test("remote profile sync infers acting principal and admin groups from the reviewed session", async () => {
@@ -110,6 +112,23 @@ test("remote profile grant-user defaults self-service grants to the logged-in em
         fixture.remoteRuntimeRoot,
         fixture.remoteRecordsRoot,
         controlPlane.url,
+      );
+      await fsp.mkdir(path.dirname(realmFileFor(tmp)), { recursive: true });
+      await fsp.writeFile(
+        realmFileFor(tmp),
+        JSON.stringify(
+          {
+            realm: "deployments",
+            enabled: true,
+            groups: [
+              { name: "deploy-submitters-pleomino-dev" },
+              { name: "deploy-approvers-pleomino-dev" },
+            ],
+            clients: [],
+          },
+          null,
+          2,
+        ) + "\n",
       );
       const selfPromise = $({
         cwd: tmp,

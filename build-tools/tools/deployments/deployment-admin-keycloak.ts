@@ -138,9 +138,12 @@ export async function syncDeploymentAdminKeycloakRealm(opts: {
 
 export async function grantDeploymentAdminKeycloakUser(opts: {
   deployment: DeploymentTarget;
+  deploymentsForRealm?: DeploymentTarget[];
+  automationPrincipalIds?: string[];
   action: DeploymentAuthAction;
   userEmail: string;
   membershipFile: string;
+  realmFile?: string;
   actingPrincipal: string;
   adminGroups: string[];
 }) {
@@ -152,6 +155,17 @@ export async function grantDeploymentAdminKeycloakUser(opts: {
   });
   const role = deploymentAuthActionRole(opts.action);
   const group = reviewedHumanGroupName(opts.deployment, role);
+  const reviewedRealmShape = opts.realmFile
+    ? await ensureGrantGroupExistsInRealm({
+        deployment: opts.deployment,
+        deploymentsForRealm: opts.deploymentsForRealm,
+        automationPrincipalIds: opts.automationPrincipalIds,
+        realmFile: opts.realmFile,
+        actingPrincipal: opts.actingPrincipal,
+        adminGroups: opts.adminGroups,
+        group,
+      })
+    : undefined;
   const realm = grantUserInMembershipRealm({
     realm: await readDeploymentKeycloakMembershipRealm(opts.membershipFile),
     action: opts.action,
@@ -172,11 +186,60 @@ export async function grantDeploymentAdminKeycloakUser(opts: {
       group,
       requiredRole: role,
     },
+    ...(reviewedRealmShape ? { reviewedRealmShape } : {}),
     audit: auditRecord(opts.actingPrincipal, authorization, {
       kind: "identity_membership_grant",
       deploymentLabel: opts.deployment.label,
       membershipFile: opts.membershipFile,
     }),
+  };
+}
+
+async function realmHasGroup(realmFile: string, group: string): Promise<boolean | undefined> {
+  try {
+    const raw = await fsp.readFile(realmFile, "utf8");
+    const parsed = JSON.parse(raw) as { groups?: Array<{ name?: string }> };
+    return new Set((parsed.groups || []).map((entry) => entry.name).filter(Boolean)).has(group);
+  } catch (error: any) {
+    if (error?.code === "ENOENT") return undefined;
+    throw error;
+  }
+}
+
+async function ensureGrantGroupExistsInRealm(opts: {
+  deployment: DeploymentTarget;
+  deploymentsForRealm?: DeploymentTarget[];
+  automationPrincipalIds?: string[];
+  realmFile: string;
+  actingPrincipal: string;
+  adminGroups: string[];
+  group: string;
+}) {
+  const existing = await realmHasGroup(opts.realmFile, opts.group);
+  if (existing === true) return { status: "already_present", realmFile: opts.realmFile };
+  try {
+    authorizeDeploymentKeycloakAdmin({
+      deployment: opts.deployment,
+      principalId: opts.actingPrincipal,
+      adminGroups: opts.adminGroups,
+      role: "shape_admin",
+    });
+  } catch {
+    throw new Error(
+      `reviewed identity membership grant requires group ${opts.group} in ${opts.realmFile}; run deploy admin identity sync with a shape-admin principal before grant-user --apply-host`,
+    );
+  }
+  const deploymentsForRealm = opts.deploymentsForRealm || [opts.deployment];
+  const desiredRealmImport = buildDeploymentAuthKeycloakRealmImport({
+    deployments: deploymentsForRealm,
+    automationPrincipalIds: opts.automationPrincipalIds || [],
+  });
+  const changed = await writeJsonIfChanged(opts.realmFile, desiredRealmImport);
+  return {
+    status: "auto_synced",
+    realmFile: opts.realmFile,
+    changed,
+    renderedDeploymentCount: deploymentsForRealm.length,
   };
 }
 

@@ -44,12 +44,16 @@ test("remote SSH transport assembles reviewed deploy admin identity grant-user c
         userEmail: "alice@example.com",
         membershipFile:
           "/etc/nixos/deployment-host/identity-provider/deployment-auth-memberships.json",
+        realmFile: "/etc/nixos/deployment-host/identity-provider/deployment-auth-realm.json",
         actingPrincipal: "user:membership-admin",
         adminGroups: ["deploy-admin-identity-membership-admin-project-pleomino"],
+        automationPrincipalIds: ["app:deploy-bot"],
       }),
     );
     assert.match(grant.at(-1) || "", /build-tools\/tools\/bin\/deploy admin identity grant-user/);
     assert.match(grant.at(-1) || "", /--user-email .*alice@example\.com/);
     assert.match(grant.at(-1) || "", /--membership-file .*deployment-auth-memberships\.json/);
+    assert.match(grant.at(-1) || "", /--realm-file .*deployment-auth-realm\.json/);
+    assert.match(grant.at(-1) || "", /--automation-principal .*app:deploy-bot/);
   });
 });

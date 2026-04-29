@@ -109,9 +109,12 @@ export async function maybeHandleDeploymentAdminCli(workspaceRoot: string): Prom
     printDeploymentAdminKeycloakResult(
       await grantDeploymentAdminKeycloakUser({
         deployment,
+        deploymentsForRealm: await resolveAllDeployments(workspaceRoot),
+        automationPrincipalIds: automationPrincipalIds(),
         action,
         userEmail: requireFlag("user-email"),
         membershipFile: requireFlag("membership-file"),
+        realmFile: getFlagStr("realm-file", "").trim() || undefined,
         actingPrincipal: requireFlag("acting-principal"),
         adminGroups: adminGroups(),
       }),
