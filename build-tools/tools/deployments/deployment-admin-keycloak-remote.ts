@@ -7,7 +7,7 @@ import { commandFailure, runCommand } from "./nixos-shared-host-remote-execution
 import {
   buildRemoteDeployAdminKeycloakGrantUserScript,
   buildRemoteDeployAdminKeycloakSyncScript,
-  buildRemoteHostApplyScript,
+  buildRemoteHostApplyScriptWithOptions,
   buildRemoteRepoPreflightScript,
   buildRemoteSshArgvWithFallback,
 } from "./nixos-shared-host-remote-shell.ts";
@@ -193,7 +193,7 @@ export async function runDeploymentAdminKeycloakRemoteProfile(opts: {
           );
           const argv = buildRemoteSshArgvWithFallback(
             plan.destination,
-            buildRemoteHostApplyScript(plan),
+            buildRemoteHostApplyScriptWithOptions(plan, { restartServices: ["keycloak"] }),
             plan.reviewedRemoteSshAuth,
           );
           return runCommand(argv).then((result) => {

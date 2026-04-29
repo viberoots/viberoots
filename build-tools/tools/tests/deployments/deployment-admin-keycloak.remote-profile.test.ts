@@ -104,6 +104,7 @@ test("deploy admin identity remote profile reuses one reviewed temp repo across 
       "",
     ].join("\n");
     const rebuildLog = path.join(tmp, "nixos-rebuild.log");
+    const systemctlLog = path.join(tmp, "systemctl.log");
     await fsp.mkdir(managedRoot, { recursive: true });
     await Promise.all([
       fsp.writeFile(configEntryPath, configEntrySource, "utf8"),
@@ -137,12 +138,17 @@ test("deploy admin identity remote profile reuses one reviewed temp repo across 
     ]);
     const hostApplyResult = await $({
       cwd: tmp,
-      env: remoteExecEnv(env, { FAKE_NIXOS_REBUILD_LOG: rebuildLog }),
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts admin identity grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${hostApplyConfigRoot} --apply-host-dry-run --action submit --user-email alice@example.com --acting-principal user:membership-admin --admin-group ${membershipAdminGroup()}`;
+      env: remoteExecEnv(env, {
+        FAKE_NIXOS_REBUILD_LOG: rebuildLog,
+        FAKE_SYSTEMCTL_LOG: systemctlLog,
+      }),
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts admin identity grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${hostApplyConfigRoot} --apply-host --action submit --user-email alice@example.com --acting-principal user:membership-admin --admin-group ${membershipAdminGroup()}`;
     const hostApplySummary = JSON.parse(String(hostApplyResult.stdout));
-    assert.equal(hostApplySummary.hostApply.requestedMode, "dry-run");
-    assert.equal(hostApplySummary.hostApply.result.mode, "dry-run");
-    assert.match(await fsp.readFile(rebuildLog, "utf8"), /dry-activate/);
+    assert.equal(hostApplySummary.hostApply.requestedMode, "switch");
+    assert.equal(hostApplySummary.hostApply.result.mode, "switch");
+    assert.deepEqual(hostApplySummary.hostApply.result.restartedServices, ["keycloak"]);
+    assert.match(await fsp.readFile(rebuildLog, "utf8"), /switch/);
+    assert.match(await fsp.readFile(systemctlLog, "utf8"), /restart keycloak/);
     assert.match(
       await fsp.readFile(membershipFileFor(hostApplyConfigRoot), "utf8"),
       /alice@example\.com/,

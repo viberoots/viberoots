@@ -167,6 +167,13 @@ export function buildRemoteDeployScript(opts: {
 }
 
 export function buildRemoteHostApplyScript(plan: NixosSharedHostRemotePlan): string {
+  return buildRemoteHostApplyScriptWithOptions(plan);
+}
+
+export function buildRemoteHostApplyScriptWithOptions(
+  plan: NixosSharedHostRemotePlan,
+  opts: { restartServices?: string[] } = {},
+): string {
   const args: Array<[string, string]> = [
     ["config-root", plan.hostApply.remoteConfigRoot],
     ["managed-root", plan.hostApply.remoteManagedRoot],
@@ -175,7 +182,13 @@ export function buildRemoteHostApplyScript(plan: NixosSharedHostRemotePlan): str
     ["expected-records-root", plan.remoteRecordsRoot],
   ];
   const flags = plan.hostApply.selectedMode === "dry-run" ? ["dry-run"] : [];
-  const suffix = [commandArgs(args), commandFlags(flags)].filter(Boolean).join(" ");
+  const suffix = [
+    commandArgs(args),
+    commandFlags(flags),
+    commandListArgs("restart-service", opts.restartServices || []),
+  ]
+    .filter(Boolean)
+    .join(" ");
   return [
     "set -euo pipefail",
     `cd ${shSingleQuote(plan.remoteRepoPath)}`,

@@ -7,6 +7,7 @@ import {
   buildRemoteCleanupScript,
   buildRemoteDeployScript,
   buildRemoteHostApplyScript,
+  buildRemoteHostApplyScriptWithOptions,
   buildRemoteRepoPreflightScript,
   buildRemoteSshArgv,
   buildRemoteSshArgvWithFallback,
@@ -107,6 +108,11 @@ test("remote SSH transport assembles reviewed host-apply commands for switch and
       switchApply.at(-1) || "",
       /--expected-state-path '"'"'\/etc\/nixos\/deployment-host\/platform-state\.json'"'"'/,
     );
+    const restartApply = buildRemoteSshArgv(
+      switchPlan.destination,
+      buildRemoteHostApplyScriptWithOptions(switchPlan, { restartServices: ["keycloak"] }),
+    );
+    assert.match(restartApply.at(-1) || "", /--restart-service '"'"'keycloak'"'"'/);
     const dryRunPlan: NixosSharedHostRemotePlan = {
       ...switchPlan,
       hostApply: {

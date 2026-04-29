@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
+import { getFlagBool, getFlagList, getFlagStr, hasFlag } from "../lib/cli.ts";
 import { scrubDeploymentSecretEnv } from "./deployment-secret-env.ts";
 import {
   defaultManagedRoot,
@@ -30,6 +30,7 @@ export type NixosSharedHostHostApplySummary = {
   runtimeRoot: string;
   recordsRoot: string;
   wiringState: "wired";
+  restartedServices?: string[];
 };
 
 function commandFailure(step: string, error: any): Error {
@@ -82,6 +83,10 @@ function nixosRebuildPrefix(): string[] {
   return typeof process.getuid === "function" && process.getuid() === 0 ? [] : ["sudo"];
 }
 
+function privilegedCommandPrefix(): string[] {
+  return typeof process.getuid === "function" && process.getuid() === 0 ? [] : ["sudo"];
+}
+
 function buildApplyArgv(
   manifest: NixosSharedHostInstallManifestV1,
   mode: NixosSharedHostHostApplyMode,
@@ -106,6 +111,31 @@ async function runApply(argv: string[]): Promise<void> {
     });
   } catch (error: any) {
     throw commandFailure("remote host apply failed", error);
+  }
+}
+
+function restartServices(): string[] {
+  return getFlagList("restart-service")
+    .map((service) => service.trim())
+    .filter(Boolean)
+    .map((service) => {
+      if (!/^[A-Za-z0-9_.@-]+$/.test(service)) {
+        throw new Error(`remote host apply preflight failed: invalid service name ${service}`);
+      }
+      return service;
+    });
+}
+
+async function restartService(service: string): Promise<void> {
+  const [file, ...args] = [...privilegedCommandPrefix(), "systemctl", "restart", service];
+  try {
+    await execFileAsync(file, args, {
+      encoding: "utf8",
+      env: scrubDeploymentSecretEnv(),
+      maxBuffer: APPLY_MAX_BUFFER,
+    });
+  } catch (error: any) {
+    throw commandFailure(`remote host apply failed while restarting ${service}`, error);
   }
 }
 
@@ -156,7 +186,13 @@ export async function runNixosSharedHostHostApply(): Promise<NixosSharedHostHost
   ]);
   const mode = selectedMode();
   const command = buildApplyArgv(manifest, mode);
+  const servicesToRestart = restartServices();
   await runApply(command);
+  if (mode === "switch") {
+    for (const service of servicesToRestart) {
+      await restartService(service);
+    }
+  }
   return {
     mode,
     applied: mode === "switch",
@@ -169,6 +205,9 @@ export async function runNixosSharedHostHostApply(): Promise<NixosSharedHostHost
     runtimeRoot: manifest.runtimeRoot,
     recordsRoot: manifest.recordsRoot,
     wiringState: "wired",
+    ...(mode === "switch" && servicesToRestart.length > 0
+      ? { restartedServices: servicesToRestart }
+      : {}),
   };
 }
 

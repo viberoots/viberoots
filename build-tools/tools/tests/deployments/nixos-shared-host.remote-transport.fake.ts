@@ -79,6 +79,17 @@ if [[ -n "\${FAKE_NIXOS_REBUILD_LOG:-}" ]]; then
 fi
 `;
 
+const FAKE_SYSTEMCTL = `#!/usr/bin/env bash
+set -euo pipefail
+if [[ "\${FAKE_SYSTEMCTL_FAIL:-0}" == "1" ]]; then
+  echo "fake systemctl failure" >&2
+  exit 104
+fi
+if [[ -n "\${FAKE_SYSTEMCTL_LOG:-}" ]]; then
+  printf '%s\\n' "$*" >> "\${FAKE_SYSTEMCTL_LOG}"
+fi
+`;
+
 const FAKE_RSYNC = `#!/usr/bin/env bash
 set -euo pipefail
 if [[ "\${FAKE_RSYNC_FAIL:-0}" == "1" ]]; then
@@ -128,6 +139,7 @@ export async function installFakeRemoteTransport(
   await fsp.writeFile(path.join(binDir, "rsync"), FAKE_RSYNC, "utf8");
   await fsp.writeFile(path.join(binDir, "sudo"), FAKE_SUDO, "utf8");
   await fsp.writeFile(path.join(binDir, "nixos-rebuild"), FAKE_NIXOS_REBUILD, "utf8");
+  await fsp.writeFile(path.join(binDir, "systemctl"), FAKE_SYSTEMCTL, "utf8");
   await fsp.writeFile(identityFile, "fake-private-key\n", "utf8");
   await fsp.writeFile(knownHostsFile, "mini ssh-ed25519 AAAATEST\n", "utf8");
   await Promise.all([
@@ -136,6 +148,7 @@ export async function installFakeRemoteTransport(
     fsp.chmod(path.join(binDir, "rsync"), 0o755),
     fsp.chmod(path.join(binDir, "sudo"), 0o755),
     fsp.chmod(path.join(binDir, "nixos-rebuild"), 0o755),
+    fsp.chmod(path.join(binDir, "systemctl"), 0o755),
     fsp.chmod(identityFile, 0o600),
   ]);
   return {
