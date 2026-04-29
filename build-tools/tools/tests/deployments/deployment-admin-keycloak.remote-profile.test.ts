@@ -72,13 +72,11 @@ test("deploy admin identity remote profile reuses one reviewed temp repo across 
       syncSummary.remoteArtifacts.configRelativeRealmFile,
       "./deployment-host/identity-provider/deployment-auth-realm.json",
     );
-    assert.equal(syncSummary.remoteArtifacts.realmFile, realmFileFor(syncConfigRoot));
+    assert.equal(syncSummary.remoteArtifacts.configRoot, tmp);
+    assert.equal(syncSummary.remoteArtifacts.realmFile, realmFileFor(tmp));
     assert.equal(syncSummary.hostApply.requestedMode, "skip");
     assert.equal(syncSummary.mutation.audit.requestedMutation.remoteProfile, "mini");
-    assert.match(
-      await fsp.readFile(realmFileFor(syncConfigRoot), "utf8"),
-      /deploy-submitters-pleomino-dev/,
-    );
+    assert.match(await fsp.readFile(realmFileFor(tmp), "utf8"), /deploy-submitters-pleomino-dev/);
 
     const authzConfigRoot = path.join(tmp, "remote-config-root-authz");
     const authzResult = await $({
@@ -149,10 +147,7 @@ test("deploy admin identity remote profile reuses one reviewed temp repo across 
     assert.deepEqual(hostApplySummary.hostApply.result.restartedServices, ["keycloak"]);
     assert.match(await fsp.readFile(rebuildLog, "utf8"), /switch/);
     assert.match(await fsp.readFile(systemctlLog, "utf8"), /restart keycloak/);
-    assert.match(
-      await fsp.readFile(membershipFileFor(hostApplyConfigRoot), "utf8"),
-      /alice@example\.com/,
-    );
+    assert.match(await fsp.readFile(membershipFileFor(tmp), "utf8"), /alice@example\.com/);
 
     const providerDeployment = cloudflarePagesDeploymentFixture();
     await installCloudflarePagesTargets(tmp, [providerDeployment]);

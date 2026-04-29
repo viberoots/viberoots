@@ -137,8 +137,7 @@ export async function runDeploymentAdminKeycloakRemoteProfile(opts: {
     ...(opts.action ? { action: opts.action } : {}),
   });
   const artifacts = deploymentAdminKeycloakArtifactPaths({
-    configRoot: plan.hostApply.remoteConfigRoot,
-    managedRoot: plan.hostApply.remoteManagedRoot,
+    configRoot: plan.remoteRepoPath,
   });
   console.error(`Remote identity admin: checking reviewed repo on ${plan.destination}...`);
   const preflight = await runCommand(

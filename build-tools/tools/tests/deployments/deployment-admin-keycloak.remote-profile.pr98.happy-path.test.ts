@@ -123,10 +123,7 @@ test("remote profile grant-user defaults self-service grants to the logged-in em
         "ada@example.com",
       );
       assert.equal(selfSummary.mutation.audit.inputResolution.targetUser.source, "session");
-      assert.match(
-        await fsp.readFile(membershipFileFor(configRootFor(tmp)), "utf8"),
-        /ada@example\.com/,
-      );
+      assert.match(await fsp.readFile(membershipFileFor(tmp), "utf8"), /ada@example\.com/);
 
       const crossPromise = $({
         cwd: tmp,
@@ -140,10 +137,7 @@ test("remote profile grant-user defaults self-service grants to the logged-in em
         "alice@example.com",
       );
       assert.equal(crossSummary.mutation.audit.inputResolution.targetUser.source, "explicit");
-      assert.match(
-        await fsp.readFile(membershipFileFor(configRootFor(tmp)), "utf8"),
-        /alice@example\.com/,
-      );
+      assert.match(await fsp.readFile(membershipFileFor(tmp), "utf8"), /alice@example\.com/);
     } finally {
       await controlPlane.close();
       await oidc.close();
