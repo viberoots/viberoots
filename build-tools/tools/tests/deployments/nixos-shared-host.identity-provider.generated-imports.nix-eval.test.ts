@@ -179,6 +179,9 @@ test("shared-host identity provider module bootstraps generated identity imports
     assert.match(out.keycloakPostStart, /live bootstrap realm shape/);
     assert.match(out.keycloakPostStart, /desired-user\.json/);
     assert.match(out.keycloakPostStart, /kcadm\.sh update "users\/\$live_user_id"/);
+    assert.match(out.keycloakPostStart, /group_create_output="\$\(/);
+    assert.match(out.keycloakPostStart, /kcadm\.sh create groups --config "\$kcadm_config"/);
+    assert.match(out.keycloakPostStart, /printf '%s\\n' "\$group_create_output"/);
     assert.match(out.keycloakPostStart, /users\/\$live_user_id\/groups\/\$group_id/);
     assert.match(out.keycloakPostStart, /first-operator bootstrap membership binding/);
     assert.match(out.keycloakPostStart, /first-operator password bootstrap/);

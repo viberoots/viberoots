@@ -199,8 +199,13 @@ in
               | head -n 1
           )"
           if [ -z "$group_id" ]; then
-            echo "bootstrap identity migration failed while reconciling ${label}: group $group_name is missing" >&2
-            exit 1
+            group_create_output="$(${keycloakBin}/kcadm.sh create groups --config "$kcadm_config" -r deployments -s name="$group_name" 2>&1)"
+            group_id="$(printf '%s\n' "$group_create_output" | ${pkgs.gnused}/bin/sed -n "s/.*id '\([^']*\)'.*/\1/p" | head -n 1)"
+            if [ -z "$group_id" ]; then
+              echo "bootstrap identity migration failed while reconciling ${label}: group $group_name is missing" >&2
+              printf '%s\n' "$group_create_output" >&2
+              exit 1
+            fi
           fi
           if ! ${keycloakBin}/kcadm.sh update "users/$live_user_id/groups/$group_id" \
             --config "$kcadm_config" \
