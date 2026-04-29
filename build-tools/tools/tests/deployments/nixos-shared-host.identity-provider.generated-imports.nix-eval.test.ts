@@ -132,6 +132,9 @@ test("shared-host identity provider module bootstraps generated identity imports
     assert.match(out.bootstrapScript, /"claim\.value":"mini"/);
     assert.match(out.bootstrapScript, /"claim\.name":"repository"/);
     assert.match(out.bootstrapScript, /"claim\.value":"kiltyj\/bucknix-fresh"/);
+    assert.match(out.bootstrapScript, /generated_realm_tmp="\$\(mktemp\)"/);
+    assert.match(out.bootstrapScript, /cmp -s "\$generated_realm_tmp"/);
+    assert.match(out.bootstrapScript, /install -m 0644 "\$generated_realm_tmp"/);
     assert.match(out.bootstrapScript, /deploy-admin-identity-shape-admin-global/);
     assert.match(out.bootstrapScript, /ops@example\.test/);
     assert.match(out.keycloakPreStart, /kc\.sh bootstrap-admin service/);

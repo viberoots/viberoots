@@ -113,11 +113,14 @@ in
     ${strictShell}
     install -d -m 0755 ${escape generatedImportRoot}
     ${lib.optionalString (generatedRealmFile != null) ''
-      if [ ! -f ${escape generatedRealmFile} ]; then
-        cat >${escape generatedRealmFile} <<'EOF'
+      generated_realm_tmp="$(mktemp)"
+      cat >"$generated_realm_tmp" <<'EOF'
 ${generatedRealmBootstrapJson}
 EOF
+      if [ ! -f ${escape generatedRealmFile} ] || ! ${pkgs.diffutils}/bin/cmp -s "$generated_realm_tmp" ${escape generatedRealmFile}; then
+        install -m 0644 "$generated_realm_tmp" ${escape generatedRealmFile}
       fi
+      rm -f "$generated_realm_tmp"
     ''}
     ${lib.optionalString (generatedMembershipFile != null) ''
       if [ ! -f ${escape generatedMembershipFile} ]; then
