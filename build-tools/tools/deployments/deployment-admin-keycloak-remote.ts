@@ -82,10 +82,6 @@ function hostApplySelection() {
   };
 }
 
-function reviewedRemoteFlagsRequested(): boolean {
-  return REMOTE_PROFILE_FLAGS.some((flag) => hasFlag(flag));
-}
-
 function requireRemoteProfileName(): string {
   const profileName = getFlagStr("profile", "").trim();
   if (!profileName) throw new Error("reviewed remote identity admin execution requires --profile");
@@ -108,7 +104,7 @@ function assertNoLocalArtifactOverride(flagName: "realm-file" | "membership-file
 }
 
 export function hasDeploymentAdminKeycloakRemoteProfileFlags(): boolean {
-  return reviewedRemoteFlagsRequested();
+  return REMOTE_PROFILE_FLAGS.some((flag) => hasFlag(flag));
 }
 
 export async function runDeploymentAdminKeycloakRemoteProfile(opts: {
@@ -137,7 +133,8 @@ export async function runDeploymentAdminKeycloakRemoteProfile(opts: {
     ...(opts.action ? { action: opts.action } : {}),
   });
   const artifacts = deploymentAdminKeycloakArtifactPaths({
-    configRoot: plan.remoteRepoPath,
+    configRoot: plan.hostApply.remoteConfigRoot,
+    managedRoot: plan.hostApply.remoteManagedRoot,
   });
   console.error(`Remote identity admin: checking reviewed repo on ${plan.destination}...`);
   const preflight = await runCommand(

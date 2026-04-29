@@ -23,7 +23,7 @@ test("pr97 docs keep reviewed remote keycloak admin flow aligned across operator
   }
   assert.match(
     setupDoc,
-    /generatedImportRoot = "\/srv\/common\/deployment-host\/identity-provider"/i,
+    /generatedImportRoot[\s\S]*defaults to\s+`\/etc\/nixos\/deployment-host\/identity-provider`/i,
   );
   assert.match(
     setupDoc,

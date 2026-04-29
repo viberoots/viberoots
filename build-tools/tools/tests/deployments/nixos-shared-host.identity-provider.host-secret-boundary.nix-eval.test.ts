@@ -32,7 +32,6 @@ test("identity-provider migration reads restricted host secrets through startup 
               hostname = "identity.example.test";
               keycloakHttpPort = 8091;
               databasePasswordFile = "/run/secrets/keycloak-db-password";
-              generatedImportRoot = "/srv/common/deployment-host/identity-provider";
               bootstrapClientRedirectUris = [ "https://deploy-auth.example.test/oidc/callback" ];
               bootstrapFirstOperatorEmail = "ops@example.test";
               bootstrapFirstOperatorPasswordFile = "/run/secrets/bootstrap-first-operator-password";

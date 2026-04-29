@@ -72,11 +72,14 @@ test("deploy admin identity remote profile reuses one reviewed temp repo across 
       syncSummary.remoteArtifacts.configRelativeRealmFile,
       "./deployment-host/identity-provider/deployment-auth-realm.json",
     );
-    assert.equal(syncSummary.remoteArtifacts.configRoot, tmp);
-    assert.equal(syncSummary.remoteArtifacts.realmFile, realmFileFor(tmp));
+    assert.equal(syncSummary.remoteArtifacts.configRoot, syncConfigRoot);
+    assert.equal(syncSummary.remoteArtifacts.realmFile, realmFileFor(syncConfigRoot));
     assert.equal(syncSummary.hostApply.requestedMode, "skip");
     assert.equal(syncSummary.mutation.audit.requestedMutation.remoteProfile, "mini");
-    assert.match(await fsp.readFile(realmFileFor(tmp), "utf8"), /deploy-submitters-pleomino-dev/);
+    assert.match(
+      await fsp.readFile(realmFileFor(syncConfigRoot), "utf8"),
+      /deploy-submitters-pleomino-dev/,
+    );
 
     const authzConfigRoot = path.join(tmp, "remote-config-root-authz");
     const authzResult = await $({
@@ -104,8 +107,23 @@ test("deploy admin identity remote profile reuses one reviewed temp repo across 
     const rebuildLog = path.join(tmp, "nixos-rebuild.log");
     const systemctlLog = path.join(tmp, "systemctl.log");
     await fsp.mkdir(managedRoot, { recursive: true });
+    await fsp.mkdir(path.dirname(realmFileFor(hostApplyConfigRoot)), { recursive: true });
     await Promise.all([
       fsp.writeFile(configEntryPath, configEntrySource, "utf8"),
+      fsp.writeFile(
+        realmFileFor(hostApplyConfigRoot),
+        JSON.stringify(
+          {
+            realm: "deployments",
+            enabled: true,
+            groups: [{ name: "deploy-submitters-pleomino-dev" }],
+            clients: [],
+          },
+          null,
+          2,
+        ) + "\n",
+        "utf8",
+      ),
       fsp.writeFile(remoteStatePath, createEmptyPlatformStateJson(), "utf8"),
       fsp.writeFile(
         manifestPathFor(managedRoot),
@@ -147,7 +165,10 @@ test("deploy admin identity remote profile reuses one reviewed temp repo across 
     assert.deepEqual(hostApplySummary.hostApply.result.restartedServices, ["keycloak"]);
     assert.match(await fsp.readFile(rebuildLog, "utf8"), /switch/);
     assert.match(await fsp.readFile(systemctlLog, "utf8"), /restart keycloak/);
-    assert.match(await fsp.readFile(membershipFileFor(tmp), "utf8"), /alice@example\.com/);
+    assert.match(
+      await fsp.readFile(membershipFileFor(hostApplyConfigRoot), "utf8"),
+      /alice@example\.com/,
+    );
 
     const providerDeployment = cloudflarePagesDeploymentFixture();
     await installCloudflarePagesTargets(tmp, [providerDeployment]);

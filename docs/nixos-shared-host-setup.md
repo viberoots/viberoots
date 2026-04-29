@@ -351,7 +351,6 @@ deploymentHost.identityProvider = {
   keycloakHttpPort = 8091;
   databasePasswordFile = "/var/lib/deployment-host-secrets/keycloak-db-password";
   bootstrapClientRedirectUris = [ "https://deploy-auth.apps.kilty.io/oidc/callback" ];
-  generatedImportRoot = "/srv/common/deployment-host/identity-provider";
   bootstrapFirstOperatorEmail = "ops@example.com";
   bootstrapFirstOperatorPasswordFile =
     "/var/lib/deployment-host-secrets/bootstrap-first-operator-password";
@@ -408,7 +407,10 @@ direnv exec . build-tools/tools/bin/deploy admin identity sync \
 ```
 
 `deploymentHost.identityProvider.generatedImportRoot` is the reviewed
-host-module surface for these mutable generated files. The module bootstraps
+host-module surface for these mutable generated files and defaults to
+`/etc/nixos/deployment-host/identity-provider`. Keep one canonical generated
+identity-provider root there, next to the reviewed host config, unless you have
+a deliberately reviewed host-config-root override. The module bootstraps
 the reviewed interactive client contract, the reviewed email mapper, the
 bootstrap admin-group shape, and the optional first trusted operator membership
 when the files do not exist yet, then reconciles the live persisted Keycloak
@@ -416,8 +418,8 @@ realm during host reconciliation by using a temporary local recovery admin plus
 Keycloak partial import. That same reviewed path covers both fresh installs and
 existing persisted realms, so upgrades no longer require manual admin-console
 repair before the first reviewed login. Keep both files gitignored and let the
-host module runtime-links them into `/srv/common/deployment-host/identity-provider`;
-do not list them in `deploymentHost.identityProvider.realmFiles`, which is
+host module runtime-links them into Keycloak's import directory; do not list
+them in `deploymentHost.identityProvider.realmFiles`, which is
 reserved for static flake-visible imports. Treat the generated realm file as
 group shape and mapper configuration only; keep human and automation membership
 in the separate generated input

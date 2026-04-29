@@ -113,9 +113,10 @@ test("remote profile grant-user defaults self-service grants to the logged-in em
         fixture.remoteRecordsRoot,
         controlPlane.url,
       );
-      await fsp.mkdir(path.dirname(realmFileFor(tmp)), { recursive: true });
+      const remoteConfigRoot = configRootFor(tmp);
+      await fsp.mkdir(path.dirname(realmFileFor(remoteConfigRoot)), { recursive: true });
       await fsp.writeFile(
-        realmFileFor(tmp),
+        realmFileFor(remoteConfigRoot),
         JSON.stringify(
           {
             realm: "deployments",
@@ -134,7 +135,7 @@ test("remote profile grant-user defaults self-service grants to the logged-in em
         cwd: tmp,
         env: remoteExecEnv(fixture.env),
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)} --action submit`;
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${remoteConfigRoot} --action submit`;
       await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);
       const selfSummary = JSON.parse(String((await selfPromise).stdout));
       assert.equal(
@@ -142,13 +143,16 @@ test("remote profile grant-user defaults self-service grants to the logged-in em
         "ada@example.com",
       );
       assert.equal(selfSummary.mutation.audit.inputResolution.targetUser.source, "session");
-      assert.match(await fsp.readFile(membershipFileFor(tmp), "utf8"), /ada@example\.com/);
+      assert.match(
+        await fsp.readFile(membershipFileFor(remoteConfigRoot), "utf8"),
+        /ada@example\.com/,
+      );
 
       const crossPromise = $({
         cwd: tmp,
         env: remoteExecEnv(fixture.env),
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)} --action approve --user-email alice@example.com`;
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${remoteConfigRoot} --action approve --user-email alice@example.com`;
       await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);
       const crossSummary = JSON.parse(String((await crossPromise).stdout));
       assert.equal(
@@ -156,7 +160,10 @@ test("remote profile grant-user defaults self-service grants to the logged-in em
         "alice@example.com",
       );
       assert.equal(crossSummary.mutation.audit.inputResolution.targetUser.source, "explicit");
-      assert.match(await fsp.readFile(membershipFileFor(tmp), "utf8"), /alice@example\.com/);
+      assert.match(
+        await fsp.readFile(membershipFileFor(remoteConfigRoot), "utf8"),
+        /alice@example\.com/,
+      );
     } finally {
       await controlPlane.close();
       await oidc.close();

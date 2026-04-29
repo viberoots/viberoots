@@ -34,7 +34,6 @@ test("shared-host identity provider module bootstraps generated identity imports
               hostname = "identity.example.test";
               acmeEmail = "ops@example.test";
               keycloakHttpPort = 8091;
-              generatedImportRoot = "/srv/common/deployment-host/identity-provider";
               bootstrapClientRedirectUris = [ "https://deploy-auth.example.test/oidc/callback" ];
               bootstrapFirstOperatorEmail = "ops@example.test";
               bootstrapFirstOperatorPasswordFile = "/var/lib/deployment-host-secrets/bootstrap-first-operator-password";
@@ -115,7 +114,7 @@ test("shared-host identity provider module bootstraps generated identity imports
     assert.equal(out.databaseType, "postgresql");
     assert.equal(out.passwordFile, "/var/lib/deployment-host-secrets/keycloak-db-password");
     assert.equal(out.initialAdminPassword, null);
-    assert.equal(out.generatedImportRoot, "/srv/common/deployment-host/identity-provider");
+    assert.equal(out.generatedImportRoot, "/etc/nixos/deployment-host/identity-provider");
     assert.equal(out.generatedRealmFile, null);
     assert.equal(out.generatedMembershipFile, null);
     assert.equal(
