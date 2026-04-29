@@ -1395,6 +1395,17 @@ deploymentHost.deploymentService = {
 };
 ```
 
+For the private reviewed-source SSH key, keep the file private but make it
+readable by the deployment service user:
+
+```nix
+sops.secrets."deployment-host/github-reviewed-source-key" = {
+  owner = "deployment-host";
+  group = "deployment-host";
+  mode = "0400";
+};
+```
+
 ```nix
 deploymentHost.deployAuthCallback = {
   enable = true;

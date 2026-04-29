@@ -363,6 +363,12 @@ deploymentHost.identityProvider = {
   openFirewall = false;
 };
 
+sops.secrets."deployment-host/github-reviewed-source-key" = {
+  owner = "deployment-host";
+  group = "deployment-host";
+  mode = "0400";
+};
+
 deploymentHost.deploymentService = {
   enable = true;
   hostname = "deploy.apps.kilty.io";
@@ -570,6 +576,9 @@ What the service and worker flags mean:
   Required for private GitHub repositories. The deployment service snapshots the
   reviewed branch by fetching `git@github.com:<owner>/<repo>.git`; point this at
   a deploy key or machine key that has read access to the governed repository.
+  The SOPS secret must be readable by the `deployment-host` service user and
+  remain private-key safe, for example:
+  `owner = "deployment-host"; group = "deployment-host"; mode = "0400";`.
 - `BNX_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE=/etc/deployment-host/github-known-hosts`
   Pins GitHub's SSH host keys for reviewed-source fetches. The deployment
   service module writes this file automatically when
