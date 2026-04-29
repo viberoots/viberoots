@@ -87,6 +87,7 @@ let
   '';
   localServerUrl =
     "http://${keycloak.settings.http-host or "127.0.0.1"}:${toString (keycloak.settings.http-port or 8080)}";
+  localReadyUrl = "${localServerUrl}/realms/master/.well-known/openid-configuration";
   partialImportStep = filePath: label: ''
     if [ -f ${escape filePath} ]; then
       if ! ${keycloakBin}/kcadm.sh create partialImport \
@@ -168,6 +169,18 @@ EOF
     kcadm_config="$kcadm_dir/kcadm.config"
     trap 'rm -rf "$kcadm_dir"' EXIT
     secret="$(tr -d '\n' < ${escape bootstrapAdminSecretFile})"
+    keycloak_ready=0
+    for _attempt in {1..60}; do
+      if ${pkgs.curl}/bin/curl --fail --silent --max-time 2 ${escape localReadyUrl} >/dev/null; then
+        keycloak_ready=1
+        break
+      fi
+      sleep 1
+    done
+    if [ "$keycloak_ready" != "1" ]; then
+      echo "bootstrap identity migration failed before live reconciliation: local Keycloak endpoint did not become ready" >&2
+      exit 1
+    fi
     if ! ${keycloakBin}/kcadm.sh config credentials \
       --config "$kcadm_config" \
       --server ${escape localServerUrl} \
