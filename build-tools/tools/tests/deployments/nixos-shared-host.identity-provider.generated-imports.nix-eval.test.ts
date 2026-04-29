@@ -159,6 +159,10 @@ test("shared-host identity provider module bootstraps generated identity imports
     assert.match(out.keycloakPostStart, /realms\/master\/\.well-known\/openid-configuration/);
     assert.match(out.keycloakPostStart, /local Keycloak endpoint did not become ready/);
     assert.match(out.keycloakPostStart, /ifResourceExists=OVERWRITE/);
+    assert.match(out.keycloakPostStart, /desired-client\.json/);
+    assert.match(out.keycloakPostStart, /kcadm\.sh update "clients\/\$live_client_id"/);
+    assert.match(out.keycloakPostStart, /protocol-mappers\/models/);
+    assert.match(out.keycloakPostStart, /bootstrap identity migration failed while reconciling/);
     assert.match(out.keycloakPostStart, /live bootstrap realm shape/);
     assert.match(out.keycloakPostStart, /first-operator bootstrap membership binding/);
     assert.match(out.keycloakPostStart, /first-operator password bootstrap/);
