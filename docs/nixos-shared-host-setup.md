@@ -353,6 +353,8 @@ deploymentHost.identityProvider = {
   bootstrapClientRedirectUris = [ "https://deploy-auth.apps.kilty.io/oidc/callback" ];
   generatedImportRoot = "/srv/common/deployment-host/identity-provider";
   bootstrapFirstOperatorEmail = "ops@example.com";
+  bootstrapFirstOperatorPasswordFile =
+    "/var/lib/deployment-host-secrets/bootstrap-first-operator-password";
   manageNginx = false;
   manageAcme = false;
   openFirewall = false;
@@ -379,6 +381,15 @@ deploymentHost.deployAuthCallback = {
   openFirewall = false;
 };
 ```
+
+`bootstrapFirstOperatorPasswordFile` is a host-managed secret path, not a Nix
+store value. Use secretspec or your host secret mechanism to place a temporary
+first-login password there. The migration reads it during service start, sets it
+once for `bootstrapFirstOperatorEmail`, and writes a marker under
+`generatedImportRoot` so later rebuilds do not reset the operator's password.
+After the first successful login, remove the temporary secret if your secret
+workflow allows it; deleting the marker intentionally re-runs the one-shot
+bootstrap.
 
 Before you rebuild, generate the reviewed identity group shape with:
 

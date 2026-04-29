@@ -17,6 +17,7 @@ test("shared-host identity provider module bootstraps generated identity imports
   assert.match(moduleText, /generatedImportRoot/);
   assert.match(moduleText, /generatedRealmFile/);
   assert.match(moduleText, /generatedMembershipFile/);
+  assert.match(moduleText, /bootstrapFirstOperatorPasswordFile/);
   assert.match(moduleText, /L\+ \$\{generatedImportDir\}\/\$\{generatedRealmImportName\}/);
   assert.match(moduleText, /L\+ \$\{generatedImportDir\}\/\$\{generatedMembershipImportName\}/);
   assert.match(moduleText, /systemd\.services\.keycloak\.preStart/);
@@ -36,6 +37,7 @@ test("shared-host identity provider module bootstraps generated identity imports
               generatedImportRoot = "/srv/common/deployment-host/identity-provider";
               bootstrapClientRedirectUris = [ "https://deploy-auth.example.test/oidc/callback" ];
               bootstrapFirstOperatorEmail = "ops@example.test";
+              bootstrapFirstOperatorPasswordFile = "/var/lib/deployment-host-secrets/bootstrap-first-operator-password";
               manageNginx = true;
               manageAcme = true;
               openFirewall = true;
@@ -59,6 +61,8 @@ test("shared-host identity provider module bootstraps generated identity imports
           system.config.deploymentHost.identityProvider.generatedRealmFile or null;
         generatedMembershipFile =
           system.config.deploymentHost.identityProvider.generatedMembershipFile or null;
+        bootstrapFirstOperatorPasswordFile =
+          system.config.deploymentHost.identityProvider.bootstrapFirstOperatorPasswordFile or null;
         hasBootstrapService =
           builtins.hasAttr "deployment-host-keycloak-generated-import-bootstrap"
           system.config.systemd.services;
@@ -87,6 +91,7 @@ test("shared-host identity provider module bootstraps generated identity imports
       generatedImportRoot: string;
       generatedRealmFile: string | null;
       generatedMembershipFile: string | null;
+      bootstrapFirstOperatorPasswordFile: string | null;
       hasBootstrapService: boolean;
       bootstrapScript: string;
       keycloakPreStart: string;
@@ -109,6 +114,10 @@ test("shared-host identity provider module bootstraps generated identity imports
     assert.equal(out.generatedImportRoot, "/srv/common/deployment-host/identity-provider");
     assert.equal(out.generatedRealmFile, null);
     assert.equal(out.generatedMembershipFile, null);
+    assert.equal(
+      out.bootstrapFirstOperatorPasswordFile,
+      "/var/lib/deployment-host-secrets/bootstrap-first-operator-password",
+    );
     assert.equal(out.hasBootstrapService, true);
     assert.match(out.bootstrapScript, /deployment-cli/);
     assert.match(out.bootstrapScript, /"claim\.name":"email"/);
@@ -141,6 +150,17 @@ test("shared-host identity provider module bootstraps generated identity imports
     assert.match(out.keycloakPostStart, /ifResourceExists=OVERWRITE/);
     assert.match(out.keycloakPostStart, /live bootstrap realm shape/);
     assert.match(out.keycloakPostStart, /first-operator bootstrap membership binding/);
+    assert.match(out.keycloakPostStart, /first-operator password bootstrap/);
+    assert.match(out.keycloakPostStart, /first-operator temporary password/);
+    assert.match(out.keycloakPostStart, /first-operator-password-set-v1/);
+    assert.match(
+      out.keycloakPostStart,
+      /\/var\/lib\/deployment-host-secrets\/bootstrap-first-operator-password/,
+    );
+    assert.match(out.keycloakPostStart, /kcadm\.sh set-password/);
+    assert.match(out.keycloakPostStart, /--username ops@example\.test/);
+    assert.match(out.keycloakPostStart, /--new-password "\$first_operator_password"/);
+    assert.match(out.keycloakPostStart, /--temporary/);
     assert.match(out.keycloakPostStart, /kcadm\.sh delete "clients\/\$client_id"/);
     assert.equal(out.nginxEnabled, true);
     assert.equal(out.forceSSL, true);

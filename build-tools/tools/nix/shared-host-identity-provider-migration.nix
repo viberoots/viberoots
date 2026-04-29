@@ -7,6 +7,8 @@
   generatedMembershipFile,
   generatedRealmBootstrapJson,
   generatedMembershipBootstrapJson,
+  bootstrapFirstOperatorEmail ? null,
+  bootstrapFirstOperatorPasswordFile ? null,
 }:
 let
   keycloak = config.services.keycloak;
@@ -28,6 +30,14 @@ let
     "${generatedImportRoot}/.deployment-host-keycloak-bootstrap-admin-secret";
   bootstrapAdminMarkerFile =
     "${generatedImportRoot}/.deployment-host-keycloak-bootstrap-admin-created-v2";
+  bootstrapFirstOperatorPasswordMarkerFile =
+    "${generatedImportRoot}/.deployment-host-keycloak-first-operator-password-set-v1";
+  normalizedBootstrapFirstOperatorEmail =
+    if bootstrapFirstOperatorEmail == null then
+      null
+    else
+      let trimmed = lib.strings.trim bootstrapFirstOperatorEmail; in
+      if trimmed == "" then null else lib.strings.toLower trimmed;
   databaseVendor = if database.type == "postgresql" then "postgres" else database.type;
   databaseName =
     if database.createLocally && database.host == "localhost" then "keycloak" else database.name;
@@ -144,6 +154,32 @@ let
       fi
     fi
   '';
+  bootstrapFirstOperatorPasswordStep =
+    lib.optionalString
+      (normalizedBootstrapFirstOperatorEmail != null && bootstrapFirstOperatorPasswordFile != null)
+      ''
+        if [ ! -f ${escape bootstrapFirstOperatorPasswordMarkerFile} ]; then
+          if [ ! -s ${escape bootstrapFirstOperatorPasswordFile} ]; then
+            echo "bootstrap identity migration failed before first-operator password bootstrap: configured password file is missing or empty" >&2
+            exit 1
+          fi
+          first_operator_password="$(tr -d '\n' < ${escape bootstrapFirstOperatorPasswordFile})"
+          if [ -z "$first_operator_password" ]; then
+            echo "bootstrap identity migration failed before first-operator password bootstrap: configured password file is empty" >&2
+            exit 1
+          fi
+          if ! ${keycloakBin}/kcadm.sh set-password \
+            --config "$kcadm_config" \
+            -r deployments \
+            --username ${escape normalizedBootstrapFirstOperatorEmail} \
+            --new-password "$first_operator_password" \
+            --temporary >/dev/null; then
+            echo "bootstrap identity migration failed while setting the first-operator temporary password" >&2
+            exit 1
+          fi
+          touch ${escape bootstrapFirstOperatorPasswordMarkerFile}
+        fi
+      '';
 in
 {
   inherit bootstrapAdminClientId;
@@ -237,6 +273,7 @@ ${ensureDeploymentsRealmStep}
 ${reconcileGroupsStep generatedRealmFile "the live bootstrap realm shape"}
 ${partialImportStep generatedRealmFile "the live bootstrap realm shape"}
 ${partialImportStep generatedMembershipFile "the first-operator bootstrap membership binding"}
+${bootstrapFirstOperatorPasswordStep}
     client_id="$(
       ${keycloakBin}/kcadm.sh get clients \
         --config "$kcadm_config" \

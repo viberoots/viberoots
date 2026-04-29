@@ -34,6 +34,8 @@ test("identity-provider migration reads restricted host secrets through startup 
               databasePasswordFile = "/run/secrets/keycloak-db-password";
               generatedImportRoot = "/srv/common/deployment-host/identity-provider";
               bootstrapClientRedirectUris = [ "https://deploy-auth.example.test/oidc/callback" ];
+              bootstrapFirstOperatorEmail = "ops@example.test";
+              bootstrapFirstOperatorPasswordFile = "/run/secrets/bootstrap-first-operator-password";
             };
           };
         };
@@ -41,6 +43,8 @@ test("identity-provider migration reads restricted host secrets through startup 
         serviceConfig = service.serviceConfig;
       in {
         passwordFile = system.config.services.keycloak.database.passwordFile;
+        bootstrapFirstOperatorPasswordFile =
+          system.config.deploymentHost.identityProvider.bootstrapFirstOperatorPasswordFile or null;
         permissionsStartOnly = serviceConfig.PermissionsStartOnly or false;
         runtimeUser = serviceConfig.User or null;
         dynamicUser = serviceConfig.DynamicUser or false;
@@ -54,6 +58,7 @@ test("identity-provider migration reads restricted host secrets through startup 
     })`nix eval --impure --expr ${expr} --json`;
     const out = JSON.parse(String(stdout || "{}")) as {
       passwordFile: string;
+      bootstrapFirstOperatorPasswordFile: string | null;
       permissionsStartOnly: boolean;
       runtimeUser: string | null;
       dynamicUser: boolean;
@@ -61,6 +66,10 @@ test("identity-provider migration reads restricted host secrets through startup 
       postStart: string;
     };
     assert.equal(out.passwordFile, "/run/secrets/keycloak-db-password");
+    assert.equal(
+      out.bootstrapFirstOperatorPasswordFile,
+      "/run/secrets/bootstrap-first-operator-password",
+    );
     assert.equal(out.permissionsStartOnly, true);
     assert.ok(out.dynamicUser || (out.runtimeUser !== null && out.runtimeUser !== "root"));
     assert.match(out.preStart, /<\$?\{?['"]?\/run\/secrets\/keycloak-db-password/);
@@ -77,6 +86,9 @@ test("identity-provider migration reads restricted host secrets through startup 
     assert.match(out.preStart, /printf 'db-url(?:-host|-database|-port|-properties)?=%s\\n'/);
     assert.doesNotMatch(out.preStart, /(^|[[:space:]])--db([[:space:]]|$)/);
     assert.match(out.preStart, /--client-secret:env=BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET/);
+    assert.match(out.postStart, /\/run\/secrets\/bootstrap-first-operator-password/);
+    assert.match(out.postStart, /first_operator_password="\$\(tr -d '\\n'/);
+    assert.match(out.postStart, /--new-password "\$first_operator_password"/);
     assert.doesNotMatch(out.preStart, /chmod|chgrp|sudo/);
     assert.doesNotMatch(out.postStart, /chmod|chgrp|sudo/);
   });

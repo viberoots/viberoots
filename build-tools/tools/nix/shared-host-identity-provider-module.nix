@@ -37,6 +37,8 @@ let
       generatedMembershipBootstrapJson
       ;
     generatedImportRoot = cfg.generatedImportRoot;
+    bootstrapFirstOperatorEmail = cfg.bootstrapFirstOperatorEmail;
+    bootstrapFirstOperatorPasswordFile = cfg.bootstrapFirstOperatorPasswordFile;
   };
 in
 {
@@ -112,6 +114,14 @@ in
         with reviewed identity-admin rights.
       '';
     };
+    bootstrapFirstOperatorPasswordFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Optional host-secret path containing a bootstrap-only temporary password for the first
+        trusted human. The migration reads this at activation time and sets it once.
+      '';
+    };
     manageNginx = lib.mkOption {
       type = lib.types.bool;
       default = false;
@@ -162,6 +172,17 @@ in
           deploymentHost.identityProvider.bootstrapClientRedirectUris must include at least one
           reviewed callback URI.
         '';
+      }
+      {
+        assertion =
+          cfg.bootstrapFirstOperatorPasswordFile == null
+          || lib.hasPrefix "/" cfg.bootstrapFirstOperatorPasswordFile;
+        message = "deploymentHost.identityProvider.bootstrapFirstOperatorPasswordFile must be an absolute host path when set.";
+      }
+      {
+        assertion =
+          cfg.bootstrapFirstOperatorPasswordFile == null || cfg.bootstrapFirstOperatorEmail != null;
+        message = "deploymentHost.identityProvider.bootstrapFirstOperatorPasswordFile requires bootstrapFirstOperatorEmail.";
       }
       {
         assertion = !(cfg.realmFiles != [ ] && generatedRealmFile != null);

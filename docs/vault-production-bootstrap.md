@@ -835,6 +835,8 @@ existing `virtualHosts = (...) // { ... };` expression:
     keycloakHttpPort = keycloakHttpPort;
     bootstrapClientRedirectUris = [ "https://deploy-auth.apps.kilty.io/oidc/callback" ];
     bootstrapFirstOperatorEmail = "ops@example.com";
+    bootstrapFirstOperatorPasswordFile =
+      "/var/lib/deployment-host-secrets/bootstrap-first-operator-password";
     databasePasswordFile = "/var/lib/deployment-host-secrets/keycloak-db-password";
 
     # The existing host file already owns nginx, ACME, and firewall ports.
