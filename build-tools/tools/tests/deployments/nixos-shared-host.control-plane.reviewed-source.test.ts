@@ -52,6 +52,9 @@ test("backend snapshots the reviewed ref from the remote instead of ambient loca
     await $({ cwd: tmp, stdio: "pipe" })`git branch -f env/pleomino/dev HEAD`;
     const ambientRevision = await gitStdout(tmp, $, "rev-parse", "env/pleomino/dev");
     assert.notEqual(ambientRevision, remoteRevision);
+    const fetchHeadPath = path.join(tmp, ".git", "FETCH_HEAD");
+    await fsp.writeFile(fetchHeadPath, "read-only fetch head\n", "utf8");
+    await fsp.chmod(fetchHeadPath, 0o400);
     const prepared = await prepareBackendNixosSharedHostControlPlaneRun({
       workspaceRoot: tmp,
       operationKind: "deploy",
@@ -72,11 +75,13 @@ test("backend snapshots the reviewed ref from the remote instead of ambient loca
       assert.equal(reviewed?.sourceRevision, remoteRevision);
       assert.ok(reviewed?.snapshotRef);
       assert.notEqual(reviewed?.snapshotRef, "env/pleomino/dev");
+      assert.equal(await fsp.readFile(fetchHeadPath, "utf8"), "read-only fetch head\n");
       assert.equal(
         await gitStdout(tmp, $, "rev-parse", reviewed?.snapshotRef || ""),
         remoteRevision,
       );
     } finally {
+      await fsp.chmod(fetchHeadPath, 0o600).catch(() => undefined);
       await cleanupReviewedSourceSnapshot(tmp, prepared.snapshot);
     }
   });

@@ -100,6 +100,7 @@ export async function snapshotReviewedSourceForSubmission(opts: {
   await gitStdout(opts.workspaceRoot, [
     "fetch",
     "--no-tags",
+    "--no-write-fetch-head",
     remoteName,
     `${reviewedRef}:${snapshotRef}`,
   ]);
