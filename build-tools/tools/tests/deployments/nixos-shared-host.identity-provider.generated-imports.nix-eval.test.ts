@@ -164,6 +164,9 @@ test("shared-host identity provider module bootstraps generated identity imports
     assert.match(out.keycloakPostStart, /protocol-mappers\/models/);
     assert.match(out.keycloakPostStart, /bootstrap identity migration failed while reconciling/);
     assert.match(out.keycloakPostStart, /live bootstrap realm shape/);
+    assert.match(out.keycloakPostStart, /desired-user\.json/);
+    assert.match(out.keycloakPostStart, /kcadm\.sh update "users\/\$live_user_id"/);
+    assert.match(out.keycloakPostStart, /users\/\$live_user_id\/groups\/\$group_id/);
     assert.match(out.keycloakPostStart, /first-operator bootstrap membership binding/);
     assert.match(out.keycloakPostStart, /first-operator password bootstrap/);
     assert.match(out.keycloakPostStart, /first-operator temporary password/);

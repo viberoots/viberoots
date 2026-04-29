@@ -198,7 +198,7 @@ ${steps.ensureDeploymentsRealmStep}
 ${steps.reconcileGroupsStep generatedRealmFile "the live bootstrap realm shape"}
 ${steps.partialImportStep generatedRealmFile "the live bootstrap realm shape"}
 ${steps.reconcileClientsStep generatedRealmFile "the live bootstrap realm shape"}
-${steps.partialImportStep generatedMembershipFile "the first-operator bootstrap membership binding"}
+${steps.reconcileUsersStep generatedMembershipFile "the first-operator bootstrap membership binding"}
 ${steps.bootstrapFirstOperatorPasswordStep}
     client_id="$(
       ${keycloakBin}/kcadm.sh get clients \

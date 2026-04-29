@@ -29,7 +29,6 @@ in
       fi
     fi
   '';
-
   reconcileGroupsStep = filePath: label: ''
     if [ -f ${escape filePath} ]; then
       while IFS= read -r group_name; do
@@ -53,7 +52,6 @@ in
       done < <(${pkgs.jq}/bin/jq -r '.groups[]?.name // empty' ${escape filePath})
     fi
   '';
-
   partialImportStep = filePath: label: ''
     if [ -f ${escape filePath} ]; then
       partial_import_file=${escape filePath}
@@ -72,13 +70,10 @@ in
       fi
     fi
   '';
-
   reconcileClientsStep = filePath: label: ''
     if [ -f ${escape filePath} ]; then
       while IFS= read -r client_blob; do
-        if [ -z "$client_blob" ]; then
-          continue
-        fi
+        [ -n "$client_blob" ] || continue
         desired_client_file="$kcadm_dir/desired-client.json"
         desired_client_update_file="$kcadm_dir/desired-client-update.json"
         desired_mapper_file="$kcadm_dir/desired-client-mapper.json"
@@ -136,9 +131,7 @@ in
             fi
           done
         while IFS= read -r mapper_json; do
-          if [ -z "$mapper_json" ]; then
-            continue
-          fi
+          [ -n "$mapper_json" ] || continue
           printf '%s\n' "$mapper_json" >"$desired_mapper_file"
           if ! ${keycloakBin}/kcadm.sh create "clients/$live_client_id/protocol-mappers/models" \
             --config "$kcadm_config" \
@@ -151,7 +144,80 @@ in
       done < <(${pkgs.jq}/bin/jq -r '.clients[]? | @base64' ${escape filePath})
     fi
   '';
-
+  reconcileUsersStep = filePath: label: ''
+    if [ -f ${escape filePath} ]; then
+      while IFS= read -r user_blob; do
+        [ -n "$user_blob" ] || continue
+        desired_user_file="$kcadm_dir/desired-user.json"
+        printf '%s' "$user_blob" | ${pkgs.coreutils}/bin/base64 --decode >"$desired_user_file"
+        desired_username="$(${pkgs.jq}/bin/jq -r '.username // empty' "$desired_user_file")"
+        desired_email="$(${pkgs.jq}/bin/jq -r '.email // .username // empty' "$desired_user_file")"
+        if [ -z "$desired_username" ]; then
+          echo "bootstrap identity migration failed while reconciling ${label}: username is missing" >&2
+          exit 1
+        fi
+        live_user_id="$(
+          ${keycloakBin}/kcadm.sh get users \
+            --config "$kcadm_config" \
+            -r deployments \
+            -q username="$desired_username" \
+            | ${pkgs.jq}/bin/jq -r '.[0].id // empty'
+        )"
+        if [ -z "$live_user_id" ]; then
+          if ! ${keycloakBin}/kcadm.sh create users \
+            --config "$kcadm_config" \
+            -r deployments \
+            -s username="$desired_username" \
+            -s email="$desired_email" \
+            -s enabled=true \
+            -s emailVerified=true >/dev/null; then
+            echo "bootstrap identity migration failed while creating ${label} user $desired_username" >&2
+            exit 1
+          fi
+          live_user_id="$(
+            ${keycloakBin}/kcadm.sh get users \
+              --config "$kcadm_config" \
+              -r deployments \
+              -q username="$desired_username" \
+              | ${pkgs.jq}/bin/jq -r '.[0].id // empty'
+          )"
+        elif ! ${keycloakBin}/kcadm.sh update "users/$live_user_id" \
+          --config "$kcadm_config" \
+          -r deployments \
+          -s email="$desired_email" \
+          -s enabled=true \
+          -s emailVerified=true >/dev/null; then
+          echo "bootstrap identity migration failed while updating ${label} user $desired_username" >&2
+          exit 1
+        fi
+        while IFS= read -r group_name; do
+          [ -n "$group_name" ] || continue
+          group_id="$(
+            ${keycloakBin}/kcadm.sh get groups \
+              --config "$kcadm_config" \
+              -r deployments \
+              -q search="$group_name" \
+              | ${pkgs.jq}/bin/jq -r --arg name "$group_name" '.[]? | select(.name == $name) | .id' \
+              | head -n 1
+          )"
+          if [ -z "$group_id" ]; then
+            echo "bootstrap identity migration failed while reconciling ${label}: group $group_name is missing" >&2
+            exit 1
+          fi
+          if ! ${keycloakBin}/kcadm.sh update "users/$live_user_id/groups/$group_id" \
+            --config "$kcadm_config" \
+            -r deployments \
+            -s realm=deployments \
+            -s userId="$live_user_id" \
+            -s groupId="$group_id" \
+            -n >/dev/null; then
+            echo "bootstrap identity migration failed while adding ${label} user $desired_username to $group_name" >&2
+            exit 1
+          fi
+        done < <(${pkgs.jq}/bin/jq -r '.groups[]? // empty' "$desired_user_file")
+      done < <(${pkgs.jq}/bin/jq -r '.users[]? | @base64' ${escape filePath})
+    fi
+  '';
   bootstrapFirstOperatorPasswordStep =
     lib.optionalString
       (normalizedBootstrapFirstOperatorEmail != null && bootstrapFirstOperatorPasswordFile != null)
