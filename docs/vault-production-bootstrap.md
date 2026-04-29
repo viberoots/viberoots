@@ -837,6 +837,10 @@ existing `virtualHosts = (...) // { ... };` expression:
     bootstrapFirstOperatorEmail = "ops@example.com";
     bootstrapFirstOperatorPasswordFile =
       "/var/lib/deployment-host-secrets/bootstrap-first-operator-password";
+    bootstrapTokenClaims = {
+      deployment_environment = "mini";
+      repository = "kiltyj/bucknix-fresh";
+    };
     databasePasswordFile = "/var/lib/deployment-host-secrets/keycloak-db-password";
 
     # The existing host file already owns nginx, ACME, and firewall ports.

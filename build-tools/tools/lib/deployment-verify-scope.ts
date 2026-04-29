@@ -10,8 +10,10 @@ export const REVIEWED_DEPLOYMENT_OWNED_BUILD_SYSTEM_PREFIXES = [
 export const REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS = [
   "build-tools/tools/nix/shared-host-identity-provider-bootstrap.nix",
   "build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix",
+  "build-tools/tools/nix/shared-host-identity-provider-migration-steps.nix",
   "build-tools/tools/nix/shared-host-identity-provider-module.nix",
   "build-tools/tools/nix/shared-host-identity-provider-migration.nix",
+  "build-tools/tools/nix/shared-host-identity-provider-options.nix",
   "build-tools/tools/nix/shared-host-postgres-module.nix",
   "build-tools/tools/nix/shared-host-vault-module.nix",
   "build-tools/tools/nix/nixos-shared-host-module.nix",

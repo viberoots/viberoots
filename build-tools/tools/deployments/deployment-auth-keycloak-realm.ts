@@ -11,6 +11,7 @@ import {
 
 const DEFAULT_REALM = "deployments";
 const DEFAULT_CLIENT_ID = "deployment-cli";
+const DEFAULT_AUDIENCE = "deployments-vault";
 
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort();
@@ -69,11 +70,55 @@ function keycloakEmailMapper() {
   };
 }
 
+function keycloakAudienceMapper(audience: string) {
+  return {
+    name: "audience",
+    protocol: "openid-connect",
+    protocolMapper: "oidc-audience-mapper",
+    consentRequired: false,
+    config: {
+      "included.custom.audience": audience,
+      "id.token.claim": "false",
+      "access.token.claim": "true",
+    },
+  };
+}
+
+function keycloakHardcodedClaimMapper(claimName: string, value: string) {
+  return {
+    name: claimName,
+    protocol: "openid-connect",
+    protocolMapper: "oidc-hardcoded-claim-mapper",
+    consentRequired: false,
+    config: {
+      "claim.name": claimName,
+      "claim.value": value,
+      "jsonType.label": "String",
+      "id.token.claim": "false",
+      "access.token.claim": "true",
+      "userinfo.token.claim": "false",
+    },
+  };
+}
+
+function singleValue(values: string[]): string | undefined {
+  const unique = uniqueSorted(values);
+  return unique.length === 1 ? unique[0] : undefined;
+}
+
 function keycloakClient(deployments: DeploymentTarget[], clientId: string) {
-  const redirectUris = uniqueSorted(
-    deployments
-      .filter((deployment) => cliPublicClientId(deployment) === clientId)
-      .map(redirectUriFor),
+  const clientDeployments = deployments.filter(
+    (deployment) => cliPublicClientId(deployment) === clientId,
+  );
+  const redirectUris = uniqueSorted(clientDeployments.map(redirectUriFor));
+  const audience = singleValue(
+    clientDeployments.map((deployment) => deployment.vaultRuntime?.audience || DEFAULT_AUDIENCE),
+  );
+  const deploymentEnvironment = singleValue(
+    clientDeployments.map((deployment) => deployment.vaultRuntime?.deploymentEnvironment || ""),
+  );
+  const repository = singleValue(
+    clientDeployments.map((deployment) => deployment.lanePolicy.governance.repository),
   );
   return {
     clientId,
@@ -83,7 +128,15 @@ function keycloakClient(deployments: DeploymentTarget[], clientId: string) {
     protocol: "openid-connect",
     directAccessGrantsEnabled: true,
     redirectUris,
-    protocolMappers: [keycloakGroupsMapper(), keycloakEmailMapper()],
+    protocolMappers: [
+      keycloakGroupsMapper(),
+      keycloakEmailMapper(),
+      ...(audience ? [keycloakAudienceMapper(audience)] : []),
+      ...(deploymentEnvironment
+        ? [keycloakHardcodedClaimMapper("deployment_environment", deploymentEnvironment)]
+        : []),
+      ...(repository ? [keycloakHardcodedClaimMapper("repository", repository)] : []),
+    ],
   };
 }
 

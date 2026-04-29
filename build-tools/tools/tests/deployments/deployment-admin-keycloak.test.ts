@@ -33,7 +33,9 @@ function adminGroup(
 }
 
 test("deploy admin identity plan stays deterministic and advertises separate admin groups", () => {
-  const deployment = cloudflarePagesDeploymentFixture();
+  const deployment = cloudflarePagesDeploymentFixture({
+    vaultRuntime: { audience: "deployments-vault", deploymentEnvironment: "mini" },
+  });
   const first = buildDeploymentAdminKeycloakPlan({
     deployment,
     automationPrincipalIds: ["jenkins"],
@@ -46,6 +48,13 @@ test("deploy admin identity plan stays deterministic and advertises separate adm
   assert.match(first.adminGroupConventions.shapeAdmin[0], /deploy-admin-identity-shape-admin-/);
   assert.match(first.nextSteps.sync, /deploy admin identity sync --deployment/);
   assert.ok(first.plannedMutations.groups.includes("deploy-submitters-pleomino-staging"));
+  assert.deepEqual(first.plannedMutations.clients[0]?.protocolMappers, [
+    "groups",
+    "email",
+    "audience",
+    "deployment_environment",
+    "repository",
+  ]);
 });
 
 test("ordinary deploy groups do not authorize deploy admin identity sync", async () => {
@@ -128,7 +137,9 @@ test("project and environment scoped deploy admin groups stay narrow", async () 
 });
 
 test("deploy admin sync and grant-user keep audit provenance and idempotent writes", async () => {
-  const deployment = cloudflarePagesDeploymentFixture();
+  const deployment = cloudflarePagesDeploymentFixture({
+    vaultRuntime: { audience: "deployments-vault", deploymentEnvironment: "mini" },
+  });
   const shapeAdmin = adminGroup("shape_admin", { kind: "project", value: "pleomino" });
   const membershipAdmin = adminGroup("membership_admin", { kind: "project", value: "pleomino" });
   await withTempDir("deploy-admin-keycloak-apply", async (tmp) => {
@@ -156,6 +167,13 @@ test("deploy admin sync and grant-user keep audit provenance and idempotent writ
     assert.match(await fsp.readFile(realmFile, "utf8"), /deploy-approvers-pleomino-staging/);
     assert.match(await fsp.readFile(realmFile, "utf8"), /"claim\.name": "email"/);
     assert.match(await fsp.readFile(realmFile, "utf8"), /oidc-usermodel-property-mapper/);
+    assert.match(await fsp.readFile(realmFile, "utf8"), /oidc-audience-mapper/);
+    assert.match(
+      await fsp.readFile(realmFile, "utf8"),
+      /"included\.custom\.audience": "deployments-vault"/,
+    );
+    assert.match(await fsp.readFile(realmFile, "utf8"), /"claim\.name": "deployment_environment"/);
+    assert.match(await fsp.readFile(realmFile, "utf8"), /"claim\.value": "kiltyj\/bucknix-fresh"/);
 
     const granted = await grantDeploymentAdminKeycloakUser({
       deployment,

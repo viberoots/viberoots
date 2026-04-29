@@ -38,6 +38,10 @@ test("shared-host identity provider module bootstraps generated identity imports
               bootstrapClientRedirectUris = [ "https://deploy-auth.example.test/oidc/callback" ];
               bootstrapFirstOperatorEmail = "ops@example.test";
               bootstrapFirstOperatorPasswordFile = "/var/lib/deployment-host-secrets/bootstrap-first-operator-password";
+              bootstrapTokenClaims = {
+                deployment_environment = "mini";
+                repository = "kiltyj/bucknix-fresh";
+              };
               manageNginx = true;
               manageAcme = true;
               openFirewall = true;
@@ -121,6 +125,13 @@ test("shared-host identity provider module bootstraps generated identity imports
     assert.equal(out.hasBootstrapService, true);
     assert.match(out.bootstrapScript, /deployment-cli/);
     assert.match(out.bootstrapScript, /"claim\.name":"email"/);
+    assert.match(out.bootstrapScript, /oidc-audience-mapper/);
+    assert.match(out.bootstrapScript, /"included\.custom\.audience":"deployments-vault"/);
+    assert.match(out.bootstrapScript, /oidc-hardcoded-claim-mapper/);
+    assert.match(out.bootstrapScript, /"claim\.name":"deployment_environment"/);
+    assert.match(out.bootstrapScript, /"claim\.value":"mini"/);
+    assert.match(out.bootstrapScript, /"claim\.name":"repository"/);
+    assert.match(out.bootstrapScript, /"claim\.value":"kiltyj\/bucknix-fresh"/);
     assert.match(out.bootstrapScript, /deploy-admin-identity-shape-admin-global/);
     assert.match(out.bootstrapScript, /ops@example\.test/);
     assert.match(out.keycloakPreStart, /kc\.sh bootstrap-admin service/);

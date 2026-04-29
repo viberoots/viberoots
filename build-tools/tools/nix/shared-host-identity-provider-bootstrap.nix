@@ -1,4 +1,10 @@
-{ lib, bootstrapFirstOperatorEmail ? null, bootstrapClientRedirectUris ? [ ] }:
+{
+  lib,
+  bootstrapFirstOperatorEmail ? null,
+  bootstrapClientRedirectUris ? [ ],
+  bootstrapTokenAudience ? "deployments-vault",
+  bootstrapTokenClaims ? { },
+}:
 let
   normalizedBootstrapEmail =
     if bootstrapFirstOperatorEmail == null then
@@ -15,6 +21,12 @@ let
   bootstrapRedirectUris = uniqueSorted (
     builtins.filter (value: value != "") (map lib.strings.trim bootstrapClientRedirectUris)
   );
+  normalizedBootstrapTokenAudience =
+    if bootstrapTokenAudience == null then
+      null
+    else
+      let trimmed = lib.strings.trim bootstrapTokenAudience; in
+      if trimmed == "" then null else trimmed;
   groupsMapper = {
     name = "groups";
     protocol = "openid-connect";
@@ -42,6 +54,38 @@ let
       "userinfo.token.claim" = "true";
     };
   };
+  audienceMappers =
+    if normalizedBootstrapTokenAudience == null then
+      [ ]
+    else
+      [
+        {
+          name = "audience";
+          protocol = "openid-connect";
+          protocolMapper = "oidc-audience-mapper";
+          consentRequired = false;
+          config = {
+            "included.custom.audience" = normalizedBootstrapTokenAudience;
+            "id.token.claim" = "false";
+            "access.token.claim" = "true";
+          };
+        }
+      ];
+  tokenClaimMappers = map (claimName: {
+    name = claimName;
+    protocol = "openid-connect";
+    protocolMapper = "oidc-hardcoded-claim-mapper";
+    consentRequired = false;
+    config = {
+      "claim.name" = claimName;
+      "claim.value" = bootstrapTokenClaims.${claimName};
+      "jsonType.label" = "String";
+      "id.token.claim" = "false";
+      "access.token.claim" = "true";
+      "userinfo.token.claim" = "false";
+    };
+  }) (builtins.attrNames bootstrapTokenClaims);
+  tokenMappers = audienceMappers ++ tokenClaimMappers;
 in
 {
   realmImport = {
@@ -57,7 +101,7 @@ in
         protocol = "openid-connect";
         directAccessGrantsEnabled = true;
         redirectUris = bootstrapRedirectUris;
-        protocolMappers = [ groupsMapper emailMapper ];
+        protocolMappers = [ groupsMapper emailMapper ] ++ tokenMappers;
       }
     ];
   };
