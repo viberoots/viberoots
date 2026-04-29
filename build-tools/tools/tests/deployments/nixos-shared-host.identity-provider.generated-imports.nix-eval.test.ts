@@ -123,9 +123,13 @@ test("shared-host identity provider module bootstraps generated identity imports
     assert.match(out.keycloakPreStart, /ln -s .*keycloak-.*\/providers/);
     assert.match(out.keycloakPreStart, /ln -s .*keycloak-.*\/lib/);
     assert.doesNotMatch(out.keycloakPreStart, /bootstrap-admin service[\s\S]*--optimized/);
-    assert.match(out.keycloakPreStart, /--db-username/);
-    assert.match(out.keycloakPreStart, /--db-password/);
-    assert.match(out.keycloakPreStart, /--db-url(?:\b|-host|-database|-port|-properties)/);
+    assert.match(out.keycloakPreStart, /printf 'db=%s\\n' postgres/);
+    assert.match(out.keycloakPreStart, /printf 'db-username=%s\\n' keycloak/);
+    assert.match(out.keycloakPreStart, /printf 'db-password=%s\\n' "\$db_password"/);
+    assert.match(
+      out.keycloakPreStart,
+      /printf 'db-url(?:-host|-database|-port|-properties)?=%s\\n'/,
+    );
     assert.doesNotMatch(out.keycloakPreStart, /(^|[[:space:]])--db([[:space:]]|$)/);
     assert.match(out.keycloakPreStart, /--client-secret:env=BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET/);
     assert.match(out.keycloakPostStart, /kcadm\.sh create partialImport/);

@@ -71,9 +71,10 @@ test("identity-provider migration reads restricted host secrets through startup 
     assert.match(out.preStart, /ln -s .*keycloak-.*\/providers/);
     assert.match(out.preStart, /ln -s .*keycloak-.*\/lib/);
     assert.doesNotMatch(out.preStart, /bootstrap-admin service[\s\S]*--optimized/);
-    assert.match(out.preStart, /--db-username/);
-    assert.match(out.preStart, /--db-password/);
-    assert.match(out.preStart, /--db-url(?:\b|-host|-database|-port|-properties)/);
+    assert.match(out.preStart, /printf 'db=%s\\n' postgres/);
+    assert.match(out.preStart, /printf 'db-username=%s\\n' keycloak/);
+    assert.match(out.preStart, /printf 'db-password=%s\\n' "\$db_password"/);
+    assert.match(out.preStart, /printf 'db-url(?:-host|-database|-port|-properties)?=%s\\n'/);
     assert.doesNotMatch(out.preStart, /(^|[[:space:]])--db([[:space:]]|$)/);
     assert.match(out.preStart, /--client-secret:env=BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET/);
     assert.doesNotMatch(out.preStart, /chmod|chgrp|sudo/);

@@ -27,7 +27,8 @@ let
   bootstrapAdminSecretFile =
     "${generatedImportRoot}/.deployment-host-keycloak-bootstrap-admin-secret";
   bootstrapAdminMarkerFile =
-    "${generatedImportRoot}/.deployment-host-keycloak-bootstrap-admin-created";
+    "${generatedImportRoot}/.deployment-host-keycloak-bootstrap-admin-created-v2";
+  databaseVendor = if database.type == "postgresql" then "postgres" else database.type;
   databaseName =
     if database.createLocally && database.host == "localhost" then "keycloak" else database.name;
   databaseUser =
@@ -62,28 +63,31 @@ let
     shopt -s inherit_errexit
   '';
   databaseArgsScript = ''
-    db_args=(
-      --db-username ${escape databaseUser}
-    )
     ${lib.optionalString (database.passwordFile != null) ''
       db_password="$(<${escape (toString database.passwordFile)})"
-      db_args+=(--db-password "$db_password")
     ''}
+  '';
+  databaseConfigScript = ''
+    {
+      printf 'db=%s\n' ${escape databaseVendor}
+      printf 'db-username=%s\n' ${escape databaseUser}
+      ${lib.optionalString (database.passwordFile != null) ''
+        printf 'db-password=%s\n' "$db_password"
+      ''}
     ${if lib.hasPrefix "/" database.host then
       ''
-        db_args+=(--db-url ${escape unixSocketUrl})
+      printf 'db-url=%s\n' ${escape unixSocketUrl}
       ''
     else
       ''
-        db_args+=(
-          --db-url-host ${escape database.host}
-          --db-url-port ${escape (toString database.port)}
-          --db-url-database ${escape databaseName}
-        )
-        ${lib.optionalString (databasePropsArg != null) ''
-          db_args+=(--db-url-properties ${escape databasePropsArg})
-        ''}
+      printf 'db-url-host=%s\n' ${escape database.host}
+      printf 'db-url-port=%s\n' ${escape (toString database.port)}
+      printf 'db-url-database=%s\n' ${escape databaseName}
+      ${lib.optionalString (databasePropsArg != null) ''
+        printf 'db-url-properties=%s\n' ${escape databasePropsArg}
       ''}
+      ''}
+    } >"$bootstrap_runtime_dir/conf/keycloak.conf"
   '';
   localServerUrl =
     "http://${keycloak.settings.http-host or "127.0.0.1"}:${toString (keycloak.settings.http-port or 8080)}";
@@ -142,11 +146,11 @@ EOF
     bootstrap_runtime_dir="$(mktemp -d)"
     trap 'rm -rf "$bootstrap_runtime_dir"' EXIT
     install -d -m 0700 "$bootstrap_runtime_dir/conf"
+    ${databaseConfigScript}
     ln -s ${escape keycloakHome}/providers "$bootstrap_runtime_dir/providers"
     ln -s ${escape keycloakHome}/lib "$bootstrap_runtime_dir/lib"
     if ! KC_HOME_DIR="$bootstrap_runtime_dir" KC_CONF_DIR="$bootstrap_runtime_dir/conf" \
       ${keycloakBin}/kc.sh bootstrap-admin service \
-      "''${db_args[@]}" \
       --client-id ${escape bootstrapAdminClientId} \
       --client-secret:env=BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET \
       --no-prompt; then
