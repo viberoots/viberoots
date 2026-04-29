@@ -160,6 +160,8 @@ test("shared-host identity provider module bootstraps generated identity imports
     assert.match(out.keycloakPreStart, /--client-secret:env=BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET/);
     assert.match(out.keycloakPostStart, /kcadm\.sh create realms/);
     assert.match(out.keycloakPostStart, /kcadm\.sh create groups/);
+    assert.match(out.keycloakPostStart, /-q exact=true/);
+    assert.match(out.keycloakPostStart, /-q max=1000/);
     assert.match(out.keycloakPostStart, /del\(\.groups\)/);
     assert.match(out.keycloakPostStart, /kcadm\.sh create partialImport/);
     assert.match(out.keycloakPostStart, /live bootstrap realm shape after partial import/);

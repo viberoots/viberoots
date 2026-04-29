@@ -32,13 +32,13 @@ in
   reconcileGroupsStep = filePath: label: ''
     if [ -f ${escape filePath} ]; then
       while IFS= read -r group_name; do
-        if [ -z "$group_name" ]; then
-          continue
-        fi
+        [ -n "$group_name" ] || continue
         if ${keycloakBin}/kcadm.sh get groups \
           --config "$kcadm_config" \
           -r deployments \
           -q search="$group_name" \
+          -q exact=true \
+          -q max=1000 \
           | ${pkgs.jq}/bin/jq -e --arg name "$group_name" 'any(.[]?; .name == $name)' >/dev/null; then
           continue
         fi
@@ -197,6 +197,8 @@ in
               --config "$kcadm_config" \
               -r deployments \
               -q search="$group_name" \
+              -q exact=true \
+              -q max=1000 \
               | ${pkgs.jq}/bin/jq -r --arg name "$group_name" '.[]? | select(.name == $name) | .id' \
               | head -n 1
           )"
