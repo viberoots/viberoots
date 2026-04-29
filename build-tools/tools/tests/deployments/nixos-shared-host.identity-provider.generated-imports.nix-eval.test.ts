@@ -132,6 +132,9 @@ test("shared-host identity provider module bootstraps generated identity imports
     );
     assert.doesNotMatch(out.keycloakPreStart, /(^|[[:space:]])--db([[:space:]]|$)/);
     assert.match(out.keycloakPreStart, /--client-secret:env=BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET/);
+    assert.match(out.keycloakPostStart, /kcadm\.sh create realms/);
+    assert.match(out.keycloakPostStart, /kcadm\.sh create groups/);
+    assert.match(out.keycloakPostStart, /del\(\.groups\)/);
     assert.match(out.keycloakPostStart, /kcadm\.sh create partialImport/);
     assert.match(out.keycloakPostStart, /realms\/master\/\.well-known\/openid-configuration/);
     assert.match(out.keycloakPostStart, /local Keycloak endpoint did not become ready/);
