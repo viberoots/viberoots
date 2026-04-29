@@ -36,8 +36,6 @@ in
         if ${keycloakBin}/kcadm.sh get groups \
           --config "$kcadm_config" \
           -r deployments \
-          -q search="$group_name" \
-          -q exact=true \
           -q max=1000 \
           | ${pkgs.jq}/bin/jq -e --arg name "$group_name" 'any(.[]?; .name == $name)' >/dev/null; then
           continue
@@ -193,11 +191,9 @@ in
         while IFS= read -r group_name; do
           [ -n "$group_name" ] || continue
           group_id="$(
-            ${keycloakBin}/kcadm.sh get groups \
+              ${keycloakBin}/kcadm.sh get groups \
               --config "$kcadm_config" \
               -r deployments \
-              -q search="$group_name" \
-              -q exact=true \
               -q max=1000 \
               | ${pkgs.jq}/bin/jq -r --arg name "$group_name" '.[]? | select(.name == $name) | .id' \
               | head -n 1
