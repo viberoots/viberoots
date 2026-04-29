@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { pathToFileURL } from "node:url";
 import { executeSubmittedNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane-submit-helpers.ts";
 import { prepareBackendNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane-backend-prepare.ts";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
@@ -47,6 +48,15 @@ test("backend snapshots the reviewed ref from the remote instead of ambient loca
     const artifactDir = path.join(tmp, "artifact");
     await writeDemoArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const reviewedOrigin = path.join(tmp, ".tmp-reviewed-origin.git");
+    await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`git remote set-url origin git@github.com:kiltyj/bucknix-fresh.git`;
+    await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`git config ${`url.${pathToFileURL(reviewedOrigin).href}.insteadOf`} git@github.com:kiltyj/bucknix-fresh.git`;
     const remoteRevision = await gitStdout(tmp, $, "rev-parse", "env/pleomino/dev");
     await commitLocalChange(tmp, $, "local-drift");
     await $({ cwd: tmp, stdio: "pipe" })`git branch -f env/pleomino/dev HEAD`;
