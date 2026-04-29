@@ -62,6 +62,7 @@ export async function createAndWaitForServiceOwnedAuthSession(opts: {
     },
   });
   console.error(`Open this deployment login URL: ${login.loginUrl}`);
+  console.error(`Deployment auth session: ${login.sessionId}`);
   if (plan.selection.browserMode !== "print") {
     try {
       await launchBrowser(login.loginUrl);
@@ -72,6 +73,7 @@ export async function createAndWaitForServiceOwnedAuthSession(opts: {
       console.error("Continue by opening the deployment login URL above manually.");
     }
   }
+  console.error(`Waiting for deployment auth session ${login.sessionId} to complete...`);
   const status = await waitForDeploymentAuthSessionViaService({
     controlPlaneUrl: opts.controlPlaneUrl,
     token: opts.controlPlaneToken,
@@ -81,5 +83,6 @@ export async function createAndWaitForServiceOwnedAuthSession(opts: {
   if (status.status !== "authenticated") {
     throw new Error(`deployment auth session failed: ${status.failure || status.status}`);
   }
+  console.error(`Deployment auth session ${login.sessionId} authenticated.`);
   return login.sessionId;
 }

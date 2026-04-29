@@ -19,9 +19,25 @@ import type {
 } from "./deployment-auth-session-types.ts";
 
 const ACTIVE_LIFECYCLE_STATES = new Set(["queued", "waiting_for_lock", "running", "cancelling"]);
+const CONTROL_PLANE_REQUEST_TIMEOUT_MS = 15_000;
 
 function authHeaders(token?: string) {
   return token ? { authorization: `Bearer ${token}` } : {};
+}
+
+async function fetchControlPlane(input: URL, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CONTROL_PLANE_REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error(`request timed out after ${CONTROL_PLANE_REQUEST_TIMEOUT_MS}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function responseErrorMessage(
@@ -77,7 +93,7 @@ export async function readNixosSharedHostControlPlaneStatusViaService(opts: {
   if (opts.submissionId) url.searchParams.set("submissionId", opts.submissionId);
   if (opts.deployRunId) url.searchParams.set("deployRunId", opts.deployRunId);
   return await readJson<DeploymentControlPlaneStatus>(
-    fetch(url, { headers: { ...authHeaders(opts.token) } }),
+    fetchControlPlane(url, { headers: { ...authHeaders(opts.token) } }),
     { route: "/api/v1/status", controlPlaneUrl: opts.controlPlaneUrl },
   );
 }
@@ -91,7 +107,7 @@ export async function readNixosSharedHostControlPlaneRecordViaService(opts: {
   const url = new URL("/api/v1/records", opts.controlPlaneUrl);
   if (opts.submissionId) url.searchParams.set("submissionId", opts.submissionId);
   if (opts.deployRunId) url.searchParams.set("deployRunId", opts.deployRunId);
-  return await readJson<any>(fetch(url, { headers: { ...authHeaders(opts.token) } }), {
+  return await readJson<any>(fetchControlPlane(url, { headers: { ...authHeaders(opts.token) } }), {
     route: "/api/v1/records",
     controlPlaneUrl: opts.controlPlaneUrl,
   });
@@ -105,7 +121,7 @@ export async function submitNixosSharedHostControlPlaneViaService(opts: {
   timeoutMs?: number;
 }) {
   const initial = await readJson<DeploymentControlPlaneSubmitResponse>(
-    fetch(new URL("/api/v1/submissions", opts.controlPlaneUrl), {
+    fetchControlPlane(new URL("/api/v1/submissions", opts.controlPlaneUrl), {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -142,7 +158,7 @@ export async function createNixosSharedHostArtifactChallengeViaService(opts: {
   request: DeploymentArtifactChallengeRequest;
 }) {
   return await readJson<DeploymentArtifactChallengeResponse>(
-    fetch(new URL("/api/v1/submission-challenges/artifact", opts.controlPlaneUrl), {
+    fetchControlPlane(new URL("/api/v1/submission-challenges/artifact", opts.controlPlaneUrl), {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -168,7 +184,7 @@ export async function submitNixosSharedHostControlPlaneRunActionViaService(opts:
   };
 }) {
   return await readJson<DeploymentControlPlaneRunActionResponse>(
-    fetch(new URL("/api/v1/run-actions", opts.controlPlaneUrl), {
+    fetchControlPlane(new URL("/api/v1/run-actions", opts.controlPlaneUrl), {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -186,7 +202,7 @@ export async function createDeploymentAuthLoginViaService(opts: {
   request: DeploymentAuthLoginRequest;
 }) {
   return await readJson<DeploymentAuthLoginResponse>(
-    fetch(new URL("/api/v1/auth/login", opts.controlPlaneUrl), {
+    fetchControlPlane(new URL("/api/v1/auth/login", opts.controlPlaneUrl), {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -206,7 +222,7 @@ export async function readDeploymentAuthSessionViaService(opts: {
   const url = new URL("/api/v1/auth/session", opts.controlPlaneUrl);
   url.searchParams.set("sessionId", opts.sessionId);
   return await readJson<DeploymentAuthSessionStatus>(
-    fetch(url, { headers: { ...authHeaders(opts.token) } }),
+    fetchControlPlane(url, { headers: { ...authHeaders(opts.token) } }),
     { route: "/api/v1/auth/session", controlPlaneUrl: opts.controlPlaneUrl },
   );
 }

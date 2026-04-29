@@ -140,6 +140,7 @@ export async function runDeploymentAdminKeycloakRemoteProfile(opts: {
     configRoot: plan.hostApply.remoteConfigRoot,
     managedRoot: plan.hostApply.remoteManagedRoot,
   });
+  console.error(`Remote identity admin: checking reviewed repo on ${plan.destination}...`);
   const preflight = await runCommand(
     buildRemoteSshArgvWithFallback(
       plan.destination,
@@ -153,6 +154,7 @@ export async function runDeploymentAdminKeycloakRemoteProfile(opts: {
       preflight,
     );
   }
+  console.error(`Remote identity admin: running ${opts.command} on ${plan.destination}...`);
   const mutationScript =
     opts.command === "sync"
       ? buildRemoteDeployAdminKeycloakSyncScript({
@@ -186,6 +188,9 @@ export async function runDeploymentAdminKeycloakRemoteProfile(opts: {
     plan.hostApply.selectedMode === "skip"
       ? undefined
       : (() => {
+          console.error(
+            `Remote identity admin: applying host configuration on ${plan.destination} (${plan.hostApply.selectedMode})...`,
+          );
           const argv = buildRemoteSshArgvWithFallback(
             plan.destination,
             buildRemoteHostApplyScript(plan),
