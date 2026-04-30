@@ -1,5 +1,4 @@
 #!/usr/bin/env zx-wrapper
-import crypto from "node:crypto";
 import { normalizeTargetLabel } from "../lib/labels.ts";
 import type { GraphNode } from "../lib/graph.ts";
 import { readString, readStringArray, readStringRecord } from "./deployment-graph-readers.ts";
@@ -21,6 +20,8 @@ import {
   readLanePromotionCompatibility,
   type DeploymentLanePromotionCompatibility,
 } from "./deployment-lane-promotion-compatibility.ts";
+import { extractDeploymentDefaults } from "./deployment-defaults.ts";
+import { fingerprintPolicy } from "./deployment-policy-fingerprint.ts";
 
 export const DEPLOYMENT_LANE_POLICY_RULE = "deployment_lane_policy";
 export const DEPLOYMENT_ADMISSION_POLICY_RULE = "deployment_admission_policy";
@@ -32,11 +33,13 @@ export type ArtifactAttestationMode = "recorded_exact_artifact";
 export type DeploymentLanePolicy = {
   ref: string;
   name: string;
+  defaultsRef?: string;
   stages: string[];
   stageBranches: Record<string, string>;
   allowedPromotionEdges: string[];
   artifactReuseMode: ArtifactReuseMode;
   promotionCompatibility?: DeploymentLanePromotionCompatibility;
+  defaultClientProfile?: string;
   governanceRef: string;
   governance: DeploymentLaneGovernance;
   fingerprint: string;
@@ -57,23 +60,6 @@ export type DeploymentAdmissionPolicy = {
   fingerprint: string;
 };
 
-function canonicalize(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (!value || typeof value !== "object") return value;
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, nested]) => [key, canonicalize(nested)]),
-  );
-}
-
-function fingerprintFor(value: unknown): string {
-  return `sha256:${crypto
-    .createHash("sha256")
-    .update(JSON.stringify(canonicalize(value)))
-    .digest("hex")}`;
-}
-
 function policyError(ref: string, message: string): string {
   return `${normalizeTargetLabel(ref)}: ${message}`;
 }
@@ -87,10 +73,16 @@ export function extractDeploymentLanePoliciesWithGovernance(
 } {
   const policies = new Map<string, DeploymentLanePolicy>();
   const errors: string[] = [];
+  const extractedDefaults = extractDeploymentDefaults(nodes);
+  errors.push(...extractedDefaults.errors);
   for (const node of nodes) {
     if (readString(node, "rule_type") !== DEPLOYMENT_LANE_POLICY_RULE) continue;
     const ref = normalizeTargetLabel(String(node.name || ""));
     const name = ref.split(":")[1] || "";
+    const defaultsRef = normalizeTargetLabel(readString(node, "defaults"));
+    const defaults = defaultsRef ? extractedDefaults.defaults.get(defaultsRef) : undefined;
+    const defaultClientProfile =
+      readString(node, "default_client_profile") || defaults?.defaultClientProfile || "";
     const stages = readStringArray(node, "stages");
     const stageBranches = readStringRecord(node, "stage_branches");
     const allowedPromotionEdges = readStringArray(node, "allowed_promotion_edges");
@@ -104,6 +96,9 @@ export function extractDeploymentLanePoliciesWithGovernance(
       continue;
     }
     if (!name) errors.push(policyError(ref, "lane policy must set name"));
+    if (defaultsRef && !defaults) {
+      errors.push(policyError(ref, `defaults target not found: ${defaultsRef}`));
+    }
     if (stages.length === 0) errors.push(policyError(ref, "lane policy must define stages"));
     for (const stage of stages) {
       if (!stageBranches[stage]) {
@@ -146,18 +141,20 @@ export function extractDeploymentLanePoliciesWithGovernance(
       }
     }
     if (errors.some((entry) => entry.startsWith(`${ref}:`))) continue;
-    const fingerprint = fingerprintFor({
+    const fingerprint = fingerprintPolicy({
       name,
       stages,
       stageBranches,
       allowedPromotionEdges,
       artifactReuseMode,
       ...lanePromotionCompatibilityFingerprintPart(promotionCompatibility.value),
+      defaultClientProfile,
       governanceFingerprint: governance!.fingerprint,
     });
     policies.set(ref, {
       ref,
       name,
+      ...(defaultsRef ? { defaultsRef } : {}),
       stages,
       stageBranches,
       allowedPromotionEdges,
@@ -165,6 +162,7 @@ export function extractDeploymentLanePoliciesWithGovernance(
       ...(promotionCompatibility.value
         ? { promotionCompatibility: promotionCompatibility.value }
         : {}),
+      ...(defaultClientProfile ? { defaultClientProfile } : {}),
       governanceRef,
       governance: governance!,
       fingerprint,
@@ -216,7 +214,7 @@ export function extractDeploymentAdmissionPolicies(nodes: GraphNode[]): {
     }
     errors.push(...validateAdmissionPolicyExtensions({ ref, attestation, supplyChainGates }));
     if (errors.some((entry) => entry.startsWith(`${ref}:`))) continue;
-    const fingerprint = fingerprintFor({
+    const fingerprint = fingerprintPolicy({
       name,
       allowedRefs,
       requiredChecks,

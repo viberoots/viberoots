@@ -12,7 +12,11 @@ import {
   startControlPlaneHarness,
   withEnvOverrides,
 } from "./nixos-shared-host.control-plane.helpers.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+import {
+  ensureNixosSharedHostStageBranch,
+  nixosSharedHostLanePolicyFixture,
+} from "./nixos-shared-host.fixture.ts";
+import { installHarnessClientProfile } from "./nixos-shared-host.remote-exec.install.helpers.ts";
 import { installFakeKubernetesHelm } from "./kubernetes.fake-helm.ts";
 import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
 import { startKubernetesPublicServer } from "./kubernetes.public-server.ts";
@@ -84,6 +88,7 @@ test("public kubernetes deploy requires a control-plane URL for protected/shared
 test("public kubernetes deploy routes deploy, provision-only, retry, and rollback through the control-plane service", async () => {
   await runInTemp("kubernetes-public-service-flow", async (tmp, $) => {
     const deployment = kubernetesDeploymentFixture({
+      lanePolicy: nixosSharedHostLanePolicyFixture({ defaultClientProfile: "mini" }),
       provisioner: { type: "terraform-stack", config: "terraform/main.tf.json" },
     });
     const artifactA = path.join(tmp, "artifact-a");
@@ -112,6 +117,7 @@ test("public kubernetes deploy routes deploy, provision-only, retry, and rollbac
           recordsRoot: path.join(tmp, "records"),
         });
         try {
+          const profileRoot = await installHarnessClientProfile($, tmp, harness.controlPlane.url);
           const runtimeContract = reviewedRuntimeContractFor("kubernetes");
           const lockScope = deployment.providerTarget.providerTargetIdentity;
           const first = JSON.parse(
@@ -121,7 +127,7 @@ test("public kubernetes deploy routes deploy, provision-only, retry, and rollbac
                   cwd: tmp,
                   stdio: "pipe",
                   env: { ...process.env },
-                })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --artifact-dir ${artifactA} --admission-evidence-json ${evidence} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`
+                })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --artifact-dir ${artifactA} --admission-evidence-json ${evidence} --profile-root ${profileRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`
               ).stdout,
             ),
           );

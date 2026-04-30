@@ -124,6 +124,9 @@ export function sharedPolicyTargetsByDir(
               ...(promotionCompatibility
                 ? [`    promotion_compatibility = ${JSON.stringify(promotionCompatibility)},`]
                 : []),
+              ...(policy.defaultClientProfile
+                ? [`    default_client_profile = ${JSON.stringify(policy.defaultClientProfile)},`]
+                : []),
               `    governance_policy = ${JSON.stringify(policy.governanceRef)},`,
               '    visibility = ["PUBLIC"],',
               ")",

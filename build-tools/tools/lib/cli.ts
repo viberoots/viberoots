@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
+import { getArgvTokens } from "./argv.ts";
 /**
  * Minimal, consistent CLI flag helpers for zx scripts.
- *
  * Precedence for all helpers:
  * 1) global argv object (as populated by zx/yargs) when present
  * 2) process.argv parsing (supports --name value and --name=value)
@@ -133,6 +133,30 @@ export function getPositionals(): string[] {
       // two-token form: `--name value` → skip value token when present
       const nxt = raw[i + 1] || "";
       if (nxt && !nxt.startsWith("--")) i++;
+      continue;
+    }
+    out.push(a);
+  }
+  return out;
+}
+
+export function getPositionalsWithValueFlags(valueFlags: Iterable<string>): string[] {
+  const g: any = (globalThis as any).argv;
+  if (g && Array.isArray(g._)) return (g._ as unknown[]).map((v) => String(v));
+  const takesValue = new Set(Array.from(valueFlags, (flag) => String(flag).replace(/^--/, "")));
+  const raw = getArgvTokens();
+  const out: string[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const a = raw[i] || "";
+    if (a === "--") {
+      out.push(...raw.slice(i + 1));
+      break;
+    }
+    if (a.startsWith("--")) {
+      if (a.includes("=")) continue;
+      const name = a.slice(2);
+      const nxt = raw[i + 1] || "";
+      if (takesValue.has(name) && nxt && !nxt.startsWith("--")) i++;
       continue;
     }
     out.push(a);

@@ -5,7 +5,7 @@ import {
   resolveComponentArtifactDirsForCli,
 } from "./deployment-cli-resolve.ts";
 import type { KubernetesDeployment } from "./contract.ts";
-import { resolveServiceClientFromFlags } from "./nixos-shared-host-service-client-config.ts";
+import { resolveServiceClientFromCliProfileOrFlags } from "./deployment-service-client-profile.ts";
 import {
   finalizeProtectedFrontDoorSubmission,
   rejectServiceOnlyLocalFlags,
@@ -28,9 +28,11 @@ export async function runProtectedKubernetesDeployFrontDoor(opts: {
 }) {
   rejectServiceOnlyLocalFlags(opts.hasFlag, "kubernetes");
   const admissionEvidence = serviceSubmissionAdmissionEvidence(opts.admissionEvidence as any);
-  const serviceClient = resolveServiceClientFromFlags({
+  const serviceClient = await resolveServiceClientFromCliProfileOrFlags({
+    workspaceRoot: opts.workspaceRoot,
     controlPlaneUrl: opts.controlPlaneUrl,
     controlPlaneToken: opts.controlPlaneToken,
+    defaultProfileName: opts.deployment.lanePolicy.defaultClientProfile,
     context: `kubernetes ${opts.deployment.protectionClass} mutation`,
   });
   return await finalizeProtectedFrontDoorSubmission({

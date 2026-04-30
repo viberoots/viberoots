@@ -103,13 +103,13 @@ function isRunnableGraphNode(n: GraphNodeLike): boolean {
 export async function resolveSelectedTargetLabel(
   workspaceRoot: string,
   target: string,
-  opts?: { baseDir?: string },
+  opts?: { baseDir?: string; preferredTargetName?: string },
 ): Promise<string> {
   const normalized = (await normalizeTargetInput(workspaceRoot, target, opts)).trim();
   if (!normalized.startsWith("//") || normalized.includes(":")) return normalized;
   try {
     const names = packageTargetNames(await readGraphNodes(workspaceRoot), normalized);
-    const preferred = `${normalized}:app`;
+    const preferred = `${normalized}:${opts?.preferredTargetName || "app"}`;
     if (names.includes(preferred)) return preferred;
     if (names.length === 1) return names[0];
     if (names.length > 1) {

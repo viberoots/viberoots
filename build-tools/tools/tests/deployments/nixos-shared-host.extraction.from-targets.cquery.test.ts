@@ -51,6 +51,7 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
       "//projects/deployments/demoapp-dev:deploy",
       "//projects/apps/demoapp:app",
       "//projects/deployments/pleomino-shared:lane",
+      "//projects/deployments/pleomino-shared:defaults",
       "//projects/deployments/pleomino-shared:lane_governance",
       "//projects/deployments/pleomino-shared:dev_release",
     ]);
@@ -60,6 +61,7 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
     assert.equal(deployments[0]?.label, "//projects/deployments/demoapp-dev:deploy");
     assert.equal(deployments[0]?.name, "deploy");
     assert.equal(deployments[0]?.lanePolicyRef, "//projects/deployments/pleomino-shared:lane");
+    assert.equal(deployments[0]?.lanePolicy.defaultClientProfile, "mini");
     assert.equal(
       deployments[0]?.admissionPolicyRef,
       "//projects/deployments/pleomino-shared:dev_release",
@@ -130,6 +132,7 @@ test("nixos-shared-host multi-component extraction reads rollout policy and comp
       "//projects/apps/demoapp:app",
       "//projects/apps/demoapi:api",
       "//projects/deployments/pleomino-shared:lane",
+      "//projects/deployments/pleomino-shared:defaults",
       "//projects/deployments/pleomino-shared:lane_governance",
       "//projects/deployments/pleomino-shared:dev_release",
     ]);

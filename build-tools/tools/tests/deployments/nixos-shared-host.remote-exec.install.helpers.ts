@@ -14,6 +14,24 @@ export async function installClientProfile(
   await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path ${remoteRepoPath} --remote-state-path ${remoteStatePath} --remote-runtime-root ${remoteRuntimeRoot} --remote-records-root ${remoteRecordsRoot} --ssh-mode ssh --control-plane-url ${controlPlaneUrl}`;
 }
 
+export async function installHarnessClientProfile(
+  $: any,
+  tmp: string,
+  controlPlaneUrl: string,
+): Promise<string> {
+  const profileRoot = path.join(tmp, "profiles");
+  await installClientProfile(
+    $,
+    profileRoot,
+    "/srv/common",
+    path.join(tmp, "remote-state.json"),
+    path.join(tmp, "remote-runtime"),
+    path.join(tmp, "remote-records"),
+    controlPlaneUrl,
+  );
+  return profileRoot;
+}
+
 export async function installReviewedPleominoTargets(tmp: string): Promise<void> {
   const appTargetsPath = path.join(tmp, "projects", "apps", "pleomino", "TARGETS");
   const deployTargetsPath = path.join(tmp, "projects", "deployments", "pleomino-dev", "TARGETS");

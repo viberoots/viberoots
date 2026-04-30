@@ -1,6 +1,7 @@
 load(
     "//build-tools/deployments:metadata_rules.bzl",
     _deployment_admission_policy = "deployment_admission_policy",
+    _deployment_defaults = "deployment_defaults",
     _deployment_lane_governance = "deployment_lane_governance",
     _deployment_lane_policy = "deployment_lane_policy",
     _deployment_release_action = "deployment_release_action",
@@ -17,6 +18,7 @@ load(
 load("//build-tools/deployments:s3_defs.bzl", _s3_static_webapp_deployment = "s3_static_webapp_deployment")
 
 deployment_admission_policy = _deployment_admission_policy
+deployment_defaults = _deployment_defaults
 deployment_lane_governance = _deployment_lane_governance
 deployment_lane_policy = _deployment_lane_policy
 deployment_release_action = _deployment_release_action

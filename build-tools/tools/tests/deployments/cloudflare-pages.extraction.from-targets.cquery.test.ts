@@ -8,7 +8,7 @@ import { extractCloudflarePagesDeployments } from "../../deployments/contract.ts
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers.ts";
 
 const ATTRS =
-  "name,rule_type,buck.type,provider,component,component_kind,publisher,publisher_config,protection_class,lane_policy,environment_stage,admission_policy,provider_target,vault_runtime,preview,prerequisites,secret_requirements,runtime_config_requirements,release_actions,target_exceptions,governance_policy,scm_backend,repository,branch_protections,stages,stage_branches,allowed_promotion_edges,artifact_reuse_mode,promotion_compatibility,allowed_refs,required_checks,required_approvals,retry_branch_policy,retry_approval_reuse,artifact_attestation_mode,labels".split(
+  "name,rule_type,buck.type,provider,component,component_kind,publisher,publisher_config,protection_class,lane_policy,environment_stage,admission_policy,provider_target,vault_runtime,preview,prerequisites,secret_requirements,runtime_config_requirements,release_actions,target_exceptions,governance_policy,defaults,default_client_profile,scm_backend,repository,branch_protections,stages,stage_branches,allowed_promotion_edges,artifact_reuse_mode,promotion_compatibility,allowed_refs,required_checks,required_approvals,retry_branch_policy,retry_approval_reuse,artifact_attestation_mode,labels".split(
     ",",
   );
 
@@ -88,7 +88,13 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
     await fsp.writeFile(
       sharedTargetsPath,
       [
-        'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_governance", "deployment_lane_policy")',
+        'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_defaults", "deployment_lane_governance", "deployment_lane_policy")',
+        "",
+        "deployment_defaults(",
+        '    name = "defaults",',
+        '    default_client_profile = "mini",',
+        '    visibility = ["PUBLIC"],',
+        ")",
         "",
         "deployment_lane_governance(",
         '    name = "lane_governance",',
@@ -104,6 +110,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
         "",
         "deployment_lane_policy(",
         '    name = "lane",',
+        '    defaults = ":defaults",',
         '    stages = ["dev", "staging", "prod"],',
         '    stage_branches = {"dev": "env/pleomino/dev", "staging": "env/pleomino/staging", "prod": "env/pleomino/prod"},',
         '    allowed_promotion_edges = ["dev->staging", "staging->prod"],',
@@ -166,7 +173,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
 
     const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
     const query =
-      "set(//projects/deployments/pleomino-staging:deploy //projects/apps/pleomino:app //projects/deployments/pleomino-shared:lane //projects/deployments/pleomino-shared:lane_governance //projects/deployments/pleomino-shared:staging_release)";
+      "set(//projects/deployments/pleomino-staging:deploy //projects/apps/pleomino:app //projects/deployments/pleomino-shared:lane //projects/deployments/pleomino-shared:defaults //projects/deployments/pleomino-shared:lane_governance //projects/deployments/pleomino-shared:staging_release)";
     const cquery = await _$({
       cwd: tmp,
       stdio: "pipe",
@@ -181,6 +188,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
     assert.deepEqual(errors, []);
     assert.equal(deployments.length, 1);
     assert.equal(deployments[0]?.label, "//projects/deployments/pleomino-staging:deploy");
+    assert.equal(deployments[0]?.lanePolicy.defaultClientProfile, "mini");
     assert.equal(deployments[0]?.publisher.config, "wrangler.jsonc");
     assert.equal(deployments[0]?.providerTarget.account, "web-platform-staging");
     assert.equal(deployments[0]?.providerTarget.project, "pleomino-staging-pages");
@@ -193,7 +201,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
 test("concrete Pleomino Cloudflare TARGETS emit publish and cleanup token requirements", async () => {
   const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
   const query =
-    "set(//projects/deployments/pleomino-staging:deploy //projects/deployments/pleomino-prod:deploy //projects/apps/pleomino:app //projects/deployments/pleomino-shared:lane //projects/deployments/pleomino-shared:lane_governance //projects/deployments/pleomino-shared:staging_release //projects/deployments/pleomino-shared:prod_release)";
+    "set(//projects/deployments/pleomino-staging:deploy //projects/deployments/pleomino-prod:deploy //projects/apps/pleomino:app //projects/deployments/pleomino-shared:lane //projects/deployments:defaults //projects/deployments/pleomino-shared:lane_governance //projects/deployments/pleomino-shared:staging_release //projects/deployments/pleomino-shared:prod_release)";
   const cquery = await $({
     stdio: "pipe",
     env: {
@@ -206,6 +214,8 @@ test("concrete Pleomino Cloudflare TARGETS emit publish and cleanup token requir
   const { deployments, errors } = extractCloudflarePagesDeployments(nodesFromCqueryJson(merged));
   assert.deepEqual(errors, []);
   assert.equal(deployments.length, 2);
+  for (const deployment of deployments)
+    assert.equal(deployment.lanePolicy.defaultClientProfile, "mini");
   for (const deployment of deployments) assertCloudflareApiTokenSteps(deployment);
   assert.deepEqual(
     deployments

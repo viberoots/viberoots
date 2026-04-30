@@ -12,7 +12,11 @@ import {
   startControlPlaneHarness,
   withEnvOverrides,
 } from "./nixos-shared-host.control-plane.helpers.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+import {
+  ensureNixosSharedHostStageBranch,
+  nixosSharedHostLanePolicyFixture,
+} from "./nixos-shared-host.fixture.ts";
+import { installHarnessClientProfile } from "./nixos-shared-host.remote-exec.install.helpers.ts";
 import { installFakeS3StaticAwsCli } from "./s3-static.fake-aws.ts";
 import { installS3StaticTargets, s3StaticDeploymentFixture } from "./s3-static.fixture.ts";
 import { startS3StaticPublicServer } from "./s3-static.public-server.ts";
@@ -65,7 +69,10 @@ test("public s3-static deploy requires a control-plane URL for protected/shared 
 
 test("public s3-static deploy routes deploy, provision-only, retry, and rollback through the control-plane service", async () => {
   await runInTemp("s3-static-public-service-flow", async (tmp, $) => {
-    const deployment = s3StaticDeploymentFixture({ provisioner: { type: "terraform-stack" } });
+    const deployment = s3StaticDeploymentFixture({
+      lanePolicy: nixosSharedHostLanePolicyFixture({ defaultClientProfile: "mini" }),
+      provisioner: { type: "terraform-stack" },
+    });
     const artifactA = path.join(tmp, "artifact-a");
     const artifactB = path.join(tmp, "artifact-b");
     const fake = await installFakeS3StaticAwsCli(tmp);
@@ -100,6 +107,7 @@ test("public s3-static deploy routes deploy, provision-only, retry, and rollback
           recordsRoot: path.join(tmp, "records"),
         });
         try {
+          const profileRoot = await installHarnessClientProfile($, tmp, harness.controlPlane.url);
           const runtimeContract = reviewedRuntimeContractFor("s3-static");
           const lockScope = deployment.providerTarget.providerTargetIdentity;
           const first = JSON.parse(
@@ -109,7 +117,7 @@ test("public s3-static deploy routes deploy, provision-only, retry, and rollback
                   cwd: tmp,
                   stdio: "pipe",
                   env: { ...process.env },
-                })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --artifact-dir ${artifactA} --admission-evidence-json ${evidence} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`
+                })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --artifact-dir ${artifactA} --admission-evidence-json ${evidence} --profile-root ${profileRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`
               ).stdout,
             ),
           );

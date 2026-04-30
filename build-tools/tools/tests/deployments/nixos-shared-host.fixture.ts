@@ -39,9 +39,7 @@ export function nixosSharedHostSsrRuntimeContractFixture(
   };
 }
 
-export function nixosSharedHostLanePolicyFixture(
-  overrides: Partial<DeploymentLanePolicy> = {},
-): DeploymentLanePolicy {
+export function nixosSharedHostLanePolicyFixture(overrides: Partial<DeploymentLanePolicy> = {}) {
   const governance = overrides.governance || nixosSharedHostLaneGovernanceFixture();
   const promotionCompatibility = overrides.promotionCompatibility as
     | DeploymentLanePromotionCompatibility
@@ -58,6 +56,10 @@ export function nixosSharedHostLanePolicyFixture(
     allowedPromotionEdges: overrides.allowedPromotionEdges || ["dev->staging", "staging->prod"],
     artifactReuseMode: overrides.artifactReuseMode || "same_artifact",
     ...(promotionCompatibility ? { promotionCompatibility } : {}),
+    ...(overrides.defaultsRef ? { defaultsRef: overrides.defaultsRef } : {}),
+    ...(overrides.defaultClientProfile
+      ? { defaultClientProfile: overrides.defaultClientProfile }
+      : {}),
     governanceRef: overrides.governanceRef || governance.ref,
     governance,
     fingerprint: overrides.fingerprint || "sha256:lane-pleomino",
@@ -66,7 +68,7 @@ export function nixosSharedHostLanePolicyFixture(
 
 export function nixosSharedHostAdmissionPolicyFixture(
   overrides: Partial<DeploymentAdmissionPolicy> = {},
-): DeploymentAdmissionPolicy {
+) {
   return {
     ref: overrides.ref || "//projects/deployments/pleomino-shared:dev_release",
     name: overrides.name || "dev_release",
@@ -85,9 +87,7 @@ export function nixosSharedHostAdmissionPolicyFixture(
   };
 }
 
-export function nixosSharedHostLanePolicyNodeFixture(
-  overrides: Partial<GraphNode> = {},
-): GraphNode {
+export function nixosSharedHostLanePolicyNodeFixture(overrides: Partial<GraphNode> = {}) {
   const policy = nixosSharedHostLanePolicyFixture();
   return {
     name: policy.ref,

@@ -89,12 +89,22 @@ def _write_stub_json(ctx):
 deployment_lane_policy = rule(
     impl = _write_stub_json,
     attrs = {
+        "defaults": attrs.option(attrs.dep(), default = None),
         "stages": attrs.list(attrs.string()),
         "stage_branches": attrs.dict(key = attrs.string(), value = attrs.string()),
         "allowed_promotion_edges": attrs.list(attrs.string(), default = []),
         "artifact_reuse_mode": attrs.string(default = "same_artifact"),
         "promotion_compatibility": attrs.string(default = ""),
         "governance_policy": attrs.option(attrs.dep(), default = None),
+        "default_client_profile": attrs.string(default = ""),
+        "labels": attrs.list(attrs.string(), default = []),
+    },
+)
+
+deployment_defaults = rule(
+    impl = _write_stub_json,
+    attrs = {
+        "default_client_profile": attrs.string(default = ""),
         "labels": attrs.list(attrs.string(), default = []),
     },
 )

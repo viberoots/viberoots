@@ -19,6 +19,7 @@ deployment_lane_governance(
 
 deployment_lane_policy(
     name = "lane",
+    defaults = "//projects/deployments:defaults",
     stages = ["dev", "staging", "prod"],
     stage_branches = {
         "dev": "env/pleomino/dev",

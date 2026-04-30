@@ -147,11 +147,14 @@ async function createPlan(
 export async function maybeRunNixosSharedHostRemoteProfile(opts: {
   workspaceRoot: string;
   deployment: NixosSharedHostDeployment;
+  defaultProfileName?: string;
   vaultRuntimeInputs?: DeploymentVaultRuntimeInputs;
   admissionEvidence?: DeploymentAdmissionEvidence;
 }): Promise<boolean> {
   const profileRequested = hasFlag("profile") || hasFlag("profile-root");
-  const profileName = hasFlag("profile") ? requireNamedFlagValue("profile") : "";
+  const profileName = hasFlag("profile")
+    ? requireNamedFlagValue("profile")
+    : String(opts.defaultProfileName || "").trim();
   const planMode = getFlagBool("plan") || getFlagBool("dry-run");
   const overrides = collectRemoteOverrides();
   const retainRemoteArtifact = getFlagBool("retain-remote-artifact");

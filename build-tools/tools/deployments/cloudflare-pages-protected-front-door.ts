@@ -12,7 +12,7 @@ import {
   readNixosSharedHostControlPlaneRecordViaService,
   submitNixosSharedHostControlPlaneViaService,
 } from "./nixos-shared-host-control-plane-client.ts";
-import { resolveServiceClientFromFlags } from "./nixos-shared-host-service-client-config.ts";
+import { resolveServiceClientFromCliProfileOrFlags } from "./deployment-service-client-profile.ts";
 import { uploadCloudflarePagesClientArtifact } from "./cloudflare-pages-artifact-upload-client.ts";
 import { serviceSubmissionAdmissionEvidence } from "./deployment-service-client-contract.ts";
 
@@ -93,9 +93,11 @@ export async function runProtectedCloudflarePagesDeployFrontDoor(opts: {
 }) {
   rejectServiceOnlyLocalFlags(opts.hasFlag);
   const admissionEvidence = serviceSubmissionAdmissionEvidence(opts.admissionEvidence as any);
-  const serviceClient = resolveServiceClientFromFlags({
+  const serviceClient = await resolveServiceClientFromCliProfileOrFlags({
+    workspaceRoot: opts.workspaceRoot,
     controlPlaneUrl: opts.controlPlaneUrl,
     controlPlaneToken: opts.controlPlaneToken,
+    defaultProfileName: opts.deployment.lanePolicy.defaultClientProfile,
     context: `cloudflare-pages ${opts.deployment.protectionClass} mutation`,
   });
   const submissionId = createCloudflarePagesSubmissionId();
