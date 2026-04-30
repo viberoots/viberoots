@@ -72,6 +72,48 @@ test("shared-host deployment service module routes hosted HTTPS to a private ser
   });
 });
 
+test("shared-host deployment service module adds Wrangler to the worker runtime path", async () => {
+  await runInTemp("shared-host-deployment-service-module-wrangler", async (tmp, $) => {
+    const expr = `
+      let
+        lib = import <nixpkgs/lib>;
+        module = import ./build-tools/tools/nix/shared-host-deployment-service-module.nix {
+          inherit lib;
+          pkgs = { wrangler = "/nix/store/test-wrangler"; };
+          config = {
+            deploymentHost.deploymentService = {
+              enable = true;
+              hostname = "deploy.example.test";
+              localBindHost = "127.0.0.1";
+              localBindPort = 7780;
+              manageNginx = false;
+              manageAcme = false;
+              acmeEmail = null;
+              openFirewall = false;
+              reviewedSourceSsh = {
+                privateKeyFile = null;
+                knownHostsFile = null;
+                environmentFile = "/etc/deployment-host/reviewed-source-ssh.env";
+              };
+            };
+          };
+        };
+      in module.config.content.systemd.services.deployment-host-control-plane-worker.path
+    `;
+    const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;
+    const out = JSON.parse(String(stdout || "{}")) as {
+      _type: string;
+      content: string[];
+      priority: number;
+    };
+    assert.deepEqual(out, {
+      _type: "order",
+      content: ["/nix/store/test-wrangler"],
+      priority: 1500,
+    });
+  });
+});
+
 test("shared-host deployment service module rejects wildcard backend binds", async () => {
   await runInTemp("shared-host-deployment-service-module-private-bind", async (tmp, $) => {
     const expr = `
@@ -79,6 +121,7 @@ test("shared-host deployment service module rejects wildcard backend binds", asy
         lib = import <nixpkgs/lib>;
         module = import ./build-tools/tools/nix/shared-host-deployment-service-module.nix {
           inherit lib;
+          pkgs = { wrangler = "/nix/store/test-wrangler"; };
           config = {
             deploymentHost.deploymentService = {
               enable = true;

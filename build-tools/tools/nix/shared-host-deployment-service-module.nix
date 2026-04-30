@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 let
   cfg = config.deploymentHost.deploymentService;
   hostname = if cfg.hostname == null then "_disabled.invalid" else cfg.hostname;
@@ -134,6 +134,10 @@ in
       enable = lib.mkDefault true;
       allowedTCPPorts = [ 80 443 ];
     };
+
+    systemd.services.deployment-host-control-plane-worker.path = lib.mkAfter [
+      pkgs.wrangler
+    ];
 
     environment.etc = lib.mkMerge [
       (lib.mkIf (reviewedSourceSshEnvironmentEnabled && reviewedSourceSsh.knownHostsFile == null) {
