@@ -136,10 +136,6 @@ let
       (entry:
         lib.nameValuePair entry.hostname {
           serverName = entry.hostname;
-          backendIdentity = entry.backendIdentity;
-          backendAddress = entry.addr.backendAddress;
-          targetGroup = entry.deployment.providerTarget.targetGroup;
-          healthPath = entry.deployment.runtime.healthPath or null;
           locations."/" = {
             proxyPass = entry.addr.backendAddress;
             proxyWebsockets = true;
