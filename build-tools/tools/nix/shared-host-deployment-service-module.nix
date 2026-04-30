@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 let
   cfg = config.deploymentHost.deploymentService;
   hostname = if cfg.hostname == null then "_disabled.invalid" else cfg.hostname;
@@ -9,6 +9,10 @@ let
   reviewedSourceSshEnvironmentEtcPath = lib.removePrefix "/etc/" reviewedSourceSsh.environmentFile;
   reviewedSourceKnownHostsFile =
     if reviewedSourceSsh.knownHostsFile == null then githubKnownHostsPath else reviewedSourceSsh.knownHostsFile;
+  cloudflarePagesWrangler = pkgs.writeShellScript "bnx-cloudflare-pages-wrangler" ''
+    export PATH="${lib.makeBinPath [ pkgs.nodejs_22 ]}:$PATH"
+    exec /srv/common/node_modules/.bin/wrangler "$@"
+  '';
   githubKnownHosts = ''
     github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
     github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
@@ -136,7 +140,7 @@ in
     };
 
     systemd.services.deployment-host-control-plane-worker.environment = {
-      BNX_CLOUDFLARE_PAGES_WRANGLER_BIN = "/srv/common/node_modules/.bin/wrangler";
+      BNX_CLOUDFLARE_PAGES_WRANGLER_BIN = "${cloudflarePagesWrangler}";
     };
 
     environment.etc = lib.mkMerge [

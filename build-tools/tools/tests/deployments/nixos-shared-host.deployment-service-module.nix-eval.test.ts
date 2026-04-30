@@ -77,8 +77,12 @@ test("shared-host deployment service module points the worker at repo-managed Wr
     const expr = `
       let
         lib = import <nixpkgs/lib>;
+        pkgs = {
+          nodejs_22 = "/nix/store/test-nodejs-22";
+          writeShellScript = name: text: "/nix/store/test-\${name}";
+        };
         module = import ./build-tools/tools/nix/shared-host-deployment-service-module.nix {
-          inherit lib;
+          inherit lib pkgs;
           config = {
             deploymentHost.deploymentService = {
               enable = true;
@@ -102,7 +106,7 @@ test("shared-host deployment service module points the worker at repo-managed Wr
     const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;
     const out = JSON.parse(String(stdout || "{}")) as Record<string, string>;
     assert.deepEqual(out, {
-      BNX_CLOUDFLARE_PAGES_WRANGLER_BIN: "/srv/common/node_modules/.bin/wrangler",
+      BNX_CLOUDFLARE_PAGES_WRANGLER_BIN: "/nix/store/test-bnx-cloudflare-pages-wrangler",
     });
   });
 });
@@ -112,8 +116,12 @@ test("shared-host deployment service module rejects wildcard backend binds", asy
     const expr = `
       let
         lib = import <nixpkgs/lib>;
+        pkgs = {
+          nodejs_22 = "/nix/store/test-nodejs-22";
+          writeShellScript = name: text: "/nix/store/test-\${name}";
+        };
         module = import ./build-tools/tools/nix/shared-host-deployment-service-module.nix {
-          inherit lib;
+          inherit lib pkgs;
           config = {
             deploymentHost.deploymentService = {
               enable = true;
