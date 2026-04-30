@@ -69,6 +69,7 @@ export async function prepareWorkerDeploymentVaultRuntime(opts: {
   workspaceRoot: string;
   deployment: DeploymentTarget;
   env?: NodeJS.ProcessEnv;
+  timeoutMs?: number;
 }): Promise<PreparedDeploymentVaultRuntime> {
   const env = opts.env || process.env;
   const plan = resolveDeploymentVaultRuntimePlan({ deployment: opts.deployment, env });
@@ -83,6 +84,7 @@ export async function prepareWorkerDeploymentVaultRuntime(opts: {
   return await prepareDeploymentVaultRuntime({
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.deployment,
+    inputs: opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : undefined,
     env,
   });
 }

@@ -11,6 +11,7 @@ export type DeployVaultJwtOptions = {
   out?: string;
   audience?: string;
   boundClaims?: Record<string, string>;
+  timeoutMs?: number;
 };
 
 function trimTrailingSlash(value: string): string {
@@ -24,8 +25,16 @@ function parseJsonObject(value: unknown, label: string): Record<string, unknown>
   return value as Record<string, unknown>;
 }
 
-async function fetchJson(url: string, init?: RequestInit) {
-  const response = await fetch(url, init);
+function withTimeoutSignal(init: RequestInit | undefined, timeoutMs: number | undefined) {
+  if (!timeoutMs) return init;
+  return {
+    ...(init || {}),
+    signal: AbortSignal.timeout(timeoutMs),
+  };
+}
+
+async function fetchJson(url: string, init?: RequestInit, timeoutMs?: number) {
+  const response = await fetch(url, withTimeoutSignal(init, timeoutMs));
   if (!response.ok) throw new Error(`request failed for ${url}: ${response.status}`);
   return parseJsonObject(await response.json(), url);
 }
@@ -44,9 +53,9 @@ export function parseExpectedClaimFlags(argv = getArgvTokens()): Record<string, 
   return claims;
 }
 
-async function discoverTokenEndpoint(issuer: string): Promise<string> {
+async function discoverTokenEndpoint(issuer: string, timeoutMs?: number): Promise<string> {
   const discoveryUrl = `${trimTrailingSlash(issuer)}/.well-known/openid-configuration`;
-  const discovery = await fetchJson(discoveryUrl);
+  const discovery = await fetchJson(discoveryUrl, undefined, timeoutMs);
   if (discovery.issuer !== trimTrailingSlash(issuer)) {
     throw new Error("OIDC discovery issuer mismatch");
   }
@@ -62,11 +71,20 @@ async function requestClientCredentialsToken(opts: DeployVaultJwtOptions): Promi
     client_id: opts.clientId,
     client_secret: opts.clientSecret,
   });
-  const response = await fetch(await discoverTokenEndpoint(opts.issuer), {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
+  const response = await fetch(
+    await discoverTokenEndpoint(opts.issuer, opts.timeoutMs),
+    withTimeoutSignal(
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body,
+      },
+      opts.timeoutMs,
+    ),
+  );
   if (!response.ok) throw new Error(`token endpoint returned ${response.status}`);
   const payload = parseJsonObject(await response.json(), "token endpoint");
   const token = typeof payload.access_token === "string" ? payload.access_token.trim() : "";

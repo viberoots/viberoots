@@ -117,6 +117,12 @@ export type CloudflarePagesControlPlaneSubmission = {
   deployRunId?: string;
   resultRecordPath?: string;
   finalOutcome?: string;
+  execution?: {
+    currentStep?: string;
+    mutationStartedAt?: string;
+    stepStartedAt?: string;
+    timeoutMs?: number;
+  };
   requestedBy?: DeploymentPrincipal;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
   authorizationSnapshot?: DeploymentControlPlaneAuthorization;

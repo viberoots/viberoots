@@ -1,24 +1,16 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
-import {
-  requireCloudflarePagesControlPlaneAuthority,
-  type CloudflarePagesControlPlaneWorkerAuthority,
-  type CloudflarePagesPublishMode,
-} from "./cloudflare-pages-control-plane-contract.ts";
+import { requireCloudflarePagesControlPlaneAuthority } from "./cloudflare-pages-control-plane-contract.ts";
 import { prepareCloudflarePagesWranglerConfig } from "./cloudflare-pages-config.ts";
-import type { CloudflarePagesPreviewIdentitySelector } from "./cloudflare-pages-preview.ts";
 import { publishCloudflarePagesStaticWebapp } from "./cloudflare-pages-publisher.ts";
 import {
   createCloudflarePagesDeployRecord,
   createCloudflarePagesDeployRunId,
-  type CloudflarePagesOperationKind,
   type CloudflarePagesDeployRecord,
   writeCloudflarePagesDeployRecord,
 } from "./cloudflare-pages-records.ts";
 import { writeCloudflarePagesReplaySnapshot } from "./cloudflare-pages-replay.ts";
 import { smokeCloudflarePagesStaticWebapp } from "./cloudflare-pages-static-smoke.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
 import { withFailedStep } from "./deployment-failed-step.ts";
 import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
 import {
@@ -29,33 +21,12 @@ import {
 import { executionPolicyWithRetry, retryAuditFrom } from "./deployment-retry-records.ts";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
-import {
-  requireAdmittedStaticWebappArtifactPath,
-  type AdmittedStaticWebappArtifact,
-} from "./static-webapp-artifacts.ts";
+import { requireAdmittedStaticWebappArtifactPath } from "./static-webapp-artifacts.ts";
+import type { CloudflarePagesStaticDeployOptions } from "./cloudflare-pages-static-deploy-options.ts";
 
-export async function runCloudflarePagesStaticDeploy(opts: {
-  workspaceRoot: string;
-  deployment: CloudflarePagesDeployment;
-  artifact: AdmittedStaticWebappArtifact;
-  recordsRoot: string;
-  deployBatchId?: string;
-  operationKind?: CloudflarePagesOperationKind;
-  authority?: CloudflarePagesControlPlaneWorkerAuthority;
-  admittedContext: CloudflarePagesAdmittedContext;
-  parentRunId?: string;
-  releaseLineageId?: string;
-  artifactLineageId?: string;
-  publishMode?: CloudflarePagesPublishMode;
-  effectiveRunTarget?: CloudflarePagesDeployment["providerTarget"];
-  previewIdentitySelector?: CloudflarePagesPreviewIdentitySelector;
-  smokeConnectOverride?: {
-    protocol: "http:" | "https:";
-    hostname: string;
-    port: number;
-    rejectUnauthorized?: boolean;
-  };
-}): Promise<{ record: CloudflarePagesDeployRecord; recordPath: string }> {
+export async function runCloudflarePagesStaticDeploy(
+  opts: CloudflarePagesStaticDeployOptions,
+): Promise<{ record: CloudflarePagesDeployRecord; recordPath: string }> {
   const authority = requireCloudflarePagesControlPlaneAuthority(opts.deployment, opts.authority);
   const runId = createCloudflarePagesDeployRunId();
   const operationKind = opts.operationKind || "deploy";
@@ -74,6 +45,9 @@ export async function runCloudflarePagesStaticDeploy(opts: {
   let executionPolicy: ReturnType<typeof executionPolicyWithRetry> | undefined;
   try {
     const artifactDir = await requireAdmittedStaticWebappArtifactPath(opts.artifact);
+    await opts.progress?.onStepStart?.("publish", {
+      ...(opts.timeouts?.publishMs ? { timeoutMs: opts.timeouts.publishMs } : {}),
+    });
     const publishSecrets = await secretRuntime.enterStep("publish");
     const apiToken = publishSecrets.cloudflare_api_token?.trim() || undefined;
     const preparedConfig = await prepareCloudflarePagesWranglerConfig({
@@ -105,8 +79,10 @@ export async function runCloudflarePagesStaticDeploy(opts: {
           renderedConfigPath: preparedConfig.renderedConfigPath,
           effectiveRunTarget,
           apiToken,
+          ...(opts.timeouts?.publishMs ? { timeoutMs: opts.timeouts.publishMs } : {}),
         }),
       classifyError: () => noPublishAutoRetry(),
+      ...(opts.timeouts?.publishMs ? { totalBudgetMs: opts.timeouts.publishMs } : {}),
     })
       .then((result) => {
         executionPolicy = executionPolicyWithRetry({
@@ -140,10 +116,14 @@ export async function runCloudflarePagesStaticDeploy(opts: {
       });
     } else {
       try {
+        const smokeTimeoutMs = opts.timeouts?.smokeMs || smokeMode.budget.totalBudgetMs;
+        await opts.progress?.onStepStart?.("smoke", {
+          ...(smokeTimeoutMs ? { timeoutMs: smokeTimeoutMs } : {}),
+        });
         await secretRuntime.enterStep("smoke");
         const completedSmoke = await runWithAutomaticRetry({
           step: "smoke",
-          totalBudgetMs: smokeMode.budget.totalBudgetMs,
+          totalBudgetMs: smokeTimeoutMs,
           run: async () =>
             await smokeCloudflarePagesStaticWebapp({
               deployment: opts.deployment,

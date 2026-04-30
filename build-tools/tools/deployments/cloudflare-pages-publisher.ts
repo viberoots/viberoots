@@ -62,9 +62,10 @@ export async function publishCloudflarePagesStaticWebapp(opts: {
   renderedConfigPath: string;
   effectiveRunTarget?: CloudflarePagesDeployment["providerTarget"];
   apiToken?: string;
+  timeoutMs?: number;
 }): Promise<CloudflarePagesPublishResult> {
   const effectiveRunTarget = opts.effectiveRunTarget || opts.deployment.providerTarget;
-  const result = await $({
+  const command = $({
     cwd: packageDirFor(opts.workspaceRoot, opts.deployment),
     stdio: "pipe",
     env: {
@@ -72,7 +73,8 @@ export async function publishCloudflarePagesStaticWebapp(opts: {
       CLOUDFLARE_ACCOUNT_ID: opts.deployment.providerTarget.account,
       ...(opts.apiToken ? { CLOUDFLARE_API_TOKEN: opts.apiToken } : {}),
     },
-  })`${wranglerBin()} pages deploy ${path.resolve(opts.artifactDir)} --project-name ${opts.deployment.providerTarget.project} ${effectiveRunTarget.previewBranch ? ["--branch", effectiveRunTarget.previewBranch] : []} --config ${path.resolve(opts.renderedConfigPath)}`.nothrow();
+  })`${wranglerBin()} pages deploy ${path.resolve(opts.artifactDir)} --project-name ${opts.deployment.providerTarget.project} ${effectiveRunTarget.previewBranch ? ["--branch", effectiveRunTarget.previewBranch] : []} --config ${path.resolve(opts.renderedConfigPath)}`;
+  const result = await (opts.timeoutMs ? command.timeout(opts.timeoutMs) : command).nothrow();
   const stdout = String((result as any).stdout || "");
   const stderr = String((result as any).stderr || "");
   if ((result as any).exitCode !== 0) {

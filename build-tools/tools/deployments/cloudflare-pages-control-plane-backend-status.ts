@@ -11,6 +11,12 @@ export type CloudflareBackendSubmissionLike = {
   lifecycleState: string;
   lockScope: string;
   executionSnapshotPath: string;
+  execution?: {
+    currentStep?: string;
+    mutationStartedAt?: string;
+    stepStartedAt?: string;
+    timeoutMs?: number;
+  };
   requestedBy?: { principalId: string; displayName?: string };
   authorization?: unknown;
 };

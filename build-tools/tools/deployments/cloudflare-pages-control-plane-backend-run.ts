@@ -1,57 +1,30 @@
 #!/usr/bin/env zx-wrapper
 import { runCloudflarePagesStaticDeploy } from "./cloudflare-pages-static-deploy.ts";
-import type { CloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-contract.ts";
-import { createCloudflarePagesDeployRunId } from "./cloudflare-pages-records.ts";
-import { resolveCloudflarePagesAdmittedSecretReferences } from "./cloudflare-pages-admission.ts";
-import { revalidateControlPlaneAdmission } from "./deployment-control-plane-revalidation.ts";
 import { lockWaitAbortReasonForSubmission } from "./deployment-control-plane-queue.ts";
 import {
   acquireBackendControlPlaneLock,
   writeBackendDeployRecordDoc,
-  writeBackendSnapshotDoc,
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend.ts";
 import { removeMirrorFile } from "./nixos-shared-host-control-plane-backend-materialize.ts";
-import {
-  readControlPlaneJson,
-  writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
-import {
-  writeTransitionRecord,
-  type CloudflarePagesTargetTransitionRecord,
-} from "./cloudflare-pages-target-transition-records.ts";
+import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
 import { sanitizedBackendRecord } from "./cloudflare-pages-control-plane-backend-records.ts";
 // prettier-ignore
 import { persistCloudflareBackendStatus, type CloudflareBackendSubmissionLike } from "./cloudflare-pages-control-plane-backend-status.ts";
 import { executeCloudflarePagesBackendPreviewCleanup } from "./cloudflare-pages-control-plane-backend-preview-cleanup.ts";
-import { withWorkerDeploymentVaultRuntime } from "./deployment-vault-runtime-worker.ts";
-import type { DeploymentSecretContext } from "./deployment-secret-context.ts";
-
-async function prepareWorkerAdmittedSnapshot(opts: {
-  workspaceRoot: string;
-  backend: NixosSharedHostControlPlaneBackendTarget;
-  executionSnapshotPath: string;
-  executionSnapshotRef: string;
-  snapshot: CloudflarePagesControlPlaneSnapshot;
-  secretContext?: DeploymentSecretContext;
-}) {
-  if (!opts.snapshot.admittedContext) return;
-  await revalidateControlPlaneAdmission({
-    workspaceRoot: opts.workspaceRoot,
-    deployment: opts.snapshot.deployment,
-    admittedContext: opts.snapshot.admittedContext,
-  });
-  opts.snapshot.admittedContext = {
-    ...opts.snapshot.admittedContext,
-    admittedSecretReferences: await resolveCloudflarePagesAdmittedSecretReferences({
-      deployment: opts.snapshot.deployment,
-      admittedContext: opts.snapshot.admittedContext,
-      ...(opts.secretContext ? { secretContext: opts.secretContext } : {}),
-    }),
-  };
-  await writeControlPlaneJson(opts.executionSnapshotPath, opts.snapshot);
-  await writeBackendSnapshotDoc(opts.backend, opts.snapshot, opts.executionSnapshotRef);
-}
+import { prepareWorkerDeploymentVaultRuntime } from "./deployment-vault-runtime-worker.ts";
+import { activateDeploymentSecretContext } from "./deployment-secret-context.ts";
+import { cleanupDeploymentVaultRuntime } from "./deployment-vault-runtime.ts";
+import {
+  cloudflareBackendTimeouts,
+  persistCloudflareBackendStep,
+  prepareWorkerAdmittedSnapshot,
+  updateCloudflareBackendStep,
+  withStepTimeout,
+  writeCloudflareBackendFailureRecord,
+  type CloudflareBackendExecutionStep,
+} from "./cloudflare-pages-control-plane-backend-execution.ts";
+import { executeCloudflarePagesBackendTargetTransition } from "./cloudflare-pages-control-plane-backend-transition.ts";
 
 export async function executeCloudflarePagesBackendSubmission(opts: {
   workspaceRoot: string;
@@ -71,7 +44,25 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
     shouldAbort: async () => await lockWaitAbortReasonForSubmission(opts.submissionPath),
   });
   try {
-    const running = { ...submission, lifecycleState: "running", workerId: opts.workerId };
+    const timeouts = cloudflareBackendTimeouts();
+    let running: CloudflareBackendSubmissionLike = {
+      ...submission,
+      lifecycleState: "running",
+      workerId: opts.workerId,
+    };
+    const persistStep = async (
+      step: CloudflareBackendExecutionStep,
+      metadata: { mutationStep?: boolean; timeoutMs?: number } = {},
+    ) => {
+      running = updateCloudflareBackendStep(running, step, metadata);
+      await persistCloudflareBackendStep({
+        backend: opts.backend,
+        submissionPath: opts.submissionPath,
+        submissionRef: opts.submissionRef,
+        executionSnapshotRef: opts.executionSnapshotRef,
+        running,
+      });
+    };
     await persistCloudflareBackendStatus({
       backend: opts.backend,
       submissionPath: opts.submissionPath,
@@ -80,11 +71,23 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
       submission: running,
     });
     try {
-      const result =
-        snapshot.action?.kind === "preview_cleanup"
-          ? await withWorkerDeploymentVaultRuntime(
-              { workspaceRoot: opts.workspaceRoot, deployment: snapshot.deployment },
-              async (runtime) => {
+      await persistStep("vault", { timeoutMs: timeouts.vaultMs });
+      const runtime = await withStepTimeout(
+        "vault",
+        timeouts.vaultMs,
+        async () =>
+          await prepareWorkerDeploymentVaultRuntime({
+            workspaceRoot: opts.workspaceRoot,
+            deployment: snapshot.deployment,
+            timeoutMs: timeouts.vaultMs,
+          }),
+      );
+      const restoreSecretContext = activateDeploymentSecretContext(runtime.secretContext);
+      const result = await (async () => {
+        try {
+          return snapshot.action?.kind === "preview_cleanup"
+            ? await (async () => {
+                await persistStep("admission_revalidation");
                 await prepareWorkerAdmittedSnapshot({
                   workspaceRoot: opts.workspaceRoot,
                   backend: opts.backend,
@@ -93,61 +96,33 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
                   snapshot,
                   ...(runtime.secretContext ? { secretContext: runtime.secretContext } : {}),
                 });
-                return await executeCloudflarePagesBackendPreviewCleanup({
-                  recordsRoot: opts.recordsRoot,
-                  workerId: opts.workerId,
-                  snapshot,
+                await persistStep("preview_cleanup", {
+                  mutationStep: true,
+                  timeoutMs: timeouts.previewCleanupMs,
                 });
-              },
-            )
-          : snapshot.targetException
-            ? await (async () => {
-                const record: CloudflarePagesTargetTransitionRecord = {
-                  schemaVersion: "cloudflare-pages-target-transition-record@1",
-                  deployRunId: createCloudflarePagesDeployRunId("transition"),
-                  operationKind: snapshot.operationKind,
-                  runClassification: snapshot.operationKind,
-                  finalOutcome: "succeeded",
-                  deploymentId: snapshot.deployment.deploymentId,
-                  deploymentLabel: snapshot.deployment.label,
-                  provider: "cloudflare-pages",
-                  providerTargetIdentity: snapshot.deployment.providerTarget.providerTargetIdentity,
-                  oldProviderTargetIdentity: snapshot.targetException.oldProviderTargetIdentity,
-                  ...(snapshot.targetException.newProviderTargetIdentity
-                    ? {
-                        newProviderTargetIdentity:
-                          snapshot.targetException.newProviderTargetIdentity,
-                      }
-                    : {}),
-                  sharedLockScope: snapshot.targetException.sharedLockScope,
-                  requestedBy: running.requestedBy || { principalId: "service" },
-                  authorization: running.authorization as any,
-                  targetException: snapshot.targetException,
-                  resultingOwnershipState:
-                    snapshot.operationKind === "retire_target"
-                      ? { kind: "retired", ownerDeploymentId: null }
-                      : {
-                          kind: "migrated",
-                          ownerDeploymentId: snapshot.deployment.deploymentId,
-                          providerTargetIdentity:
-                            snapshot.deployment.providerTarget.providerTargetIdentity,
-                        },
-                  controlPlane: {
-                    submissionId: snapshot.submissionId,
-                    submissionPath: "",
-                    executionSnapshotPath: "",
-                    lockScope: snapshot.lockScope,
-                    workerId: opts.workerId,
-                  },
-                };
-                return {
-                  record,
-                  recordPath: await writeTransitionRecord(opts.recordsRoot, record),
-                };
+                return await withStepTimeout(
+                  "preview_cleanup",
+                  timeouts.previewCleanupMs,
+                  async () =>
+                    await executeCloudflarePagesBackendPreviewCleanup({
+                      recordsRoot: opts.recordsRoot,
+                      workerId: opts.workerId,
+                      snapshot,
+                    }),
+                );
               })()
-            : await withWorkerDeploymentVaultRuntime(
-                { workspaceRoot: opts.workspaceRoot, deployment: snapshot.deployment },
-                async (runtime) => {
+            : snapshot.targetException
+              ? await (async () => {
+                  await persistStep("target_transition", { mutationStep: true });
+                  return await executeCloudflarePagesBackendTargetTransition({
+                    recordsRoot: opts.recordsRoot,
+                    workerId: opts.workerId,
+                    running,
+                    snapshot,
+                  });
+                })()
+              : await (async () => {
+                  await persistStep("admission_revalidation");
                   await prepareWorkerAdmittedSnapshot({
                     workspaceRoot: opts.workspaceRoot,
                     backend: opts.backend,
@@ -193,9 +168,25 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
                     ...(snapshot.smokeConnectOverride
                       ? { smokeConnectOverride: snapshot.smokeConnectOverride }
                       : {}),
+                    progress: {
+                      onStepStart: async (step, metadata) => {
+                        await persistStep(step, {
+                          mutationStep: true,
+                          ...(metadata?.timeoutMs ? { timeoutMs: metadata.timeoutMs } : {}),
+                        });
+                      },
+                    },
+                    timeouts: {
+                      publishMs: timeouts.publishMs,
+                      ...(timeouts.smokeMs ? { smokeMs: timeouts.smokeMs } : {}),
+                    },
                   });
-                },
-              );
+                })();
+        } finally {
+          restoreSecretContext();
+          await cleanupDeploymentVaultRuntime(runtime);
+        }
+      })();
       await writeBackendDeployRecordDoc(
         opts.backend,
         sanitizedBackendRecord(result.record),
@@ -217,13 +208,24 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
         } as any,
       });
     } catch (error) {
-      if (!(error as any)?.record || !(error as any)?.recordPath) throw error;
+      const failure =
+        (error as any)?.record && (error as any)?.recordPath
+          ? { record: (error as any).record, recordPath: (error as any).recordPath }
+          : await writeCloudflareBackendFailureRecord({
+              recordsRoot: opts.recordsRoot,
+              workerId: opts.workerId,
+              submissionRef: opts.submissionRef,
+              executionSnapshotPath: opts.executionSnapshotPath,
+              running,
+              snapshot,
+              error,
+            });
       await writeBackendDeployRecordDoc(
         opts.backend,
-        sanitizedBackendRecord((error as any).record),
-        (error as any).recordPath,
+        sanitizedBackendRecord(failure.record),
+        failure.recordPath,
       );
-      await removeMirrorFile((error as any).recordPath);
+      await removeMirrorFile(failure.recordPath);
       await persistCloudflareBackendStatus({
         backend: opts.backend,
         submissionPath: opts.submissionPath,
@@ -233,9 +235,9 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
           ...running,
           lifecycleState: "finished",
           completedAt: new Date().toISOString(),
-          deployRunId: (error as any).record.deployRunId,
-          resultRecordPath: (error as any).recordPath,
-          finalOutcome: (error as any).record.finalOutcome,
+          deployRunId: failure.record.deployRunId,
+          resultRecordPath: failure.recordPath,
+          finalOutcome: failure.record.finalOutcome,
         } as any,
       });
     }

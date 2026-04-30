@@ -62,7 +62,7 @@ export type CloudflarePagesDeployRecord = {
     provenancePath?: string;
   };
   admittedContext: CloudflarePagesAdmittedContext;
-  failedStep?: "publish" | "smoke" | "preview_cleanup";
+  failedStep?: "vault" | "publish" | "smoke" | "preview_cleanup";
   runnerIdentities?: DeploymentRunnerIdentities;
   publisherType?: string;
   smokeRunnerType?: "cloudflare-pages-static-webapp-smoke";

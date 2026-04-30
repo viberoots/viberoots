@@ -23,6 +23,7 @@ const configPath = path.resolve(flagValue("--config"));
 const publishRoot = process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT || "";
 const logPath = process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_LOG || "";
 const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || "";
+const delayMs = Number(process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_DELAY_MS || "0");
 const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
 if (String(config.name || "") !== projectName) {
   console.error("wrangler config name mismatch");
@@ -31,6 +32,9 @@ if (String(config.name || "") !== projectName) {
 if (!publishRoot) {
   console.error("missing BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT");
   process.exit(4);
+}
+if (Number.isFinite(delayMs) && delayMs > 0) {
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 const destination = branch
   ? path.join(path.resolve(publishRoot), projectName + "--preview--" + branch)

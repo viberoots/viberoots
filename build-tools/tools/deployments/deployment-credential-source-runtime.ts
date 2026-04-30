@@ -56,6 +56,7 @@ async function mintJenkinsClientSecret(opts: CredentialSourceRuntimeOptions) {
     clientSecret,
     audience: opts.audience,
     boundClaims: boundClaims(opts),
+    timeoutMs: opts.timeoutMs,
   });
   return { workloadJwt: minted.token, claims: minted.claims };
 }
