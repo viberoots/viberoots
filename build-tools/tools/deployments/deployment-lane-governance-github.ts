@@ -112,16 +112,23 @@ export async function fetchGithubLaneGovernanceSnapshot(opts: {
   env?: NodeJS.ProcessEnv;
 }): Promise<DeploymentLaneGovernanceSnapshot> {
   const governance = opts.lanePolicy.governance;
-  const rules = await queryGithubRules({
-    repository: governance.repository,
-    branch: governance.branchProtections[0]?.branch || "",
-    env: opts.env,
-  });
+  const rulesByBranch = new Map(
+    await Promise.all(
+      governance.branchProtections.map(async (declared) => [
+        declared.branch,
+        await queryGithubRules({
+          repository: governance.repository,
+          branch: declared.branch,
+          env: opts.env,
+        }),
+      ]),
+    ),
+  );
   return {
     scmBackend: "github",
     repository: governance.repository,
     branchProtections: governance.branchProtections.map((declared) => {
-      const rule = matchingRule(rules, declared.branch);
+      const rule = matchingRule(rulesByBranch.get(declared.branch) || [], declared.branch);
       if (!rule) throw new Error(`missing required protected branch for ${declared.stage}`);
       if (!rule.requiresLinearHistory || rule.allowsForcePushes) {
         throw new Error(`missing fast-forward-only enforcement for ${declared.stage}`);

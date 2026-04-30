@@ -10,9 +10,9 @@ deployment_lane_governance(
     scm_backend = "github",
     repository = "kiltyj/common",
     branch_protections = [
-        {"stage": "dev", "branch": "env/pleomino/dev", "required_checks": "deploy/pleomino-dev", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},
-        {"stage": "staging", "branch": "env/pleomino/staging", "required_checks": "deploy/pleomino-staging", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},
-        {"stage": "prod", "branch": "env/pleomino/prod", "required_checks": "deploy/pleomino-prod", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},
+        {"stage": "dev", "branch": "env/pleomino/dev", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},
+        {"stage": "staging", "branch": "env/pleomino/staging", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},
+        {"stage": "prod", "branch": "env/pleomino/prod", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},
     ],
     visibility = ["PUBLIC"],
 )
@@ -38,7 +38,7 @@ deployment_lane_policy(
 deployment_admission_policy(
     name = "dev_release",
     allowed_refs = ["env/pleomino/dev"],
-    required_checks = ["deploy/pleomino-dev"],
+    required_checks = ["deploy/admission"],
     required_approvals = [],
     retry_branch_policy = "branch_independent",
     artifact_attestation_mode = "recorded_exact_artifact",
@@ -48,7 +48,7 @@ deployment_admission_policy(
 deployment_admission_policy(
     name = "staging_release",
     allowed_refs = ["env/pleomino/staging"],
-    required_checks = ["deploy/pleomino-staging"],
+    required_checks = ["deploy/admission"],
     required_approvals = [],
     retry_branch_policy = "branch_independent",
     artifact_attestation_mode = "recorded_exact_artifact",
@@ -58,7 +58,7 @@ deployment_admission_policy(
 deployment_admission_policy(
     name = "prod_release",
     allowed_refs = ["env/pleomino/prod"],
-    required_checks = ["deploy/pleomino-prod"],
+    required_checks = ["deploy/admission"],
     required_approvals = [],
     retry_branch_policy = "branch_independent",
     artifact_attestation_mode = "recorded_exact_artifact",

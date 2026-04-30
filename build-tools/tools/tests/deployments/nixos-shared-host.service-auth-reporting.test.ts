@@ -215,6 +215,7 @@ test("automation principals can submit structured evidence only when they also h
         principalId: "oidc:service-account-jenkins",
         roles: ["submitter", "admission_reporter"],
       });
+      const admissionEvidence = humanCheckEvidence(deployment, subject);
       const submitted = await readJson<any>(
         await postCheckedSubmission({
           controlPlaneUrl: controlPlane.url,
@@ -222,17 +223,14 @@ test("automation principals can submit structured evidence only when they also h
           artifactDir,
           authSessionId,
           admissionEvidence: {
-            ...humanCheckEvidence(deployment, subject),
-            checks: [
-              {
-                name: "deploy/pleomino-dev",
-                subject,
-                status: "passed",
-                checkedAt: "2026-04-23T00:00:00.000Z",
-                recordRef: "check://deploy/pleomino-dev",
-                reportingKind: "ci_pipeline",
-              },
-            ],
+            ...admissionEvidence,
+            checks: admissionEvidence.checks.map((check) => ({
+              ...check,
+              status: "passed",
+              checkedAt: "2026-04-23T00:00:00.000Z",
+              recordRef: "check://deploy/pleomino-dev",
+              reportingKind: "ci_pipeline",
+            })),
           },
         }),
       );

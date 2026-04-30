@@ -66,6 +66,48 @@ test("mark-check-passed accepts an explicit mark-check-for-commit override", asy
   });
 });
 
+test("mark-check-passed scopes synthesized check evidence to the selected deployment", async () => {
+  await runInTemp("deployment-admission-cli-scoped-mark-check", async (tmp, $) => {
+    await writeTempListedDeploymentWorkspace(tmp);
+    await $({ cwd: tmp })`git init`;
+    await $({ cwd: tmp })`git config user.name Codex`;
+    await $({ cwd: tmp })`git config user.email codex@example.test`;
+    await $({ cwd: tmp })`git add .`;
+    await $({ cwd: tmp })`git commit -m initial`;
+    const head = String((await $({ cwd: tmp, stdio: "pipe" })`git rev-parse HEAD`).stdout).trim();
+    await $({ cwd: tmp })`git branch env/demo/dev ${head}`;
+    const oldCwd = process.cwd();
+    try {
+      process.chdir(tmp);
+      const deployment = await resolveDeploymentForCli(
+        tmp,
+        (name) => {
+          if (name === "deployment") return "//sandbox/deployments/demo-dev:deploy";
+          throw new Error(`missing required --${name}`);
+        },
+        {
+          deploymentJsonErrorMessage:
+            "--deployment-json is not supported; use --deployment <label>",
+        },
+      );
+      await withSyntheticArgv(["--mark-check-passed=deploy/demo-dev"], async () => {
+        const evidence = await resolveDeploymentAdmissionEvidence({
+          deployment,
+          workspaceRoot: tmp,
+        });
+        assert.equal(evidence?.checks?.[0]?.deploymentId, "demo-dev");
+        assert.equal(evidence?.checks?.[0]?.environmentStage, "dev");
+        assert.equal(
+          evidence?.checks?.[0]?.admissionPolicyRef,
+          "//sandbox/deployments/shared:dev_release",
+        );
+      });
+    } finally {
+      process.chdir(oldCwd);
+    }
+  });
+});
+
 test("admission-evidence-json checks inherit ci_pipeline reporting in CI when kind is omitted", async () => {
   await runInTemp("deployment-admission-cli-ci-reporting-kind", async (tmp) => {
     const oldCwd = process.cwd();

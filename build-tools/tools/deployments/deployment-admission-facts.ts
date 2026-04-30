@@ -9,6 +9,7 @@ import {
 import type {
   DeploymentAdmissionCheckFact,
   DeploymentAdmissionEvidence,
+  DeploymentCheckEvidence,
   DeploymentPolicyBinding,
   DeploymentPrerequisiteFact,
 } from "./deployment-admission-evidence.ts";
@@ -52,16 +53,21 @@ export function requiredCheckFacts(opts: {
     (check) => check.status === "passed",
   );
   const current = currentEvidence
-    .filter((check) => subjects.has(check.subject))
+    .filter((check) => subjects.has(check.subject) && checkScopeMatches(opts.deployment, check))
     .map((check) => ({
       name: check.name,
       subject: check.subject,
       checkedAt: check.checkedAt,
+      ...(check.deploymentId ? { deploymentId: check.deploymentId } : {}),
+      ...(check.environmentStage ? { environmentStage: check.environmentStage } : {}),
+      ...(check.admissionPolicyRef ? { admissionPolicyRef: check.admissionPolicyRef } : {}),
       ...(check.recordRef ? { recordRef: check.recordRef } : {}),
       ...(check.reportingKind ? { reportingKind: check.reportingKind } : {}),
     }));
   const carriedEvidence = sourceAdmissionChecks(opts.sourceRecord);
-  const carried = carriedEvidence.filter((check) => subjects.has(check.subject));
+  const carried = carriedEvidence.filter(
+    (check) => subjects.has(check.subject) && checkScopeMatches(opts.deployment, check),
+  );
   return opts.deployment.admissionPolicy.requiredChecks.map((name) => {
     const hit =
       current.find((check) => check.name === name) || carried.find((check) => check.name === name);
@@ -86,6 +92,17 @@ export function requiredCheckFacts(opts: {
     }
     return hit;
   });
+}
+
+function checkScopeMatches(
+  deployment: { deploymentId: string; environmentStage: string; admissionPolicyRef: string },
+  check: DeploymentCheckEvidence | DeploymentAdmissionCheckFact,
+) {
+  return (
+    check.deploymentId === deployment.deploymentId &&
+    check.environmentStage === deployment.environmentStage &&
+    check.admissionPolicyRef === deployment.admissionPolicyRef
+  );
 }
 
 function mismatchDetail(opts: {

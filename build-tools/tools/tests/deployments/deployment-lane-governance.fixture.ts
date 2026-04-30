@@ -116,9 +116,11 @@ export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
   tmp: string;
   $: any;
   deployment: {
+    deploymentId: string;
     admissionPolicy: {
       requiredChecks: string[];
     };
+    admissionPolicyRef: string;
     environmentStage: string;
     label: string;
     lanePolicy: {
@@ -179,6 +181,9 @@ export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
                 subject: sourceRevision,
                 status: "passed" as const,
                 checkedAt: "2026-04-06T12:00:00.000Z",
+                deploymentId: opts.deployment.deploymentId,
+                environmentStage: opts.deployment.environmentStage,
+                admissionPolicyRef: opts.deployment.admissionPolicyRef,
                 recordRef: `check://${name}`,
               })),
             }

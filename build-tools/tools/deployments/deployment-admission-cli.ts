@@ -68,8 +68,16 @@ function mergeCheckEvidence(
   inferred: DeploymentCheckEvidence[],
 ): DeploymentCheckEvidence[] {
   const merged = new Map<string, DeploymentCheckEvidence>();
-  for (const entry of existing) merged.set(`${entry.name}\u0000${entry.subject}`, entry);
-  for (const entry of inferred) merged.set(`${entry.name}\u0000${entry.subject}`, entry);
+  const key = (entry: DeploymentCheckEvidence) =>
+    [
+      entry.name,
+      entry.subject,
+      entry.deploymentId || "",
+      entry.environmentStage || "",
+      entry.admissionPolicyRef || "",
+    ].join("\u0000");
+  for (const entry of existing) merged.set(key(entry), entry);
+  for (const entry of inferred) merged.set(key(entry), entry);
   return Array.from(merged.values());
 }
 
@@ -132,12 +140,20 @@ export async function resolveDeploymentAdmissionEvidence(
     }
   }
   const checkedAt = new Date().toISOString();
+  const deploymentScope = opts.deployment
+    ? {
+        deploymentId: opts.deployment.deploymentId,
+        environmentStage: opts.deployment.environmentStage,
+        admissionPolicyRef: opts.deployment.admissionPolicyRef,
+      }
+    : {};
   const inferredChecks = markedPassedChecks.map(
     (name): DeploymentCheckEvidence => ({
       name,
       subject,
       status: "passed",
       checkedAt,
+      ...deploymentScope,
       recordRef: `manual-check://${name}`,
       reportingKind,
     }),
