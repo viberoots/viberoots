@@ -41,10 +41,14 @@ test("nixos-shared-host publisher stages immutable releases and atomically activ
       layout: container,
     });
     const publishedRelease = await fsp.realpath(second.releasePath);
-    const current = await fsp.realpath(path.join(containerRoot, "srv/static-app/current"));
-    const live = await fsp.realpath(path.join(containerRoot, "srv/static-app/live"));
+    const currentLink = path.join(containerRoot, "srv/static-app/current");
+    const liveLink = path.join(containerRoot, "srv/static-app/live");
+    const current = await fsp.realpath(currentLink);
+    const live = await fsp.realpath(liveLink);
     assert.equal(current, publishedRelease);
     assert.equal(live, publishedRelease);
+    assert.match(await fsp.readlink(currentLink), /^releases\//);
+    assert.equal(await fsp.readlink(liveLink), "current");
     assert.notEqual(first.artifactIdentity, second.artifactIdentity);
     assert.match(await fsp.readFile(path.join(live, "index.html"), "utf8"), /v2/);
   });

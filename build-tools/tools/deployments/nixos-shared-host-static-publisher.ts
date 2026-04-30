@@ -35,7 +35,7 @@ async function ensureMaterializedTarget(containerRoot: string, layout: PublishRo
 async function activateRelease(currentLink: string, releasePath: string): Promise<void> {
   const nextLink = `${currentLink}.next`;
   await fsp.rm(nextLink, { recursive: true, force: true });
-  await fsp.symlink(releasePath, nextLink);
+  await fsp.symlink(path.relative(path.dirname(currentLink), releasePath), nextLink);
   await fsp.rename(nextLink, currentLink);
 }
 

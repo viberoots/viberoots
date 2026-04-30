@@ -54,6 +54,15 @@ let
 
   containerRuntimeFor = runtimeSupport.containerRuntimeFor;
 
+  appBaseDomainFor = hostname:
+    lib.concatStringsSep "." (lib.tail (lib.splitString "." hostname));
+
+  runtimeMountRootFor = entry:
+    if entry.runtime.runtime == "ssr-webapp-host" then "/srv/ssr-app" else "/srv/static-app";
+
+  hostRuntimeRootFor = entry:
+    "${cfg.runtimeRoot}/containers/${entry.containerName}${runtimeMountRootFor entry}";
+
   renderedEntries = map
     (deployment:
       let
@@ -136,6 +145,8 @@ let
       (entry:
         lib.nameValuePair entry.hostname {
           serverName = entry.hostname;
+          onlySSL = true;
+          useACMEHost = appBaseDomainFor entry.hostname;
           locations."/" = {
             proxyPass = entry.addr.backendAddress;
             proxyWebsockets = true;
@@ -151,9 +162,21 @@ let
           privateNetwork = true;
           hostAddress = entry.addr.hostAddress;
           localAddress = entry.addr.localAddress;
+          bindMounts = {
+            "${runtimeMountRootFor entry}" = {
+              hostPath = hostRuntimeRootFor entry;
+              isReadOnly = false;
+            };
+          };
           config = { ... }: runtimeSupport.containerConfigFor entry;
         })
       renderedEntries);
+
+  runtimeTmpfiles = lib.concatMap
+    (entry: [
+      "d ${hostRuntimeRootFor entry} 0775 deployment-host deployment-host -"
+    ])
+    renderedEntries;
 in
 {
   options.nixosSharedHost = {
@@ -161,6 +184,10 @@ in
     statePath = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
       default = null;
+    };
+    runtimeRoot = lib.mkOption {
+      type = lib.types.str;
+      default = "/var/lib/deployment-host/runtime";
     };
     rendered = lib.mkOption {
       type = lib.types.attrs;
@@ -177,6 +204,7 @@ in
     ];
 
     nixosSharedHost.rendered = rendered;
+    systemd.tmpfiles.rules = runtimeTmpfiles;
     containers = lib.mkIf _conflictCheck containers;
     services.nginx.enable = true;
     services.nginx.virtualHosts = lib.mkIf _conflictCheck nginxVirtualHosts;
