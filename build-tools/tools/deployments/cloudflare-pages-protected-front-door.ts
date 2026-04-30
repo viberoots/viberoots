@@ -15,6 +15,7 @@ import {
 import { resolveServiceClientFromCliProfileOrFlags } from "./deployment-service-client-profile.ts";
 import { uploadCloudflarePagesClientArtifact } from "./cloudflare-pages-artifact-upload-client.ts";
 import { serviceSubmissionAdmissionEvidence } from "./deployment-service-client-contract.ts";
+import { terminalControlPlaneRejectionMessage } from "./deployment-provider-protected-front-door.ts";
 
 const SERVICE_ONLY_LOCAL_FLAGS = ["records-root", "control-plane-database-url"] as const;
 
@@ -52,6 +53,8 @@ async function finalizeServiceResponse(
   controlPlaneToken: string | undefined,
   status: DeploymentControlPlaneStatus,
 ) {
+  const rejectionMessage = terminalControlPlaneRejectionMessage(status);
+  if (rejectionMessage) throw Object.assign(new Error(rejectionMessage), { status });
   if (!status.deployRunId) return status;
   const record = await readFinalizedRecord({
     controlPlaneUrl,

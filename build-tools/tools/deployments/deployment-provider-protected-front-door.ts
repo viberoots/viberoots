@@ -15,6 +15,13 @@ export function rejectServiceOnlyLocalFlags(hasFlag: (flag: string) => boolean, 
   );
 }
 
+export function terminalControlPlaneRejectionMessage(status: DeploymentControlPlaneStatus) {
+  const reason = status.rejectionCode || status.terminationReason;
+  if (!reason) return undefined;
+  const deployment = status.deploymentId ? ` for ${status.deploymentId}` : "";
+  return `shared control-plane mutation rejected${deployment}: ${reason}`;
+}
+
 async function readFinalizedRecord(opts: {
   controlPlaneUrl: string;
   controlPlaneToken?: string;
@@ -59,6 +66,8 @@ async function requireSucceededRecord(opts: {
   controlPlaneToken?: string;
   status: DeploymentControlPlaneStatus;
 }) {
+  const rejectionMessage = terminalControlPlaneRejectionMessage(opts.status);
+  if (rejectionMessage) throw Object.assign(new Error(rejectionMessage), { status: opts.status });
   const record = await readFinalizedRecord({
     controlPlaneUrl: opts.controlPlaneUrl,
     ...(opts.controlPlaneToken ? { controlPlaneToken: opts.controlPlaneToken } : {}),

@@ -24,6 +24,7 @@ import {
   type DeploymentExpectedArtifactIdentities,
 } from "./deployment-artifact-binding.ts";
 import { deploymentServicePrincipalForToken } from "./deployment-artifact-challenges.ts";
+import { terminalControlPlaneRejectionMessage } from "./deployment-provider-protected-front-door.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -106,6 +107,8 @@ async function finalizeServiceResponse(
   controlPlaneToken: string | undefined,
   status: DeploymentControlPlaneStatus,
 ) {
+  const rejectionMessage = terminalControlPlaneRejectionMessage(status);
+  if (rejectionMessage) throw Object.assign(new Error(rejectionMessage), { status });
   if (!status.deployRunId) return { kind: "status" as const, status };
   const record = await readFinalizedRecord({
     controlPlaneUrl,

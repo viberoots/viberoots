@@ -14,6 +14,7 @@ import {
   writeCloudflareServiceArtifact,
   writeWranglerConfig,
 } from "./cloudflare-pages.service-flow.helpers.ts";
+import { terminalControlPlaneRejectionMessage } from "../../deployments/deployment-provider-protected-front-door.ts";
 
 test("public cloudflare-pages deploy requires a control-plane URL for protected/shared targets", async () => {
   await runInTemp("cloudflare-pages-public-service-required", async (tmp, $) => {
@@ -76,4 +77,28 @@ test("public cloudflare-pages deploy rejects mixed service and local records fla
       await harness.close();
     }
   });
+});
+
+test("service terminal admission rejection is reported without deploy-record lookup", () => {
+  const message = terminalControlPlaneRejectionMessage({
+    schemaVersion: "deployment-control-plane-status@1",
+    submissionId: "cp-test",
+    submittedAt: "2026-04-30T00:00:00.000Z",
+    completedAt: "2026-04-30T00:00:01.000Z",
+    deploymentId: "pleomino-staging",
+    deploymentLabel: "//projects/deployments/pleomino-staging:deploy",
+    operationKind: "deploy",
+    providerTargetIdentity: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    lockScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    lifecycleState: "finished",
+    terminationReason: "no_longer_admitted",
+    rejectionCode: "no_longer_admitted",
+    deployRunId: "deploy-test",
+    dedupe: { mode: "created", requestFingerprint: "sha256:test" },
+  });
+
+  assert.equal(
+    message,
+    "shared control-plane mutation rejected for pleomino-staging: no_longer_admitted",
+  );
 });
