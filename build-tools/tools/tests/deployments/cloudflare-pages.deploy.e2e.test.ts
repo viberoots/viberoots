@@ -92,6 +92,8 @@ test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", 
       assert.equal(wranglerLog.projectName, "pleomino-staging-pages");
       assert.equal(wranglerLog.accountId, "web-platform-staging");
       assert.equal(wranglerLog.config.name, "pleomino-staging-pages");
+      assert.equal(wranglerLog.args.includes("--config"), false);
+      assert.equal(path.basename(wranglerLog.configPath), "wrangler.json");
     } finally {
       await server.close();
     }

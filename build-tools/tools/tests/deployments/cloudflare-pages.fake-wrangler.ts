@@ -11,6 +11,14 @@ function flagValue(name) {
   return index >= 0 ? String(process.argv[index + 1] || "") : "";
 }
 
+function defaultConfigPath() {
+  for (const name of ["wrangler.json", "wrangler.jsonc"]) {
+    const candidate = path.resolve(process.cwd(), name);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return "";
+}
+
 const args = process.argv.slice(2);
 if (args[0] !== "pages" || args[1] !== "deploy") {
   console.error("unsupported fake wrangler command");
@@ -19,11 +27,16 @@ if (args[0] !== "pages" || args[1] !== "deploy") {
 const artifactDir = path.resolve(args[2] || "");
 const projectName = flagValue("--project-name");
 const branch = flagValue("--branch");
-const configPath = path.resolve(flagValue("--config"));
+const explicitConfigPath = flagValue("--config");
+const configPath = explicitConfigPath ? path.resolve(explicitConfigPath) : defaultConfigPath();
 const publishRoot = process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT || "";
 const logPath = process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_LOG || "";
 const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || "";
 const delayMs = Number(process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_DELAY_MS || "0");
+if (!configPath) {
+  console.error("missing wrangler config");
+  process.exit(5);
+}
 const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
 if (String(config.name || "") !== projectName) {
   console.error("wrangler config name mismatch");
@@ -54,6 +67,7 @@ if (logPath) {
       artifactDir,
       projectName,
       branch,
+      cwd: process.cwd(),
       configPath,
       accountId,
       config,

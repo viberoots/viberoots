@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
-import { packagePathFromLabel } from "../lib/labels.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
 import { scrubDeploymentSecretEnv } from "./deployment-secret-env.ts";
 
@@ -11,10 +12,6 @@ type CloudflarePagesPublishResult = {
 
 function wranglerBin(): string {
   return process.env.BNX_CLOUDFLARE_PAGES_WRANGLER_BIN?.trim() || "wrangler";
-}
-
-function packageDirFor(workspaceRoot: string, deployment: CloudflarePagesDeployment): string {
-  return path.join(path.resolve(workspaceRoot), packagePathFromLabel(deployment.label));
 }
 
 function maybeProviderReleaseId(output: string): string | undefined {
@@ -52,7 +49,20 @@ function maybePublicUrl(output: string): string | undefined {
 }
 
 function commandError(stdout: string, stderr: string): string {
-  return [stderr.trim(), stdout.trim()].filter(Boolean)[0] || "wrangler pages deploy failed";
+  const output = [stderr.trim(), stdout.trim()].filter(Boolean)[0] || "";
+  const clean = output
+    .replace(/\u001b\[[0-9;]*m/g, "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .find((line) => !/^Logs were written to /.test(line));
+  return clean ? `wrangler pages deploy failed: ${clean}` : "wrangler pages deploy failed";
+}
+
+async function withDefaultWranglerConfig(renderedConfigPath: string): Promise<string> {
+  const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), "bnx-cloudflare-pages-wrangler-"));
+  await fsp.copyFile(path.resolve(renderedConfigPath), path.join(workDir, "wrangler.json"));
+  return workDir;
 }
 
 export async function publishCloudflarePagesStaticWebapp(opts: {
@@ -65,25 +75,30 @@ export async function publishCloudflarePagesStaticWebapp(opts: {
   timeoutMs?: number;
 }): Promise<CloudflarePagesPublishResult> {
   const effectiveRunTarget = opts.effectiveRunTarget || opts.deployment.providerTarget;
-  const command = $({
-    cwd: packageDirFor(opts.workspaceRoot, opts.deployment),
-    stdio: "pipe",
-    env: {
-      ...scrubDeploymentSecretEnv(),
-      CLOUDFLARE_ACCOUNT_ID: opts.deployment.providerTarget.account,
-      ...(opts.apiToken ? { CLOUDFLARE_API_TOKEN: opts.apiToken } : {}),
-    },
-  })`${wranglerBin()} pages deploy ${path.resolve(opts.artifactDir)} --project-name ${opts.deployment.providerTarget.project} ${effectiveRunTarget.previewBranch ? ["--branch", effectiveRunTarget.previewBranch] : []} --config ${path.resolve(opts.renderedConfigPath)}`;
-  const result = await (opts.timeoutMs ? command.timeout(opts.timeoutMs) : command).nothrow();
-  const stdout = String((result as any).stdout || "");
-  const stderr = String((result as any).stderr || "");
-  if ((result as any).exitCode !== 0) {
-    throw new Error(commandError(stdout, stderr));
+  const wranglerWorkDir = await withDefaultWranglerConfig(opts.renderedConfigPath);
+  try {
+    const command = $({
+      cwd: wranglerWorkDir,
+      stdio: "pipe",
+      env: {
+        ...scrubDeploymentSecretEnv(),
+        CLOUDFLARE_ACCOUNT_ID: opts.deployment.providerTarget.account,
+        ...(opts.apiToken ? { CLOUDFLARE_API_TOKEN: opts.apiToken } : {}),
+      },
+    })`${wranglerBin()} pages deploy ${path.resolve(opts.artifactDir)} --project-name ${opts.deployment.providerTarget.project} ${effectiveRunTarget.previewBranch ? ["--branch", effectiveRunTarget.previewBranch] : []}`;
+    const result = await (opts.timeoutMs ? command.timeout(opts.timeoutMs) : command).nothrow();
+    const stdout = String((result as any).stdout || "");
+    const stderr = String((result as any).stderr || "");
+    if ((result as any).exitCode !== 0) {
+      throw new Error(commandError(stdout, stderr));
+    }
+    const providerReleaseId = maybeProviderReleaseId(`${stdout}\n${stderr}`);
+    const publicUrl = maybePublicUrl(`${stdout}\n${stderr}`) || effectiveRunTarget.canonicalUrl;
+    return {
+      publicUrl,
+      ...(providerReleaseId ? { providerReleaseId } : {}),
+    };
+  } finally {
+    await fsp.rm(wranglerWorkDir, { recursive: true, force: true });
   }
-  const providerReleaseId = maybeProviderReleaseId(`${stdout}\n${stderr}`);
-  const publicUrl = maybePublicUrl(`${stdout}\n${stderr}`) || effectiveRunTarget.canonicalUrl;
-  return {
-    publicUrl,
-    ...(providerReleaseId ? { providerReleaseId } : {}),
-  };
 }
