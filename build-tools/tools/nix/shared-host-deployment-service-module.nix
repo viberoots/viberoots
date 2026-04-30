@@ -10,7 +10,7 @@ let
   reviewedSourceKnownHostsFile =
     if reviewedSourceSsh.knownHostsFile == null then githubKnownHostsPath else reviewedSourceSsh.knownHostsFile;
   cloudflarePagesWrangler = pkgs.writeShellScript "bnx-cloudflare-pages-wrangler" ''
-    export PATH="${lib.makeBinPath [ pkgs.nodejs_22 ]}:$PATH"
+    export PATH="${lib.makeBinPath [ pkgs.coreutils pkgs.gnused pkgs.nodejs_22 ]}:$PATH"
     exec /srv/common/node_modules/.bin/wrangler "$@"
   '';
   githubKnownHosts = ''

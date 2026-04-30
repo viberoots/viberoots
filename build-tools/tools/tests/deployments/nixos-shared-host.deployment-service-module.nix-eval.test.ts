@@ -78,6 +78,8 @@ test("shared-host deployment service module points the worker at repo-managed Wr
       let
         lib = import <nixpkgs/lib>;
         pkgs = {
+          coreutils = "/nix/store/test-coreutils";
+          gnused = "/nix/store/test-gnused";
           nodejs_22 = "/nix/store/test-nodejs-22";
           writeShellScript = name: text: "/nix/store/test-\${name}";
         };
@@ -117,6 +119,8 @@ test("shared-host deployment service module rejects wildcard backend binds", asy
       let
         lib = import <nixpkgs/lib>;
         pkgs = {
+          coreutils = "/nix/store/test-coreutils";
+          gnused = "/nix/store/test-gnused";
           nodejs_22 = "/nix/store/test-nodejs-22";
           writeShellScript = name: text: "/nix/store/test-\${name}";
         };
