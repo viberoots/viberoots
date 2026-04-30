@@ -65,6 +65,28 @@ async function withDefaultWranglerConfig(renderedConfigPath: string): Promise<st
   return workDir;
 }
 
+async function withPagesWranglerConfig(
+  renderedConfigPath: string,
+  artifactDir: string,
+): Promise<string> {
+  const workDir = await withDefaultWranglerConfig(renderedConfigPath);
+  const configPath = path.join(workDir, "wrangler.json");
+  const rendered = JSON.parse(await fsp.readFile(configPath, "utf8")) as Record<string, unknown>;
+  await fsp.writeFile(
+    configPath,
+    JSON.stringify(
+      {
+        ...rendered,
+        pages_build_output_dir: path.resolve(artifactDir),
+      },
+      null,
+      2,
+    ) + "\n",
+    "utf8",
+  );
+  return workDir;
+}
+
 export async function publishCloudflarePagesStaticWebapp(opts: {
   workspaceRoot: string;
   deployment: CloudflarePagesDeployment;
@@ -75,14 +97,13 @@ export async function publishCloudflarePagesStaticWebapp(opts: {
   timeoutMs?: number;
 }): Promise<CloudflarePagesPublishResult> {
   const effectiveRunTarget = opts.effectiveRunTarget || opts.deployment.providerTarget;
-  const wranglerWorkDir = await withDefaultWranglerConfig(opts.renderedConfigPath);
+  const wranglerWorkDir = await withPagesWranglerConfig(opts.renderedConfigPath, opts.artifactDir);
   try {
     const command = $({
       cwd: wranglerWorkDir,
       stdio: "pipe",
       env: {
         ...scrubDeploymentSecretEnv(),
-        CLOUDFLARE_ACCOUNT_ID: opts.deployment.providerTarget.account,
         ...(opts.apiToken ? { CLOUDFLARE_API_TOKEN: opts.apiToken } : {}),
       },
     })`${wranglerBin()} pages deploy ${path.resolve(opts.artifactDir)} --project-name ${opts.deployment.providerTarget.project} ${effectiveRunTarget.previewBranch ? ["--branch", effectiveRunTarget.previewBranch] : []}`;

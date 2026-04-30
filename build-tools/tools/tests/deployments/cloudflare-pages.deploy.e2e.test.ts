@@ -90,8 +90,9 @@ test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", 
         (await fsp.readFile(fake.logPath, "utf8")).trim().split(/\r?\n/).at(-1) || "{}",
       );
       assert.equal(wranglerLog.projectName, "pleomino-staging-pages");
-      assert.equal(wranglerLog.accountId, "web-platform-staging");
+      assert.equal(wranglerLog.accountId, "");
       assert.equal(wranglerLog.config.name, "pleomino-staging-pages");
+      assert.equal(wranglerLog.config.pages_build_output_dir, wranglerLog.artifactDir);
       assert.equal(wranglerLog.args.includes("--config"), false);
       assert.equal(path.basename(wranglerLog.configPath), "wrangler.json");
     } finally {
