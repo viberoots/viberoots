@@ -10,9 +10,9 @@ deployment_lane_governance(
     scm_backend = "github",
     repository = "kiltyj/common",
     branch_protections = [
-        {"stage": "dev", "branch": "env/pleomino/dev", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "user:kiltyj", "emergency_direct_push_principals": "user:kiltyj"},
-        {"stage": "staging", "branch": "env/pleomino/staging", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "user:kiltyj", "emergency_direct_push_principals": "user:kiltyj"},
-        {"stage": "prod", "branch": "env/pleomino/prod", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "user:kiltyj", "emergency_direct_push_principals": "user:kiltyj"},
+        {"stage": "dev", "branch": "env/pleomino/dev", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "repository-role:admin", "emergency_direct_push_principals": "repository-role:admin"},
+        {"stage": "staging", "branch": "env/pleomino/staging", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "repository-role:admin", "emergency_direct_push_principals": "repository-role:admin"},
+        {"stage": "prod", "branch": "env/pleomino/prod", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "repository-role:admin", "emergency_direct_push_principals": "repository-role:admin"},
     ],
     visibility = ["PUBLIC"],
 )

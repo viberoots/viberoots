@@ -1,5 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentLaneGovernanceSnapshot } from "./deployment-admission-governance.ts";
+import {
+  githubRulesetGovernanceFor,
+  type GithubRulesetNode,
+} from "./deployment-lane-governance-github-rulesets.ts";
 import type { DeploymentLanePolicy } from "./deployment-policy.ts";
 
 const GITHUB_GRAPHQL_URL = "https://api.github.com/graphql";
@@ -26,6 +30,9 @@ type GithubResponse = {
     repository?: {
       branchProtectionRules?: {
         nodes?: GithubRuleNode[];
+      };
+      rulesets?: {
+        nodes?: GithubRulesetNode[];
       };
     };
   };
@@ -57,11 +64,11 @@ function matchingRule(rules: GithubRuleNode[], branch: string): GithubRuleNode |
   );
 }
 
-async function queryGithubRules(opts: {
+async function queryGithubGovernance(opts: {
   repository: string;
   branch: string;
   env?: NodeJS.ProcessEnv;
-}): Promise<GithubRuleNode[]> {
+}): Promise<{ branchProtectionRules: GithubRuleNode[]; rulesets: GithubRulesetNode[] }> {
   const env = opts.env || process.env;
   const token = String(env[GITHUB_TOKEN_ENV] || "").trim() || String(env.GITHUB_TOKEN || "").trim();
   if (!token) {
@@ -92,6 +99,36 @@ async function queryGithubRules(opts: {
                 bypassForcePushAllowances(first: 50) { nodes { actor { __typename ... on App { slug } ... on Team { slug } ... on User { login } } } }
               }
             }
+            rulesets(first: 100) {
+              nodes {
+                name
+                target
+                enforcement
+                conditions { refName { include exclude } }
+                bypassActors(first: 50) {
+                  nodes {
+                    bypassMode
+                    deployKey
+                    enterpriseOwner
+                    enterpriseRole
+                    organizationAdmin
+                    repositoryRoleName
+                    actor { __typename ... on App { slug } ... on Team { slug } ... on User { login } }
+                  }
+                }
+                rules(first: 100) {
+                  nodes {
+                    type
+                    parameters {
+                      __typename
+                      ... on RequiredStatusChecksParameters {
+                        requiredStatusChecks { context }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       `,
@@ -104,7 +141,10 @@ async function queryGithubRules(opts: {
       `GitHub governance lookup failed for ${opts.repository}: ${payload.errors?.[0]?.message || response.statusText}`,
     );
   }
-  return payload.data?.repository?.branchProtectionRules?.nodes || [];
+  return {
+    branchProtectionRules: payload.data?.repository?.branchProtectionRules?.nodes || [],
+    rulesets: payload.data?.repository?.rulesets?.nodes || [],
+  };
 }
 
 export async function fetchGithubLaneGovernanceSnapshot(opts: {
@@ -116,7 +156,7 @@ export async function fetchGithubLaneGovernanceSnapshot(opts: {
     await Promise.all(
       governance.branchProtections.map(async (declared) => [
         declared.branch,
-        await queryGithubRules({
+        await queryGithubGovernance({
           repository: governance.repository,
           branch: declared.branch,
           env: opts.env,
@@ -128,23 +168,34 @@ export async function fetchGithubLaneGovernanceSnapshot(opts: {
     scmBackend: "github",
     repository: governance.repository,
     branchProtections: governance.branchProtections.map((declared) => {
-      const rule = matchingRule(rulesByBranch.get(declared.branch) || [], declared.branch);
-      if (!rule) throw new Error(`missing required protected branch for ${declared.stage}`);
-      if (!rule.requiresLinearHistory || rule.allowsForcePushes) {
+      const rules = rulesByBranch.get(declared.branch);
+      const rule = matchingRule(rules?.branchProtectionRules || [], declared.branch);
+      const rulesetGovernance = githubRulesetGovernanceFor(rules?.rulesets || [], declared.branch);
+      if (!rule && !rulesetGovernance) {
+        throw new Error(`missing required protected branch for ${declared.stage}`);
+      }
+      const fastForwardOnly = rule
+        ? rule.requiresLinearHistory && !rule.allowsForcePushes
+        : rulesetGovernance?.fastForwardOnly === true;
+      if (!fastForwardOnly) {
         throw new Error(`missing fast-forward-only enforcement for ${declared.stage}`);
       }
       return {
         stage: declared.stage,
         branch: declared.branch,
-        requiredChecks: sortedUnique(rule.requiredStatusCheckContexts),
+        requiredChecks: rule
+          ? sortedUnique(rule.requiredStatusCheckContexts)
+          : rulesetGovernance?.requiredChecks || [],
         fastForwardOnly: true,
-        normalAdvancePrincipals: sortedUnique([
-          ...rule.pushAllowances.nodes.map((entry) => actorId(entry.actor)),
-          ...rule.bypassPullRequestAllowances.nodes.map((entry) => actorId(entry.actor)),
-        ]),
-        emergencyDirectPushPrincipals: sortedUnique(
-          rule.bypassForcePushAllowances.nodes.map((entry) => actorId(entry.actor)),
-        ),
+        normalAdvancePrincipals: rule
+          ? sortedUnique([
+              ...rule.pushAllowances.nodes.map((entry) => actorId(entry.actor)),
+              ...rule.bypassPullRequestAllowances.nodes.map((entry) => actorId(entry.actor)),
+            ])
+          : rulesetGovernance?.normalAdvancePrincipals || [],
+        emergencyDirectPushPrincipals: rule
+          ? sortedUnique(rule.bypassForcePushAllowances.nodes.map((entry) => actorId(entry.actor)))
+          : rulesetGovernance?.emergencyDirectPushPrincipals || [],
       };
     }),
   };
