@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, ... }:
 let
   cfg = config.deploymentHost.deploymentService;
   hostname = if cfg.hostname == null then "_disabled.invalid" else cfg.hostname;
@@ -135,9 +135,9 @@ in
       allowedTCPPorts = [ 80 443 ];
     };
 
-    systemd.services.deployment-host-control-plane-worker.path = lib.mkAfter [
-      pkgs.wrangler
-    ];
+    systemd.services.deployment-host-control-plane-worker.environment = {
+      BNX_CLOUDFLARE_PAGES_WRANGLER_BIN = "/srv/common/node_modules/.bin/wrangler";
+    };
 
     environment.etc = lib.mkMerge [
       (lib.mkIf (reviewedSourceSshEnvironmentEnabled && reviewedSourceSsh.knownHostsFile == null) {

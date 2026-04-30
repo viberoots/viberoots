@@ -72,14 +72,13 @@ test("shared-host deployment service module routes hosted HTTPS to a private ser
   });
 });
 
-test("shared-host deployment service module adds Wrangler to the worker runtime path", async () => {
+test("shared-host deployment service module points the worker at repo-managed Wrangler", async () => {
   await runInTemp("shared-host-deployment-service-module-wrangler", async (tmp, $) => {
     const expr = `
       let
         lib = import <nixpkgs/lib>;
         module = import ./build-tools/tools/nix/shared-host-deployment-service-module.nix {
           inherit lib;
-          pkgs = { wrangler = "/nix/store/test-wrangler"; };
           config = {
             deploymentHost.deploymentService = {
               enable = true;
@@ -98,18 +97,12 @@ test("shared-host deployment service module adds Wrangler to the worker runtime 
             };
           };
         };
-      in module.config.content.systemd.services.deployment-host-control-plane-worker.path
+      in module.config.content.systemd.services.deployment-host-control-plane-worker.environment
     `;
     const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;
-    const out = JSON.parse(String(stdout || "{}")) as {
-      _type: string;
-      content: string[];
-      priority: number;
-    };
+    const out = JSON.parse(String(stdout || "{}")) as Record<string, string>;
     assert.deepEqual(out, {
-      _type: "order",
-      content: ["/nix/store/test-wrangler"],
-      priority: 1500,
+      BNX_CLOUDFLARE_PAGES_WRANGLER_BIN: "/srv/common/node_modules/.bin/wrangler",
     });
   });
 });
@@ -121,7 +114,6 @@ test("shared-host deployment service module rejects wildcard backend binds", asy
         lib = import <nixpkgs/lib>;
         module = import ./build-tools/tools/nix/shared-host-deployment-service-module.nix {
           inherit lib;
-          pkgs = { wrangler = "/nix/store/test-wrangler"; };
           config = {
             deploymentHost.deploymentService = {
               enable = true;
