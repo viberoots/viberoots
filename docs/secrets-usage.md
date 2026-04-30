@@ -576,6 +576,23 @@ The default session policy is memory-only. There is no persistent token cache,
 no `deploy auth status`, and no `deploy auth logout` until a reviewed OS
 credential-store cache is introduced.
 
+## Vault Role Reconciliation
+
+Use the reviewed admin Vault commands when live Vault auth roles drift from the
+project deployment metadata:
+
+```bash
+deploy admin vault plan --deployment //projects/deployments/pleomino-staging:deploy
+deploy admin vault check --deployment //projects/deployments/pleomino-staging:deploy
+deploy admin vault sync --deployment //projects/deployments/pleomino-staging:deploy
+```
+
+`plan` is local and read-only. `check` reads live Vault state and exits
+non-zero when the JWT config, read policy, or JWT role differs from the
+deployment contract. `sync` applies the derived Vault JWT config, read policy,
+and role idempotently. The command reads a Vault admin token from `VAULT_TOKEN`
+by default, or from `--vault-admin-token-env` / `--vault-admin-token-file`.
+
 ## When To Open Which Doc
 
 Open [Deployment And Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)

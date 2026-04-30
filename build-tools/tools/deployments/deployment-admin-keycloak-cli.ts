@@ -8,6 +8,7 @@ import {
   printDeploymentAdminKeycloakResult,
   syncDeploymentAdminKeycloakRealm,
 } from "./deployment-admin-keycloak.ts";
+import { handleDeploymentAdminVaultCli } from "./deployment-admin-vault-cli.ts";
 import {
   hasDeploymentAdminKeycloakRemoteProfileFlags,
   runDeploymentAdminKeycloakRemoteProfile,
@@ -30,12 +31,17 @@ function requireAction(): DeploymentAuthAction {
 
 function commandName(): string {
   const [, scope = "", command = ""] = getPositionals();
-  if (!["identity", "keycloak"].includes(scope)) {
+  if (!["identity", "keycloak", "vault"].includes(scope)) {
     throw new Error(
-      'deploy admin currently supports the "identity" namespace (the deprecated "keycloak" alias still works)',
+      'deploy admin currently supports the "identity" and "vault" namespaces (the deprecated "keycloak" alias still works)',
     );
   }
   return command;
+}
+
+function adminScope(): string {
+  const [, scope = ""] = getPositionals();
+  return scope;
 }
 
 function automationPrincipalIds(): string[] {
@@ -54,6 +60,9 @@ export async function maybeHandleDeploymentAdminCli(workspaceRoot: string): Prom
       "public repo-level deploy admin requires --deployment <label>; --deployment-json is not an operator source of truth",
   });
   const command = commandName();
+  if (adminScope() === "vault") {
+    return await handleDeploymentAdminVaultCli({ command, deployment });
+  }
   if (command === "plan") {
     if (hasDeploymentAdminKeycloakRemoteProfileFlags()) {
       throw new Error(

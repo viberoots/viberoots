@@ -189,3 +189,22 @@ test("executable Vault bootstrap output can use deployment vault_runtime metadat
   assert.equal(payload.vault.roleName, "deploy-pleomino-read");
   assert.doesNotThrow(() => assertVaultBootstrapExecutableDocument(payload));
 });
+
+test("Vault bootstrap bound claims use vault_runtime deployment environment when present", () => {
+  const payload = buildVaultBootstrapDocument({
+    deployment: cloudflarePagesDeploymentFixture({
+      secretRequirements: deploymentWithSecrets().secretRequirements,
+      vaultRuntime: {
+        addr: "https://vault.example.net:8200",
+        oidcIssuer: "https://identity.example.net/realms/deployments",
+        audience: "deployments-vault",
+        deploymentClientId: "deployment-runner",
+        serviceAccountClientId: "deployment-runner",
+        deploymentEnvironment: "mini",
+        roleName: "deploy-pleomino-read",
+      },
+    }),
+  });
+  assert.equal(payload.vault.boundClaims.deployment_environment, "mini");
+  assert.equal(payload.vault.boundClaims.azp, "deployment-runner");
+});

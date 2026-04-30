@@ -1,14 +1,20 @@
 #!/usr/bin/env zx-wrapper
 import { sanitizeName } from "../lib/sanitize.ts";
 import { providerTargetIdentityFor, type DeploymentTarget } from "./contract.ts";
-import type { DeploymentRequirement } from "./deployment-requirements.ts";
-import { requireVaultContractPath } from "./deployment-secret-vault-paths.ts";
+import {
+  buildVaultSecretTemplatesDocument,
+  type TargetScope,
+} from "./deployment-vault-secret-templates.ts";
+export {
+  buildVaultSecretTemplatesDocument,
+  DEPLOYMENT_VAULT_SECRET_TEMPLATES_SCHEMA,
+  renderVaultSecretTemplatesDocument,
+} from "./deployment-vault-secret-templates.ts";
+export type { VaultSecretTemplateFormat } from "./deployment-vault-secret-templates.ts";
 
 export const DEPLOYMENT_VAULT_BOOTSTRAP_SCHEMA = "deployment-vault-bootstrap@1";
-export const DEPLOYMENT_VAULT_SECRET_TEMPLATES_SCHEMA = "deployment-vault-secret-templates@1";
 
 export type VaultBootstrapFormat = "json" | "shell" | "hcl" | "markdown";
-export type VaultSecretTemplateFormat = "json" | "files";
 
 export type VaultBootstrapInputs = {
   issuerUrl?: string | undefined;
@@ -18,8 +24,6 @@ export type VaultBootstrapInputs = {
   policyName?: string | undefined;
   extraBoundClaims?: Record<string, string> | undefined;
 };
-
-type TargetScope = { value: string; source: "provider-target-identity" | "deploy-run-lock-scope" };
 
 function defaultPolicyName(deployment: DeploymentTarget): string {
   const stageSuffix = deployment.environmentStage ? `-${deployment.environmentStage}` : "";
@@ -46,26 +50,6 @@ function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\"'\"'")}'`;
 }
 
-function secretTemplate(requirement: DeploymentRequirement, targetScope: string) {
-  const vaultPath = requireVaultContractPath(requirement.contractId);
-  return {
-    name: requirement.name,
-    contractId: requirement.contractId,
-    mount: vaultPath.mount,
-    secretPath: vaultPath.secretPath,
-    kvDataPath: vaultPath.dataPath,
-    kvMetadataPath: vaultPath.metadataPath,
-    fileName: `${sanitizeName(requirement.name || vaultPath.secretPath)}.json`,
-    content: {
-      value: "<fill-me>",
-      allowedSteps: [requirement.step],
-      targetScopes: [targetScope],
-      refreshMode: "none",
-      credentialClass: "routine",
-    },
-  };
-}
-
 function baseDocument(deployment: DeploymentTarget, targetScope: TargetScope) {
   return {
     deployment: {
@@ -80,26 +64,6 @@ function baseDocument(deployment: DeploymentTarget, targetScope: TargetScope) {
   };
 }
 
-export function buildVaultSecretTemplatesDocument(opts: {
-  deployment: DeploymentTarget;
-  targetScope?: TargetScope;
-}) {
-  const targetScope = opts.targetScope || {
-    value: providerTargetIdentityFor(opts.deployment),
-    source: "provider-target-identity" as const,
-  };
-  const templates = opts.deployment.secretRequirements.map((requirement) =>
-    secretTemplate(requirement, targetScope.value),
-  );
-  return {
-    schemaVersion: DEPLOYMENT_VAULT_SECRET_TEMPLATES_SCHEMA,
-    ...baseDocument(opts.deployment, targetScope),
-    empty: templates.length === 0,
-    message: templates.length === 0 ? "deployment declares no secret requirements" : undefined,
-    templates,
-  };
-}
-
 function bootstrapInputs(opts: { deployment: DeploymentTarget; inputs: VaultBootstrapInputs }) {
   const metadata = opts.deployment.vaultRuntime;
   const policyName =
@@ -107,10 +71,17 @@ function bootstrapInputs(opts: { deployment: DeploymentTarget; inputs: VaultBoot
     metadata?.roleName?.trim() ||
     defaultPolicyName(opts.deployment);
   const roleName = opts.inputs.roleName?.trim() || metadata?.roleName?.trim() || policyName;
-  const clientId = opts.inputs.deploymentClientId?.trim() || metadata?.deploymentClientId?.trim();
+  const clientId =
+    opts.inputs.deploymentClientId?.trim() ||
+    metadata?.serviceAccountClientId?.trim() ||
+    metadata?.deploymentClientId?.trim();
+  const deploymentEnvironment =
+    opts.inputs.extraBoundClaims?.deployment_environment ||
+    metadata?.deploymentEnvironment?.trim() ||
+    opts.deployment.environmentStage;
   const claims = sortedObject({
     ...(clientId ? { azp: clientId } : {}),
-    deployment_environment: opts.deployment.environmentStage,
+    deployment_environment: deploymentEnvironment,
     repository: requireRepository(opts.deployment),
     ...(opts.inputs.extraBoundClaims || {}),
   });
@@ -236,15 +207,4 @@ export function renderVaultBootstrapDocument(
     role,
     "```",
   ].join("\n");
-}
-
-export function renderVaultSecretTemplatesDocument(
-  document: ReturnType<typeof buildVaultSecretTemplatesDocument>,
-  format: VaultSecretTemplateFormat,
-): string {
-  if (format === "json") return JSON.stringify(document, null, 2);
-  if (document.templates.length === 0) return "# no secret templates: deployment declares none\n";
-  return document.templates
-    .map((template) => `# ${template.fileName}\n${JSON.stringify(template.content, null, 2)}`)
-    .join("\n\n");
 }
