@@ -48,15 +48,48 @@ function maybePublicUrl(output: string): string | undefined {
   return undefined;
 }
 
-function commandError(stdout: string, stderr: string): string {
+const MAX_WRANGLER_ERROR_LENGTH = 160;
+
+function stripAnsi(text: string): string {
+  return text.replace(/\u001b\[[0-9;]*m/g, "");
+}
+
+function cleanWranglerErrorLine(line: string): string {
+  return line
+    .trim()
+    .replace(/^[^\w/]*(?:\[ERROR\]\s*)?/i, "")
+    .replace(/\s+/g, " ");
+}
+
+function safeWranglerError(text: string): string {
+  const safe = text.replace(/[^\w .,:;_/#()+\-"'\[\]@]/g, "").trim();
+  return safe.length > MAX_WRANGLER_ERROR_LENGTH
+    ? `${safe.slice(0, MAX_WRANGLER_ERROR_LENGTH - 3).trimEnd()}...`
+    : safe;
+}
+
+export function summarizeWranglerPagesDeployError(stdout: string, stderr: string): string {
   const output = [stderr.trim(), stdout.trim()].filter(Boolean)[0] || "";
-  const clean = output
-    .replace(/\u001b\[[0-9;]*m/g, "")
+  const plain = stripAnsi(output);
+  const requestMatch = plain.match(/A request to the Cloudflare API \(([^)]+)\) failed\./);
+  const detailMatch = plain.match(/([A-Za-z][^\r\n]*\(status: \d+\) \[code: \d+\])/);
+  if (requestMatch?.[1] && detailMatch?.[1]) {
+    return `wrangler pages deploy failed: ${safeWranglerError(
+      `Cloudflare API ${requestMatch[1]}: ${detailMatch[1]}`,
+    )}`;
+  }
+  const clean = plain
     .split(/\r?\n/)
-    .map((line) => line.trim())
+    .map(cleanWranglerErrorLine)
     .filter(Boolean)
     .find((line) => !/^Logs were written to /.test(line));
-  return clean ? `wrangler pages deploy failed: ${clean}` : "wrangler pages deploy failed";
+  return clean
+    ? `wrangler pages deploy failed: ${safeWranglerError(clean)}`
+    : "wrangler pages deploy failed";
+}
+
+function commandError(stdout: string, stderr: string): string {
+  return summarizeWranglerPagesDeployError(stdout, stderr);
 }
 
 async function withDefaultWranglerConfig(renderedConfigPath: string): Promise<string> {
