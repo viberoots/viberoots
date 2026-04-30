@@ -41,6 +41,7 @@ test("nixos-shared-host Nix module derives containers and nginx routes from auth
           proxyPass = system.config.services.nginx.virtualHosts."demoapp.apps.kilty.io".locations."/".proxyPass;
         };
         bindMount = system.config.containers.demoapp.bindMounts."/srv/static-app";
+        allowedTCPPorts = system.config.containers.demoapp.config.networking.firewall.allowedTCPPorts;
         rendered = system.config.nixosSharedHost.rendered.demoapp;
       }
     `;
@@ -57,6 +58,7 @@ test("nixos-shared-host Nix module derives containers and nginx routes from auth
         hostPath: string;
         isReadOnly: boolean;
       };
+      allowedTCPPorts: number[];
       rendered: Record<string, unknown>;
     };
     assert.deepEqual(out.containers, ["demoapp"]);
@@ -69,6 +71,7 @@ test("nixos-shared-host Nix module derives containers and nginx routes from auth
       "/var/lib/deployment-host/runtime/containers/demoapp/srv/static-app",
     );
     assert.equal(out.bindMount.isReadOnly, false);
+    assert.deepEqual(out.allowedTCPPorts, [3000]);
     assert.equal(out.rendered.hostname, "demoapp.apps.kilty.io");
     assert.equal(out.rendered.backendIdentity, "demoapp:3000");
     assert.equal(out.rendered.runtime, "static-app-host");
@@ -118,6 +121,7 @@ test("nixos-shared-host Nix module renders the reviewed SSR host runtime contrac
         };
       in {
         bindMount = system.config.containers.demoapp.bindMounts."/srv/ssr-app";
+        allowedTCPPorts = system.config.containers.demoapp.config.networking.firewall.allowedTCPPorts;
         rendered = system.config.nixosSharedHost.rendered.demoapp;
       }
     `;
@@ -127,6 +131,7 @@ test("nixos-shared-host Nix module renders the reviewed SSR host runtime contrac
         hostPath: string;
         isReadOnly: boolean;
       };
+      allowedTCPPorts: number[];
       rendered: Record<string, unknown>;
     };
     const rendered = out.rendered;
@@ -135,6 +140,7 @@ test("nixos-shared-host Nix module renders the reviewed SSR host runtime contrac
       "/var/lib/deployment-host/runtime/containers/demoapp/srv/ssr-app",
     );
     assert.equal(out.bindMount.isReadOnly, false);
+    assert.deepEqual(out.allowedTCPPorts, [3000]);
     assert.equal(rendered.runtime, "ssr-webapp-host");
     assert.equal(rendered.serverEntry, "/srv/ssr-app/live/dist/server/index.js");
     assert.equal(rendered.clientDir, "/srv/ssr-app/live/dist/client");

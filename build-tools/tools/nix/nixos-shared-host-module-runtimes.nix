@@ -20,6 +20,7 @@ let
 
   staticContainerConfig = port: {
     system.stateVersion = "24.11";
+    networking.firewall.allowedTCPPorts = [ port ];
     services.nginx = {
       enable = true;
       virtualHosts.localhost = {
@@ -46,6 +47,7 @@ let
 
   ssrContainerConfig = port: {
     system.stateVersion = "24.11";
+    networking.firewall.allowedTCPPorts = [ port ];
     environment.systemPackages = [ pkgs.nodejs ];
     systemd.services.nixos-shared-host-app = {
       wantedBy = [ "multi-user.target" ];
