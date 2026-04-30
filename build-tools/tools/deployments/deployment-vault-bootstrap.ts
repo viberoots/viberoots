@@ -106,9 +106,13 @@ export function buildVaultBootstrapDocument(opts: {
     targetScope,
   }).templates;
   const normalized = bootstrapInputs({ deployment: opts.deployment, inputs });
-  const policyHcl = [...new Set(templates.map((template) => template.kvDataPath))]
+  const policyPaths = templates.flatMap((template) => [
+    template.kvDataPath,
+    template.kvMetadataPath,
+  ]);
+  const policyHcl = [...new Set(policyPaths)]
     .sort((a, b) => a.localeCompare(b))
-    .map((kvDataPath) => `path "${kvDataPath}" {\n  capabilities = ["read"]\n}`)
+    .map((policyPath) => `path "${policyPath}" {\n  capabilities = ["read"]\n}`)
     .join("\n\n");
   return {
     schemaVersion: DEPLOYMENT_VAULT_BOOTSTRAP_SCHEMA,

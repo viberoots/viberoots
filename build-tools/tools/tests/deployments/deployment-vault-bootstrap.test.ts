@@ -63,6 +63,10 @@ test("deploy --print-vault-bootstrap emits deployment-derived JSON", async () =>
     const policyMatches =
       payload.policyHcl.match(/secret\/data\/deployments\/pleomino\/cloudflare_api_token/g) || [];
     assert.equal(policyMatches.length, 1);
+    const metadataPolicyMatches =
+      payload.policyHcl.match(/secret\/metadata\/deployments\/pleomino\/cloudflare_api_token/g) ||
+      [];
+    assert.equal(metadataPolicyMatches.length, 1);
   });
 });
 

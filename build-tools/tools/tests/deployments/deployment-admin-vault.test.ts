@@ -129,6 +129,10 @@ test("deploy admin vault desired state derives bound claims from reviewed deploy
       repository: "kiltyj/common",
     });
     assert.match(desired.policyHcl, /secret\/data\/deployments\/pleomino\/cloudflare_api_token/);
+    assert.match(
+      desired.policyHcl,
+      /secret\/metadata\/deployments\/pleomino\/cloudflare_api_token/,
+    );
   } finally {
     await vault.close();
   }
