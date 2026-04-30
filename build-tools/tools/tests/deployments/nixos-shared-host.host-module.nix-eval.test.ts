@@ -42,6 +42,7 @@ test("nixos-shared-host Nix module derives containers and nginx routes from auth
         };
         bindMount = system.config.containers.demoapp.bindMounts."/srv/static-app";
         allowedTCPPorts = system.config.containers.demoapp.config.networking.firewall.allowedTCPPorts;
+        containerPostStart = system.config.systemd.services."container@demoapp".postStart;
         rendered = system.config.nixosSharedHost.rendered.demoapp;
       }
     `;
@@ -59,6 +60,7 @@ test("nixos-shared-host Nix module derives containers and nginx routes from auth
         isReadOnly: boolean;
       };
       allowedTCPPorts: number[];
+      containerPostStart: string;
       rendered: Record<string, unknown>;
     };
     assert.deepEqual(out.containers, ["demoapp"]);
@@ -72,6 +74,11 @@ test("nixos-shared-host Nix module derives containers and nginx routes from auth
     );
     assert.equal(out.bindMount.isReadOnly, false);
     assert.deepEqual(out.allowedTCPPorts, [3000]);
+    assert.match(out.containerPostStart, /chown -R deployment-host:deployment-host/);
+    assert.match(
+      out.containerPostStart,
+      /\/var\/lib\/deployment-host\/runtime\/containers\/demoapp\/srv\/static-app/,
+    );
     assert.equal(out.rendered.hostname, "demoapp.apps.kilty.io");
     assert.equal(out.rendered.backendIdentity, "demoapp:3000");
     assert.equal(out.rendered.runtime, "static-app-host");

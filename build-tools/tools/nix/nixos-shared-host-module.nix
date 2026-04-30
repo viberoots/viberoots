@@ -177,6 +177,19 @@ let
       "d ${hostRuntimeRootFor entry} 0775 deployment-host deployment-host -"
     ])
     renderedEntries;
+
+  runtimeOwnershipServices =
+    lib.listToAttrs (map
+      (entry:
+        lib.nameValuePair "container@${entry.containerName}" {
+          postStart = lib.mkAfter ''
+            ${pkgs.coreutils}/bin/chown -R deployment-host:deployment-host ${
+              lib.escapeShellArg (hostRuntimeRootFor entry)
+            }
+            ${pkgs.findutils}/bin/find ${lib.escapeShellArg (hostRuntimeRootFor entry)} -type d -exec ${pkgs.coreutils}/bin/chmod 0775 {} +
+          '';
+        })
+      renderedEntries);
 in
 {
   options.nixosSharedHost = {
@@ -205,6 +218,7 @@ in
 
     nixosSharedHost.rendered = rendered;
     systemd.tmpfiles.rules = runtimeTmpfiles;
+    systemd.services = lib.mkIf _conflictCheck runtimeOwnershipServices;
     containers = lib.mkIf _conflictCheck containers;
     services.nginx.enable = true;
     services.nginx.virtualHosts = lib.mkIf _conflictCheck nginxVirtualHosts;
