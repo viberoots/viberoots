@@ -32,9 +32,11 @@ test("deploy --validate-only prints metadata-derived admission requirements", as
         ref: "env/demo/dev",
         sha: requiredSha,
       },
-      mark_check_passed: {
+      admit: {
         relevant_for_workflow: true,
         authorization_required: "admission_reporter",
+        deploy_flag: "--admit-and-deploy",
+        evidence_only_flag: "--admit-only",
       },
     });
   });
@@ -54,25 +56,27 @@ test("deploy --validate-only makes zero required checks explicit", async () => {
       allowed_refs: ["env/demo/staging"],
       required_checks: [],
       required_approvals: [],
-      mark_check_passed: {
+      admit: {
         relevant_for_workflow: false,
         authorization_required: "admission_reporter",
+        deploy_flag: "--admit-and-deploy",
+        evidence_only_flag: "--admit-only",
       },
     });
   });
 });
 
-test("deploy --mark-check-passed with no value suggests authoritative required checks", async () => {
-  await runInTemp("deploy-mark-check-passed-missing-value", async (tmp, $) => {
+test("deploy --admit-and-deploy with no value suggests authoritative required checks", async () => {
+  await runInTemp("deploy-admit-and-deploy-missing-value", async (tmp, $) => {
     await writeTempListedDeploymentWorkspace(tmp);
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-dev:deploy --mark-check-passed`.nothrow();
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-dev:deploy --admit-and-deploy`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(
       String(result.stderr),
-      /Run this instead: deploy --deployment \/\/sandbox\/deployments\/demo-dev:deploy --mark-check-passed deploy\/demo-dev/,
+      /Run this instead: deploy --deployment \/\/sandbox\/deployments\/demo-dev:deploy --admit-and-deploy deploy\/demo-dev/,
     );
     assert.match(
       String(result.stderr),
@@ -87,25 +91,25 @@ test("deploy --mark-check-passed with no value suggests authoritative required c
   });
 });
 
-test("deploy --mark-check-passed with no value says when a deployment has no required checks", async () => {
-  await runInTemp("deploy-mark-check-passed-no-required-checks", async (tmp, $) => {
+test("deploy --admit-and-deploy with no value says when a deployment has no required checks", async () => {
+  await runInTemp("deploy-admit-and-deploy-no-required-checks", async (tmp, $) => {
     await writeTempCloudflareValidationWorkspace(tmp);
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --mark-check-passed`.nothrow();
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --admit-and-deploy`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /required_checks: none/);
     assert.match(
       String(result.stderr),
       /Run this instead: deploy --deployment \/\/sandbox\/deployments\/demo-staging:deploy/,
     );
-    assert.doesNotMatch(String(result.stderr), /Run this instead: .*--mark-check-passed/);
+    assert.doesNotMatch(String(result.stderr), /Run this instead: .*--admit-and-deploy/);
   });
 });
 
-test("deploy --mark-check-passed defaults to HEAD and fails closed when the deployment requires another commit", async () => {
-  await runInTemp("deploy-mark-check-passed-head-mismatch", async (tmp, $) => {
+test("deploy --admit-and-deploy defaults to HEAD and fails closed when the deployment requires another commit", async () => {
+  await runInTemp("deploy-admit-and-deploy-head-mismatch", async (tmp, $) => {
     await writeTempListedDeploymentWorkspace(tmp);
     await $({ cwd: tmp })`git init`;
     await $({ cwd: tmp })`git config user.name Codex`;
@@ -126,7 +130,7 @@ test("deploy --mark-check-passed defaults to HEAD and fails closed when the depl
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-dev:deploy --mark-check-passed deploy/demo-dev`.nothrow();
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-dev:deploy --admit-and-deploy deploy/demo-dev`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /defaulted to local HEAD:/);
     assert.match(String(result.stderr), new RegExp(`requires checks for: ${stageRevision}`));
@@ -137,19 +141,19 @@ test("deploy --mark-check-passed defaults to HEAD and fails closed when the depl
     );
     assert.match(
       String(result.stderr),
-      new RegExp(`--mark-check-for-commit ${stageRevision.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+      new RegExp(`--admit-for-commit ${stageRevision.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
     );
   });
 });
 
-test("deploy --mark-check-passed explains when the deployment source ref is unavailable locally", async () => {
-  await runInTemp("deploy-mark-check-passed-missing-source-ref", async (tmp, $) => {
+test("deploy --admit-and-deploy explains when the deployment source ref is unavailable locally", async () => {
+  await runInTemp("deploy-admit-and-deploy-missing-source-ref", async (tmp, $) => {
     await writeTempListedDeploymentWorkspace(tmp);
     await $({ cwd: tmp, stdio: "pipe" })`git branch -D env/demo/dev`.nothrow();
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-dev:deploy --mark-check-passed deploy/demo-dev`.nothrow();
+    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-dev:deploy --admit-and-deploy deploy/demo-dev`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(
       String(result.stderr),
@@ -161,11 +165,11 @@ test("deploy --mark-check-passed explains when the deployment source ref is unav
     );
     assert.match(
       String(result.stderr),
-      /Then retry: deploy --deployment \/\/sandbox\/deployments\/demo-dev:deploy --mark-check-passed deploy\/demo-dev/,
+      /Then retry: deploy --deployment \/\/sandbox\/deployments\/demo-dev:deploy --admit-and-deploy deploy\/demo-dev/,
     );
     assert.match(
       String(result.stderr),
-      /Or rerun with --mark-check-for-commit <sha> if you already know the reviewed commit\./,
+      /Or rerun with --admit-for-commit <sha> if you already know the reviewed commit\./,
     );
     assert.doesNotMatch(String(result.stderr), /Inspect requirements only:/);
     assert.doesNotMatch(String(result.stderr), /Command failed: git rev-parse env\/demo\/dev/);
@@ -177,8 +181,8 @@ test("deploy --mark-check-passed explains when the deployment source ref is unav
   });
 });
 
-test("deploy --mark-check-for-commit binds explicit evidence to the requested commit", async () => {
-  await runInTemp("deploy-mark-check-for-commit-explicit", async (tmp, $) => {
+test("deploy --admit-for-commit binds explicit evidence to the requested commit", async () => {
+  await runInTemp("deploy-admit-for-commit-explicit", async (tmp, $) => {
     await writeTempListedDeploymentWorkspace(tmp);
     await $({ cwd: tmp })`git init`;
     await $({ cwd: tmp })`git config user.name Codex`;
@@ -197,8 +201,8 @@ test("deploy --mark-check-for-commit binds explicit evidence to the requested co
     const priorCwd = process.cwd();
     (globalThis as { argv?: Record<string, unknown> }).argv = {
       deployment: "//sandbox/deployments/demo-dev:deploy",
-      "mark-check-passed": ["deploy/demo-dev"],
-      "mark-check-for-commit": stageRevision,
+      "admit-and-deploy": ["deploy/demo-dev"],
+      "admit-for-commit": stageRevision,
     };
     process.chdir(tmp);
     try {

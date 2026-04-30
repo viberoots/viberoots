@@ -106,7 +106,7 @@ function augmentRemoteAdmissionMismatchMessage(
     ...(deploymentSourceRef ? [`deployment_source_ref: ${deploymentSourceRef}`] : []),
     "This usually means the remote control-plane repo state does not match your local git workspace.",
     "Make sure the deployment branch is up to date and pushed before retrying.",
-    `Sync the reviewed deployment ref on the service-side repo, or rerun with --mark-check-for-commit ${requiredSubject} if ${requiredSubject} is intentionally the reviewed commit to deploy.`,
+    `Sync the reviewed deployment ref on the service-side repo, or rerun with --admit-for-commit ${requiredSubject} if ${requiredSubject} is intentionally the reviewed commit to deploy.`,
   ].join("\n");
 }
 

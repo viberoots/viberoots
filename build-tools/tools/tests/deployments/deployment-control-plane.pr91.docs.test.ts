@@ -21,11 +21,11 @@ test("pr91 docs keep admission_reporter as the submit-time evidence boundary", a
       read("docs/nixos-shared-host-technician-checklist.md"),
     ]);
   for (const doc of [usageDoc, sharedHostUsageDoc, setupDoc, checklistDoc]) {
-    assert.match(doc, /mark-check-passed[\s\S]*authorized shortcut/i);
+    assert.match(doc, /admit-and-deploy[\s\S]*authorized shortcut/i);
     assert.match(doc, /submitter[\s\S]*admission_reporter/i);
   }
   assert.match(scenariosDoc, /human manual check reporting[\s\S]*admission_reporter/i);
   assert.match(scenariosDoc, /CI structured evidence[\s\S]*submitter[\s\S]*admission_reporter/i);
   assert.match(contractDoc, /submit-time `admissionEvidence\.checks`[\s\S]*admission_reporter/i);
-  assert.match(contractDoc, /mark-check-passed[\s\S]*same `admission_reporter` authorization/i);
+  assert.match(contractDoc, /admit-and-deploy[\s\S]*same `admission_reporter` authorization/i);
 });

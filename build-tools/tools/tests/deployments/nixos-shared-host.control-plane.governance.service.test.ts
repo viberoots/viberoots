@@ -30,7 +30,7 @@ async function deployWithChecks(opts: {
     cwd: opts.tmp,
     env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
     stdio: "pipe",
-  })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${opts.deploymentLabel} --artifact-dir ${opts.artifactDir} --mark-check-passed deploy/demo-dev --mark-check-for-commit ${opts.stageRevision} --control-plane-url ${opts.controlPlaneUrl} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(opts.serverPort)} --smoke-connect-protocol https:`;
+  })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${opts.deploymentLabel} --artifact-dir ${opts.artifactDir} --admit-and-deploy deploy/demo-dev --admit-for-commit ${opts.stageRevision} --control-plane-url ${opts.controlPlaneUrl} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(opts.serverPort)} --smoke-connect-protocol https:`;
   return JSON.parse(String(result.stdout));
 }
 

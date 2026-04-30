@@ -5,8 +5,8 @@ import { promisify } from "node:util";
 import { getFlagList, getFlagStr, hasFlag } from "../lib/cli.ts";
 import type { DeploymentTarget } from "./contract.ts";
 import {
-  markCheckSubjectMismatchMessage,
-  missingMarkCheckPassedValueMessage,
+  admitSubjectMismatchMessage,
+  missingAdmitValueMessage,
   resolveDeploymentRequiredCheckSubject,
 } from "./deployment-admission-requirements.ts";
 import { isCiSession } from "./deployment-credential-source-selection.ts";
@@ -19,24 +19,61 @@ import {
 
 const execFileAsync = promisify(execFile);
 
-function readMarkedPassedChecks(deployment?: DeploymentTarget): string[] {
-  const checks = getFlagList("mark-check-passed")
+type AdmissionShortcutMode = "admit-only" | "admit-and-deploy";
+
+function assertNoLegacyAdmissionFlags() {
+  if (hasFlag("mark-check-passed")) {
+    throw new Error(
+      "--mark-check-passed has been replaced by --admit-and-deploy. Use --admit-only when you want to emit admission evidence without deploying.",
+    );
+  }
+  if (hasFlag("mark-check-for-commit")) {
+    throw new Error("--mark-check-for-commit has been replaced by --admit-for-commit");
+  }
+}
+
+export function hasAdmitOnlyFlag(): boolean {
+  return hasFlag("admit-only");
+}
+
+export function hasAdmitAndDeployFlag(): boolean {
+  return hasFlag("admit-and-deploy");
+}
+
+function readAdmissionShortcutMode(): AdmissionShortcutMode | undefined {
+  const admitOnly = hasAdmitOnlyFlag();
+  const admitAndDeploy = hasAdmitAndDeployFlag();
+  if (admitOnly && admitAndDeploy) {
+    throw new Error("--admit-only and --admit-and-deploy are mutually exclusive");
+  }
+  if (admitOnly) return "admit-only";
+  if (admitAndDeploy) return "admit-and-deploy";
+  return undefined;
+}
+
+function readAdmittedChecks(deployment?: DeploymentTarget): string[] {
+  const mode = readAdmissionShortcutMode();
+  if (!mode) return [];
+  const flagName = mode === "admit-only" ? "admit-only" : "admit-and-deploy";
+  const flag: "--admit-and-deploy" | "--admit-only" =
+    flagName === "admit-only" ? "--admit-only" : "--admit-and-deploy";
+  const checks = getFlagList(flagName)
     .map((entry) => entry.trim())
     .filter(Boolean);
-  if (hasFlag("mark-check-passed") && checks.length === 0) {
+  if (checks.length === 0) {
     throw new Error(
       deployment
-        ? missingMarkCheckPassedValueMessage(deployment)
-        : "--mark-check-passed requires one or more check names",
+        ? missingAdmitValueMessage(deployment, flag)
+        : `${flag} requires one or more check names`,
     );
   }
   return Array.from(new Set(checks));
 }
 
-function readMarkedPassedCommitOverride(): string | undefined {
-  if (!hasFlag("mark-check-for-commit")) return undefined;
-  const value = getFlagStr("mark-check-for-commit", "").trim();
-  if (!value) throw new Error("--mark-check-for-commit requires a non-empty commit SHA or git rev");
+function readAdmitCommitOverride(): string | undefined {
+  if (!hasFlag("admit-for-commit")) return undefined;
+  const value = getFlagStr("admit-for-commit", "").trim();
+  if (!value) throw new Error("--admit-for-commit requires a non-empty commit SHA or git rev");
   return value;
 }
 
@@ -57,8 +94,8 @@ async function resolveMarkedPassedCheckSubject(
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(
       revision
-        ? `--mark-check-for-commit requires a resolvable git revision (${revision}): ${detail}`
-        : `--mark-check-passed requires a git workspace with a resolvable HEAD: ${detail}`,
+        ? `--admit-for-commit requires a resolvable git revision (${revision}): ${detail}`
+        : `admission shortcuts require a git workspace with a resolvable HEAD: ${detail}`,
     );
   }
 }
@@ -104,12 +141,13 @@ export async function resolveDeploymentAdmissionEvidence(
     workspaceRoot?: string;
   } = {},
 ): Promise<DeploymentAdmissionEvidence | undefined> {
+  assertNoLegacyAdmissionFlags();
   const workspaceRoot = opts.workspaceRoot || process.cwd();
   const evidenceJson = getFlagStr("admission-evidence-json", "").trim();
-  const markedPassedChecks = readMarkedPassedChecks(opts.deployment);
-  const markedPassedCommitOverride = readMarkedPassedCommitOverride();
-  if (markedPassedCommitOverride && markedPassedChecks.length === 0) {
-    throw new Error("--mark-check-for-commit requires --mark-check-passed");
+  const admittedChecks = readAdmittedChecks(opts.deployment);
+  const admitCommitOverride = readAdmitCommitOverride();
+  if (admitCommitOverride && admittedChecks.length === 0) {
+    throw new Error("--admit-for-commit requires --admit-and-deploy or --admit-only");
   }
   const reportingKind = defaultCheckReportingKind(process.env);
   const baseEvidence = annotateCheckReportingKind(
@@ -121,8 +159,8 @@ export async function resolveDeploymentAdmissionEvidence(
   if (evidenceJson && !baseEvidence) {
     throw new Error(`invalid --admission-evidence-json payload: ${evidenceJson}`);
   }
-  if (markedPassedChecks.length === 0) return baseEvidence;
-  const subject = await resolveMarkedPassedCheckSubject(workspaceRoot, markedPassedCommitOverride);
+  if (admittedChecks.length === 0) return baseEvidence;
+  const subject = await resolveMarkedPassedCheckSubject(workspaceRoot, admitCommitOverride);
   if (opts.deployment && opts.deployment.admissionPolicy.requiredChecks.length > 0) {
     const required = await resolveDeploymentRequiredCheckSubject({
       workspaceRoot,
@@ -130,10 +168,10 @@ export async function resolveDeploymentAdmissionEvidence(
     });
     if (required.sha !== subject) {
       throw new Error(
-        markCheckSubjectMismatchMessage({
+        admitSubjectMismatchMessage({
           deployment: opts.deployment,
           actualSha: subject,
-          actualSource: markedPassedCommitOverride ? "explicit" : "head",
+          actualSource: admitCommitOverride ? "explicit" : "head",
           required,
         }),
       );
@@ -147,7 +185,7 @@ export async function resolveDeploymentAdmissionEvidence(
         admissionPolicyRef: opts.deployment.admissionPolicyRef,
       }
     : {};
-  const inferredChecks = markedPassedChecks.map(
+  const inferredChecks = admittedChecks.map(
     (name): DeploymentCheckEvidence => ({
       name,
       subject,

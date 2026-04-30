@@ -28,7 +28,7 @@ Concrete policy examples:
 - human-only production approval:
   `deploy-submitters-pleomino-prod` submits while `deploy-approvers-pleomino-prod` approves
 - human manual check reporting:
-  a reviewed human may use `--mark-check-passed` only when the same principal
+  a reviewed human may use `--admit-and-deploy` only when the same principal
   also holds `admission_reporter` for that deployment scope
 - CI dev auto-submit:
   `deploy-automation-jenkins-submitters-dev` grants `submitter` for reviewed `dev` deployments

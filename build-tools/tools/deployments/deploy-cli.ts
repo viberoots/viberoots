@@ -2,7 +2,10 @@
 import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
 import { maybeHandleDeploymentAdminCli } from "./deployment-admin-keycloak-cli.ts";
 import { maybeHandleDeploymentAuthCli } from "./deployment-auth-diagnostics.ts";
-import { resolveDeploymentAdmissionEvidence } from "./deployment-admission-cli.ts";
+import {
+  hasAdmitOnlyFlag,
+  resolveDeploymentAdmissionEvidence,
+} from "./deployment-admission-cli.ts";
 import { resolveDeploymentForCli } from "./deployment-cli-resolve.ts";
 import {
   assertDeployCliReadonlyGuardrails,
@@ -32,18 +35,12 @@ function requireFlag(name: string): string {
   return value;
 }
 
-function ensurePublicSourceOfTruth(opts: { deploymentJsonErrorMessage: string }) {
-  if (hasFlag("deployment-json")) {
-    throw new Error(opts.deploymentJsonErrorMessage);
-  }
-}
-
 export async function runDeployCli(opts: {
   workspaceRoot: string;
   publicFrontDoor: boolean;
   deploymentJsonErrorMessage: string;
 }) {
-  ensurePublicSourceOfTruth(opts);
+  if (hasFlag("deployment-json")) throw new Error(opts.deploymentJsonErrorMessage);
   if (await maybeHandleDeploymentAdminCli(opts.workspaceRoot)) return;
   if (await maybeHandleDeploymentAuthCli(opts.workspaceRoot)) return;
   if (getFlagBool("from-changes")) {
@@ -80,6 +77,11 @@ export async function runDeployCli(opts: {
     workspaceRoot: opts.workspaceRoot,
   });
   const smokeConnectOverride = resolveSmokeConnectOverride();
+  if (hasAdmitOnlyFlag()) {
+    if (!admissionEvidence) throw new Error("--admit-only did not produce admission evidence");
+    printDeployJson(admissionEvidence);
+    return;
+  }
   assertDeployCliReadonlyGuardrails(flags);
   if (
     await maybeHandleReadonlyDeployCli({ workspaceRoot: opts.workspaceRoot, deployment, flags })

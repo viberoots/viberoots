@@ -155,13 +155,13 @@ function childArgs(ctx: JenkinsContext): string[] {
     ...(hasFlag("admission-evidence-json")
       ? ["--admission-evidence-json", requireFlagValue("admission-evidence-json")]
       : []),
-    ...(hasFlag("mark-check-passed")
-      ? ((value) => (value ? ["--mark-check-passed", value] : ["--mark-check-passed"]))(
-          getFlagStr("mark-check-passed", "").trim(),
+    ...(hasFlag("admit-and-deploy")
+      ? ((value) => (value ? ["--admit-and-deploy", value] : ["--admit-and-deploy"]))(
+          getFlagStr("admit-and-deploy", "").trim(),
         )
       : []),
-    ...(hasFlag("mark-check-for-commit")
-      ? ["--mark-check-for-commit", requireFlagValue("mark-check-for-commit")]
+    ...(hasFlag("admit-for-commit")
+      ? ["--admit-for-commit", requireFlagValue("admit-for-commit")]
       : []),
     "--profile",
     ctx.profileName,

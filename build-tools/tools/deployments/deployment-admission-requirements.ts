@@ -34,9 +34,11 @@ export type DeploymentAdmissionRequirementsForCli = {
     ref: string;
     sha: string;
   };
-  mark_check_passed: {
+  admit: {
     relevant_for_workflow: boolean;
     authorization_required: "admission_reporter";
+    deploy_flag: "--admit-and-deploy";
+    evidence_only_flag: "--admit-only";
   };
 };
 
@@ -92,7 +94,7 @@ export async function resolveDeploymentRequiredCheckSubject(opts: {
         `deployment source ref ${ref} is not available in this git workspace for ${opts.deployment.label}`,
         remotesMissingLine(await renderFetchReviewedRefCommand(opts.workspaceRoot, ref)),
         `Then retry: ${renderDeployCommand(currentDeployCommandArgs(opts.deployment))}`,
-        "Or rerun with --mark-check-for-commit <sha> if you already know the reviewed commit.",
+        "Or rerun with --admit-for-commit <sha> if you already know the reviewed commit.",
         `git detail: ${detail}`,
       ].join("\n"),
     );
@@ -116,21 +118,26 @@ export async function deploymentAdmissionRequirementsForCli(
     required_checks: [...deployment.admissionPolicy.requiredChecks],
     required_approvals: [...deployment.admissionPolicy.requiredApprovals],
     ...(requiredCheckSubject ? { required_check_subject: requiredCheckSubject } : {}),
-    mark_check_passed: {
+    admit: {
       relevant_for_workflow: deployment.admissionPolicy.requiredChecks.length > 0,
       authorization_required: "admission_reporter",
+      deploy_flag: "--admit-and-deploy",
+      evidence_only_flag: "--admit-only",
     },
   };
 }
 
-export function missingMarkCheckPassedValueMessage(deployment: DeploymentTarget): string {
+export function missingAdmitValueMessage(
+  deployment: DeploymentTarget,
+  flag: "--admit-and-deploy" | "--admit-only",
+): string {
   const requirements = {
     admission_policy: deployment.admissionPolicyRef,
     required_checks: [...deployment.admissionPolicy.requiredChecks],
   };
-  const currentArgs = stripMarkCheckPassedFromCurrentArgs(deployment);
+  const currentArgs = stripAdmissionShortcutArgs(deployment);
   return [
-    "--mark-check-passed needs an explicit check name for this deployment.",
+    `${flag} needs an explicit check name for this deployment.`,
     `deployment: ${deployment.label}`,
     `admission_policy: ${requirements.admission_policy}`,
     requirements.required_checks.length > 0
@@ -139,7 +146,7 @@ export function missingMarkCheckPassedValueMessage(deployment: DeploymentTarget)
     requirements.required_checks.length > 0
       ? `Run this instead: ${renderDeployCommand([
           ...currentArgs,
-          "--mark-check-passed",
+          flag,
           requirements.required_checks.join(","),
         ])}`
       : `Run this instead: ${renderDeployCommand(currentArgs)}`,
@@ -148,17 +155,17 @@ export function missingMarkCheckPassedValueMessage(deployment: DeploymentTarget)
   ].join("\n");
 }
 
-export function markCheckSubjectMismatchMessage(opts: {
+export function admitSubjectMismatchMessage(opts: {
   deployment: DeploymentTarget;
   actualSha: string;
   actualSource: "head" | "explicit";
   required: { ref: string; sha: string };
 }): string {
-  const currentArgs = stripMarkCheckPassedFromCurrentArgs(opts.deployment);
+  const currentArgs = stripAdmissionShortcutArgs(opts.deployment);
   const actualSourceLine =
     opts.actualSource === "head"
-      ? `--mark-check-passed defaulted to local HEAD: ${opts.actualSha}`
-      : `--mark-check-for-commit resolved to: ${opts.actualSha}`;
+      ? `admission shortcut defaulted to local HEAD: ${opts.actualSha}`
+      : `--admit-for-commit resolved to: ${opts.actualSha}`;
   return [
     actualSourceLine,
     `But this deploy currently requires checks for: ${opts.required.sha}`,
@@ -166,30 +173,30 @@ export function markCheckSubjectMismatchMessage(opts: {
     "Make sure the deployment branch is up to date and pushed before retrying.",
     `Run this instead: ${renderDeployCommand([
       ...currentArgs,
-      "--mark-check-for-commit",
+      "--admit-for-commit",
       opts.required.sha,
     ])}`,
     `Inspect requirements only: ${renderDeployCommand(["--deployment", opts.deployment.label, "--validate-only"])}`,
   ].join("\n");
 }
 
-function stripMarkCheckPassedFromCurrentArgs(deployment: DeploymentTarget): string[] {
+function stripAdmissionShortcutArgs(deployment: DeploymentTarget): string[] {
   const raw = getArgvTokens();
   const kept: string[] = [];
   for (let i = 0; i < raw.length; i += 1) {
     const arg = raw[i] || "";
-    if (arg === "--mark-check-passed") {
+    if (arg === "--admit-and-deploy" || arg === "--admit-only") {
       const next = raw[i + 1] || "";
       if (next && !next.startsWith("--")) i += 1;
       continue;
     }
-    if (arg.startsWith("--mark-check-passed=")) continue;
-    if (arg === "--mark-check-for-commit") {
+    if (arg.startsWith("--admit-and-deploy=") || arg.startsWith("--admit-only=")) continue;
+    if (arg === "--admit-for-commit") {
       const next = raw[i + 1] || "";
       if (next && !next.startsWith("--")) i += 1;
       continue;
     }
-    if (arg.startsWith("--mark-check-for-commit=")) continue;
+    if (arg.startsWith("--admit-for-commit=")) continue;
     kept.push(arg);
   }
   return hasFlag("deployment") ? kept : ["--deployment", deployment.label, ...kept];

@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { remoteServiceSubmissionError } from "../../deployments/nixos-shared-host-remote-execution-transport.ts";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
 
-test("remote service submission error explains when the service requires a different commit than the submitted mark-check evidence", () => {
+test("remote service submission error explains when the service requires a different commit than the submitted admission evidence", () => {
   const deployment = nixosSharedHostDeploymentFixture({
     admissionPolicy: {
       ...nixosSharedHostDeploymentFixture().admissionPolicy,
@@ -56,7 +56,7 @@ test("remote service submission error explains when the service requires a diffe
   assert.match(String(error.message), /deployment branch is up to date and pushed before retrying/);
   assert.match(
     String(error.message),
-    /--mark-check-for-commit 85e2c9ee8dd909fc041f693fe8e937e34e7b36ef/,
+    /--admit-for-commit 85e2c9ee8dd909fc041f693fe8e937e34e7b36ef/,
   );
   assert.match(String(error.message), /service_hostname: mini/);
   assert.match(String(error.message), /service_workspace_root: \/srv\/common/);

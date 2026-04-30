@@ -813,7 +813,7 @@ The helper reads the current status first and reuses the recorded
 bindings automatically.
 For auth-required protected/shared runs, the service opens or prints the login
 URL and derives the approver from the authenticated service session.
-For submit-time check evidence, `--mark-check-passed` is only an authorized shortcut.
+For submit-time check evidence, `--admit-and-deploy` is only an authorized shortcut.
 The authenticated principal still needs `submitter` to request the deploy and
 `admission_reporter` to assert checks for that scope.
 Before the first protected/shared submit, run

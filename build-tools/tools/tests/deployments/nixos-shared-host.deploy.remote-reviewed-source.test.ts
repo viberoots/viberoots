@@ -71,7 +71,7 @@ test("remote deploy surfaces reviewed-source mismatch guidance when the local ch
       const result = await $({
         cwd: tmp,
         env: remoteExecEnv(env),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --mark-check-passed deploy/pleomino-dev`.nothrow();
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --admit-and-deploy deploy/pleomino-dev`.nothrow();
       assert.notEqual(result.exitCode, 0);
       assert.match(String(result.stderr), /reviewed source mismatch for env\/pleomino\/dev/);
       assert.match(
@@ -86,7 +86,7 @@ test("remote deploy surfaces reviewed-source mismatch guidance when the local ch
         String(result.stderr),
         /deployment branch is up to date and pushed before retrying/,
       );
-      assert.match(String(result.stderr), new RegExp(`--mark-check-for-commit ${serviceRevision}`));
+      assert.match(String(result.stderr), new RegExp(`--admit-for-commit ${serviceRevision}`));
     } finally {
       await controlPlane.close();
     }

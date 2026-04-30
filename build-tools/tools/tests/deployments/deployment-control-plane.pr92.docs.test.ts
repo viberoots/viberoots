@@ -17,7 +17,7 @@ test("pr92 docs keep admission requirement discovery aligned with the CLI", asyn
   ]);
   for (const doc of [usageDoc, sharedHostUsageDoc, setupDoc]) {
     assert.match(doc, /validate-only[\s\S]*required_checks/i);
-    assert.match(doc, /mark-check-passed[\s\S]*admission_reporter/i);
+    assert.match(doc, /admit-and-deploy[\s\S]*admission_reporter/i);
   }
   assert.match(
     contractDoc,

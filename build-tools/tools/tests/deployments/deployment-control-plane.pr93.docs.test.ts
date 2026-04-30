@@ -31,6 +31,6 @@ test("pr93 docs keep reviewed-source snapshotting and mismatch guidance aligned"
   for (const doc of [usageDoc, sharedHostUsageDoc]) {
     assert.match(doc, /service-owned reviewed(?: source)?[\s\S]*snapshot/i);
     assert.match(doc, /clientExpectedSourceRevision[\s\S]*serviceReviewedSourceRevision/i);
-    assert.match(doc, /--mark-check-for-commit <serviceReviewedSourceRevision>/i);
+    assert.match(doc, /--admit-for-commit <serviceReviewedSourceRevision>/i);
   }
 });

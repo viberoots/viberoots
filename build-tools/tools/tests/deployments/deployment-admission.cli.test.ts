@@ -19,14 +19,14 @@ function withSyntheticArgv(args: string[], fn: () => Promise<void>): Promise<voi
   });
 }
 
-test("mark-check-passed infers the current HEAD subject and synthesizes passed checks", async () => {
-  await runInTemp("deployment-admission-cli-mark-check-passed", async (tmp, $) => {
+test("admit-and-deploy infers the current HEAD subject and synthesizes passed checks", async () => {
+  await runInTemp("deployment-admission-cli-admit-and-deploy", async (tmp, $) => {
     const oldCwd = process.cwd();
     try {
       process.chdir(tmp);
       const head = String((await $({ cwd: tmp, stdio: "pipe" })`git rev-parse HEAD`).stdout).trim();
       await withSyntheticArgv(
-        ["--mark-check-passed=deploy/pleomino-dev, deploy/pleomino-dev"],
+        ["--admit-and-deploy=deploy/pleomino-dev, deploy/pleomino-dev"],
         async () => {
           const evidence = await resolveDeploymentAdmissionEvidence();
           assert.ok(evidence);
@@ -47,14 +47,14 @@ test("mark-check-passed infers the current HEAD subject and synthesizes passed c
   });
 });
 
-test("mark-check-passed accepts an explicit mark-check-for-commit override", async () => {
-  await runInTemp("deployment-admission-cli-mark-check-for-commit", async (tmp, $) => {
+test("admit-and-deploy accepts an explicit admit-for-commit override", async () => {
+  await runInTemp("deployment-admission-cli-admit-for-commit", async (tmp, $) => {
     const oldCwd = process.cwd();
     try {
       process.chdir(tmp);
       const head = String((await $({ cwd: tmp, stdio: "pipe" })`git rev-parse HEAD`).stdout).trim();
       await withSyntheticArgv(
-        ["--mark-check-passed=deploy/pleomino-dev", "--mark-check-for-commit", head],
+        ["--admit-and-deploy=deploy/pleomino-dev", "--admit-for-commit", head],
         async () => {
           const evidence = await resolveDeploymentAdmissionEvidence();
           assert.equal(evidence?.checks?.[0]?.subject, head);
@@ -66,8 +66,8 @@ test("mark-check-passed accepts an explicit mark-check-for-commit override", asy
   });
 });
 
-test("mark-check-passed scopes synthesized check evidence to the selected deployment", async () => {
-  await runInTemp("deployment-admission-cli-scoped-mark-check", async (tmp, $) => {
+test("admit-and-deploy scopes synthesized check evidence to the selected deployment", async () => {
+  await runInTemp("deployment-admission-cli-scoped-admit", async (tmp, $) => {
     await writeTempListedDeploymentWorkspace(tmp);
     await $({ cwd: tmp })`git init`;
     await $({ cwd: tmp })`git config user.name Codex`;
@@ -90,7 +90,7 @@ test("mark-check-passed scopes synthesized check evidence to the selected deploy
             "--deployment-json is not supported; use --deployment <label>",
         },
       );
-      await withSyntheticArgv(["--mark-check-passed=deploy/demo-dev"], async () => {
+      await withSyntheticArgv(["--admit-and-deploy=deploy/demo-dev"], async () => {
         const evidence = await resolveDeploymentAdmissionEvidence({
           deployment,
           workspaceRoot: tmp,
@@ -141,8 +141,8 @@ test("admission-evidence-json checks inherit ci_pipeline reporting in CI when ki
   });
 });
 
-test("mark-check-passed fails closed when local HEAD does not match the deployment-required commit", async () => {
-  await runInTemp("deployment-admission-cli-mark-check-head-mismatch", async (tmp, $) => {
+test("admit-and-deploy fails closed when local HEAD does not match the deployment-required commit", async () => {
+  await runInTemp("deployment-admission-cli-admit-head-mismatch", async (tmp, $) => {
     await writeTempListedDeploymentWorkspace(tmp);
     await $({ cwd: tmp })`git init`;
     await $({ cwd: tmp })`git config user.name Codex`;
@@ -170,7 +170,7 @@ test("mark-check-passed fails closed when local HEAD does not match the deployme
             "--deployment-json is not supported; use --deployment <label>",
         },
       );
-      await withSyntheticArgv(["--mark-check-passed=deploy/demo-dev"], async () => {
+      await withSyntheticArgv(["--admit-and-deploy=deploy/demo-dev"], async () => {
         await assert.rejects(
           () =>
             resolveDeploymentAdmissionEvidence({
@@ -178,7 +178,7 @@ test("mark-check-passed fails closed when local HEAD does not match the deployme
               workspaceRoot: tmp,
             }),
           new RegExp(
-            `defaulted to local HEAD: [0-9a-f]{40}[\\s\\S]*requires checks for: ${requiredSha}[\\s\\S]*--mark-check-for-commit ${requiredSha}`,
+            `defaulted to local HEAD: [0-9a-f]{40}[\\s\\S]*requires checks for: ${requiredSha}[\\s\\S]*--admit-for-commit ${requiredSha}`,
           ),
         );
       });
@@ -188,7 +188,7 @@ test("mark-check-passed fails closed when local HEAD does not match the deployme
   });
 });
 
-test("mark-check-passed merges with admission-evidence-json and overrides duplicate checks", async () => {
+test("admit-and-deploy merges with admission-evidence-json and overrides duplicate checks", async () => {
   await runInTemp("deployment-admission-cli-merge", async (tmp, $) => {
     const oldCwd = process.cwd();
     try {
@@ -218,7 +218,7 @@ test("mark-check-passed merges with admission-evidence-json and overrides duplic
         }),
       );
       await withSyntheticArgv(
-        ["--admission-evidence-json", evidencePath, "--mark-check-passed=deploy/pleomino-dev"],
+        ["--admission-evidence-json", evidencePath, "--admit-and-deploy=deploy/pleomino-dev"],
         async () => {
           const evidence = await resolveDeploymentAdmissionEvidence();
           assert.equal(evidence?.requestedBy?.principalId, "user:bootstrap");

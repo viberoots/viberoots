@@ -179,7 +179,7 @@ direnv exec . build-tools/tools/bin/deploy \
 
 For auth-required protected/shared runs, the service opens or prints the login
 URL and records the approver from the authenticated service session.
-Treat `--mark-check-passed` as an authorized shortcut, not a bypass:
+Treat `--admit-and-deploy` as an authorized shortcut, not a bypass:
 the same principal still needs `submitter` to start the deploy and
 `admission_reporter` to assert checks.
 

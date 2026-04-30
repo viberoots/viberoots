@@ -105,8 +105,8 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
   });
 });
 
-test("jenkins wrapper forwards mark-check-passed so bootstrap deploys can avoid hand-written evidence", async () => {
-  await runInTemp("nixos-shared-host-jenkins-exec-mark-check-passed", async (tmp, $) => {
+test("jenkins wrapper forwards admit-and-deploy so bootstrap deploys can avoid hand-written evidence", async () => {
+  await runInTemp("nixos-shared-host-jenkins-exec-admit-and-deploy", async (tmp, $) => {
     const deployment = pleominoDeploymentFixture();
     const { env } = await installFakeRemoteTransport(tmp);
     const artifactDir = path.join(tmp, "artifact");
@@ -170,7 +170,7 @@ test("jenkins wrapper forwards mark-check-passed so bootstrap deploys can avoid 
       const result = await $({
         cwd: tmp,
         env: jenkinsExecEnv(env),
-      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --admission-evidence-json ${admissionEvidencePath} --mark-check-passed deploy/pleomino-dev --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --admission-evidence-json ${admissionEvidencePath} --admit-and-deploy deploy/pleomino-dev --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.ok, true);
       assert.equal(summary.remoteExecution.controlPlane.finalOutcome, "succeeded");

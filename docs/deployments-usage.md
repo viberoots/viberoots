@@ -254,11 +254,14 @@ If you are using the reviewed `nixos-shared-host` client profile workflow, use
 `--profile mini` instead of `--control-plane-url`.
 For auth-required protected/shared runs, the deployment service opens or prints
 the login URL and records the approver from the authenticated service session.
-`--mark-check-passed` remains an authorized shortcut for constructing
+`--admit-and-deploy` remains an authorized shortcut for constructing
 `admissionEvidence.checks`, but it is not a local bypass: the same principal
 still needs `submitter` to request the deploy and `admission_reporter` to
 report submit-time checks for that scope.
-To discover the reviewed check names before you use `--mark-check-passed`, run
+Use `--admit-only` when you want to emit the admission evidence JSON without
+deploying, and `--admit-and-deploy` when you want to submit that evidence and
+deploy in one command.
+To discover the reviewed check names before you use either admission shortcut, run
 `deploy --deployment <label> --validate-only` and inspect
 `admissionRequirements.admission_policy`, `allowed_refs`, `required_checks`,
 and `required_approvals` in the JSON response. That read-only output tells you
@@ -333,13 +336,13 @@ interactive login session to include an authoritative email for the current
 human, usually via the IdP's standard `email` claim; if the session omits it,
 fix the reviewed identity mapper before retrying. Keep the explicit file and
 principal/group flags for intentionally local or non-remote workflows only.
-For protected/shared service-backed runs, `--mark-check-passed` and
-`--mark-check-for-commit` only describe the commit the client believes it is
+For protected/shared service-backed runs, `--admit-and-deploy` and
+`--admit-for-commit` only describe the commit the client believes it is
 submitting. Final admission still binds to the service-owned reviewed source
 snapshot for the deployment's authoritative stage ref. If the service returns a
 reviewed source mismatch, compare `clientExpectedSourceRevision` with
 `serviceReviewedSourceRevision`: either sync the service-side reviewed ref or
-rerun with `--mark-check-for-commit <serviceReviewedSourceRevision>` only when
+rerun with `--admit-for-commit <serviceReviewedSourceRevision>` only when
 that fetched service revision is intentionally the reviewed commit to deploy.
 For supported SCM backends, protected/shared service-backed runs also use
 service-owned lane governance verification. The normal reviewed flow does not

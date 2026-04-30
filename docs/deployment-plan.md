@@ -12332,14 +12332,14 @@ grant sets instead of synthetic role assumptions.
 ### Description
 
 I will make the control plane enforce the distinction between "may submit a deploy" and "may report
-admission evidence." This PR closes the gap exposed by `--mark-check-passed`: the convenience flag
+admission evidence." This PR closes the gap exposed by `--admit-and-deploy`: the convenience flag
 and any future CI-generated check evidence will continue to use the same underlying
 `admissionEvidence` channel, but the service will reject `checks` evidence unless the authenticated
 principal also has an `admission_reporter` grant matching the deployment.
 
 This keeps the mechanism shared between humans and CI while allowing different UX:
 
-- humans may use `--mark-check-passed` as a convenience flag when authorized
+- humans may use `--admit-and-deploy` as a convenience flag when authorized
 - CI should generally submit structured evidence produced by real verification steps
 - both routes are governed by the same `admission_reporter` authorization boundary
 
@@ -12365,7 +12365,7 @@ adds a reviewed "report evidence now, submit later" flow.
   - future reviewed evidence-only APIs must reuse the same `admission_reporter` authorization model
     rather than inventing a parallel role
 - Keep the convenience UX but document it correctly:
-  - `--mark-check-passed` becomes an authorized shortcut for constructing check evidence, not an
+  - `--admit-and-deploy` becomes an authorized shortcut for constructing check evidence, not an
     unconditional local bypass
 - Clarify CI workflow expectations:
   - CI may use the same evidence mechanism
@@ -12384,7 +12384,7 @@ adds a reviewed "report evidence now, submit later" flow.
   - a plain `submitter` cannot submit `admissionEvidence.checks`
   - an `admission_reporter` without `submitter` still cannot submit a deploy
   - a principal with both grants can submit a deploy with check evidence
-- Add remote-profile tests proving `--mark-check-passed` fails closed for authorized submitters
+- Add remote-profile tests proving `--admit-and-deploy` fails closed for authorized submitters
   lacking `admission_reporter`.
 - Add Jenkins / automation tests proving structured evidence submission succeeds only when the
   automation principal has `admission_reporter`.
@@ -12398,7 +12398,7 @@ adds a reviewed "report evidence now, submit later" flow.
 ### Docs (in this PR)
 
 - Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
-  to explain that `--mark-check-passed` is an authorized reporting shortcut rather than a universal
+  to explain that `--admit-and-deploy` is an authorized reporting shortcut rather than a universal
   local escape hatch.
 - Update [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md)
   with reviewed examples of:
@@ -12416,7 +12416,7 @@ adds a reviewed "report evidence now, submit later" flow.
 - `v`
 - targeted deployment-domain tests covering:
   - service-boundary evidence authorization
-  - remote `--mark-check-passed` fail-closed behavior
+  - remote `--admit-and-deploy` fail-closed behavior
   - Jenkins / automation evidence authorization
   - evidence provenance / audit fields
   - diagnostics and docs parity
@@ -12432,7 +12432,7 @@ adds a reviewed "report evidence now, submit later" flow.
 
 - Protected/shared deploy submission and admission-evidence reporting are enforced as distinct
   capabilities.
-- `--mark-check-passed` only works when the authenticated principal has both the right to submit the
+- `--admit-and-deploy` only works when the authenticated principal has both the right to submit the
   deploy and the right to report checks for that scope.
 - CI can use the same evidence mechanism through structured reporting without requiring a separate
   hard-coded control-plane path.
@@ -12467,11 +12467,11 @@ starts rejecting unauthorized evidence.
 
 ---
 
-## PR-92: Admission-requirement introspection + `--mark-check-passed` discoverability closeout
+## PR-92: Admission-requirement introspection + `--admit-and-deploy` discoverability closeout
 
 ### Description
 
-I will close the operator UX gap exposed by the current `--mark-check-passed` flow: the required
+I will close the operator UX gap exposed by the current `--admit-and-deploy` flow: the required
 check names are authoritative in reviewed deployment metadata, but the CLI currently expects users
 to already know them. This PR makes admission requirements discoverable through reviewed read-only
 surfaces and actionable diagnostics so operators do not need to inspect `TARGETS` files just to
@@ -12483,7 +12483,7 @@ self-describing:
 - deployment metadata remains the source of truth for `required_checks`, `required_approvals`, and
   `allowed_refs`
 - read-only CLI output should surface those requirements directly for the selected deployment
-- `--mark-check-passed` errors should guide users toward the authoritative requirement names instead
+- `--admit-and-deploy` errors should guide users toward the authoritative requirement names instead
   of failing with a bare arity error
 
 ### Scope & Changes
@@ -12496,8 +12496,8 @@ self-describing:
   - `allowed_refs`
   - `required_checks`
   - `required_approvals`
-  - whether `--mark-check-passed` is relevant for the selected workflow
-- Make `--mark-check-passed` discoverable and self-correcting:
+  - whether `--admit-and-deploy` is relevant for the selected workflow
+- Make `--admit-and-deploy` discoverable and self-correcting:
   - if passed with no value, fail with actionable guidance
   - when possible, include the deployment's required check names in that guidance
   - when the deployment has no required checks, say so explicitly rather than implying a hidden
@@ -12521,19 +12521,19 @@ self-describing:
   - `allowed_refs`
   - `required_checks`
   - `required_approvals`
-- Add tests proving `--mark-check-passed` with no value fails with actionable diagnostics that
+- Add tests proving `--admit-and-deploy` with no value fails with actionable diagnostics that
   include the deployment's required check names when present.
 - Add tests proving deployments with zero required checks produce explicit "no required checks"
   guidance instead of a misleading placeholder value.
 - Add wrapper tests proving remote-profile and Jenkins-facing surfaces preserve the same
-  discoverability guidance where they expose `--mark-check-passed` behavior.
+  discoverability guidance where they expose `--admit-and-deploy` behavior.
 - Add docs-parity tests proving operator docs and CLI examples stay aligned on how required check
   names are discovered.
 
 ### Docs (in this PR)
 
 - Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
-  with a concrete "how do I discover the right `--mark-check-passed` value?" workflow.
+  with a concrete "how do I discover the right `--admit-and-deploy` value?" workflow.
 - Update [NixOS Shared Host Setup](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-setup.md)
   to document the read-only requirement-inspection path before the first protected/shared submit.
 - Update [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md)
@@ -12547,7 +12547,7 @@ self-describing:
 - `v`
 - targeted deployment-domain tests covering:
   - deploy admission introspection output
-  - `--mark-check-passed` missing-value diagnostics
+  - `--admit-and-deploy` missing-value diagnostics
   - remote/Jenkins discoverability parity
   - docs parity
 
@@ -12562,7 +12562,7 @@ self-describing:
 
 - Operators can discover the authoritative required check names for a deployment through a reviewed
   read-only CLI path.
-- `--mark-check-passed` no longer fails with a non-actionable message when the missing value can be
+- `--admit-and-deploy` no longer fails with a non-actionable message when the missing value can be
   derived from reviewed deployment metadata.
 - The CLI does not require users to inspect checked-in `TARGETS` files just to learn valid
   admission requirement names.
@@ -12603,7 +12603,7 @@ but also tells operators how to discover the valid requirement names that bounda
 
 I will close the remaining protected/shared admission gap where the client and the control plane can
 disagree about the reviewed deployment source revision. Today the client may construct
-`--mark-check-passed` evidence against its local view of the stage ref while the control plane
+`--admit-and-deploy` evidence against its local view of the stage ref while the control plane
 admits the deploy against a different commit in its own repo state. This PR makes the control plane
 authoritative for the reviewed source snapshot while keeping that authority explicit, auditable, and
 safe for concurrent submissions.
@@ -12639,7 +12639,7 @@ The reviewed model should become:
   - require the service to compare that expectation against the freshly snapshotted reviewed ref
   - reject when they differ, with diagnostics that show both SHAs and the reviewed stage ref
 - Make remote-profile and direct service submissions converge on the same source-of-truth model so
-  `--mark-check-passed`, artifact provenance, retry, and rollback all refer to the same reviewed
+  `--admit-and-deploy`, artifact provenance, retry, and rollback all refer to the same reviewed
   source snapshot.
 - Keep local prechecks useful but not authoritative:
   - local CLI guidance may still inspect the local repo for operator convenience
@@ -12676,7 +12676,7 @@ The reviewed model should become:
   submissions remain isolated.
 - Update [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md) with
   operator guidance for diagnosing client/service source-revision mismatch and when
-  `--mark-check-for-commit` is appropriate.
+  `--admit-for-commit` is appropriate.
 - Update [NixOS Shared Host Usage](/Users/kiltyj/Code/bucknix-fresh/docs/nixos-shared-host-usage.md)
   to explain that protected/shared admission is finalized against the service-owned reviewed source
   snapshot, not implicitly against the operator's local checkout.
@@ -12740,7 +12740,7 @@ submissions, which makes the control plane more stateful than a simple ambient-w
 
 ### Recommendation
 
-Implement immediately after PR-92 so the improved `--mark-check-passed` UX is backed by one
+Implement immediately after PR-92 so the improved `--admit-and-deploy` UX is backed by one
 consistent service-owned reviewed source snapshot instead of still depending on whichever repo state
 the client and control plane happen to have locally.
 

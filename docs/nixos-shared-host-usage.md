@@ -328,12 +328,15 @@ Do not pass Vault JWT files, Vault tokens, fixture paths, provider credentials,
 or client-supplied principals through these client commands. For protected/shared
 `mini` runs, the deployment service derives the authenticated principal and the
 worker uses server-local Vault credential sources.
-`--mark-check-passed` is an authorized shortcut for constructing
+`--admit-and-deploy` is an authorized shortcut for constructing
 `admissionEvidence.checks`; it does not bypass service-side authorization. The
 same principal still needs `submitter` to request the deploy and
 `admission_reporter` to report those checks. If a submit fails with
 `unauthorized`, use the returned message to distinguish missing `submitter`
 access from missing `admission_reporter` access.
+Use `--admit-only` when you want to emit the admission evidence JSON without
+deploying, and `--admit-and-deploy` when you want to submit that evidence and
+deploy in one command.
 Use `deploy auth print-groups --deployment <label>` to inspect the reviewed
 Keycloak group shape for one deployment, and
 `deploy auth explain-groups --deployment <label> --action submit|approve|report_checks`
@@ -414,7 +417,7 @@ service-owned reviewed snapshot of the deployment's authoritative stage ref, not
 against your laptop checkout. If a submit returns a reviewed source mismatch,
 compare `clientExpectedSourceRevision` with `serviceReviewedSourceRevision`.
 Either sync the service-side reviewed ref or rerun with
-`--mark-check-for-commit <serviceReviewedSourceRevision>` only when that
+`--admit-for-commit <serviceReviewedSourceRevision>` only when that
 service-fetched commit is intentionally the reviewed one to deploy.
 
 ## Inspect Status And Results
