@@ -12,6 +12,7 @@ import type {
   DeploymentControlPlaneArtifactStatus,
   DeploymentControlPlaneLifecycleState,
   DeploymentControlPlaneRequestDedupe,
+  DeploymentControlPlaneServiceInstance,
   DeploymentControlPlaneSubmitRejectionCode,
   DeploymentControlPlaneTerminationReason,
 } from "./deployment-control-plane-contract.ts";
@@ -124,6 +125,7 @@ export type CloudflarePagesControlPlaneSubmission = {
     timeoutMs?: number;
   };
   requestedBy?: DeploymentPrincipal;
+  serviceInstance?: DeploymentControlPlaneServiceInstance;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
   authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   rejectionCode?: DeploymentControlPlaneSubmitRejectionCode;

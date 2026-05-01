@@ -5,6 +5,7 @@ import {
   statusFromSubmission,
   submitResponseFromSubmission,
 } from "../../deployments/deployment-control-plane-status.ts";
+import { formatDeploymentControlPlaneStatusText } from "../../deployments/deployment-control-plane-status-format.ts";
 
 test("control-plane submit and status responses preserve public service-instance diagnostics", () => {
   const submission = {
@@ -34,4 +35,5 @@ test("control-plane submit and status responses preserve public service-instance
 
   assert.deepEqual(submit.serviceInstance, submission.serviceInstance);
   assert.deepEqual(status.serviceInstance, submission.serviceInstance);
+  assert.match(formatDeploymentControlPlaneStatusText(status), /service: git 8f00f5/);
 });

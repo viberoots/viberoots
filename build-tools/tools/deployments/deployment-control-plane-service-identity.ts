@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { DeploymentControlPlaneServiceInstance } from "./deployment-control-plane-contract.ts";
+import { CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "./cloudflare-pages-control-plane-api-contract.ts";
 import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "./nixos-shared-host-control-plane-api-contract.ts";
 import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract.ts";
 
@@ -122,7 +123,8 @@ export async function resolveReviewedControlPlaneServiceInstance(opts: {
   workspaceRoot: string;
   deployment: DeploymentTarget;
 }): Promise<DeploymentControlPlaneServiceInstance | undefined> {
-  return opts.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
+  return opts.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA ||
+    opts.schemaVersion === CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
     ? await resolveControlPlaneServiceInstance({
         workspaceRoot: opts.workspaceRoot,
         deployment: opts.deployment,

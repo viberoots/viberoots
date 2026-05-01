@@ -1,22 +1,12 @@
 #!/usr/bin/env zx-wrapper
-import type {
-  DeploymentControlPlaneRunActionResponse,
-  DeploymentControlPlaneRunActionRequest,
-  DeploymentControlPlaneStatus,
-  DeploymentControlPlaneSubmitResponse,
-  DeploymentControlPlaneAuthorization,
-} from "./deployment-control-plane-contract.ts";
+// prettier-ignore
+import type { DeploymentControlPlaneRunActionResponse, DeploymentControlPlaneRunActionRequest, DeploymentControlPlaneStatus, DeploymentControlPlaneSubmitResponse, DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract.ts";
 import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
 import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract.ts";
-import type {
-  DeploymentArtifactChallengeRequest,
-  DeploymentArtifactChallengeResponse,
-} from "./deployment-artifact-binding.ts";
-import type {
-  DeploymentAuthLoginRequest,
-  DeploymentAuthLoginResponse,
-  DeploymentAuthSessionStatus,
-} from "./deployment-auth-session-types.ts";
+// prettier-ignore
+import type { DeploymentArtifactChallengeRequest, DeploymentArtifactChallengeResponse } from "./deployment-artifact-binding.ts";
+// prettier-ignore
+import type { DeploymentAuthLoginRequest, DeploymentAuthLoginResponse, DeploymentAuthSessionStatus } from "./deployment-auth-session-types.ts";
 
 const ACTIVE_LIFECYCLE_STATES = new Set(["queued", "waiting_for_lock", "running", "cancelling"]);
 const CONTROL_PLANE_REQUEST_TIMEOUT_MS = 15_000;
@@ -142,6 +132,7 @@ export async function submitNixosSharedHostControlPlaneViaService(opts: {
   );
   const deadline = Date.now() + timeoutMs;
   let latest: DeploymentControlPlaneStatus = initial;
+  let lastProgress = `${initial.lifecycleState}:${initial.execution?.currentStep || ""}`;
   while (Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, pollMs));
     latest = await readNixosSharedHostControlPlaneStatusViaService({
@@ -149,7 +140,16 @@ export async function submitNixosSharedHostControlPlaneViaService(opts: {
       token: opts.token,
       submissionId: initial.submissionId,
     });
-    if (!ACTIVE_LIFECYCLE_STATES.has(latest.lifecycleState)) {
+    const progress = `${latest.lifecycleState}:${latest.execution?.currentStep || ""}`;
+    const stillActive = ACTIVE_LIFECYCLE_STATES.has(latest.lifecycleState);
+    if (progress !== lastProgress) {
+      const step = latest.execution?.currentStep ? `; step ${latest.execution.currentStep}` : "";
+      console.error(
+        `[deploy] Control-plane submission ${initial.submissionId} is ${latest.lifecycleState}${step}${stillActive ? "; still waiting" : ""}`,
+      );
+      lastProgress = progress;
+    }
+    if (!stillActive) {
       return { initial, final: latest };
     }
   }

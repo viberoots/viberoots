@@ -58,6 +58,7 @@ export function createCloudflarePagesControlPlaneSubmission(
     resultRecordPath?: string;
     finalOutcome?: string;
     requestedBy?: DeploymentPrincipal;
+    serviceInstance?: CloudflarePagesControlPlaneSubmission["serviceInstance"];
     authorization?: DeploymentControlPlaneAuthorizationDecision;
     authorizationSnapshot?: DeploymentControlPlaneAuthorization;
     rejectionCode?: CloudflarePagesControlPlaneSubmission["rejectionCode"];
@@ -84,6 +85,7 @@ export function createCloudflarePagesControlPlaneSubmission(
     ...(opts.resultRecordPath ? { resultRecordPath: opts.resultRecordPath } : {}),
     ...(opts.finalOutcome ? { finalOutcome: opts.finalOutcome } : {}),
     ...(opts.requestedBy ? { requestedBy: opts.requestedBy } : {}),
+    ...(opts.serviceInstance ? { serviceInstance: opts.serviceInstance } : {}),
     ...(opts.authorization ? { authorization: opts.authorization } : {}),
     ...(opts.authorizationSnapshot ? { authorizationSnapshot: opts.authorizationSnapshot } : {}),
     ...(opts.rejectionCode ? { rejectionCode: opts.rejectionCode } : {}),
@@ -104,6 +106,7 @@ export function createCloudflarePagesAdmittedTerminalSubmission(
     terminationReason: "cancelled" | "superseded" | "no_longer_admitted" | "lock_timeout";
     dedupe: DeploymentControlPlaneRequestDedupe;
     requestedBy?: DeploymentPrincipal;
+    serviceInstance?: CloudflarePagesControlPlaneSubmission["serviceInstance"];
     authorization?: DeploymentControlPlaneAuthorizationDecision;
     authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   },
@@ -119,6 +122,7 @@ export function createCloudflarePagesAdmittedTerminalSubmission(
     terminationReason: opts.terminationReason,
     dedupe: opts.dedupe,
     requestedBy: opts.requestedBy,
+    serviceInstance: opts.serviceInstance,
     authorization: opts.authorization,
     authorizationSnapshot: opts.authorizationSnapshot,
   });

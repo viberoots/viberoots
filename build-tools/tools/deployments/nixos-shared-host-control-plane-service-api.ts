@@ -35,10 +35,8 @@ import { reusedBackendSubmitResponse } from "./nixos-shared-host-control-plane-s
 import { resolveServiceSubmitRequest } from "./nixos-shared-host-control-plane-service-submit.ts";
 import { handleProtectedChallengedNixosServiceSubmit } from "./nixos-shared-host-control-plane-service-protected-submit.ts";
 import { resolveNixosSharedHostSubmitContext } from "./nixos-shared-host-control-plane-submit-context.ts";
-export {
-  readControlPlaneRecord,
-  readControlPlaneStatus,
-} from "./nixos-shared-host-control-plane-service-read.ts";
+// prettier-ignore
+export { readControlPlaneRecord, readControlPlaneStatus } from "./nixos-shared-host-control-plane-service-read.ts";
 
 // prettier-ignore
 export type ServiceRunActionRequest = DeploymentControlPlaneRunActionRequest & { deployRunId?: string; authSessionId?: string; requestedBy?: DeploymentPrincipal; authorization?: DeploymentControlPlaneAuthorization; };
@@ -228,6 +226,7 @@ export async function handleControlPlaneSubmit(
             },
             ...(authorization ? { authorization } : {}),
             ...(boundary.authorization ? { authorizationSnapshot: boundary.authorization } : {}),
+            ...(serviceInstance ? { serviceInstance } : {}),
             governanceResolver,
           });
     await enqueueBackendSubmission(
@@ -242,9 +241,9 @@ export async function handleControlPlaneSubmit(
   }
 }
 
+// prettier-ignore
 export async function handleControlPlaneRunAction(
   request: ServiceRunActionRequest,
-  opts: { backend: NixosSharedHostControlPlaneBackendTarget; workspaceRoot: string },
-) {
+  opts: { backend: NixosSharedHostControlPlaneBackendTarget; workspaceRoot: string }) {
   return await handleControlPlaneRunActionService(request, opts);
 }

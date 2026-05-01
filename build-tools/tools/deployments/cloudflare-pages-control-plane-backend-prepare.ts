@@ -18,6 +18,7 @@ import { createCloudflarePagesDeployRunId } from "./cloudflare-pages-records.ts"
 import type {
   DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
+  DeploymentControlPlaneServiceInstance,
 } from "./deployment-control-plane-contract.ts";
 import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
@@ -57,6 +58,7 @@ function admissionFailureSubmission(opts: {
   requestedBy: ReturnType<typeof requestedByFor>;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
   authorizationSnapshot?: DeploymentControlPlaneAuthorization;
+  serviceInstance?: DeploymentControlPlaneServiceInstance;
   error: DeploymentAdmissionError;
 }) {
   const pendingApproval =
@@ -80,6 +82,7 @@ function admissionFailureSubmission(opts: {
           }),
       dedupe: opts.dedupe,
       requestedBy: opts.requestedBy,
+      ...(opts.serviceInstance ? { serviceInstance: opts.serviceInstance } : {}),
       ...(opts.authorization ? { authorization: opts.authorization } : {}),
       ...(opts.authorizationSnapshot ? { authorizationSnapshot: opts.authorizationSnapshot } : {}),
       deployRunId: createCloudflarePagesDeployRunId(),
@@ -121,6 +124,7 @@ export async function prepareBackendCloudflarePagesControlPlaneRun(opts: {
   dedupe: RequestDedupe;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
   authorizationSnapshot?: DeploymentControlPlaneAuthorization;
+  serviceInstance?: DeploymentControlPlaneServiceInstance;
   governanceResolver?: DeploymentLaneGovernanceResolver;
 }) {
   const snapshot = await buildCloudflarePagesBackendSnapshot(opts.resolved, {
@@ -149,6 +153,7 @@ export async function prepareBackendCloudflarePagesControlPlaneRun(opts: {
         executionSnapshotPath: refs.executionSnapshotPath,
         dedupe: opts.dedupe,
         requestedBy,
+        ...(opts.serviceInstance ? { serviceInstance: opts.serviceInstance } : {}),
         ...(opts.authorization ? { authorization: opts.authorization } : {}),
         ...(opts.authorizationSnapshot
           ? { authorizationSnapshot: opts.authorizationSnapshot }
@@ -178,6 +183,7 @@ export async function prepareBackendCloudflarePagesControlPlaneRun(opts: {
         lifecycleState: "queued",
         dedupe: opts.dedupe,
         requestedBy,
+        ...(opts.serviceInstance ? { serviceInstance: opts.serviceInstance } : {}),
         ...(opts.authorization ? { authorization: opts.authorization } : {}),
         ...(opts.authorizationSnapshot
           ? { authorizationSnapshot: opts.authorizationSnapshot }

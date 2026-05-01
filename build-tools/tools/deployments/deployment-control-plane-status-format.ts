@@ -69,6 +69,17 @@ function executionLine(status: DeploymentControlPlaneStatus): string | undefined
   return `execution: ${parts.join(" | ")}`;
 }
 
+function serviceLine(status: DeploymentControlPlaneStatus): string | undefined {
+  const service = status.serviceInstance;
+  if (!service?.gitHead && !service?.hostname) return undefined;
+  return [
+    service.gitHead ? `git ${service.gitHead}` : "",
+    service.hostname ? `host ${service.hostname}` : "",
+  ]
+    .filter(Boolean)
+    .join(" | ");
+}
+
 export function formatDeploymentControlPlaneStatusText(
   status: DeploymentControlPlaneStatus,
 ): string {
@@ -80,6 +91,7 @@ export function formatDeploymentControlPlaneStatusText(
     `target: ${status.providerTargetIdentity}`,
     artifactLine(status.artifact),
     executionLine(status),
+    serviceLine(status) ? `service: ${serviceLine(status)}` : undefined,
     approvalLine(status),
     diagnosticLine(status),
   ]
