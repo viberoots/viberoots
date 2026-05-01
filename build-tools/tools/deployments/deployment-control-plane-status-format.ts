@@ -88,10 +88,36 @@ export function formatDeploymentControlPlaneStatusText(
 }
 
 export function formatDeploymentControlPlaneRecordText(record: any): string {
+  const controlPlane = record.controlPlane || record.authority;
+  const smokeException = record.smokeException
+    ? [
+        record.smokeException.scope ? `scope ${String(record.smokeException.scope)}` : "",
+        record.smokeException.owner ? `owner ${String(record.smokeException.owner)}` : "",
+        record.smokeException.expiresAt ? `expires ${String(record.smokeException.expiresAt)}` : "",
+        record.smokeException.reviewBy ? `review ${String(record.smokeException.reviewBy)}` : "",
+      ]
+        .filter(Boolean)
+        .join(" | ")
+    : "";
   return [
     `record: ${String(record.deployRunId || "unknown")}`,
     `outcome: ${String(record.finalOutcome || "unknown")}`,
-    record.artifactIdentity ? `artifact: ${String(record.artifactIdentity)}` : undefined,
+    record.failedStep ? `failed step: ${String(record.failedStep)}` : undefined,
+    record.deploymentLabel ? `deployment: ${String(record.deploymentLabel)}` : undefined,
+    record.providerTargetIdentity ? `target: ${String(record.providerTargetIdentity)}` : undefined,
+    controlPlane?.submissionId ? `submissionId: ${String(controlPlane.submissionId)}` : undefined,
+    controlPlane?.workerId ? `workerId: ${String(controlPlane.workerId)}` : undefined,
+    controlPlane?.lockScope ? `lockScope: ${String(controlPlane.lockScope)}` : undefined,
+    record.publicUrl ? `publicUrl: ${String(record.publicUrl)}` : undefined,
+    record.providerReleaseId ? `providerReleaseId: ${String(record.providerReleaseId)}` : undefined,
+    record.artifact?.identity
+      ? `artifact: ${String(record.artifact.identity)}`
+      : record.artifactIdentity
+        ? `artifact: ${String(record.artifactIdentity)}`
+        : undefined,
+    record.smokeOutcome ? `smoke: ${String(record.smokeOutcome)}` : undefined,
+    smokeException ? `smoke exception: ${smokeException}` : undefined,
+    record.errorFingerprint ? `errorFingerprint: ${String(record.errorFingerprint)}` : undefined,
     record.error || record.smokeError
       ? `diagnostic: ${redactDeploymentAuthText(String(record.error || record.smokeError))}`
       : undefined,
