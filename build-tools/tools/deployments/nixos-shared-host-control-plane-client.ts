@@ -137,6 +137,9 @@ export async function submitNixosSharedHostControlPlaneViaService(opts: {
   }
   const timeoutMs = opts.timeoutMs ?? CONTROL_PLANE_SUBMISSION_TIMEOUT_MS;
   const pollMs = opts.pollMs ?? 100;
+  console.error(
+    `[deploy] Control-plane submission ${initial.submissionId} is ${initial.lifecycleState}; waiting up to ${Math.max(1, Math.ceil(timeoutMs / 60_000))} minutes for the service worker to finish. This can take a while during DNS or smoke checks. You can check from another terminal with: deploy --status --submission-id ${initial.submissionId}`,
+  );
   const deadline = Date.now() + timeoutMs;
   let latest: DeploymentControlPlaneStatus = initial;
   while (Date.now() < deadline) {
