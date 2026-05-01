@@ -10,6 +10,7 @@ import {
   resolveDeploymentReviewedTargetEnvironment,
   type DeploymentReviewedTargetEnvironmentAdmission,
 } from "./deployment-reviewed-target-environment.ts";
+import { deploymentGitIsAncestor } from "./deployment-git-ref.ts";
 
 export type NixosSharedHostTargetEnvironmentAdmission =
   DeploymentReviewedTargetEnvironmentAdmission;
@@ -19,11 +20,12 @@ export async function gitIsAncestor(
   ancestorRevision: string,
   descendantRevision: string,
 ): Promise<boolean> {
-  const out = await $({
-    cwd: workspaceRoot,
-    stdio: "pipe",
-  })`git merge-base --is-ancestor ${ancestorRevision} ${descendantRevision}`.nothrow();
-  return (out as any).exitCode === 0;
+  return await deploymentGitIsAncestor({
+    workspaceRoot,
+    ancestorRevision,
+    descendantRevision,
+    purpose: "nixos-shared-host source revision",
+  });
 }
 
 export async function targetEnvironmentAdmission(

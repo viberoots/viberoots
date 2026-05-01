@@ -9,6 +9,7 @@ import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract
 import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence.ts";
 import type { DeploymentRunRecordLike } from "./deployment-admission-records.ts";
 import { readBackendDeployRecordByDeployRunId } from "./nixos-shared-host-control-plane-backend.ts";
+import { resolveDeploymentGitCommit } from "./deployment-git-ref.ts";
 
 type RevalidationContext = {
   targetEnvironment?: {
@@ -20,14 +21,6 @@ type RevalidationContext = {
   };
   policyEvaluation?: DeploymentAdmissionPolicyEvaluation;
 };
-
-async function gitStdout(workspaceRoot: string, args: string[]): Promise<string> {
-  const out = await $({ cwd: workspaceRoot, stdio: "pipe" })`git ${args}`.nothrow();
-  if ((out as any).exitCode !== 0) {
-    throw new Error(`git ${args.join(" ")} failed in ${workspaceRoot}`);
-  }
-  return String((out as any).stdout || "").trim();
-}
 
 async function readSharedBackendRecord(opts: {
   recordsRoot: string;
@@ -85,7 +78,11 @@ export async function revalidateControlPlaneAdmission(opts: {
     opts.admittedContext.targetEnvironment?.reviewedSourceSnapshot?.snapshotRef ||
     opts.admittedContext.targetEnvironment?.targetRef ||
     requiredDeploymentStageBranch(opts.deployment);
-  const currentRevision = await gitStdout(opts.workspaceRoot, ["rev-parse", targetRef]);
+  const currentRevision = await resolveDeploymentGitCommit({
+    workspaceRoot: opts.workspaceRoot,
+    revision: targetRef,
+    purpose: "control-plane revalidation target ref",
+  });
   if (
     opts.admittedContext.targetEnvironment?.targetRevision &&
     currentRevision !== opts.admittedContext.targetEnvironment.targetRevision

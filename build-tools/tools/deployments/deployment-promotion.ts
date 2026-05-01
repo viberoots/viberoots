@@ -17,6 +17,7 @@ import type {
   CrossDeploymentPromotionSourceSelection,
   DeploymentPromotionSource,
 } from "./deployment-promotion-types.ts";
+import { resolveDeploymentGitCommit } from "./deployment-git-ref.ts";
 export type {
   CrossDeploymentPromotionSelection,
   CrossDeploymentPromotionSourceSelection,
@@ -24,14 +25,6 @@ export type {
 } from "./deployment-promotion-types.ts";
 export { resolveDeploymentPromotionSource } from "./deployment-promotion-source.ts";
 export { resolveDeploymentPromotionSourceRecordPath } from "./deployment-promotion-source.ts";
-
-async function gitStdout(workspaceRoot: string, args: string[]): Promise<string> {
-  const out = await $({ cwd: workspaceRoot, stdio: "pipe" })`git ${args}`.nothrow();
-  if ((out as any).exitCode !== 0) {
-    throw new Error(`git ${args.join(" ")} failed in ${workspaceRoot}`);
-  }
-  return String((out as any).stdout || "").trim();
-}
 
 async function eligibilityErrors(
   workspaceRoot: string,
@@ -45,7 +38,11 @@ async function eligibilityErrors(
       `deployment admission policy ${deployment.admissionPolicyRef} does not allow source ref ${targetRef}`,
     );
   }
-  const targetRevision = await gitStdout(workspaceRoot, ["rev-parse", targetRef]);
+  const targetRevision = await resolveDeploymentGitCommit({
+    workspaceRoot,
+    revision: targetRef,
+    purpose: "promotion target ref",
+  });
   if (targetRevision !== sourcePromotionRevision(source)) {
     errors.push(
       `source run no longer matches current promotable target state: ${source.record.deployRunId}`,

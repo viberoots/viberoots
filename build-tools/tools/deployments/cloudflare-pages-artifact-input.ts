@@ -16,6 +16,7 @@ import {
   type AdmittedStaticWebappArtifact,
 } from "./static-webapp-artifacts.ts";
 import { admitStaticWebappUploadSession } from "./static-webapp-upload-sessions.ts";
+import { resolveDeploymentGitCommit } from "./deployment-git-ref.ts";
 
 export type CloudflarePagesArtifactInput =
   | {
@@ -48,59 +49,14 @@ export type CloudflarePagesArtifactInput =
       artifactIdentity?: string;
     };
 
-async function gitStdout(workspaceRoot: string, args: string[]): Promise<string> {
-  const out = await $({ cwd: workspaceRoot, stdio: "pipe" })`git ${args}`.nothrow();
-  if ((out as any).exitCode !== 0) {
-    const stderr = String((out as any).stderr || "").trim();
-    throw new Error(
-      `git ${args.join(" ")} failed in ${workspaceRoot}${stderr ? `: ${stderr}` : ""}`,
-    );
-  }
-  return String((out as any).stdout || "").trim();
-}
-
-async function gitSucceeds(workspaceRoot: string, args: string[]): Promise<boolean> {
-  const out = await $({ cwd: workspaceRoot, stdio: "pipe" })`git ${args}`.nothrow();
-  return (out as any).exitCode === 0;
-}
-
-async function fetchSourceRevisionRefs(workspaceRoot: string): Promise<string | undefined> {
-  const remoteNames = (await gitStdout(workspaceRoot, ["remote"]))
-    .split(/\r?\n/g)
-    .map((line) => line.trim())
-    .filter(Boolean);
-  const remoteName =
-    remoteNames.find((name) => name === "github") ||
-    remoteNames.find((name) => name === "origin") ||
-    remoteNames[0];
-  if (!remoteName) return undefined;
-  await gitStdout(workspaceRoot, ["fetch", "--quiet", remoteName]);
-  return remoteName;
-}
-
 async function verifySourceRevision(workspaceRoot: string, sourceRevision: string) {
   const revision = sourceRevision.trim();
   if (!revision) throw new Error("artifact input requires sourceRevision");
-  const revisionRef = `${revision}^{commit}`;
-  if (await gitSucceeds(workspaceRoot, ["rev-parse", "--verify", revisionRef])) return;
-
-  let fetchedRemote: string | undefined;
-  try {
-    fetchedRemote = await fetchSourceRevisionRefs(workspaceRoot);
-  } catch (error) {
-    throw new Error(
-      `source revision ${revision} is not available in ${workspaceRoot}, and git fetch failed: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
-  }
-  if (await gitSucceeds(workspaceRoot, ["rev-parse", "--verify", revisionRef])) return;
-
-  throw new Error(
-    `source revision ${revision} is not available in ${workspaceRoot}${
-      fetchedRemote ? ` after fetching ${fetchedRemote}` : " and no git remote is configured"
-    }; push the commit or update the service checkout's fetch access, then retry the deploy`,
-  );
+  await resolveDeploymentGitCommit({
+    workspaceRoot,
+    revision,
+    purpose: "artifact input source revision",
+  });
 }
 
 async function admitBundleRef(opts: {

@@ -6,6 +6,7 @@ import {
   snapshotReviewedSourceForSubmission,
   type DeploymentReviewedSourceSnapshot,
 } from "./nixos-shared-host-reviewed-source-snapshot.ts";
+import { resolveDeploymentGitCommit } from "./deployment-git-ref.ts";
 
 export type DeploymentReviewedTargetEnvironmentAdmission = {
   mode: "stage_branch_snapshot";
@@ -24,13 +25,6 @@ function requiredPolicyRef(deployment: DeploymentTarget): string {
     );
   }
   return sourceRef;
-}
-
-async function gitStdout(workspaceRoot: string, args: string[]): Promise<string> {
-  const out = await $({ cwd: workspaceRoot, stdio: "pipe" })`git ${args}`.nothrow();
-  if ((out as any).exitCode !== 0)
-    throw new Error(`git ${args.join(" ")} failed in ${workspaceRoot}`);
-  return String((out as any).stdout || "").trim();
 }
 
 function reviewedSourceMismatchMessage(opts: {
@@ -71,7 +65,11 @@ export async function resolveDeploymentReviewedTargetEnvironment(opts: {
       : undefined);
   const targetRevision =
     reviewedSourceSnapshot?.sourceRevision ||
-    (await gitStdout(opts.workspaceRoot, ["rev-parse", targetRef]));
+    (await resolveDeploymentGitCommit({
+      workspaceRoot: opts.workspaceRoot,
+      revision: targetRef,
+      purpose: "deployment reviewed target ref",
+    }));
   const expected = opts.expectedSourceRevision?.trim();
   if (expected && expected !== targetRevision) {
     throw new DeploymentAdmissionError(
