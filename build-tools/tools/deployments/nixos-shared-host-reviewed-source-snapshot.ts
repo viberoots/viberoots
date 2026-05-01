@@ -134,7 +134,7 @@ function isRemoteUrl(value: string): boolean {
   return /^(?:https?|ssh):\/\//i.test(value) || /^[^@]+@[^:]+:/i.test(value);
 }
 
-async function gitFetchEnvForReviewedRemote(
+export async function gitFetchEnvForReviewedRemote(
   workspaceRoot: string,
   fetchTarget: string,
 ): Promise<{ env?: NodeJS.ProcessEnv; cleanup: () => Promise<void> }> {

@@ -1,9 +1,14 @@
 #!/usr/bin/env zx-wrapper
+import { gitFetchEnvForReviewedRemote } from "./nixos-shared-host-reviewed-source-snapshot.ts";
 
 export type DeploymentGitFetchMode = "never" | "if_missing" | "before_resolve";
 
-export async function deploymentGitStdout(workspaceRoot: string, args: string[]): Promise<string> {
-  const out = await $({ cwd: workspaceRoot, stdio: "pipe" })`git ${args}`.nothrow();
+export async function deploymentGitStdout(
+  workspaceRoot: string,
+  args: string[],
+  env?: NodeJS.ProcessEnv,
+): Promise<string> {
+  const out = await $({ cwd: workspaceRoot, stdio: "pipe", env })`git ${args}`.nothrow();
   if ((out as any).exitCode !== 0) {
     const stderr = String((out as any).stderr || "").trim();
     throw new Error(
@@ -47,14 +52,23 @@ async function fetchDeploymentGitRemoteRefs(opts: {
 }): Promise<string | undefined> {
   const remoteName = await preferredDeploymentGitRemote(opts.workspaceRoot, opts.remoteName);
   if (!remoteName) return undefined;
-  await deploymentGitStdout(opts.workspaceRoot, [
-    "fetch",
-    "--quiet",
-    "--no-tags",
-    "--no-write-fetch-head",
-    remoteName,
-    `+refs/heads/*:refs/remotes/${remoteName}/*`,
-  ]);
+  const fetchEnv = await gitFetchEnvForReviewedRemote(opts.workspaceRoot, remoteName);
+  try {
+    await deploymentGitStdout(
+      opts.workspaceRoot,
+      [
+        "fetch",
+        "--quiet",
+        "--no-tags",
+        "--no-write-fetch-head",
+        remoteName,
+        `+refs/heads/*:refs/remotes/${remoteName}/*`,
+      ],
+      fetchEnv.env,
+    );
+  } finally {
+    await fetchEnv.cleanup();
+  }
   return remoteName;
 }
 
