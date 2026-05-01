@@ -2,7 +2,7 @@
 import path from "node:path";
 import { requireCloudflarePagesControlPlaneAuthority } from "./cloudflare-pages-control-plane-contract.ts";
 import { prepareCloudflarePagesWranglerConfig } from "./cloudflare-pages-config.ts";
-import { ensureCloudflarePagesCustomDomain } from "./cloudflare-pages-custom-domain.ts";
+import { provisionCloudflarePagesTarget } from "./cloudflare-pages-provision.ts";
 import { publishCloudflarePagesStaticWebapp } from "./cloudflare-pages-publisher.ts";
 import {
   createCloudflarePagesDeployRecord,
@@ -59,7 +59,7 @@ export async function runCloudflarePagesStaticDeploy(
     });
     if (publishMode === "normal" && opts.deployment.providerTarget.customDomain) {
       const provisionSecrets = await secretRuntime.enterStep("provision");
-      await ensureCloudflarePagesCustomDomain({
+      await provisionCloudflarePagesTarget({
         deployment: opts.deployment,
         apiToken: provisionSecrets.cloudflare_api_token,
       }).catch((error) => {

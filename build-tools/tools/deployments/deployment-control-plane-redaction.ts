@@ -23,7 +23,7 @@ const SECRET_VALUE_PATTERN =
 const SAFE_TEXT_PATTERN = /^[a-z0-9 .,:;_/#()+\-"'[\]@]+$/i;
 const SAFE_DIAGNOSTIC_PATTERN = /^[a-z0-9 .,:;_/#()+\-"'[\]@?=>]+$/i;
 const SAFE_DIAGNOSTIC_PREFIX_PATTERN =
-  /^(cloudflare-pages [a-z_]+ timed out|cloudflare-pages custom domain provisioning requires|cloudflare dns [a-z ]+ failed|cloudflare pages custom domain [a-z ]+ failed|etimedout smoke request|smoke content mismatch|smoke expected 200|wrangler pages deploy failed)/i;
+  /^(cloudflare-pages [a-z_]+ timed out|cloudflare-pages custom domain provisioning requires|cloudflare-pages project provisioning requires|cloudflare dns [a-z ]+ failed|cloudflare pages custom domain [a-z ]+ failed|cloudflare pages project [a-z ]+ failed|etimedout smoke request|smoke content mismatch|smoke expected 200|wrangler pages deploy failed)/i;
 
 function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";

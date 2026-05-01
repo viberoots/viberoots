@@ -115,6 +115,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/cloudflare-pages.extraction.from-targets.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.preview.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.preview-cleanup-secrets.test.ts": True,
+    "build-tools/tools/tests/deployments/cloudflare-pages.project.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.preview.smoke-exception.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.preview.guardrails.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.promotion.helpers.ts": False,
