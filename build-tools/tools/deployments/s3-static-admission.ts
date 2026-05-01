@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import type { S3StaticDeployment } from "./contract.ts";
-import { requiredDeploymentStageBranch } from "./contract.ts";
 import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence.ts";
 import type { DeploymentRequirement } from "./deployment-requirements.ts";
 import {
@@ -8,6 +7,10 @@ import {
   resolveSourceRunAdmittedSecretReferences,
 } from "./deployment-secret-admission.ts";
 import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec.ts";
+import {
+  resolveDeploymentReviewedTargetEnvironment,
+  type DeploymentReviewedTargetEnvironmentAdmission,
+} from "./deployment-reviewed-target-environment.ts";
 
 export type S3StaticAdmittedContext = {
   lanePolicyRef: string;
@@ -37,29 +40,17 @@ export type S3StaticAdmittedContext = {
     targetRevision: string;
     providerTargetIdentity: string;
     lockScope: string;
-  };
+  } & Pick<DeploymentReviewedTargetEnvironmentAdmission, "reviewedSourceSnapshot">;
 };
-
-async function gitStdout(workspaceRoot: string, args: string[]): Promise<string> {
-  const out = await $({ cwd: workspaceRoot, stdio: "pipe" })`git ${args}`.nothrow();
-  if ((out as any).exitCode !== 0) {
-    throw new Error(`git ${args.join(" ")} failed in ${workspaceRoot}`);
-  }
-  return String((out as any).stdout || "").trim();
-}
 
 export async function resolveInitialS3StaticAdmittedContext(opts: {
   workspaceRoot: string;
   deployment: S3StaticDeployment;
   artifactIdentity: string;
+  submissionId?: string;
+  expectedSourceRevision?: string;
 }): Promise<S3StaticAdmittedContext> {
-  const sourceRef = requiredDeploymentStageBranch(opts.deployment);
-  if (!opts.deployment.admissionPolicy.allowedRefs.includes(sourceRef)) {
-    throw new Error(
-      `deployment admission policy ${opts.deployment.admissionPolicyRef} does not allow source ref ${sourceRef}`,
-    );
-  }
-  const sourceRevision = await gitStdout(opts.workspaceRoot, ["rev-parse", sourceRef]);
+  const target = await resolveDeploymentReviewedTargetEnvironment(opts);
   return {
     lanePolicyRef: opts.deployment.lanePolicyRef,
     lanePolicyFingerprint: opts.deployment.lanePolicy.fingerprint,
@@ -69,7 +60,7 @@ export async function resolveInitialS3StaticAdmittedContext(opts: {
     secretRequirements: opts.deployment.secretRequirements,
     admittedSecretReferences: await resolveInitialAdmittedSecretReferences({
       requirements: opts.deployment.secretRequirements,
-      targetScope: opts.deployment.providerTarget.providerTargetIdentity,
+      targetScope: target.lockScope,
     }),
     runtimeConfigRequirements: opts.deployment.runtimeConfigRequirements,
     referenceResolutionPolicy: {
@@ -79,18 +70,12 @@ export async function resolveInitialS3StaticAdmittedContext(opts: {
     targetExceptionRefs: opts.deployment.targetExceptions.map((entry) => entry.ref).sort(),
     source: {
       mode: "stage_branch_head",
-      sourceRef,
-      sourceRevision,
+      sourceRef: target.targetRef,
+      sourceRevision: target.targetRevision,
       artifactIdentity: opts.artifactIdentity,
       artifactTrustMode: opts.deployment.admissionPolicy.artifactAttestationMode,
     },
-    targetEnvironment: {
-      mode: "stage_branch_snapshot",
-      targetRef: sourceRef,
-      targetRevision: sourceRevision,
-      providerTargetIdentity: opts.deployment.providerTarget.providerTargetIdentity,
-      lockScope: opts.deployment.providerTarget.providerTargetIdentity,
-    },
+    targetEnvironment: target,
   };
 }
 
@@ -99,6 +84,8 @@ export async function resolvePromotionS3StaticAdmittedContext(opts: {
   deployment: S3StaticDeployment;
   artifactIdentity: string;
   sourceRecord: { deployRunId: string; deploymentId: string };
+  submissionId?: string;
+  expectedSourceRevision?: string;
 }): Promise<S3StaticAdmittedContext> {
   const admitted = await resolveInitialS3StaticAdmittedContext(opts);
   return {
@@ -132,6 +119,8 @@ export async function resolveSourceRunS3StaticAdmittedContext(opts: {
       };
     };
   };
+  submissionId?: string;
+  expectedSourceRevision?: string;
 }): Promise<S3StaticAdmittedContext> {
   const admitted = await resolveInitialS3StaticAdmittedContext(opts);
   return {

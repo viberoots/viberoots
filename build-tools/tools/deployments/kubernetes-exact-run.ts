@@ -26,6 +26,8 @@ export async function submitKubernetesExactArtifactRun(opts: {
   parentRunId: string;
   releaseLineageId: string;
   artifactLineageId: string;
+  submissionId?: string;
+  expectedSourceRevision?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: { protocol: "http:" | "https:"; hostname: string; port: number };
 }) {
@@ -36,12 +38,20 @@ export async function submitKubernetesExactArtifactRun(opts: {
           deployment: opts.deployment,
           artifactIdentity: opts.artifactLineageId,
           sourceRecord: opts.sourceRecord,
+          ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
+          ...(opts.expectedSourceRevision
+            ? { expectedSourceRevision: opts.expectedSourceRevision }
+            : {}),
         })
       : await resolveSourceRunKubernetesAdmittedContext({
           workspaceRoot: opts.workspaceRoot,
           deployment: opts.deployment,
           artifactIdentity: opts.artifactLineageId,
           sourceRecord: opts.sourceRecord,
+          ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
+          ...(opts.expectedSourceRevision
+            ? { expectedSourceRevision: opts.expectedSourceRevision }
+            : {}),
         });
   admittedContext.policyEvaluation = await evaluateDeploymentAdmission({
     workspaceRoot: opts.workspaceRoot,

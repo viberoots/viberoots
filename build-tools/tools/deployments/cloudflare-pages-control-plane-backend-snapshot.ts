@@ -193,6 +193,7 @@ export async function buildCloudflarePagesBackendSnapshot(
           ? { deployBatchId: resolved.request.deployBatchId }
           : {}),
         artifact: await resolveCloudflarePagesArtifactForSubmission(resolved, opts),
+        expectedSourceRevision: resolved.request.expectedSourceRevision,
         ...(resolved.request.smokeConnectOverride
           ? { smokeConnectOverride: resolved.request.smokeConnectOverride }
           : {}),

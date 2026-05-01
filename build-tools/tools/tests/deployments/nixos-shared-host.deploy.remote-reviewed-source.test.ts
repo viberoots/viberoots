@@ -82,10 +82,7 @@ test("remote deploy surfaces reviewed-source mismatch guidance when the local ch
         String(result.stderr),
         new RegExp(`serviceReviewedSourceRevision=${serviceRevision}`),
       );
-      assert.match(
-        String(result.stderr),
-        /deployment branch is up to date and pushed before retrying/,
-      );
+      assert.match(String(result.stderr), /that branch is up to date and pushed before retrying/);
       assert.match(String(result.stderr), new RegExp(`--admit-for-commit ${serviceRevision}`));
     } finally {
       await controlPlane.close();

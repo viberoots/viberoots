@@ -33,6 +33,7 @@ export type CloudflarePagesControlPlaneSubmitRequest = {
   deployBatchId?: string;
   artifactDir?: string;
   artifactInput?: CloudflarePagesArtifactInput;
+  expectedSourceRevision?: string;
   sourceRunId?: string;
   targetExceptionRef?: string;
   publishBehavior?: CloudflarePagesPublishBehavior;

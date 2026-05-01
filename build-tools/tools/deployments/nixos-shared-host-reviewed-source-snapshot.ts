@@ -3,7 +3,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { shSingleQuote } from "../lib/shell-quote.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
+import type { DeploymentTarget } from "./contract.ts";
 import { requiredDeploymentStageBranch } from "./contract.ts";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
 
@@ -16,7 +16,7 @@ const GITHUB_KNOWN_HOSTS = [
 const REVIEWED_SOURCE_SSH_KEY_FILE_ENV = "BNX_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE";
 const REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE_ENV = "BNX_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE";
 
-export type NixosSharedHostReviewedSourceSnapshot = {
+export type DeploymentReviewedSourceSnapshot = {
   reviewedRef: string;
   snapshotRef: string;
   sourceRevision: string;
@@ -25,17 +25,19 @@ export type NixosSharedHostReviewedSourceSnapshot = {
   snapshottedAt: string;
 };
 
+export type NixosSharedHostReviewedSourceSnapshot = DeploymentReviewedSourceSnapshot;
+
 type ReviewedSourceCarrier =
-  | NixosSharedHostReviewedSourceSnapshot
+  | DeploymentReviewedSourceSnapshot
   | {
-      reviewedSourceSnapshot?: NixosSharedHostReviewedSourceSnapshot;
+      reviewedSourceSnapshot?: DeploymentReviewedSourceSnapshot;
       admittedContext?: {
         targetEnvironment?: {
-          reviewedSourceSnapshot?: NixosSharedHostReviewedSourceSnapshot;
+          reviewedSourceSnapshot?: DeploymentReviewedSourceSnapshot;
         };
       };
       targetEnvironment?: {
-        reviewedSourceSnapshot?: NixosSharedHostReviewedSourceSnapshot;
+        reviewedSourceSnapshot?: DeploymentReviewedSourceSnapshot;
       };
     };
 
@@ -70,7 +72,7 @@ function githubSshRemoteForRepository(repository: string): string {
   return `git@github.com:${repository}.git`;
 }
 
-function reviewedFetchTargetFor(deployment: NixosSharedHostDeployment, remoteName: string): string {
+function reviewedFetchTargetFor(deployment: DeploymentTarget, remoteName: string): string {
   const scmBackend = trim(deployment.lanePolicy.governance.scmBackend).toLowerCase();
   const repository = trim(deployment.lanePolicy.governance.repository);
   if (scmBackend === "github" && repository) {
@@ -81,7 +83,7 @@ function reviewedFetchTargetFor(deployment: NixosSharedHostDeployment, remoteNam
 
 async function resolveReviewedRemoteName(
   workspaceRoot: string,
-  deployment: NixosSharedHostDeployment,
+  deployment: DeploymentTarget,
 ): Promise<string> {
   const remotes = (
     await gitStdout(workspaceRoot, ["remote"])
@@ -173,10 +175,10 @@ async function gitFetchEnvForReviewedRemote(
 
 export async function snapshotReviewedSourceForSubmission(opts: {
   workspaceRoot: string;
-  deployment: NixosSharedHostDeployment;
+  deployment: DeploymentTarget;
   submissionId: string;
   expectedSourceRevision?: string;
-}): Promise<NixosSharedHostReviewedSourceSnapshot> {
+}): Promise<DeploymentReviewedSourceSnapshot> {
   const reviewedRef = requiredDeploymentStageBranch(opts.deployment);
   const remoteName = await resolveReviewedRemoteName(opts.workspaceRoot, opts.deployment);
   const snapshotRef = snapshotRefFor(opts.submissionId, reviewedRef);
@@ -205,8 +207,9 @@ export async function snapshotReviewedSourceForSubmission(opts: {
         `clientExpectedSourceRevision=${expectedSourceRevision}`,
         `serviceReviewedSourceRevision=${sourceRevision}`,
         `serviceRemote=${remoteName}`,
-        "Make sure the deployment branch is up to date and pushed before retrying.",
-        `Sync the service-side reviewed ref or rerun with --admit-for-commit ${sourceRevision} if ${sourceRevision} is intentionally the reviewed commit to deploy.`,
+        "The service fetched the reviewed deployment branch before admission.",
+        "Make sure that branch is up to date and pushed before retrying.",
+        `Rerun with --admit-for-commit ${sourceRevision} if ${sourceRevision} is intentionally the reviewed commit to deploy.`,
       ].join("\n"),
     );
   }
@@ -222,10 +225,10 @@ export async function snapshotReviewedSourceForSubmission(opts: {
 
 export function reviewedSourceSnapshotFrom(
   value: ReviewedSourceCarrier | undefined,
-): NixosSharedHostReviewedSourceSnapshot | undefined {
+): DeploymentReviewedSourceSnapshot | undefined {
   if (!value || typeof value !== "object") return undefined;
   if ("snapshotRef" in value && trim((value as { snapshotRef?: unknown }).snapshotRef)) {
-    return value as NixosSharedHostReviewedSourceSnapshot;
+    return value as DeploymentReviewedSourceSnapshot;
   }
   return (
     value.reviewedSourceSnapshot ||

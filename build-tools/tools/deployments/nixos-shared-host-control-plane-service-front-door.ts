@@ -1,9 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { execFile } from "node:child_process";
 import path from "node:path";
-import { promisify } from "node:util";
 import type { NixosSharedHostDeployment } from "./contract.ts";
-import { requiredDeploymentStageBranch } from "./contract.ts";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
 import type { DeploymentControlPlaneStatus } from "./deployment-control-plane-contract.ts";
 import {
@@ -25,8 +22,10 @@ import {
 } from "./deployment-artifact-binding.ts";
 import { deploymentServicePrincipalForToken } from "./deployment-artifact-challenges.ts";
 import { terminalControlPlaneRejectionMessage } from "./deployment-provider-protected-front-door.ts";
-
-const execFileAsync = promisify(execFile);
+import {
+  clientServiceAdmissionEvidence,
+  resolveExpectedDeploymentSourceRevision,
+} from "./deployment-source-revision.ts";
 
 export type NixosSharedHostServiceFrontDoorResponse =
   | { kind: "result"; result: { record: any } }
@@ -37,48 +36,6 @@ function resolvedArtifactDirsByComponentId(artifactDirsByComponentId?: Record<st
   return Object.fromEntries(
     Object.entries(artifactDirsByComponentId).map(([key, value]) => [key, path.resolve(value)]),
   );
-}
-
-function clientAdmissionEvidence(admissionEvidence?: DeploymentAdmissionEvidence) {
-  if (!admissionEvidence) return undefined;
-  const { requestedBy: _requestedBy, ...evidence } = admissionEvidence;
-  return evidence;
-}
-
-async function gitRevision(workspaceRoot: string, revision: string): Promise<string | undefined> {
-  try {
-    const { stdout } = await execFileAsync("git", ["rev-parse", revision], { cwd: workspaceRoot });
-    const resolved = String(stdout || "").trim();
-    return resolved || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function expectedRevisionFromChecks(
-  deployment: NixosSharedHostDeployment,
-  admissionEvidence?: DeploymentAdmissionEvidence,
-): string | undefined {
-  const requiredChecks = new Set(deployment.admissionPolicy.requiredChecks);
-  const subjects = Array.from(
-    new Set(
-      (admissionEvidence?.checks || [])
-        .filter((check) => check.status === "passed" && requiredChecks.has(check.name))
-        .map((check) => String(check.subject || "").trim())
-        .filter(Boolean),
-    ),
-  );
-  return subjects.length === 1 ? subjects[0] : undefined;
-}
-
-async function resolveExpectedSourceRevision(
-  workspaceRoot: string,
-  deployment: NixosSharedHostDeployment,
-  admissionEvidence?: DeploymentAdmissionEvidence,
-): Promise<string | undefined> {
-  const fromChecks = expectedRevisionFromChecks(deployment, admissionEvidence);
-  if (fromChecks) return fromChecks;
-  return await gitRevision(workspaceRoot, requiredDeploymentStageBranch(deployment));
 }
 
 async function readFinalizedRecord(opts: {
@@ -156,10 +113,14 @@ export async function runNixosSharedHostDirectServiceMutation(opts: {
     rejectUnauthorized?: boolean;
   };
 }) {
-  const admissionEvidence = clientAdmissionEvidence(opts.admissionEvidence);
+  const admissionEvidence = clientServiceAdmissionEvidence(opts.admissionEvidence);
   const expectedSourceRevision =
     !opts.sourceRunId && opts.operationKind !== "explicit_removal" && opts.workspaceRoot
-      ? await resolveExpectedSourceRevision(opts.workspaceRoot, opts.deployment, admissionEvidence)
+      ? await resolveExpectedDeploymentSourceRevision({
+          workspaceRoot: opts.workspaceRoot,
+          deployment: opts.deployment,
+          admissionEvidence,
+        })
       : undefined;
   const expected =
     opts.expectedArtifactIdentities ||

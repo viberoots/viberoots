@@ -139,6 +139,9 @@ export async function runProtectedCloudflarePagesDeployFrontDoor(opts: {
               ? "promotion"
               : "deploy",
     ...(artifactInput ? { artifactInput } : {}),
+    ...(artifactInput && "sourceRevision" in artifactInput
+      ? { expectedSourceRevision: artifactInput.sourceRevision }
+      : {}),
     ...(opts.publishOnly ? { publishBehavior: "publish-only" as const } : {}),
     ...(opts.preview ? { publishMode: "preview" as const } : {}),
     ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),

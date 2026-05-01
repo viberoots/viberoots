@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import type { GooglePlayDeployment } from "./contract.ts";
-import { requiredDeploymentStageBranch } from "./contract.ts";
 import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence.ts";
 import type { DeploymentRequirement } from "./deployment-requirements.ts";
 import {
@@ -8,6 +7,10 @@ import {
   resolveSourceRunAdmittedSecretReferences,
 } from "./deployment-secret-admission.ts";
 import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec.ts";
+import {
+  resolveDeploymentReviewedTargetEnvironment,
+  type DeploymentReviewedTargetEnvironmentAdmission,
+} from "./deployment-reviewed-target-environment.ts";
 
 type GooglePlaySourceAdmission = {
   mode: "stage_branch_head" | "source_run_reuse" | "promotion_source_run";
@@ -41,31 +44,8 @@ export type GooglePlayAdmittedContext = {
     targetRevision: string;
     providerTargetIdentity: string;
     lockScope: string;
-  };
+  } & Pick<DeploymentReviewedTargetEnvironmentAdmission, "reviewedSourceSnapshot">;
 };
-
-async function gitStdout(workspaceRoot: string, args: string[]): Promise<string> {
-  const out = await $({ cwd: workspaceRoot, stdio: "pipe" })`git ${args}`.nothrow();
-  if ((out as any).exitCode !== 0)
-    throw new Error(`git ${args.join(" ")} failed in ${workspaceRoot}`);
-  return String((out as any).stdout || "").trim();
-}
-
-async function targetEnvironment(workspaceRoot: string, deployment: GooglePlayDeployment) {
-  const targetRef = requiredDeploymentStageBranch(deployment);
-  if (!deployment.admissionPolicy.allowedRefs.includes(targetRef)) {
-    throw new Error(
-      `deployment admission policy ${deployment.admissionPolicyRef} does not allow source ref ${targetRef}`,
-    );
-  }
-  return {
-    mode: "stage_branch_snapshot" as const,
-    targetRef,
-    targetRevision: await gitStdout(workspaceRoot, ["rev-parse", targetRef]),
-    providerTargetIdentity: deployment.providerTarget.providerTargetIdentity,
-    lockScope: deployment.providerTarget.providerTargetIdentity,
-  };
-}
 
 async function baseContext(
   deployment: GooglePlayDeployment,
@@ -107,8 +87,10 @@ async function admittedContextFor(opts: {
   artifactIdentity: string;
   mode: GooglePlaySourceAdmission["mode"];
   sourceRecord?: { deployRunId: string; deploymentId: string; admittedContext?: any };
+  submissionId?: string;
+  expectedSourceRevision?: string;
 }): Promise<GooglePlayAdmittedContext> {
-  const target = await targetEnvironment(opts.workspaceRoot, opts.deployment);
+  const target = await resolveDeploymentReviewedTargetEnvironment(opts);
   return {
     ...(await baseContext(
       opts.deployment,
@@ -133,6 +115,8 @@ export async function resolveInitialGooglePlayAdmittedContext(opts: {
   workspaceRoot: string;
   deployment: GooglePlayDeployment;
   artifactIdentity: string;
+  submissionId?: string;
+  expectedSourceRevision?: string;
 }) {
   return await admittedContextFor({ ...opts, mode: "stage_branch_head" });
 }

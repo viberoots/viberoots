@@ -23,6 +23,7 @@ import {
   startControlPlaneHarness,
   withEnvOverrides,
 } from "./nixos-shared-host.control-plane.helpers.ts";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 
 async function writeDeploymentJson(filePath: string, deployment: unknown) {
@@ -141,8 +142,8 @@ test("deploy front door runs a cloudflare-pages deploy from Buck-backed metadata
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeTempCloudflareValidationWorkspace(tmp);
     await writeArtifact(artifactDir, "<html>demo staging</html>\n");
-    await $({ cwd: tmp, stdio: "pipe" })`git branch -f env/demo/staging HEAD`;
     const deployment = await resolveDeploymentFromTarget(tmp, deploymentLabel);
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,

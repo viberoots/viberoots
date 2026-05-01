@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import type { CloudflarePagesDeployment } from "./contract.ts";
-import { requiredDeploymentStageBranch } from "./contract.ts";
 import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence.ts";
 import type { DeploymentRequirement } from "./deployment-requirements.ts";
 import {
@@ -9,6 +8,10 @@ import {
 } from "./deployment-secret-admission.ts";
 import type { DeploymentSecretContext } from "./deployment-secret-context.ts";
 import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec.ts";
+import {
+  resolveDeploymentReviewedTargetEnvironment,
+  type DeploymentReviewedTargetEnvironmentAdmission,
+} from "./deployment-reviewed-target-environment.ts";
 
 export type CloudflarePagesSourceAdmission = {
   mode: "stage_branch_head" | "source_run_reuse" | "promotion_source_run";
@@ -26,7 +29,7 @@ export type CloudflarePagesTargetEnvironmentAdmission = {
   targetRevision: string;
   providerTargetIdentity: string;
   lockScope: string;
-};
+} & Pick<DeploymentReviewedTargetEnvironmentAdmission, "reviewedSourceSnapshot">;
 
 export type CloudflarePagesAdmittedContext = {
   lanePolicyRef: string;
@@ -46,16 +49,6 @@ export type CloudflarePagesAdmittedContext = {
   source: CloudflarePagesSourceAdmission;
   targetEnvironment: CloudflarePagesTargetEnvironmentAdmission;
 };
-
-function requiredPolicyRef(deployment: CloudflarePagesDeployment): string {
-  const sourceRef = requiredDeploymentStageBranch(deployment);
-  if (!deployment.admissionPolicy.allowedRefs.includes(sourceRef)) {
-    throw new Error(
-      `deployment admission policy ${deployment.admissionPolicyRef} does not allow source ref ${sourceRef}`,
-    );
-  }
-  return sourceRef;
-}
 
 async function baseContext(
   deployment: CloudflarePagesDeployment,
@@ -102,37 +95,35 @@ async function baseContext(
   };
 }
 
-async function gitStdout(workspaceRoot: string, args: string[]): Promise<string> {
-  const out = await $({ cwd: workspaceRoot, stdio: "pipe" })`git ${args}`.nothrow();
-  if ((out as any).exitCode !== 0) {
-    throw new Error(`git ${args.join(" ")} failed in ${workspaceRoot}`);
-  }
-  return String((out as any).stdout || "").trim();
-}
-
 async function targetEnvironmentAdmission(
   workspaceRoot: string,
   deployment: CloudflarePagesDeployment,
+  submissionId?: string,
+  expectedSourceRevision?: string,
 ): Promise<CloudflarePagesTargetEnvironmentAdmission> {
-  const targetRef = requiredPolicyRef(deployment);
-  const targetRevision = await gitStdout(workspaceRoot, ["rev-parse", targetRef]);
-  return {
-    mode: "stage_branch_snapshot",
-    targetRef,
-    targetRevision,
-    providerTargetIdentity: deployment.providerTarget.providerTargetIdentity,
-    lockScope: deployment.providerTarget.providerTargetIdentity,
-  };
+  return await resolveDeploymentReviewedTargetEnvironment({
+    workspaceRoot,
+    deployment,
+    ...(submissionId ? { submissionId } : {}),
+    ...(expectedSourceRevision ? { expectedSourceRevision } : {}),
+  });
 }
 
 export async function resolveInitialCloudflarePagesAdmittedContext(opts: {
   workspaceRoot: string;
   deployment: CloudflarePagesDeployment;
   artifactIdentity: string;
+  submissionId?: string;
+  expectedSourceRevision?: string;
   secretContext?: DeploymentSecretContext;
   deferSecretReferenceResolution?: boolean;
 }): Promise<CloudflarePagesAdmittedContext> {
-  const target = await targetEnvironmentAdmission(opts.workspaceRoot, opts.deployment);
+  const target = await targetEnvironmentAdmission(
+    opts.workspaceRoot,
+    opts.deployment,
+    opts.submissionId,
+    opts.expectedSourceRevision,
+  );
   return {
     ...(await baseContext(opts.deployment, target.lockScope, undefined, opts)),
     source: {

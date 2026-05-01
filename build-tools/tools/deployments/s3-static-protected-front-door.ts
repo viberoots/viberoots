@@ -9,6 +9,7 @@ import {
 } from "./deployment-provider-protected-front-door.ts";
 import { S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "./s3-static-control-plane.ts";
 import { serviceSubmissionAdmissionEvidence } from "./deployment-service-client-contract.ts";
+import { resolveExpectedDeploymentSourceRevision } from "./deployment-source-revision.ts";
 
 export async function runProtectedS3StaticDeployFrontDoor(opts: {
   workspaceRoot: string;
@@ -25,6 +26,11 @@ export async function runProtectedS3StaticDeployFrontDoor(opts: {
 }) {
   rejectServiceOnlyLocalFlags(opts.hasFlag, "s3-static");
   const admissionEvidence = serviceSubmissionAdmissionEvidence(opts.admissionEvidence as any);
+  const expectedSourceRevision = await resolveExpectedDeploymentSourceRevision({
+    workspaceRoot: opts.workspaceRoot,
+    deployment: opts.deployment,
+    admissionEvidence,
+  });
   const serviceClient = await resolveServiceClientFromCliProfileOrFlags({
     workspaceRoot: opts.workspaceRoot,
     controlPlaneUrl: opts.controlPlaneUrl,
@@ -50,6 +56,7 @@ export async function runProtectedS3StaticDeployFrontDoor(opts: {
       ...(!opts.publishOnly && !opts.provisionOnly
         ? { artifactDir: await resolveArtifactDirForCli(opts.workspaceRoot, opts.deployment) }
         : {}),
+      ...(expectedSourceRevision ? { expectedSourceRevision } : {}),
       ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
       ...(admissionEvidence ? { admissionEvidence } : {}),
       ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),

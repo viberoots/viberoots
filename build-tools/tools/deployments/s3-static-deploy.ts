@@ -34,6 +34,8 @@ export async function submitS3StaticDeploy(opts: {
   deployment: S3StaticDeployment;
   artifactDir: string;
   recordsRoot: string;
+  submissionId?: string;
+  expectedSourceRevision?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: {
     protocol: "http:" | "https:";
@@ -51,6 +53,8 @@ export async function submitS3StaticDeploy(opts: {
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.deployment,
     artifactIdentity: artifact.identity,
+    ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
+    ...(opts.expectedSourceRevision ? { expectedSourceRevision: opts.expectedSourceRevision } : {}),
   });
   const provisionerPlan = await writeS3StaticProvisionerPlan({
     recordsRoot: opts.recordsRoot,

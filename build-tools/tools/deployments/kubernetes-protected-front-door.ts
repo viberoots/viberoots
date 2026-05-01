@@ -12,6 +12,7 @@ import {
 } from "./deployment-provider-protected-front-door.ts";
 import { KUBERNETES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "./kubernetes-control-plane.ts";
 import { serviceSubmissionAdmissionEvidence } from "./deployment-service-client-contract.ts";
+import { resolveExpectedDeploymentSourceRevision } from "./deployment-source-revision.ts";
 
 export async function runProtectedKubernetesDeployFrontDoor(opts: {
   workspaceRoot: string;
@@ -28,6 +29,11 @@ export async function runProtectedKubernetesDeployFrontDoor(opts: {
 }) {
   rejectServiceOnlyLocalFlags(opts.hasFlag, "kubernetes");
   const admissionEvidence = serviceSubmissionAdmissionEvidence(opts.admissionEvidence as any);
+  const expectedSourceRevision = await resolveExpectedDeploymentSourceRevision({
+    workspaceRoot: opts.workspaceRoot,
+    deployment: opts.deployment,
+    admissionEvidence,
+  });
   const serviceClient = await resolveServiceClientFromCliProfileOrFlags({
     workspaceRoot: opts.workspaceRoot,
     controlPlaneUrl: opts.controlPlaneUrl,
@@ -60,6 +66,7 @@ export async function runProtectedKubernetesDeployFrontDoor(opts: {
             }
           : { artifactDir: await resolveArtifactDirForCli(opts.workspaceRoot, opts.deployment) }
         : {}),
+      ...(expectedSourceRevision ? { expectedSourceRevision } : {}),
       ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
       ...(admissionEvidence ? { admissionEvidence } : {}),
       ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),

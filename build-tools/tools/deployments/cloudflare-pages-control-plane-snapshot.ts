@@ -46,6 +46,7 @@ export async function createCloudflarePagesControlPlaneSnapshot(
     source?: CloudflarePagesPromotionSourceSelection;
     smokeConnectOverride?: CloudflarePagesSmokeConnectOverride;
     deferSecretReferenceResolution?: boolean;
+    expectedSourceRevision?: string;
   },
   submissionId: string,
 ): Promise<CloudflarePagesControlPlaneSnapshot> {
@@ -75,6 +76,10 @@ export async function createCloudflarePagesControlPlaneSnapshot(
         workspaceRoot: opts.workspaceRoot,
         deployment: opts.deployment,
         artifactIdentity: artifact.identity,
+        submissionId,
+        ...(opts.expectedSourceRevision
+          ? { expectedSourceRevision: opts.expectedSourceRevision }
+          : {}),
         ...(opts.deferSecretReferenceResolution ? { deferSecretReferenceResolution: true } : {}),
       });
   const lockScope = opts.deployment.providerTarget.providerTargetIdentity;

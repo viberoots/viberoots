@@ -123,7 +123,8 @@ test("service-backed deploy fails closed when the client and service disagree on
             "reviewed source mismatch for env/pleomino/dev",
             `clientExpectedSourceRevision=${clientRevision}`,
             `serviceReviewedSourceRevision=${serviceRevision}`,
-            "deployment branch is up to date and pushed before retrying",
+            "service fetched the reviewed deployment branch before admission",
+            "that branch is up to date and pushed before retrying",
           ].join("[\\s\\S]*"),
         ),
       );

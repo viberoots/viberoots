@@ -40,6 +40,8 @@ export async function submitKubernetesDeploy(opts: {
   recordsRoot: string;
   artifactDir?: string;
   artifactDirsByComponentId?: Record<string, string>;
+  submissionId?: string;
+  expectedSourceRevision?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: {
     protocol: "http:" | "https:";
@@ -69,6 +71,8 @@ export async function submitKubernetesDeploy(opts: {
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.deployment,
     artifactIdentity: compositeArtifactIdentity,
+    ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
+    ...(opts.expectedSourceRevision ? { expectedSourceRevision: opts.expectedSourceRevision } : {}),
   });
   const provisionerPlan = await writeKubernetesProvisionerPlan({
     recordsRoot: opts.recordsRoot,

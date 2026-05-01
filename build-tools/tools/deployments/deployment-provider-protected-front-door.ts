@@ -57,6 +57,8 @@ export async function finalizeProtectedFrontDoorSubmission(opts: {
     token: opts.controlPlaneToken,
     request: opts.request,
   });
+  const rejectionMessage = terminalControlPlaneRejectionMessage(final);
+  if (rejectionMessage) throw Object.assign(new Error(rejectionMessage), { status: final });
   if (!final.deployRunId) return final;
   return await requireSucceededRecord({
     controlPlaneUrl: opts.controlPlaneUrl,

@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fs from "node:fs/promises";
 import type { KubernetesDeployment } from "./contract.ts";
+import { terminalSubmissionFromAdmissionFailure } from "./deployment-provider-control-plane-admission-failure.ts";
 import { assertCrossDeploymentExactPromotionEligible } from "./deployment-provider-promotion.ts";
 import {
   enqueueBackendSubmission,
@@ -32,6 +33,7 @@ export type KubernetesControlPlaneSubmitRequest = {
   operationKind: "deploy" | "promotion" | "retry" | "rollback" | "provision_only";
   artifactDir?: string;
   artifactDirsByComponentId?: Record<string, string>;
+  expectedSourceRevision?: string;
   sourceRunId?: string;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
@@ -51,6 +53,7 @@ type Snapshot = {
   recordsRoot: string;
   artifactDir?: string;
   artifactDirsByComponentId?: Record<string, string>;
+  expectedSourceRevision?: string;
   sourceRunId?: string;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
@@ -77,6 +80,9 @@ export async function queueKubernetesControlPlaneSubmission(opts: {
     ...(opts.request.artifactDir ? { artifactDir: opts.request.artifactDir } : {}),
     ...(opts.request.artifactDirsByComponentId
       ? { artifactDirsByComponentId: opts.request.artifactDirsByComponentId }
+      : {}),
+    ...(opts.request.expectedSourceRevision
+      ? { expectedSourceRevision: opts.request.expectedSourceRevision }
       : {}),
     ...(opts.request.sourceRunId ? { sourceRunId: opts.request.sourceRunId } : {}),
     ...(opts.request.admissionEvidence
@@ -131,18 +137,19 @@ export async function executeKubernetesControlPlaneSubmission(opts: {
   const submission = JSON.parse(await fs.readFile(opts.submissionPath, "utf8"));
   const snapshot = JSON.parse(await fs.readFile(opts.executionSnapshotPath, "utf8")) as Snapshot;
   const lock = await acquireBackendControlPlaneLock(opts.backend, snapshot.lockScope);
+  const runningSubmission = { ...submission, lifecycleState: "running", workerId: opts.workerId };
   try {
-    await persistSubmissionStatus({
-      ...submission,
-      lifecycleState: "running",
-      workerId: opts.workerId,
-    });
+    await persistSubmissionStatus(runningSubmission);
     const result =
       snapshot.operationKind === "deploy"
         ? await submitKubernetesDeploy({
             workspaceRoot: snapshot.workspaceRoot,
             deployment: snapshot.deployment,
             recordsRoot: snapshot.recordsRoot,
+            submissionId: snapshot.submissionId,
+            ...(snapshot.expectedSourceRevision
+              ? { expectedSourceRevision: snapshot.expectedSourceRevision }
+              : {}),
             ...(snapshot.artifactDirsByComponentId
               ? { artifactDirsByComponentId: snapshot.artifactDirsByComponentId }
               : { artifactDir: String(snapshot.artifactDir || "") }),
@@ -158,6 +165,10 @@ export async function executeKubernetesControlPlaneSubmission(opts: {
               workspaceRoot: snapshot.workspaceRoot,
               deployment: snapshot.deployment,
               recordsRoot: snapshot.recordsRoot,
+              submissionId: snapshot.submissionId,
+              ...(snapshot.expectedSourceRevision
+                ? { expectedSourceRevision: snapshot.expectedSourceRevision }
+                : {}),
               ...(snapshot.admissionEvidence
                 ? { admissionEvidence: snapshot.admissionEvidence as any }
                 : {}),
@@ -190,6 +201,10 @@ export async function executeKubernetesControlPlaneSubmission(opts: {
                 releaseLineageId: source.record.releaseLineageId || source.record.deployRunId,
                 artifactLineageId:
                   source.record.artifactLineageId || source.replaySnapshot.artifactIdentity,
+                submissionId: snapshot.submissionId,
+                ...(snapshot.expectedSourceRevision
+                  ? { expectedSourceRevision: snapshot.expectedSourceRevision }
+                  : {}),
                 ...(snapshot.admissionEvidence
                   ? { admissionEvidence: snapshot.admissionEvidence as any }
                   : {}),
@@ -214,6 +229,17 @@ export async function executeKubernetesControlPlaneSubmission(opts: {
       resultRecordPath: result.recordPath,
       finalOutcome: result.record.finalOutcome,
     });
+  } catch (error) {
+    const rejected = terminalSubmissionFromAdmissionFailure({
+      error,
+      submission: runningSubmission,
+      workerId: opts.workerId,
+    });
+    if (rejected) {
+      await persistSubmissionStatus(rejected);
+      return;
+    }
+    throw error;
   } finally {
     await lock.release();
   }

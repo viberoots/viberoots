@@ -11,6 +11,8 @@ export async function submitS3StaticProvisionOnly(opts: {
   workspaceRoot: string;
   deployment: S3StaticDeployment;
   recordsRoot: string;
+  submissionId?: string;
+  expectedSourceRevision?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
 }) {
   const deployRunId = `deploy-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
@@ -18,6 +20,8 @@ export async function submitS3StaticProvisionOnly(opts: {
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.deployment,
     artifactIdentity: `provision-only:${opts.deployment.providerTarget.providerTargetIdentity}`,
+    ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
+    ...(opts.expectedSourceRevision ? { expectedSourceRevision: opts.expectedSourceRevision } : {}),
   });
   const provisionerPlan = await writeS3StaticProvisionerPlan({
     recordsRoot: opts.recordsRoot,
