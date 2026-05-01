@@ -51,6 +51,7 @@ test("cloudflare-pages deploy summarizes Cloudflare API auth failures safely", (
 test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", async () => {
   await runInTemp("cloudflare-pages-e2e", async (tmp, $) => {
     const deployment = cloudflarePagesDeploymentFixture();
+    deployment.providerTarget.accountId = "1b911846f80a89272c0dbaf44f5c810f";
     const deploymentJson = path.join(tmp, "deployment.json");
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
@@ -107,8 +108,9 @@ test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", 
         (await fsp.readFile(fake.logPath, "utf8")).trim().split(/\r?\n/).at(-1) || "{}",
       );
       assert.equal(wranglerLog.projectName, "pleomino-staging-pages");
-      assert.equal(wranglerLog.accountId, "");
+      assert.equal(wranglerLog.accountId, "1b911846f80a89272c0dbaf44f5c810f");
       assert.equal(wranglerLog.config.name, "pleomino-staging-pages");
+      assert.equal(wranglerLog.config.account_id, "1b911846f80a89272c0dbaf44f5c810f");
       assert.equal(wranglerLog.config.pages_build_output_dir, wranglerLog.artifactDir);
       assert.equal(wranglerLog.args.includes("--config"), false);
       assert.equal(path.basename(wranglerLog.configPath), "wrangler.json");

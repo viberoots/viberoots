@@ -214,6 +214,11 @@ test("concrete Pleomino Cloudflare TARGETS emit publish and cleanup token requir
   const { deployments, errors } = extractCloudflarePagesDeployments(nodesFromCqueryJson(merged));
   assert.deepEqual(errors, []);
   assert.equal(deployments.length, 2);
+  assert.equal(
+    deployments.find((deployment) => deployment.deploymentId === "pleomino-staging")?.providerTarget
+      .accountId,
+    "1b911846f80a89272c0dbaf44f5c810f",
+  );
   for (const deployment of deployments)
     assert.equal(deployment.lanePolicy.defaultClientProfile, "mini");
   for (const deployment of deployments) assertCloudflareApiTokenSteps(deployment);

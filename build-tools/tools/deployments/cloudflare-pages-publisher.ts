@@ -14,6 +14,12 @@ function wranglerBin(): string {
   return process.env.BNX_CLOUDFLARE_PAGES_WRANGLER_BIN?.trim() || "wrangler";
 }
 
+function cloudflareAccountEnv(deployment: CloudflarePagesDeployment): Record<string, string> {
+  return deployment.providerTarget.accountId
+    ? { CLOUDFLARE_ACCOUNT_ID: deployment.providerTarget.accountId }
+    : {};
+}
+
 function maybeProviderReleaseId(output: string): string | undefined {
   const lines = output
     .split(/\r?\n/)
@@ -138,6 +144,7 @@ export async function publishCloudflarePagesStaticWebapp(opts: {
       env: {
         ...scrubDeploymentSecretEnv(),
         ...(opts.apiToken ? { CLOUDFLARE_API_TOKEN: opts.apiToken } : {}),
+        ...cloudflareAccountEnv(opts.deployment),
       },
     })`${wranglerBin()} pages deploy ${path.resolve(opts.artifactDir)} --project-name ${opts.deployment.providerTarget.project} ${effectiveRunTarget.previewBranch ? ["--branch", effectiveRunTarget.previewBranch] : []}`;
     const result = await (opts.timeoutMs ? command.timeout(opts.timeoutMs) : command).nothrow();

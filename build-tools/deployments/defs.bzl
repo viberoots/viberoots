@@ -48,6 +48,7 @@ def cloudflare_pages_static_webapp_deployment(
         component,
         account,
         project,
+        account_id = "",
         project_id = "",
         smoke = None,
         smoke_exception = None,
@@ -86,6 +87,7 @@ def cloudflare_pages_static_webapp_deployment(
         }],
         provider_target = {
             "account": account,
+            "account_id": account_id,
             "project": project,
             "id": project_id if project_id else project,
         },

@@ -19,6 +19,7 @@ export type NixosSharedHostProviderTarget = {
 
 export type CloudflarePagesProviderTarget = {
   account: string;
+  accountId?: string;
   project: string;
   id: string;
   canonicalUrl: string;
@@ -101,14 +102,17 @@ export function deriveNixosSharedHostProviderTarget(input: {
 
 export function deriveCloudflarePagesProviderTarget(input: {
   account: string;
+  accountId?: string;
   project: string;
   id?: string;
 }): CloudflarePagesProviderTarget {
   const account = input.account.trim();
+  const accountId = input.accountId?.trim();
   const project = input.project.trim();
   const id = (input.id || project).trim() || project;
   return {
     account,
+    ...(accountId ? { accountId } : {}),
     project,
     id,
     canonicalUrl: `https://${project}.pages.dev/`,

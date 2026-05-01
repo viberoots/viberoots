@@ -98,7 +98,11 @@ export async function prepareCloudflarePagesWranglerConfig(opts: {
   }
   const configuredAccountId =
     typeof parsed.account_id === "string" ? String(parsed.account_id).trim() : undefined;
-  if (configuredAccountId && configuredAccountId !== opts.deployment.providerTarget.account) {
+  const expectedAccountIds = [
+    opts.deployment.providerTarget.account,
+    opts.deployment.providerTarget.accountId,
+  ].filter(Boolean);
+  if (configuredAccountId && !expectedAccountIds.includes(configuredAccountId)) {
     throw new Error(
       `${sourcePath}: wrangler account_id ${configuredAccountId} does not match deployment provider_target.account ${opts.deployment.providerTarget.account}`,
     );
@@ -106,6 +110,9 @@ export async function prepareCloudflarePagesWranglerConfig(opts: {
   const rendered = {
     ...parsed,
     name: opts.deployment.providerTarget.project,
+    ...(opts.deployment.providerTarget.accountId
+      ? { account_id: opts.deployment.providerTarget.accountId }
+      : {}),
   };
   const outputPath = path.resolve(opts.outputPath);
   await fsp.mkdir(path.dirname(outputPath), { recursive: true });

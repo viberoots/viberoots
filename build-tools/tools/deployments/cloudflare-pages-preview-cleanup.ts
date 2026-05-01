@@ -27,8 +27,10 @@ async function deleteCloudflarePagesDeployment(opts: {
   if (!apiToken) {
     throw new Error("cloudflare-pages preview cleanup requires an admitted Cloudflare API token");
   }
+  const accountId =
+    opts.deployment.providerTarget.accountId || opts.deployment.providerTarget.account;
   const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(opts.deployment.providerTarget.account)}/pages/projects/${encodeURIComponent(opts.deployment.providerTarget.project)}/deployments/${encodeURIComponent(opts.providerReleaseId)}`,
+    `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/pages/projects/${encodeURIComponent(opts.deployment.providerTarget.project)}/deployments/${encodeURIComponent(opts.providerReleaseId)}`,
     {
       method: "DELETE",
       headers: {

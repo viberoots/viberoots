@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { CloudflarePagesDeployment } from "./contract.ts";
 import type { DeploymentPreviewPolicy } from "./contract-types.ts";
-import { deploymentError } from "./contract-extract-shared.ts";
+import { deploymentError, duplicateValueEntries } from "./contract-extract-shared.ts";
 import { allowsSharedTargetTransition } from "./deployment-target-exceptions.ts";
 
 export function pushCloudflarePreviewErrors(
@@ -54,4 +54,26 @@ export function allowsCloudflareAliasCollision(
       ),
     ),
   );
+}
+
+export function pushDuplicateCloudflareTargetIdentityErrors(
+  errors: string[],
+  deployments: CloudflarePagesDeployment[],
+) {
+  for (const duplicate of duplicateValueEntries(
+    deployments.map((deployment) => ({
+      value: deployment.providerTarget.providerTargetIdentity,
+      label: deployment.label,
+    })),
+  )) {
+    if (allowsCloudflareAliasCollision(deployments, duplicate.value)) continue;
+    for (const label of duplicate.labels) {
+      errors.push(
+        deploymentError(
+          label,
+          `duplicate provider_target identity "${duplicate.value}" collides with ${duplicate.labels.join(", ")}`,
+        ),
+      );
+    }
+  }
 }

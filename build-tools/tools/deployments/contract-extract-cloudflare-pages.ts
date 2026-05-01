@@ -10,7 +10,6 @@ import {
 import { readPrimaryDeploymentComponent } from "./contract-extract-components.ts";
 import {
   deploymentError,
-  duplicateValueEntries,
   readSmokePolicy,
   pushRolloutPolicyFieldErrors,
   pushTokenFieldErrors,
@@ -33,8 +32,8 @@ import {
 import { readDeploymentRequirements } from "./deployment-requirements.ts";
 import { pushCloudflareComponentKindErrors } from "./cloudflare-pages-capability-validation.ts";
 import {
-  allowsCloudflareAliasCollision,
   pushCloudflarePreviewErrors,
+  pushDuplicateCloudflareTargetIdentityErrors,
 } from "./cloudflare-pages-extract-helpers.ts";
 
 const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/;
@@ -71,6 +70,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
     const vaultRuntime = readVaultRuntimeConfig(node);
     const rolloutPolicy = readRolloutPolicy(node);
     const account = providerTarget.account || "";
+    const accountId = providerTarget.account_id || "";
     const project = providerTarget.project || "";
     const id = providerTarget.id || project;
     const deploymentErrors: string[] = [];
@@ -107,6 +107,14 @@ export function extractCloudflarePagesDeploymentsFromContext(
         required,
         invalidMessage: `${fieldPath} must be lowercase alphanumeric plus internal hyphens`,
       });
+    }
+    if (accountId && !/^[0-9a-f]{32}$/.test(accountId)) {
+      deploymentErrors.push(
+        deploymentError(
+          label,
+          "provider_target.account_id must be a 32-character lowercase Cloudflare account id",
+        ),
+      );
     }
     if (protectionClass !== SHARED_NONPROD && protectionClass !== PRODUCTION_FACING) {
       deploymentErrors.push(
@@ -227,24 +235,9 @@ export function extractCloudflarePagesDeploymentsFromContext(
       ],
       ...(preview ? { preview } : {}),
       publisher: { type: publisher, config: publisherConfig },
-      providerTarget: deriveCloudflarePagesProviderTarget({ account, project, id }),
+      providerTarget: deriveCloudflarePagesProviderTarget({ account, accountId, project, id }),
     });
   }
-  for (const duplicate of duplicateValueEntries(
-    deployments.map((deployment) => ({
-      value: deployment.providerTarget.providerTargetIdentity,
-      label: deployment.label,
-    })),
-  )) {
-    if (allowsCloudflareAliasCollision(deployments, duplicate.value)) continue;
-    for (const label of duplicate.labels) {
-      context.errors.push(
-        deploymentError(
-          label,
-          `duplicate provider_target identity "${duplicate.value}" collides with ${duplicate.labels.join(", ")}`,
-        ),
-      );
-    }
-  }
+  pushDuplicateCloudflareTargetIdentityErrors(context.errors, deployments);
   return deployments.sort((a, b) => a.label.localeCompare(b.label));
 }
