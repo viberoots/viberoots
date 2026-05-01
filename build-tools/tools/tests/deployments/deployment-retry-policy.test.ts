@@ -58,6 +58,18 @@ test("smoke retries stay within the total timeout budget and preserve retry fact
   assert.equal(result.audit.attempts[0]?.reasonCode, "smoke_readiness_transient");
 });
 
+test("smoke retry classification treats error codes as transient even when messages omit them", () => {
+  const error = Object.assign(
+    new Error("Client network socket disconnected before secure TLS connection was established"),
+    { code: "ECONNRESET" },
+  );
+  assert.deepEqual(classifySmokeRetry(error, 2), {
+    retryable: true,
+    reasonCode: "smoke_network_transient",
+    backoffMs: 200,
+  });
+});
+
 test("smoke budget defaults derive from component kind or explicit metadata", () => {
   assert.deepEqual(resolveDeploymentSmokeBudget({ componentKind: "static-webapp" }), {
     runnerClass: "http_5m",

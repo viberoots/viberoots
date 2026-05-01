@@ -14,6 +14,30 @@ test("record text includes failure and control-plane context", () => {
     providerReleaseId: "cf-deploy-123",
     artifact: { identity: "static-webapp:abc123" },
     smokeOutcome: "failed_nonblocking",
+    executionPolicy: {
+      smokeBudget: {
+        runnerClass: "http_5m",
+        totalBudgetMs: 300000,
+        source: "component_kind_default",
+      },
+      retries: [
+        {
+          step: "smoke",
+          maxRetries: 76,
+          totalAttempts: 77,
+          retriesUsed: 76,
+          exhaustedBudget: true,
+          attempts: [
+            {
+              attempt: 77,
+              outcome: "failed",
+              reasonCode: "budget_exhausted",
+              message: "smoke expected 200 from https://staging.example.test/, got 522",
+            },
+          ],
+        },
+      ],
+    },
     error: "payload redacted (sha256:error-1)",
     errorFingerprint: "sha256:error-1",
     controlPlane: {
@@ -33,6 +57,14 @@ test("record text includes failure and control-plane context", () => {
   assert.match(text, /providerReleaseId: cf-deploy-123/);
   assert.match(text, /artifact: static-webapp:abc123/);
   assert.match(text, /smoke: failed_nonblocking/);
+  assert.match(
+    text,
+    /smoke budget: class http_5m \| budget 300000ms \| source component_kind_default/,
+  );
+  assert.match(
+    text,
+    /retry: step smoke \| attempts 77\/77 \| retries 76 \| budget exhausted \| last budget_exhausted \| message smoke expected 200 from https:\/\/staging\.example\.test\/, got 522/,
+  );
   assert.match(text, /errorFingerprint: sha256:error-1/);
   assert.match(text, /diagnostic: payload redacted \(sha256:error-1\)/);
 });

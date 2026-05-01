@@ -12,6 +12,7 @@ import {
 } from "./cloudflare-pages-records.ts";
 import { writeCloudflarePagesReplaySnapshot } from "./cloudflare-pages-replay.ts";
 import {
+  effectiveCloudflarePagesSmokeTimeoutMs,
   maxCloudflarePagesCustomDomainSmokeRetries,
   shouldUseCloudflarePagesCustomDomainSmokeBudget,
 } from "./cloudflare-pages-smoke-retries.ts";
@@ -27,7 +28,10 @@ import { executionPolicyWithRetry, retryAuditFrom } from "./deployment-retry-rec
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
 import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
 import { requireAdmittedStaticWebappArtifactPath } from "./static-webapp-artifacts.ts";
-import type { CloudflarePagesStaticDeployOptions } from "./cloudflare-pages-static-deploy-options.ts";
+import type {
+  CloudflarePagesStaticDeployOptions,
+  CloudflarePagesStaticSmokeRecord,
+} from "./cloudflare-pages-static-deploy-options.ts";
 
 export async function runCloudflarePagesStaticDeploy(
   opts: CloudflarePagesStaticDeployOptions,
@@ -112,13 +116,7 @@ export async function runCloudflarePagesStaticDeploy(
         });
         throw withFailedStep("publish", error);
       });
-    let smoke:
-      | {
-          publicUrl?: string;
-          smokeOutcome: "passed" | "failed_nonblocking" | "omitted_by_exception";
-          smokeError?: string;
-        }
-      | undefined;
+    let smoke: CloudflarePagesStaticSmokeRecord | undefined;
     if (smokeMode.mode === "omitted") {
       smoke = {
         publicUrl: effectiveRunTarget.canonicalUrl,
@@ -130,7 +128,10 @@ export async function runCloudflarePagesStaticDeploy(
       });
     } else {
       try {
-        const smokeTimeoutMs = opts.timeouts?.smokeMs || smokeMode.budget.totalBudgetMs;
+        const smokeTimeoutMs = effectiveCloudflarePagesSmokeTimeoutMs({
+          workerTimeoutMs: opts.timeouts?.smokeMs,
+          policyBudgetMs: smokeMode.budget.totalBudgetMs,
+        });
         await opts.progress?.onStepStart?.("smoke", {
           ...(smokeTimeoutMs ? { timeoutMs: smokeTimeoutMs } : {}),
         });
@@ -148,6 +149,7 @@ export async function runCloudflarePagesStaticDeploy(
               deployment: opts.deployment,
               indexPath: path.join(artifactDir, "index.html"),
               effectiveRunTarget,
+              publishedPublicUrl: published.publicUrl,
               connectOverride: opts.smokeConnectOverride,
             }),
           classifyError: classifySmokeRetry,

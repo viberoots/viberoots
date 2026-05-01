@@ -51,6 +51,19 @@ function messageFor(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function errorCodesFor(error: unknown): string[] {
+  const codes: string[] = [];
+  let current: unknown = error;
+  const seen = new Set<unknown>();
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    const code = (current as { code?: unknown }).code;
+    if (typeof code === "string" && code.trim()) codes.push(code.trim());
+    current = (current as { cause?: unknown }).cause;
+  }
+  return codes;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -79,7 +92,15 @@ export function defaultMaxRetriesForStep(step: DeploymentLifecycleStep): number 
 
 export function classifySmokeRetry(error: unknown, attempt: number): DeploymentRetryDecision {
   const message = messageFor(error);
+  const code = errorCodesFor(error).join(" ");
   if (/ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up/i.test(message)) {
+    return {
+      retryable: true,
+      reasonCode: "smoke_network_transient",
+      backoffMs: attempt * 100,
+    };
+  }
+  if (/\b(ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN)\b/i.test(code)) {
     return {
       retryable: true,
       reasonCode: "smoke_network_transient",

@@ -11,6 +11,12 @@ import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts"
 
 export type CloudflarePagesStaticDeployStep = "publish" | "smoke";
 
+export type CloudflarePagesStaticSmokeRecord = {
+  publicUrl?: string;
+  smokeOutcome: "passed" | "failed_nonblocking" | "omitted_by_exception";
+  smokeError?: string;
+};
+
 export type CloudflarePagesStaticDeployOptions = {
   workspaceRoot: string;
   deployment: CloudflarePagesDeployment;

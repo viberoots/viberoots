@@ -45,11 +45,15 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
   });
   try {
     const timeouts = cloudflareBackendTimeouts();
-    let running: CloudflareBackendSubmissionLike = {
-      ...submission,
-      lifecycleState: "running",
-      workerId: opts.workerId,
-    };
+    let running: CloudflareBackendSubmissionLike = updateCloudflareBackendStep(
+      {
+        ...submission,
+        lifecycleState: "running",
+        workerId: opts.workerId,
+      },
+      "vault",
+      { timeoutMs: timeouts.vaultMs },
+    );
     const persistStep = async (
       step: CloudflareBackendExecutionStep,
       metadata: { mutationStep?: boolean; timeoutMs?: number } = {},
@@ -71,7 +75,6 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
       submission: running,
     });
     try {
-      await persistStep("vault", { timeoutMs: timeouts.vaultMs });
       const runtime = await withStepTimeout(
         "vault",
         timeouts.vaultMs,

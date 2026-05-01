@@ -50,6 +50,37 @@ test("record helpers redact secret-bearing error strings before durable persiste
   assert.match(String(cloudflareRecord.errorFingerprint), /^sha256:/);
 });
 
+test("record helpers preserve known safe smoke diagnostics", () => {
+  const cloudflareRecord = createCloudflarePagesDeployRecord(cloudflarePagesDeploymentFixture(), {
+    deployRunId: "deploy-smoke",
+    finalOutcome: "smoke_failed_after_publish",
+    failedStep: "smoke",
+    admittedContext: {
+      lanePolicyRef: "//build-tools/deployments/lanes:staging",
+      lanePolicyFingerprint: "sha256:lane",
+      admissionPolicyRef: "//build-tools/deployments/policies:staging",
+      admissionPolicyFingerprint: "sha256:policy",
+      environmentStage: "staging",
+      source: { mode: "stage_branch_head", sourceRef: "env/app/staging", sourceRevision: "abc123" },
+      targetEnvironment: {
+        mode: "stage_branch_snapshot",
+        targetRef: "env/app/staging",
+        targetRevision: "abc123",
+        providerTargetIdentity: "target-cf",
+        lockScope: "target-cf",
+      },
+    },
+    error:
+      "smoke expected 200 from https://staging.pleomino.com/, got 522. Cloudflare returned 522 for custom domain staging.pleomino.com; the Pages project may be published while Cloudflare custom-domain routing is still activating. The deploy will keep retrying within its smoke budget, and if it still fails, check the Pages custom domain status and the CNAME for staging.pleomino.com -> pleomino-staging-pages.pages.dev.",
+  });
+
+  assert.match(
+    String(cloudflareRecord.error),
+    /smoke expected 200 from https:\/\/staging\.pleomino\.com\/, got 522/,
+  );
+  assert.equal(cloudflareRecord.errorFingerprint, undefined);
+});
+
 test("observability views keep referenced artifacts secret-safe by exposing reference-only payloads", async () => {
   await runInTemp("deployment-control-plane-redaction", async (tmp) => {
     const recordsRoot = path.join(tmp, "records");

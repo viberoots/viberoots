@@ -19,6 +19,9 @@ export type DeploymentOperatorVisiblePayload = {
 const SECRET_PATTERN =
   /account[_-]?id|api[_-]?key|authorization|bearer|cookie|passwd|password|private[_-]?key|secret|sk_(live|test)|token|x-auth|-----begin/i;
 const SAFE_TEXT_PATTERN = /^[a-z0-9 .,:;_/#()+\-"'[\]@]+$/i;
+const SAFE_DIAGNOSTIC_PATTERN = /^[a-z0-9 .,:;_/#()+\-"'[\]@?=>]+$/i;
+const SAFE_DIAGNOSTIC_PREFIX_PATTERN =
+  /^(cloudflare-pages [a-z_]+ timed out|etimedout smoke request|smoke content mismatch|smoke expected 200)/i;
 
 function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
@@ -34,9 +37,14 @@ export function redactOperatorText(value: unknown): DeploymentOperatorVisiblePay
   const text = normalizeText(value);
   if (!text) return undefined;
   const fingerprint = fingerprintValue(text);
+  const isKnownSafeDiagnostic =
+    text.length <= 800 &&
+    SAFE_DIAGNOSTIC_PREFIX_PATTERN.test(text) &&
+    SAFE_DIAGNOSTIC_PATTERN.test(text) &&
+    !SECRET_PATTERN.test(text);
   const isClearlySafe =
     text.length <= 160 && SAFE_TEXT_PATTERN.test(text) && !SECRET_PATTERN.test(text);
-  return isClearlySafe
+  return isClearlySafe || isKnownSafeDiagnostic
     ? {
         classification: "display_safe",
         redacted: false,

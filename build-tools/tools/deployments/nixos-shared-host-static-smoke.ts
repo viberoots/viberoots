@@ -87,3 +87,12 @@ export async function smokeNixosSharedHostStaticWebapp(opts: {
   await expectStatus200(healthUrl, opts.connectOverride);
   return { publicUrl, healthUrl };
 }
+
+export async function checkNixosSharedHostStaticWebappAvailable(opts: {
+  hostname: string;
+  connectOverride?: SmokeConnectOverride;
+}): Promise<NixosSharedHostStaticSmokeResult> {
+  const publicUrl = new URL("/", `https://${opts.hostname}`).toString();
+  await expectStatus200(publicUrl, opts.connectOverride);
+  return { publicUrl };
+}

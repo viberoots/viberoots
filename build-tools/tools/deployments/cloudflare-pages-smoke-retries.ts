@@ -20,3 +20,12 @@ export function maxCloudflarePagesCustomDomainSmokeRetries(
   );
   return Math.max(2, budgetBoundRetries);
 }
+
+export function effectiveCloudflarePagesSmokeTimeoutMs(opts: {
+  workerTimeoutMs?: number;
+  policyBudgetMs?: number;
+}): number | undefined {
+  if (opts.workerTimeoutMs === undefined) return opts.policyBudgetMs;
+  if (opts.policyBudgetMs === undefined) return opts.workerTimeoutMs;
+  return Math.max(opts.workerTimeoutMs, opts.policyBudgetMs);
+}

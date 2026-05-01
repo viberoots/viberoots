@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { resolveInitialCloudflarePagesAdmittedContext } from "../../deployments/cloudflare-pages-admission.ts";
 import { updateCloudflareBackendStep } from "../../deployments/cloudflare-pages-control-plane-backend-execution.ts";
+import { effectiveCloudflarePagesSmokeTimeoutMs } from "../../deployments/cloudflare-pages-smoke-retries.ts";
 import { runCloudflarePagesStaticDeploy } from "../../deployments/cloudflare-pages-static-deploy.ts";
 import { admitStaticWebappArtifact } from "../../deployments/static-webapp-artifacts.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
@@ -41,6 +42,23 @@ test("cloudflare backend progress keeps current step and first mutation start", 
   assert.equal(publish.execution?.currentStep, "publish");
   assert.equal(publish.execution?.timeoutMs, 25);
   assert.ok(publish.execution?.mutationStartedAt);
+});
+
+test("cloudflare smoke timeout cannot shorten the deployment smoke policy budget", () => {
+  assert.equal(
+    effectiveCloudflarePagesSmokeTimeoutMs({
+      workerTimeoutMs: 3_000,
+      policyBudgetMs: 5 * 60_000,
+    }),
+    5 * 60_000,
+  );
+  assert.equal(
+    effectiveCloudflarePagesSmokeTimeoutMs({
+      workerTimeoutMs: 10 * 60_000,
+      policyBudgetMs: 5 * 60_000,
+    }),
+    10 * 60_000,
+  );
 });
 
 test("cloudflare-pages publish timeout records the failed step and reports progress", async () => {

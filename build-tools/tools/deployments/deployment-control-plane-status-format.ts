@@ -80,6 +80,49 @@ function serviceLine(status: DeploymentControlPlaneStatus): string | undefined {
     .join(" | ");
 }
 
+function smokeBudgetLine(record: any): string | undefined {
+  const budget = record.executionPolicy?.smokeBudget;
+  if (!budget) return undefined;
+  const parts = [
+    budget.runnerClass ? `class ${String(budget.runnerClass)}` : "",
+    budget.totalBudgetMs ? `budget ${String(budget.totalBudgetMs)}ms` : "",
+    budget.source ? `source ${String(budget.source)}` : "",
+  ].filter(Boolean);
+  return parts.length > 0 ? `smoke budget: ${parts.join(" | ")}` : undefined;
+}
+
+function shortDiagnostic(value: unknown): string {
+  const text = redactDeploymentAuthText(
+    String(value || "")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+  return text.length > 240 ? `${text.slice(0, 240)}...` : text;
+}
+
+function retryLine(record: any): string | undefined {
+  const retries = Array.isArray(record.executionPolicy?.retries)
+    ? record.executionPolicy.retries
+    : [];
+  const retry = retries.at(-1);
+  if (!retry) return undefined;
+  const attempts = Array.isArray(retry.attempts) ? retry.attempts : [];
+  const lastAttempt = attempts.at(-1);
+  const maxAttempts =
+    typeof retry.maxRetries === "number" ? Number(retry.maxRetries) + 1 : undefined;
+  const parts = [
+    retry.step ? `step ${String(retry.step)}` : "",
+    typeof retry.totalAttempts === "number"
+      ? `attempts ${String(retry.totalAttempts)}${maxAttempts ? `/${String(maxAttempts)}` : ""}`
+      : "",
+    typeof retry.retriesUsed === "number" ? `retries ${String(retry.retriesUsed)}` : "",
+    retry.exhaustedBudget ? "budget exhausted" : "",
+    lastAttempt?.reasonCode ? `last ${String(lastAttempt.reasonCode)}` : "",
+    lastAttempt?.message ? `message ${shortDiagnostic(lastAttempt.message)}` : "",
+  ].filter(Boolean);
+  return parts.length > 0 ? `retry: ${parts.join(" | ")}` : undefined;
+}
+
 export function formatDeploymentControlPlaneStatusText(
   status: DeploymentControlPlaneStatus,
 ): string {
@@ -128,6 +171,8 @@ export function formatDeploymentControlPlaneRecordText(record: any): string {
         ? `artifact: ${String(record.artifactIdentity)}`
         : undefined,
     record.smokeOutcome ? `smoke: ${String(record.smokeOutcome)}` : undefined,
+    smokeBudgetLine(record),
+    retryLine(record),
     smokeException ? `smoke exception: ${smokeException}` : undefined,
     record.errorFingerprint ? `errorFingerprint: ${String(record.errorFingerprint)}` : undefined,
     record.error || record.smokeError
