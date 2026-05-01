@@ -11,6 +11,10 @@ import {
   writeCloudflarePagesDeployRecord,
 } from "./cloudflare-pages-records.ts";
 import { writeCloudflarePagesReplaySnapshot } from "./cloudflare-pages-replay.ts";
+import {
+  maxCloudflarePagesCustomDomainSmokeRetries,
+  shouldUseCloudflarePagesCustomDomainSmokeBudget,
+} from "./cloudflare-pages-smoke-retries.ts";
 import { smokeCloudflarePagesStaticWebapp } from "./cloudflare-pages-static-smoke.ts";
 import { withFailedStep } from "./deployment-failed-step.ts";
 import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
@@ -134,6 +138,11 @@ export async function runCloudflarePagesStaticDeploy(
         const completedSmoke = await runWithAutomaticRetry({
           step: "smoke",
           totalBudgetMs: smokeTimeoutMs,
+          ...(shouldUseCloudflarePagesCustomDomainSmokeBudget({
+            effectiveRunTarget,
+          })
+            ? { maxRetries: maxCloudflarePagesCustomDomainSmokeRetries(smokeTimeoutMs) }
+            : {}),
           run: async () =>
             await smokeCloudflarePagesStaticWebapp({
               deployment: opts.deployment,

@@ -34,16 +34,32 @@ function apiUrl(pathname: string): string {
   return `${cloudflareApiBaseUrl()}/${pathname.replace(/^\/+/, "")}`;
 }
 
-function errorSummary<T>(action: string, response: CloudflareResponse<T>): string {
+function isCloudflareAuthError<T>(response: CloudflareResponse<T>): boolean {
+  return (
+    response.status === 401 ||
+    response.status === 403 ||
+    response.payload.errors?.some(
+      (error) => error.code === 10000 || /auth|permission|unauthorized/i.test(error.message || ""),
+    ) ||
+    false
+  );
+}
+
+function errorSummary<T>(action: string, response: CloudflareResponse<T>, hint?: string): string {
   const details = response.payload.errors
     ?.map((error) =>
       [error.message, error.code ? `[code: ${error.code}]` : ""].filter(Boolean).join(" "),
     )
     .filter(Boolean)
     .join("; ");
-  return details
+  const summary = details
     ? `Cloudflare DNS ${action} failed: ${details}`
     : `Cloudflare DNS ${action} failed with HTTP ${response.status}`;
+  return hint && isCloudflareAuthError(response) ? `${summary}. ${hint}` : summary;
+}
+
+function dnsRecordPermissionHint(opts: { zoneId: string; domain: string }): string {
+  return `Ensure the Cloudflare API token has Zone:DNS Read and Zone:DNS Edit scoped to zone ${opts.zoneId} for ${opts.domain}.`;
 }
 
 async function cloudflareRequest<T>(
@@ -103,7 +119,7 @@ async function findCnameRecord(opts: {
   if (response.status < 300 && response.payload.success !== false) {
     return response.payload.result?.[0];
   }
-  throw new Error(errorSummary("record lookup", response));
+  throw new Error(errorSummary("record lookup", response, dnsRecordPermissionHint(opts)));
 }
 
 async function writeCnameRecord(opts: {
@@ -131,7 +147,13 @@ async function writeCnameRecord(opts: {
   if (response.status < 300 && response.payload.success !== false) {
     return response.payload.result || body;
   }
-  throw new Error(errorSummary(opts.recordId ? "record update" : "record create", response));
+  throw new Error(
+    errorSummary(
+      opts.recordId ? "record update" : "record create",
+      response,
+      dnsRecordPermissionHint(opts),
+    ),
+  );
 }
 
 export async function ensureCloudflarePagesDnsRecord(opts: {

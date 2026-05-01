@@ -10,6 +10,7 @@ async function withFakeCloudflareApi<T>(
     url: string;
     requests: Array<{ method: string; pathname: string; search: string }>;
   }) => Promise<T>,
+  options: { dnsRecordAuthFailure?: boolean } = {},
 ): Promise<T> {
   const requests: Array<{ method: string; pathname: string; search: string }> = [];
   const domains = new Set<string>();
@@ -36,6 +37,16 @@ async function withFakeCloudflareApi<T>(
       return;
     }
     if (req.method === "GET" && url.pathname.endsWith("/dns_records")) {
+      if (options.dnsRecordAuthFailure) {
+        res.writeHead(403, { "content-type": "application/json" });
+        res.end(
+          JSON.stringify({
+            success: false,
+            errors: [{ code: 10000, message: "Authentication error" }],
+          }),
+        );
+        return;
+      }
       const name = url.searchParams.get("name") || "";
       const record = dnsRecords.get(name);
       res.writeHead(200, { "content-type": "application/json" });
@@ -161,6 +172,30 @@ test("cloudflare-pages custom domain provisioning creates missing domains idempo
       2,
     );
   });
+});
+
+test("cloudflare-pages custom domain provisioning explains DNS token scope failures", async () => {
+  await assert.rejects(
+    () =>
+      withFakeCloudflareApi(
+        async () => {
+          const deployment = cloudflarePagesDeploymentFixture({
+            providerTarget: {
+              ...cloudflarePagesDeploymentFixture().providerTarget,
+              accountId: "1b911846f80a89272c0dbaf44f5c810f",
+              customDomain: "staging.pleomino.com",
+              customDomainZoneId: "zone-pleomino",
+            },
+          });
+          await ensureCloudflarePagesCustomDomain({
+            deployment,
+            apiToken: "cf-test-token",
+          });
+        },
+        { dnsRecordAuthFailure: true },
+      ),
+    /Zone:DNS Read and Zone:DNS Edit scoped to zone zone-pleomino for staging\.pleomino\.com/,
+  );
 });
 
 test("cloudflare-pages custom domain provisioning can use a configured DNS zone id", async () => {

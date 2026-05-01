@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloudflare-pages-control-plane.ts";
+import { maxCloudflarePagesCustomDomainSmokeRetries } from "../../deployments/cloudflare-pages-smoke-retries.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import {
   cloudflarePagesDeploymentFixture,
@@ -30,6 +31,12 @@ async function writeWranglerConfig(
   await fsp.mkdir(path.dirname(root), { recursive: true });
   await fsp.writeFile(root, raw, "utf8");
 }
+
+test("cloudflare-pages custom domain smoke retries scale with the smoke budget", () => {
+  assert.equal(maxCloudflarePagesCustomDomainSmokeRetries(undefined), undefined);
+  assert.equal(maxCloudflarePagesCustomDomainSmokeRetries(1000), 2);
+  assert.equal(maxCloudflarePagesCustomDomainSmokeRetries(300000), 60);
+});
 
 test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", async () => {
   await runInTemp("cloudflare-pages-e2e", async (tmp, $) => {

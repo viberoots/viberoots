@@ -13,10 +13,22 @@ export async function smokeCloudflarePagesStaticWebapp(opts: {
     rejectUnauthorized?: boolean;
   };
 }): Promise<{ publicUrl: string }> {
-  return await smokeNixosSharedHostStaticWebapp({
-    hostname: new URL((opts.effectiveRunTarget || opts.deployment.providerTarget).canonicalUrl)
-      .hostname,
-    indexPath: opts.indexPath,
-    connectOverride: opts.connectOverride,
-  });
+  const target = opts.effectiveRunTarget || opts.deployment.providerTarget;
+  const hostname = new URL(target.canonicalUrl).hostname;
+  try {
+    return await smokeNixosSharedHostStaticWebapp({
+      hostname,
+      indexPath: opts.indexPath,
+      connectOverride: opts.connectOverride,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const customDomain = target.customDomain?.trim();
+    if (customDomain && hostname === customDomain && /got 522\b/.test(message)) {
+      throw new Error(
+        `${message}. Cloudflare returned 522 for custom domain ${customDomain}; the Pages project may be published while Cloudflare custom-domain routing is still activating. The deploy will keep retrying within its smoke budget, and if it still fails, check the Pages custom domain status and the CNAME for ${customDomain} -> ${target.project}.pages.dev.`,
+      );
+    }
+    throw error;
+  }
 }

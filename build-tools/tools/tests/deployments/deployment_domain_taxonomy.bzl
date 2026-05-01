@@ -107,6 +107,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-targets.install.cloudflare.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-targets.install.fragments.no-inherited-kill.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.deploy.e2e.test.ts": True,
+    "build-tools/tools/tests/deployments/cloudflare-pages-static-smoke.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.publisher-error.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.timeout.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.extraction.from-targets.cquery.test.ts": True,
