@@ -8,6 +8,7 @@ import {
   runWithAutomaticRetry,
 } from "../../deployments/deployment-retry-policy.ts";
 import { resolveDeploymentSmokeBudget } from "../../deployments/deployment-smoke-budget.ts";
+import { maxCloudflarePagesCustomDomainSmokeRetries } from "../../deployments/cloudflare-pages-smoke-retries.ts";
 
 test("lifecycle retry policy keeps validate, build, resolve, and provision on a fail-first path", () => {
   assert.equal(defaultMaxRetriesForStep("validate"), 0);
@@ -79,4 +80,10 @@ test("smoke budget defaults derive from component kind or explicit metadata", ()
     totalBudgetMs: undefined,
     source: "component_kind_default",
   });
+});
+
+test("cloudflare custom-domain smoke retry cap allows the timeout budget to decide", () => {
+  assert.equal(maxCloudflarePagesCustomDomainSmokeRetries(1000), 4);
+  assert.equal(maxCloudflarePagesCustomDomainSmokeRetries(5 * 60 * 1000), 76);
+  assert.equal(maxCloudflarePagesCustomDomainSmokeRetries(10 * 60 * 1000), 109);
 });

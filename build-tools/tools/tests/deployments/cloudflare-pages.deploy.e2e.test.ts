@@ -34,8 +34,8 @@ async function writeWranglerConfig(
 
 test("cloudflare-pages custom domain smoke retries scale with the smoke budget", () => {
   assert.equal(maxCloudflarePagesCustomDomainSmokeRetries(undefined), undefined);
-  assert.equal(maxCloudflarePagesCustomDomainSmokeRetries(1000), 2);
-  assert.equal(maxCloudflarePagesCustomDomainSmokeRetries(300000), 60);
+  assert.equal(maxCloudflarePagesCustomDomainSmokeRetries(1000), 4);
+  assert.equal(maxCloudflarePagesCustomDomainSmokeRetries(300000), 76);
 });
 
 test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", async () => {
