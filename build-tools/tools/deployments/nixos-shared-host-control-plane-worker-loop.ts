@@ -79,9 +79,13 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
   try {
     if (snapshot?.deployment?.provider === "cloudflare-pages") {
       if (["running", "cancelling"].includes(claimed.lifecycleState)) {
-        throw new Error(
-          `cloudflare-pages backend recovery is not supported for ${claimed.submissionId}`,
-        );
+        await reconcileNixosSharedHostRecoveredSubmission({
+          submissionPath: materialized.submissionPath,
+          recordsRoot: opts.recordsRoot,
+          backend,
+        });
+        await persistMaterializedSubmission({ backend, ...materialized });
+        return true;
       }
       await executeCloudflarePagesBackendSubmission({
         workspaceRoot: opts.workspaceRoot,
