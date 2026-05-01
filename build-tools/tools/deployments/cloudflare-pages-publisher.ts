@@ -54,7 +54,7 @@ function maybePublicUrl(output: string): string | undefined {
   return undefined;
 }
 
-const MAX_WRANGLER_ERROR_LENGTH = 160;
+const MAX_WRANGLER_ERROR_LENGTH = 500;
 
 function stripAnsi(text: string): string {
   return text.replace(/\u001b\[[0-9;]*m/g, "");
@@ -76,6 +76,14 @@ function isWranglerNoiseLine(line: string): boolean {
   );
 }
 
+function meaningfulWranglerErrorLines(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map(cleanWranglerErrorLine)
+    .filter(Boolean)
+    .filter((line) => !isWranglerNoiseLine(line));
+}
+
 function safeWranglerError(text: string): string {
   const safe = text.replace(/[^\w .,:;_/#()+\-"'\[\]@]/g, "").trim();
   return safe.length > MAX_WRANGLER_ERROR_LENGTH
@@ -93,13 +101,10 @@ export function summarizeWranglerPagesDeployError(stdout: string, stderr: string
       `Cloudflare API ${requestMatch[1]}: ${detailMatch[1]}`,
     )}`;
   }
-  const clean = plain
-    .split(/\r?\n/)
-    .map(cleanWranglerErrorLine)
-    .filter(Boolean)
-    .find((line) => !isWranglerNoiseLine(line));
-  return clean
-    ? `wrangler pages deploy failed: ${safeWranglerError(clean)}`
+  const meaningfulLines = meaningfulWranglerErrorLines(plain);
+  const summary = meaningfulLines.slice(0, 4).join(" ");
+  return summary
+    ? `wrangler pages deploy failed: ${safeWranglerError(summary)}`
     : "wrangler pages deploy failed";
 }
 

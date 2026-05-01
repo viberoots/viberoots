@@ -53,3 +53,44 @@ test("cloudflare-pages rejects wrangler config drift before publish begins", asy
     );
   });
 });
+
+test("cloudflare-pages rejects wrangler account_id drift before omitting it for Pages", async () => {
+  await runInTemp("cloudflare-pages-account-id-drift", async (tmp, $) => {
+    const deployment = cloudflarePagesDeploymentFixture();
+    deployment.providerTarget.accountId = "1b911846f80a89272c0dbaf44f5c810f";
+    const artifactDir = path.join(tmp, "artifact");
+    await writeArtifact(artifactDir);
+    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const admissionEvidence = deploymentAdmissionEvidenceFixture({
+      deployment,
+      operationKind: "deploy",
+      sourceRevision: "rev-cloudflare-account-drift-1",
+      artifactIdentity: "artifact-cloudflare-account-drift-1",
+      artifactLineageId: "artifact-cloudflare-account-drift-1",
+    });
+    const configPath = path.join(
+      tmp,
+      "projects",
+      "deployments",
+      "pleomino-staging",
+      "wrangler.jsonc",
+    );
+    await fsp.mkdir(path.dirname(configPath), { recursive: true });
+    await fsp.writeFile(
+      configPath,
+      '{\n  "account_id": "00000000000000000000000000000000",\n  "compatibility_date": "2026-03-18"\n}\n',
+      "utf8",
+    );
+    await assert.rejects(
+      async () =>
+        await submitCloudflarePagesControlPlaneDeploy({
+          workspaceRoot: tmp,
+          deployment,
+          artifactDir,
+          recordsRoot: path.join(tmp, "records"),
+          admissionEvidence,
+        }),
+      /does not match deployment provider_target\.account/,
+    );
+  });
+});

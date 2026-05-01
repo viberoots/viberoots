@@ -110,9 +110,6 @@ export async function prepareCloudflarePagesWranglerConfig(opts: {
   const rendered = {
     ...parsed,
     name: opts.deployment.providerTarget.project,
-    ...(opts.deployment.providerTarget.accountId
-      ? { account_id: opts.deployment.providerTarget.accountId }
-      : {}),
   };
   const outputPath = path.resolve(opts.outputPath);
   await fsp.mkdir(path.dirname(outputPath), { recursive: true });
