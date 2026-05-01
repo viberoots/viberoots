@@ -61,6 +61,7 @@ export function createCloudflarePagesControlPlaneSubmission(
     authorization?: DeploymentControlPlaneAuthorizationDecision;
     authorizationSnapshot?: DeploymentControlPlaneAuthorization;
     rejectionCode?: CloudflarePagesControlPlaneSubmission["rejectionCode"];
+    rejectionMessage?: string;
     pendingReasonCode?: CloudflarePagesControlPlaneSubmission["pendingReasonCode"];
   },
 ): CloudflarePagesControlPlaneSubmission {
@@ -86,6 +87,7 @@ export function createCloudflarePagesControlPlaneSubmission(
     ...(opts.authorization ? { authorization: opts.authorization } : {}),
     ...(opts.authorizationSnapshot ? { authorizationSnapshot: opts.authorizationSnapshot } : {}),
     ...(opts.rejectionCode ? { rejectionCode: opts.rejectionCode } : {}),
+    ...(opts.rejectionMessage ? { rejectionMessage: opts.rejectionMessage } : {}),
     ...(opts.pendingReasonCode ? { pendingReasonCode: opts.pendingReasonCode } : {}),
     ...(artifactStatusFromSnapshot(snapshot)
       ? { artifact: artifactStatusFromSnapshot(snapshot) }

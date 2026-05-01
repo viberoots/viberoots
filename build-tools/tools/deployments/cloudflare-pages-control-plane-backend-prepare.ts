@@ -19,6 +19,7 @@ import type {
   DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
 } from "./deployment-control-plane-contract.ts";
+import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
 import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution.ts";
@@ -75,6 +76,7 @@ function admissionFailureSubmission(opts: {
             completedAt: new Date().toISOString(),
             terminationReason: "no_longer_admitted" as const,
             rejectionCode: opts.error.code,
+            rejectionMessage: redactDeploymentAuthText(opts.error.message),
           }),
       dedupe: opts.dedupe,
       requestedBy: opts.requestedBy,

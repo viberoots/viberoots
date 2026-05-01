@@ -64,6 +64,7 @@ function toStatusBase(submission: SubmissionLike): DeploymentControlPlaneRespons
       ? { authorizationSnapshot: toPublicAuthorizationSnapshot(submission.authorizationSnapshot) }
       : {}),
     ...(submission.rejectionCode ? { rejectionCode: submission.rejectionCode } : {}),
+    ...(submission.rejectionMessage ? { rejectionMessage: submission.rejectionMessage } : {}),
     ...(submission.pendingReasonCode ? { pendingReasonCode: submission.pendingReasonCode } : {}),
     ...(submission.serviceInstance ? { serviceInstance: submission.serviceInstance } : {}),
     ...(submission.approval ? { approval: toPublicApprovalSummary(submission.approval) } : {}),

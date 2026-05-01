@@ -51,6 +51,7 @@ type SubmissionRecord = {
     | "unauthorized"
     | "no_longer_admitted"
     | "not_resumable";
+  rejectionMessage?: string;
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
   serviceInstance?: DeploymentControlPlaneServiceInstance;
   approval?: {

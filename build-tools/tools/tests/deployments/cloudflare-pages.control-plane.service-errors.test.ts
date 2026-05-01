@@ -102,3 +102,28 @@ test("service terminal admission rejection is reported without deploy-record loo
     "shared control-plane mutation rejected for pleomino-staging: no_longer_admitted",
   );
 });
+
+test("service terminal admission rejection includes concrete rejection details", () => {
+  const message = terminalControlPlaneRejectionMessage({
+    schemaVersion: "deployment-control-plane-status@1",
+    submissionId: "cp-test",
+    submittedAt: "2026-04-30T00:00:00.000Z",
+    completedAt: "2026-04-30T00:00:01.000Z",
+    deploymentId: "pleomino-staging",
+    deploymentLabel: "//projects/deployments/pleomino-staging:deploy",
+    operationKind: "deploy",
+    providerTargetIdentity: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    lockScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    lifecycleState: "finished",
+    terminationReason: "no_longer_admitted",
+    rejectionCode: "no_longer_admitted",
+    rejectionMessage: "prerequisite deployment has no successful admitted run: pleomino-dev",
+    deployRunId: "deploy-test",
+    dedupe: { mode: "created", requestFingerprint: "sha256:test" },
+  });
+
+  assert.equal(
+    message,
+    "shared control-plane mutation rejected for pleomino-staging: no_longer_admitted: prerequisite deployment has no successful admitted run: pleomino-dev",
+  );
+});

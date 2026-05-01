@@ -127,6 +127,7 @@ export type CloudflarePagesControlPlaneSubmission = {
   authorization?: DeploymentControlPlaneAuthorizationDecision;
   authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   rejectionCode?: DeploymentControlPlaneSubmitRejectionCode;
+  rejectionMessage?: string;
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
   artifact?: DeploymentControlPlaneArtifactStatus;
   latestAction?: {

@@ -19,7 +19,11 @@ export function terminalControlPlaneRejectionMessage(status: DeploymentControlPl
   const reason = status.rejectionCode || status.terminationReason;
   if (!reason) return undefined;
   const deployment = status.deploymentId ? ` for ${status.deploymentId}` : "";
-  return `shared control-plane mutation rejected${deployment}: ${reason}`;
+  const detail =
+    typeof status.rejectionMessage === "string" && status.rejectionMessage.trim()
+      ? `: ${status.rejectionMessage.trim()}`
+      : "";
+  return `shared control-plane mutation rejected${deployment}: ${reason}${detail}`;
 }
 
 async function readFinalizedRecord(opts: {

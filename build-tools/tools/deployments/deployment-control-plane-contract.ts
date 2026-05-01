@@ -204,6 +204,7 @@ export type DeploymentControlPlaneResponseBase = {
   rejectionCode?:
     | DeploymentControlPlaneSubmitRejectionCode
     | DeploymentControlPlaneRunActionRejectionCode;
+  rejectionMessage?: string;
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
   serviceInstance?: DeploymentControlPlaneServiceInstance;
   approval?: DeploymentControlPlaneApprovalSummary;
