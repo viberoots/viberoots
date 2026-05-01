@@ -72,7 +72,6 @@ export function extractCloudflarePagesDeploymentsFromContext(
     const account = providerTarget.account || "";
     const accountId = providerTarget.account_id || "";
     const project = providerTarget.project || "";
-    const id = providerTarget.id || project;
     const customDomain = providerTarget.custom_domain || "";
     const deploymentErrors: string[] = [];
     if (!label) {
@@ -97,7 +96,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
     for (const [fieldPath, value, required] of [
       ["provider_target.account", account, true],
       ["provider_target.project", project, true],
-      ["provider_target.id", id, false],
+      ["provider_target.id", providerTarget.id || project, false],
     ] as const) {
       pushTokenFieldErrors({
         errors: deploymentErrors,
@@ -240,8 +239,9 @@ export function extractCloudflarePagesDeploymentsFromContext(
         account,
         accountId,
         project,
-        id,
+        id: providerTarget.id || project,
         customDomain,
+        customDomainZoneId: providerTarget.custom_domain_zone_id || "",
       }),
     });
   }

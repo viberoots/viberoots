@@ -162,3 +162,31 @@ test("cloudflare-pages custom domain provisioning creates missing domains idempo
     );
   });
 });
+
+test("cloudflare-pages custom domain provisioning can use a configured DNS zone id", async () => {
+  await withFakeCloudflareApi(async ({ requests }) => {
+    const deployment = cloudflarePagesDeploymentFixture({
+      providerTarget: {
+        ...cloudflarePagesDeploymentFixture().providerTarget,
+        accountId: "1b911846f80a89272c0dbaf44f5c810f",
+        customDomain: "staging.pleomino.com",
+        customDomainZoneId: "zone-pleomino",
+      },
+    });
+    const created = await ensureCloudflarePagesCustomDomain({
+      deployment,
+      apiToken: "cf-test-token",
+    });
+    assert.deepEqual(created, {
+      kind: "ready",
+      domain: "staging.pleomino.com",
+      created: true,
+      status: "pending",
+    });
+    assert.equal(requests.filter((request) => request.pathname === "/zones").length, 0);
+    assert.equal(
+      requests.filter((request) => request.pathname === "/zones/zone-pleomino/dns_records").length,
+      2,
+    );
+  });
+});

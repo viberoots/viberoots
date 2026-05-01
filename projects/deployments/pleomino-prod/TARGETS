@@ -6,6 +6,7 @@ cloudflare_pages_static_webapp_deployment(
     account = "web-platform-prod",
     account_id = "1b911846f80a89272c0dbaf44f5c810f",
     custom_domain = "pleomino.com",
+    custom_domain_zone_id = "9411ac5903acb1c2e29b3d4c04ef7e6f",
     project = "pleomino-prod-pages",
     lane_policy = "//projects/deployments/pleomino-shared:lane",
     environment_stage = "prod",

@@ -161,6 +161,7 @@ export async function ensureCloudflarePagesCustomDomain(opts: {
     accountId,
     project: opts.deployment.providerTarget.project,
     domain,
+    zoneId: opts.deployment.providerTarget.customDomainZoneId,
     apiToken,
   };
   const existing = await fetchDomain(request);

@@ -138,9 +138,16 @@ export async function ensureCloudflarePagesDnsRecord(opts: {
   accountId: string;
   project: string;
   domain: string;
+  zoneId?: string;
   apiToken: string;
 }): Promise<{ zone: string; created: boolean; updated: boolean }> {
-  const zone = await findZone(opts);
+  const configuredZoneId = opts.zoneId?.trim();
+  const zone = configuredZoneId
+    ? {
+        id: configuredZoneId,
+        name: zoneCandidatesFor(opts.domain).at(-1) || opts.domain,
+      }
+    : await findZone(opts);
   if (!zone.id || !zone.name) throw new Error(`Cloudflare DNS zone lookup returned no id`);
   const content = `${opts.project}.pages.dev`;
   const existing = await findCnameRecord({ ...opts, zoneId: zone.id });

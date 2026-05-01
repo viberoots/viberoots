@@ -132,6 +132,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
         '    component = "//projects/apps/pleomino:app",',
         '    account = "web-platform-staging",',
         '    custom_domain = "staging.pleomino.com",',
+        '    custom_domain_zone_id = "zone-pleomino",',
         '    project = "pleomino-staging-pages",',
         '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
         '    environment_stage = "staging",',
@@ -193,6 +194,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
     assert.equal(deployments[0]?.providerTarget.account, "web-platform-staging");
     assert.equal(deployments[0]?.providerTarget.project, "pleomino-staging-pages");
     assert.equal(deployments[0]?.providerTarget.customDomain, "staging.pleomino.com");
+    assert.equal(deployments[0]?.providerTarget.customDomainZoneId, "zone-pleomino");
     assert.equal(deployments[0]?.providerTarget.canonicalUrl, "https://staging.pleomino.com/");
     assert.deepEqual(deployments[0]?.prerequisites, []);
     assert.equal(deployments[0]?.preview?.identitySelector, "source_run");
@@ -226,9 +228,11 @@ test("concrete Pleomino Cloudflare TARGETS emit publish and cleanup token requir
   const staging = deployments.find((deployment) => deployment.deploymentId === "pleomino-staging");
   const prod = deployments.find((deployment) => deployment.deploymentId === "pleomino-prod");
   assert.equal(staging?.providerTarget.customDomain, "staging.pleomino.com");
+  assert.equal(staging?.providerTarget.customDomainZoneId, "9411ac5903acb1c2e29b3d4c04ef7e6f");
   assert.equal(staging?.providerTarget.canonicalUrl, "https://staging.pleomino.com/");
   assert.equal(prod?.providerTarget.accountId, "1b911846f80a89272c0dbaf44f5c810f");
   assert.equal(prod?.providerTarget.customDomain, "pleomino.com");
+  assert.equal(prod?.providerTarget.customDomainZoneId, "9411ac5903acb1c2e29b3d4c04ef7e6f");
   assert.equal(prod?.providerTarget.canonicalUrl, "https://pleomino.com/");
   assertCloudflareApiTokenSteps(staging!, ["preview_cleanup", "provision", "publish"]);
   assertCloudflareApiTokenSteps(prod!, ["preview_cleanup", "provision", "publish"]);
