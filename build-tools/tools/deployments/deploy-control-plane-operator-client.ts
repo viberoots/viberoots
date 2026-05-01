@@ -1,6 +1,6 @@
 import path from "node:path";
 import { getFlagStr, hasFlag } from "../lib/cli.ts";
-import { isNixosSharedHostDeployment, type DeploymentTarget } from "./contract.ts";
+import type { DeploymentTarget } from "./contract.ts";
 import {
   readNixosSharedHostControlPlaneRecordViaService,
   readNixosSharedHostControlPlaneStatusViaService,
@@ -47,11 +47,6 @@ export async function resolveServiceClientForOperator(opts: {
   actionLabel: string;
 }) {
   if (hasFlag("profile") || hasFlag("profile-root")) {
-    if (!isNixosSharedHostDeployment(opts.deployment)) {
-      throw new Error(
-        `${opts.actionLabel} only supports --profile for nixos-shared-host deployments`,
-      );
-    }
     const profile = await readNixosSharedHostClientProfile({
       outputRoot: resolveProfileRoot(opts.workspaceRoot),
       profileName: requireProfileName(),

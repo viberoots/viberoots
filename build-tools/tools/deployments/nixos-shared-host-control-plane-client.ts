@@ -20,6 +20,7 @@ import type {
 
 const ACTIVE_LIFECYCLE_STATES = new Set(["queued", "waiting_for_lock", "running", "cancelling"]);
 const CONTROL_PLANE_REQUEST_TIMEOUT_MS = 15_000;
+export const CONTROL_PLANE_SUBMISSION_TIMEOUT_MS = 10 * 60 * 1000;
 
 function authHeaders(token?: string) {
   return token ? { authorization: `Bearer ${token}` } : {};
@@ -134,7 +135,7 @@ export async function submitNixosSharedHostControlPlaneViaService(opts: {
   if (!ACTIVE_LIFECYCLE_STATES.has(initial.lifecycleState)) {
     return { initial, final: initial };
   }
-  const timeoutMs = opts.timeoutMs ?? 60_000;
+  const timeoutMs = opts.timeoutMs ?? CONTROL_PLANE_SUBMISSION_TIMEOUT_MS;
   const pollMs = opts.pollMs ?? 100;
   const deadline = Date.now() + timeoutMs;
   let latest: DeploymentControlPlaneStatus = initial;
@@ -149,7 +150,9 @@ export async function submitNixosSharedHostControlPlaneViaService(opts: {
       return { initial, final: latest };
     }
   }
-  throw new Error(`timed out waiting for control-plane submission ${initial.submissionId}`);
+  throw new Error(
+    `timed out waiting for control-plane submission ${initial.submissionId} after ${timeoutMs}ms; latest lifecycle state was ${latest.lifecycleState}. Use deploy --status --submission-id ${initial.submissionId} to check whether the worker is still running or finished after the client stopped waiting.`,
+  );
 }
 
 export async function createNixosSharedHostArtifactChallengeViaService(opts: {
