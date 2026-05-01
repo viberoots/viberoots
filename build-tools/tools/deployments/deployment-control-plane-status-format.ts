@@ -59,6 +59,16 @@ function diagnosticLine(status: DeploymentControlPlaneStatus): string | undefine
   return diagnostic ? `diagnostic: ${redactDeploymentAuthText(diagnostic)}` : undefined;
 }
 
+function executionLine(status: DeploymentControlPlaneStatus): string | undefined {
+  if (!status.execution?.currentStep) return undefined;
+  const parts = [
+    status.execution.currentStep,
+    status.execution.stepStartedAt ? `started ${status.execution.stepStartedAt}` : "",
+    status.execution.timeoutMs ? `timeout ${status.execution.timeoutMs}ms` : "",
+  ].filter(Boolean);
+  return `execution: ${parts.join(" | ")}`;
+}
+
 export function formatDeploymentControlPlaneStatusText(
   status: DeploymentControlPlaneStatus,
 ): string {
@@ -69,6 +79,7 @@ export function formatDeploymentControlPlaneStatusText(
     `deployment: ${status.deploymentLabel}`,
     `target: ${status.providerTargetIdentity}`,
     artifactLine(status.artifact),
+    executionLine(status),
     approvalLine(status),
     diagnosticLine(status),
   ]

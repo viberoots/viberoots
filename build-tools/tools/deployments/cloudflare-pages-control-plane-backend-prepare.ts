@@ -159,6 +159,7 @@ export async function prepareBackendCloudflarePagesControlPlaneRun(opts: {
       throw Object.assign(error, { submission });
     }
   }
+  const deployRunId = deployRunIdFor(snapshot);
   const submission = await queueBackendSubmissionForLock({
     backend: opts.backend,
     snapshot: snapshot as any,
@@ -181,7 +182,7 @@ export async function prepareBackendCloudflarePagesControlPlaneRun(opts: {
         ...(opts.authorizationSnapshot
           ? { authorizationSnapshot: opts.authorizationSnapshot }
           : {}),
-        ...(deployRunIdFor(snapshot) ? { deployRunId: deployRunIdFor(snapshot) } : {}),
+        ...(deployRunId ? { deployRunId } : {}),
       },
     ),
     refs,

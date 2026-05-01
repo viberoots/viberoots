@@ -19,6 +19,13 @@ function submissionWithLeakedApprovalPath() {
     lifecycleState: "pending_approval" as const,
     terminationReason: null,
     dedupe: { mode: "created" as const, requestFingerprint: "sha256:submit" },
+    execution: {
+      currentStep: "smoke",
+      mutationStartedAt: "2026-04-16T12:03:00.000Z",
+      stepStartedAt: "2026-04-16T12:04:00.000Z",
+      timeoutMs: 600_000,
+      secretToken: "should-not-leak",
+    },
     authorizationSnapshot: {
       requestedBy: {
         principalId: "user:submitter",
@@ -101,6 +108,24 @@ function assertPublicAuthorizationBoundary(response: {
   assert.ok(!("noisy" in (response.latestAction?.authorizationSnapshot?.grants[0]?.scope || {})));
 }
 
+function assertPublicExecutionBoundary(response: {
+  execution?: {
+    currentStep?: string;
+    mutationStartedAt?: string;
+    stepStartedAt?: string;
+    timeoutMs?: number;
+    secretToken?: string;
+  };
+}) {
+  assert.deepEqual(response.execution, {
+    currentStep: "smoke",
+    mutationStartedAt: "2026-04-16T12:03:00.000Z",
+    stepStartedAt: "2026-04-16T12:04:00.000Z",
+    timeoutMs: 600_000,
+  });
+  assert.ok(!("secretToken" in (response.execution || {})));
+}
+
 test("submit, status, and run-action responses strip approval-record paths from nested approval summaries", () => {
   const submission = submissionWithLeakedApprovalPath() as any;
 
@@ -114,4 +139,7 @@ test("submit, status, and run-action responses strip approval-record paths from 
   assertPublicAuthorizationBoundary(submit);
   assertPublicAuthorizationBoundary(status);
   assertPublicAuthorizationBoundary(action);
+  assertPublicExecutionBoundary(submit);
+  assertPublicExecutionBoundary(status);
+  assertPublicExecutionBoundary(action);
 });

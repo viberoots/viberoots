@@ -22,6 +22,7 @@ import {
 } from "./deployment-artifact-binding.ts";
 import { deploymentServicePrincipalForToken } from "./deployment-artifact-challenges.ts";
 import { terminalControlPlaneRejectionMessage } from "./deployment-provider-protected-front-door.ts";
+import { controlPlaneRecordFailureMessage } from "./deployment-control-plane-record-failure.ts";
 import {
   clientServiceAdmissionEvidence,
   resolveExpectedDeploymentSourceRevision,
@@ -73,13 +74,7 @@ async function finalizeServiceResponse(
     deployRunId: status.deployRunId,
   });
   if (record.finalOutcome !== "succeeded") {
-    const details =
-      typeof record.error === "string" && record.error.trim()
-        ? record.error.trim()
-        : typeof record.smokeError === "string" && record.smokeError.trim()
-          ? record.smokeError.trim()
-          : `final outcome: ${String(record.finalOutcome || "unknown")}`;
-    throw Object.assign(new Error(`shared control-plane mutation failed: ${details}`), {
+    throw Object.assign(new Error(controlPlaneRecordFailureMessage(record)), {
       status,
       record,
     });

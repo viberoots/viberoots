@@ -16,6 +16,7 @@ import {
   writeWranglerConfig,
 } from "./cloudflare-pages.service-flow.helpers.ts";
 import { terminalControlPlaneRejectionMessage } from "../../deployments/deployment-provider-protected-front-door.ts";
+import { controlPlaneRecordFailureMessage } from "../../deployments/deployment-control-plane-record-failure.ts";
 
 async function gitStdout(cwd: string, $: any, ...args: string[]): Promise<string> {
   return String((await $({ cwd, stdio: "pipe" })`git ${args}`).stdout).trim();
@@ -152,6 +153,25 @@ test("service terminal admission rejection is reported without deploy-record loo
     message,
     "shared control-plane mutation rejected for pleomino-staging: no_longer_admitted",
   );
+});
+
+test("service terminal record failures include step, ids, and inspection command", () => {
+  const message = controlPlaneRecordFailureMessage({
+    deployRunId: "deploy-redacted",
+    finalOutcome: "publish_failed",
+    failedStep: "publish",
+    error:
+      "payload redacted (sha256:b37ccd6d8a492dfeebf6a9faa4a4b04650f23958e3527f7cdf31919f8a9450cb)",
+    errorFingerprint: "sha256:b37ccd6d8a492dfeebf6a9faa4a4b04650f23958e3527f7cdf31919f8a9450cb",
+    controlPlane: { submissionId: "cp-redacted" },
+  });
+
+  assert.match(message, /outcome publish_failed/);
+  assert.match(message, /failed step publish/);
+  assert.match(message, /deployRunId deploy-redacted/);
+  assert.match(message, /submissionId cp-redacted/);
+  assert.match(message, /errorFingerprint sha256:b37ccd6d8a492dfe/);
+  assert.match(message, /deploy --record --deploy-run-id deploy-redacted --text/);
 });
 
 test("service terminal admission rejection includes concrete rejection details", () => {

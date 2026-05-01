@@ -41,6 +41,21 @@ function toPublicAuthorizationSnapshot(
   return normalizeAuthorizationSnapshot(authorization);
 }
 
+function toPublicExecutionSnapshot(
+  execution: any,
+): DeploymentControlPlaneResponseBase["execution"] {
+  return {
+    ...(typeof execution.currentStep === "string" ? { currentStep: execution.currentStep } : {}),
+    ...(typeof execution.mutationStartedAt === "string"
+      ? { mutationStartedAt: execution.mutationStartedAt }
+      : {}),
+    ...(typeof execution.stepStartedAt === "string"
+      ? { stepStartedAt: execution.stepStartedAt }
+      : {}),
+    ...(typeof execution.timeoutMs === "number" ? { timeoutMs: execution.timeoutMs } : {}),
+  };
+}
+
 function toStatusBase(submission: SubmissionLike): DeploymentControlPlaneResponseBase {
   return {
     submissionId: submission.submissionId,
@@ -56,6 +71,7 @@ function toStatusBase(submission: SubmissionLike): DeploymentControlPlaneRespons
     ...(submission.workerId ? { workerId: submission.workerId } : {}),
     ...(submission.deployRunId ? { deployRunId: submission.deployRunId } : {}),
     ...(submission.finalOutcome ? { finalOutcome: submission.finalOutcome } : {}),
+    ...(submission.execution ? { execution: toPublicExecutionSnapshot(submission.execution) } : {}),
     ...(submission.progressiveRollout ? { progressiveRollout: submission.progressiveRollout } : {}),
     dedupe: submission.dedupe,
     ...(submission.requestedBy ? { requestedBy: submission.requestedBy } : {}),

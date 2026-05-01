@@ -196,6 +196,12 @@ export type DeploymentControlPlaneResponseBase = {
   workerId?: string;
   deployRunId?: string;
   finalOutcome?: string;
+  execution?: {
+    currentStep?: string;
+    mutationStartedAt?: string;
+    stepStartedAt?: string;
+    timeoutMs?: number;
+  };
   progressiveRollout?: NixosSharedHostProgressiveRollout;
   dedupe: DeploymentControlPlaneRequestDedupe;
   requestedBy?: DeploymentPrincipal;

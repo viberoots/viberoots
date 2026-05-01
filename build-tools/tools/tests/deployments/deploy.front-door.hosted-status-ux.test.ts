@@ -34,6 +34,11 @@ async function startHostedStatusServer() {
               artifactIdentity: "static-webapp:abc123",
               artifactDigest: "abc123",
             },
+            execution: {
+              currentStep: "smoke",
+              stepStartedAt: "2026-04-16T12:03:00.000Z",
+              timeoutMs: 600000,
+            },
             approval: {
               state: "pending",
               approvalNames: ["human/dev"],
@@ -78,6 +83,8 @@ test("deploy --status --text summarizes hosted run phase, approval, and artifact
       assert.match(text, /deployRunId: deploy-run-hosted-ux/);
       assert.match(text, /artifact: admitted \| client_upload \| static-webapp:abc123/);
       assert.match(text, /digest abc123/);
+      assert.match(text, /execution: smoke \| started 2026-04-16T12:03:00.000Z/);
+      assert.match(text, /timeout 600000ms/);
       assert.match(text, /approval: deploy --approve --deploy-run-id deploy-run-hosted-ux/);
     } finally {
       await mock.close();

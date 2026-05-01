@@ -4,6 +4,7 @@ import {
   readNixosSharedHostControlPlaneRecordViaService,
   submitNixosSharedHostControlPlaneViaService,
 } from "./nixos-shared-host-control-plane-client.ts";
+import { controlPlaneRecordFailureMessage } from "./deployment-control-plane-record-failure.ts";
 
 const SERVICE_ONLY_LOCAL_FLAGS = ["records-root", "control-plane-database-url"] as const;
 
@@ -80,7 +81,5 @@ async function requireSucceededRecord(opts: {
     deployRunId: String(opts.status.deployRunId || ""),
   });
   if (record.finalOutcome === "succeeded") return record;
-  throw new Error(
-    `shared control-plane mutation failed: ${String(record.error || record.smokeError || record.finalOutcome || "unknown")}`,
-  );
+  throw new Error(controlPlaneRecordFailureMessage(record));
 }
