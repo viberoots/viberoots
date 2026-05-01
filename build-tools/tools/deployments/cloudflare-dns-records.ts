@@ -76,7 +76,6 @@ async function findZone(opts: {
   for (const candidate of zoneCandidatesFor(opts.domain)) {
     const params = new URLSearchParams({
       name: candidate,
-      "account.id": opts.accountId,
       per_page: "1",
     });
     const response = await cloudflareRequest<CloudflareZone[]>(`/zones?${params}`, opts);

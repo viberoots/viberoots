@@ -6,14 +6,17 @@ import { ensureCloudflarePagesCustomDomain } from "../../deployments/cloudflare-
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
 
 async function withFakeCloudflareApi<T>(
-  run: (opts: { url: string; requests: Array<{ method: string; pathname: string }> }) => Promise<T>,
+  run: (opts: {
+    url: string;
+    requests: Array<{ method: string; pathname: string; search: string }>;
+  }) => Promise<T>,
 ): Promise<T> {
-  const requests: Array<{ method: string; pathname: string }> = [];
+  const requests: Array<{ method: string; pathname: string; search: string }> = [];
   const domains = new Set<string>();
   const dnsRecords = new Map<string, { id: string; content: string; proxied: boolean }>();
   const server = http.createServer((req, res) => {
     const url = new URL(req.url || "/", "http://127.0.0.1");
-    requests.push({ method: req.method || "GET", pathname: url.pathname });
+    requests.push({ method: req.method || "GET", pathname: url.pathname, search: url.search });
     if (req.headers.authorization !== "Bearer cf-test-token") {
       res.writeHead(401, { "content-type": "application/json" });
       res.end(JSON.stringify({ success: false, errors: [{ message: "unauthorized" }] }));
@@ -25,7 +28,7 @@ async function withFakeCloudflareApi<T>(
         JSON.stringify({
           success: true,
           result:
-            url.searchParams.get("name") === "pleomino.com"
+            url.searchParams.get("name") === "pleomino.com" && !url.searchParams.has("account.id")
               ? [{ id: "zone-pleomino", name: "pleomino.com" }]
               : [],
         }),
@@ -145,6 +148,12 @@ test("cloudflare-pages custom domain provisioning creates missing domains idempo
       1,
     );
     assert.equal(requests.filter((request) => request.pathname === "/zones").length, 4);
+    assert.equal(
+      requests.some(
+        (request) => request.pathname === "/zones" && request.search.includes("account.id"),
+      ),
+      false,
+    );
     assert.equal(
       requests.filter(
         (request) => request.method === "GET" && request.pathname.endsWith("/dns_records"),
