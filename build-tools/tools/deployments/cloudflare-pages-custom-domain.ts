@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { ensureCloudflarePagesDnsRecord } from "./cloudflare-dns-records.ts";
 import type { CloudflarePagesDeployment } from "./contract.ts";
 
 type CloudflarePagesDomain = {
@@ -164,8 +165,10 @@ export async function ensureCloudflarePagesCustomDomain(opts: {
   };
   const existing = await fetchDomain(request);
   if (existing) {
+    await ensureCloudflarePagesDnsRecord(request);
     return { kind: "ready", domain, created: false, ...domainStatus(existing) };
   }
   const created = await addDomain(request);
+  await ensureCloudflarePagesDnsRecord(request);
   return { kind: "ready", domain, created: true, ...domainStatus(created) };
 }

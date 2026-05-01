@@ -10,12 +10,54 @@ async function withFakeCloudflareApi<T>(
 ): Promise<T> {
   const requests: Array<{ method: string; pathname: string }> = [];
   const domains = new Set<string>();
+  const dnsRecords = new Map<string, { id: string; content: string; proxied: boolean }>();
   const server = http.createServer((req, res) => {
     const url = new URL(req.url || "/", "http://127.0.0.1");
     requests.push({ method: req.method || "GET", pathname: url.pathname });
     if (req.headers.authorization !== "Bearer cf-test-token") {
       res.writeHead(401, { "content-type": "application/json" });
       res.end(JSON.stringify({ success: false, errors: [{ message: "unauthorized" }] }));
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/zones") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          success: true,
+          result:
+            url.searchParams.get("name") === "pleomino.com"
+              ? [{ id: "zone-pleomino", name: "pleomino.com" }]
+              : [],
+        }),
+      );
+      return;
+    }
+    if (req.method === "GET" && url.pathname.endsWith("/dns_records")) {
+      const name = url.searchParams.get("name") || "";
+      const record = dnsRecords.get(name);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          success: true,
+          result: record ? [{ id: record.id, type: "CNAME", name, ...record }] : [],
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && url.pathname.endsWith("/dns_records")) {
+      let body = "";
+      req.setEncoding("utf8");
+      req.on("data", (chunk) => (body += chunk));
+      req.on("end", () => {
+        const parsed = JSON.parse(body) as { name: string; content: string; proxied: boolean };
+        dnsRecords.set(parsed.name, {
+          id: "dns-record-1",
+          content: parsed.content,
+          proxied: parsed.proxied,
+        });
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ success: true, result: { id: "dns-record-1", ...parsed } }));
+      });
       return;
     }
     const domainMatch = url.pathname.match(/\/domains\/([^/]+)$/);
@@ -90,9 +132,24 @@ test("cloudflare-pages custom domain provisioning creates missing domains idempo
       created: false,
       status: "active",
     });
-    assert.deepEqual(
-      requests.map((request) => request.method),
-      ["GET", "POST", "GET"],
+    assert.equal(
+      requests.filter(
+        (request) => request.method === "POST" && request.pathname.endsWith("/domains"),
+      ).length,
+      1,
+    );
+    assert.equal(
+      requests.filter(
+        (request) => request.method === "POST" && request.pathname.endsWith("/dns_records"),
+      ).length,
+      1,
+    );
+    assert.equal(requests.filter((request) => request.pathname === "/zones").length, 4);
+    assert.equal(
+      requests.filter(
+        (request) => request.method === "GET" && request.pathname.endsWith("/dns_records"),
+      ).length,
+      2,
     );
   });
 });
