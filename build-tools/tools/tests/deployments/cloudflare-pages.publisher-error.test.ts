@@ -1,7 +1,26 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { summarizeWranglerPagesDeployError } from "../../deployments/cloudflare-pages-publisher.ts";
+import {
+  cloudflarePagesProviderPublicUrl,
+  summarizeWranglerPagesDeployError,
+} from "../../deployments/cloudflare-pages-publisher.ts";
+
+test("cloudflare-pages provider URL fallback ignores custom domains", () => {
+  assert.equal(
+    cloudflarePagesProviderPublicUrl({
+      project: "pleomino-staging-pages",
+    }),
+    "https://pleomino-staging-pages.pages.dev/",
+  );
+  assert.equal(
+    cloudflarePagesProviderPublicUrl({
+      project: "pleomino-staging-pages",
+      previewBranch: "prv-abc123",
+    }),
+    "https://prv-abc123.pleomino-staging-pages.pages.dev/",
+  );
+});
 
 test("cloudflare-pages deploy summarizes Cloudflare API auth failures safely", () => {
   const stderr = `

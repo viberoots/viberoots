@@ -81,6 +81,62 @@ test("record helpers preserve known safe smoke diagnostics", () => {
   assert.equal(cloudflareRecord.errorFingerprint, undefined);
 });
 
+test("record helpers preserve known safe Cloudflare publish diagnostics", () => {
+  const cloudflareRecord = createCloudflarePagesDeployRecord(cloudflarePagesDeploymentFixture(), {
+    deployRunId: "deploy-publish",
+    finalOutcome: "publish_failed",
+    failedStep: "publish",
+    admittedContext: {
+      lanePolicyRef: "//build-tools/deployments/lanes:prod",
+      lanePolicyFingerprint: "sha256:lane",
+      admissionPolicyRef: "//build-tools/deployments/policies:prod",
+      admissionPolicyFingerprint: "sha256:policy",
+      environmentStage: "production",
+      source: { mode: "stage_branch_head", sourceRef: "env/app/prod", sourceRevision: "abc123" },
+      targetEnvironment: {
+        mode: "stage_branch_snapshot",
+        targetRef: "env/app/prod",
+        targetRevision: "abc123",
+        providerTargetIdentity: "target-cf",
+        lockScope: "target-cf",
+      },
+    },
+    error:
+      "Cloudflare DNS record lookup failed: Authentication error [code: 10000]. Ensure the Cloudflare API token has Zone:DNS Read and Zone:DNS Edit scoped to zone zone-pleomino for pleomino.com.",
+  });
+
+  assert.match(String(cloudflareRecord.error), /Cloudflare DNS record lookup failed/);
+  assert.match(String(cloudflareRecord.error), /Cloudflare API token has Zone:DNS Read/);
+  assert.equal(cloudflareRecord.errorFingerprint, undefined);
+});
+
+test("record helpers still redact concrete token values in Cloudflare diagnostics", () => {
+  const cloudflareRecord = createCloudflarePagesDeployRecord(cloudflarePagesDeploymentFixture(), {
+    deployRunId: "deploy-publish-secret",
+    finalOutcome: "publish_failed",
+    failedStep: "publish",
+    admittedContext: {
+      lanePolicyRef: "//build-tools/deployments/lanes:prod",
+      lanePolicyFingerprint: "sha256:lane",
+      admissionPolicyRef: "//build-tools/deployments/policies:prod",
+      admissionPolicyFingerprint: "sha256:policy",
+      environmentStage: "production",
+      source: { mode: "stage_branch_head", sourceRef: "env/app/prod", sourceRevision: "abc123" },
+      targetEnvironment: {
+        mode: "stage_branch_snapshot",
+        targetRef: "env/app/prod",
+        targetRevision: "abc123",
+        providerTargetIdentity: "target-cf",
+        lockScope: "target-cf",
+      },
+    },
+    error: "Cloudflare DNS record lookup failed: token=cf-secret-value",
+  });
+
+  assert.ok(!String(cloudflareRecord.error).includes("cf-secret-value"));
+  assert.match(String(cloudflareRecord.errorFingerprint), /^sha256:/);
+});
+
 test("observability views keep referenced artifacts secret-safe by exposing reference-only payloads", async () => {
   await runInTemp("deployment-control-plane-redaction", async (tmp) => {
     const recordsRoot = path.join(tmp, "records");

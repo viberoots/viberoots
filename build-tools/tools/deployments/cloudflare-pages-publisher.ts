@@ -54,6 +54,14 @@ function maybePublicUrl(output: string): string | undefined {
   return undefined;
 }
 
+export function cloudflarePagesProviderPublicUrl(
+  target: Pick<CloudflarePagesDeployment["providerTarget"], "previewBranch" | "project">,
+): string {
+  return target.previewBranch
+    ? `https://${target.previewBranch}.${target.project}.pages.dev/`
+    : `https://${target.project}.pages.dev/`;
+}
+
 const MAX_WRANGLER_ERROR_LENGTH = 500;
 
 function stripAnsi(text: string): string {
@@ -168,7 +176,9 @@ export async function publishCloudflarePagesStaticWebapp(opts: {
       throw new Error(commandError(stdout, stderr));
     }
     const providerReleaseId = maybeProviderReleaseId(`${stdout}\n${stderr}`);
-    const publicUrl = maybePublicUrl(`${stdout}\n${stderr}`) || effectiveRunTarget.canonicalUrl;
+    const publicUrl =
+      maybePublicUrl(`${stdout}\n${stderr}`) ||
+      cloudflarePagesProviderPublicUrl(effectiveRunTarget);
     return {
       publicUrl,
       ...(providerReleaseId ? { providerReleaseId } : {}),
