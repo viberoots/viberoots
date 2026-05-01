@@ -5,6 +5,7 @@ cloudflare_pages_static_webapp_deployment(
     component = "//projects/apps/pleomino:app",
     account = "web-platform-staging",
     account_id = "1b911846f80a89272c0dbaf44f5c810f",
+    custom_domain = "staging.pleomino.com",
     project = "pleomino-staging-pages",
     lane_policy = "//projects/deployments/pleomino-shared:lane",
     environment_stage = "staging",
@@ -28,6 +29,12 @@ cloudflare_pages_static_webapp_deployment(
         "pkce_callback_bind_path": "/oidc/callback",
     },
     secret_requirements = [
+        {
+            "name": "cloudflare_api_token",
+            "step": "provision",
+            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",
+            "required": "true",
+        },
         {
             "name": "cloudflare_api_token",
             "step": "publish",

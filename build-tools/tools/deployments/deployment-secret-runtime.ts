@@ -39,6 +39,10 @@ function authorityMode(authority?: DeploymentSecretRuntimeOpts["authority"]) {
   return authority?.kind === "break-glass-worker" ? "break_glass" : "routine";
 }
 
+function cacheKey(binding: DeploymentSecretReference): string {
+  return `${binding.referenceId}:${binding.step}`;
+}
+
 function isExpired(secret: DeploymentSecretMaterial, now: Date): boolean {
   return !!secret.expiresAt && Date.parse(secret.expiresAt) <= now.getTime();
 }
@@ -89,7 +93,8 @@ export function createDeploymentSecretRuntime(opts: DeploymentSecretRuntimeOpts)
       const active = deploymentSecretBindingsForStep(bindings, step);
       const resolved: Record<string, string> = {};
       for (const binding of active) {
-        let secret = cached.get(binding.referenceId);
+        const key = cacheKey(binding);
+        let secret = cached.get(key);
         try {
           if (!secret) {
             secret = await opts.backend.acquire(binding);
@@ -113,7 +118,7 @@ export function createDeploymentSecretRuntime(opts: DeploymentSecretRuntimeOpts)
           );
         }
         ensureAccess(secret, step, opts.targetScope, mode);
-        cached.set(binding.referenceId, secret);
+        cached.set(key, secret);
         resolved[binding.name] = secret.value;
       }
       return resolved;

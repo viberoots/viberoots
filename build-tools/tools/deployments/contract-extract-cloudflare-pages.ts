@@ -73,6 +73,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
     const accountId = providerTarget.account_id || "";
     const project = providerTarget.project || "";
     const id = providerTarget.id || project;
+    const customDomain = providerTarget.custom_domain || "";
     const deploymentErrors: string[] = [];
     if (!label) {
       context.errors.push("deployment target missing canonical label");
@@ -235,7 +236,13 @@ export function extractCloudflarePagesDeploymentsFromContext(
       ],
       ...(preview ? { preview } : {}),
       publisher: { type: publisher, config: publisherConfig },
-      providerTarget: deriveCloudflarePagesProviderTarget({ account, accountId, project, id }),
+      providerTarget: deriveCloudflarePagesProviderTarget({
+        account,
+        accountId,
+        project,
+        id,
+        customDomain,
+      }),
     });
   }
   pushDuplicateCloudflareTargetIdentityErrors(context.errors, deployments);

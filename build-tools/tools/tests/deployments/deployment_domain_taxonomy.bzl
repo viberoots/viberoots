@@ -100,6 +100,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/google-play.validation.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.artifact-input.service.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.contract.test.ts": True,
+    "build-tools/tools/tests/deployments/cloudflare-pages.custom-domain.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.control-plane.service-errors.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.control-plane.service.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-targets.install.cloudflare.test.ts": True,

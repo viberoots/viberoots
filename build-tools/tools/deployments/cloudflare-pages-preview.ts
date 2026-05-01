@@ -77,8 +77,9 @@ export function deriveCloudflarePagesPreviewTarget(
 ): CloudflarePagesProviderTarget {
   requireCloudflarePagesPreviewSupport(deployment);
   const previewBranch = normalizedPreviewBranch(sourceRunId, deployment.providerTarget.project);
+  const { customDomain: _customDomain, ...providerTarget } = deployment.providerTarget;
   return {
-    ...deployment.providerTarget,
+    ...providerTarget,
     canonicalUrl: `https://${previewBranch}.${deployment.providerTarget.project}.pages.dev/`,
     providerTargetIdentity: `${deployment.providerTarget.providerTargetIdentity}#preview:${previewBranch}`,
     previewBranch,

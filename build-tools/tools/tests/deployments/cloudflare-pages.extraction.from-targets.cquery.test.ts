@@ -12,18 +12,26 @@ const ATTRS =
     ",",
   );
 
-function assertCloudflareApiTokenSteps(deployment: {
-  secretRequirements: Array<{ name: string; step: string; contractId: string; required: boolean }>;
-}) {
+function assertCloudflareApiTokenSteps(
+  deployment: {
+    secretRequirements: Array<{
+      name: string;
+      step: string;
+      contractId: string;
+      required: boolean;
+    }>;
+  },
+  expectedSteps = ["preview_cleanup", "publish"],
+) {
+  const expected = expectedSteps
+    .map((step) => [step, "secret://deployments/pleomino/cloudflare_api_token", true])
+    .sort();
   assert.deepEqual(
     deployment.secretRequirements
       .filter((requirement) => requirement.name === "cloudflare_api_token")
       .map((requirement) => [requirement.step, requirement.contractId, requirement.required])
       .sort(),
-    [
-      ["preview_cleanup", "secret://deployments/pleomino/cloudflare_api_token", true],
-      ["publish", "secret://deployments/pleomino/cloudflare_api_token", true],
-    ],
+    expected,
   );
 }
 
@@ -46,26 +54,11 @@ const EXPECTED_MINI_VAULT_RUNTIME_BASE = {
     bindPath: "/oidc/callback",
   },
 };
-const EXPECTED_PLEOMINO_PROD_VAULT_RUNTIME = EXPECTED_MINI_VAULT_RUNTIME_BASE;
-const EXPECTED_PLEOMINO_STAGING_VAULT_RUNTIME = EXPECTED_MINI_VAULT_RUNTIME_BASE;
-
 test("cloudflare-pages deployment extraction reads canonical metadata from TARGETS via cquery", async () => {
   await runInTemp("cloudflare-pages-cquery-extraction", async (tmp, _$) => {
-    const appTargetsPath = path.join(tmp, "projects", "apps", "pleomino", "TARGETS");
-    const deployTargetsPath = path.join(
-      tmp,
-      "projects",
-      "deployments",
-      "pleomino-staging",
-      "TARGETS",
-    );
-    const sharedTargetsPath = path.join(
-      tmp,
-      "projects",
-      "deployments",
-      "pleomino-shared",
-      "TARGETS",
-    );
+    const appTargetsPath = path.join(tmp, "projects/apps/pleomino/TARGETS");
+    const deployTargetsPath = path.join(tmp, "projects/deployments/pleomino-staging/TARGETS");
+    const sharedTargetsPath = path.join(tmp, "projects/deployments/pleomino-shared/TARGETS");
     await fsp.mkdir(path.dirname(appTargetsPath), { recursive: true });
     await fsp.mkdir(path.dirname(deployTargetsPath), { recursive: true });
     await fsp.mkdir(path.dirname(sharedTargetsPath), { recursive: true });
@@ -138,11 +131,18 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
         '    name = "deploy",',
         '    component = "//projects/apps/pleomino:app",',
         '    account = "web-platform-staging",',
+        '    custom_domain = "staging.pleomino.com",',
         '    project = "pleomino-staging-pages",',
         '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
         '    environment_stage = "staging",',
         '    admission_policy = "//projects/deployments/pleomino-shared:staging_release",',
         "    secret_requirements = [",
+        "        {",
+        '            "name": "cloudflare_api_token",',
+        '            "step": "provision",',
+        '            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",',
+        '            "required": "true",',
+        "        },",
         "        {",
         '            "name": "cloudflare_api_token",',
         '            "step": "publish",',
@@ -192,9 +192,11 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
     assert.equal(deployments[0]?.publisher.config, "wrangler.jsonc");
     assert.equal(deployments[0]?.providerTarget.account, "web-platform-staging");
     assert.equal(deployments[0]?.providerTarget.project, "pleomino-staging-pages");
+    assert.equal(deployments[0]?.providerTarget.customDomain, "staging.pleomino.com");
+    assert.equal(deployments[0]?.providerTarget.canonicalUrl, "https://staging.pleomino.com/");
     assert.deepEqual(deployments[0]?.prerequisites, []);
     assert.equal(deployments[0]?.preview?.identitySelector, "source_run");
-    assertCloudflareApiTokenSteps(deployments[0]!);
+    assertCloudflareApiTokenSteps(deployments[0]!, ["preview_cleanup", "provision", "publish"]);
   });
 });
 
@@ -221,11 +223,19 @@ test("concrete Pleomino Cloudflare TARGETS emit publish and cleanup token requir
   );
   for (const deployment of deployments)
     assert.equal(deployment.lanePolicy.defaultClientProfile, "mini");
-  for (const deployment of deployments) assertCloudflareApiTokenSteps(deployment);
+  const staging = deployments.find((deployment) => deployment.deploymentId === "pleomino-staging");
+  const prod = deployments.find((deployment) => deployment.deploymentId === "pleomino-prod");
+  assert.equal(staging?.providerTarget.customDomain, "staging.pleomino.com");
+  assert.equal(staging?.providerTarget.canonicalUrl, "https://staging.pleomino.com/");
+  assert.equal(prod?.providerTarget.accountId, "1b911846f80a89272c0dbaf44f5c810f");
+  assert.equal(prod?.providerTarget.customDomain, "pleomino.com");
+  assert.equal(prod?.providerTarget.canonicalUrl, "https://pleomino.com/");
+  assertCloudflareApiTokenSteps(staging!, ["preview_cleanup", "provision", "publish"]);
+  assertCloudflareApiTokenSteps(prod!, ["preview_cleanup", "provision", "publish"]);
   assert.deepEqual(
     deployments
       .map((deployment) => deployment.vaultRuntime)
       .sort((a, b) => String(a?.roleName || "").localeCompare(String(b?.roleName || ""))),
-    [EXPECTED_PLEOMINO_PROD_VAULT_RUNTIME, EXPECTED_PLEOMINO_STAGING_VAULT_RUNTIME],
+    [EXPECTED_MINI_VAULT_RUNTIME_BASE, EXPECTED_MINI_VAULT_RUNTIME_BASE],
   );
 });

@@ -76,6 +76,9 @@ export async function installCloudflarePagesTargets(
         ...(deployment.providerTarget.accountId
           ? [`    account_id = ${JSON.stringify(deployment.providerTarget.accountId)},`]
           : []),
+        ...(deployment.providerTarget.customDomain
+          ? [`    custom_domain = ${JSON.stringify(deployment.providerTarget.customDomain)},`]
+          : []),
         `    project = ${JSON.stringify(deployment.providerTarget.project)},`,
         ...(deployment.providerTarget.id !== deployment.providerTarget.project
           ? [`    project_id = ${JSON.stringify(deployment.providerTarget.id)},`]

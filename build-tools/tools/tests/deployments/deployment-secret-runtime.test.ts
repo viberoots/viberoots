@@ -64,6 +64,42 @@ test("secret runtime stays backend-agnostic while selecting least-privilege step
   assert.deepEqual(Object.keys(smoke), ["smoke_token"]);
 });
 
+test("secret runtime caches the same backend reference separately per lifecycle step", async () => {
+  let acquireCalls = 0;
+  const runtime = createDeploymentSecretRuntime({
+    backend: {
+      async acquire(binding) {
+        acquireCalls += 1;
+        return {
+          binding,
+          value: `${binding.step}-token`,
+          allowedSteps: [binding.step],
+          targetScopes: ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+          credentialClass: "routine",
+          refreshMode: "none",
+        };
+      },
+    },
+    requirements: [
+      deploymentRequirementFixture({
+        name: "cloudflare_api_token",
+        step: "provision",
+        contractId: "secret://deployments/pleomino/cloudflare_api_token",
+      }),
+      deploymentRequirementFixture({
+        name: "cloudflare_api_token",
+        step: "publish",
+        contractId: "secret://deployments/pleomino/cloudflare_api_token",
+      }),
+    ],
+    targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+  });
+
+  assert.equal((await runtime.enterStep("provision")).cloudflare_api_token, "provision-token");
+  assert.equal((await runtime.enterStep("publish")).cloudflare_api_token, "publish-token");
+  assert.equal(acquireCalls, 2);
+});
+
 test("secret runtime renews an expired renewable credential without widening scope", async () => {
   let nowMs = Date.parse("2026-04-10T10:00:00.000Z");
   let renewCalls = 0;

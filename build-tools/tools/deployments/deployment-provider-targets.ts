@@ -22,6 +22,7 @@ export type CloudflarePagesProviderTarget = {
   accountId?: string;
   project: string;
   id: string;
+  customDomain?: string;
   canonicalUrl: string;
   providerTargetIdentity: string;
   previewBranch?: string;
@@ -105,17 +106,20 @@ export function deriveCloudflarePagesProviderTarget(input: {
   accountId?: string;
   project: string;
   id?: string;
+  customDomain?: string;
 }): CloudflarePagesProviderTarget {
   const account = input.account.trim();
   const accountId = input.accountId?.trim();
   const project = input.project.trim();
   const id = (input.id || project).trim() || project;
+  const customDomain = input.customDomain?.trim();
   return {
     account,
     ...(accountId ? { accountId } : {}),
     project,
     id,
-    canonicalUrl: `https://${project}.pages.dev/`,
+    ...(customDomain ? { customDomain } : {}),
+    canonicalUrl: customDomain ? `https://${customDomain}/` : `https://${project}.pages.dev/`,
     providerTargetIdentity: `${CLOUDFLARE_PAGES_PROVIDER}:${account}/${project}`,
   };
 }

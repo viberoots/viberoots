@@ -36,6 +36,20 @@ test("deriveCloudflarePagesProviderTarget normalizes canonical url and lock iden
   });
 });
 
+test("deriveCloudflarePagesProviderTarget uses custom domain as canonical url", () => {
+  const target = deriveCloudflarePagesProviderTarget({
+    account: "web-platform-staging",
+    project: "pleomino-staging-pages",
+    customDomain: "staging.pleomino.com",
+  });
+  assert.equal(target.customDomain, "staging.pleomino.com");
+  assert.equal(target.canonicalUrl, "https://staging.pleomino.com/");
+  assert.equal(
+    target.providerTargetIdentity,
+    "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+  );
+});
+
 test("extractCloudflarePagesDeployments reads provider target and publisher config", () => {
   const nodes: GraphNode[] = [
     staticWebappComponent("//projects/apps/pleomino:app"),
@@ -89,6 +103,7 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
       prerequisites: [{ deployment_id: "pleomino-dev", mode: "ordering_only" }],
       provider_target: {
         account: "web-platform-staging",
+        custom_domain: "staging.pleomino.com",
         project: "pleomino-staging-pages",
       },
     },
@@ -103,6 +118,8 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
     { deploymentId: "pleomino-dev", mode: "ordering_only" },
   ]);
   assert.equal(deployments[1]?.providerTarget.id, "pleomino-staging-pages");
+  assert.equal(deployments[1]?.providerTarget.customDomain, "staging.pleomino.com");
+  assert.equal(deployments[1]?.providerTarget.canonicalUrl, "https://staging.pleomino.com/");
   assert.equal(deployments[1]?.preview?.identitySelector, "source_run");
   assert.equal(
     deployments[1]?.providerTarget.providerTargetIdentity,
