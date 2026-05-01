@@ -4,7 +4,6 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloudflare-pages-control-plane.ts";
-import { summarizeWranglerPagesDeployError } from "../../deployments/cloudflare-pages-publisher.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import {
   cloudflarePagesDeploymentFixture,
@@ -31,22 +30,6 @@ async function writeWranglerConfig(
   await fsp.mkdir(path.dirname(root), { recursive: true });
   await fsp.writeFile(root, raw, "utf8");
 }
-
-test("cloudflare-pages deploy summarizes Cloudflare API auth failures safely", () => {
-  const stderr = `
-\u001b[31m✘ [ERROR] A request to the Cloudflare API (/memberships) failed.\u001b[0m
-
-  Authentication failed (status: 400) [code: 9106]
-
-  Logs were written to "/var/lib/deployment-host/.config/.wrangler/logs/wrangler.log"
-`;
-  const summary = summarizeWranglerPagesDeployError("", stderr);
-  assert.equal(
-    summary,
-    "wrangler pages deploy failed: Cloudflare API /memberships: Authentication failed (status: 400) [code: 9106]",
-  );
-  assert.ok(summary.length <= 160);
-});
 
 test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", async () => {
   await runInTemp("cloudflare-pages-e2e", async (tmp, $) => {

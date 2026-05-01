@@ -63,8 +63,17 @@ function stripAnsi(text: string): string {
 function cleanWranglerErrorLine(line: string): string {
   return line
     .trim()
-    .replace(/^[^\w/]*(?:\[ERROR\]\s*)?/i, "")
+    .replace(/^[^\w/]*/g, "")
+    .replace(/^\[?ERROR\]?\s*/i, "")
     .replace(/\s+/g, " ");
+}
+
+function isWranglerNoiseLine(line: string): boolean {
+  return (
+    /^Logs were written to /.test(line) ||
+    /^wrangler \d+\.\d+\.\d+\b/i.test(line) ||
+    /^update available\b/i.test(line)
+  );
 }
 
 function safeWranglerError(text: string): string {
@@ -88,7 +97,7 @@ export function summarizeWranglerPagesDeployError(stdout: string, stderr: string
     .split(/\r?\n/)
     .map(cleanWranglerErrorLine)
     .filter(Boolean)
-    .find((line) => !/^Logs were written to /.test(line));
+    .find((line) => !isWranglerNoiseLine(line));
   return clean
     ? `wrangler pages deploy failed: ${safeWranglerError(clean)}`
     : "wrangler pages deploy failed";
