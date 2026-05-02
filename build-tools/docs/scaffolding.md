@@ -196,6 +196,14 @@ For `scaf new ts webapp-ssr-next <name>`, the generated `next.config.mjs` includ
 - `dev` and `dev:ssr` compose `next dev` with a wasm producer watcher.
 - `dev:wasm:watch` rebuilds from `app/wasm-producer/*.txt` inputs and syncs each declared module key destination from `app/wasm-modules.manifest.json`.
 
+Vercel artifact mode for `webapp-ssr-next`:
+
+- The generated `TARGETS` includes `node_vercel_next_artifact(name = "vercel_artifact")`.
+- `:app` remains the normal SSR runtime target and keeps producing `dist/server/index.js` plus `dist/client/`.
+- `:vercel_artifact` consumes that hermetic Buck/Nix webapp output and materializes `vercel-prebuilt/.vercel/output` with `artifact-identity.json`.
+- Vercel project/build metadata is declared in `vercel.project.json`; local `.vercel` directories and undeclared `VERCEL_*` environment variables fail the artifact build.
+- The artifact target carries `kind:app`, `webapp:ssr`, `framework:next`, `deployable:app`, and `deployment-component:ssr-webapp` labels so deployment component extraction sees it as an SSR webapp.
+
 Troubleshooting when local dependency edits do not refresh:
 
 - Confirm the dependency spec uses `workspace:`, `link:`, or `file:` in the importer `package.json`.

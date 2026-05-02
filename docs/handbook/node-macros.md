@@ -25,6 +25,14 @@ Node macros include importer-local patches via `native.glob(...)`. Because Buck 
   - Do not pass a separate `importer` argument. If you do, it must match the lockfile label importer or the macro fails fast.
   - Provide the lockfile label via `lockfile_label=...`. Do not pass a `lockfile:` entry in `labels` (even if it matches), because macros require exactly one lockfile label.
 
+- **`node_vercel_next_artifact(...)`** (`build-tools/node/defs_vercel.bzl`)
+  - Builds `.#node-vercel-next.<importer>` through the filtered flake helper and copies the resulting `vercel-prebuilt/` directory into `$OUT`.
+  - Consumes the existing `node-webapp` Next SSR output, so `node_webapp` remains the canonical local/protected SSR runtime build and this macro only packages the Vercel Build Output API shape.
+  - Requires `vercel.project.json` by default. That file is a Buck action input and declares Vercel project/runtime metadata.
+  - Fails closed when app-local `.vercel` state or undeclared `VERCEL_*` environment variables are present.
+  - Stamps `kind:app`, `webapp:ssr`, `framework:next`, `deployable:app`, `deployment-component:ssr-webapp`, and `vercel:prebuilt`.
+  - Uses the same importer-scoped lockfile contract and optional `importer` consistency check as `node_webapp(...)`.
+
 - **`nix_node_cli_bin(..., bundle=True)`** (`build-tools/node/defs_nix.bzl`)
   - Produces a single-file, shebanged bundle for a Node CLI by building the per-importer flake attr and copying the emitted bundle to `$OUT`.
   - Requires exactly one importer-scoped lockfile label: `lockfile:<path>#<importer>`.
@@ -54,6 +62,7 @@ Before Nix build execution, Node build entrypoint macros run read-only transitiv
 - Entry points covered:
   - `nix_node_gen` and wrappers (`nix_node_lib`)
   - `node_webapp`
+  - `node_vercel_next_artifact`
   - `nix_node_cli_bin` (`bundle=True` and `bundle=False`)
   - `node_asset_stage`
   - `node_wasm_inline_module`

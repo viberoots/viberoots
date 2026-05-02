@@ -25,6 +25,7 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
   - `nix_node_lib`
   - `nix_node_bin`
   - `node_webapp`
+  - `node_vercel_next_artifact`
   - `nix_node_cli_bin`
   - `node_asset_stage`
   - `node_wasm_inline_module`
@@ -831,6 +832,31 @@ Public args:
 - `ts_module_roots` list of strings. TypeScript module roots for generated module-surface metadata.
   - Example: `ts_module_roots = ["src/ts-modules"]`
   - Used for / scenarios: Declares TypeScript module-surface roots. Use it when module metadata should be generated from specific source trees.
+
+### `node_vercel_next_artifact(name, labels = [], lockfile_label = None, importer = None, vercel_config = "vercel.project.json", out = None, **kwargs)`
+
+Use this for Next SSR apps that need a Vercel Build Output API artifact.
+
+Public args:
+
+- `name` string. Target name.
+  - Example: `node_vercel_next_artifact(name = "vercel_artifact")`
+  - Used for / scenarios: Defines the deployable prebuilt artifact label for a Next SSR app.
+- `labels` list of strings. Optional labels to add.
+  - Example: `labels = ["team:web"]`
+  - Used for / scenarios: Adds ownership or selection metadata. The macro already stamps `kind:app`, `webapp:ssr`, `framework:next`, `deployable:app`, `deployment-component:ssr-webapp`, and `vercel:prebuilt`.
+- `lockfile_label` string. Lockfile label in the form `lockfile:<path>#<package>`.
+  - Example: `lockfile_label = "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"`
+  - Used for / scenarios: Pins dependency resolution context to the app importer lockfile.
+- `importer` string. Optional package name. Must match the lockfile label suffix.
+  - Example: `importer = "projects/apps/web"`
+  - Used for / scenarios: Pins an explicit importer package path when wiring must be checked directly.
+- `vercel_config` string. Declared Vercel artifact config file. Defaults to `vercel.project.json`.
+  - Example: `vercel_config = "vercel.project.json"`
+  - Used for / scenarios: Declares project/runtime metadata as a Buck action input. Ambient `.vercel` state and undeclared `VERCEL_*` variables fail the build.
+- `out` string. Output directory name. Default is `vercel-prebuilt`.
+  - Example: `out = "vercel-prebuilt"`
+  - Used for / scenarios: Names the directory containing `.vercel/output` and `artifact-identity.json`.
 
 ### `nix_node_cli_bin(name, entry = None, out = None, labels = [], deps = [], lockfile_label = None, bundle = False, importer = None, **kwargs)`
 

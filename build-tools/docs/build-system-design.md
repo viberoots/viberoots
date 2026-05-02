@@ -134,7 +134,7 @@ extra-experimental-features = nix-command flakes
 1. **Sanitization (names/attrs):** All Starlark macros should use `//build-tools/lang:sanitize.bzl:sanitize_name` for artifact and attribute names. The Nix side mirrors this transform in `build-tools/tools/nix/lib/lang-helpers.nix:sanitizeName`. TypeScript tooling must not hand-roll this contract; use `build-tools/tools/lib/sanitize.ts:sanitizeName` so callsites stay drift-free.
    - **Nix “target label → attr suffix” mapping**: the canonical contract lives in `build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel` and `//build-tools/lang:nix_attr.bzl:sanitize_nix_attr_from_target_label`. If this mapping changes, update both and keep `build-tools/tools/tests/labels/nix-attr-sanitize.parity.test.ts` passing.
 1. **Global inputs policy (PR‑5):** Treat repository‑level global inputs (e.g., `flake.lock`) primarily at the builder/Nix level. Macros must not hardcode `//:flake.lock`. When a macro directly calls Nix, wire global inputs through `//build-tools/lang:defs_common.bzl:wire_global_nix_inputs(...)` (implemented in `//build-tools/lang:nix_calling_macros.bzl` and backed by `//build-tools/lang:global_inputs.bzl:global_nix_inputs()`).
-   - Node alignment: We stamp `global_nix_inputs()` only in Node macros that directly call Nix (`node_webapp`, `nix_node_cli_bin(bundle=True)`, `nix_node_cli_bin(bundle=False)`). Non‑Nix macros remain unstamped at the macro level.
+   - Node alignment: We stamp `global_nix_inputs()` only in Node macros that directly call Nix (`node_webapp`, `node_vercel_next_artifact`, `nix_node_cli_bin(bundle=True)`, `nix_node_cli_bin(bundle=False)`). Non‑Nix macros remain unstamped at the macro level.
 1. **Scaffolding:** When you add new target types, **update/augment** the existing scaffolding tools in `build-tools/tools/` (don’t invent new scaffolding).
 1. **Platforms:** Everything must work on at least **aarch64-darwin**, **aarch64-linux**, and **x86_64-linux**.
 1. **Glue scripts run outside Nix.** Generators are plain Node tools; do not wrap them in `nix run`.
@@ -163,7 +163,7 @@ extra-experimental-features = nix-command flakes
 
 - For a concrete Node→C++ addon scaffold and artifact flow, see `build-tools/docs/node-call-cpp.md`.
 
-- Node macros that call Nix must use the standardized helper surface in `//build-tools/lang:nix_shell.bzl` for genrule-style command assembly (e.g., `node_webapp`, bundled `nix_node_cli_bin`).
+- Node macros that call Nix must use the standardized helper surface in `//build-tools/lang:nix_shell.bzl` for genrule-style command assembly (e.g., `node_webapp`, `node_vercel_next_artifact`, bundled `nix_node_cli_bin`).
   - Use `nix_calling_genrule_bootstrap(...)` to standardize `WORKSPACE_ROOT`/`REPO_ROOT`/`FLK_ROOT` derivation and optional `build-tools/tools/buck/workspace-root.env` sourcing (for temp repos and sandboxed actions).
   - Use `nix_calling_genrule_nix_build_out_path_prefix(...)` (or `nix_build_out_path_cmd(...)`) for the canonical “nix build + capture out path” structure.
   - `nix_bootstrap_env_pnpm_store()` is Node-specific and opt-in (unified PNPM store setup / env exports).

@@ -31,6 +31,11 @@ let
     importerDirs = importers.importerDirs;
   };
 
+  nodeVercelNext = import ./node-vercel-next.nix {
+    inherit pkgs filterRepo repoSnapshot repoRoot nodeWebapp;
+    importerDirs = importers.importerDirs;
+  };
+
   nodeTest = import ./node-test.nix {
     inherit pkgs uv2nixLib repoRoot;
     nodeMods = resolvedNodeMods;
@@ -57,9 +62,9 @@ in
   test-seed = testSeed;
   node-cli = nodeCli;
   node-webapp = nodeWebapp;
+  node-vercel-next = nodeVercelNext;
   node-test = nodeTest;
   py-wasi-toolchain = pyWasiToolchain;
   toolchains = toolchains;
 } // python
-
 

@@ -10,6 +10,7 @@
       "Production startup is direct Node execution of server/index.ts output.",
       "Scripts include dev, dev:ssr, dev:ssr:only, dev:wasm, dev:wasm:watch, build:ssr, and start:ssr.",
       "TARGETS keeps SSR intent explicit with framework labels for later planner wiring.",
+      "TARGETS also includes an opt-in vercel_artifact target that packages the Next SSR build as a Vercel Build Output API directory without reading local .vercel state.",
       "Workspace-linked local dependencies (workspace:/link:/file:) are transpiled from source in dev mode for live updates in client and SSR render paths.",
       "The dev loop composes Next dev and a wasm producer watcher that rebuilds wasm payloads into generated module-key contract destinations under app/wasm-contract/.",
       "Wasm watcher logs are deterministic for tests: [wasm-watch] rebuild:start, [wasm-watch] sync:ok, [wasm-watch] rebuild:fail, and a manual recovery command.",

@@ -1,4 +1,4 @@
-load("//build-tools/node:defs.bzl", "node_asset_stage", "node_webapp", "nix_node_test")
+load("//build-tools/node:defs.bzl", "node_asset_stage", "node_vercel_next_artifact", "node_webapp", "nix_node_test")
 
 node_webapp(
     name = "app_raw",
@@ -11,6 +11,10 @@ node_asset_stage(
     assets = [],
     labels = ["lang:node", "kind:app", "webapp:ssr", "framework:next"],
     out = "dist",
+)
+
+node_vercel_next_artifact(
+    name = "vercel_artifact",
 )
 
 nix_node_test(
