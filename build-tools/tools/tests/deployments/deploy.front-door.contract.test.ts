@@ -64,56 +64,54 @@ test("deploy --list returns the stable repo-level discovery document from scaffo
   });
 });
 
-test("deploy --validate-only validates the reviewed front-door contract without creating local records", async () => {
-  await runInTemp("deploy-validate-only-contract", async (tmp, $) => {
-    const recordsRoot = path.join(tmp, "records");
-    await writeTempCloudflareValidationWorkspace(tmp);
-    const result = await $({
-      cwd: tmp,
-      stdio: "pipe",
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --validate-only`;
-    const payload = JSON.parse(String(result.stdout));
-    assert.equal(payload.schemaVersion, "deploy-validate@1");
-    assert.equal(payload.valid, true);
-    assert.equal(
-      await fsp
-        .access(recordsRoot)
-        .then(() => "present")
-        .catch(() => "missing"),
-      "missing",
-    );
-  });
-});
-
-test("deploy --validate-only fails closed on malformed cloudflare provider config content", async () => {
-  await runInTemp("deploy-validate-only-cloudflare-invalid-config", async (tmp, $) => {
-    await writeTempCloudflareValidationWorkspace(tmp, {
-      wranglerConfig: '{ "name": "demo-staging-pages", "account_id": ',
+test("deploy --validate-only preserves cloudflare-pages front-door contracts", async (t) => {
+  await runInTemp("deploy-validate-only-cloudflare-contracts", async (tmp, $) => {
+    await t.test("validates the reviewed contract without creating local records", async () => {
+      const recordsRoot = path.join(tmp, "records");
+      await writeTempCloudflareValidationWorkspace(tmp);
+      const result = await $({
+        cwd: tmp,
+        stdio: "pipe",
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --validate-only`;
+      const payload = JSON.parse(String(result.stdout));
+      assert.equal(payload.schemaVersion, "deploy-validate@1");
+      assert.equal(payload.valid, true);
+      assert.equal(
+        await fsp
+          .access(recordsRoot)
+          .then(() => "present")
+          .catch(() => "missing"),
+        "missing",
+      );
     });
-    await assert.rejects(
-      async () =>
-        await $({
-          cwd: tmp,
-          stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --validate-only`,
-      /invalid wrangler config/,
-    );
-  });
-});
 
-test("deploy --validate-only validates referenced Buck target kind expectations", async () => {
-  await runInTemp("deploy-validate-only-component-kind", async (tmp, $) => {
-    await writeTempCloudflareValidationWorkspace(tmp, {
-      appLabels: ["kind:app"],
+    await t.test("fails closed on malformed provider config content", async () => {
+      await writeTempCloudflareValidationWorkspace(tmp, {
+        wranglerConfig: '{ "name": "demo-staging-pages", "account_id": ',
+      });
+      await assert.rejects(
+        async () =>
+          await $({
+            cwd: tmp,
+            stdio: "pipe",
+          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --validate-only`,
+        /invalid wrangler config/,
+      );
     });
-    await assert.rejects(
-      async () =>
-        await $({
-          cwd: tmp,
-          stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --validate-only`,
-      /is not a supported static-webapp/,
-    );
+
+    await t.test("validates referenced Buck target kind expectations", async () => {
+      await writeTempCloudflareValidationWorkspace(tmp, {
+        appLabels: ["kind:app"],
+      });
+      await assert.rejects(
+        async () =>
+          await $({
+            cwd: tmp,
+            stdio: "pipe",
+          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --validate-only`,
+        /is not a supported static-webapp/,
+      );
+    });
   });
 });
 
@@ -188,47 +186,45 @@ test("deploy front door runs a cloudflare-pages deploy from Buck-backed metadata
   });
 });
 
-test("internal deploy entrypoint preserves cloudflare-pages provider guardrails with Buck selection", async () => {
-  await runInTemp("deploy-cloudflare-provision-only-guard", async (tmp, $) => {
-    const deployment = cloudflarePagesDeploymentFixture();
-    await installCloudflarePagesTargets(tmp, [deployment]);
-    await assert.rejects(
-      async () =>
-        await $({
-          cwd: tmp,
-          stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --provision-only`,
-      /does not support --provision-only/,
-    );
-  });
-});
+test("internal deploy entrypoint preserves provider reuse guardrails", async (t) => {
+  await runInTemp("deploy-internal-provider-reuse-guards", async (tmp, $) => {
+    await t.test("cloudflare-pages rejects provision-only with Buck selection", async () => {
+      const deployment = cloudflarePagesDeploymentFixture();
+      await installCloudflarePagesTargets(tmp, [deployment]);
+      await assert.rejects(
+        async () =>
+          await $({
+            cwd: tmp,
+            stdio: "pipe",
+          })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --provision-only`,
+        /does not support --provision-only/,
+      );
+    });
 
-test("internal deploy entrypoint requires source-run-id for s3-static publish-only reuse", async () => {
-  await runInTemp("deploy-s3-static-publish-only-guard", async (tmp, $) => {
-    const deployment = s3StaticDeploymentFixture();
-    await installS3StaticTargets(tmp, [deployment]);
-    await assert.rejects(
-      async () =>
-        await $({
-          cwd: tmp,
-          stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --publish-only`,
-      /s3-static --publish-only requires --source-run-id/,
-    );
-  });
-});
+    await t.test("s3-static requires source-run-id for publish-only reuse", async () => {
+      const deployment = s3StaticDeploymentFixture();
+      await installS3StaticTargets(tmp, [deployment]);
+      await assert.rejects(
+        async () =>
+          await $({
+            cwd: tmp,
+            stdio: "pipe",
+          })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --publish-only`,
+        /s3-static --publish-only requires --source-run-id/,
+      );
+    });
 
-test("internal deploy entrypoint requires source-run-id for kubernetes publish-only reuse", async () => {
-  await runInTemp("deploy-kubernetes-publish-only-guard", async (tmp, $) => {
-    const deployment = kubernetesDeploymentFixture();
-    await installKubernetesTargets(tmp, [deployment]);
-    await assert.rejects(
-      async () =>
-        await $({
-          cwd: tmp,
-          stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --publish-only`,
-      /kubernetes --publish-only requires --source-run-id/,
-    );
+    await t.test("kubernetes requires source-run-id for publish-only reuse", async () => {
+      const deployment = kubernetesDeploymentFixture();
+      await installKubernetesTargets(tmp, [deployment]);
+      await assert.rejects(
+        async () =>
+          await $({
+            cwd: tmp,
+            stdio: "pipe",
+          })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --publish-only`,
+        /kubernetes --publish-only requires --source-run-id/,
+      );
+    });
   });
 });

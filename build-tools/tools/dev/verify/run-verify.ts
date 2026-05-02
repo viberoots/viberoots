@@ -178,22 +178,31 @@ export async function runVerify(): Promise<void> {
       `[verify] buck2 orphan cleanup: scanned_forkservers=${res.scanned} candidates=${res.candidates} killed=${res.killed}`,
     );
   } catch {}
-  let pgid = process.pid;
+  const activePgids = new Set<number>();
   let requestedExitCode: number | null = null;
   let shutdownPromise: Promise<void> | null = null;
   const cleanupRegisteredTempRepoState = createRegisteredStateCleaner({
     stateFile,
     logFile: lock.logFile,
   });
+  let shutdownLogged = false;
   const requestShutdown = (sig: NodeJS.Signals): Promise<void> => {
     requestedExitCode = sig === "SIGINT" ? 130 : 143;
     if (!shutdownPromise) {
       shutdownPromise = (async () => {
+        if (!shutdownLogged) {
+          shutdownLogged = true;
+          await appendVerifyLogLine(
+            lock.logFile,
+            `[verify] stopped signal=${sig} end_s=${Math.floor(Date.now() / 1000)}`,
+          );
+        }
         if (seedCleanup) {
           await seedCleanup();
           seedCleanup = null;
         }
-        await killProcessGroup(pgid);
+        const pgids = activePgids.size > 0 ? [...activePgids] : [process.pid];
+        await Promise.all(pgids.map(async (pgid) => await killProcessGroup(pgid)));
         await killBuckIsolation(root, iso);
         await cleanupRegisteredTempRepoState();
       })();
@@ -221,9 +230,8 @@ export async function runVerify(): Promise<void> {
         targets: selection.targets,
         zxNodeModulesOut,
         analysisDir,
-        onPgid: (nextPgid) => {
-          pgid = nextPgid;
-        },
+        onPgid: (nextPgid) => activePgids.add(nextPgid),
+        onPgidDone: (donePgid) => activePgids.delete(donePgid),
       }),
   );
   if (shutdownPromise) await shutdownPromise;

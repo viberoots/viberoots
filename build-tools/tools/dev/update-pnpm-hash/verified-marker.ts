@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { withExclusiveInstallLock } from "../install/lock.ts";
 import { updateNodeModulesHashesJson } from "./hashes-json.ts";
 
 export type PnpmStoreVerifiedMarker = {
@@ -156,6 +157,20 @@ export async function persistVerifiedHash(opts: {
     lockHash: opts.marker.lockHash,
     hashValue: opts.marker.hashValue,
     builderFingerprint: opts.marker.builderFingerprint,
+  });
+}
+
+export async function withSharedHashCacheLock<T>(
+  opts: { repoRoot: string; builderFingerprint: string; lockHash: string },
+  fn: () => Promise<T>,
+): Promise<T> {
+  const lockRoot = sharedCacheRepoRoot(opts.repoRoot);
+  const lockKey = `pnpm-store-hash:${opts.builderFingerprint}:${opts.lockHash}`;
+  return await withExclusiveInstallLock(lockKey, fn, {
+    timeoutMs: 15 * 60_000,
+    staleMs: 15 * 60_000,
+    verbose: String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1",
+    scopeRootAbs: lockRoot,
   });
 }
 

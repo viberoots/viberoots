@@ -202,6 +202,13 @@ async function ensureUnifiedPnpmStoreOncePerWorker($: any): Promise<string> {
   return await cachedUnifiedPnpmStorePath;
 }
 
+function nixPathHasNixpkgsEntry(value: string): boolean {
+  return String(value || "")
+    .split(":")
+    .map((entry) => entry.trim())
+    .some((entry) => entry.startsWith("nixpkgs="));
+}
+
 let stableTestHomeOnce: Promise<string> | null = null;
 async function stableTestHomeOncePerWorker(): Promise<string> {
   if (stableTestHomeOnce) return await stableTestHomeOnce;
@@ -453,16 +460,18 @@ export async function runInTemp<T>(
   exportEnv.GOSUMDB = exportEnv.GOSUMDB || "sum.golang.org";
   exportEnv.GOMODCACHE = exportEnv.GOMODCACHE || goModCacheRoot;
   try {
-    const pinnedNixpkgs = await timeAsync("runInTemp pinnedNixpkgsPath", async () => {
-      return await pinnedNixpkgsPathOncePerWorker($);
-    });
-    if (pinnedNixpkgs) {
-      const nixPathEntries = String(exportEnv.NIX_PATH || "")
-        .split(":")
-        .map((entry) => entry.trim())
-        .filter(Boolean)
-        .filter((entry) => !entry.startsWith("nixpkgs="));
-      exportEnv.NIX_PATH = [`nixpkgs=${pinnedNixpkgs}`, ...nixPathEntries].join(":");
+    if (!nixPathHasNixpkgsEntry(exportEnv.NIX_PATH || "")) {
+      const pinnedNixpkgs = await timeAsync("runInTemp pinnedNixpkgsPath", async () => {
+        return await pinnedNixpkgsPathOncePerWorker($);
+      });
+      if (pinnedNixpkgs) {
+        const nixPathEntries = String(exportEnv.NIX_PATH || "")
+          .split(":")
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+          .filter((entry) => !entry.startsWith("nixpkgs="));
+        exportEnv.NIX_PATH = [`nixpkgs=${pinnedNixpkgs}`, ...nixPathEntries].join(":");
+      }
     }
   } catch {}
   if (!exportEnv.SSL_CERT_FILE && exportEnv.NIX_SSL_CERT_FILE) {

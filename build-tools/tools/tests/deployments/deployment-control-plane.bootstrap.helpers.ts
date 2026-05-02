@@ -13,6 +13,14 @@ export async function writeBootstrapArtifact(root: string, body: string) {
   await fsp.writeFile(path.join(root, "healthz"), "ok\n", "utf8");
 }
 
+export function bootstrapCasePaths(root: string) {
+  return {
+    statePath: path.join(root, "platform-state.json"),
+    hostRoot: path.join(root, "host"),
+    recordsRoot: path.join(root, "records"),
+  };
+}
+
 export function bootstrapDeploymentFixture() {
   return nixosSharedHostDeploymentFixture({
     deploymentId: "deploy-system-dev",

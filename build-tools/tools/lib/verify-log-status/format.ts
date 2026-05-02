@@ -12,6 +12,8 @@ export function formatVerifyStatusJsonLine(st: VerifyStatus): string {
     remaining: st.remaining ?? null,
     failed: st.failed,
     done: st.done,
+    stopped: st.stopped ?? false,
+    stop_reason: st.stopReason ?? null,
     elapsed: st.elapsed ?? null,
     gc_detected: st.gcDetected,
     log: st.logPath,
@@ -47,15 +49,17 @@ export function formatVerifyStatusText(
   const RED = "\u001b[31m";
   const ORANGE = "\u001b[38;5;208m";
   const color =
-    !st.done && !anyFailures && st.gcDetected
-      ? BLUE
-      : st.done && anyFailures
-        ? RED
-        : st.done && !anyFailures
-          ? GREEN
-          : !st.done && anyFailures
-            ? ORANGE
-            : YELLOW;
+    !st.done && st.stopped
+      ? ORANGE
+      : !st.done && !anyFailures && st.gcDetected
+        ? BLUE
+        : st.done && anyFailures
+          ? RED
+          : st.done && !anyFailures
+            ? GREEN
+            : !st.done && anyFailures
+              ? ORANGE
+              : YELLOW;
 
   const DIM = "\u001b[2m";
   const label = (s: string) => (isTty ? `${DIM}${s}${RESET}` : s);
@@ -69,7 +73,9 @@ export function formatVerifyStatusText(
       `${label("Pass group:")}      ${val(`${st.passName} (${st.passIndex}/${st.passTotal})`)}`,
     );
   }
-  lines.push(`${label(st.done ? "Tests finished:" : "Tests so far:")}`);
+  lines.push(
+    `${label(st.done ? "Tests finished:" : st.stopped ? "Tests stopped:" : "Tests so far:")}`,
+  );
   lines.push(`  ${val(`Pass:          ${st.pass}`)}`);
   lines.push(`  ${val(`Fail:          ${st.fail}`)}`);
   lines.push(`  ${val(`Fatal:         ${st.fatal}`)}`);
@@ -77,6 +83,9 @@ export function formatVerifyStatusText(
   lines.push(`  ${val(`Build failure: ${st.buildFailure}`)}`);
   lines.push(`${label("----------------------")}`);
   lines.push(`${label("Tests remaining:")} ${val(remaining)}`);
+  if (st.stopped) {
+    lines.push(`${label("Run stopped:")} ${val(st.stopReason || "yes")}`);
+  }
   lines.push(`${label("GC detected:")} ${val(st.gcDetected ? "yes" : "no")}`);
   lines.push(st.logPath);
 

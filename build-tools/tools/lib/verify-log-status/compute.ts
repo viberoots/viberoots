@@ -4,100 +4,19 @@ import type { VerifyStatus } from "./types.ts";
 import {
   findLastFullSuiteWindowStart,
   formatElapsed,
-  parseLineFromBuckLogForMatching,
   parseBuck2ExitMarker,
   parseGcDetected,
   parseVerifyBeginEpochSec,
+  parseVerifyStoppedMarker,
 } from "./parsing.ts";
 import { deriveInProgressCounts } from "./derived.ts";
+import {
+  parseExpandedTargetCount,
+  parsePassBegins,
+  parsePassExits,
+  passExitForBegin,
+} from "./passes.ts";
 import { parseFinalSummary } from "./summary.ts";
-
-type PassBegin = {
-  idx: number;
-  name: string;
-  index: number;
-  total: number;
-  targetCount?: number;
-};
-
-type PassExit = {
-  idx: number;
-  name: string;
-  status: number;
-  pass: number;
-  fail: number;
-};
-
-function countTargetsFromPassBeginLine(line: string): number | undefined {
-  const marker = " targets=";
-  const idx = line.indexOf(marker);
-  if (idx < 0) return undefined;
-  const targets = line.slice(idx + marker.length).trim();
-  if (!targets) return 0;
-  return targets.split(/\s+/).filter(Boolean).length;
-}
-
-function parsePassBegins(lines: string[]): PassBegin[] {
-  const re =
-    /^\[verify\]\s+target pass begin name=(\S+)\s+index=(\d+)\/(\d+)\b(?:\s+target_count=(\d+))?/;
-  const out: PassBegin[] = [];
-  for (let idx = 0; idx < lines.length; idx++) {
-    const { normalized } = parseLineFromBuckLogForMatching(lines[idx]);
-    const m = re.exec(normalized);
-    if (!m) continue;
-    const explicitTargetCount = m[4] ? Number(m[4]) : undefined;
-    const inferredTargetCount =
-      explicitTargetCount !== undefined
-        ? explicitTargetCount
-        : countTargetsFromPassBeginLine(normalized);
-    out.push({
-      idx,
-      name: m[1] || "",
-      index: Number(m[2]),
-      total: Number(m[3]),
-      targetCount:
-        inferredTargetCount !== undefined && Number.isFinite(inferredTargetCount)
-          ? inferredTargetCount
-          : undefined,
-    });
-  }
-  return out;
-}
-
-function parsePassExits(lines: string[]): PassExit[] {
-  const re =
-    /^\[verify\]\s+buck2 test exit iso=.*\s+pass=(\S+)\s+status=(\d+).*?\bpass_count=(\d+)\s+fail_count=(\d+)\b/;
-  const out: PassExit[] = [];
-  for (let idx = 0; idx < lines.length; idx++) {
-    const { normalized } = parseLineFromBuckLogForMatching(lines[idx]);
-    const m = re.exec(normalized);
-    if (!m) continue;
-    out.push({
-      idx,
-      name: m[1] || "",
-      status: Number(m[2]),
-      pass: Number(m[3]),
-      fail: Number(m[4]),
-    });
-  }
-  return out;
-}
-
-function passExitForBegin(begin: PassBegin, exits: PassExit[]): PassExit | undefined {
-  return exits.find((exit) => exit.name === begin.name && exit.idx > begin.idx);
-}
-
-function parseExpandedTargetCount(lines: string[]): number | undefined {
-  const re = /^\[verify\]\s+expanded targets:\s+concrete=(\d+)\b/;
-  for (const raw of lines) {
-    const { normalized } = parseLineFromBuckLogForMatching(raw);
-    const m = re.exec(normalized);
-    if (!m) continue;
-    const count = Number(m[1]);
-    return Number.isFinite(count) ? count : undefined;
-  }
-  return undefined;
-}
 
 function aggregateVerifyPassStatus(
   lines: string[],
@@ -110,6 +29,7 @@ function aggregateVerifyPassStatus(
   const exits = parsePassExits(lines);
   const latestBegin = begins[begins.length - 1];
   const latestExit = passExitForBegin(latestBegin, exits);
+  const activeBegins = begins.filter((begin) => passExitForBegin(begin, exits) === undefined);
   let pass = 0;
   let fail = 0;
   let fatal = 0;
@@ -133,8 +53,12 @@ function aggregateVerifyPassStatus(
       if (exit.status !== 0) buildFailure++;
       continue;
     }
-    if (begin !== latestBegin) continue;
-    const current = deriveInProgressCounts(lines.slice(begin.idx));
+    const canFilterBegin = begin.targetLabels !== undefined && begin.targetLabels.size > 0;
+    if (!canFilterBegin && activeBegins.length > 1 && begin !== latestBegin) continue;
+    if (!canFilterBegin && activeBegins.length <= 1 && begin !== activeBegins[0]) continue;
+    const current = deriveInProgressCounts(lines.slice(begin.idx), {
+      targetLabels: canFilterBegin ? begin.targetLabels : undefined,
+    });
     pass += current.pass;
     fail += current.fail;
     fatal += current.fatal;
@@ -145,7 +69,11 @@ function aggregateVerifyPassStatus(
     remaining = current.remaining;
   }
 
-  const done = latestExit !== undefined && latestBegin.index >= latestBegin.total;
+  const expectedPassTotal = Math.max(...begins.map((begin) => begin.total));
+  const begunPassIndexes = new Set(begins.map((begin) => begin.index));
+  const done =
+    begunPassIndexes.size >= expectedPassTotal &&
+    begins.every((begin) => passExitForBegin(begin, exits) !== undefined);
   const aggregateRemaining =
     totalTargets === undefined ? remaining : Math.max(0, totalTargets - completed);
   return {
@@ -169,6 +97,8 @@ export function computeVerifyStatusFromLogText(opts: {
   logPath: string;
   pid?: number;
   text: string;
+  stoppedAtSec?: number;
+  stopReason?: string;
 }): VerifyStatus {
   const cleaned = stripAnsiAndCrs(opts.text);
   const lines = cleaned.split("\n");
@@ -177,6 +107,7 @@ export function computeVerifyStatusFromLogText(opts: {
   const window = startIdx > 0 ? lines.slice(startIdx) : lines;
 
   const exitMarker = parseBuck2ExitMarker(window);
+  const stoppedMarker = parseVerifyStoppedMarker(window);
   const beginSec = parseVerifyBeginEpochSec(window);
   const gcDetected = parseGcDetected(window);
 
@@ -193,12 +124,17 @@ export function computeVerifyStatusFromLogText(opts: {
   // - When done: freeze using end_s if available; otherwise treat as unknown ("?").
   const done =
     base.passTotal && base.passTotal > 1 ? base.done : exitMarker.done ? true : base.done;
+  const stoppedAtSec = stoppedMarker.endSec ?? opts.stoppedAtSec;
+  const stopped = !done && (stoppedMarker.stopped || stoppedAtSec !== undefined);
   const elapsed = (() => {
     if (base.elapsed) return base.elapsed;
     if (beginSec === undefined) return undefined;
     if (done) {
       if (exitMarker.endSec === undefined) return undefined;
       return formatElapsed(exitMarker.endSec - beginSec);
+    }
+    if (stopped && stoppedAtSec !== undefined) {
+      return formatElapsed(stoppedAtSec - beginSec);
     }
     return formatElapsed(Date.now() / 1000 - beginSec);
   })();
@@ -214,6 +150,8 @@ export function computeVerifyStatusFromLogText(opts: {
     logPath: path.normalize(opts.logPath),
     ...base,
     done,
+    stopped,
+    stopReason: stopped ? (stoppedMarker.reason ?? opts.stopReason) : undefined,
     buildFailure,
     elapsed,
     gcDetected,

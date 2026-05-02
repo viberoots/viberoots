@@ -5,6 +5,7 @@ import {
   type PnpmStoreVerifiedMarker,
   persistVerifiedHash,
   restoreHashFromSharedCache,
+  withSharedHashCacheLock,
 } from "./verified-marker.ts";
 
 export async function handleNonDefaultImporter(opts: {
@@ -39,6 +40,34 @@ export async function handleNonDefaultImporter(opts: {
       },
     });
   };
+  const restoreSharedHash = async () => {
+    if (!opts.existingLockHash) return false;
+    return await restoreHashFromSharedCache({
+      repoRoot: opts.repoRoot,
+      key: opts.key,
+      markerPath: opts.markerPath,
+      importer: opts.importer,
+      storeAttr: opts.storeAttr,
+      builderFingerprint: opts.builderFingerprint,
+      existingLockHash: opts.existingLockHash,
+      existingHash: opts.existingHash,
+      hasValidExistingHash: opts.hasValidExistingHash,
+    });
+  };
+  const withSharedHashComputation = async (compute: () => Promise<boolean>) => {
+    if (!opts.existingLockHash) return await compute();
+    return await withSharedHashCacheLock(
+      {
+        repoRoot: opts.repoRoot,
+        builderFingerprint: opts.builderFingerprint,
+        lockHash: opts.existingLockHash,
+      },
+      async () => {
+        if (await restoreSharedHash()) return true;
+        return await compute();
+      },
+    );
+  };
   if (opts.hasValidExistingHash) {
     if (
       opts.existingLockHash &&
@@ -58,134 +87,133 @@ export async function handleNonDefaultImporter(opts: {
     console.log(
       `[update-pnpm-hash] importer=${opts.importer} step=stale-existing-hash attr=${opts.storeAttr} lockfile=${opts.key}`,
     );
-    const verifyExisting = await opts.runFixedBuild(
+    if (
+      await withSharedHashComputation(async () => {
+        const verifyExisting = await opts.runFixedBuild(
+          `importer=${opts.importer} step=fixed-build attr=${opts.storeAttr}`,
+        );
+        if (verifyExisting.ok) {
+          await persistHash(opts.existingHash);
+          console.log("pnpm-store:", opts.storeAttr, "hash updated and build succeeded");
+          return true;
+        }
+        if (/does not provide attribute/.test(String(verifyExisting.output || ""))) {
+          console.warn(
+            `[update-pnpm-hash] skip: flake attr missing (${opts.storeAttr}); continuing`,
+          );
+          return true;
+        }
+        const suggestedFromExisting = extractHash(String(verifyExisting.output || ""));
+        if (suggestedFromExisting) {
+          await updateNodeModulesHashesJson(opts.key, suggestedFromExisting);
+          console.log(
+            `[update-pnpm-hash] importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr} timeout=${opts.timeoutSec}s`,
+          );
+          const verifyAfterHash = await opts.runFixedBuild(
+            `importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr}`,
+          );
+          if (!verifyAfterHash.ok) {
+            console.error(
+              "pnpm-store still failing after hash update\n\n" +
+                String(verifyAfterHash.output || ""),
+            );
+            process.exit(1);
+            return true;
+          }
+          await persistHash(suggestedFromExisting);
+          console.log("pnpm-store:", opts.storeAttr, "hash updated and build succeeded");
+          return true;
+        }
+        return false;
+      })
+    ) {
+      return true;
+    }
+  }
+  if (await restoreSharedHash()) {
+    return true;
+  }
+  return await withSharedHashComputation(async () => {
+    console.log(
+      `[update-pnpm-hash] importer=${opts.importer} step=fixed-build attr=${opts.storeAttr} timeout=${opts.timeoutSec}s`,
+    );
+    const verify = await opts.runFixedBuild(
       `importer=${opts.importer} step=fixed-build attr=${opts.storeAttr}`,
     );
-    if (verifyExisting.ok) {
-      await persistHash(opts.existingHash);
+    if (verify.ok) {
+      if (opts.hasValidExistingHash) await persistHash(opts.existingHash);
       console.log("pnpm-store:", opts.storeAttr, "hash updated and build succeeded");
       return true;
     }
-    if (/does not provide attribute/.test(String(verifyExisting.output || ""))) {
+    if (/does not provide attribute/.test(String(verify.output || ""))) {
       console.warn(`[update-pnpm-hash] skip: flake attr missing (${opts.storeAttr}); continuing`);
       return true;
     }
-    const suggestedFromExisting = extractHash(String(verifyExisting.output || ""));
-    if (suggestedFromExisting) {
-      await updateNodeModulesHashesJson(opts.key, suggestedFromExisting);
+    suggestedHash = extractHash(String(verify.output || ""));
+    if (!suggestedHash) {
       console.log(
-        `[update-pnpm-hash] importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr} timeout=${opts.timeoutSec}s`,
+        `[update-pnpm-hash] importer=${opts.importer} step=unfixed-build attr=${opts.unfixedAttr} timeout=${opts.timeoutSec}s`,
       );
-      const verifyAfterHash = await opts.runFixedBuild(
-        `importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr}`,
+      let pre = await opts.runUnfixedBuild(
+        `importer=${opts.importer} step=unfixed-build attr=${opts.unfixedAttr}`,
       );
-      if (!verifyAfterHash.ok) {
+      if (!pre.ok) {
+        await generateImporterLockfile({ repoRoot: opts.repoRoot, importer: opts.importer });
+        console.log(
+          `[update-pnpm-hash] importer=${opts.importer} step=unfixed-build-retry attr=${opts.unfixedAttr} timeout=${opts.timeoutSec}s`,
+        );
+        pre = await opts.runUnfixedBuild(
+          `importer=${opts.importer} step=unfixed-build-retry attr=${opts.unfixedAttr}`,
+        );
+      }
+      if (!pre.ok || !pre.sri) {
+        console.error(
+          "pnpm-store-unfixed failed and no SRI hash was produced\n\n" + String(pre.output || ""),
+        );
+        process.exit(1);
+        return true;
+      }
+      suggestedHash = pre.sri;
+    }
+    const sri0 = suggestedHash;
+    if (!sri0) {
+      console.error("pnpm-store hash suggestion unexpectedly missing for non-default importer");
+      process.exit(1);
+      return true;
+    }
+    let sri = sri0;
+    await updateNodeModulesHashesJson(opts.key, sri);
+    console.log(
+      `[update-pnpm-hash] importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr} timeout=${opts.timeoutSec}s`,
+    );
+    const verifyAfterHash = await opts.runFixedBuild(
+      `importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr}`,
+    );
+    if (!verifyAfterHash.ok) {
+      const suggestedFromFixed = extractHash(String(verifyAfterHash.output || ""));
+      if (suggestedFromFixed && suggestedFromFixed !== sri) {
+        sri = suggestedFromFixed;
+        await updateNodeModulesHashesJson(opts.key, sri);
+        const retryAfterHash = await opts.runFixedBuild(
+          `importer=${opts.importer} step=fixed-build-after-hash-retry attr=${opts.storeAttr}`,
+        );
+        if (!retryAfterHash.ok) {
+          console.error(
+            "pnpm-store still failing after hash update\n\n" + String(retryAfterHash.output || ""),
+          );
+          process.exit(1);
+          return true;
+        }
+      } else {
         console.error(
           "pnpm-store still failing after hash update\n\n" + String(verifyAfterHash.output || ""),
         );
         process.exit(1);
         return true;
       }
-      await persistHash(suggestedFromExisting);
-      console.log("pnpm-store:", opts.storeAttr, "hash updated and build succeeded");
-      return true;
     }
-  }
-  if (
-    opts.existingLockHash &&
-    (await restoreHashFromSharedCache({
-      repoRoot: opts.repoRoot,
-      key: opts.key,
-      markerPath: opts.markerPath,
-      importer: opts.importer,
-      storeAttr: opts.storeAttr,
-      builderFingerprint: opts.builderFingerprint,
-      existingLockHash: opts.existingLockHash,
-      existingHash: opts.existingHash,
-      hasValidExistingHash: opts.hasValidExistingHash,
-    }))
-  ) {
-    return true;
-  }
-  console.log(
-    `[update-pnpm-hash] importer=${opts.importer} step=fixed-build attr=${opts.storeAttr} timeout=${opts.timeoutSec}s`,
-  );
-  const verify = await opts.runFixedBuild(
-    `importer=${opts.importer} step=fixed-build attr=${opts.storeAttr}`,
-  );
-  if (verify.ok) {
-    if (opts.hasValidExistingHash) await persistHash(opts.existingHash);
+    await persistHash(sri);
     console.log("pnpm-store:", opts.storeAttr, "hash updated and build succeeded");
     return true;
-  }
-  if (/does not provide attribute/.test(String(verify.output || ""))) {
-    console.warn(`[update-pnpm-hash] skip: flake attr missing (${opts.storeAttr}); continuing`);
-    return true;
-  }
-  suggestedHash = extractHash(String(verify.output || ""));
-  if (!suggestedHash) {
-    console.log(
-      `[update-pnpm-hash] importer=${opts.importer} step=unfixed-build attr=${opts.unfixedAttr} timeout=${opts.timeoutSec}s`,
-    );
-    let pre = await opts.runUnfixedBuild(
-      `importer=${opts.importer} step=unfixed-build attr=${opts.unfixedAttr}`,
-    );
-    if (!pre.ok) {
-      await generateImporterLockfile({ repoRoot: opts.repoRoot, importer: opts.importer });
-      console.log(
-        `[update-pnpm-hash] importer=${opts.importer} step=unfixed-build-retry attr=${opts.unfixedAttr} timeout=${opts.timeoutSec}s`,
-      );
-      pre = await opts.runUnfixedBuild(
-        `importer=${opts.importer} step=unfixed-build-retry attr=${opts.unfixedAttr}`,
-      );
-    }
-    if (!pre.ok || !pre.sri) {
-      console.error(
-        "pnpm-store-unfixed failed and no SRI hash was produced\n\n" + String(pre.output || ""),
-      );
-      process.exit(1);
-      return true;
-    }
-    suggestedHash = pre.sri;
-  }
-  const sri0 = suggestedHash;
-  if (!sri0) {
-    console.error("pnpm-store hash suggestion unexpectedly missing for non-default importer");
-    process.exit(1);
-    return true;
-  }
-  let sri = sri0;
-  await updateNodeModulesHashesJson(opts.key, sri);
-  console.log(
-    `[update-pnpm-hash] importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr} timeout=${opts.timeoutSec}s`,
-  );
-  const verifyAfterHash = await opts.runFixedBuild(
-    `importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr}`,
-  );
-  if (!verifyAfterHash.ok) {
-    const suggestedFromFixed = extractHash(String(verifyAfterHash.output || ""));
-    if (suggestedFromFixed && suggestedFromFixed !== sri) {
-      sri = suggestedFromFixed;
-      await updateNodeModulesHashesJson(opts.key, sri);
-      const retryAfterHash = await opts.runFixedBuild(
-        `importer=${opts.importer} step=fixed-build-after-hash-retry attr=${opts.storeAttr}`,
-      );
-      if (!retryAfterHash.ok) {
-        console.error(
-          "pnpm-store still failing after hash update\n\n" + String(retryAfterHash.output || ""),
-        );
-        process.exit(1);
-        return true;
-      }
-    } else {
-      console.error(
-        "pnpm-store still failing after hash update\n\n" + String(verifyAfterHash.output || ""),
-      );
-      process.exit(1);
-      return true;
-    }
-  }
-  await persistHash(sri);
-  console.log("pnpm-store:", opts.storeAttr, "hash updated and build succeeded");
-  return true;
+  });
 }

@@ -11,6 +11,8 @@ export type VerifyStatus = {
   remaining?: number;
   failed: string[];
   done: boolean;
+  stopped?: boolean;
+  stopReason?: string;
   elapsed?: string;
   gcDetected: boolean;
   source: VerifyStatusSource;

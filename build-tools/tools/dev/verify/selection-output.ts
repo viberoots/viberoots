@@ -9,7 +9,7 @@ export function printVerifySelection(
   process.stdout.write(`[verify] selection: ${summarizeVerifyScopeDecision(decision)}\n`);
   if (expanded) {
     process.stdout.write(
-      `[verify] expanded selection: concreteTargets=${expanded.expandedTargetCount} passCount=${expanded.passCount} isolatedPasses=${expanded.isolatedPassCount} isolatedTargets=${expanded.isolatedTargetCount} sharedTargets=${expanded.sharedTargetCount}\n`,
+      `[verify] expanded selection: concreteTargets=${expanded.expandedTargetCount} passCount=${expanded.passCount} isolatedPasses=${expanded.isolatedPassCount} isolatedTargets=${expanded.isolatedTargetCount} resourceLimitedPasses=${expanded.resourceLimitedPassCount} resourceLimitedTargets=${expanded.resourceLimitedTargetCount} sharedTargets=${expanded.sharedTargetCount}\n`,
     );
   }
   if (decision.diagnostics) {

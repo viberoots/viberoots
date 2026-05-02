@@ -1,38 +1,10 @@
-import fsp from "node:fs/promises";
 import process from "node:process";
-import {
-  computeVerifyStatusFromLogText,
-  formatVerifyStatusJsonLine,
-  formatVerifyStatusText,
-} from "../../lib/verify-log-status.ts";
+import { formatVerifyStatusJsonLine, formatVerifyStatusText } from "../../lib/verify-log-status.ts";
 import type { TailLogArgs } from "./args.ts";
 import type { Resolution } from "./resolve.ts";
 import { pidAliveWithSignature, pidStartSignature, resolveLatest, resolvePid } from "./resolve.ts";
+import { computeStatusFromLogPath, emptyNdjson } from "./status-compute.ts";
 import { clearScreen, getExtraStatusLines, trimToTerminal } from "./status-helpers.ts";
-
-function emptyNdjson(pid: number, error: string): string {
-  return JSON.stringify({
-    pid,
-    pass: 0,
-    fail: 0,
-    fatal: 0,
-    skip: 0,
-    build_failure: 0,
-    remaining: null,
-    failed: [],
-    done: false,
-    elapsed: null,
-    gc_detected: false,
-    log: null,
-    source: "derived",
-    error,
-  });
-}
-
-async function computeStatusFromLogPath(logPath: string, pid: number) {
-  const text = await fsp.readFile(logPath, "utf8");
-  return computeVerifyStatusFromLogText({ logPath, pid: pid || undefined, text });
-}
 
 async function resolveForArgs(args: TailLogArgs): Promise<Resolution> {
   if (args.selection.kind === "latest") return await resolveLatest();
@@ -52,7 +24,7 @@ export async function runStatusOnce(args: TailLogArgs): Promise<void> {
     return;
   }
   try {
-    const st = await computeStatusFromLogPath(res.logPath, res.pid || 0);
+    const st = await computeStatusFromLogPath(res.logPath, res.pid || 0, res.active);
     const out = args.json
       ? formatVerifyStatusJsonLine(st)
       : formatVerifyStatusText(st, {
@@ -149,7 +121,7 @@ export async function renderStatusWatchLoop(args: TailLogArgs): Promise<void> {
       if (res.logPath) {
         if (json) {
           try {
-            const st = await computeStatusFromLogPath(res.logPath, pid);
+            const st = await computeStatusFromLogPath(res.logPath, pid, res.active);
             process.stdout.write(formatVerifyStatusJsonLine(st) + "\n");
           } catch {
             process.stdout.write(emptyNdjson(pid, "log file missing") + "\n");
@@ -157,7 +129,7 @@ export async function renderStatusWatchLoop(args: TailLogArgs): Promise<void> {
         } else {
           let out = "";
           try {
-            const st = await computeStatusFromLogPath(res.logPath, pid);
+            const st = await computeStatusFromLogPath(res.logPath, pid, res.active);
             out = formatVerifyStatusText(st, {
               isTty: isTty || (process.env.FORCE_COLOR || "") === "1",
             });
@@ -206,7 +178,13 @@ export async function renderStatusWatchLoop(args: TailLogArgs): Promise<void> {
           done = true;
         } else {
           const alive = await pidAliveWithSignature(args.selection.pid, pidSig);
-          if (!alive) done = true;
+          if (!alive) {
+            if (res.active) {
+              rerender = true;
+            } else {
+              done = true;
+            }
+          }
         }
       }
     } finally {

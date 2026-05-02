@@ -1,6 +1,13 @@
 import type { VerifyStatus } from "./types.ts";
 import { collectFailedLabels, parseLineFromBuckLogForMatching, parseRemaining } from "./parsing.ts";
 
+export function normalizeBuckTestLabel(label: string): string {
+  return label
+    .replace(/\s+\([^)]*\)\s*$/, "")
+    .trim()
+    .replace(/^[A-Za-z0-9_.-]+(?=\/\/)/, "");
+}
+
 function labelAfterMarker(line: string, marker: string): string | null {
   const idx = line.indexOf(marker);
   if (idx < 0) return null;
@@ -9,7 +16,12 @@ function labelAfterMarker(line: string, marker: string): string | null {
   return label ? label : null;
 }
 
-export function deriveInProgressCounts(lines: string[]): Omit<VerifyStatus, "logPath"> {
+export function deriveInProgressCounts(
+  lines: string[],
+  opts: {
+    targetLabels?: ReadonlySet<string>;
+  } = {},
+): Omit<VerifyStatus, "logPath"> {
   // Buck emits completion lines that are stable (unlike superconsole repaint frames).
   // We only count these and dedupe by status+label or status+line.
   const passAltRe = /(?:^|\s)Pass:\s*(.+)$/;
@@ -22,6 +34,7 @@ export function deriveInProgressCounts(lines: string[]): Omit<VerifyStatus, "log
     fail = 0,
     fatal = 0,
     skip = 0;
+  const failed: string[] = [];
 
   for (const raw of lines) {
     const parsed = parseLineFromBuckLogForMatching(raw);
@@ -57,14 +70,17 @@ export function deriveInProgressCounts(lines: string[]): Omit<VerifyStatus, "log
     if (!status) continue;
 
     // Normalize label a bit: remove trailing parens duration if present.
-    const cleaned = label.replace(/\s+\([^)]*\)\s*$/, "").trim();
+    const cleaned = normalizeBuckTestLabel(label);
+    if (opts.targetLabels && !opts.targetLabels.has(cleaned)) continue;
     const key = cleaned ? `${status}|${cleaned}` : `${status}|${line}`;
     if (seen.has(key)) continue;
     seen.add(key);
 
     if (status === "pass") pass++;
-    else if (status === "fail") fail++;
-    else if (status === "fatal") fatal++;
+    else if (status === "fail") {
+      fail++;
+      if (cleaned) failed.push(cleaned);
+    } else if (status === "fatal") fatal++;
     else if (status === "skip") skip++;
   }
 
@@ -85,7 +101,7 @@ export function deriveInProgressCounts(lines: string[]): Omit<VerifyStatus, "log
     skip,
     buildFailure: 0,
     remaining: parseRemaining(lines),
-    failed: collectFailedLabels(lines),
+    failed: opts.targetLabels ? failed : collectFailedLabels(lines),
     done: false,
     elapsed,
     source: "derived",

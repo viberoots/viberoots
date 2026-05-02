@@ -6,8 +6,8 @@ import { resolveToolPath } from "../../lib/tool-paths.ts";
 import { latestSymlink, lockDir, logsDir } from "./paths.ts";
 
 export type Resolution =
-  | { pid: number; logPath: string }
-  | { pid: number; logPath: null; error: string };
+  | { pid: number; logPath: string; active: boolean }
+  | { pid: number; logPath: null; error: string; active: boolean };
 
 function isInt(s: string): boolean {
   return /^[0-9]+$/.test(s);
@@ -118,35 +118,36 @@ export async function resolveLatest(): Promise<Resolution> {
   const lockedPid = lockedPidRaw && isInt(lockedPidRaw) ? Number(lockedPidRaw) : 0;
   if (lockedPid > 0 && (await pidAlive(lockedPid)) && lockedLogRaw) {
     const lp = await fs.realpath(lockedLogRaw).catch(() => lockedLogRaw);
-    return { pid: lockedPid, logPath: lp };
+    return { pid: lockedPid, logPath: lp, active: true };
   }
 
   try {
     const lp = await fs.realpath(latestSymlink);
-    return { pid: 0, logPath: lp };
+    return { pid: 0, logPath: lp, active: false };
   } catch {}
 
   const newest = await newestVerifyLog();
-  if (newest) return { pid: 0, logPath: newest };
-  return { pid: 0, logPath: null, error: "no verify logs found" };
+  if (newest) return { pid: 0, logPath: newest, active: false };
+  return { pid: 0, logPath: null, error: "no verify logs found", active: false };
 }
 
 export async function resolvePid(pid: number): Promise<Resolution> {
+  const active = await pidAlive(pid);
   const lockedPidRaw = await readText(path.join(lockDir, "pid"));
   const lockedLogRaw = await readText(path.join(lockDir, "log"));
   if (lockedPidRaw && lockedLogRaw && lockedPidRaw === String(pid)) {
     const lp = await fs.realpath(lockedLogRaw).catch(() => lockedLogRaw);
-    return { pid, logPath: lp };
+    return { pid, logPath: lp, active };
   }
   const byPid = path.join(logsDir, "by-pid", `${pid}.log`);
   try {
     const lp = await fs.realpath(byPid);
-    return { pid, logPath: lp };
+    return { pid, logPath: lp, active };
   } catch {}
   const legacy = path.join(logsDir, `verify-${pid}.log`);
   try {
     const lp = await fs.realpath(legacy);
-    return { pid, logPath: lp };
+    return { pid, logPath: lp, active };
   } catch {}
-  return { pid, logPath: null, error: `log file not found for pid ${pid}` };
+  return { pid, logPath: null, error: `log file not found for pid ${pid}`, active };
 }

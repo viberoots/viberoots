@@ -100,4 +100,6 @@ test("tail-log: explicit PID --status -w exits after the PID ends (no switching)
   assert.ok(seen.length >= 1);
   assert.equal(seen.at(-1).pid, pid);
   assert.equal(seen.at(-1).log, logReal);
+  assert.equal(seen.at(-1).stopped, true);
+  assert.equal(seen.at(-1).stop_reason, "process-exited");
 });

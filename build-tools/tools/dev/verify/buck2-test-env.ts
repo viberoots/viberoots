@@ -23,6 +23,9 @@ function maybeEnvArg(name: string, value: string | undefined): string[] {
 export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): string[] {
   const nestedIso = verifyNestedBuckIsolation(opts.iso, opts.passName);
   const extraEnvArgs: string[] = [];
+  const sslCertFile = process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE;
+  const sslCertDir = process.env.SSL_CERT_DIR || process.env.NIX_SSL_CERT_DIR;
+  const nodeExtraCaCerts = process.env.NODE_EXTRA_CA_CERTS || sslCertFile;
   if (process.env.TEST_TIMING) extraEnvArgs.push("--env", `TEST_TIMING=${process.env.TEST_TIMING}`);
   if (process.env.TEST_TIMING_SUMMARY) {
     extraEnvArgs.push("--env", `TEST_TIMING_SUMMARY=${process.env.TEST_TIMING_SUMMARY}`);
@@ -64,6 +67,12 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
     `ZX_TEST_NODE_MODULES_OUT=${opts.zxNodeModulesOut}`,
     "--env",
     `NIX_PATH=${process.env.NIX_PATH || ""}`,
+    ...maybeEnvArg("XDG_CONFIG_HOME", process.env.XDG_CONFIG_HOME),
+    ...maybeEnvArg("NIX_SSL_CERT_FILE", process.env.NIX_SSL_CERT_FILE || sslCertFile),
+    ...maybeEnvArg("SSL_CERT_FILE", sslCertFile),
+    ...maybeEnvArg("NIX_SSL_CERT_DIR", process.env.NIX_SSL_CERT_DIR || sslCertDir),
+    ...maybeEnvArg("SSL_CERT_DIR", sslCertDir),
+    ...maybeEnvArg("NODE_EXTRA_CA_CERTS", nodeExtraCaCerts),
     "--env",
     `BUCK_NESTED_ISO=${nestedIso}`,
     "--env",

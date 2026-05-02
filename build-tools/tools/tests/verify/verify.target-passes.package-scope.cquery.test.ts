@@ -6,6 +6,8 @@ import {
   planVerifyTargetPasses,
   summarizeVerifyTargetPlan,
   VERIFY_ISOLATED_LABEL,
+  VERIFY_RESOURCE_LIMITED_LABEL,
+  VERIFY_RESOURCE_LIMITED_THREADS,
 } from "../../dev/verify/target-passes.ts";
 import { inheritedBuckIsolation } from "../lib/test-helpers.ts";
 
@@ -85,11 +87,29 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
     sharedPass?.targets.includes("//:verify_template_test_scope_policy"),
     "expected build-system zx tests to remain in the shared pass",
   );
-  assert.deepEqual(summarizeVerifyTargetPlan({ targetLabels: targets, passes }), {
-    expandedTargetCount: targets.length,
-    isolatedPassCount: 1,
-    isolatedTargetCount: 14,
-    sharedTargetCount: sharedPass?.targets.length ?? 0,
-    passCount: 2,
-  });
+  const resourceLimitedPass = passes.find((pass) => pass.name === "resource-limited");
+  assert.ok(
+    resourceLimitedPass?.targets.includes("//:deployments_nixos_shared_host_reuse_e2e"),
+    "expected resource-heavy deployment tests to run outside the shared pass",
+  );
+  assert.ok(
+    resourceLimitedPass?.targets.every((target) => !isolatedPass.targets.includes(target)),
+    "expected isolated targets to stay out of the resource-limited pass",
+  );
+  assert.equal(resourceLimitedPass?.threadsOverride, VERIFY_RESOURCE_LIMITED_THREADS);
+  const resourceLimitedLabels = targets.find(
+    (entry) => entry.target === "//:deployments_nixos_shared_host_reuse_e2e",
+  )?.labels;
+  assert.ok(
+    resourceLimitedLabels?.includes(VERIFY_RESOURCE_LIMITED_LABEL),
+    "expected resource-limited deployment target labels to survive wildcard expansion",
+  );
+  const summary = summarizeVerifyTargetPlan({ targetLabels: targets, passes });
+  assert.equal(summary.expandedTargetCount, targets.length);
+  assert.equal(summary.isolatedPassCount, 1);
+  assert.ok(summary.isolatedTargetCount >= 15);
+  assert.equal(summary.resourceLimitedPassCount, 1);
+  assert.ok(summary.resourceLimitedTargetCount > 0);
+  assert.equal(summary.sharedTargetCount, sharedPass?.targets.length ?? 0);
+  assert.equal(summary.passCount, 3);
 });

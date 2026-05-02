@@ -75,10 +75,13 @@ nix_go_tiny_wasm_lib(
         const appDir = path.join(tmp, "projects", "apps", "demo-web");
         await fs.outputFile(
           path.join(appDir, "TARGETS"),
-          `load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
+          `load("@prelude//:rules.bzl", "genrule")
+load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module")
 
-node_webapp(
+genrule(
     name = "app_raw",
+    out = "dist",
+    cmd = "mkdir -p \\"$OUT\\" && printf 'app marker\\n' > \\"$OUT/index.txt\\"",
 )
 
 node_wasm_inline_module(
@@ -139,6 +142,10 @@ node_asset_stage(
         const outDir = outLine.split(/\s+/).pop() || "";
         if (!outDir) throw new Error("no output dir from buck2 build for staged webapp");
         const outPath = path.isAbsolute(outDir) ? outDir : path.join(tmp, outDir);
+        assert.ok(await fs.pathExists(path.join(outPath, "index.txt")));
+        assert.ok(await fs.pathExists(path.join(outPath, "top.wasm")));
+        assert.ok(await fs.pathExists(path.join(outPath, "wasm-inline", "index.js")));
+        assert.ok(await fs.pathExists(path.join(outPath, "server", "wasm", "top.wasm")));
         const stagedWasm = path.join(outPath, "tinygo.wasm");
         const stat = await fs.stat(stagedWasm);
         assert.ok(stat.size > 0, "expected staged tinygo.wasm to be non-empty");

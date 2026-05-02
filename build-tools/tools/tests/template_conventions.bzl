@@ -79,6 +79,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
     "build-tools/tools/tests/scaffolding/webapp-static-pwa.runtime-offline.contract.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static-pwa"],
         "classification": "template:contract",
+        "extra_labels": ["verify:isolated"],
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-contract-and-runtime-smoke.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next"],

@@ -153,6 +153,26 @@ export function parseBuck2ExitMarker(lines: string[]): {
   return { done: false };
 }
 
+export function parseVerifyStoppedMarker(lines: string[]): {
+  stopped: boolean;
+  endSec?: number;
+  reason?: string;
+} {
+  const re = /^\[verify\]\s+stopped\b(?:\s+reason=(\S+))?(?:\s+signal=(\S+))?(?:\s+end_s=(\d+))?/;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const { normalized } = parseLineForMatching(lines[i]);
+    const m = re.exec(normalized);
+    if (!m) continue;
+    const end = m[3] ? Number(m[3]) : undefined;
+    return {
+      stopped: true,
+      endSec: end !== undefined && Number.isFinite(end) && end > 0 ? end : undefined,
+      reason: m[1] || (m[2] ? `signal:${m[2]}` : undefined),
+    };
+  }
+  return { stopped: false };
+}
+
 export function parseVerifyBeginEpochSec(lines: string[]): number | undefined {
   // Prefer the earliest verify-run start marker when available so elapsed includes
   // preflight/setup time before buck2 test execution begins.

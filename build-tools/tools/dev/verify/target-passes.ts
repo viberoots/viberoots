@@ -4,6 +4,8 @@ import { normalizeTargetLabel } from "../../lib/labels.ts";
 import { resolveToolPathSync } from "../../lib/tool-paths.ts";
 
 export const VERIFY_ISOLATED_LABEL = "verify:isolated";
+export const VERIFY_RESOURCE_LIMITED_LABEL = "verify:resource-limited";
+export const VERIFY_RESOURCE_LIMITED_THREADS = 4;
 
 export type VerifyTargetLabels = {
   target: string;
@@ -20,6 +22,8 @@ export type VerifyTargetExpansionSummary = {
   expandedTargetCount: number;
   isolatedPassCount: number;
   isolatedTargetCount: number;
+  resourceLimitedPassCount: number;
+  resourceLimitedTargetCount: number;
   sharedTargetCount: number;
   passCount: number;
 };
@@ -58,10 +62,15 @@ export function planVerifyTargetPasses(
 ): VerifyTargetPass[] {
   const sharedTargets: string[] = [];
   const isolatedTargets: string[] = [];
+  const resourceLimitedTargets: string[] = [];
 
   for (const entry of targets) {
     if (entry.labels.includes(VERIFY_ISOLATED_LABEL)) {
       isolatedTargets.push(entry.target);
+      continue;
+    }
+    if (entry.labels.includes(VERIFY_RESOURCE_LIMITED_LABEL)) {
+      resourceLimitedTargets.push(entry.target);
       continue;
     }
     sharedTargets.push(entry.target);
@@ -84,6 +93,13 @@ export function planVerifyTargetPasses(
             },
           ]
         : [];
+  if (resourceLimitedTargets.length > 0) {
+    passes.push({
+      name: "resource-limited",
+      targets: resourceLimitedTargets,
+      threadsOverride: VERIFY_RESOURCE_LIMITED_THREADS,
+    });
+  }
   if (sharedTargets.length > 0) {
     passes.push({ name: "shared", targets: sharedTargets });
   }
@@ -95,11 +111,18 @@ export function summarizeVerifyTargetPlan(plan: VerifyTargetPlan): VerifyTargetE
   const isolatedTargetCount = plan.passes
     .filter((pass) => pass.name.startsWith("isolated"))
     .reduce((total, pass) => total + pass.targets.length, 0);
+  const resourceLimitedPasses = plan.passes.filter((pass) => pass.name === "resource-limited");
+  const resourceLimitedTargetCount = resourceLimitedPasses.reduce(
+    (total, pass) => total + pass.targets.length,
+    0,
+  );
   const sharedTargetCount = plan.passes.find((pass) => pass.name === "shared")?.targets.length ?? 0;
   return {
     expandedTargetCount: plan.targetLabels.length,
     isolatedPassCount,
     isolatedTargetCount,
+    resourceLimitedPassCount: resourceLimitedPasses.length,
+    resourceLimitedTargetCount,
     sharedTargetCount,
     passCount: plan.passes.length,
   };

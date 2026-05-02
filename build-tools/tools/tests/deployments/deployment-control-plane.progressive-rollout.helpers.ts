@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime.ts";
+import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers.ts";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
 
 export function progressiveFixture() {
@@ -57,6 +58,23 @@ export function progressiveHosts(hostRoot: string) {
     "demoapi.apps.kilty.io": () =>
       path.join(nixosSharedHostContainerRoot(hostRoot, "demoapi"), "srv/static-app/live"),
   };
+}
+
+export function progressiveCasePaths(tmp: string, name: string) {
+  const root = path.join(tmp, name);
+  return {
+    root,
+    hostRoot: path.join(root, "host"),
+    recordsRoot: path.join(root, "records"),
+    frontendArtifact: path.join(root, "artifacts", "frontend"),
+    apiArtifact: path.join(root, "artifacts", "api"),
+    statePath: path.join(root, "platform-state.json"),
+  };
+}
+
+export async function writeProgressiveArtifacts(paths: ReturnType<typeof progressiveCasePaths>) {
+  await writeDemoArtifact(paths.frontendArtifact, "frontend");
+  await writeDemoArtifact(paths.apiArtifact, "api");
 }
 
 export function pauseOnFinalSmoke() {
