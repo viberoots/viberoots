@@ -35,7 +35,10 @@ export const VERCEL_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
     ],
   },
   previewSupport: {
-    support: [bullet("not reviewed in the local/test Vercel publisher slice")],
+    support: [
+      bullet("preview publish and preview cleanup are audited source-run scoped operations"),
+      bullet("preview mutations require the same secret-runtime token contract as publish"),
+    ],
   },
   smokeReleaseHealth: {
     defaultSmokeModel: [
@@ -52,8 +55,9 @@ export const VERCEL_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
     ],
   },
   retryIdempotency: [
-    bullet("local fixture publishes are deterministic for target identity plus artifact identity"),
-    bullet("live retry, rollback, and ambiguous outcome handling are deferred to a later PR"),
+    bullet("fake API publishes are deterministic for target identity plus artifact identity"),
+    bullet("retry and rollback use recorded exact artifacts and never rebuild from branch state"),
+    bullet("ambiguous provider API outcomes fail closed with explicit records"),
   ],
   partialPublishObservability: [
     bullet("the local fixture records provider release id, public URL, and artifact identity"),
@@ -66,7 +70,7 @@ export const VERCEL_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
     reviewedSupport: [bullet("not supported in the initial Vercel provider slice")],
   },
   protectedSharedEligibility: [
-    bullet("eligible only for validation and local/test fixture publishing in this PR"),
-    bullet("live protected/shared mutation is deferred until the reviewed Vercel API publisher"),
+    bullet("protected/shared Vercel mutation is routed through the reviewed control-plane service"),
+    bullet("laptop-local protected/shared artifact paths are rejected by the public front door"),
   ],
 };

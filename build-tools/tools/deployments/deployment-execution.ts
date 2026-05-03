@@ -7,6 +7,7 @@ import {
   isKubernetesDeployment,
   isNixosSharedHostDeployment,
   isS3StaticDeployment,
+  isVercelDeployment,
   type DeploymentTarget,
 } from "./contract.ts";
 import { submitAppStoreConnectDeploy } from "./app-store-connect-deploy.ts";
@@ -21,6 +22,7 @@ import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-cont
 import { submitKubernetesDeploy } from "./kubernetes-deploy.ts";
 import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
 import { submitS3StaticDeploy } from "./s3-static-deploy.ts";
+import { submitVercelDeploy, summarizeVercelResult } from "./vercel-deploy.ts";
 
 export type DeploymentSmokeConnectOverride = {
   protocol: "http:" | "https:";
@@ -71,6 +73,10 @@ function defaultGooglePlayRecordsRoot(workspaceRoot: string): string {
 
 function defaultKubernetesRecordsRoot(workspaceRoot: string): string {
   return path.join(workspaceRoot, ".local", "deployments", "kubernetes", "records");
+}
+
+function defaultVercelRecordsRoot(workspaceRoot: string): string {
+  return path.join(workspaceRoot, ".local", "deployments", "vercel", "records");
 }
 
 async function resolveArtifactDir(
@@ -143,6 +149,19 @@ export async function runNormalDeployment(opts: {
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
       ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
     });
+  }
+  if (isVercelDeployment(opts.deployment)) {
+    return summarizeVercelResult(
+      await submitVercelDeploy({
+        workspaceRoot: opts.workspaceRoot,
+        deployment: opts.deployment,
+        recordsRoot: path.resolve(
+          opts.sharedRecordsRoot || defaultVercelRecordsRoot(opts.workspaceRoot),
+        ),
+        artifactDir: await resolveArtifactDir(opts.workspaceRoot, opts.deployment),
+        ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
+      }),
+    );
   }
   if (!isNixosSharedHostDeployment(opts.deployment)) {
     return await submitCloudflarePagesControlPlaneDeploy({

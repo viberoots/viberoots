@@ -407,10 +407,12 @@ step instead of editing Keycloak by hand.
 
 - good fit for repo-built Next.js SSR apps that produce a Vercel Build Output
   API artifact
-- the initial reviewed slice validates metadata and supports the deterministic
-  local/test `vercel-prebuilt` publisher fixture
-- live Vercel API publish, preview, smoke, retry, and rollback are intentionally
-  deferred to the later production publisher PR
+- publishes admitted `.vercel/output` artifacts with `vercel-prebuilt`
+- resolves the Vercel API token through `secret_requirements`; do not pass
+  provider tokens through ambient environment variables
+- preview, preview cleanup, retry, and rollback are source-run scoped audited
+  operations; protected/shared mutations must route through the reviewed
+  control-plane service path
 
 `app-store-connect`
 

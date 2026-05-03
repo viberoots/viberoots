@@ -187,6 +187,10 @@ Common example values and when to use them:
 - `contract_id = "secret://deployments/pleomino/cloudflare_api_token"`
   Use a stable, descriptive ID. It should stay the same even as the secret
   value rotates.
+- `contract_id = "secret://deployments/console/vercel_api_token"`
+  Use `name = "vercel_api_token"` for Vercel provider API tokens. Declare it on
+  the `publish` step, and add a separate `preview_cleanup` requirement when
+  preview cleanup is enabled.
 - `contract_id = "secret://deployments/demoapp/database_url"`
   Use this kind of shape for app-specific credentials that belong to one
   deployment family.
@@ -195,6 +199,10 @@ Common example values and when to use them:
 - `required = "false"`
   Use this only for optional behavior, such as a preview-only credential or an
   optional authenticated smoke check.
+
+Vercel tokens must resolve through the secret runtime. Do not pass them through
+ambient shell variables for deployment execution, and do not include token
+values in deploy records.
 
 Optional fields you may also see:
 

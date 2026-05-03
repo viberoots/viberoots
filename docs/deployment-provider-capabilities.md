@@ -834,7 +834,8 @@ Normative-source note:
 ### Preview Support
 
 - preview support:
-  - not reviewed in the local/test Vercel publisher slice
+  - preview publish and preview cleanup are audited source-run scoped operations
+  - preview mutations require the same secret-runtime token contract as publish
 
 ### Smoke / Release Health
 
@@ -854,8 +855,9 @@ Normative-source note:
 
 ### Retry / Idempotency
 
-- local fixture publishes are deterministic for target identity plus artifact identity
-- live retry, rollback, and ambiguous outcome handling are deferred to a later PR
+- fake API publishes are deterministic for target identity plus artifact identity
+- retry and rollback use recorded exact artifacts and never rebuild from branch state
+- ambiguous provider API outcomes fail closed with explicit records
 
 ### Partial Publish Observability
 
@@ -872,8 +874,8 @@ Normative-source note:
 
 ### Protected/Shared Eligibility
 
-- eligible only for validation and local/test fixture publishing in this PR
-- live protected/shared mutation is deferred until the reviewed Vercel API publisher
+- protected/shared Vercel mutation is routed through the reviewed control-plane service
+- laptop-local protected/shared artifact paths are rejected by the public front door
 
 <!-- END GENERATED PROVIDER CAPABILITIES -->
 

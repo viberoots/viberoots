@@ -79,7 +79,6 @@ export function extractVercelDeploymentsFromContext(
       deploymentErrors.push(
         deploymentError(label, "vercel does not support explicit rollout_policy"),
       );
-    if (preview) deploymentErrors.push(deploymentError(label, "vercel does not support preview"));
     for (const [fieldPath, value] of [
       ["provider_target.team", team],
       ["provider_target.project", project],
@@ -190,6 +189,7 @@ export function extractVercelDeploymentsFromContext(
       releaseActions,
       targetExceptions,
       ...(smoke ? { smoke } : {}),
+      ...(preview ? { preview } : {}),
       ...(vaultRuntime ? { vaultRuntime } : {}),
       component: { kind: SSR_WEBAPP_COMPONENT, target: componentTarget },
       components: [

@@ -65,11 +65,10 @@ test("validation rejects unsupported component kinds and multi-component Vercel 
   );
 });
 
-test("validation rejects Vercel preview metadata and git-autobuild config mode", async () => {
-  assert.ok(
-    errorsFor({ preview: { target_derivation: "provider_managed_source_run" } }).some((entry) =>
-      entry.includes("vercel does not support preview"),
-    ),
+test("validation accepts Vercel preview metadata and rejects git-autobuild config mode", async () => {
+  assert.deepEqual(
+    errorsFor({ preview: { target_derivation: "provider_managed_source_run" } }),
+    [],
   );
   const workspaceRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "vercel-config-"));
   try {
