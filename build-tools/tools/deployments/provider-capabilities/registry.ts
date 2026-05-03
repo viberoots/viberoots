@@ -14,12 +14,14 @@ import {
   NIXOS_SHARED_HOST_PROVIDER,
   S3_STATIC_PROVIDER,
 } from "../deployment-provider-targets.ts";
+import { VERCEL_PROVIDER } from "../vercel-provider-target.ts";
 import { APP_STORE_CONNECT_PROVIDER_CAPABILITY } from "./app-store-connect.ts";
 import { CLOUDFLARE_PAGES_PROVIDER_CAPABILITY } from "./cloudflare-pages.ts";
 import { GOOGLE_PLAY_PROVIDER_CAPABILITY } from "./google-play.ts";
 import { KUBERNETES_PROVIDER_CAPABILITY } from "./kubernetes.ts";
 import { NIXOS_SHARED_HOST_PROVIDER_CAPABILITY } from "./nixos-shared-host.ts";
 import { S3_STATIC_PROVIDER_CAPABILITY } from "./s3-static.ts";
+import { VERCEL_PROVIDER_CAPABILITY } from "./vercel.ts";
 import type { DeploymentProviderCapability } from "./types.ts";
 import { validateProviderCapabilityRegistry } from "./validate.ts";
 
@@ -30,6 +32,7 @@ export const REVIEWED_PROVIDER_IDS = [
   CLOUDFLARE_PAGES_PROVIDER,
   S3_STATIC_PROVIDER,
   KUBERNETES_PROVIDER,
+  VERCEL_PROVIDER,
 ] as const;
 
 export const REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER: Record<
@@ -42,6 +45,7 @@ export const REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER: Record<
   [CLOUDFLARE_PAGES_PROVIDER]: CLOUDFLARE_PAGES_PROVIDER_CAPABILITY,
   [S3_STATIC_PROVIDER]: S3_STATIC_PROVIDER_CAPABILITY,
   [KUBERNETES_PROVIDER]: KUBERNETES_PROVIDER_CAPABILITY,
+  [VERCEL_PROVIDER]: VERCEL_PROVIDER_CAPABILITY,
 };
 
 validateProviderCapabilityRegistry(

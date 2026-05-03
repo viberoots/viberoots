@@ -12,6 +12,7 @@ import { extractGooglePlayDeploymentsFromContext } from "./contract-extract-goog
 import { extractKubernetesDeploymentsFromContext } from "./contract-extract-kubernetes.ts";
 import { extractNixosSharedHostDeploymentsFromContext } from "./contract-extract-nixos-shared-host.ts";
 import { extractS3StaticDeploymentsFromContext } from "./contract-extract-s3-static.ts";
+import { extractVercelDeploymentsFromContext } from "./contract-extract-vercel.ts";
 
 const DEPLOYMENT_PREREQUISITE_MODES = new Set<DeploymentPrerequisiteMode>([
   "ordering_only",
@@ -104,6 +105,7 @@ export function extractDeployments(nodes: GraphNode[]): {
     ...extractGooglePlayDeploymentsFromContext(context),
     ...extractS3StaticDeploymentsFromContext(context),
     ...extractKubernetesDeploymentsFromContext(context),
+    ...extractVercelDeploymentsFromContext(context),
   ].sort((a, b) => a.label.localeCompare(b.label));
   context.errors.push(...validateDeploymentPrerequisites(deployments));
   return {

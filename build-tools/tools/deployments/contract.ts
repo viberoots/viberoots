@@ -7,6 +7,7 @@ import { extractGooglePlayDeploymentsFromContext } from "./contract-extract-goog
 import { extractKubernetesDeploymentsFromContext } from "./contract-extract-kubernetes.ts";
 import { extractNixosSharedHostDeploymentsFromContext } from "./contract-extract-nixos-shared-host.ts";
 import { extractS3StaticDeploymentsFromContext } from "./contract-extract-s3-static.ts";
+import { extractVercelDeploymentsFromContext } from "./contract-extract-vercel.ts";
 
 export function extractNixosSharedHostDeployments(nodes: GraphNode[]) {
   const context = createDeploymentExtractionContext(nodes);
@@ -56,6 +57,14 @@ export function extractKubernetesDeployments(nodes: GraphNode[]) {
   };
 }
 
+export function extractVercelDeployments(nodes: GraphNode[]) {
+  const context = createDeploymentExtractionContext(nodes);
+  return {
+    deployments: extractVercelDeploymentsFromContext(context),
+    errors: uniqueErrors(context.errors),
+  };
+}
+
 export * from "./contract-types.ts";
 export * from "./contract-extract.ts";
 export * from "./contract-extract-cloudflare-pages.ts";
@@ -64,5 +73,6 @@ export * from "./contract-extract-google-play.ts";
 export * from "./contract-extract-kubernetes.ts";
 export * from "./contract-extract-nixos-shared-host.ts";
 export * from "./contract-extract-s3-static.ts";
+export * from "./contract-extract-vercel.ts";
 export * from "./deployment-targets.ts";
 export * from "./deployment-provider-targets.ts";

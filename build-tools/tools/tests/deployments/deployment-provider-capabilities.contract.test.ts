@@ -33,6 +33,7 @@ test("reviewed provider registry is complete and deterministic", () => {
     "cloudflare-pages",
     "s3-static",
     "kubernetes",
+    "vercel",
   ]);
   assert.equal(REVIEWED_PROVIDER_CAPABILITIES.length, REVIEWED_PROVIDER_IDS.length);
   assert.deepEqual(
@@ -71,6 +72,7 @@ test("legacy lookup helpers preserve the reviewed runtime contract", () => {
   assert.equal(providerCapabilityFor("cloudflare-pages")?.defaultRolloutMode, "all_at_once");
   assert.equal(providerCapabilityFor("s3-static")?.defaultRolloutMode, "all_at_once");
   assert.equal(providerCapabilityFor("kubernetes")?.defaultRolloutMode, "all_at_once");
+  assert.equal(providerCapabilityFor("vercel")?.defaultRolloutMode, "all_at_once");
   assert.equal(
     rolloutPolicyOmissionInPolicy({ provider: "app-store-connect", componentCount: 1 }),
     true,
@@ -90,6 +92,7 @@ test("legacy lookup helpers preserve the reviewed runtime contract", () => {
   );
   assert.equal(rolloutPolicyOmissionInPolicy({ provider: "s3-static", componentCount: 1 }), true);
   assert.equal(rolloutPolicyOmissionInPolicy({ provider: "kubernetes", componentCount: 1 }), true);
+  assert.equal(rolloutPolicyOmissionInPolicy({ provider: "vercel", componentCount: 1 }), true);
   assert.equal(providerDeclaresReleaseActionType("nixos-shared-host", "cache_warmup"), true);
   assert.equal(
     providerDeclaresReleaseActionType("nixos-shared-host", "post_publish_verification"),
@@ -103,6 +106,7 @@ test("legacy lookup helpers preserve the reviewed runtime contract", () => {
   assert.equal(providerDeclaresReleaseActionType("cloudflare-pages", "cache_warmup"), false);
   assert.equal(providerDeclaresReleaseActionType("s3-static", "cache_warmup"), false);
   assert.equal(providerDeclaresReleaseActionType("kubernetes", "cache_warmup"), false);
+  assert.equal(providerDeclaresReleaseActionType("vercel", "cache_warmup"), false);
   const nixos = providerCapabilityFor("nixos-shared-host");
   assert.deepEqual(nixos?.supportedComponentKinds, ["static-webapp", "ssr-webapp"]);
   assert.deepEqual(nixos?.multiComponentKinds, ["static-webapp"]);
@@ -110,6 +114,9 @@ test("legacy lookup helpers preserve the reviewed runtime contract", () => {
   assert.deepEqual(kubernetes?.supportedComponentKinds, ["service", "third-party-service"]);
   assert.deepEqual(kubernetes?.multiComponentKinds, ["service", "third-party-service"]);
   assert.deepEqual(kubernetes?.supportedRolloutModes, ["all_at_once", "ordered_best_effort"]);
+  const vercel = providerCapabilityFor("vercel");
+  assert.deepEqual(vercel?.supportedComponentKinds, ["ssr-webapp"]);
+  assert.deepEqual(vercel?.multiComponentKinds, []);
   const capability = providerCapabilityFor("app-store-connect");
   assert.deepEqual(capability?.supportedComponentKinds, ["mobile-app"]);
   assert.deepEqual(capability?.multiComponentKinds, []);

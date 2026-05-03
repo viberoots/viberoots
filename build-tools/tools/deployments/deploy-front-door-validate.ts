@@ -17,6 +17,8 @@ import { pushKubernetesComponentKindErrors } from "./kubernetes-capability-valid
 import type { NixosSharedHostDeployment } from "./contract.ts";
 import { pushS3StaticComponentKindErrors } from "./s3-static-capability-validation.ts";
 import { prepareS3StaticPublisherConfig } from "./s3-static-config.ts";
+import { pushVercelComponentKindErrors } from "./vercel-capability-validation.ts";
+import { prepareVercelPublisherConfig } from "./vercel-config.ts";
 
 function componentsForValidation(deployment: DeploymentTarget): DeploymentComponent[] {
   return deployment.components.length > 0
@@ -112,6 +114,15 @@ function pushComponentValidationErrors(opts: {
         break;
       case "nixos-shared-host":
         break;
+      case "vercel":
+        pushVercelComponentKindErrors({
+          label: opts.deployment.label,
+          declaredKind: component.kind,
+          componentTarget: component.target,
+          componentNode,
+          errors: opts.errors,
+        });
+        break;
       default:
         opts.errors.push(`${opts.deployment.label}: unsupported deployment provider`);
     }
@@ -159,6 +170,9 @@ async function validateProviderConfigSemantics(
         await prepareGooglePlayPublisherConfig({ workspaceRoot, deployment, outputPath });
         return;
       case "nixos-shared-host":
+        return;
+      case "vercel":
+        await prepareVercelPublisherConfig({ workspaceRoot, deployment, outputPath });
         return;
     }
   } finally {

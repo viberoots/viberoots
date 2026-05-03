@@ -60,6 +60,19 @@ Initial reviewed `nixos-shared-host` shape:
 - `target_group` defaults to the provider's implicit shared-dev group when omitted
 - `app_name` must be a lowercase hostname token and must not carry dots or explicit subdomain overrides
 
+Initial reviewed `vercel` shape:
+
+- canonical identity fields:
+  - `team`
+  - `project`
+  - `environment`
+- canonical identity string:
+  - `vercel:<team>/<project>#<environment>`
+- optional normalized field:
+  - `canonical_url`, defaulting to `https://${project}.vercel.app/`
+- the initial provider slice supports repo-built prebuilt SSR artifacts only; provider-side Git
+  auto-builds are not a reviewed deployment shape
+
 ### `vault_runtime`
 
 Optional keys:
@@ -161,6 +174,15 @@ Required keys:
 Optional keys:
 
 - provider-specific package-relative config paths such as `config`
+
+Reviewed Vercel publisher config:
+
+- `publisher = "vercel-prebuilt"`
+- `publisher_config` points at checked-in package-local JSON/JSONC, normally
+  `vercel-prebuilt.jsonc`
+- the config may repeat `team`, `project`, and `environment` for review clarity, but those values
+  must match `provider_target`
+- `mode = "git-autobuild"` is rejected; protected/shared deploys must consume repo-built artifacts
 
 ### `provisioner`
 

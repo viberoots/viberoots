@@ -16,6 +16,7 @@ load(
     _require_shared_policy = "require_shared_policy",
 )
 load("//build-tools/deployments:s3_defs.bzl", _s3_static_webapp_deployment = "s3_static_webapp_deployment")
+load("//build-tools/deployments:vercel_defs.bzl", _vercel_next_webapp_deployment = "vercel_next_webapp_deployment")
 
 deployment_admission_policy = _deployment_admission_policy
 deployment_defaults = _deployment_defaults
@@ -114,6 +115,13 @@ def cloudflare_pages_static_webapp_deployment(
 
 def s3_static_webapp_deployment(**kwargs):
     _s3_static_webapp_deployment(
+        deployment_target = deployment_target,
+        require_shared_policy = _require_shared_policy,
+        **kwargs
+    )
+
+def vercel_next_webapp_deployment(**kwargs):
+    _vercel_next_webapp_deployment(
         deployment_target = deployment_target,
         require_shared_policy = _require_shared_policy,
         **kwargs

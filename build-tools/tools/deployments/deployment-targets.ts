@@ -7,6 +7,7 @@ import type {
   KubernetesDeployment,
   NixosSharedHostDeployment,
   S3StaticDeployment,
+  VercelDeployment,
 } from "./contract-types.ts";
 import {
   APP_STORE_CONNECT_PROVIDER,
@@ -15,6 +16,7 @@ import {
   KUBERNETES_PROVIDER,
   NIXOS_SHARED_HOST_PROVIDER,
   S3_STATIC_PROVIDER,
+  VERCEL_PROVIDER,
 } from "./contract-types.ts";
 
 export function isNixosSharedHostDeployment(
@@ -51,6 +53,10 @@ export function isGooglePlayDeployment(
   deployment: DeploymentTarget,
 ): deployment is GooglePlayDeployment {
   return deployment.provider === GOOGLE_PLAY_PROVIDER;
+}
+
+export function isVercelDeployment(deployment: DeploymentTarget): deployment is VercelDeployment {
+  return deployment.provider === VERCEL_PROVIDER;
 }
 
 export function isMultiComponentDeployment(deployment: DeploymentTarget): boolean {

@@ -792,6 +792,89 @@ Normative-source note:
 - protected/shared mutation, exact-artifact retry or rollback reuse, and reviewed `--provision-only` execution must route through the reviewed control-plane service / worker front door
 - protected/shared execution must stay inside vetted built-in publisher, provisioner, and service-health smoke code
 
+## Capability Entry: `vercel`
+
+### Identity
+
+- `provider`: `vercel`
+- canonical target identity fields:
+  - `team`
+  - `project`
+  - `environment`
+- canonical lock-key shape:
+  - `vercel:<team>/<project>#<environment>`
+
+### Component Support
+
+- supported component kinds:
+  - `ssr-webapp`
+- multi-component support:
+  - not supported in the initial Vercel slice
+- additional unsupported shapes:
+  - static webapps
+  - provider-side Git auto-builds
+
+### Rollout Support
+
+- default rollout mode:
+  - `all_at_once`
+- rollout-policy omission posture:
+  - omission is reviewed only for one prebuilt `ssr-webapp` artifact
+- supported rollout modes:
+  - `all_at_once`
+- unsupported rollout modes:
+  - `all_or_nothing`
+  - `ordered_best_effort`
+  - `parallel_best_effort`
+  - `canary`
+  - `blue_green`
+  - `phased`
+  - `store_staged`
+
+### Preview Support
+
+- preview support:
+  - not reviewed in the local/test Vercel publisher slice
+
+### Smoke / Release Health
+
+- default smoke model:
+  - built-in HTTP smoke is deferred to the live Vercel publisher PR
+  - the local publisher records the reviewed canonical URL without probing it
+
+### Built-In Publisher Contract
+
+- built-in publisher type:
+  - `vercel-prebuilt`
+- exact publish input:
+  - one admitted immutable Vercel Build Output API artifact
+- checked-in provider config:
+  - publisher config records team, project, environment, and `mode: prebuilt`
+  - `mode: git-autobuild` and ambient `.vercel` state are rejected
+
+### Retry / Idempotency
+
+- local fixture publishes are deterministic for target identity plus artifact identity
+- live retry, rollback, and ambiguous outcome handling are deferred to a later PR
+
+### Partial Publish Observability
+
+- the local fixture records provider release id, public URL, and artifact identity
+
+### Provisioner Support
+
+- not supported in the initial Vercel provider slice
+
+### Built-In `release_actions` Support
+
+- protected/shared built-in `release_actions`:
+  - not supported in the initial Vercel provider slice
+
+### Protected/Shared Eligibility
+
+- eligible only for validation and local/test fixture publishing in this PR
+- live protected/shared mutation is deferred until the reviewed Vercel API publisher
+
 <!-- END GENERATED PROVIDER CAPABILITIES -->
 
 ## Adding Another Provider

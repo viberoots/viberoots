@@ -403,6 +403,15 @@ step instead of editing Keycloak by hand.
 - uses the same `deploy` command, with Kubernetes-specific rollout rules
 - use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
 
+`vercel`
+
+- good fit for repo-built Next.js SSR apps that produce a Vercel Build Output
+  API artifact
+- the initial reviewed slice validates metadata and supports the deterministic
+  local/test `vercel-prebuilt` publisher fixture
+- live Vercel API publish, preview, smoke, retry, and rollback are intentionally
+  deferred to the later production publisher PR
+
 `app-store-connect`
 
 - good fit for iOS apps
