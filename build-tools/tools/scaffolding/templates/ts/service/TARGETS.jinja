@@ -1,0 +1,10 @@
+load("//build-tools/node:defs.bzl", "nix_node_test", "node_service_artifact")
+
+node_service_artifact(
+    name = "service_artifact",
+    runtime_contract = "service.runtime.json",
+)
+
+nix_node_test(
+    name = "unit",
+)

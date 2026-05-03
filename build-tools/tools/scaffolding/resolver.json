@@ -21,6 +21,7 @@
     "go-addon": "projects",
     "go-cpp-lib": "projects",
     "lib": "projects/libs/{name}",
+    "service": "projects/apps/{name}",
     "wasm-app": "projects",
     "wasm-inline": "projects/libs/{name}-wasm-inline",
     "wasm-linking-app": "projects",

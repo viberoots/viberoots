@@ -1,0 +1,18 @@
+{
+  "language": "ts",
+  "template": "service",
+  "description": "Long-running Node service with deployable runtime artifact",
+  "resolverDestination": "projects/apps/{name}",
+  "help": {
+    "usage": "scaf new ts service <name> [--path=DEST] [--key=value ...]",
+    "notes": [
+      "Generates projects/apps/<name> with a health endpoint, runtime contract, unit test, and deployable node_service_artifact target.",
+      "Use this for long-running Node processes rather than browser webapp scaffolds.",
+      "TARGETS uses node_service_artifact and nix_node_test with one importer-scoped lockfile label."
+    ],
+    "examples": [
+      "scaf new ts service data-room-worker",
+      "scaf new ts service data-room-web --importer=projects/apps/data-room-web"
+    ]
+  }
+}

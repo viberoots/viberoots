@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "node-service-runtime@1",
+  "serviceName": "{{ name }}",
+  "entrypoint": "src/index.js",
+  "productionCommand": ["node", "dist/src/index.js"],
+  "health": {
+    "path": "/healthz",
+    "port": 3000
+  },
+  "runtimeConfig": ["PORT"],
+  "secretRequirements": []
+}

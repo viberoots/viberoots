@@ -1,0 +1,8 @@
+import { describe, expect, it } from "vitest";
+import { healthResponse } from "../src/index.js";
+
+describe("health response", () => {
+  it("identifies the service", () => {
+    expect(JSON.parse(healthResponse())).toEqual({ ok: true, service: "{{ name }}" });
+  });
+});

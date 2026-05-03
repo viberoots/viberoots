@@ -1,5 +1,6 @@
 load("//build-tools/node:defs_core.bzl", _nix_node_gen = "nix_node_gen", _nix_node_test = "nix_node_test", _nix_node_lib = "nix_node_lib", _nix_node_bin = "nix_node_bin")
 load("//build-tools/node:defs_nix.bzl", _node_webapp = "node_webapp", _nix_node_cli_bin = "nix_node_cli_bin")
+load("//build-tools/node:defs_service.bzl", _node_service_artifact = "node_service_artifact")
 load("//build-tools/node:defs_vercel.bzl", _node_vercel_next_artifact = "node_vercel_next_artifact")
 load("//build-tools/lang:collections.bzl", "dedupe_preserve")
 load("//build-tools/lang:label_stamping.bzl", "normalize_labels")
@@ -145,6 +146,26 @@ def node_vercel_next_artifact(
         importer = importer,
         vercel_config = vercel_config,
         out = out,
+        **kwargs
+    )
+
+def node_service_artifact(
+        name,
+        labels = [],
+        lockfile_label = None,
+        importer = None,
+        runtime_contract = "service.runtime.json",
+        out = None,
+        deps = [],
+        **kwargs):
+    _node_service_artifact(
+        name = name,
+        labels = labels,
+        lockfile_label = lockfile_label,
+        importer = importer,
+        runtime_contract = runtime_contract,
+        out = out,
+        deps = deps,
         **kwargs
     )
 

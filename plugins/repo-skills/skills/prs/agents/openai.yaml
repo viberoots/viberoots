@@ -1,0 +1,4 @@
+interface:
+  display_name: "PRs"
+  short_description: "Run a range of planned PRs sequentially"
+  default_prompt: "$prs 1-3 docs/deployment-plan.md"

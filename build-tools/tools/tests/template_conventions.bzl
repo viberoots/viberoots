@@ -40,6 +40,10 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/cli"],
         "classification": "template:contract",
     },
+    "build-tools/tools/tests/scaffolding/node-service.scaffold-contract.test.ts": {
+        "template_roots": ["build-tools/tools/scaffolding/templates/ts/service"],
+        "classification": "template:contract",
+    },
     "build-tools/tools/tests/scaffolding/webapp.scaffold-and-build.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-static"],
         "classification": "template:contract",

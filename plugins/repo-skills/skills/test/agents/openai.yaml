@@ -1,0 +1,4 @@
+interface:
+  display_name: "Test"
+  short_description: "Validate repo changes in a tester subagent"
+  default_prompt: "Use $test to validate the current repo changes, optionally with a single v selector."

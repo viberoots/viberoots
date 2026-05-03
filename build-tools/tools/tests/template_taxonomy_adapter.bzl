@@ -16,6 +16,7 @@ CANONICAL_TEMPLATE_IDS = [
     "ts/go-addon",
     "ts/go-cpp-lib",
     "ts/lib",
+    "ts/service",
     "ts/wasm-app",
     "ts/wasm-inline",
     "ts/wasm-linking-app",

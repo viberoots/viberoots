@@ -1,13 +1,13 @@
 ---
 name: pr
-description: Implement a numbered PR item from the repository's plan document while supporting both explicit `$pr 4.5.1` invocation and bare `$pr` auto-advance from the last recorded identifier. Use when Codex should start from fresh context, resolve the PR identifier and default plan document from the repo-local defaults, review the standard repo docs and any extra docs explicitly named in the current prompt, implement the plan item, prefer existing utilities, wire tests, self-review, stage changes, run lint and prettier, load direnv, run the exact targeted validation flow, and stop before the manual full-suite `v` run.
+description: Implement a numbered PR item from the repository's plan document while supporting both explicit `$pr 4.5.1` invocation and bare `$pr` auto-advance from the last recorded identifier. Use when Codex should start from fresh context, resolve the PR identifier and default plan document from the repo-local defaults, review the standard repo docs and any extra docs explicitly named in the current prompt, implement the plan item, prefer existing utilities, wire tests, self-review, stage changes, run lint and prettier, delegate focused and full-suite validation to the `test` skill, use the `investigate` skill for validation failures, and report passing full-suite results and timing before commit readiness.
 ---
 
 # PR
 
 ## Overview
 
-Use this skill to take over a fresh repository context and drive one planned PR item to targeted-test readiness without skipping the repo's design and methodology guardrails.
+Use this skill to take over a fresh repository context and drive one planned PR item through focused validation, full-suite validation, and commit-readiness evidence without skipping the repo's design and methodology guardrails.
 
 Use this skill as the short front door for planned PR implementation work.
 
@@ -137,22 +137,27 @@ Perform a self-review against:
 
 Run repository commands inside the repo dev shell. Prefer `direnv exec . bash -lc '...'` unless the current shell is already equivalently loaded.
 
-Before handoff, and before any targeted validation attempt, run the formatting and methodology gates first:
+Before full-suite validation, and before any focused validation attempt, run the formatting and methodology gates first:
 
 1. Stage all current changes.
 2. Run lint and prettier.
 3. Run the applicable strict 250-line methodology file-size gate with the existing repo tooling. Use the repo-approved runner for the environment. Prefer `node build-tools/tools/dev/file-size-lint.ts --scope=source --fail=true` when the entrypoint is directly executable under `node`, otherwise use `zx-wrapper build-tools/tools/dev/file-size-lint.ts --scope=source --fail=true`. Also run the corresponding `--scope=ssr-tests` gate when touched work includes SSR test modules or other work that must satisfy that gate.
 4. Restage if lint, prettier, or file-size-gate fixes modify files.
-5. Run the build and targeted tests with the exact requested sequence: `i && b && v <new-tests>`
-6. Treat `<new-tests>` as the new tests added for the PR.
+5. Invoke the `test` skill to run the build and targeted tests with `<new-tests>` as the requested selector. The `test` skill owns the actual validation command execution and logging.
+6. Treat `<new-tests>` as the new tests added for the PR, and pass that selector through to the `test` skill.
 7. When `<new-tests>` are supplied as file paths, especially under `build-tools/tools/tests`, prefer exact Buck labels for generated root tests when available. If you do use file paths, confirm the selector expansion with `v --explain-selection` or the verify log before trusting the run.
 8. If touched work includes `build-tools/tools/dev/verify/**`, validate both label-based and file-path-based `v` invocation for at least one affected target.
+9. After self-review, focused validation, and any resulting investigations all pass, invoke the `test` skill without a selector to run the full-suite validation sequence. The `test` skill owns the actual full-suite command execution, logging, and timing.
 
-Never run the full-suite `v` command as part of this workflow unless the user explicitly overrides that rule.
+Never run `v` directly as part of this workflow. Use the `test` skill for both focused and full-suite validation.
 
 ## Handle Failures
 
-If any step in `i && b && v <new-tests>` fails after your changes, treat that failure as caused by the current PR until you have direct evidence otherwise, unless the user explicitly instructs you to treat failures differently.
+If the `test` skill reports that any step in the selected validation flow failed after your changes, treat that failure as caused by the current PR until you have direct evidence otherwise, unless the user explicitly instructs you to treat failures differently.
+
+If the focused validation fails, continue investigating in the current PR workflow unless the user provided a saved log and explicitly asks to use the `investigate` skill. If the full-suite validation fails, invoke the `investigate` skill with the saved full-suite log path from the `test` skill report.
+
+After the `investigate` skill identifies and fixes the full-suite failure, rerun the failing tests or smallest meaningful failing set with the `test` skill and the appropriate selector. Iterate through investigate, fix, and focused rerun until the failing tests pass. Then invoke the `test` skill without a selector to rerun the full suite. Iterate until the full suite passes or you are genuinely blocked.
 
 Do not assume a failure is unrelated just because the failing target or file is outside the edited surface. Changes to shared build tooling, build graph inputs, labels, macros, test generation, root config files, or broad `build-tools/**` inputs can invalidate previously cached paths and expose regressions elsewhere.
 
@@ -164,21 +169,23 @@ Investigate and fix the root cause in the primary path. Do not add fallbacks, al
 
 Prefer removing incorrect assumptions and making the primary path robust so the failure cannot recur silently.
 
-After every code change made during iteration, rerun lint, prettier, and the applicable strict 250-line methodology file-size gate, restage the changes, and then rerun the failing tests as a set before reporting back.
+After every code change made during iteration, rerun lint, prettier, and the applicable strict 250-line methodology file-size gate, restage the changes, and then use the `test` skill to rerun the failing tests as a set before reporting back.
 
 If the change touches shared tooling, generated-test wiring, deployment tooling, labels/macros, or `build-tools/tools/dev/verify/**`, do not stop at a single passing repro. Rerun the smallest meaningful impacted set before handoff.
 
 Only describe a failure as unrelated when you have explicit evidence that the failure predates the current change set or the user explicitly tells you not to treat it as PR-caused.
 
-Do not hand off with a "ready for full suite" status, or tell the user to run `v` again, until the latest failing test passes individually or the latest meaningful failing set passes together, or you are genuinely blocked.
+Do not hand off with a commit-readiness status until the latest full-suite validation run passes, or you are genuinely blocked.
 
 ## Report Back
 
-If targeted validation passes, report that the branch is ready for a full-suite `v` run and include the exact targeted commands or selectors that were validated. Also include either concrete `Pass:` target lines or a saved verify-log path showing the executed targets. Do not run full `v` yourself.
+If focused validation passes, continue to full-suite validation through the `test` skill. Do not stop merely because focused validation passed.
+
+If full-suite validation passes, report that the branch is ready for a commit and include the focused and full-suite validation evidence: exact selectors or command shape validated, saved log paths, concise pass summaries, and timing for the full-suite run.
 
 If validation still fails, summarize the remaining failure set and the next fix to make.
 
-Do not commit unless all tests are passing. Because this workflow stops before the manual full-suite `v` run, the normal outcome is to stop short of committing and hand off for that run.
+Do not commit unless all focused and full-suite validation has passed. After a passing full-suite run, stop short of committing unless the user explicitly asked for a commit.
 
 ## Reference
 

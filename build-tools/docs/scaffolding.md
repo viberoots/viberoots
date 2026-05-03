@@ -44,6 +44,7 @@ Examples:
 ```bash
 scaf new go lib[rary] greeter-utilities
 scaf new go cli-app greeter-cli
+scaf new ts service data-room-worker --yes
 scaf new ts webapp-ssr-vite demo-vite-ssr --yes
 scaf new ts webapp-static-pwa demo-pwa --yes
 ```
@@ -57,6 +58,7 @@ Both examples create the destination under the canonical location for the chosen
 
 For static web delivery:
 
+- `service` is for long-running Node processes with health checks and deployment runtime metadata.
 - `webapp-static` is the minimal static Vite baseline.
 - `webapp-static-pwa` adds manifest, service worker, icon placeholders, and offline app-shell defaults.
 - `webapp-ssr-vite` and `webapp-ssr-next` remain the right choice when server-rendered HTML is still required.
@@ -66,6 +68,7 @@ Static vs PWA vs SSR selection guidance:
 - Choose `webapp-static` when static hosting and client rendering are enough, and install/offline support is not part of the baseline contract.
 - Choose `webapp-static-pwa` when the browser is the long-lived state owner and you want offline app-shell behavior, install metadata, and zero-backend delivery by default.
 - Choose `webapp-ssr-vite` or `webapp-ssr-next` only when the initial HTML must depend on request-time inputs such as auth, cookies, headers, crawler-visible content, or other server-owned data.
+- Choose `service` for HTTP services, workers, and API/runtime processes that need a production command, health endpoint, runtime config contract, and secret contract instead of browser assets.
 - Hash-only or browser-storage-only client state is a poor fit for SSR-first ownership: the server cannot read URL fragment state, and it should not guess at browser-only persisted state during first paint.
 - If that client-owned state materially changes the initial screen, prefer `webapp-static` or `webapp-static-pwa` so the runtime owns first render without hydration mismatch repair logic.
 
@@ -203,6 +206,13 @@ Vercel artifact mode for `webapp-ssr-next`:
 - `:vercel_artifact` consumes that hermetic Buck/Nix webapp output and materializes `vercel-prebuilt/.vercel/output` with `artifact-identity.json`.
 - Vercel project/build metadata is declared in `vercel.project.json`; local `.vercel` directories and undeclared `VERCEL_*` environment variables fail the artifact build.
 - The artifact target carries `kind:app`, `webapp:ssr`, `framework:next`, `deployable:app`, and `deployment-component:ssr-webapp` labels so deployment component extraction sees it as an SSR webapp.
+
+Node service artifact mode for `ts/service`:
+
+- The generated `TARGETS` includes `node_service_artifact(name = "service_artifact")`.
+- `service.runtime.json` declares `schemaVersion = "node-service-runtime@1"`, the server entrypoint, production command, health endpoint, runtime config names, and secret requirement names.
+- The Buck/Nix artifact materializes a directory containing `dist/`, `package.json`, `runtime-contract.json`, `node_modules`, and `artifact-identity.json`.
+- The artifact identity is computed from finalized artifact bytes and is labeled with `kind:app`, `service:node`, `deployable:app`, and `deployment-component:service`.
 
 Troubleshooting when local dependency edits do not refresh:
 

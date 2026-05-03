@@ -17,6 +17,7 @@ const EXPECTED_TS_TEMPLATE_IDS = [
   "ts/webapp-ssr-vite",
   "ts/cpp-addon",
   "ts/go-addon",
+  "ts/service",
   "ts/wasm-inline",
   "ts/wasm-app",
   "ts/wasm-linking-app",

@@ -23,6 +23,7 @@ export const TEMPLATE_TAXONOMY = {
     "go-addon",
     "go-cpp-lib",
     "lib",
+    "service",
     "wasm-app",
     "wasm-inline",
     "wasm-linking-app",

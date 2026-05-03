@@ -1,6 +1,6 @@
 # PR Checklist
 
-Use this checklist before saying the work is ready for a manual full-suite `v` run.
+Use this checklist before saying the work is ready for a commit.
 
 ## Inputs
 
@@ -50,26 +50,31 @@ Use this checklist before saying the work is ready for a manual full-suite `v` r
 - [ ] Use the repo-approved runner for file-size lint: `node ...` when directly executable in the active shell, otherwise `zx-wrapper build-tools/tools/dev/file-size-lint.ts --scope=source --fail=true`.
 - [ ] Also run the corresponding `--scope=ssr-tests` gate when touched work includes SSR test modules or other work that must satisfy that gate.
 - [ ] Restage if lint, prettier, or file-size-gate fixes changed files.
-- [ ] Run exactly `i && b && v <new-tests>`.
-- [ ] Treat `<new-tests>` as the new tests added for the PR.
+- [ ] Invoke the `test` skill with `<new-tests>` as the requested selector.
+- [ ] Treat `<new-tests>` as the new tests added for the PR, and pass that selector through to the `test` skill.
 - [ ] When `<new-tests>` are supplied as file paths, especially under `build-tools/tools/tests`, prefer exact Buck labels for generated root tests when available.
 - [ ] If file-path selectors were used, confirm selector expansion with `v --explain-selection` or the verify log before trusting the run.
 - [ ] If touched work includes `build-tools/tools/dev/verify/**`, validate both label-based and file-path-based `v` invocation for at least one affected target.
-- [ ] If any step in `i && b && v <new-tests>` fails, treat the failure as caused by the current PR until disproven, unless the user explicitly instructs otherwise.
+- [ ] After self-review, focused validation, and any resulting investigations pass, invoke the `test` skill without a selector for full-suite validation.
+- [ ] Do not run `v` directly; use the `test` skill for focused and full-suite validation.
+- [ ] If the `test` skill reports that any step in the selected focused validation flow failed, treat the failure as caused by the current PR until disproven, unless the user explicitly instructs otherwise.
+- [ ] If full-suite validation fails, invoke the `investigate` skill with the saved full-suite log path from the `test` skill report.
+- [ ] After full-suite failure investigation and fixes, rerun the failing tests or smallest meaningful failing set with the `test` skill.
+- [ ] Iterate investigate, fix, focused rerun, and full-suite rerun until the full suite passes or you are genuinely blocked.
 - [ ] Do not classify failures as unrelated merely because the failing target is outside the edited files.
 - [ ] Reproduce the failing helper, wrapper, or tool directly when possible and inspect intermediate artifacts before broadening the fix.
 - [ ] For Buck macro or build-config tests, confirm the temp harness is not replacing the root config under test.
 - [ ] Fix root causes in the primary path instead of adding fallbacks that could hide bugs, unless the user explicitly asks for that behavior or the plan requires it.
 - [ ] Make the primary path robust rather than papering over failures with alternate branches or escape hatches.
-- [ ] After every iterative code change, rerun lint, prettier, the applicable strict 250-line methodology file-size gate, restage, and rerun the failing tests as a set.
+- [ ] After every iterative code change, rerun lint, prettier, the applicable strict 250-line methodology file-size gate, restage, and use the `test` skill to rerun the failing tests as a set.
 - [ ] If the change touches shared tooling, generated-test wiring, deployment tooling, labels/macros, or `build-tools/tools/dev/verify/**`, rerun the smallest meaningful impacted set before handoff.
 
 ## Handoff
 
-- [ ] Do not run full-suite `v`.
-- [ ] Do not claim readiness, or tell the user to run `v`, unless the latest targeted validation passes.
+- [ ] Do not claim commit readiness unless the latest full-suite validation through the `test` skill passes.
 - [ ] Before suggesting another broader or full-suite run, confirm the latest failing test passes individually or the latest meaningful failing set passes together.
 - [ ] Report the exact targeted commands or selectors that were validated.
 - [ ] Include either concrete `Pass:` target lines or a saved verify-log path showing the executed targets.
+- [ ] Report the passing full-suite log path, concise test result summary, and timing.
 - [ ] Run `git status --short` after the latest validation pass and note any incidental fixes or surfaced regressions that are now part of the staged change set.
 - [ ] Do not commit unless all tests are passing.

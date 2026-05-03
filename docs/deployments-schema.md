@@ -612,6 +612,13 @@ Resolved component expectations:
     - `clientDir = "dist/client"`
     - `servingTopology = "single-host-node-with-nginx"`
     - `environmentNeutralBuild = true`
+- `service` Node artifacts should preserve the reviewed `node-service-runtime@1` contract generated
+  by `node_service_artifact`:
+  - `entrypoint`
+  - `productionCommand`
+  - `health.path` and `health.port`
+  - `runtimeConfig`
+  - `secretRequirements`
 - default smoke or release-health classification should derive from the reviewed component kind:
   - `static-webapp`: HTTP smoke, 5 minute budget
   - `ssr-webapp`: HTTP or runtime-contract smoke, 10 minute budget
