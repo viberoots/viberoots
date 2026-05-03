@@ -1,0 +1,28 @@
+version: 1
+
+_envops:
+  block_start_string: "{%"
+  block_end_string: "%}"
+  variable_start_string: "{{"
+  variable_end_string: "}}"
+  comment_start_string: "{#"
+  comment_end_string: "#}"
+  keep_trailing_newline: true
+
+_exclude:
+  - meta.json
+
+name: ""
+language: "deployment"
+template: "opentofu-foundation"
+component: ""
+cluster: ""
+namespace: "{{ name }}"
+release: "{{ name }}"
+stage: "dev"
+shared_package: "{{ name }}-shared"
+stack_identity: "foundation/{{ name }}"
+state_backend_identity: "s3://replace-me/{{ name }}"
+
+_tasks:
+  - mkdir -p opentofu

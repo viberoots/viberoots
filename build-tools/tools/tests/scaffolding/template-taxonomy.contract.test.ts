@@ -24,6 +24,14 @@ const EXPECTED_TS_TEMPLATE_IDS = [
   "ts/go-cpp-lib",
 ];
 
+const EXPECTED_DEPLOYMENT_TEMPLATE_IDS = [
+  "deployment/opentofu-foundation",
+  "deployment/opentofu-provisioner",
+  "deployment/service",
+  "deployment/shared",
+  "deployment/vercel-next",
+];
+
 function sortedUnique(values: string[]): string[] {
   return Array.from(new Set(values)).sort();
 }
@@ -42,6 +50,21 @@ test("taxonomy matches templates/ts filesystem roots", async () => {
     .filter((entry) => entry.isDirectory())
     .map((entry) => `ts/${entry.name}`);
   assert.deepEqual(sortedUnique(idsFromFilesystem), sortedUnique(CANONICAL_TS_TEMPLATE_IDS));
+});
+
+test("taxonomy includes deployment scaffold family", async () => {
+  const deploymentRoot = path.join(
+    "build-tools",
+    "tools",
+    "scaffolding",
+    "templates",
+    "deployment",
+  );
+  const entries = await fsp.readdir(deploymentRoot, { withFileTypes: true });
+  const idsFromFilesystem = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => `deployment/${entry.name}`);
+  assert.deepEqual(sortedUnique(idsFromFilesystem), sortedUnique(EXPECTED_DEPLOYMENT_TEMPLATE_IDS));
 });
 
 test("filesystem contract: no canonical TypeScript templates remain under templates/node", async () => {

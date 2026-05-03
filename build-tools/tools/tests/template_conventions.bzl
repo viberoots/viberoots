@@ -369,6 +369,16 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "template_roots": ["build-tools/tools/scaffolding/templates/language/kit"],
         "classification": "template:smoke",
     },
+    "build-tools/tools/tests/scaffolding/deployment.scaffold-contract.test.ts": {
+        "template_roots": [
+            "build-tools/tools/scaffolding/templates/deployment/shared",
+            "build-tools/tools/scaffolding/templates/deployment/vercel-next",
+            "build-tools/tools/scaffolding/templates/deployment/service",
+            "build-tools/tools/scaffolding/templates/deployment/opentofu-foundation",
+            "build-tools/tools/scaffolding/templates/deployment/opentofu-provisioner",
+        ],
+        "classification": "template:contract",
+    },
     "build-tools/tools/tests/ts-cpp-go-wasm/scaffolding.scaf-new-dry-run.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/go-cpp-lib"],
         "classification": "template:smoke",

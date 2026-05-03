@@ -9,6 +9,13 @@ export const TEMPLATE_NAME_ALIASES: Record<string, string> = {
 
 export const TEMPLATE_TAXONOMY = {
   "cpp": ["cli", "lib"],
+  "deployment": [
+    "opentofu-foundation",
+    "opentofu-provisioner",
+    "service",
+    "shared",
+    "vercel-next",
+  ],
   "go": ["cli", "lib"],
   "language": ["kit"],
   "python": [

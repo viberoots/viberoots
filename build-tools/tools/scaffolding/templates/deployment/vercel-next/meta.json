@@ -1,0 +1,17 @@
+{
+  "language": "deployment",
+  "template": "vercel-next",
+  "description": "Vercel prebuilt Next.js deployment package",
+  "resolverDestination": "projects/deployments/{name}",
+  "requiredFlags": ["component", "team", "project"],
+  "help": {
+    "usage": "scaf new deployment vercel-next <deployment-id> --component=//projects/apps/app:vercel_artifact --team=team --project=project",
+    "notes": [
+      "Generates a Vercel deployment target that consumes a repo-built node_vercel_next_artifact.",
+      "Placeholder secret and runtime config requirements are emitted as reviewed contract examples."
+    ],
+    "examples": [
+      "scaf new deployment vercel-next console-dev --component=//projects/apps/console:vercel_artifact --team=acme --project=console --yes"
+    ]
+  }
+}

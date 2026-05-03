@@ -47,6 +47,9 @@ scaf new go cli-app greeter-cli
 scaf new ts service data-room-worker --yes
 scaf new ts webapp-ssr-vite demo-vite-ssr --yes
 scaf new ts webapp-static-pwa demo-pwa --yes
+scaf new deployment shared console --repository=example/platform --yes
+scaf new deployment vercel-next console-dev --component=//projects/apps/console:vercel_artifact --team=acme --project=console --yes
+scaf new deployment service api-dev --component=//projects/apps/api:service_artifact --cluster=dev-cluster --yes
 ```
 
 For TypeScript SSR templates, framework-specific names are explicit:
@@ -71,6 +74,23 @@ Static vs PWA vs SSR selection guidance:
 - Choose `service` for HTTP services, workers, and API/runtime processes that need a production command, health endpoint, runtime config contract, and secret contract instead of browser assets.
 - Hash-only or browser-storage-only client state is a poor fit for SSR-first ownership: the server cannot read URL fragment state, and it should not guess at browser-only persisted state during first paint.
 - If that client-owned state materially changes the initial screen, prefer `webapp-static` or `webapp-static-pwa` so the runtime owns first render without hydration mismatch repair logic.
+
+Deployment scaffold templates live under the `deployment` taxonomy. They create deployment packages
+under `projects/deployments/<deployment-id>` and stay inside the normal `scaf` resolver, template
+metadata, and template-only verify selection path.
+
+- `deployment/shared` creates lane governance, lane policy, and dev/staging/prod admission policy.
+- `deployment/vercel-next` creates a Vercel prebuilt Next.js package for a repo-built artifact.
+- `deployment/service` creates a Kubernetes service deployment package and provider config.
+- `deployment/opentofu-foundation` creates a Kubernetes deployment with an `opentofu-stack`
+  provisioner and placeholder stack layout.
+- `deployment/opentofu-provisioner` adds only the package-local `opentofu/` subdirectory for an
+  existing deployment package.
+
+Deployment templates fail before rendering when required provider answers are missing. For example,
+`deployment/vercel-next` requires `--component`, `--team`, and `--project`; `deployment/service` and
+`deployment/opentofu-foundation` require `--component` and `--cluster`; `deployment/shared` requires
+`--repository`.
 
 Local-origin PWA validation guidance:
 

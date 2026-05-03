@@ -1,0 +1,16 @@
+{
+  "language": "deployment",
+  "template": "opentofu-provisioner",
+  "description": "App-attached OpenTofu provisioner subdirectory",
+  "resolverDestination": "projects/deployments/{name}",
+  "help": {
+    "usage": "scaf new deployment opentofu-provisioner <deployment-id> [--path=projects/deployments/<deployment-id>]",
+    "notes": [
+      "Generates only the package-local opentofu/ stack files used by an existing deployment target.",
+      "Pair with provisioner = \"opentofu-stack\" and provisioner_config = \"opentofu/stack.json\" in TARGETS."
+    ],
+    "examples": [
+      "scaf new deployment opentofu-provisioner api-dev --path=projects/deployments/api-dev --yes"
+    ]
+  }
+}

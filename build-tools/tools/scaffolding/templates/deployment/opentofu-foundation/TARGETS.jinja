@@ -1,0 +1,27 @@
+load("//build-tools/deployments:defs.bzl", "kubernetes_service_deployment")
+
+kubernetes_service_deployment(
+    name = "deploy",
+    component = "{{ component }}",
+    cluster = "{{ cluster }}",
+    namespace = "{{ namespace }}",
+    release = "{{ release }}",
+    service_kind = "worker",
+    provisioner = "opentofu-stack",
+    provisioner_config = "opentofu/stack.json",
+    lane_policy = "//projects/deployments/{{ shared_package }}:lane",
+    environment_stage = "{{ stage }}",
+    admission_policy = "//projects/deployments/{{ shared_package }}:{{ stage }}_release",
+    provider_target = {
+        "stack_identity": "{{ stack_identity }}",
+        "state_backend_identity": "{{ state_backend_identity }}",
+    },
+    secret_requirements = [
+        {
+            "name": "opentofu-provider-credentials",
+            "step": "provision",
+            "contract_id": "secret://deployments/{{ name }}/opentofu_provider",
+            "required": "true",
+        },
+    ],
+)

@@ -1,0 +1,34 @@
+load("//build-tools/deployments:defs.bzl", "kubernetes_service_deployment")
+
+kubernetes_service_deployment(
+    name = "deploy",
+    component = "{{ component }}",
+    cluster = "{{ cluster }}",
+    namespace = "{{ namespace }}",
+    release = "{{ release }}",
+    service_kind = "{{ service_kind }}",
+    health_path = "{{ health_path }}",
+    lane_policy = "//projects/deployments/{{ shared_package }}:lane",
+    environment_stage = "{{ stage }}",
+    admission_policy = "//projects/deployments/{{ shared_package }}:{{ stage }}_release",
+    secret_requirements = [
+        {
+            "name": "container-runtime-token",
+            "step": "publish",
+            "contract_id": "secret://deployments/{{ name }}/container_runtime_token",
+            "required": "true",
+        },
+    ],
+    runtime_config_requirements = [
+        {
+            "name": "service-public-url",
+            "step": "smoke",
+            "contract_id": "runtime://deployments/{{ name }}/public_url",
+            "required": "true",
+        },
+    ],
+    smoke = {
+        "runner": "service-health",
+        "path": "{{ health_path }}",
+    },
+)

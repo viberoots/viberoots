@@ -410,6 +410,19 @@ step instead of editing Keycloak by hand.
   non-destructive
 - use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
 
+Scaffold-first examples:
+
+```bash
+scaf new deployment shared console --repository=example/platform --yes
+scaf new deployment vercel-next console-dev --component=//projects/apps/console:vercel_artifact --team=acme --project=console --shared_package=console-shared --yes
+scaf new deployment service api-dev --component=//projects/apps/api:service_artifact --cluster=dev-cluster --shared_package=console-shared --yes
+scaf new deployment opentofu-foundation platform-dev --component=//projects/apps/platform:service_artifact --cluster=dev-cluster --shared_package=console-shared --yes
+scaf new deployment opentofu-provisioner api-dev --path=projects/deployments/api-dev --yes
+```
+
+The generated packages include placeholder secret/runtime config contract IDs and provider config
+files. Replace those placeholders with reviewed provider/account/domain values before admission.
+
 Web service example:
 
 ```starlark

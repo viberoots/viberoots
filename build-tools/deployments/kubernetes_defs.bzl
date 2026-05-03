@@ -15,6 +15,7 @@ def kubernetes_service_deployment(
         publisher_config = "helm/values.yaml",
         provisioner = "",
         provisioner_config = "",
+        provider_target = {},
         protection_class = "shared_nonprod",
         lane_policy = None,
         environment_stage = "",
@@ -30,6 +31,15 @@ def kubernetes_service_deployment(
     effective_ingress_mode = ingress_mode
     if not effective_ingress_mode:
         effective_ingress_mode = "none" if service_kind == "worker" else "public"
+    base_provider_target = {
+        "cluster": cluster,
+        "namespace": namespace,
+        "release": release,
+        "service_kind": service_kind,
+        "ingress_mode": effective_ingress_mode,
+        "health_path": health_path,
+    }
+    base_provider_target.update(provider_target)
     deployment_target(
         name = name,
         provider = "kubernetes",
@@ -48,14 +58,7 @@ def kubernetes_service_deployment(
             "kind": "service",
             "target": component,
         }],
-        provider_target = {
-            "cluster": cluster,
-            "namespace": namespace,
-            "release": release,
-            "service_kind": service_kind,
-            "ingress_mode": effective_ingress_mode,
-            "health_path": health_path,
-        },
+        provider_target = base_provider_target,
         smoke = smoke or {},
         smoke_exception = smoke_exception or {},
         prerequisites = prerequisites,

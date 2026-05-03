@@ -1,0 +1,59 @@
+load(
+    "//build-tools/deployments:defs.bzl",
+    "deployment_admission_policy",
+    "deployment_lane_governance",
+    "deployment_lane_policy",
+)
+
+deployment_lane_governance(
+    name = "lane_governance",
+    scm_backend = "github",
+    repository = "{{ repository }}",
+    branch_protections = [
+        {"stage": "dev", "branch": "env/{{ name }}/dev", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "repository-role:admin", "emergency_direct_push_principals": "repository-role:admin"},
+        {"stage": "staging", "branch": "env/{{ name }}/staging", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "repository-role:admin", "emergency_direct_push_principals": "repository-role:admin"},
+        {"stage": "prod", "branch": "env/{{ name }}/prod", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "repository-role:admin", "emergency_direct_push_principals": "repository-role:admin"},
+    ],
+    visibility = ["PUBLIC"],
+)
+
+deployment_lane_policy(
+    name = "lane",
+    defaults = "//projects/deployments:defaults",
+    stages = ["dev", "staging", "prod"],
+    stage_branches = {
+        "dev": "env/{{ name }}/dev",
+        "staging": "env/{{ name }}/staging",
+        "prod": "env/{{ name }}/prod",
+    },
+    allowed_promotion_edges = ["dev->staging", "staging->prod"],
+    artifact_reuse_mode = "same_artifact",
+    governance_policy = ":lane_governance",
+    default_client_profile = "{{ default_client_profile }}",
+    visibility = ["PUBLIC"],
+)
+
+deployment_admission_policy(
+    name = "dev_release",
+    allowed_refs = ["env/{{ name }}/dev"],
+    required_checks = ["deploy/admission"],
+    artifact_attestation_mode = "recorded_exact_artifact",
+    visibility = ["PUBLIC"],
+)
+
+deployment_admission_policy(
+    name = "staging_release",
+    allowed_refs = ["env/{{ name }}/staging"],
+    required_checks = ["deploy/admission"],
+    artifact_attestation_mode = "recorded_exact_artifact",
+    visibility = ["PUBLIC"],
+)
+
+deployment_admission_policy(
+    name = "prod_release",
+    allowed_refs = ["env/{{ name }}/prod"],
+    required_checks = ["deploy/admission"],
+    required_approvals = ["release-owner"],
+    artifact_attestation_mode = "recorded_exact_artifact",
+    visibility = ["PUBLIC"],
+)

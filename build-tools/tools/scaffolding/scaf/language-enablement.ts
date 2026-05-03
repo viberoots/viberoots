@@ -17,6 +17,9 @@ export async function isLanguageEnabled(language: string): Promise<boolean> {
   if (language === "ts") {
     return true;
   }
+  if (language === "deployment") {
+    return await exists(path.join("build-tools", "deployments", "defs.bzl"));
+  }
   const tplPath = path.join("build-tools", "tools", "nix", "templates", `${language}.nix`);
   return await exists(tplPath);
 }

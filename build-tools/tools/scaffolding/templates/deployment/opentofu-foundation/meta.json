@@ -1,0 +1,17 @@
+{
+  "language": "deployment",
+  "template": "opentofu-foundation",
+  "description": "Kubernetes foundation deployment with an OpenTofu provisioner stack",
+  "resolverDestination": "projects/deployments/{name}",
+  "requiredFlags": ["component", "cluster"],
+  "help": {
+    "usage": "scaf new deployment opentofu-foundation <deployment-id> --component=//projects/apps/foundation:service_artifact --cluster=cluster",
+    "notes": [
+      "Generates a Kubernetes deployment target with a reviewed opentofu-stack provisioner.",
+      "OpenTofu stack files stay under the deployment package opentofu/ directory."
+    ],
+    "examples": [
+      "scaf new deployment opentofu-foundation platform-dev --component=//projects/apps/platform:service_artifact --cluster=dev-cluster --yes"
+    ]
+  }
+}

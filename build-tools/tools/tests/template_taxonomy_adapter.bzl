@@ -4,6 +4,11 @@
 CANONICAL_TEMPLATE_IDS = [
     "cpp/cli",
     "cpp/lib",
+    "deployment/opentofu-foundation",
+    "deployment/opentofu-provisioner",
+    "deployment/service",
+    "deployment/shared",
+    "deployment/vercel-next",
     "go/cli",
     "go/lib",
     "language/kit",

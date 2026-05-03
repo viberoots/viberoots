@@ -7,6 +7,13 @@
     "cli": "projects/apps/{name}",
     "lib": "projects/libs/{name}"
   },
+  "deployment": {
+    "opentofu-foundation": "projects/deployments/{name}",
+    "opentofu-provisioner": "projects/deployments/{name}",
+    "service": "projects/deployments/{name}",
+    "shared": "projects/deployments/{name}-shared",
+    "vercel-next": "projects/deployments/{name}"
+  },
   "go": {
     "cli": "projects/apps/{name}",
     "lib": "projects/libs/{name}"

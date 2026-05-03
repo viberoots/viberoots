@@ -1,0 +1,17 @@
+{
+  "language": "deployment",
+  "template": "service",
+  "description": "Kubernetes service deployment package",
+  "resolverDestination": "projects/deployments/{name}",
+  "requiredFlags": ["component", "cluster"],
+  "help": {
+    "usage": "scaf new deployment service <deployment-id> --component=//projects/apps/api:service_artifact --cluster=cluster",
+    "notes": [
+      "Generates a Kubernetes service deployment with provider config and health smoke metadata.",
+      "Use --service_kind=worker when the generated deployment should default to no public ingress."
+    ],
+    "examples": [
+      "scaf new deployment service api-dev --component=//projects/apps/api:service_artifact --cluster=dev-cluster --yes"
+    ]
+  }
+}

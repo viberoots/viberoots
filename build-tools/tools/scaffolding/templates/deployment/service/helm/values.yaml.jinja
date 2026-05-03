@@ -1,0 +1,7 @@
+image:
+  digest: "sha256:replace-with-admitted-service-artifact"
+service:
+  kind: "{{ service_kind }}"
+  healthPath: "{{ health_path }}"
+ingress:
+  mode: "{% if service_kind == "worker" %}none{% else %}public{% endif %}"

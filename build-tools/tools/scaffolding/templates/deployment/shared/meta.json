@@ -1,0 +1,15 @@
+{
+  "language": "deployment",
+  "template": "shared",
+  "description": "Shared lane governance, lane policy, and admission policies for deployment packages",
+  "resolverDestination": "projects/deployments/{name}-shared",
+  "requiredFlags": ["repository"],
+  "help": {
+    "usage": "scaf new deployment shared <name> --repository=owner/repo [--path=DEST]",
+    "notes": [
+      "Generates a shared deployment lane package under projects/deployments/<name>-shared.",
+      "The generated lane defaults to dev, staging, and prod admission policies."
+    ],
+    "examples": ["scaf new deployment shared console --repository=example/platform --yes"]
+  }
+}

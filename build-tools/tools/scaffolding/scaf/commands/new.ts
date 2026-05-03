@@ -55,6 +55,18 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
     console.error(`unknown template: ${language}/${template}`);
     process.exit(1);
   }
+  const meta = JSON.parse(await fsp.readFile(metaPath, "utf8")) as { requiredFlags?: string[] };
+  const missingFlags = (meta.requiredFlags || []).filter((flag) => {
+    const value = String(flags[flag] || "").trim();
+    return value.length === 0;
+  });
+  if (missingFlags.length > 0) {
+    console.error(
+      `missing required scaffold answers for ${canonicalLanguage}/${template}: ` +
+        missingFlags.map((flag) => `--${flag}`).join(", "),
+    );
+    process.exit(2);
+  }
   const destInfo = resolveDestination(canonicalLanguage, template, name, flags["path"]);
   const dest = language === "language" && template === "kit" ? "." : destInfo.path;
   const data: Record<string, any> = { name, language: canonicalLanguage, template };
