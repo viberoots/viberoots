@@ -7,6 +7,7 @@ import type { DeploymentRequirement } from "./deployment-requirements.ts";
 import type { DeploymentSmokePolicy } from "./deployment-smoke-policy.ts";
 import type { DeploymentTargetException } from "./deployment-target-exceptions.ts";
 import type { DeploymentVaultRuntimeConfig } from "./deployment-vault-runtime-types.ts";
+import type { OpenTofuProvisionerMetadata } from "./opentofu-stack.ts";
 import {
   MOBILE_APP_COMPONENT_KIND,
   SSR_WEBAPP_COMPONENT_KIND,
@@ -170,7 +171,7 @@ export type S3StaticDeployment = DeploymentBase & {
     type: string;
     config: string;
   };
-  provisioner?: { type: string };
+  provisioner?: { type: string } | OpenTofuProvisionerMetadata;
   providerTarget: S3StaticProviderTarget;
 };
 
@@ -180,10 +181,12 @@ export type KubernetesDeployment = DeploymentBase & {
     type: string;
     config: string;
   };
-  provisioner?: {
-    type: string;
-    config: string;
-  };
+  provisioner?:
+    | {
+        type: string;
+        config: string;
+      }
+    | OpenTofuProvisionerMetadata;
   providerTarget: KubernetesProviderTarget;
 };
 

@@ -107,6 +107,7 @@ export const KUBERNETES_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
     bullet("reviewed built-in provisioners for the initial slice:", [
       bullet("`terraform-stack`"),
       bullet("`cdktf-stack`"),
+      bullet("`opentofu-stack`"),
     ]),
     bullet("meaning:", [
       bullet(
@@ -121,6 +122,9 @@ export const KUBERNETES_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
     ]),
     bullet(
       "`--provision-only` is reviewed for protected/shared deployments through the control-plane service when the deployment declares one reviewed built-in provisioner",
+    ),
+    bullet(
+      "`opentofu-stack` provisioners must keep stack-owned files under the deployment package `opentofu/` directory and bind stack identity plus state backend identity into admission evidence",
     ),
     bullet(
       "that provision-only path still binds one admitted source revision and one frozen execution snapshot before provider mutation",

@@ -136,7 +136,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/kubernetes.control-plane.service.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.deploy.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.fake-helm.ts": False,
-    "build-tools/tools/tests/deployments/kubernetes.fixture.ts": False,
+    "build-tools/tools/tests/deployments/kubernetes.fixture.ts": False, "build-tools/tools/tests/deployments/kubernetes.opentofu-stack.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.public-server.ts": False,
     "build-tools/tools/tests/deployments/kubernetes.publisher.config-drift.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.validation.test.ts": True,

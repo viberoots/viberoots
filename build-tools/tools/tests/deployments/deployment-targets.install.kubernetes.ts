@@ -71,6 +71,13 @@ export async function installKubernetesTargets(
         `        "namespace": ${JSON.stringify(deployment.providerTarget.namespace)},`,
         `        "release": ${JSON.stringify(deployment.providerTarget.release)},`,
         `        "id": ${JSON.stringify(deployment.providerTarget.id)},`,
+        ...(deployment.provisioner?.type === "opentofu-stack"
+          ? [
+              `        "stack_identity": ${JSON.stringify(deployment.provisioner.stackIdentity)},`,
+              `        "state_backend_identity": ${JSON.stringify(deployment.provisioner.stateBackendIdentity)},`,
+              `        "allowed_environment_differences": ${JSON.stringify(deployment.provisioner.allowedEnvironmentDifferences.join(","))},`,
+            ]
+          : []),
         "    },",
         ...["    prerequisites =", ...renderStringRecordList(renderPrerequisiteList(deployment))],
         ...[

@@ -1,6 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentTarget } from "./contract.ts";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+import { OPENTOFU_STACK_PROVISIONER } from "./opentofu-stack.ts";
+
+const REVIEWED_STACK_PROVISIONERS = ["terraform-stack", "cdktf-stack", OPENTOFU_STACK_PROVISIONER];
 import { destructiveReleaseActions, releaseActionRefs } from "./deployment-release-actions.ts";
 import { providerDeclaresReleaseActionType } from "./deployment-provider-capabilities.ts";
 import type {
@@ -85,7 +88,7 @@ export function requireBuiltInExecutionBoundary(deployment: DeploymentTarget) {
     }
     if (
       deployment.provisioner?.type &&
-      !["terraform-stack", "cdktf-stack"].includes(deployment.provisioner.type)
+      !REVIEWED_STACK_PROVISIONERS.includes(deployment.provisioner.type)
     ) {
       throw new DeploymentAdmissionError(
         "no_longer_admitted",
@@ -139,7 +142,7 @@ export function requireBuiltInExecutionBoundary(deployment: DeploymentTarget) {
     }
     if (
       deployment.provisioner?.type &&
-      !["terraform-stack", "cdktf-stack"].includes(deployment.provisioner.type)
+      !REVIEWED_STACK_PROVISIONERS.includes(deployment.provisioner.type)
     ) {
       throw new DeploymentAdmissionError(
         "no_longer_admitted",

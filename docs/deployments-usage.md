@@ -401,6 +401,9 @@ step instead of editing Keycloak by hand.
 
 - good fit for services and third-party services
 - uses the same `deploy` command, with Kubernetes-specific rollout rules
+- supports `opentofu-stack` provision-only foundation runs when stack files live
+  under the deployment package `opentofu/` directory and the plan is
+  non-destructive
 - use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
 
 `vercel`

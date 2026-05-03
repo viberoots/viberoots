@@ -6,6 +6,7 @@ import type { DeploymentAdmissionBinding } from "./deployment-admission-evidence
 
 export type DeploymentAdmissionOperationKind =
   | "deploy"
+  | "provision_only"
   | "promotion"
   | "retry"
   | "rollback"

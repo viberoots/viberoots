@@ -27,9 +27,12 @@ import { pushKubernetesComponentKindErrors } from "./kubernetes-capability-valid
 import { pushKubernetesRolloutErrors } from "./kubernetes-rollout-validation.ts";
 import { readDeploymentRequirements } from "./deployment-requirements.ts";
 import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
+import {
+  readOpenTofuProvisionerMetadata,
+  REVIEWED_STACK_PROVISIONERS,
+} from "./opentofu-stack-extract.ts";
 
 const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/;
-const BUILT_IN_PROVISIONERS = new Set(["terraform-stack", "cdktf-stack"]);
 const VALID_PROTECTION_CLASSES = new Set(["local_only", "shared_nonprod", "production_facing"]);
 
 export function extractKubernetesDeploymentsFromContext(
@@ -106,11 +109,18 @@ export function extractKubernetesDeploymentsFromContext(
     if (!publisherConfig) {
       deploymentErrors.push(deploymentError(label, "missing required publisher_config"));
     }
-    if (provisioner && !BUILT_IN_PROVISIONERS.has(provisioner)) {
+    const openTofuProvisioner = readOpenTofuProvisionerMetadata({
+      label,
+      provisioner,
+      provisionerConfig,
+      providerTarget,
+      errors: deploymentErrors,
+    });
+    if (provisioner && !REVIEWED_STACK_PROVISIONERS.has(provisioner)) {
       deploymentErrors.push(
         deploymentError(
           label,
-          `unsupported kubernetes provisioner "${provisioner}" (expected terraform-stack or cdktf-stack)`,
+          `unsupported kubernetes provisioner "${provisioner}" (expected terraform-stack, cdktf-stack, or opentofu-stack)`,
         ),
       );
     }
@@ -200,7 +210,9 @@ export function extractKubernetesDeploymentsFromContext(
       component: { kind: primaryComponent?.kind || componentKind, target: componentTarget },
       components,
       publisher: { type: publisher, config: publisherConfig },
-      ...(provisioner ? { provisioner: { type: provisioner, config: provisionerConfig } } : {}),
+      ...(provisioner
+        ? { provisioner: openTofuProvisioner || { type: provisioner, config: provisionerConfig } }
+        : {}),
       providerTarget: deriveKubernetesProviderTarget({ cluster, namespace, release, id }),
     });
   }

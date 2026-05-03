@@ -72,6 +72,7 @@ _TEMP_REPO_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/kubernetes.control-plane.reviewed-source.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.control-plane.service.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.deploy.e2e.test.ts": True,
+    "build-tools/tools/tests/deployments/kubernetes.opentofu-stack.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.publisher.config-drift.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.artifact-binding.service.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.challenge-authz.test.ts": True,

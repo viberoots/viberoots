@@ -206,6 +206,15 @@ Minimum plan/diff contract when provisioner-managed infra mutation is reviewable
 - how destructive or replacement actions are surfaced distinctly from create or in-place update
 - if no meaningful plan or diff can be produced, the reviewed higher-bar approval posture required for that path
 
+`opentofu-stack` is a reviewed built-in provisioner type for Kubernetes-owned
+foundation and app-attached infrastructure. Its package-local stack files must
+live under `projects/deployments/<deployment-id>/opentofu/`; deployment metadata
+must declare `provider_target.stack_identity` and
+`provider_target.state_backend_identity`; the resolved OpenTofu plan fingerprint
+and stack-config fingerprint are bound into admission evidence. Routine
+`deploy` and `--provision-only` flows fail closed on delete, replace, or unknown
+plan actions.
+
 ### `runtime_config_requirements`
 
 Required shape:

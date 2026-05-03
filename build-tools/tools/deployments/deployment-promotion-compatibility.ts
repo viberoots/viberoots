@@ -11,6 +11,7 @@ import {
   provisionerTypeFor,
   rolloutSignature,
 } from "./deployment-promotion-contract.ts";
+import { opentofuPromotionCompatibilityErrors } from "./opentofu-stack.ts";
 
 type PromotionSourceLike = {
   record: { finalOutcome?: string; publishMode?: string; deploymentId: string };
@@ -128,6 +129,7 @@ export function promotionCompatibilityErrors(
         `provisioner mismatch: current=${targetProvisioner || "<none>"} source=${sourceProvisioner || "<none>"}`,
       );
     }
+    errors.push(...opentofuPromotionCompatibilityErrors(deployment, sourceDeployment));
   }
   if (
     deployment.lanePolicy.artifactReuseMode === "same_artifact" &&

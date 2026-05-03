@@ -24,6 +24,7 @@ export async function submitKubernetesProvisionOnly(opts: {
     ...(opts.expectedSourceRevision ? { expectedSourceRevision: opts.expectedSourceRevision } : {}),
   });
   const provisionerPlan = await writeKubernetesProvisionerPlan({
+    workspaceRoot: opts.workspaceRoot,
     recordsRoot: opts.recordsRoot,
     deployRunId,
     deployment: opts.deployment,
