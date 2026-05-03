@@ -11,6 +11,7 @@ import {
   renderPrerequisiteList,
   renderRequirementList,
   renderSmokeLines,
+  renderStringList,
   renderStringRecordList,
 } from "./deployment-targets.install.render.ts";
 import {
@@ -55,6 +56,14 @@ export async function installS3StaticTargets(
           "    runtime_config_requirements =",
           ...renderStringRecordList(renderRequirementList(deployment.runtimeConfigRequirements)),
         ],
+        ...(deployment.externalRequirementProfiles &&
+        deployment.externalRequirementProfiles.length > 0
+          ? [
+              `    external_requirement_profiles = ${renderStringList(
+                deployment.externalRequirementProfiles,
+              )},`,
+            ]
+          : []),
         ...renderSmokeLines(deployment.smoke),
         ")",
         "",

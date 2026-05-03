@@ -13,6 +13,10 @@ import { extractKubernetesDeploymentsFromContext } from "./contract-extract-kube
 import { extractNixosSharedHostDeploymentsFromContext } from "./contract-extract-nixos-shared-host.ts";
 import { extractS3StaticDeploymentsFromContext } from "./contract-extract-s3-static.ts";
 import { extractVercelDeploymentsFromContext } from "./contract-extract-vercel.ts";
+import {
+  readExternalRequirementProfiles,
+  validateExternalDeploymentRequirementProfiles,
+} from "./deployment-extract-metadata.ts";
 
 const DEPLOYMENT_PREREQUISITE_MODES = new Set<DeploymentPrerequisiteMode>([
   "ordering_only",
@@ -93,6 +97,27 @@ function validateDeploymentPrerequisites(deployments: DeploymentTarget[]): strin
   return errors;
 }
 
+function validateExternalRequirementMetadata(
+  nodes: GraphNode[],
+  deployments: DeploymentTarget[],
+): string[] {
+  const errors: string[] = [];
+  const nodesByLabel = new Map(nodes.map((node) => [String(node.name || ""), node]));
+  for (const deployment of deployments) {
+    const node = nodesByLabel.get(deployment.label);
+    if (!node) continue;
+    deployment.externalRequirementProfiles = readExternalRequirementProfiles(node);
+    validateExternalDeploymentRequirementProfiles({
+      node,
+      label: deployment.label,
+      secretRequirements: deployment.secretRequirements,
+      runtimeConfigRequirements: deployment.runtimeConfigRequirements,
+      errors,
+    });
+  }
+  return errors;
+}
+
 export function extractDeployments(nodes: GraphNode[]): {
   deployments: DeploymentTarget[];
   errors: string[];
@@ -107,6 +132,7 @@ export function extractDeployments(nodes: GraphNode[]): {
     ...extractKubernetesDeploymentsFromContext(context),
     ...extractVercelDeploymentsFromContext(context),
   ].sort((a, b) => a.label.localeCompare(b.label));
+  context.errors.push(...validateExternalRequirementMetadata(nodes, deployments));
   context.errors.push(...validateDeploymentPrerequisites(deployments));
   return {
     deployments,

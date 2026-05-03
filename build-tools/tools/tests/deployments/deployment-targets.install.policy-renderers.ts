@@ -23,6 +23,16 @@ export function renderAdmissionPolicy(
     `    allowed_refs = ${renderStringList(policy.allowedRefs)},`,
     `    required_checks = ${renderStringList(policy.requiredChecks)},`,
     `    required_approvals = ${renderStringList(policy.requiredApprovals)},`,
+    ...[
+      "    readiness_gates =",
+      ...renderStringRecordList(
+        (policy.readinessGates || []).map((gate) => ({
+          name: gate.name,
+          type: gate.type,
+          required_for: gate.requiredFor.join(","),
+        })),
+      ),
+    ],
     `    retry_branch_policy = ${JSON.stringify(policy.retryBranchPolicy)},`,
     `    retry_approval_reuse = ${JSON.stringify(policy.retryApprovalReuse)},`,
     `    artifact_attestation_mode = ${JSON.stringify(policy.artifactAttestationMode)},`,

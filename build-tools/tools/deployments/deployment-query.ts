@@ -13,7 +13,6 @@ import {
 const DEPLOYMENT_CQUERY_ATTRS = [
   "name",
   "rule_type",
-  "buck.type",
   "provider",
   "component",
   "component_kind",
@@ -42,6 +41,7 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "prerequisites",
   "secret_requirements",
   "runtime_config_requirements",
+  "external_requirement_profiles",
   "release_actions",
   "target_exceptions",
   "type",

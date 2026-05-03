@@ -76,3 +76,5 @@ export * from "./contract-extract-s3-static.ts";
 export * from "./contract-extract-vercel.ts";
 export * from "./deployment-targets.ts";
 export * from "./deployment-provider-targets.ts";
+export * from "./deployment-readiness-gates.ts";
+export * from "./external-deployment-requirements.ts";

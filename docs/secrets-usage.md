@@ -63,6 +63,9 @@ For production Vault bring-up and the optional local/test export bridge into
 - runtime secret values are resolved only when a lifecycle step actually needs
   them
 - Vault is the current backend, but callers use the stable `secretspec` layer
+- external provider credentials are never satisfied from ambient provider
+  environment variables such as local CLI tokens; they must be declared as
+  `secret_requirements` and resolved by the secret runtime
 
 ## Quick Start
 
@@ -104,6 +107,26 @@ const publishSecrets = await runtime.enterStep("publish");
 In this example, `targetEnvironment.lockScope` is the exact value the runtime
 checks against `targetScopes`. Operators should treat that `lockScope` value as
 the source of truth for the right target scope string.
+
+## External Deployment Contract IDs
+
+Use stable reviewed contract IDs for external dependencies:
+
+- WorkOS/AuthKit public config: `config://deployments/workos/...`
+- WorkOS/AuthKit secrets: `secret://deployments/workos/...`
+- Supabase public URL: `config://deployments/supabase/public_url/...`
+- Supabase privileged credentials: `secret://deployments/supabase/...`
+- Ragie API credentials: `secret://deployments/ragie/...`
+- Source Access signing/HMAC material:
+  `secret://deployments/source-access/...`
+- console-to-web base URL: `config://deployments/console/web_base_url/...`
+- provider tokens for Cloudflare, Vercel, container runtime, DNS, and OpenTofu:
+  `secret://deployments/<provider>/...`
+
+Keep each requirement step-specific. Provider publish tokens belong to
+`publish`, provisioning credentials belong to `provision`, preview cleanup
+credentials belong to `preview_cleanup`, and smoke-only credentials belong to
+`smoke`.
 
 ## End-To-End Example
 

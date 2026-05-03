@@ -35,6 +35,14 @@ function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
   };
 }
 
+const vercelProviderSecretRequirement = {
+  name: "vercel_api_token",
+  step: "publish",
+  contract_id: "secret://deployments/vercel/api_token/staging",
+  required: "true",
+  source: "secret_runtime",
+};
+
 test("deriveVercelProviderTarget creates canonical identity and URL", () => {
   assert.deepEqual(
     deriveVercelProviderTarget({
@@ -64,5 +72,29 @@ test("extractVercelDeployments reads provider target and publisher config", () =
   assert.equal(
     deployments[0]?.providerTarget.providerTargetIdentity,
     "vercel:web-platform/console-staging#staging",
+  );
+});
+
+test("extractVercelDeployments enforces declared external requirement profiles", () => {
+  const { deployments, errors } = extractVercelDeployments([
+    ssrComponent("//projects/apps/console:app"),
+    ...vercelPolicyNodes(),
+    deploymentNode({
+      external_requirement_profiles: ["vercel_provider"],
+      secret_requirements: [vercelProviderSecretRequirement],
+    }),
+  ]);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(deployments[0]?.externalRequirementProfiles, ["vercel_provider"]);
+
+  const rejected = extractVercelDeployments([
+    ssrComponent("//projects/apps/console:app"),
+    ...vercelPolicyNodes(),
+    deploymentNode({ external_requirement_profiles: ["vercel_provider"] }),
+  ]).errors;
+  assert.ok(
+    rejected.some((entry) =>
+      entry.includes("vercel_provider missing secret_requirements vercel_api_token"),
+    ),
   );
 });

@@ -19,6 +19,8 @@ import { pushS3StaticComponentKindErrors } from "./s3-static-capability-validati
 import { prepareS3StaticPublisherConfig } from "./s3-static-config.ts";
 import { pushVercelComponentKindErrors } from "./vercel-capability-validation.ts";
 import { prepareVercelPublisherConfig } from "./vercel-config.ts";
+import { appTargetBoundaryErrors } from "./deployment-boundary-checks.ts";
+import { ambientProviderEnvBypassErrors } from "./external-deployment-requirements.ts";
 
 function componentsForValidation(deployment: DeploymentTarget): DeploymentComponent[] {
   return deployment.components.length > 0
@@ -189,6 +191,15 @@ export async function validateRepoFrontDoorDeployment(
   if (!nodeMap.has(deployment.label)) {
     errors.push(`deployment target not found: ${deployment.label}`);
   }
+  errors.push(...appTargetBoundaryErrors(Array.from(nodeMap.values())));
+  errors.push(
+    ...ambientProviderEnvBypassErrors({
+      label: deployment.label,
+      env: process.env,
+      secretRequirements: deployment.secretRequirements,
+      profiles: deployment.externalRequirementProfiles || [],
+    }),
+  );
   pushComponentValidationErrors({ deployment, nodeMap, errors });
   if (errors.length > 0) {
     throw new Error(Array.from(new Set(errors)).join("\n"));

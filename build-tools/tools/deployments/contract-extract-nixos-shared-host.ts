@@ -26,7 +26,9 @@ import {
 import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata.ts";
 import { readBootstrapPolicy } from "./deployment-bootstrap-policy.ts";
 import {
+  readExternalRequirementProfiles,
   resolveDeploymentMetadataRefs,
+  validateExternalDeploymentRequirementProfiles,
   validateExplicitDeploymentRequirements,
 } from "./deployment-extract-metadata.ts";
 import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
@@ -86,6 +88,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
       node,
       "runtime_config_requirements",
     );
+    const externalRequirementProfiles = readExternalRequirementProfiles(node);
     const releaseActionRefs = readLabelList(node, "release_actions");
     const targetExceptionRefs = readLabelList(node, "target_exceptions");
     const deploymentErrors: string[] = [];
@@ -122,6 +125,13 @@ export function extractNixosSharedHostDeploymentsFromContext(
       label,
       fieldPath: "runtime_config_requirements",
       requirements: runtimeConfigRequirements,
+      errors: deploymentErrors,
+    });
+    validateExternalDeploymentRequirementProfiles({
+      node,
+      label,
+      secretRequirements,
+      runtimeConfigRequirements,
       errors: deploymentErrors,
     });
     const resolvedComponents = resolveNixosSharedHostComponents({
@@ -209,6 +219,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
       prerequisites,
       secretRequirements,
       runtimeConfigRequirements,
+      externalRequirementProfiles,
       releaseActions,
       targetExceptions,
       ...(smoke ? { smoke } : {}),

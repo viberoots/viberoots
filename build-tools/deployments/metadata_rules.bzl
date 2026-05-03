@@ -37,6 +37,7 @@ def _deployment_document(ctx):
         "prerequisites": ctx.attrs.prerequisites,
         "secret_requirements": ctx.attrs.secret_requirements,
         "runtime_config_requirements": ctx.attrs.runtime_config_requirements,
+        "external_requirement_profiles": ctx.attrs.external_requirement_profiles,
         "release_actions": _label_list(ctx.attrs.release_actions),
         "target_exceptions": _label_list(ctx.attrs.target_exceptions),
     }
@@ -75,6 +76,7 @@ deployment_target = rule(
         "prerequisites": attrs.list(attrs.dict(key = attrs.string(), value = attrs.string()), default = []),
         "secret_requirements": attrs.list(attrs.dict(key = attrs.string(), value = attrs.string()), default = []),
         "runtime_config_requirements": attrs.list(attrs.dict(key = attrs.string(), value = attrs.string()), default = []),
+        "external_requirement_profiles": attrs.list(attrs.string(), default = []),
         "release_actions": attrs.list(attrs.dep(), default = []),
         "target_exceptions": attrs.list(attrs.dep(), default = []),
         "labels": attrs.list(attrs.string(), default = []),
@@ -125,6 +127,10 @@ deployment_admission_policy = rule(
         "allowed_refs": attrs.list(attrs.string()),
         "required_checks": attrs.list(attrs.string(), default = []),
         "required_approvals": attrs.list(attrs.string(), default = []),
+        "readiness_gates": attrs.list(
+            attrs.dict(key = attrs.string(), value = attrs.string()),
+            default = [],
+        ),
         "retry_branch_policy": attrs.string(default = "branch_independent"),
         "retry_approval_reuse": attrs.string(default = "fresh_only"),
         "artifact_attestation_mode": attrs.string(default = "recorded_exact_artifact"),

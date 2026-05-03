@@ -3,18 +3,12 @@ import { normalizeTargetLabel } from "../lib/labels.ts";
 import type { GraphNode } from "../lib/graph.ts";
 import { readString, readStringArray, readStringRecord } from "./deployment-graph-readers.ts";
 import type { DeploymentLaneGovernance } from "./deployment-lane-governance.ts";
-import {
-  readAttestationPolicy,
-  readSbomPolicy,
-  readSupplyChainGatePolicies,
-  type DeploymentAttestationPolicy,
-  type DeploymentSbomPolicy,
-  type DeploymentSupplyChainGatePolicy,
+import type {
+  DeploymentAttestationPolicy,
+  DeploymentSbomPolicy,
+  DeploymentSupplyChainGatePolicy,
 } from "./deployment-admission-supply-chain.ts";
-import {
-  admissionPolicyExtensionFingerprintPart,
-  validateAdmissionPolicyExtensions,
-} from "./deployment-policy-admission-extensions.ts";
+import type { DeploymentReadinessGatePolicy } from "./deployment-readiness-gates.ts";
 import {
   lanePromotionCompatibilityFingerprintPart,
   readLanePromotionCompatibility,
@@ -22,6 +16,7 @@ import {
 } from "./deployment-lane-promotion-compatibility.ts";
 import { extractDeploymentDefaults } from "./deployment-defaults.ts";
 import { fingerprintPolicy } from "./deployment-policy-fingerprint.ts";
+export { extractDeploymentAdmissionPolicies } from "./deployment-admission-policy.ts";
 
 export const DEPLOYMENT_LANE_POLICY_RULE = "deployment_lane_policy";
 export const DEPLOYMENT_ADMISSION_POLICY_RULE = "deployment_admission_policy";
@@ -51,6 +46,7 @@ export type DeploymentAdmissionPolicy = {
   allowedRefs: string[];
   requiredChecks: string[];
   requiredApprovals: string[];
+  readinessGates?: DeploymentReadinessGatePolicy[];
   retryBranchPolicy: RetryBranchPolicy;
   retryApprovalReuse: RetryApprovalReuse;
   artifactAttestationMode: ArtifactAttestationMode;
@@ -165,77 +161,6 @@ export function extractDeploymentLanePoliciesWithGovernance(
       ...(defaultClientProfile ? { defaultClientProfile } : {}),
       governanceRef,
       governance: governance!,
-      fingerprint,
-    });
-  }
-  return { policies, errors };
-}
-
-export function extractDeploymentAdmissionPolicies(nodes: GraphNode[]): {
-  policies: Map<string, DeploymentAdmissionPolicy>;
-  errors: string[];
-} {
-  const policies = new Map<string, DeploymentAdmissionPolicy>();
-  const errors: string[] = [];
-  for (const node of nodes) {
-    if (readString(node, "rule_type") !== DEPLOYMENT_ADMISSION_POLICY_RULE) continue;
-    const ref = normalizeTargetLabel(String(node.name || ""));
-    const name = ref.split(":")[1] || "";
-    const allowedRefs = readStringArray(node, "allowed_refs");
-    const requiredChecks = readStringArray(node, "required_checks");
-    const requiredApprovals = readStringArray(node, "required_approvals");
-    const retryBranchPolicy = (readString(node, "retry_branch_policy") ||
-      "branch_independent") as RetryBranchPolicy;
-    const retryApprovalReuse = (readString(node, "retry_approval_reuse") ||
-      "fresh_only") as RetryApprovalReuse;
-    const artifactAttestationMode = (readString(node, "artifact_attestation_mode") ||
-      "recorded_exact_artifact") as ArtifactAttestationMode;
-    const attestation = readAttestationPolicy(node);
-    const sbom = readSbomPolicy(node);
-    const supplyChainGates = readSupplyChainGatePolicies(node);
-    if (!ref) {
-      errors.push("deployment admission policy missing canonical label");
-      continue;
-    }
-    if (!name) errors.push(policyError(ref, "admission policy must set name"));
-    if (allowedRefs.length === 0) {
-      errors.push(policyError(ref, "admission policy must define allowed_refs"));
-    }
-    if (retryBranchPolicy !== "branch_independent" && retryBranchPolicy !== "branch_coupled") {
-      errors.push(policyError(ref, `unsupported retry_branch_policy "${retryBranchPolicy}"`));
-    }
-    if (retryApprovalReuse !== "fresh_only" && retryApprovalReuse !== "same_lineage") {
-      errors.push(policyError(ref, `unsupported retry_approval_reuse "${retryApprovalReuse}"`));
-    }
-    if (artifactAttestationMode !== "recorded_exact_artifact") {
-      errors.push(
-        policyError(ref, `unsupported artifact_attestation_mode "${artifactAttestationMode}"`),
-      );
-    }
-    errors.push(...validateAdmissionPolicyExtensions({ ref, attestation, supplyChainGates }));
-    if (errors.some((entry) => entry.startsWith(`${ref}:`))) continue;
-    const fingerprint = fingerprintPolicy({
-      name,
-      allowedRefs,
-      requiredChecks,
-      requiredApprovals,
-      retryBranchPolicy,
-      retryApprovalReuse,
-      artifactAttestationMode,
-      ...admissionPolicyExtensionFingerprintPart({ attestation, sbom, supplyChainGates }),
-    });
-    policies.set(ref, {
-      ref,
-      name,
-      allowedRefs,
-      requiredChecks,
-      requiredApprovals,
-      retryBranchPolicy,
-      retryApprovalReuse,
-      artifactAttestationMode,
-      ...(attestation ? { attestation } : {}),
-      ...(sbom ? { sbom } : {}),
-      supplyChainGates,
       fingerprint,
     });
   }

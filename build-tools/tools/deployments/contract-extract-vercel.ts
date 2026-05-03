@@ -23,7 +23,9 @@ import {
 } from "./contract-extract-shared.ts";
 import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
 import {
+  readExternalRequirementProfiles,
   resolveDeploymentMetadataRefs,
+  validateExternalDeploymentRequirementProfiles,
   validateExplicitDeploymentRequirements,
 } from "./deployment-extract-metadata.ts";
 import { readDeploymentRequirements } from "./deployment-requirements.ts";
@@ -60,6 +62,7 @@ export function extractVercelDeploymentsFromContext(
       node,
       "runtime_config_requirements",
     );
+    const externalRequirementProfiles = readExternalRequirementProfiles(node);
     const releaseActionRefs = readLabelList(node, "release_actions");
     const targetExceptionRefs = readLabelList(node, "target_exceptions");
     const preview = readPreviewPolicy(node, "preview");
@@ -132,6 +135,13 @@ export function extractVercelDeploymentsFromContext(
       requirements: runtimeConfigRequirements,
       errors: deploymentErrors,
     });
+    validateExternalDeploymentRequirementProfiles({
+      node,
+      label,
+      secretRequirements,
+      runtimeConfigRequirements,
+      errors: deploymentErrors,
+    });
     pushSmokePolicyErrors({
       label,
       protectionClass,
@@ -186,6 +196,7 @@ export function extractVercelDeploymentsFromContext(
       prerequisites: readPrerequisites(node, "prerequisites"),
       secretRequirements,
       runtimeConfigRequirements,
+      externalRequirementProfiles,
       releaseActions,
       targetExceptions,
       ...(smoke ? { smoke } : {}),

@@ -37,8 +37,11 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
         '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
         '    environment_stage = "dev",',
         '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",',
-        "    secret_requirements = [],",
+        "    secret_requirements = [",
+        '        {"name": "source_access_hmac_key", "step": "publish", "contract_id": "secret://deployments/source-access/hmac_key/dev", "required": "true", "source": "secret_runtime"},',
+        "    ],",
         "    runtime_config_requirements = [],",
+        '    external_requirement_profiles = ["source_access"],',
         '    app_name = "demoapp",',
         "    container_port = 3000,",
         ")",
@@ -70,10 +73,64 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
     assert.equal(deployments[0]?.runtime.appName, "demoapp");
     assert.equal(deployments[0]?.runtime.containerPort, 3000);
     assert.deepEqual(deployments[0]?.prerequisites, []);
+    assert.deepEqual(deployments[0]?.externalRequirementProfiles, ["source_access"]);
     assert.equal(deployments[0]?.providerTarget.hostname, "demoapp.apps.kilty.io");
     assert.equal(
       deployments[0]?.providerTarget.sharedDevTargetIdentity,
       "nixos-shared-host:default:demoapp",
+    );
+  });
+});
+
+test("nixos-shared-host cquery extraction rejects incomplete external requirement profiles", async () => {
+  await runInTemp("deployment-cquery-profile-rejection", async (tmp, _$) => {
+    const appTargetsPath = path.join(tmp, "projects", "apps", "demoapp", "TARGETS");
+    const deployTargetsPath = path.join(tmp, "projects", "deployments", "demoapp-dev", "TARGETS");
+    const sharedTargetsPath = path.join(
+      tmp,
+      "projects",
+      "deployments",
+      "pleomino-shared",
+      "TARGETS",
+    );
+    await writeStaticWebappTarget(appTargetsPath, "app");
+    await writeSharedLaneTargets(sharedTargetsPath);
+    await ensureParentDir(deployTargetsPath);
+    await fsp.writeFile(
+      deployTargetsPath,
+      [
+        'load("//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
+        "",
+        "nixos_shared_host_static_webapp_deployment(",
+        '    name = "deploy",',
+        '    component = "//projects/apps/demoapp:app",',
+        '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
+        '    environment_stage = "dev",',
+        '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",',
+        "    secret_requirements = [],",
+        "    runtime_config_requirements = [],",
+        '    external_requirement_profiles = ["source_access"],',
+        '    app_name = "demoapp",',
+        "    container_port = 3000,",
+        ")",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const nodes = await runDeploymentCquery(tmp, _$, "deployment-cquery-profile-rejection", [
+      "//projects/deployments/demoapp-dev:deploy",
+      "//projects/apps/demoapp:app",
+      "//projects/deployments/pleomino-shared:lane",
+      "//projects/deployments/pleomino-shared:defaults",
+      "//projects/deployments/pleomino-shared:lane_governance",
+      "//projects/deployments/pleomino-shared:dev_release",
+    ]);
+    const { errors } = extractNixosSharedHostDeployments(nodes);
+    assert.ok(
+      errors.some((entry) =>
+        entry.includes("source_access missing secret_requirements source_access_hmac_key"),
+      ),
     );
   });
 });

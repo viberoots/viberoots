@@ -1,9 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import type { GraphNode } from "../lib/graph.ts";
+import { readStringArray } from "./deployment-graph-readers.ts";
 import {
   type DeploymentRequirement,
   validateDeploymentRequirements,
 } from "./deployment-requirements.ts";
+import {
+  isExternalRequirementProfile,
+  validateExternalRequirementProfiles,
+  type ExternalDeploymentRequirementProfile,
+} from "./external-deployment-requirements.ts";
 
 function deploymentExtractionError(label: string, message: string): string {
   return `${label}: ${message}`;
@@ -20,6 +26,43 @@ export function validateExplicitDeploymentRequirements(opts: {
     opts.errors.push(deploymentExtractionError(opts.label, `missing required ${opts.fieldPath}`));
   }
   validateDeploymentRequirements(opts);
+}
+
+export function readExternalRequirementProfiles(
+  node: GraphNode,
+): ExternalDeploymentRequirementProfile[] {
+  return readStringArray(node, "external_requirement_profiles").filter(
+    isExternalRequirementProfile,
+  );
+}
+
+export function validateExternalDeploymentRequirementProfiles(opts: {
+  node: GraphNode;
+  label: string;
+  secretRequirements: DeploymentRequirement[];
+  runtimeConfigRequirements: DeploymentRequirement[];
+  errors: string[];
+}) {
+  const rawProfiles = readStringArray(opts.node, "external_requirement_profiles");
+  const profiles = rawProfiles.filter(isExternalRequirementProfile);
+  for (const profile of rawProfiles) {
+    if (!isExternalRequirementProfile(profile)) {
+      opts.errors.push(
+        deploymentExtractionError(
+          opts.label,
+          `unsupported external_requirement_profiles entry "${profile}"`,
+        ),
+      );
+    }
+  }
+  opts.errors.push(
+    ...validateExternalRequirementProfiles({
+      label: opts.label,
+      profiles,
+      secretRequirements: opts.secretRequirements,
+      runtimeConfigRequirements: opts.runtimeConfigRequirements,
+    }),
+  );
 }
 
 export function resolveDeploymentMetadataRefs<T>(opts: {

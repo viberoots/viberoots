@@ -29,6 +29,7 @@ import {
   evaluateSbomPolicy,
   evaluateSupplyChainGatePolicies,
 } from "./deployment-admission-supply-chain-evaluator.ts";
+import { evaluateReadinessGatePolicies } from "./deployment-readiness-gates.ts";
 
 export async function evaluateDeploymentAdmission(opts: {
   workspaceRoot: string;
@@ -79,6 +80,12 @@ export async function evaluateDeploymentAdmission(opts: {
     sourceRecord: opts.sourceRecord,
     evidence: opts.evidence?.supplyChainGates,
   });
+  const readinessGates = evaluateReadinessGatePolicies({
+    deployment: opts.deployment,
+    operationKind: opts.operationKind,
+    binding,
+    evidence: opts.evidence?.readinessGates,
+  });
   return {
     evaluatedAt: new Date().toISOString(),
     requestedBy,
@@ -115,5 +122,6 @@ export async function evaluateDeploymentAdmission(opts: {
     ...(attestation ? { attestation } : {}),
     ...(sbom ? { sbom } : {}),
     supplyChainGates,
+    readinessGates,
   };
 }

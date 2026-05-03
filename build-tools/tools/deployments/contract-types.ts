@@ -4,6 +4,7 @@ import type { DeploymentComponentKind } from "./deployment-component-kinds.ts";
 import type { DeploymentRolloutPolicy } from "./deployment-rollout.ts";
 import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
 import type { DeploymentRequirement } from "./deployment-requirements.ts";
+import type { ExternalDeploymentRequirementProfile } from "./external-deployment-requirements.ts";
 import type { DeploymentSmokePolicy } from "./deployment-smoke-policy.ts";
 import type { DeploymentTargetException } from "./deployment-target-exceptions.ts";
 import type { DeploymentVaultRuntimeConfig } from "./deployment-vault-runtime-types.ts";
@@ -103,6 +104,7 @@ export type DeploymentBase = {
   prerequisites: DeploymentPrerequisite[];
   secretRequirements: DeploymentRequirement[];
   runtimeConfigRequirements: DeploymentRequirement[];
+  externalRequirementProfiles?: ExternalDeploymentRequirementProfile[];
   releaseActions: DeploymentReleaseAction[];
   targetExceptions: DeploymentTargetException[];
   smoke?: DeploymentSmokePolicy;

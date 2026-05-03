@@ -993,6 +993,43 @@ Copyable example:
 "targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"]
 ```
 
+### External Deployment Secret And Readiness Contracts
+
+External deployments must declare provider and product dependencies through
+reviewed deployment metadata rather than ambient local CLI state, `.env` files,
+or CI variables that bypass the secret runtime.
+
+Reviewed external secret and runtime-config profile families include:
+
+- WorkOS/AuthKit public config and client secrets
+- Supabase public URL and privileged service credentials
+- Ragie API credentials
+- Source Access signing/HMAC material
+- console-to-web base URL
+- Cloudflare, Vercel, container runtime, DNS, and OpenTofu provider credentials
+
+Deployment targets declare the applicable families with
+`external_requirement_profiles`. The extraction/admission path rejects unknown
+profiles, missing declarations, duplicate requirement names, wrong lifecycle
+steps, wrong `secret://deployments/...` or `config://deployments/...` contract
+scope, and attempts to satisfy provider credentials from ambient provider
+environment variables.
+
+Secret contract IDs use `secret://deployments/...` and public runtime config
+uses `config://deployments/...`. Provider publish tokens belong to `publish`,
+provisioning credentials belong to `provision`, preview cleanup credentials
+belong to `preview_cleanup`, and smoke-only credentials belong to `smoke`.
+Duplicate declarations for the same requirement name are rejected because they
+make admission and replay ambiguous.
+
+Admission policies may also require redacted readiness-gate evidence for live
+checks that are not suitable for every local PR run. Supported gate types are
+Ragie ACL semantics, tenant leak checks, WorkOS MCP auth, storage grant
+lifecycle, and Connect metadata/OAuth checks. Evidence is valid only when it is
+bound to the deployment id, provider target identity, source revision or source
+run id, and an external evidence reference. Raw provider responses, tokens,
+forensic fields, or diagnostic payloads are not accepted as admission evidence.
+
 ### Secret Runtime Rules
 
 The runtime contract is intentionally narrow:

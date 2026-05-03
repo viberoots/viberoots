@@ -50,6 +50,7 @@ cloudflare_pages_static_webapp_deployment(
         },
     ],
     runtime_config_requirements = [],
+    external_requirement_profiles = ["cloudflare_provider"],
     prerequisites = [
         {
             "deployment_id": "pleomino-staging",

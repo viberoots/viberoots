@@ -12,26 +12,27 @@ Authoritative source: the canonical deployment rule in `projects/deployments/<de
 
 Minimum fields:
 
-| Field                         | Required                                         | Notes                                                                                                                                                               |
-| ----------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`                        | yes                                              | Canonical target name, normally `deploy`.                                                                                                                           |
-| `provider`                    | yes                                              | Provider family identifier.                                                                                                                                         |
-| `provider_target`             | yes                                              | Structured provider-target identity object.                                                                                                                         |
-| `components`                  | yes                                              | Non-empty list of deployable component descriptors.                                                                                                                 |
-| `publisher`                   | yes                                              | Structured publish contract.                                                                                                                                        |
-| `protection_class`            | yes                                              | `local_only`, `shared_nonprod`, or `production_facing`.                                                                                                             |
-| `secret_requirements`         | yes                                              | `{}` allowed and reviewable.                                                                                                                                        |
-| `runtime_config_requirements` | yes                                              | `{}` allowed; declares non-secret runtime config inputs.                                                                                                            |
-| `provisioner`                 | no                                               | Present only when provisioning is deployment-owned.                                                                                                                 |
-| `release_actions`             | no                                               | Present only when release-time actions are needed.                                                                                                                  |
-| `smoke`                       | yes for protected/shared                         | Optional for `local_only`.                                                                                                                                          |
-| `preview`                     | no                                               | Explicit opt-in only.                                                                                                                                               |
-| `prerequisites`               | no                                               | Explicit direct-edge deployment prerequisites.                                                                                                                      |
-| `vault_runtime`               | no                                               | Stable Vault/IdP runtime metadata for deployment-derived JWT auth. Secret values must not be stored here.                                                           |
-| `lane_policy`                 | yes for `shared_nonprod` and `production_facing` | Must resolve to authoritative policy object.                                                                                                                        |
-| `environment_stage`           | yes for `shared_nonprod` and `production_facing` | Must be defined by the lane policy.                                                                                                                                 |
-| `admission_policy`            | yes for `shared_nonprod` and `production_facing` | Repo-owned policy reference.                                                                                                                                        |
-| `rollout_policy`              | no                                               | Required when behavior differs from provider default, and also required for protected/shared multi-component deployments even when they match the provider default. |
+| Field                           | Required                                         | Notes                                                                                                                                                               |
+| ------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                          | yes                                              | Canonical target name, normally `deploy`.                                                                                                                           |
+| `provider`                      | yes                                              | Provider family identifier.                                                                                                                                         |
+| `provider_target`               | yes                                              | Structured provider-target identity object.                                                                                                                         |
+| `components`                    | yes                                              | Non-empty list of deployable component descriptors.                                                                                                                 |
+| `publisher`                     | yes                                              | Structured publish contract.                                                                                                                                        |
+| `protection_class`              | yes                                              | `local_only`, `shared_nonprod`, or `production_facing`.                                                                                                             |
+| `secret_requirements`           | yes                                              | `{}` allowed and reviewable.                                                                                                                                        |
+| `runtime_config_requirements`   | yes                                              | `{}` allowed; declares non-secret runtime config inputs.                                                                                                            |
+| `external_requirement_profiles` | no                                               | Names reviewed external provider or product requirement families whose typed secret/runtime-config declarations must be present and correctly scoped.               |
+| `provisioner`                   | no                                               | Present only when provisioning is deployment-owned.                                                                                                                 |
+| `release_actions`               | no                                               | Present only when release-time actions are needed.                                                                                                                  |
+| `smoke`                         | yes for protected/shared                         | Optional for `local_only`.                                                                                                                                          |
+| `preview`                       | no                                               | Explicit opt-in only.                                                                                                                                               |
+| `prerequisites`                 | no                                               | Explicit direct-edge deployment prerequisites.                                                                                                                      |
+| `vault_runtime`                 | no                                               | Stable Vault/IdP runtime metadata for deployment-derived JWT auth. Secret values must not be stored here.                                                           |
+| `lane_policy`                   | yes for `shared_nonprod` and `production_facing` | Must resolve to authoritative policy object.                                                                                                                        |
+| `environment_stage`             | yes for `shared_nonprod` and `production_facing` | Must be defined by the lane policy.                                                                                                                                 |
+| `admission_policy`              | yes for `shared_nonprod` and `production_facing` | Repo-owned policy reference.                                                                                                                                        |
+| `rollout_policy`                | no                                               | Required when behavior differs from provider default, and also required for protected/shared multi-component deployments even when they match the provider default. |
 
 Single-provider invariant:
 
@@ -115,6 +116,20 @@ Optional keys:
 
 `vault_runtime` may contain public routing and identity metadata, but must never contain client
 secrets, Vault tokens, root tokens, or secret material.
+
+External deployments should express product and provider dependencies through
+`secret_requirements` and `runtime_config_requirements`, not `.env` files, CI
+variables, or provider-local project settings. The reviewed profile families are
+WorkOS/AuthKit, Supabase, Ragie, Source Access HMAC material, console-to-web
+base URL, Cloudflare, Vercel, container runtime, DNS, and OpenTofu provider
+credentials.
+Deployment metadata declares the applicable set with
+`external_requirement_profiles`; extractors reject unsupported profile names,
+missing requirements, duplicate requirement names, wrong lifecycle steps, wrong
+contract scopes, or wrong requirement sources.
+Secrets use `secret://deployments/...` contract IDs and are resolved only by the
+secret runtime for the declared lifecycle step; public runtime config uses
+`config://deployments/...` contract IDs.
 
 For the reviewed `mini` shared deploy host shape, existing Vault-backed deployments should use:
 
@@ -530,13 +545,14 @@ Minimum gate-evidence record for each evaluated phase gate:
 
 Minimum fields:
 
-| Field                               | Required                | Notes                                               |
-| ----------------------------------- | ----------------------- | --------------------------------------------------- |
-| `name` or stable id                 | yes                     | Versioned policy identity.                          |
-| `allowed_refs` or equivalent        | yes                     | Allowed branches/refs.                              |
-| `required_checks`                   | yes                     | Required CI or validation checks.                   |
-| `required_approvals`                | yes                     | Human/policy approval requirements, possibly empty. |
-| `artifact_attestation_requirements` | yes for publishing runs | Build trust requirements.                           |
+| Field                               | Required                | Notes                                                      |
+| ----------------------------------- | ----------------------- | ---------------------------------------------------------- |
+| `name` or stable id                 | yes                     | Versioned policy identity.                                 |
+| `allowed_refs` or equivalent        | yes                     | Allowed branches/refs.                                     |
+| `required_checks`                   | yes                     | Required CI or validation checks.                          |
+| `required_approvals`                | yes                     | Human/policy approval requirements, possibly empty.        |
+| `readiness_gates`                   | no                      | Live or staging-only evidence gates required by admission. |
+| `artifact_attestation_requirements` | yes for publishing runs | Build trust requirements.                                  |
 
 Optional fields:
 
@@ -547,6 +563,13 @@ Optional fields:
 - whether fresh approval is required for rollback by protection class
 - approval payload-binding requirements when human or policy approval is required
 - authorization scope requirements or policy reference when the deployment uses scoped submit/approve/operate permissions
+
+`readiness_gates` are for deploy-blocking checks that cannot always run in a
+local PR, such as Ragie ACL semantics, live tenant leak checks, WorkOS MCP auth,
+storage grant lifecycle, and Connect metadata/OAuth checks. Evidence must be
+redacted and bound to deployment id, provider target identity, source revision
+or source run id, and an external evidence reference. Raw provider responses,
+tokens, or diagnostic payloads are not admission evidence.
 
 Minimum `artifact_attestation_requirements` contract:
 

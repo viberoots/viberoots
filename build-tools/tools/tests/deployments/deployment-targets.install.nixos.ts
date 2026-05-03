@@ -113,6 +113,14 @@ export async function installNixosSharedHostTargets(
           "    runtime_config_requirements =",
           ...renderStringRecordList(renderRequirementList(deployment.runtimeConfigRequirements)),
         ],
+        ...(deployment.externalRequirementProfiles &&
+        deployment.externalRequirementProfiles.length > 0
+          ? [
+              `    external_requirement_profiles = ${renderStringList(
+                deployment.externalRequirementProfiles,
+              )},`,
+            ]
+          : []),
         ...(deployment.releaseActions.length > 0
           ? [
               `    release_actions = ${renderStringList(deployment.releaseActions.map((action) => action.ref))},`,

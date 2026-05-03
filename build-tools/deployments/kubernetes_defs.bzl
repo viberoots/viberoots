@@ -23,6 +23,7 @@ def kubernetes_service_deployment(
         prerequisites = [],
         secret_requirements = [],
         runtime_config_requirements = [],
+        external_requirement_profiles = [],
         vault_runtime = {},
         labels = [],
         visibility = ["PUBLIC"]):
@@ -64,6 +65,7 @@ def kubernetes_service_deployment(
         prerequisites = prerequisites,
         secret_requirements = secret_requirements,
         runtime_config_requirements = runtime_config_requirements,
+        external_requirement_profiles = external_requirement_profiles,
         vault_runtime = vault_runtime,
         labels = labels + [
             "kind:deployment",
