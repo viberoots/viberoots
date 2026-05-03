@@ -14,6 +14,9 @@ type KubernetesRenderedConfig = {
   release: string;
   smoke_url: string;
   smoke_expect_contains?: string;
+  service_kind?: string;
+  ingress_mode?: string;
+  health_path?: string;
   component_artifacts: Record<string, { path: string; identity: string }>;
 };
 
@@ -43,6 +46,17 @@ function requireDriftMatch(
   expected: string,
 ): void {
   if (configured && configured !== expected) {
+    throw new Error(`${sourcePath}: ${field} ${configured} does not match deployment ${expected}`);
+  }
+}
+
+function requireOptionalDriftMatch(
+  sourcePath: string,
+  field: string,
+  configured: string,
+  expected: string,
+): void {
+  if (configured && expected && configured !== expected) {
     throw new Error(`${sourcePath}: ${field} ${configured} does not match deployment ${expected}`);
   }
 }
@@ -100,6 +114,21 @@ export async function prepareKubernetesPublisherConfig(opts: {
     readString(parsed.smoke_url) ||
     `https://${opts.deployment.providerTarget.release}.${opts.deployment.providerTarget.namespace}.${opts.deployment.providerTarget.cluster}/healthz`;
   const smokeExpectContains = readString(parsed.smoke_expect_contains);
+  const serviceKind = readString(parsed.service_kind);
+  const ingressMode = readString(parsed.ingress_mode);
+  const healthPath = readString(parsed.health_path);
+  requireOptionalDriftMatch(
+    sourcePath,
+    "service_kind",
+    serviceKind,
+    opts.deployment.providerTarget.serviceKind || "",
+  );
+  requireOptionalDriftMatch(
+    sourcePath,
+    "ingress_mode",
+    ingressMode,
+    opts.deployment.providerTarget.ingressMode || "",
+  );
   const rendered: KubernetesRenderedConfig = {
     chart,
     cluster: opts.deployment.providerTarget.cluster,
@@ -107,6 +136,15 @@ export async function prepareKubernetesPublisherConfig(opts: {
     release: opts.deployment.providerTarget.release,
     smoke_url: smokeUrl,
     ...(smokeExpectContains ? { smoke_expect_contains: smokeExpectContains } : {}),
+    ...(serviceKind || opts.deployment.providerTarget.serviceKind
+      ? { service_kind: serviceKind || opts.deployment.providerTarget.serviceKind }
+      : {}),
+    ...(ingressMode || opts.deployment.providerTarget.ingressMode
+      ? { ingress_mode: ingressMode || opts.deployment.providerTarget.ingressMode }
+      : {}),
+    ...(healthPath || opts.deployment.providerTarget.healthPath
+      ? { health_path: healthPath || opts.deployment.providerTarget.healthPath }
+      : {}),
     component_artifacts: opts.componentArtifacts,
   };
   const outputPath = path.resolve(opts.outputPath);

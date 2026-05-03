@@ -9,7 +9,6 @@ import { deriveKubernetesProviderTarget } from "./deployment-provider-targets.ts
 import { readPrimaryDeploymentComponent } from "./contract-extract-components.ts";
 import {
   deploymentError,
-  duplicateValueEntries,
   pushTokenFieldErrors,
   readLabel,
   readLabelList,
@@ -25,13 +24,14 @@ import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts"
 import { resolveDeploymentMetadataRefs } from "./deployment-extract-metadata.ts";
 import { pushKubernetesComponentKindErrors } from "./kubernetes-capability-validation.ts";
 import { pushKubernetesRolloutErrors } from "./kubernetes-rollout-validation.ts";
+import { pushKubernetesServicePostureErrors } from "./kubernetes-service-posture.ts";
 import { readDeploymentRequirements } from "./deployment-requirements.ts";
 import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
 import {
   readOpenTofuProvisionerMetadata,
   REVIEWED_STACK_PROVISIONERS,
 } from "./opentofu-stack-extract.ts";
-
+import { pushDuplicateProviderTargetIdentityErrors } from "./provider-target-identity-errors.ts";
 const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/;
 const VALID_PROTECTION_CLASSES = new Set(["local_only", "shared_nonprod", "production_facing"]);
 
@@ -72,6 +72,7 @@ export function extractKubernetesDeploymentsFromContext(
     const namespace = providerTarget.namespace || "";
     const release = providerTarget.release || "";
     const id = providerTarget.id || `${cluster}/${namespace}/${release}`;
+    const expectedId = `${cluster}/${namespace}/${release}`;
     const deploymentErrors: string[] = [];
     if (!primaryComponent?.target) {
       deploymentErrors.push(deploymentError(label, "missing required component target"));
@@ -100,6 +101,14 @@ export function extractKubernetesDeploymentsFromContext(
     }
     if (!id) {
       deploymentErrors.push(deploymentError(label, "provider_target.id is required"));
+    }
+    if (id && id !== expectedId) {
+      deploymentErrors.push(
+        deploymentError(
+          label,
+          `provider_target.id ${id} does not match canonical target ${expectedId}`,
+        ),
+      );
     }
     if (publisher !== "helm-release") {
       deploymentErrors.push(
@@ -148,6 +157,12 @@ export function extractKubernetesDeploymentsFromContext(
         errors: deploymentErrors,
       });
     }
+    pushKubernetesServicePostureErrors({
+      label,
+      componentKind: primaryComponent?.kind || componentKind,
+      providerTarget,
+      errors: deploymentErrors,
+    });
     pushKubernetesRolloutErrors({
       label,
       protectionClass,
@@ -213,23 +228,17 @@ export function extractKubernetesDeploymentsFromContext(
       ...(provisioner
         ? { provisioner: openTofuProvisioner || { type: provisioner, config: provisionerConfig } }
         : {}),
-      providerTarget: deriveKubernetesProviderTarget({ cluster, namespace, release, id }),
+      providerTarget: deriveKubernetesProviderTarget({
+        cluster,
+        namespace,
+        release,
+        id,
+        serviceKind: providerTarget.service_kind,
+        ingressMode: providerTarget.ingress_mode,
+        healthPath: providerTarget.health_path,
+      }),
     });
   }
-  for (const duplicate of duplicateValueEntries(
-    deployments.map((deployment) => ({
-      value: deployment.providerTarget.providerTargetIdentity,
-      label: deployment.label,
-    })),
-  )) {
-    for (const label of duplicate.labels) {
-      context.errors.push(
-        deploymentError(
-          label,
-          `duplicate provider_target identity "${duplicate.value}" collides with ${duplicate.labels.join(", ")}`,
-        ),
-      );
-    }
-  }
+  pushDuplicateProviderTargetIdentityErrors(context.errors, deployments);
   return deployments.sort((a, b) => a.label.localeCompare(b.label));
 }

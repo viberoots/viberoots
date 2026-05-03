@@ -129,3 +129,84 @@ test("extractKubernetesDeployments reads shared-platform provider target and rol
   );
   assert.deepEqual(deployments[0]?.rolloutPolicy?.steps, ["otel-collector", "metrics-agent"]);
 });
+
+test("extractKubernetesDeployments accepts first-class web service posture", () => {
+  const { deployments, errors } = extractKubernetesDeployments([
+    serviceComponent("//projects/apps/api:image"),
+    kubernetesLanePolicyNodeFixture(),
+    nixosSharedHostLaneGovernanceNodeFixture(),
+    kubernetesAdmissionPolicyNodeFixture({ required_checks: ["deploy/pleomino-prod"] }),
+    {
+      name: "//projects/deployments/api-prod:deploy",
+      provider: "kubernetes",
+      component: "//projects/apps/api:image",
+      component_kind: "service",
+      publisher: "helm-release",
+      publisher_config: "helm/values.yaml",
+      protection_class: "production_facing",
+      lane_policy: "//projects/deployments/pleomino-shared:lane",
+      environment_stage: "prod",
+      admission_policy: "//projects/deployments/platform-shared:prod_release",
+      secret_requirements: [],
+      runtime_config_requirements: [],
+      provider_target: {
+        cluster: "prod-us-west",
+        namespace: "web",
+        release: "api",
+        service_kind: "web",
+        ingress_mode: "public",
+        health_path: "/healthz",
+      },
+    },
+  ]);
+  assert.deepEqual(errors, []);
+  assert.equal(deployments[0]?.providerTarget.serviceKind, "web");
+  assert.equal(deployments[0]?.providerTarget.ingressMode, "public");
+  assert.equal(deployments[0]?.providerTarget.healthPath, "/healthz");
+});
+
+test("extractKubernetesDeployments rejects worker public ingress and web without health", () => {
+  const base = {
+    provider: "kubernetes",
+    component: "//projects/apps/api:image",
+    component_kind: "service",
+    publisher: "helm-release",
+    publisher_config: "helm/values.yaml",
+    protection_class: "production_facing",
+    lane_policy: "//projects/deployments/pleomino-shared:lane",
+    environment_stage: "prod",
+    admission_policy: "//projects/deployments/platform-shared:prod_release",
+    secret_requirements: [],
+    runtime_config_requirements: [],
+  };
+  const { errors } = extractKubernetesDeployments([
+    serviceComponent("//projects/apps/api:image"),
+    kubernetesLanePolicyNodeFixture(),
+    nixosSharedHostLaneGovernanceNodeFixture(),
+    kubernetesAdmissionPolicyNodeFixture(),
+    {
+      ...base,
+      name: "//projects/deployments/api-prod:deploy",
+      provider_target: {
+        cluster: "prod-us-west",
+        namespace: "web",
+        release: "api",
+        service_kind: "web",
+        ingress_mode: "public",
+      },
+    },
+    {
+      ...base,
+      name: "//projects/deployments/worker-prod:deploy",
+      provider_target: {
+        cluster: "prod-us-west",
+        namespace: "worker",
+        release: "jobs",
+        service_kind: "worker",
+        ingress_mode: "public",
+      },
+    },
+  ]);
+  assert.match(errors.join("\n"), /web service deployments must declare health_path/);
+  assert.match(errors.join("\n"), /worker service deployments must not declare public ingress/);
+});

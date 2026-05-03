@@ -401,10 +401,48 @@ step instead of editing Keycloak by hand.
 
 - good fit for services and third-party services
 - uses the same `deploy` command, with Kubernetes-specific rollout rules
+- declare single-service apps with `kubernetes_service_deployment(...)`; web services require public
+  ingress plus a health path, while worker services must not declare public ingress
+- checked-in `helm/values.yaml` can carry chart, smoke URL, service kind, ingress mode, and health
+  path; deploy injects admitted service artifacts into the rendered provider config
 - supports `opentofu-stack` provision-only foundation runs when stack files live
   under the deployment package `opentofu/` directory and the plan is
   non-destructive
 - use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
+
+Web service example:
+
+```starlark
+kubernetes_service_deployment(
+    name = "web",
+    component = "//projects/apps/api:image",
+    cluster = "prod-us-west",
+    namespace = "web",
+    release = "api",
+    service_kind = "web",
+    ingress_mode = "public",
+    health_path = "/healthz",
+    lane_policy = "//projects/deployments/shared:lane",
+    environment_stage = "prod",
+    admission_policy = "//projects/deployments/shared:prod_release",
+)
+```
+
+Worker service example:
+
+```starlark
+kubernetes_service_deployment(
+    name = "worker",
+    component = "//projects/apps/jobs:image",
+    cluster = "prod-us-west",
+    namespace = "workers",
+    release = "jobs",
+    service_kind = "worker",
+    lane_policy = "//projects/deployments/shared:lane",
+    environment_stage = "prod",
+    admission_policy = "//projects/deployments/shared:prod_release",
+)
+```
 
 `vercel`
 

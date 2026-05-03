@@ -20,11 +20,7 @@ import { installHarnessClientProfile } from "./nixos-shared-host.remote-exec.ins
 import { installFakeKubernetesHelm } from "./kubernetes.fake-helm.ts";
 import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
 import { startKubernetesPublicServer } from "./kubernetes.public-server.ts";
-
-async function writeArtifact(root: string, body: string) {
-  await fsp.mkdir(root, { recursive: true });
-  await fsp.writeFile(path.join(root, "service.txt"), body, "utf8");
-}
+import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture.ts";
 
 async function writeValues(root: string, deploymentId: string) {
   const configPath = path.join(
@@ -65,7 +61,7 @@ test("public kubernetes deploy requires a control-plane URL for protected/shared
   await runInTemp("kubernetes-public-service-required", async (tmp, $) => {
     const deployment = kubernetesDeploymentFixture();
     const artifactDir = path.join(tmp, "artifact");
-    await writeArtifact(artifactDir, "service-required\n");
+    await writeServiceArtifact(artifactDir, "service-required\n");
     await installKubernetesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
     await writeValues(tmp, deployment.deploymentId);
@@ -94,8 +90,8 @@ test("public kubernetes deploy routes deploy, provision-only, retry, and rollbac
     const artifactA = path.join(tmp, "artifact-a");
     const artifactB = path.join(tmp, "artifact-b");
     const fake = await installFakeKubernetesHelm(tmp);
-    await writeArtifact(artifactA, "api-a\n");
-    await writeArtifact(artifactB, "api-b\n");
+    await writeServiceArtifact(artifactA, "api-a\n");
+    await writeServiceArtifact(artifactB, "api-b\n");
     await installKubernetesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
     await writeValues(tmp, deployment.deploymentId);
@@ -194,11 +190,13 @@ test("public kubernetes deploy routes deploy, provision-only, retry, and rollbac
           assert.equal(retryRecord.parentRunId, first.deployRunId);
           assert.equal(retryRecord.releaseLineageId, first.deployRunId);
           assert.equal(retryRecord.artifactLineageId, firstRecord.artifact?.identity);
+          assert.deepEqual(retryRecord.componentArtifacts, firstRecord.componentArtifacts);
           assert.equal(rollbackRecord.runClassification, runtimeContract.rollbackClassification);
           assert.equal(rollbackRecord.operationKind, runtimeContract.rollbackClassification);
           assert.equal(rollbackRecord.parentRunId, first.deployRunId);
           assert.equal(rollbackRecord.releaseLineageId, first.deployRunId);
           assert.equal(rollbackRecord.artifactLineageId, firstRecord.artifact?.identity);
+          assert.deepEqual(rollbackRecord.componentArtifacts, firstRecord.componentArtifacts);
           if (runtimeContract.protectedSharedRequiresControlPlane) {
             for (const record of [firstRecord, provisionOnlyRecord, retryRecord, rollbackRecord]) {
               assertProtectedSharedControlPlaneRecord(record, lockScope);

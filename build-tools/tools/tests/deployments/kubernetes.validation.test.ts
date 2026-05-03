@@ -7,6 +7,7 @@ import {
   kubernetesAdmissionPolicyNodeFixture,
   kubernetesLanePolicyNodeFixture,
 } from "./kubernetes.fixture.ts";
+import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture.ts";
 
 function serviceComponent(label: string): GraphNode {
   return { name: label, labels: ["kind:app"] };
@@ -38,7 +39,14 @@ function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
 }
 
 function policyNodes(): GraphNode[] {
-  return [kubernetesLanePolicyNodeFixture(), kubernetesAdmissionPolicyNodeFixture()];
+  return [
+    kubernetesLanePolicyNodeFixture(),
+    nixosSharedHostLaneGovernanceNodeFixture(),
+    kubernetesAdmissionPolicyNodeFixture({
+      allowed_refs: ["env/pleomino/staging"],
+      required_checks: ["deploy/pleomino-staging"],
+    }),
+  ];
 }
 
 test("validation rejects unsupported kubernetes publisher and provisioner drift", () => {
@@ -49,6 +57,36 @@ test("validation rejects unsupported kubernetes publisher and provisioner drift"
   ]);
   assert.ok(errors.some((entry) => entry.includes("unsupported kubernetes publisher")));
   assert.ok(errors.some((entry) => entry.includes("unsupported kubernetes provisioner")));
+});
+
+test("validation accepts private worker ingress and rejects target identity drift", () => {
+  const valid = extractKubernetesDeployments([
+    serviceComponent("//projects/apps/api:image"),
+    ...policyNodes(),
+    deploymentNode({
+      provider_target: {
+        cluster: "prod-us-west",
+        namespace: "workers",
+        release: "jobs",
+        service_kind: "worker",
+        ingress_mode: "none",
+      },
+    }),
+  ]);
+  assert.deepEqual(valid.errors, []);
+  const invalid = extractKubernetesDeployments([
+    serviceComponent("//projects/apps/api:image"),
+    ...policyNodes(),
+    deploymentNode({
+      provider_target: {
+        cluster: "prod-us-west",
+        namespace: "workers",
+        release: "jobs",
+        id: "prod-us-west/web/api",
+      },
+    }),
+  ]);
+  assert.ok(invalid.errors.some((entry) => entry.includes("does not match canonical target")));
 });
 
 test("validation rejects unsupported component kinds for kubernetes", () => {

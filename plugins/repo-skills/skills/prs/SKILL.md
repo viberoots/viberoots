@@ -1,6 +1,6 @@
 ---
 name: prs
-description: Work through a numeric range of planned PRs from the shared plan document in sequence. Use when the user invokes `$prs <range> [plan-document]`, such as `$prs 1-10 docs/external-deployments-plan.md` or `$prs 11-15`, and wants each PR implemented by a dedicated subagent using the `pr` skill, committed through the `cc` skill only after self-review, full-suite validation, full-suite timing-regression checks, and a separate scope-review subagent pass, then assessed with `assess-plan` and known `assess-design`, augmented with follow-up PRs when gaps remain, and never pushed unless explicitly requested.
+description: Work through a numeric range of planned PRs from the shared plan document in sequence. Use when the user invokes `$prs <range> [plan-document]`, such as `$prs 1-10 docs/external-deployments-plan.md` or `$prs 11-15`, and wants each PR implemented by a dedicated subagent using the `pr` skill, committed through the `cc` skill only after self-review, full-suite validation, full-suite timing-regression checks, and a separate scope-review subagent pass, then notified via ntfy with PR summary evidence, assessed with `assess-plan` and known `assess-design`, augmented with follow-up PRs when gaps remain, and never pushed unless explicitly requested.
 ---
 
 # PRs

@@ -137,6 +137,10 @@ Perform a self-review against:
 
 Run repository commands inside the repo dev shell. Prefer `direnv exec . bash -lc '...'` unless the current shell is already equivalently loaded.
 
+During validation, wait quietly. Do not send periodic status updates, progress pings, or "still running" messages while the `test` skill is running. Conserve tokens and report only when validation completes, fails, needs action, or produces evidence needed for handoff.
+
+When invoked by `$prs` in pre-full-suite review mode, stop after self-review, gates, and focused validation pass. Report ready-for-review evidence and do not run full-suite validation until `$prs` reports that the separate scope-review subagent passed and explicitly authorizes full-suite validation.
+
 Before full-suite validation, and before any focused validation attempt, run the formatting and methodology gates first:
 
 1. Stage all current changes.
@@ -147,7 +151,7 @@ Before full-suite validation, and before any focused validation attempt, run the
 6. Treat `<new-tests>` as the new tests added for the PR, and pass that selector through to the `test` skill.
 7. When `<new-tests>` are supplied as file paths, especially under `build-tools/tools/tests`, prefer exact Buck labels for generated root tests when available. If you do use file paths, confirm the selector expansion with `v --explain-selection` or the verify log before trusting the run.
 8. If touched work includes `build-tools/tools/dev/verify/**`, validate both label-based and file-path-based `v` invocation for at least one affected target.
-9. After self-review, focused validation, and any resulting investigations all pass, invoke the `test` skill without a selector to run the full-suite validation sequence. The `test` skill owns the actual full-suite command execution, logging, and timing.
+9. After self-review, focused validation, and any resulting investigations all pass, invoke the `test` skill without a selector to run the full-suite validation sequence. The `test` skill owns the actual full-suite command execution, logging, and timing. If `$prs` invoked this run in pre-full-suite review mode, defer this step until `$prs` authorizes it after scope review.
 
 Never run `v` directly as part of this workflow. Use the `test` skill for both focused and full-suite validation.
 

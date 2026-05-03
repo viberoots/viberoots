@@ -4,21 +4,18 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { submitKubernetesDeploy } from "../../deployments/kubernetes-deploy.ts";
+import { prepareKubernetesPublisherConfig } from "../../deployments/kubernetes-config.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
 import { kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
+import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture.ts";
 import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
-
-async function writeArtifact(root: string): Promise<void> {
-  await fsp.mkdir(root, { recursive: true });
-  await fsp.writeFile(path.join(root, "service.txt"), "drift\n", "utf8");
-}
 
 test("kubernetes rejects provider config drift before publish begins", async () => {
   await runInTemp("kubernetes-config-drift", async (tmp, $) => {
     const deployment = kubernetesDeploymentFixture();
     const artifactDir = path.join(tmp, "artifact");
-    await writeArtifact(artifactDir);
+    await writeServiceArtifact(artifactDir, "drift\n");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
@@ -52,5 +49,45 @@ test("kubernetes rejects provider config drift before publish begins", async () 
         }),
       /does not match deployment provider_target\.cluster/,
     );
+  });
+});
+
+test("kubernetes rendered service config records reviewed ingress posture", async () => {
+  await runInTemp("kubernetes-service-config-render", async (tmp) => {
+    const deployment = kubernetesDeploymentFixture({
+      providerTarget: {
+        serviceKind: "web",
+        ingressMode: "public",
+        healthPath: "/healthz",
+      } as any,
+    });
+    const configPath = path.join(
+      tmp,
+      "projects",
+      "deployments",
+      deployment.deploymentId,
+      "helm",
+      "values.yaml",
+    );
+    await fsp.mkdir(path.dirname(configPath), { recursive: true });
+    await fsp.writeFile(
+      configPath,
+      "chart: ./charts/api\nservice_kind: web\ningress_mode: public\nhealth_path: /healthz\n",
+      "utf8",
+    );
+    const rendered = await prepareKubernetesPublisherConfig({
+      workspaceRoot: tmp,
+      deployment,
+      componentArtifacts: { api: { path: "/store/api", identity: "node-service:api" } },
+      outputPath: path.join(tmp, "rendered.json"),
+    });
+    const body = JSON.parse(await fsp.readFile(rendered.renderedConfigPath, "utf8"));
+    assert.equal(body.service_kind, "web");
+    assert.equal(body.ingress_mode, "public");
+    assert.equal(body.health_path, "/healthz");
+    assert.deepEqual(body.component_artifacts.api, {
+      path: "/store/api",
+      identity: "node-service:api",
+    });
   });
 });

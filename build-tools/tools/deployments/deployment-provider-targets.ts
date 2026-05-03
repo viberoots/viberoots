@@ -45,6 +45,9 @@ export type KubernetesProviderTarget = {
   release: string;
   id: string;
   providerTargetIdentity: string;
+  serviceKind?: string;
+  ingressMode?: string;
+  healthPath?: string;
 };
 
 export type AppStoreConnectProviderTarget = {
@@ -157,6 +160,9 @@ export function deriveKubernetesProviderTarget(input: {
   namespace: string;
   release: string;
   id?: string;
+  serviceKind?: string;
+  ingressMode?: string;
+  healthPath?: string;
 }): KubernetesProviderTarget {
   const cluster = input.cluster.trim();
   const namespace = input.namespace.trim();
@@ -168,6 +174,9 @@ export function deriveKubernetesProviderTarget(input: {
     release,
     id,
     providerTargetIdentity: `${KUBERNETES_PROVIDER}:${cluster}/${namespace}/${release}`,
+    ...(input.serviceKind ? { serviceKind: input.serviceKind.trim() } : {}),
+    ...(input.ingressMode ? { ingressMode: input.ingressMode.trim() } : {}),
+    ...(input.healthPath ? { healthPath: input.healthPath.trim() } : {}),
   };
 }
 

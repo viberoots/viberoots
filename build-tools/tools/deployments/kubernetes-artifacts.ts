@@ -1,5 +1,4 @@
 #!/usr/bin/env zx-wrapper
-import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { copyTree } from "../lib/copy-tree.ts";
@@ -10,21 +9,14 @@ export const KUBERNETES_ARTIFACT_PROVENANCE_SCHEMA = "kubernetes-component-artif
 export type AdmittedKubernetesComponentArtifact = {
   componentId: string;
   identity: string;
-  sourceKind: "file" | "directory";
+  sourceKind: "directory" | "image-digest";
   storedArtifactPath: string;
   provenancePath: string;
 };
 
-async function walkFiles(root: string, dir = root): Promise<string[]> {
-  const entries = await fsp.readdir(dir, { withFileTypes: true });
-  const files: string[] = [];
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    const abs = path.join(dir, entry.name);
-    if (entry.isDirectory()) files.push(...(await walkFiles(root, abs)));
-    else if (entry.isFile()) files.push(path.relative(root, abs));
-  }
-  return files;
-}
+const NODE_SERVICE_IDENTITY_SCHEMA = "node-service-artifact-identity@1";
+const NODE_SERVICE_RUNTIME_SCHEMA = "node-service-runtime@1";
+const IMAGE_DIGEST_RE = /^sha256:[a-f0-9]{64}$/;
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
@@ -35,23 +27,45 @@ async function pathExists(filePath: string): Promise<boolean> {
   }
 }
 
-async function artifactIdentityForPath(componentId: string, artifactPath: string): Promise<string> {
-  const stat = await fsp.stat(artifactPath);
-  const hash = crypto.createHash("sha256");
-  hash.update(`${componentId}\n`);
-  if (stat.isDirectory()) {
-    for (const rel of await walkFiles(artifactPath)) {
-      hash.update(`${rel}\n`);
-      hash.update(await fsp.readFile(path.join(artifactPath, rel)));
-      hash.update("\n");
+async function readJsonFile(filePath: string): Promise<Record<string, unknown>> {
+  return JSON.parse(await fsp.readFile(filePath, "utf8")) as Record<string, unknown>;
+}
+
+async function validateNodeServiceArtifactDir(artifactPath: string): Promise<string> {
+  const runtimePath = path.join(artifactPath, "runtime-contract.json");
+  const identityPath = path.join(artifactPath, "artifact-identity.json");
+  const runtime = await readJsonFile(runtimePath).catch((error: any) => {
+    if (error?.code === "ENOENT") {
+      throw new Error("service artifact must include runtime-contract.json");
     }
-  } else {
-    hash.update(path.basename(artifactPath));
-    hash.update("\n");
-    hash.update(await fsp.readFile(artifactPath));
-    hash.update("\n");
+    throw error;
+  });
+  if (runtime.schemaVersion !== NODE_SERVICE_RUNTIME_SCHEMA) {
+    throw new Error("service artifact runtime-contract.json must use node-service-runtime@1");
   }
-  return `service-artifact:${hash.digest("hex")}`;
+  const identity = await readJsonFile(identityPath).catch((error: any) => {
+    if (error?.code === "ENOENT") {
+      throw new Error("service artifact must include reviewed node-service artifact identity");
+    }
+    throw error;
+  });
+  if (
+    identity.schemaVersion !== NODE_SERVICE_IDENTITY_SCHEMA ||
+    identity.kind !== "node-service" ||
+    typeof identity.identity !== "string" ||
+    !identity.identity.startsWith("node-service:")
+  ) {
+    throw new Error("service artifact must include reviewed node-service artifact identity");
+  }
+  return identity.identity;
+}
+
+async function validateImageDigestFile(artifactPath: string): Promise<string> {
+  const digest = (await fsp.readFile(artifactPath, "utf8")).trim();
+  if (!IMAGE_DIGEST_RE.test(digest)) {
+    throw new Error("service artifact file must contain an OCI image digest sha256:<64 hex>");
+  }
+  return `image-digest:${digest}`;
 }
 
 function storedPathFor(recordsRoot: string, identity: string): string {
@@ -115,12 +129,18 @@ export async function admitKubernetesComponentArtifacts(opts: {
   const artifacts: AdmittedKubernetesComponentArtifact[] = [];
   for (const componentId of Object.keys(opts.artifactPathsByComponentId).sort()) {
     const artifactPath = path.resolve(opts.artifactPathsByComponentId[componentId] || "");
-    const stat = await fsp.stat(artifactPath);
-    const identity = await artifactIdentityForPath(componentId, artifactPath);
+    const stat = await fsp.stat(artifactPath).catch((error: any) => {
+      if (error?.code === "ENOENT") throw new Error(`missing service artifact: ${artifactPath}`);
+      throw error;
+    });
+    const sourceKind = stat.isDirectory() ? "directory" : "image-digest";
+    const identity = stat.isDirectory()
+      ? await validateNodeServiceArtifactDir(artifactPath)
+      : await validateImageDigestFile(artifactPath);
     const artifact: AdmittedKubernetesComponentArtifact = {
       componentId,
       identity,
-      sourceKind: stat.isDirectory() ? "directory" : "file",
+      sourceKind,
       storedArtifactPath: storedPathFor(opts.recordsRoot, identity),
       provenancePath: provenancePathFor(opts.recordsRoot, identity),
     };

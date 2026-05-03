@@ -27,6 +27,7 @@ Validation command:
 Conserve tokens:
 - Pipe the full combined command output to a timestamped log file under buck-out/tmp/codex-test-logs/.
 - Do not paste verbose output into the conversation.
+- Stay quiet while the validation command is running. Do not send progress updates, heartbeat messages, or "still running" notes.
 - If the command passes, report only the commands run, the log path, elapsed timing, and a concise success summary.
 - If the command fails, inspect the log with targeted tools such as tail, rg, and focused sed ranges. Report the failing command or phase, elapsed timing, the relevant error lines, and the log path. Include enough detail for the main agent to fix the issue without reading the entire log.
 
@@ -69,7 +70,7 @@ Run this from the repo root using `bash -lc` or `zsh -lc` so direnv can export t
 
 ## Main-Agent Behavior
 
-After spawning the tester, keep working on any non-overlapping task if one exists. Wait for the tester when its result is needed to answer the user.
+After spawning the tester, keep working on any non-overlapping task if one exists. Wait quietly for the tester when its result is needed to answer the user; do not send interim status updates just because validation is still running.
 
 When the tester finishes:
 

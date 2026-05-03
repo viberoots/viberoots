@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
+import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture.ts";
 import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers.ts";
 import {
   ensureNixosSharedHostStageBranch,
@@ -21,11 +22,6 @@ async function commitLocalChange(cwd: string, $: any, name: string): Promise<str
   await $({ cwd, stdio: "pipe" })`git add ${`${name}.txt`}`;
   await $({ cwd, stdio: "pipe" })`git commit -m ${name}`;
   return await gitStdout(cwd, $, "rev-parse", "HEAD");
-}
-
-async function writeArtifact(root: string) {
-  await fsp.mkdir(root, { recursive: true });
-  await fsp.writeFile(path.join(root, "service.txt"), "source-mismatch\n", "utf8");
 }
 
 async function writeValues(root: string, deploymentId: string) {
@@ -84,7 +80,7 @@ test("service-backed kubernetes deploy fails closed when client source differs f
       }),
     });
     const artifactDir = path.join(tmp, "artifact");
-    await writeArtifact(artifactDir);
+    await writeServiceArtifact(artifactDir, "source-mismatch\n");
     await installKubernetesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
     await writeValues(tmp, deployment.deploymentId);

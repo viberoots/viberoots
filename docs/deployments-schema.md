@@ -153,6 +153,39 @@ Canonical reviewed component-kind registry:
 - `service`
 - `third-party-service`
 
+Kubernetes single-service deployments should use `kubernetes_service_deployment(...)` instead of
+raw `deployment_target(...)` metadata. The macro emits `component_kind = "service"` and records
+reviewed posture in `provider_target`: web services require `ingress_mode = "public"` plus
+`health_path`, while worker services must use `ingress_mode = "none"` or `"private"`.
+
+```starlark
+kubernetes_service_deployment(
+    name = "web",
+    component = "//projects/apps/api:image",
+    cluster = "prod-us-west",
+    namespace = "web",
+    release = "api",
+    service_kind = "web",
+    ingress_mode = "public",
+    health_path = "/healthz",
+    lane_policy = "//projects/deployments/shared:lane",
+    environment_stage = "prod",
+    admission_policy = "//projects/deployments/shared:prod_release",
+)
+
+kubernetes_service_deployment(
+    name = "worker",
+    component = "//projects/apps/jobs:image",
+    cluster = "prod-us-west",
+    namespace = "workers",
+    release = "jobs",
+    service_kind = "worker",
+    lane_policy = "//projects/deployments/shared:lane",
+    environment_stage = "prod",
+    admission_policy = "//projects/deployments/shared:prod_release",
+)
+```
+
 Current reviewed provider-specific rule for `nixos-shared-host`:
 
 - every component must use `kind = "static-webapp"`
