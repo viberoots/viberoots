@@ -38,6 +38,7 @@ let
           "$TSC_BIN" -p .
           node --experimental-strip-types \
             --disable-warning=ExperimentalWarning \
+            --import "$REPO_ROOT/build-tools/tools/dev/zx-init.mjs" \
             "$REPO_ROOT/build-tools/tools/node/service-artifact.ts" \
             --dist-dir "$PWD/dist" \
             --contract "$PWD/$CONTRACT_REL" \

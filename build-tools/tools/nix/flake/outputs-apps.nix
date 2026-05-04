@@ -21,6 +21,7 @@
         --experimental-top-level-await \
         --disable-warning=ExperimentalWarning \
         --import="${pkgs.nodePackages.zx}/lib/node_modules/zx/build/globals.js" \
+        --import="$PWD/build-tools/tools/dev/zx-init.mjs" \
         "$PWD/build-tools/tools/dev/bulk-move.ts" "$@"
     ''}/bin/bulk-move";
   };

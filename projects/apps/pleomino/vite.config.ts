@@ -64,6 +64,8 @@ function staticPwaPrecachePlugin() {
           "--experimental-top-level-await",
           "--disable-warning=ExperimentalWarning",
           "--experimental-strip-types",
+          "--import",
+          path.resolve(appRoot, "../../../build-tools/tools/dev/zx-init.mjs"),
           "../../../build-tools/tools/dev/materialize-static-pwa-precache.ts",
           "--client-dir",
           path.resolve(appRoot, outDir),

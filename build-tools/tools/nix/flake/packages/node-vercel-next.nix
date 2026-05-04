@@ -32,6 +32,7 @@ let
           chmod -R u+w "$DIST" 2>/dev/null || true
           node --experimental-strip-types \
             --disable-warning=ExperimentalWarning \
+            --import "$REPO_ROOT/build-tools/tools/dev/zx-init.mjs" \
             "$REPO_ROOT/build-tools/tools/vercel/next-artifact.ts" \
             --app-dir "$APP_DIR" \
             --dist-dir "$DIST" \
