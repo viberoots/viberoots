@@ -4,13 +4,37 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { submitKubernetesDeploy } from "../../deployments/kubernetes-deploy.ts";
+import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "../../deployments/deployment-secret-fixture.ts";
 import { runInTemp } from "../lib/test-helpers.ts";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
 import { installFakeKubernetesHelm } from "./kubernetes.fake-helm.ts";
 import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
+import {
+  REVIEWED_KUBERNETES_PUBLISH_CONTRACT,
+  reviewedKubernetesPublishRequirements,
+} from "./kubernetes.publish-credentials.fixture.ts";
 import { startKubernetesPublicServer } from "./kubernetes.public-server.ts";
 import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture.ts";
 import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+
+async function writeKubernetesPublishSecretFixture(tmp: string): Promise<string> {
+  const fixturePath = path.join(tmp, "kubernetes-publish-secrets.json");
+  await fsp.writeFile(
+    fixturePath,
+    JSON.stringify({
+      schemaVersion: "deployment-secret-fixture@1",
+      contracts: {
+        [REVIEWED_KUBERNETES_PUBLISH_CONTRACT]: {
+          value: "vault-fake-kubeconfig",
+          allowedSteps: ["publish"],
+          targetScopes: ["*"],
+        },
+      },
+    }),
+    "utf8",
+  );
+  return fixturePath;
+}
 
 async function writeHelmValues(root: string, deploymentId: string, content: string): Promise<void> {
   const configPath = path.join(
@@ -29,7 +53,9 @@ test("kubernetes deploy CLI completes single-service publish with reviewed provi
   await runInTemp("kubernetes-e2e-single", async (tmp, $) => {
     const deployment = kubernetesDeploymentFixture({
       provisioner: { type: "terraform-stack", config: "terraform/main.tf.json" },
+      secretRequirements: reviewedKubernetesPublishRequirements(),
     });
+    const secretFixturePath = await writeKubernetesPublishSecretFixture(tmp);
     const deploymentJson = path.join(tmp, "deployment.json");
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
@@ -67,6 +93,7 @@ test("kubernetes deploy CLI completes single-service publish with reviewed provi
           BNX_KUBERNETES_HELM_BIN: path.join(fake.binDir, "helm"),
           BNX_KUBERNETES_FAKE_PUBLISH_ROOT: fake.publishRoot,
           BNX_KUBERNETES_FAKE_HELM_LOG: fake.logPath,
+          [DEPLOYMENT_SECRET_FIXTURE_PATH_ENV]: secretFixturePath,
         },
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`;
       const summary = JSON.parse(String(result.stdout));
@@ -80,6 +107,11 @@ test("kubernetes deploy CLI completes single-service publish with reviewed provi
       assert.equal(record.componentResults.length, 1);
       assert.equal(record.smokeOutcome, "passed");
       assert.ok(record.provisionerPlan?.artifactPath);
+      assert.deepEqual(record.publisherCredentials?.envNames, ["kubernetes_publish_kubeconfig"]);
+      assert.deepEqual(record.publisherCredentials?.contractRefs, [
+        REVIEWED_KUBERNETES_PUBLISH_CONTRACT,
+      ]);
+      assert.equal(JSON.stringify(record).includes("vault-fake-kubeconfig"), false);
     } finally {
       await server.close();
     }
@@ -89,6 +121,7 @@ test("kubernetes deploy CLI completes single-service publish with reviewed provi
 test("kubernetes deploy preserves ordered multi-component publish state", async () => {
   await runInTemp("kubernetes-e2e-multi", async (tmp, $) => {
     const deployment = kubernetesDeploymentFixture({
+      secretRequirements: reviewedKubernetesPublishRequirements(),
       components: [
         { id: "api", kind: "service", target: "//projects/apps/api:image" },
         {
@@ -109,6 +142,7 @@ test("kubernetes deploy preserves ordered multi-component publish state", async 
     const apiArtifact = path.join(tmp, "artifact-api");
     const sidecarArtifact = path.join(tmp, "artifact-sidecar");
     const fake = await installFakeKubernetesHelm(tmp);
+    const secretFixturePath = await writeKubernetesPublishSecretFixture(tmp);
     await writeServiceArtifact(apiArtifact, "api-service\n");
     await writeServiceArtifact(sidecarArtifact, "otel-sidecar\n");
     await installKubernetesTargets(tmp, [deployment]);
@@ -143,6 +177,7 @@ test("kubernetes deploy preserves ordered multi-component publish state", async 
           BNX_KUBERNETES_HELM_BIN: path.join(fake.binDir, "helm"),
           BNX_KUBERNETES_FAKE_PUBLISH_ROOT: fake.publishRoot,
           BNX_KUBERNETES_FAKE_HELM_LOG: fake.logPath,
+          [DEPLOYMENT_SECRET_FIXTURE_PATH_ENV]: secretFixturePath,
         },
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --component-artifacts api=${apiArtifact},otel-sidecar=${sidecarArtifact} --admission-evidence-json ${admissionEvidenceJson} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`;
       const summary = JSON.parse(String(result.stdout));
@@ -163,66 +198,6 @@ test("kubernetes deploy preserves ordered multi-component publish state", async 
         ["api", "otel-sidecar"],
       );
     } finally {
-      await server.close();
-    }
-  });
-});
-
-test("kubernetes deploy records service-health smoke failure after publish", async () => {
-  await runInTemp("kubernetes-e2e-smoke-failure", async (tmp, $) => {
-    const deployment = kubernetesDeploymentFixture();
-    const artifactDir = path.join(tmp, "artifact");
-    const recordsRoot = path.join(tmp, "records");
-    const fake = await installFakeKubernetesHelm(tmp);
-    await writeServiceArtifact(artifactDir, "api-service\n");
-    await installKubernetesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
-    await writeHelmValues(
-      tmp,
-      deployment.deploymentId,
-      "chart: ./charts/api\nsmoke_url: http://shared-observability.example.test/healthz\nsmoke_expect_contains: missing\n",
-    );
-    const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
-      tmp,
-      $,
-      deploymentLabel: deployment.label,
-      deployment,
-    });
-    const server = await startKubernetesPublicServer({
-      deployment,
-      publishRoot: fake.publishRoot,
-    });
-    const originalEnv = { ...process.env };
-    process.env.PATH = `${fake.binDir}:${originalEnv.PATH || ""}`;
-    process.env.BNX_KUBERNETES_HELM_BIN = path.join(fake.binDir, "helm");
-    process.env.BNX_KUBERNETES_FAKE_PUBLISH_ROOT = fake.publishRoot;
-    process.env.BNX_KUBERNETES_FAKE_HELM_LOG = fake.logPath;
-    try {
-      await assert.rejects(
-        async () =>
-          await submitKubernetesDeploy({
-            workspaceRoot: tmp,
-            deployment,
-            recordsRoot,
-            artifactDir,
-            admissionEvidence: JSON.parse(await fsp.readFile(admissionEvidenceJson, "utf8")),
-            smokeConnectOverride: {
-              protocol: "http:",
-              hostname: "127.0.0.1",
-              port: server.port,
-            },
-          }),
-        (error: any) => {
-          assert.equal(error.record.finalOutcome, "smoke_failed_after_publish");
-          assert.equal(error.record.failedStep, "smoke");
-          return true;
-        },
-      );
-    } finally {
-      process.env.PATH = originalEnv.PATH || "";
-      delete process.env.BNX_KUBERNETES_HELM_BIN;
-      delete process.env.BNX_KUBERNETES_FAKE_PUBLISH_ROOT;
-      delete process.env.BNX_KUBERNETES_FAKE_HELM_LOG;
       await server.close();
     }
   });

@@ -67,6 +67,7 @@ export type KubernetesDeployRecord = {
   replaySnapshotPath?: string;
   publicUrl?: string;
   providerReleaseId?: string;
+  publisherCredentials?: { envNames: string[]; contractRefs: string[] };
   failedStep?: "publish" | "smoke";
   error?: string;
   errorFingerprint?: string;

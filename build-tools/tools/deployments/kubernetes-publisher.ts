@@ -21,6 +21,7 @@ export async function publishKubernetesComponent(opts: {
   renderedConfigPath: string;
   componentId: string;
   artifactPath: string;
+  publishCredentialEnv?: Record<string, string>;
 }): Promise<{ providerReleaseId: string }> {
   const helmBin = process.env.BNX_KUBERNETES_HELM_BIN || "helm";
   const command = [
@@ -44,6 +45,7 @@ export async function publishKubernetesComponent(opts: {
     stdio: "pipe",
     env: {
       ...scrubDeploymentSecretEnv(),
+      ...(opts.publishCredentialEnv || {}),
       BNX_KUBERNETES_COMPONENT_ID: opts.componentId,
       BNX_KUBERNETES_COMPONENT_ARTIFACT: opts.artifactPath,
       BNX_KUBERNETES_RENDERED_CONFIG: opts.renderedConfigPath,

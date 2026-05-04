@@ -13,6 +13,8 @@ import { publishKubernetesComponent } from "./kubernetes-publisher.ts";
 import { createKubernetesDeployRecord, writeKubernetesDeployRecord } from "./kubernetes-records.ts";
 import { writeKubernetesReplaySnapshot } from "./kubernetes-replay.ts";
 import { smokeKubernetesRelease } from "./kubernetes-smoke.ts";
+// prettier-ignore
+import { publisherCredentialFields, resolveKubernetesPublishCredentialsForDeployment, type KubernetesPublishCredentialsHooks } from "./kubernetes-publish-credentials-orchestration.ts";
 
 type SourceRecordLike = { deployRunId: string; deploymentId: string; admittedContext?: any };
 
@@ -29,6 +31,7 @@ export async function submitKubernetesExactArtifactRun(opts: {
   submissionId?: string;
   expectedSourceRevision?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
+  publishCredentials?: KubernetesPublishCredentialsHooks;
   smokeConnectOverride?: { protocol: "http:" | "https:"; hostname: string; port: number };
 }) {
   const admittedContext =
@@ -64,6 +67,9 @@ export async function submitKubernetesExactArtifactRun(opts: {
     evidence: opts.admissionEvidence,
   });
   const deployRunId = `deploy-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+  let publisherCredentials: Awaited<
+    ReturnType<typeof resolveKubernetesPublishCredentialsForDeployment>
+  > = { env: {}, envNames: [], contractRefs: [] };
   try {
     const preparedConfig = await prepareKubernetesPublisherConfig({
       workspaceRoot: opts.workspaceRoot,
@@ -76,6 +82,11 @@ export async function submitKubernetesExactArtifactRun(opts: {
       ),
       outputPath: path.join(opts.recordsRoot, "provider-config", `${deployRunId}.helm-values.json`),
     });
+    publisherCredentials = await resolveKubernetesPublishCredentialsForDeployment({
+      deployment: opts.deployment,
+      admittedContext,
+      hooks: opts.publishCredentials,
+    });
     for (const artifact of opts.componentArtifacts) {
       await publishKubernetesComponent({
         workspaceRoot: opts.workspaceRoot,
@@ -84,6 +95,7 @@ export async function submitKubernetesExactArtifactRun(opts: {
         renderedConfigPath: preparedConfig.renderedConfigPath,
         componentId: artifact.componentId,
         artifactPath: artifact.storedArtifactPath,
+        publishCredentialEnv: publisherCredentials.env,
       });
     }
     const smoke = await smokeKubernetesRelease({
@@ -124,6 +136,7 @@ export async function submitKubernetesExactArtifactRun(opts: {
       providerConfigFingerprint: preparedConfig.fingerprint,
       replaySnapshotPath,
       publicUrl: smoke.publicUrl,
+      ...publisherCredentialFields(publisherCredentials),
     });
     return { record, recordPath: await writeKubernetesDeployRecord(opts.recordsRoot, record) };
   } catch (error) {
@@ -143,6 +156,7 @@ export async function submitKubernetesExactArtifactRun(opts: {
       deploymentMetadataFingerprint: deploymentMetadataFingerprintFor(opts.deployment),
       failedStep: "publish",
       error: error instanceof Error ? error.message : String(error),
+      ...publisherCredentialFields(publisherCredentials),
     });
     const recordPath = await writeKubernetesDeployRecord(opts.recordsRoot, record);
     throw Object.assign(error instanceof Error ? error : new Error(String(error)), {

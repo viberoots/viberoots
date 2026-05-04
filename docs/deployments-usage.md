@@ -421,6 +421,14 @@ step instead of editing Keycloak by hand.
 - routine protected/shared flows reject `delete`, `replace`, or unknown plan
   actions; reviewed destructive workflows must attach a
   `destructiveExceptionRef` evidence entry before any destructive plan can apply
+- Kubernetes service publish credentials (kubeconfig, service-account token, or
+  control-plane-issued short-lived credential reference) are resolved through
+  deployment `secret_requirements` at the `publish` step, both for the normal
+  deploy path and for retry, rollback, and promotion replays. Protected/shared
+  Kubernetes service deployments without a reviewed publish-step contract fail
+  closed before Helm runs, ambient cluster credentials are scrubbed from the
+  publisher process, and only the resolved credential env names plus contract
+  refs are written to deploy records (never the credential values)
 - use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
 
 Scaffold-first examples:

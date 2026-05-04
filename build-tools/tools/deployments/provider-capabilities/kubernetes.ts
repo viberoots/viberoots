@@ -149,5 +149,8 @@ export const KUBERNETES_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
     bullet(
       "protected/shared execution must stay inside vetted built-in publisher, provisioner, and service-health smoke code",
     ),
+    bullet(
+      "protected/shared kubernetes service publish, retry, rollback, and promotion must declare `secret_requirements` at the `publish` step; ambient Helm or cluster credentials are rejected and the publisher process receives only the resolved reviewed credential env",
+    ),
   ],
 };

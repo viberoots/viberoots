@@ -127,6 +127,13 @@ Use stable reviewed contract IDs for external dependencies:
   `secret://deployments/opentofu/provider`. Backend credentials follow the same
   step and contract namespace and must never be sourced from ambient process
   environment.
+- Kubernetes/container-runtime publish credentials (for example a generated
+  kubeconfig secret, service-account token, or control-plane-issued short-lived
+  credential reference) use `kubernetes_publish_kubeconfig` at step `publish`
+  with contract id `secret://deployments/kubernetes/<cluster>/<namespace>/...`.
+  Protected/shared Kubernetes service deployments must declare publish-step
+  `secret_requirements` and may not rely on ambient Helm or cluster
+  environment state.
 
 Keep each requirement step-specific. Provider publish tokens belong to
 `publish`, provisioning credentials belong to `provision`, preview cleanup

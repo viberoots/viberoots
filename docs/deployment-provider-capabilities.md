@@ -793,6 +793,7 @@ Normative-source note:
 - in policy for protected/shared reviewed multi-component service plus sidecar or shared-platform deployments only when the deployment declares the reviewed explicit rollout policy
 - protected/shared mutation, exact-artifact retry or rollback reuse, and reviewed `--provision-only` execution must route through the reviewed control-plane service / worker front door
 - protected/shared execution must stay inside vetted built-in publisher, provisioner, and service-health smoke code
+- protected/shared kubernetes service publish, retry, rollback, and promotion must declare `secret_requirements` at the `publish` step; ambient Helm or cluster credentials are rejected and the publisher process receives only the resolved reviewed credential env
 
 ## Capability Entry: `vercel`
 

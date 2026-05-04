@@ -9,6 +9,12 @@ import { runInTemp } from "../lib/test-helpers.ts";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
 import { installFakeKubernetesHelm } from "./kubernetes.fake-helm.ts";
 import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
+import {
+  fakeKubernetesPublishSecretRuntime,
+  reviewedKubernetesPublishRequirements,
+  setKubernetesPublishSecretFixtureEnv,
+  writeKubernetesPublishSecretFixture,
+} from "./kubernetes.publish-credentials.fixture.ts";
 import { startKubernetesPublicServer } from "./kubernetes.public-server.ts";
 import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture.ts";
 import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
@@ -35,7 +41,13 @@ async function writeHelmValues(root: string, deploymentId: string, content: stri
 
 test("kubernetes app-attached deploy attaches OpenTofu apply outcome with replay evidence", async () => {
   await runInTemp("kubernetes-opentofu-deploy-attached", async (tmp, $) => {
-    const deployment = kubernetesDeploymentFixture({ provisioner: openTofuProvisioner() });
+    const deployment = kubernetesDeploymentFixture({
+      provisioner: openTofuProvisioner(),
+      secretRequirements: reviewedKubernetesPublishRequirements(),
+    });
+    const publishRuntime = fakeKubernetesPublishSecretRuntime();
+    const secretFixturePath = await writeKubernetesPublishSecretFixture(tmp);
+    const fixtureEnv = setKubernetesPublishSecretFixtureEnv(secretFixturePath);
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
     const fake = await installFakeKubernetesHelm(tmp);
@@ -86,6 +98,7 @@ test("kubernetes app-attached deploy attaches OpenTofu apply outcome with replay
             opentofu_provider_credentials: INTEGRATION_SECRET_VALUE,
           }),
         },
+        publishCredentials: publishRuntime.hooks,
         smokeConnectOverride: {
           protocol: "http:",
           hostname: "127.0.0.1",
@@ -115,6 +128,7 @@ test("kubernetes app-attached deploy attaches OpenTofu apply outcome with replay
       delete process.env.BNX_KUBERNETES_HELM_BIN;
       delete process.env.BNX_KUBERNETES_FAKE_PUBLISH_ROOT;
       delete process.env.BNX_KUBERNETES_FAKE_HELM_LOG;
+      fixtureEnv.restore();
       await server.close();
     }
   });
