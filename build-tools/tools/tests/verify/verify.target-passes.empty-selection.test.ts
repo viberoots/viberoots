@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertVerifyTargetPlanNotEmpty } from "../../dev/verify/target-passes.ts";
+import { assertVerifyTargetPlanNotEmpty } from "../../dev/verify/target-passes";
 
 test("verify fails fast when explicit selectors resolve to zero concrete targets", () => {
   assert.throws(

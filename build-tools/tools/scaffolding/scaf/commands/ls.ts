@@ -1,6 +1,6 @@
-import type { ScafFlags } from "../types.ts";
+import type { ScafFlags } from "../types";
 
-import { discoverScaffolds } from "../scaffolds/discover.ts";
+import { discoverScaffolds } from "../scaffolds/discover";
 
 export async function cmdLs(flags: ScafFlags) {
   const rows = await discoverScaffolds(".");

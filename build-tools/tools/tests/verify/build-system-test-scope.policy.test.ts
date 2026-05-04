@@ -8,9 +8,9 @@ import {
   isBuildSystemPath,
   isIgnoredBuildSystemScopePath,
   parseBuildSystemTestMode,
-} from "../../lib/build-system-test-scope.ts";
-import { resolveNonBuildSystemBuckTargets } from "../../lib/non-build-system-scope.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "../../lib/build-system-test-scope";
+import { resolveNonBuildSystemBuckTargets } from "../../lib/non-build-system-scope";
+import { runInTemp } from "../lib/test-helpers";
 
 test("build-system test scope mode parsing supports auto/always/never", () => {
   assert.equal(parseBuildSystemTestMode(undefined), "auto");

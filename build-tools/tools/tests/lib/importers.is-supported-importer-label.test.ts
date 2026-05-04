@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { getImporterRootsContract } from "../../lib/importer-roots.ts";
+import { getImporterRootsContract } from "../../lib/importer-roots";
 import { isSupportedImporterLabel } from "../../lib/importers";
 
 test("isSupportedImporterLabel matches the importer-roots contract", () => {

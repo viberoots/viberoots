@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { resolveToolPathSync } from "./tool-paths.ts";
+import { resolveToolPathSync } from "./tool-paths";
 
 function isExactTokenOrNixBin(token: string, binName: "nix" | "nix-store"): boolean {
   if (token === binName) return true;

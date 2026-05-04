@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import path from "node:path";
 
-import { canonicalTemplateLanguage, normalizeTemplateName } from "./taxonomy.ts";
+import { canonicalTemplateLanguage, normalizeTemplateName } from "./taxonomy";
 
 export function resolveDestination(
   language: string,

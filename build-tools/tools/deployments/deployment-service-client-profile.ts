@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getFlagStr, hasFlag } from "../lib/cli.ts";
-import { readNixosSharedHostClientProfile } from "./nixos-shared-host-install-dev-machine.ts";
+import { getFlagStr, hasFlag } from "../lib/cli";
+import { readNixosSharedHostClientProfile } from "./nixos-shared-host-install-dev-machine";
 import {
   resolveServiceClientFromFlags,
   resolveServiceClientFromManifest,
   type NixosSharedHostResolvedServiceClient,
-} from "./nixos-shared-host-service-client-config.ts";
+} from "./nixos-shared-host-service-client-config";
 
 function resolveProfileRoot(workspaceRoot: string): string {
   const profileRoot = getFlagStr("profile-root", "").trim();

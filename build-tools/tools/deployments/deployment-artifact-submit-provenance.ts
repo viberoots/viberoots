@@ -7,20 +7,20 @@ import {
   type DeploymentArtifactBindingProvenance,
   type DeploymentArtifactChallengeRequest,
   type DeploymentExpectedArtifactIdentities,
-} from "./deployment-artifact-binding.ts";
+} from "./deployment-artifact-binding";
 import {
   assertArtifactChallengeBindingMatches,
   decodeArtifactChallengeBinding,
-} from "./deployment-artifact-challenge-binding.ts";
+} from "./deployment-artifact-challenge-binding";
 import {
   assertDeploymentArtifactProofKeyActive,
   defaultDeploymentArtifactProofKeyRegistry,
   type DeploymentArtifactProofKeyRegistry,
-} from "./deployment-artifact-proof-keys.ts";
-import { decodeBackendJson } from "./nixos-shared-host-control-plane-backend-db.ts";
-import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract.ts";
-import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-control-plane-contract.ts";
-import { finalizedStagedArtifactReference } from "./nixos-shared-host-artifact-submit-request.ts";
+} from "./deployment-artifact-proof-keys";
+import { decodeBackendJson } from "./nixos-shared-host-control-plane-backend-db";
+import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract";
+import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-control-plane-contract";
+import { finalizedStagedArtifactReference } from "./nixos-shared-host-artifact-submit-request";
 
 export type ArtifactChallengeRow = {
   challenge_id: string;

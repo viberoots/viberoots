@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { run } from "./exporter/main.ts";
+import { run } from "./exporter/main";
 
 async function main() {
   // Prefer WORKSPACE_ROOT (set by zx test harness) over BUCK_TEST_SRC so simulated graphs

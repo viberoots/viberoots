@@ -10,7 +10,7 @@ import { SOURCE_FILES_SCOPE, findFileSizeOffenders } from "../../dev/file-size-l
 import {
   METHODOLOGY_EXCEPTIONS_FILENAME,
   resolveSourceFileSizeExceptionPaths,
-} from "../../dev/file-size-lint-exceptions.ts";
+} from "../../dev/file-size-lint-exceptions";
 
 function oversizedModule(lines: number): string {
   return Array.from({ length: lines }, (_, index) => `export const line${index} = ${index};`).join(

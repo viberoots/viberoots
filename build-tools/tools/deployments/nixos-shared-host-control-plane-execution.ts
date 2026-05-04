@@ -1,18 +1,18 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-control-plane-contract.ts";
-import { runNixosSharedHostExplicitRemoval } from "./nixos-shared-host-explicit-removal.ts";
-import type { NixosSharedHostGateEvaluator } from "./nixos-shared-host-progressive-execution.ts";
-import { runNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy.ts";
+import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-control-plane-contract";
+import { runNixosSharedHostExplicitRemoval } from "./nixos-shared-host-explicit-removal";
+import type { NixosSharedHostGateEvaluator } from "./nixos-shared-host-progressive-execution";
+import { runNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy";
 import {
   acquireControlPlaneLock,
   readControlPlaneJson,
   writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
-import { nixosSharedHostLockScopes } from "./nixos-shared-host-components.ts";
-import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
-import { withWorkerDeploymentVaultRuntime } from "./deployment-vault-runtime-worker.ts";
-import { resolveNixosSharedHostAdmittedSecretReferences } from "./nixos-shared-host-admission-helpers.ts";
-import type { DeploymentSecretContext } from "./deployment-secret-context.ts";
+} from "./nixos-shared-host-control-plane-store";
+import { nixosSharedHostLockScopes } from "./nixos-shared-host-components";
+import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records";
+import { withWorkerDeploymentVaultRuntime } from "./deployment-vault-runtime-worker";
+import { resolveNixosSharedHostAdmittedSecretReferences } from "./nixos-shared-host-admission-helpers";
+import type { DeploymentSecretContext } from "./deployment-secret-context";
 
 async function resolveWorkerAdmittedSecrets(opts: {
   snapshot: NixosSharedHostControlPlaneSnapshot;

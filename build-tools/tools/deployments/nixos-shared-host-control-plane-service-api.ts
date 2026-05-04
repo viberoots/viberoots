@@ -1,42 +1,42 @@
 #!/usr/bin/env zx-wrapper
-import { authorizeControlPlaneSubmit } from "./deployment-control-plane-authz.ts";
-import { resolveSubmitAuthorizationBoundary } from "./deployment-service-authorization-boundary.ts";
+import { authorizeControlPlaneSubmit } from "./deployment-control-plane-authz";
+import { resolveSubmitAuthorizationBoundary } from "./deployment-service-authorization-boundary";
 import {
   CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
   type CloudflarePagesControlPlaneSubmitRequest,
-} from "./cloudflare-pages-control-plane-api-contract.ts";
-import { prepareBackendCloudflarePagesControlPlaneRun } from "./cloudflare-pages-control-plane-backend-prepare.ts";
-import { resolveCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit.ts";
-import { assertNoProtectedSharedClientIdentityFields } from "./deployment-service-client-contract.ts";
-import { handleControlPlaneRunActionService } from "./deployment-control-plane-run-action-service.ts";
+} from "./cloudflare-pages-control-plane-api-contract";
+import { prepareBackendCloudflarePagesControlPlaneRun } from "./cloudflare-pages-control-plane-backend-prepare";
+import { resolveCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit";
+import { assertNoProtectedSharedClientIdentityFields } from "./deployment-service-client-contract";
+import { handleControlPlaneRunActionService } from "./deployment-control-plane-run-action-service";
 import {
   isDeploymentProviderServiceSubmitRequest,
   queueDeploymentProviderControlPlaneSubmission,
   type DeploymentProviderServiceSubmitRequest,
-} from "./deployment-provider-control-plane-submit.ts";
-import { submitResponseFromSubmission } from "./deployment-control-plane-status.ts";
+} from "./deployment-provider-control-plane-submit";
+import { submitResponseFromSubmission } from "./deployment-control-plane-status";
 import type {
   DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneRunActionRequest,
-} from "./deployment-control-plane-contract.ts";
-import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
+} from "./deployment-control-plane-contract";
+import type { DeploymentPrincipal } from "./deployment-admission-evidence";
 import {
   enqueueBackendSubmission,
   resolveBackendIdempotency,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
+} from "./nixos-shared-host-control-plane-backend";
 import {
   NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
   type NixosSharedHostControlPlaneSubmitRequest,
-} from "./nixos-shared-host-control-plane-api-contract.ts";
-import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
-import { prepareBackendNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-backend-prepare.ts";
-import { reusedBackendSubmitResponse } from "./nixos-shared-host-control-plane-service-idempotency.ts";
-import { resolveServiceSubmitRequest } from "./nixos-shared-host-control-plane-service-submit.ts";
-import { handleProtectedChallengedNixosServiceSubmit } from "./nixos-shared-host-control-plane-service-protected-submit.ts";
-import { resolveNixosSharedHostSubmitContext } from "./nixos-shared-host-control-plane-submit-context.ts";
+} from "./nixos-shared-host-control-plane-api-contract";
+import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract";
+import { prepareBackendNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-backend-prepare";
+import { reusedBackendSubmitResponse } from "./nixos-shared-host-control-plane-service-idempotency";
+import { resolveServiceSubmitRequest } from "./nixos-shared-host-control-plane-service-submit";
+import { handleProtectedChallengedNixosServiceSubmit } from "./nixos-shared-host-control-plane-service-protected-submit";
+import { resolveNixosSharedHostSubmitContext } from "./nixos-shared-host-control-plane-submit-context";
 // prettier-ignore
-export { readControlPlaneRecord, readControlPlaneStatus } from "./nixos-shared-host-control-plane-service-read.ts";
+export { readControlPlaneRecord, readControlPlaneStatus } from "./nixos-shared-host-control-plane-service-read";
 
 // prettier-ignore
 export type ServiceRunActionRequest = DeploymentControlPlaneRunActionRequest & { deployRunId?: string; authSessionId?: string; requestedBy?: DeploymentPrincipal; authorization?: DeploymentControlPlaneAuthorization; };

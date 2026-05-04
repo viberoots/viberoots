@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { untrackedRequiresImpureForTargets } from "../../dev/dev-build/untracked.ts";
+import { untrackedRequiresImpureForTargets } from "../../dev/dev-build/untracked";
 
 test("target-aware untracked policy ignores unrelated docs/tests paths", () => {
   const r = untrackedRequiresImpureForTargets({

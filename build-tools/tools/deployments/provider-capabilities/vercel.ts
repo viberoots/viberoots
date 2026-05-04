@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { SSR_WEBAPP_COMPONENT_KIND } from "../deployment-component-kinds.ts";
-import { VERCEL_PROVIDER } from "../vercel-provider-target.ts";
-import type { DeploymentProviderCapability } from "./types.ts";
-import { bullet } from "./types.ts";
+import { SSR_WEBAPP_COMPONENT_KIND } from "../deployment-component-kinds";
+import { VERCEL_PROVIDER } from "../vercel-provider-target";
+import type { DeploymentProviderCapability } from "./types";
+import { bullet } from "./types";
 
 export const VERCEL_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
   provider: VERCEL_PROVIDER,
@@ -58,11 +58,30 @@ export const VERCEL_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
     bullet("fake API publishes are deterministic for target identity plus artifact identity"),
     bullet("retry and rollback use recorded exact artifacts and never rebuild from branch state"),
     bullet("ambiguous provider API outcomes fail closed with explicit records"),
+    bullet(
+      "shared `--publish-only` reuses only an admitted exact prebuilt artifact selected with `--source-run-id`",
+    ),
+    bullet("same-deployment `--publish-only` is reviewed as `retry`"),
+    bullet(
+      "same-deployment rollback is reviewed only for prior successful normal runs on the same canonical live target identity",
+    ),
+  ],
+  immutableReuseOperatorFlows: [
+    bullet("same-deployment rollback requires both `--publish-only` and `--rollback`"),
+    bullet(
+      "rollback source selection is limited to prior successful normal live-target runs for the same deployment",
+    ),
+    bullet("retry or rollback fails closed when the retained exact artifact is unavailable"),
   ],
   partialPublishObservability: [
     bullet("the local fixture records provider release id, public URL, and artifact identity"),
   ],
-  provisionerSupport: [bullet("not supported in the initial Vercel provider slice")],
+  provisionerSupport: [
+    bullet("not supported in the initial Vercel provider slice"),
+    bullet(
+      "`--provision-only` is reviewed for protected/shared deployments through the control-plane service when the deployment declares one reviewed built-in provisioner",
+    ),
+  ],
   releaseActions: {
     supportsProtectedShared: false,
     declaredTypes: [],
@@ -72,5 +91,8 @@ export const VERCEL_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
   protectedSharedEligibility: [
     bullet("protected/shared Vercel mutation is routed through the reviewed control-plane service"),
     bullet("laptop-local protected/shared artifact paths are rejected by the public front door"),
+    bullet(
+      "protected/shared mutation, exact-artifact retry or rollback reuse, and reviewed `--provision-only` execution must route through the reviewed control-plane service / worker front door",
+    ),
   ],
 };

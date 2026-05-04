@@ -8,7 +8,7 @@ import { parseBuck2ProgressFromLines } from "./buck2-output";
 import { createBuck2SlowestRecorder } from "./buck2-slowest";
 import { verifyBuck2Threads } from "./buck2-threads";
 import { buildVerifyTestEnvArgs, previewVerifyNestedBuckIsolation } from "./buck2-test-env";
-import { resolveToolPathSync } from "../../lib/tool-paths.ts";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 
 export { verifyBuck2Threads, type VerifyBuck2ThreadsOptions } from "./buck2-threads";
 

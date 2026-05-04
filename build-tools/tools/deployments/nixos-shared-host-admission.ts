@@ -1,27 +1,27 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence.ts";
+import type { NixosSharedHostDeployment } from "./contract";
+import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence";
 import {
   resolveInitialAdmittedSecretReferences,
   resolveSourceRunAdmittedSecretReferences,
-} from "./deployment-secret-admission.ts";
-import type { DeploymentSecretContext } from "./deployment-secret-context.ts";
+} from "./deployment-secret-admission";
+import type { DeploymentSecretContext } from "./deployment-secret-context";
 import {
   requirementSummary,
   sameRequirementSet,
   type DeploymentRequirement,
-} from "./deployment-requirements.ts";
-import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec.ts";
+} from "./deployment-requirements";
+import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec";
 import {
   gitIsAncestor,
   replayMismatch,
   resolveNixosSharedHostAdmittedSecretReferences,
   targetEnvironmentAdmission,
   type NixosSharedHostTargetEnvironmentAdmission,
-} from "./nixos-shared-host-admission-helpers.ts";
-import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
-import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
-import type { NixosSharedHostReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot.ts";
+} from "./nixos-shared-host-admission-helpers";
+import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records";
+import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay";
+import type { NixosSharedHostReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot";
 
 export type NixosSharedHostSourceAdmission = {
   mode: "stage_branch_head" | "source_run_reuse" | "promotion_source_run";

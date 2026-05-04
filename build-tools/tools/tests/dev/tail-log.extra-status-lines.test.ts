@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { getExtraStatusLines } from "../../dev/tail-log/status-helpers.ts";
+import { getExtraStatusLines } from "../../dev/tail-log/status-helpers";
 
 test("tail-log extra status lines include process counters", () => {
   const output = getExtraStatusLines(false);

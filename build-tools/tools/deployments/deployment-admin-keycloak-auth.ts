@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
-import { deploymentAuthProjectSlug } from "./deployment-auth-groups.ts";
+import type { DeploymentTarget } from "./contract";
+import { deploymentAuthProjectSlug } from "./deployment-auth-groups";
 
 export type DeploymentKeycloakAdminRole = "read" | "shape_admin" | "membership_admin";
 

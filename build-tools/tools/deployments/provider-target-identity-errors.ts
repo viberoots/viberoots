@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { deploymentError, duplicateValueEntries } from "./contract-extract-shared.ts";
+import { deploymentError, duplicateValueEntries } from "./contract-extract-shared";
 
 export function pushDuplicateProviderTargetIdentityErrors(
   errors: string[],

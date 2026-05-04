@@ -6,18 +6,18 @@ import { test } from "node:test";
 import {
   createStaticWebappArtifactBundleBytes,
   STATIC_WEBAPP_ARTIFACT_BUNDLE_SCHEMA,
-} from "../../deployments/static-webapp-artifact-bundle.ts";
-import { expectedNixosSharedHostArtifactIdentities } from "../../deployments/deployment-artifact-binding.ts";
-import { artifactIdentityForNixosSharedHostDir } from "../../deployments/nixos-shared-host-artifacts.ts";
-import { compositeNixosSharedHostArtifactIdentity } from "../../deployments/nixos-shared-host-component-artifacts.ts";
+} from "../../deployments/static-webapp-artifact-bundle";
+import { expectedNixosSharedHostArtifactIdentities } from "../../deployments/deployment-artifact-binding";
+import { artifactIdentityForNixosSharedHostDir } from "../../deployments/nixos-shared-host-artifacts";
+import { compositeNixosSharedHostArtifactIdentity } from "../../deployments/nixos-shared-host-component-artifacts";
 import {
   createStaticWebappUploadSession,
   admitStaticWebappUploadSession,
-} from "../../deployments/static-webapp-upload-sessions.ts";
-import { resolveCloudflarePagesArtifactInput } from "../../deployments/cloudflare-pages-artifact-input.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+} from "../../deployments/static-webapp-upload-sessions";
+import { resolveCloudflarePagesArtifactInput } from "../../deployments/cloudflare-pages-artifact-input";
+import { runInTemp } from "../lib/test-helpers";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 async function writeArtifact(root: string, body = "<html>ok</html>\n") {
   await fsp.mkdir(root, { recursive: true });

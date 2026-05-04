@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { resolveToolPath } from "../../../lib/tool-paths.ts";
+import { resolveToolPath } from "../../../lib/tool-paths";
 import { zxInitPathFromWorkspace } from "./zx-init-probe";
 
 let buckReaperStateFile: string | null = null;

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getPositionals } from "../lib/cli.ts";
+import { getPositionals } from "../lib/cli";
 
 async function exists(p: string) {
   try {

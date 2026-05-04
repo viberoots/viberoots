@@ -3,7 +3,7 @@ import type {
   DeploymentAttestationPolicy,
   DeploymentSbomPolicy,
   DeploymentSupplyChainGatePolicy,
-} from "./deployment-admission-supply-chain.ts";
+} from "./deployment-admission-supply-chain";
 
 function policyError(ref: string, message: string): string {
   return `${ref}: ${message}`;

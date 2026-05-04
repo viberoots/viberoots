@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
-import type { DeploymentTarget } from "./contract.ts";
+import type { DeploymentTarget } from "./contract";
 
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);

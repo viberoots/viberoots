@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { classificationRegistryEntry } from "../../buck/exporter/lang/classification-registry.ts";
+import { classificationRegistryEntry } from "../../buck/exporter/lang/classification-registry";
 
 test("language classification registry is stable contract data", () => {
   const go = classificationRegistryEntry("go");

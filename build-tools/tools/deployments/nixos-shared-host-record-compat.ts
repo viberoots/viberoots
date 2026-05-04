@@ -1,22 +1,19 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
-import { NIXOS_SHARED_HOST_PROVIDER, type NixosSharedHostDeployment } from "./contract.ts";
-import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
-import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
-import type { NixosSharedHostMutationAuthority } from "./nixos-shared-host-control-plane-contract.ts";
-import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
-import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
+import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records";
+import { NIXOS_SHARED_HOST_PROVIDER, type NixosSharedHostDeployment } from "./contract";
+import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission";
+import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results";
+import type { NixosSharedHostMutationAuthority } from "./nixos-shared-host-control-plane-contract";
+import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout";
+import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan";
 import type {
   NixosSharedHostFailedStep,
   NixosSharedHostFinalOutcome,
   NixosSharedHostOperationKind,
   NixosSharedHostRunClassification,
-} from "./nixos-shared-host-records.ts";
-import type {
-  DeploymentSmokeException,
-  DeploymentSmokeOutcome,
-} from "./deployment-smoke-policy.ts";
-import { nixosSharedHostRunnerIdentities } from "./nixos-shared-host-provenance.ts";
+} from "./nixos-shared-host-records";
+import type { DeploymentSmokeException, DeploymentSmokeOutcome } from "./deployment-smoke-policy";
+import { nixosSharedHostRunnerIdentities } from "./nixos-shared-host-provenance";
 
 const CURRENT_NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-10";
 

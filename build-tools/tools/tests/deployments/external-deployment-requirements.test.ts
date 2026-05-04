@@ -4,8 +4,8 @@ import { test } from "node:test";
 import {
   ambientProviderEnvBypassErrors,
   validateExternalRequirementProfiles,
-} from "../../deployments/external-deployment-requirements.ts";
-import { deploymentRequirementFixture } from "./deployment-metadata.fixture.ts";
+} from "../../deployments/external-deployment-requirements";
+import { deploymentRequirementFixture } from "./deployment-metadata.fixture";
 
 test("external requirement profiles validate required secrets and runtime config", () => {
   const errors = validateExternalRequirementProfiles({

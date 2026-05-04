@@ -4,8 +4,8 @@ import {
   prewarmSolverRuntimeAssets,
   resetSolverRuntimeForTests,
   setSolverWorkerFactoryForTests,
-} from "../src/game/solver/solver-runtime.ts";
-import { resetSolverWasmForTests } from "../src/game/solver/wasm-runtime.ts";
+} from "../src/game/solver/solver-runtime";
+import { resetSolverWasmForTests } from "../src/game/solver/wasm-runtime";
 
 describe("solver runtime prewarm", () => {
   const initialWorkerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");

@@ -13,7 +13,7 @@ test("readGraph handles array shape", async () => {
     const dir = path.join(tmp, "build-tools", "tools", "buck");
     await fsp.mkdir(dir, { recursive: true });
     await fsp.writeFile(path.join(dir, "graph.json"), JSON.stringify(nodes), "utf8");
-    const { readGraph } = await import("../../lib/graph.ts");
+    const { readGraph } = await import("../../lib/graph");
     const list = await readGraph(path.join(dir, "graph.json"));
     if (!Array.isArray(list) || list.length !== 2) {
       console.error("expected two nodes from array graph");
@@ -38,7 +38,7 @@ test("readGraph handles object-map shape", async () => {
     const dir = path.join(tmp, "build-tools", "tools", "buck");
     await fsp.mkdir(dir, { recursive: true });
     await fsp.writeFile(path.join(dir, "graph.json"), JSON.stringify(nodes), "utf8");
-    const { readGraph } = await import("../../lib/graph.ts");
+    const { readGraph } = await import("../../lib/graph");
     const list = await readGraph(path.join(dir, "graph.json"));
     if (!Array.isArray(list) || list.length !== 2) {
       console.error("expected two nodes from object-map graph");

@@ -2,16 +2,16 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { providerTargetIdentityFor } from "../../deployments/contract.ts";
-import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator.ts";
+import { providerTargetIdentityFor } from "../../deployments/contract";
+import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator";
 import {
   queryDeploymentNodes,
   resolveDeploymentFromTarget,
-} from "../../deployments/deployment-query.ts";
-import { extractDeploymentAdmissionPolicies } from "../../deployments/deployment-policy.ts";
-import { writeTempReadinessFrontDoorWorkspace } from "./deploy.front-door-readiness.fixture.ts";
-import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "../../deployments/deployment-query";
+import { extractDeploymentAdmissionPolicies } from "../../deployments/deployment-policy";
+import { writeTempReadinessFrontDoorWorkspace } from "./deploy.front-door-readiness.fixture";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
+import { runInTemp } from "../lib/test-helpers";
 
 const DEPLOYMENT_LABEL = "//projects/deployments/console-staging:deploy";
 const POLICY_LABEL = "//projects/deployments/shared:staging_release";

@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { queryBackend } from "../../deployments/nixos-shared-host-control-plane-backend-db.ts";
+import { queryBackend } from "../../deployments/nixos-shared-host-control-plane-backend-db";
 
 type BackendTarget = {
   recordsRoot: string;

@@ -6,8 +6,8 @@ import {
   authorizeControlPlaneRunAction,
   authorizeControlPlaneSubmit,
   grantsFor,
-} from "../../deployments/deployment-control-plane-authz.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+} from "../../deployments/deployment-control-plane-authz";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 
 test("authorization diagnostics distinguish missing submitter, admission_reporter, and approver grants", () => {
   const deployment = cloudflarePagesDeploymentFixture();

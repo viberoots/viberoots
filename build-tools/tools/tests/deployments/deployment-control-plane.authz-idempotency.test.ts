@@ -8,11 +8,11 @@ import {
   authorizeControlPlaneRunAction,
   authorizeControlPlaneSubmit,
   grantsFor,
-} from "../../deployments/deployment-control-plane-authz.ts";
-import { resolveSubmitIdempotency } from "../../deployments/deployment-control-plane-idempotency.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+} from "../../deployments/deployment-control-plane-authz";
+import { resolveSubmitIdempotency } from "../../deployments/deployment-control-plane-idempotency";
+import { runInTemp } from "../lib/test-helpers";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 test("control-plane RBAC keeps submitter and operator scopes distinct", () => {
   const deployment = cloudflarePagesDeploymentFixture();

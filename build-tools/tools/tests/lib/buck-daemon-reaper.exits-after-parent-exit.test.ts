@@ -5,7 +5,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { resolveToolPathSync } from "../../lib/tool-paths.ts";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 
 function startSignatureForPid(pid: number, timeoutMs: number) {
   const psPath = resolveToolPathSync("ps");

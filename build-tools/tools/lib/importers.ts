@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getImporterRootsContract } from "./importer-roots.ts";
-import { defaultLockfileBasenameForLang, findPnpmLockfiles, findUvLockfiles } from "./lockfiles.ts";
-import { toPosixPath } from "./posix-path.ts";
+import { getImporterRootsContract } from "./importer-roots";
+import { defaultLockfileBasenameForLang, findPnpmLockfiles, findUvLockfiles } from "./lockfiles";
+import { toPosixPath } from "./posix-path";
 
 /**
  * Find importer lockfiles given simple filename globs.

@@ -1,9 +1,9 @@
-import { shortHash } from "./short-hash.ts";
+import { shortHash } from "./short-hash";
 import {
   normalizeNixAttr,
   providerNameForImporter,
   providerNameForNixAttr,
-} from "./provider-names.ts";
+} from "./provider-names";
 
 export const encodeForPatchFilename = (s: string) => s.replace(/\//g, "__");
 export const decodeFromPatchFilename = (s: string) => s.replace(/__/g, "/");
@@ -66,6 +66,6 @@ export {
   normalizeNixAttr,
   providerNameForImporter,
   providerNameForNixAttr,
-} from "./provider-names.ts";
+} from "./provider-names";
 
-export { shortHash } from "./short-hash.ts";
+export { shortHash } from "./short-hash";

@@ -1,25 +1,25 @@
 #!/usr/bin/env zx-wrapper
-import { requireNixosSharedHostAdmittedArtifactPath } from "./nixos-shared-host-artifacts.ts";
-import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention.ts";
+import { requireNixosSharedHostAdmittedArtifactPath } from "./nixos-shared-host-artifacts";
+import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results";
+import type { NixosSharedHostDeployment } from "./contract";
+import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention";
 import {
   readBackendDeployRecordEnvelopeByDeployRunId,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
+} from "./nixos-shared-host-control-plane-backend";
 import {
   liveRollbackCompatibilityErrors,
   recordedReplayPolicyErrors,
   replayRunnerCompatibilityErrors,
   rollbackSourceEligibilityErrors,
   sameDeploymentReplayErrors,
-} from "./nixos-shared-host-replay-guardrails.ts";
-import { type NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
+} from "./nixos-shared-host-replay-guardrails";
+import { type NixosSharedHostDeployRecord } from "./nixos-shared-host-records";
 import {
   nixosSharedHostReplayArtifactIdentity,
   readNixosSharedHostReplaySnapshot,
   type NixosSharedHostReplaySnapshot,
-} from "./nixos-shared-host-replay-snapshot.ts";
+} from "./nixos-shared-host-replay-snapshot";
 
 export {
   NIXOS_SHARED_HOST_REPLAY_SNAPSHOT_SCHEMA,
@@ -29,7 +29,7 @@ export {
   writeNixosSharedHostReplayComponentResults,
   writeNixosSharedHostReplaySnapshot,
   type NixosSharedHostReplaySnapshot,
-} from "./nixos-shared-host-replay-snapshot.ts";
+} from "./nixos-shared-host-replay-snapshot";
 
 function requireReplaySnapshotPath(record: NixosSharedHostDeployRecord): string {
   if (typeof record.replaySnapshotPath === "string" && record.replaySnapshotPath.trim()) {

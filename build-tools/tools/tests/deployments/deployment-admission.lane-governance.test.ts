@@ -2,13 +2,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import path from "node:path";
-import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator.ts";
-import { createServiceOwnedLaneGovernanceResolver } from "../../deployments/deployment-lane-governance-service.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator";
+import { createServiceOwnedLaneGovernanceResolver } from "../../deployments/deployment-lane-governance-service";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 import {
   nixosSharedHostLaneGovernanceFixture,
   reviewedLaneAdmissionEvidenceFixture,
-} from "./deployment-lane-governance.fixture.ts";
+} from "./deployment-lane-governance.fixture";
 
 function admittedContextFixture() {
   return {

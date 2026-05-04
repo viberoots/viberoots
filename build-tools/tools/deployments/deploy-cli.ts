@@ -1,27 +1,28 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
-import { maybeHandleDeploymentAdminCli } from "./deployment-admin-keycloak-cli.ts";
-import { maybeHandleDeploymentAuthCli } from "./deployment-auth-diagnostics.ts";
-import {
-  hasAdmitOnlyFlag,
-  resolveDeploymentAdmissionEvidence,
-} from "./deployment-admission-cli.ts";
-import { resolveDeploymentForCli } from "./deployment-cli-resolve.ts";
+import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli";
+import { maybeHandleDeploymentAdminCli } from "./deployment-admin-keycloak-cli";
+import { maybeHandleDeploymentAuthCli } from "./deployment-auth-diagnostics";
+import { hasAdmitOnlyFlag, resolveDeploymentAdmissionEvidence } from "./deployment-admission-cli";
+import { resolveDeploymentForCli } from "./deployment-cli-resolve";
 import {
   assertDeployCliReadonlyGuardrails,
   maybeHandleReadonlyDeployCli,
   readDeployCliReadonlyFlags,
-} from "./deploy-cli-readonly.ts";
-import { listDeploymentsForCli, printDeployJson } from "./deploy-front-door.ts";
-import { resolveSmokeConnectOverride } from "./deployment-cli-smoke.ts";
+} from "./deploy-cli-readonly";
+import { listDeploymentsForCli, printDeployJson } from "./deploy-front-door";
+import { resolveSmokeConnectOverride } from "./deployment-cli-smoke";
 import {
   cleanupDeploymentVaultRuntime,
   prepareDeploymentVaultRuntime,
-} from "./deployment-vault-runtime.ts";
-import { activateDeploymentSecretContext } from "./deployment-secret-context.ts";
-import { assertNoProtectedSharedClientCredentialInputs } from "./deployment-service-client-contract.ts";
-import { isCloudflarePagesDeployment, isNixosSharedHostDeployment } from "./contract.ts";
-import { runProviderDeployFrontDoor } from "./deploy-cli-provider-dispatch.ts";
+} from "./deployment-vault-runtime";
+import { activateDeploymentSecretContext } from "./deployment-secret-context";
+import { assertNoProtectedSharedClientCredentialInputs } from "./deployment-service-client-contract";
+import {
+  isCloudflarePagesDeployment,
+  isKubernetesDeployment,
+  isNixosSharedHostDeployment,
+} from "./contract";
+import { runProviderDeployFrontDoor } from "./deploy-cli-provider-dispatch";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();
@@ -38,7 +39,7 @@ export async function runDeployCli(opts: {
   if (await maybeHandleDeploymentAdminCli(opts.workspaceRoot)) return;
   if (await maybeHandleDeploymentAuthCli(opts.workspaceRoot)) return;
   if (getFlagBool("from-changes")) {
-    const { runFromChangesCli } = await import("./deployment-from-changes-cli.ts");
+    const { runFromChangesCli } = await import("./deployment-from-changes-cli");
     await runFromChangesCli(opts.workspaceRoot);
     return;
   }
@@ -112,7 +113,9 @@ export async function runDeployCli(opts: {
   const serviceBackedWorkerRuntime =
     opts.publicFrontDoor &&
     deployment.protectionClass !== "local_only" &&
-    (isNixosSharedHostDeployment(deployment) || isCloudflarePagesDeployment(deployment));
+    (isNixosSharedHostDeployment(deployment) ||
+      isCloudflarePagesDeployment(deployment) ||
+      isKubernetesDeployment(deployment));
   const vaultRuntime = serviceBackedWorkerRuntime
     ? { minted: false }
     : await prepareDeploymentVaultRuntime({

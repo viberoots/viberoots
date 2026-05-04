@@ -1,33 +1,33 @@
 #!/usr/bin/env zx-wrapper
-import { defaultRequestedBy } from "./deployment-admission-evidence.ts";
+import { defaultRequestedBy } from "./deployment-admission-evidence";
 import {
   type NixosSharedHostControlPlaneBackendTarget,
   writeBackendSnapshotDoc,
   writeBackendSubmissionDoc,
-} from "./nixos-shared-host-control-plane-backend.ts";
-import { queueBackendSubmissionForLock } from "./nixos-shared-host-control-plane-backend-submit.ts";
+} from "./nixos-shared-host-control-plane-backend";
+import { queueBackendSubmissionForLock } from "./nixos-shared-host-control-plane-backend-submit";
 import {
   executionSnapshotPathFor,
   submissionPathFor,
-} from "./nixos-shared-host-control-plane-store.ts";
-import type { CloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-contract.ts";
-import { createCloudflarePagesControlPlaneSubmission } from "./cloudflare-pages-control-plane-submission.ts";
-import type { CloudflarePagesControlPlaneSubmitRequest } from "./cloudflare-pages-control-plane-api-contract.ts";
-import { type ResolvedCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit.ts";
-import { createCloudflarePagesDeployRunId } from "./cloudflare-pages-records.ts";
+} from "./nixos-shared-host-control-plane-store";
+import type { CloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-contract";
+import { createCloudflarePagesControlPlaneSubmission } from "./cloudflare-pages-control-plane-submission";
+import type { CloudflarePagesControlPlaneSubmitRequest } from "./cloudflare-pages-control-plane-api-contract";
+import { type ResolvedCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit";
+import { createCloudflarePagesDeployRunId } from "./cloudflare-pages-records";
 import type {
   DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneServiceInstance,
-} from "./deployment-control-plane-contract.ts";
-import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
-import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution.ts";
+} from "./deployment-control-plane-contract";
+import { redactDeploymentAuthText } from "./deployment-auth-redaction";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
+import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution";
 import {
   buildCloudflarePagesBackendSnapshot,
   type CloudflarePagesBackendSnapshot,
-} from "./cloudflare-pages-control-plane-backend-snapshot.ts";
+} from "./cloudflare-pages-control-plane-backend-snapshot";
 
 type RequestDedupe = {
   mode: "created" | "reused";

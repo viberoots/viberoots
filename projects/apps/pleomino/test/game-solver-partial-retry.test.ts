@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SolverRequest } from "../src/game/solver/solver-types.ts";
+import type { SolverRequest } from "../src/game/solver/solver-types";
 
 const runSolverSearchInWasm = vi.fn();
 
@@ -8,7 +8,7 @@ vi.mock("../src/game/solver/wasm-runtime.ts", () => ({
 }));
 
 describe("solver partial-board retries", async () => {
-  const { solveBoardWithWasm } = await import("../src/game/solver/solver.ts");
+  const { solveBoardWithWasm } = await import("../src/game/solver/solver");
 
   afterEach(() => {
     runSolverSearchInWasm.mockReset();

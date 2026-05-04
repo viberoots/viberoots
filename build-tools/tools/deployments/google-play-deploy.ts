@@ -4,32 +4,32 @@ import {
   admitGooglePlayArtifact,
   requireAdmittedGooglePlayArtifactPath,
   type AdmittedGooglePlayArtifact,
-} from "./google-play-artifacts.ts";
-import { resolveInitialGooglePlayAdmittedContext } from "./google-play-admission.ts";
-import { prepareGooglePlayPublisherConfig } from "./google-play-config.ts";
+} from "./google-play-artifacts";
+import { resolveInitialGooglePlayAdmittedContext } from "./google-play-admission";
+import { prepareGooglePlayPublisherConfig } from "./google-play-config";
 import {
   assertHealthyGooglePlayRelease,
   publishGooglePlayMobileApp,
-} from "./google-play-publisher.ts";
+} from "./google-play-publisher";
 import {
   createGooglePlayDeployRecord,
   createGooglePlayDeployRunId,
   writeGooglePlayDeployRecord,
   type GooglePlayDeployRecord,
-} from "./google-play-records.ts";
-import { writeGooglePlayReplaySnapshot } from "./google-play-replay.ts";
-import type { GooglePlayDeployment } from "./contract.ts";
-import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
+} from "./google-play-records";
+import { writeGooglePlayReplaySnapshot } from "./google-play-replay";
+import type { GooglePlayDeployment } from "./contract";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy";
 import {
   mergeExecutionPolicyFacts,
   publishWithFailClosedRetry,
-} from "./mobile-store-deploy-shared.ts";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
-import { evaluateMobileStoreReleaseHealth } from "./mobile-store-secret-runtime.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
+} from "./mobile-store-deploy-shared";
+import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
+import { evaluateMobileStoreReleaseHealth } from "./mobile-store-secret-runtime";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
 
 export async function publishRecordedGooglePlayArtifact(opts: {
   workspaceRoot: string;

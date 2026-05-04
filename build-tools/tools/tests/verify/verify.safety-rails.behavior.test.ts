@@ -8,7 +8,7 @@ import {
   pollVerifySafetyRailsOnce,
   summarizeVerifySafetyRailsTelemetry,
   writeVerifySafetyRailsTriggerSnapshot,
-} from "../../dev/verify/safety-rails.ts";
+} from "../../dev/verify/safety-rails";
 
 async function readText(p: string): Promise<string> {
   return await fsp.readFile(p, "utf8");

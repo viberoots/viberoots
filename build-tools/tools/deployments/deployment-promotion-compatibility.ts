@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
-import { edgeAllowsCrossProviderPromotion } from "./deployment-lane-promotion-compatibility.ts";
+import type { DeploymentTarget } from "./contract";
+import { edgeAllowsCrossProviderPromotion } from "./deployment-lane-promotion-compatibility";
 import {
   componentIds,
   componentKinds,
@@ -10,8 +10,8 @@ import {
   promotionCompatibilityFamily,
   provisionerTypeFor,
   rolloutSignature,
-} from "./deployment-promotion-contract.ts";
-import { opentofuPromotionCompatibilityErrors } from "./opentofu-stack.ts";
+} from "./deployment-promotion-contract";
+import { opentofuPromotionCompatibilityErrors } from "./opentofu-stack";
 
 type PromotionSourceLike = {
   record: { finalOutcome?: string; publishMode?: string; deploymentId: string };

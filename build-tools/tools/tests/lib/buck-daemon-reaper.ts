@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { resolveToolPathSync } from "../../lib/tool-paths.ts";
-import { cwdIsInsideTempRepo } from "./buck-daemon-reaper-utils.ts";
+import { resolveToolPathSync } from "../../lib/tool-paths";
+import { cwdIsInsideTempRepo } from "./buck-daemon-reaper-utils";
 import {
   cleanupRegisteredVerifyProcesses,
   parseVerifyOwnedState,

@@ -2,9 +2,9 @@
 import type {
   DeploymentComponentKind,
   DeploymentDefaultSmokeClass,
-} from "./deployment-component-kinds.ts";
-import { defaultSmokeClassForComponentKind } from "./deployment-component-kinds.ts";
-import type { DeploymentSmokePolicy } from "./deployment-smoke-policy.ts";
+} from "./deployment-component-kinds";
+import { defaultSmokeClassForComponentKind } from "./deployment-component-kinds";
+import type { DeploymentSmokePolicy } from "./deployment-smoke-policy";
 
 export type DeploymentSmokeBudgetSource =
   | "component_kind_default"

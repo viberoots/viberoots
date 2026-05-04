@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import type { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator.ts";
-import { providerTargetIdentityFor } from "../../deployments/contract.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import type { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator";
+import { providerTargetIdentityFor } from "../../deployments/contract";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 type ReviewedDeployment = ReturnType<typeof nixosSharedHostDeploymentFixture>;
 type AdmissionArgs = Parameters<typeof evaluateDeploymentAdmission>[0];

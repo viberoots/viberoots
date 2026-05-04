@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { deploymentError, pushRolloutPolicyFieldErrors } from "./contract-extract-shared.ts";
-import type { AppStoreConnectDeployment } from "./contract-types.ts";
+import { deploymentError, pushRolloutPolicyFieldErrors } from "./contract-extract-shared";
+import type { AppStoreConnectDeployment } from "./contract-types";
 
 export function pushAppStoreConnectRolloutErrors(opts: {
   label: string;

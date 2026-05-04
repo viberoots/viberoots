@@ -1,24 +1,24 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+import type { DeploymentTarget } from "./contract";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 import {
   createDeploymentAdmissionBinding,
   requiredCheckSubjectsFor,
   type DeploymentAdmissionOperationKind,
-} from "./deployment-admission-binding.ts";
+} from "./deployment-admission-binding";
 import type {
   DeploymentAdmissionCheckFact,
   DeploymentAdmissionEvidence,
   DeploymentCheckEvidence,
   DeploymentPolicyBinding,
   DeploymentPrerequisiteFact,
-} from "./deployment-admission-evidence.ts";
-import { resolveAllDeployments } from "./deployment-query.ts";
+} from "./deployment-admission-evidence";
+import { resolveAllDeployments } from "./deployment-query";
 import {
   latestSuccessfulDeploymentRecord,
   sourceAdmissionChecks,
   type DeploymentRunRecordLike,
-} from "./deployment-admission-records.ts";
+} from "./deployment-admission-records";
 
 export type AdmittedContextLike = {
   source: {

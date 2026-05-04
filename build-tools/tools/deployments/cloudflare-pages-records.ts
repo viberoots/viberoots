@@ -2,25 +2,22 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { readVersionedJson } from "./deployment-schema-compat.ts";
-import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
-import type { CloudflarePagesControlPlaneWorkerAuthority } from "./cloudflare-pages-control-plane-contract.ts";
-import type { CloudflarePagesPublishMode } from "./cloudflare-pages-control-plane-contract.ts";
-import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
-import type {
-  DeploymentSmokeException,
-  DeploymentSmokeOutcome,
-} from "./deployment-smoke-policy.ts";
+import { readVersionedJson } from "./deployment-schema-compat";
+import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission";
+import type { CloudflarePagesControlPlaneWorkerAuthority } from "./cloudflare-pages-control-plane-contract";
+import type { CloudflarePagesPublishMode } from "./cloudflare-pages-control-plane-contract";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy";
+import type { DeploymentSmokeException, DeploymentSmokeOutcome } from "./deployment-smoke-policy";
 import type {
   CloudflarePagesPreviewCleanupReason,
   CloudflarePagesPreviewIdentitySelector,
-} from "./cloudflare-pages-preview.ts";
-import { CLOUDFLARE_PAGES_PROVIDER, type CloudflarePagesDeployment } from "./contract.ts";
+} from "./cloudflare-pages-preview";
+import { CLOUDFLARE_PAGES_PROVIDER, type CloudflarePagesDeployment } from "./contract";
 import {
   cloudflarePagesRunnerIdentities,
   type DeploymentRunnerIdentities,
-} from "./deployment-runner-identities.ts";
-import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
+} from "./deployment-runner-identities";
+import { operatorErrorFields } from "./deployment-control-plane-redaction";
 
 export const CLOUDFLARE_PAGES_RECORD_SCHEMA = "deploy-record@2026-04-10";
 

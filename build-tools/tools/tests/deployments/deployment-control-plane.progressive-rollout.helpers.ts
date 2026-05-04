@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime.ts";
-import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime";
+import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 export function progressiveFixture() {
   return nixosSharedHostDeploymentFixture({

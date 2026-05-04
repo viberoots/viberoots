@@ -1,19 +1,19 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { GraphNode } from "../../lib/graph.ts";
+import type { GraphNode } from "../../lib/graph";
 import {
   deriveCloudflarePagesProviderTarget,
   extractCloudflarePagesDeployments,
-} from "../../deployments/contract.ts";
-import { deriveCloudflarePagesPreviewTarget } from "../../deployments/cloudflare-pages-preview.ts";
+} from "../../deployments/contract";
+import { deriveCloudflarePagesPreviewTarget } from "../../deployments/cloudflare-pages-preview";
 import {
   cloudflarePagesAdmissionPolicyNodeFixture,
   cloudflarePagesDeploymentFixture,
   cloudflarePagesLaneGovernanceNodeFixture,
   cloudflarePagesLanePolicyNodeFixture,
   cloudflarePagesPreviewFixture,
-} from "./cloudflare-pages.fixture.ts";
+} from "./cloudflare-pages.fixture";
 
 function staticWebappComponent(label: string): GraphNode {
   return {

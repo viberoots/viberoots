@@ -2,8 +2,37 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { spawn } from "node:child_process";
-import { resolveToolPath } from "../../lib/tool-paths.ts";
-import { latestSymlink, lockDir, logsDir } from "./paths.ts";
+import { resolveToolPath } from "../../lib/tool-paths";
+import { workspaceRoot } from "./paths";
+
+function lockPidPath(root: string): string {
+  return path.join(root, "buck-out", "tmp", "verify-lock", "pid");
+}
+function lockLogPath(root: string): string {
+  return path.join(root, "buck-out", "tmp", "verify-lock", "log");
+}
+function logsDirFor(root: string): string {
+  return path.join(root, "buck-out", "tmp", "verify-logs");
+}
+function latestSymlinkFor(root: string): string {
+  return path.join(logsDirFor(root), "latest.log");
+}
+
+async function worktreeRoots(): Promise<string[]> {
+  try {
+    const wtParent = path.join(workspaceRoot, ".claude", "worktrees");
+    const entries = await fs.readdir(wtParent);
+    return entries.map((n) => path.join(wtParent, n));
+  } catch {
+    return [];
+  }
+}
+
+async function candidateRoots(): Promise<string[]> {
+  const roots = new Set<string>([workspaceRoot]);
+  for (const r of await worktreeRoots()) roots.add(r);
+  return [...roots];
+}
 
 export type Resolution =
   | { pid: number; logPath: string; active: boolean }
@@ -94,37 +123,64 @@ async function readText(p: string): Promise<string> {
 }
 
 async function newestVerifyLog(): Promise<string | null> {
-  try {
-    const entries = await fs.readdir(logsDir);
-    const candidates = entries
-      .filter((n) => /^verify-.*\.log$/.test(n))
-      .map((n) => path.join(logsDir, n));
-    let best: { p: string; m: number } | null = null;
-    for (const p of candidates) {
-      const st = await fs.stat(p).catch(() => null);
-      const m = st ? st.mtimeMs : -1;
-      if (m > 0 && (!best || m > best.m)) best = { p, m };
-    }
-    if (!best) return null;
-    return await fs.realpath(best.p).catch(() => best.p);
-  } catch {
-    return null;
+  let best: { p: string; m: number } | null = null;
+  for (const root of await candidateRoots()) {
+    const dir = logsDirFor(root);
+    try {
+      const entries = await fs.readdir(dir);
+      const candidates = entries
+        .filter((n) => /^verify-.*\.log$/.test(n))
+        .map((n) => path.join(dir, n));
+      for (const p of candidates) {
+        const st = await fs.stat(p).catch(() => null);
+        const m = st ? st.mtimeMs : -1;
+        if (m > 0 && (!best || m > best.m)) best = { p, m };
+      }
+    } catch {}
   }
+  if (!best) return null;
+  return await fs.realpath(best.p).catch(() => best.p);
+}
+
+async function bestLiveLock(): Promise<{ pid: number; logPath: string } | null> {
+  let best: { pid: number; logPath: string; mtime: number } | null = null;
+  for (const root of await candidateRoots()) {
+    const pidFile = lockPidPath(root);
+    const logFile = lockLogPath(root);
+    const pidRaw = await readText(pidFile);
+    const logRaw = await readText(logFile);
+    const pid = pidRaw && isInt(pidRaw) ? Number(pidRaw) : 0;
+    if (pid <= 0 || !logRaw) continue;
+    if (!(await pidAlive(pid))) continue;
+    const st = await fs.stat(pidFile).catch(() => null);
+    const m = st ? st.mtimeMs : 0;
+    if (!best || m > best.mtime) {
+      const lp = await fs.realpath(logRaw).catch(() => logRaw);
+      best = { pid, logPath: lp, mtime: m };
+    }
+  }
+  if (!best) return null;
+  return { pid: best.pid, logPath: best.logPath };
+}
+
+async function bestLatestSymlink(): Promise<string | null> {
+  let best: { p: string; m: number } | null = null;
+  for (const root of await candidateRoots()) {
+    try {
+      const real = await fs.realpath(latestSymlinkFor(root));
+      const st = await fs.stat(real);
+      if (!best || st.mtimeMs > best.m) best = { p: real, m: st.mtimeMs };
+    } catch {}
+  }
+  return best?.p ?? null;
 }
 
 export async function resolveLatest(): Promise<Resolution> {
-  const lockedPidRaw = await readText(path.join(lockDir, "pid"));
-  const lockedLogRaw = await readText(path.join(lockDir, "log"));
-  const lockedPid = lockedPidRaw && isInt(lockedPidRaw) ? Number(lockedPidRaw) : 0;
-  if (lockedPid > 0 && (await pidAlive(lockedPid)) && lockedLogRaw) {
-    const lp = await fs.realpath(lockedLogRaw).catch(() => lockedLogRaw);
-    return { pid: lockedPid, logPath: lp, active: true };
-  }
+  const live = await bestLiveLock();
+  if (live) return { pid: live.pid, logPath: live.logPath, active: true };
 
-  try {
-    const lp = await fs.realpath(latestSymlink);
-    return { pid: 0, logPath: lp, active: false };
-  } catch {}
+  const sym = await bestLatestSymlink();
+  if (sym) return { pid: 0, logPath: sym, active: false };
 
   const newest = await newestVerifyLog();
   if (newest) return { pid: 0, logPath: newest, active: false };
@@ -133,21 +189,20 @@ export async function resolveLatest(): Promise<Resolution> {
 
 export async function resolvePid(pid: number): Promise<Resolution> {
   const active = await pidAlive(pid);
-  const lockedPidRaw = await readText(path.join(lockDir, "pid"));
-  const lockedLogRaw = await readText(path.join(lockDir, "log"));
-  if (lockedPidRaw && lockedLogRaw && lockedPidRaw === String(pid)) {
-    const lp = await fs.realpath(lockedLogRaw).catch(() => lockedLogRaw);
-    return { pid, logPath: lp, active };
+  for (const root of await candidateRoots()) {
+    const lockedPidRaw = await readText(lockPidPath(root));
+    const lockedLogRaw = await readText(lockLogPath(root));
+    if (lockedPidRaw && lockedLogRaw && lockedPidRaw === String(pid)) {
+      const lp = await fs.realpath(lockedLogRaw).catch(() => lockedLogRaw);
+      return { pid, logPath: lp, active };
+    }
+    const dir = logsDirFor(root);
+    const byPid = path.join(dir, "by-pid", `${pid}.log`);
+    const lp = await fs.realpath(byPid).catch(() => null);
+    if (lp) return { pid, logPath: lp, active };
+    const legacy = path.join(dir, `verify-${pid}.log`);
+    const lp2 = await fs.realpath(legacy).catch(() => null);
+    if (lp2) return { pid, logPath: lp2, active };
   }
-  const byPid = path.join(logsDir, "by-pid", `${pid}.log`);
-  try {
-    const lp = await fs.realpath(byPid);
-    return { pid, logPath: lp, active };
-  } catch {}
-  const legacy = path.join(logsDir, `verify-${pid}.log`);
-  try {
-    const lp = await fs.realpath(legacy);
-    return { pid, logPath: lp, active };
-  } catch {}
   return { pid, logPath: null, error: `log file not found for pid ${pid}`, active };
 }

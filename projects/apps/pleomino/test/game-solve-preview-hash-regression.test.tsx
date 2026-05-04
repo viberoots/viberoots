@@ -2,16 +2,16 @@
 import React from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadPersistedGameStateFromHash } from "../src/game/persistence.ts";
-import * as solverRuntime from "../src/game/solver/solver-runtime.ts";
-import { createInitialGameHistoryState, createInitialGameState } from "../src/game/state.ts";
-import { pleominoGameReducer } from "../src/game/reducer.ts";
-import { selectGameViewModel } from "../src/game/selectors.ts";
-import type { GameHistoryState, GameState } from "../src/game/types.ts";
-import { GameScreen } from "../src/ui/game-screen.tsx";
+import { loadPersistedGameStateFromHash } from "../src/game/persistence";
+import * as solverRuntime from "../src/game/solver/solver-runtime";
+import { createInitialGameHistoryState, createInitialGameState } from "../src/game/state";
+import { pleominoGameReducer } from "../src/game/reducer";
+import { selectGameViewModel } from "../src/game/selectors";
+import type { GameHistoryState, GameState } from "../src/game/types";
+import { GameScreen } from "../src/ui/game-screen";
 
 vi.mock("../src/game/solver/solver-runtime.ts", async () => {
-  const actual = await vi.importActual<typeof import("../src/game/solver/solver-runtime.ts")>(
+  const actual = await vi.importActual<typeof import("../src/game/solver/solver-runtime")>(
     "../src/game/solver/solver-runtime.ts",
   );
   return {

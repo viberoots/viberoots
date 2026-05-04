@@ -4,10 +4,10 @@ import path from "node:path";
 import {
   syncLocalPrefetchIntoPnpmStore,
   syncSourcePnpmStoreIntoLocalPrefetch,
-} from "../dev/update-pnpm-hash/prefetched-store.ts";
-import { withHiddenNodeModules } from "./pnpm-node-modules-guard.ts";
-import { parsePnpmLock } from "./pnpm-lock.ts";
-import { externalPnpmStateDirs, removeLegacyImporterPnpmState } from "./pnpm-state-paths.ts";
+} from "../dev/update-pnpm-hash/prefetched-store";
+import { withHiddenNodeModules } from "./pnpm-node-modules-guard";
+import { parsePnpmLock } from "./pnpm-lock";
+import { externalPnpmStateDirs, removeLegacyImporterPnpmState } from "./pnpm-state-paths";
 
 type PkgJson = {
   dependencies?: Record<string, string>;

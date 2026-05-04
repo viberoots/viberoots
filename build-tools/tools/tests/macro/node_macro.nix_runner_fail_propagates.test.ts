@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
   stageTempRepoPaths,
-} from "../lib/test-helpers/git-stage.ts";
+} from "../lib/test-helpers/git-stage";
 
 // Verify that the nix_node_test external runner propagates test failures to Buck (non-zero).
 const TEST_TIMEOUT_MS =

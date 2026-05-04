@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../lib/graph.ts";
+import type { GraphNode } from "../lib/graph";
 
 export type DeploymentRequirementStep =
   | "provision"

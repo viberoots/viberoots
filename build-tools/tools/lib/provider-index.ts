@@ -1,10 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import {
-  computeImporterLabel,
-  findImporterLockfiles,
-  isSupportedImporterLabel,
-} from "./importers.ts";
-import { providerNameForImporter } from "./providers.ts";
+import { computeImporterLabel, findImporterLockfiles, isSupportedImporterLabel } from "./importers";
+import { providerNameForImporter } from "./providers";
 
 export type ProviderIndexEntry = { provider: string; key: string };
 

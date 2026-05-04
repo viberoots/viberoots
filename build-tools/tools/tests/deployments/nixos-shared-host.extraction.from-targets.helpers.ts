@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { nodesFromCqueryJson } from "../../buck/exporter/cquery/nodes.ts";
-import { inheritedBuckIsolation } from "../lib/test-helpers.ts";
+import { nodesFromCqueryJson } from "../../buck/exporter/cquery/nodes";
+import { inheritedBuckIsolation } from "../lib/test-helpers";
 
 const DEPLOYMENT_CQUERY_ATTRS = [
   "name",

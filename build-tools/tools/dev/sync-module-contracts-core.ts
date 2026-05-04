@@ -1,24 +1,24 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { collectDeps } from "../lib/node-deps-enforcement-core.ts";
-import { toPosixPath } from "../lib/posix-path.ts";
-import { getImporterRootsContract } from "../lib/importer-roots.ts";
-import { sanitizeName } from "../lib/sanitize.ts";
-import { writeIfChanged } from "../lib/fs-helpers.ts";
-import { resolveModuleContractsPaths, type ModuleContractsPaths } from "./module-contract-paths.ts";
+import { collectDeps } from "../lib/node-deps-enforcement-core";
+import { toPosixPath } from "../lib/posix-path";
+import { getImporterRootsContract } from "../lib/importer-roots";
+import { sanitizeName } from "../lib/sanitize";
+import { writeIfChanged } from "../lib/fs-helpers";
+import { resolveModuleContractsPaths, type ModuleContractsPaths } from "./module-contract-paths";
 import {
   mergeWasmEntries,
   wasmEntriesFromTargets,
   type WasmEntry,
-} from "./module-contract-wasm-targets.ts";
+} from "./module-contract-wasm-targets";
 import {
   assetStageMetadataFromTargets,
   discoverTsModulesFromRoots,
   tsModuleRootsFromTargets,
   discoverWasmModulesFromRoots,
-} from "./module-surface-discovery.ts";
-import { moduleSurfaceRootsFromGraph } from "./module-surface-graph.ts";
+} from "./module-surface-discovery";
+import { moduleSurfaceRootsFromGraph } from "./module-surface-graph";
 
 type TsEntry = { moduleKey: string; sourceEntryPath: string; runtimeImportPath: string };
 

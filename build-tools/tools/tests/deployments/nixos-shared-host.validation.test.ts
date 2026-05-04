@@ -1,19 +1,19 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { extractNixosSharedHostDeployments } from "../../deployments/contract.ts";
-import { REVIEWED_NON_STATIC_COMPONENT_KINDS } from "../../deployments/deployment-provider-capabilities.ts";
-import type { GraphNode } from "../../lib/graph.ts";
+import { extractNixosSharedHostDeployments } from "../../deployments/contract";
+import { REVIEWED_NON_STATIC_COMPONENT_KINDS } from "../../deployments/deployment-provider-capabilities";
+import type { GraphNode } from "../../lib/graph";
 import {
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostLanePolicyNodeFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 import {
   deploymentNode,
   policyNodes,
   ssrWebappComponent,
   staticWebappComponent,
-} from "./nixos-shared-host.validation.helpers.ts";
+} from "./nixos-shared-host.validation.helpers";
 
 test("validation rejects duplicate app_name collisions", () => {
   const nodes: GraphNode[] = [

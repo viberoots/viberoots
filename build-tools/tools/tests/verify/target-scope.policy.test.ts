@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isNonBuildSystemOnlyVerifyTargets } from "../../dev/verify/target-scope.ts";
+import { isNonBuildSystemOnlyVerifyTargets } from "../../dev/verify/target-scope";
 
 test("non-build-system scope detection", () => {
   assert.equal(isNonBuildSystemOnlyVerifyTargets(["//projects/apps/my-app/..."]), true);

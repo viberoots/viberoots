@@ -2,26 +2,23 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { readVersionedJson } from "./deployment-schema-compat.ts";
-import type { AppStoreConnectAdmittedContext } from "./app-store-connect-admission.ts";
+import { readVersionedJson } from "./deployment-schema-compat";
+import type { AppStoreConnectAdmittedContext } from "./app-store-connect-admission";
 import type {
   AppStoreConnectReleaseHealth,
   AppStoreConnectRolloutState,
   AppStoreConnectTrackState,
-} from "./app-store-connect-publisher.ts";
-import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
-import type {
-  DeploymentSmokeException,
-  DeploymentSmokeOutcome,
-} from "./deployment-smoke-policy.ts";
-import type { AppStoreConnectDeployment } from "./contract.ts";
+} from "./app-store-connect-publisher";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy";
+import type { DeploymentSmokeException, DeploymentSmokeOutcome } from "./deployment-smoke-policy";
+import type { AppStoreConnectDeployment } from "./contract";
 import {
   appStoreConnectRunnerIdentities,
   type DeploymentRunnerIdentities,
-} from "./deployment-runner-identities.ts";
-import type { AdmittedMobileAppArtifact } from "./app-store-connect-artifacts.ts";
-import { APP_STORE_CONNECT_PROVIDER } from "./contract.ts";
-import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
+} from "./deployment-runner-identities";
+import type { AdmittedMobileAppArtifact } from "./app-store-connect-artifacts";
+import { APP_STORE_CONNECT_PROVIDER } from "./contract";
+import { operatorErrorFields } from "./deployment-control-plane-redaction";
 
 export const APP_STORE_CONNECT_RECORD_SCHEMA = "deploy-record@2026-04-10";
 

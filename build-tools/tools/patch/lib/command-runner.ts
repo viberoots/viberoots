@@ -1,4 +1,4 @@
-import { runManagedCommand } from "../../lib/managed-command.ts";
+import { runManagedCommand } from "../../lib/managed-command";
 
 export async function runPatchCommand(
   command: string,

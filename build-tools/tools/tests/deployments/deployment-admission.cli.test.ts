@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { resolveDeploymentAdmissionEvidence } from "../../deployments/deployment-admission-cli.ts";
-import { resolveDeploymentForCli } from "../../deployments/deployment-cli-resolve.ts";
-import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { resolveDeploymentAdmissionEvidence } from "../../deployments/deployment-admission-cli";
+import { resolveDeploymentForCli } from "../../deployments/deployment-cli-resolve";
+import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture";
+import { runInTemp } from "../lib/test-helpers";
 
 function withSyntheticArgv(args: string[], fn: () => Promise<void>): Promise<void> {
   const oldGlobal = (globalThis as Record<string, unknown>).argv;

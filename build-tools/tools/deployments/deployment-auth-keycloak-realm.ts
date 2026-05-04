@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
+import type { DeploymentTarget } from "./contract";
 import {
   normalizeDeploymentPkceCallbackProfile,
   urlHost,
-} from "./deployment-pkce-callback-profile.ts";
+} from "./deployment-pkce-callback-profile";
 import {
   reviewedAutomationGroupsForPrincipal,
   reviewedHumanGroupsForDeployment,
-} from "./deployment-auth-groups.ts";
+} from "./deployment-auth-groups";
 
 const DEFAULT_REALM = "deployments";
 const DEFAULT_CLIENT_ID = "deployment-cli";

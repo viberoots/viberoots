@@ -929,3 +929,367 @@ unreviewed ambient cluster access outside the repo's secret-runtime model.
 
 It adds another credential materialization path and more negative tests around provider environment
 handling.
+
+## PR-12.5: Repo-wide zx-init resolver hook (infrastructure only; sweep deferred)
+
+### 1. Intent
+
+Make the `zx-init.mjs` resolver hook (which auto-appends `.ts` to relative imports) reachable from
+every Node entry point in the repo, including nix-built derivations that run `node` inside hermetic
+sandboxes and shebang `#!/usr/bin/env zx-wrapper` invocations from temp scaffolding workspaces.
+This PR lands the resolver-hook plumbing only. The actual repo-wide `.ts`-extension sweep is
+deferred to a follow-up PR because two failure classes that surface during the sweep require their
+own surgery: contract tests that lock in the old `.ts`-extension convention, and vite/next dev
+servers that hang during scaffolding-test temp dev-server startup when bare imports interact with
+vite's own ESM resolver. Both are tractable but warrant a focused, separately-scoped PR.
+
+The dev-shell half of the hook landed in chore commit `255ee410` (`exec_in_dev_shell` exports
+`NODE_OPTIONS=--import=file://$LIVE_ROOT/.../zx-init.mjs`). This PR extends the hook to:
+
+- the nix-built `zx-wrapper` itself, which now walks up from `$PWD` (or honors `$ZX_INIT`) to
+  locate `build-tools/tools/dev/zx-init.mjs` and adds `--import` automatically,
+- the four nix derivations that invoke `node` against repo source (`node-webapp`, `node-service`,
+  `node-vercel-next`, `planner/node-webapp`),
+- the vite plugin in `projects/apps/pleomino/vite.config.ts` that spawns
+  `materialize-static-pwa-precache.ts` via `execFileSync`,
+- the `bulk-move` flake app.
+
+### 2. Scope of changes
+
+- Modify the nix-built `zx-wrapper` (defined in `build-tools/tools/nix/devshell.nix` and
+  `build-tools/tools/nix/flake/per-system-context.nix`) so it discovers `zx-init.mjs` at run time:
+  honor an explicit `$ZX_INIT` env var first; otherwise walk up from `$PWD` looking for
+  `build-tools/tools/dev/zx-init.mjs`. This single change covers every shebang `#!/usr/bin/env
+zx-wrapper` invocation in the repo (~99 spawn sites) without per-site edits, including the
+  ones spawned from temp scaffolding workspaces.
+- Thread `--import "$REPO_ROOT/build-tools/tools/dev/zx-init.mjs"` through the four nix derivations
+  that invoke `node` directly against repo source: `flake/packages/node-webapp.nix`,
+  `flake/packages/node-service.nix`, `flake/packages/node-vercel-next.nix`, and
+  `planner/node-webapp.nix`. These run `sync-module-contracts.ts`, `service-artifact.ts`, and
+  `next-artifact.ts` in hermetic sandboxes that strip `NODE_OPTIONS`, so the env-only hook from
+  `_env.sh` does not reach them.
+- Thread `--import` through the `bulk-move` flake app (`flake/outputs-apps.nix`) and the vite
+  plugin in `projects/apps/pleomino/vite.config.ts` that spawns
+  `materialize-static-pwa-precache.ts` via `execFileSync`.
+- Keep the dev-shell `NODE_OPTIONS` export from `_env.sh` (committed in `255ee410`) as the
+  dev-shell side of the contract.
+- Defer to a follow-up PR: the actual `.ts`-extension sweep across `.ts`/`.tsx` source files, plus
+  the matching contract-test updates (`webapp.phase3-runtime-consistency-policy.contract.test.ts`,
+  `webapp.phase4.guardrails.contract.test.ts`) and a lint rule preventing re-introduction. The
+  follow-up PR also has to characterize and fix the vite/next dev-server hang that surfaces in
+  `webapp-ssr-vite.dev-runtime-consistency.phase3.test.ts`-style tests when bare imports interact
+  with vite's own ESM resolver inside a temp scaffolded workspace.
+
+### 3. External prerequisites
+
+- None.
+
+### 4. Tests to be added
+
+- Contract test asserting that the nix-built `zx-wrapper` registers `zx-init.mjs` automatically
+  when invoked with `$PWD` inside a tree that contains `build-tools/tools/dev/zx-init.mjs`, and
+  also when invoked with an explicit `$ZX_INIT` env var pointing at a non-default location.
+- Contract test asserting that the four updated nix derivations
+  (`node-webapp`/`node-service`/`node-vercel-next`/`planner-node-webapp`) thread `--import` of
+  `zx-init.mjs` through their generated build phase.
+- The follow-up sweep PR will own the linter / `.ts`-extension regression tests; this PR does not
+  block on them.
+
+### 5. Docs to be added or updated
+
+- Add a short section to `build-tools/docs/build-system-design.md` (or the relevant build-system
+  doc) describing how the resolver hook is registered for dev-shell vs. nix-builder execution and
+  why redundant `.ts` extensions are no longer needed.
+- Update any developer onboarding/contributing notes that previously instructed authors to add
+  `.ts` extensions to relative imports.
+- Update this plan if the sweep boundaries or exception list change.
+
+### 6. Acceptance criteria
+
+- All existing tests pass at or better than the most recent recorded successful full-suite timing
+  baseline (PR-12 baseline 2443s).
+- Removing `.ts` from a relative `import` in any single representative source file does not break
+  either the dev-shell `i`/`b`/`v` flow or a nix-built derivation that runs `node`.
+- The dev-shell `NODE_OPTIONS` export from `_env.sh` (committed in `255ee410`) remains in place as
+  the dev-shell side of the contract; the new wrapper-side discovery is additive, not a
+  replacement.
+- The follow-up sweep PR can run a deterministic source-tree rewrite and remain green without
+  needing further infrastructure work.
+
+### 7. Risks
+
+- A nix derivation may execute `node` in a way the audit misses (e.g. a custom builder that strips
+  `NODE_OPTIONS` and never threads `--import`), causing a hard build break only after the sweep
+  removes `.ts`.
+- Tooling outside the repo (editors, type-checkers, third-party scripts) may rely on explicit
+  `.ts` extensions; some IDE configurations resolve specifiers using extensions even though
+  `tsconfig.json` already sets `moduleResolution: bundler` and `allowImportingTsExtensions: true`.
+
+### 8. Mitigations
+
+- Drive the audit from a list of every place the repo currently invokes `node` (Buck rules, Nix
+  derivations, shell scripts, package scripts) and assert each call site has the hook either via
+  `NODE_OPTIONS` or via an explicit `--import` arg.
+- Stage the change in two phases: first the resolver-hook plumbing across all entry points (with
+  the existing `.ts` extensions left in place), validated by the full suite; then the sweep itself,
+  validated again.
+- Keep the new lint/contract rule active so future `.ts` extensions cannot creep back in
+  silently.
+
+### 9. Consequences of not implementing this PR
+
+The repo keeps two parallel import-style conventions (`./foo.ts` mostly, `./foo` in some places),
+which contradicts the project's preference and can confuse new contributors. The dev-shell-only
+half of the fix from `255ee410` then sits half-finished, since the real benefit (being able to drop
+the redundant extensions) is gated on the nix-builder half.
+
+### 10. Downsides for implementing this PR
+
+It touches many derivations and rules across the build system, and the sweep produces a large
+mechanical diff that must be reviewed mostly to confirm it is in fact mechanical. The new lint
+rule adds another codebase-wide gate that must keep its allowlist accurate as the build system
+evolves.
+
+## PR-13: Vercel deploy-CLI service-backed worker runtime parity
+
+### 1. Intent
+
+Close the Vercel parity gap in the deploy CLI client subprocess so protected/shared Vercel
+mutations always run through the reviewed control-plane service path, never minting a vault JWT or
+preparing a deployment vault runtime locally, and prove that path end to end with a control-plane
+service test and the front-door negative tests left open by PR-10.
+
+### 2. Scope of changes
+
+- Add `vercel` to the `serviceBackedWorkerRuntime` selection in
+  `build-tools/tools/deployments/deploy-cli.ts` so the CLI client subprocess for protected/shared
+  Vercel deploys, previews, retries, rollbacks, and preview cleanups never invokes
+  `prepareDeploymentVaultRuntime` or mints a vault JWT locally, matching the existing kubernetes
+  parity fix.
+- Route Vercel CLI client subprocess execution through the same in-process control-plane service
+  worker harness already used for kubernetes, preserving `local_only` Vercel fixture behavior on the
+  laptop-local path.
+- Add explicit front-door negative coverage for protected/shared Vercel mutation rejecting
+  laptop-local artifact directories and direct local-publish flags, in addition to the existing
+  records-root rejection from PR-10.
+
+### 3. External prerequisites
+
+- No live Vercel account is required.
+- No additional secret runtime contracts beyond those already defined for Vercel in PR-3 and PR-10.
+
+### 4. Tests to be added
+
+- A `vercel.control-plane.service.test.ts` end-to-end test analogous to
+  `kubernetes.control-plane.service.test.ts` that exercises the deploy CLI client subprocess against
+  an in-process Vercel control-plane worker for protected/shared deploy, preview, preview cleanup,
+  retry, and rollback.
+- Front-door negative tests proving protected/shared Vercel mutations reject laptop-local artifact
+  directories and direct local-publish flags, complementing the records-root rejection already
+  covered by PR-10.
+- Regression coverage proving the deploy CLI client subprocess never calls
+  `prepareDeploymentVaultRuntime` for protected/shared Vercel operations.
+
+### 5. Docs to be added or updated
+
+- Update deployment usage docs to call out that protected/shared Vercel mutations always run through
+  the service-backed worker runtime, alongside the equivalent kubernetes statement.
+- Update Vercel troubleshooting docs with the CLI client subprocess service path and the front-door
+  rejection surfaces for laptop-local artifact directories and direct local-publish flags.
+
+### 6. Acceptance criteria
+
+- Protected/shared Vercel mutations through the deploy CLI never construct a deployment vault
+  runtime or mint a vault JWT inside the CLI client subprocess.
+- The new Vercel control-plane service test passes against the in-process worker for every Vercel
+  operation kind covered by PR-10.
+- Protected/shared Vercel front-door negative tests exist for laptop-local artifact directories,
+  records roots, and direct local-publish flags.
+
+### 7. Risks
+
+- Service-backed worker runtime selection can drift again if a new provider is added without parity
+  updates, regressing into laptop-local secret material handling.
+- Vercel control-plane service tests can become slow or flaky if the in-process worker harness is
+  not shared with the existing kubernetes harness.
+
+### 8. Mitigations
+
+- Centralize the `serviceBackedWorkerRuntime` selection so adding a provider requires an explicit
+  parity decision and add a regression test that fails when a protected/shared provider is missing
+  from the set.
+- Reuse the existing in-process control-plane worker harness from the kubernetes service test to
+  keep the new Vercel test deterministic and bounded.
+
+### 9. Consequences of not implementing this PR
+
+The deploy CLI client subprocess can still attempt to mint a vault JWT and prepare a deployment
+vault runtime locally for protected/shared Vercel deploys, leaving Vercel one parity step behind
+kubernetes, and PR-10's front-door guarantees remain only partially proven by tests.
+
+### 10. Downsides for implementing this PR
+
+It adds another control-plane service end-to-end test and more front-door negative tests, slightly
+increasing CLI test surface and runtime.
+
+## PR-14: Vercel control-plane admission, replay, and frozen execution snapshot
+
+### 1. Intent
+
+Bring the Vercel control-plane worker into parity with the kubernetes and S3 workers so Vercel
+submissions go through the shared admission and replay engine and so worker execution runs from a
+frozen admitted execution snapshot with secret-contract references rather than an inline secret
+runtime.
+
+### 2. Scope of changes
+
+- Route Vercel control-plane submissions through `evaluateDeploymentAdmission` instead of writing
+  submission records directly with synthetic `dedupe` and `admission` fields, so lane gating,
+  admitted-selector replay, and admission evidence are computed by the shared engine.
+- Replace the inline `submitVercelDeploy` secret runtime construction in `runVercelOperation` with
+  execution from a frozen admitted execution snapshot that carries secret-contract references, the
+  admitted artifact reference, source run ID, operation kind, and admission evidence.
+- Use admitted-selector replay for Vercel retry, rollback, and preview cleanup so the worker reuses
+  the recorded admitted execution snapshot rather than rebuilding admission state from request
+  inputs.
+- Preserve the existing Vercel artifact admission, smoke, fake API, and record behavior behind the
+  shared admission and replay boundary.
+
+### 3. External prerequisites
+
+- No live Vercel account is required.
+- No new secret runtime contracts beyond those already defined for Vercel in PR-3 and PR-10.
+
+### 4. Tests to be added
+
+- Admission engine tests proving Vercel deploy, preview, preview cleanup, retry, and rollback
+  submissions are admitted, denied, or queued by `evaluateDeploymentAdmission` on the same code path
+  as kubernetes and S3.
+- Frozen execution-snapshot tests proving the Vercel worker executes from the admitted snapshot's
+  secret-contract references and admitted artifact reference, and never reconstructs the secret
+  runtime from raw request inputs.
+- Replay tests proving Vercel retry, rollback, and preview cleanup resolve the admitted-selector
+  recorded snapshot and reject mismatched admission evidence.
+- Negative tests proving the Vercel control-plane worker rejects submissions whose admission
+  decision did not come from the shared admission engine.
+
+### 5. Docs to be added or updated
+
+- Update deployment design and usage docs to state that Vercel control-plane submissions go through
+  the shared admission engine and execute from frozen admitted execution snapshots.
+- Update Vercel troubleshooting docs with admission-evidence and frozen-snapshot failure modes.
+
+### 6. Acceptance criteria
+
+- Vercel control-plane submissions never bypass `evaluateDeploymentAdmission` and never synthesize
+  `dedupe` or `admission` fields inline.
+- The Vercel worker executes only from frozen admitted execution snapshots with secret-contract
+  references and admitted artifact references.
+- Vercel retry, rollback, and preview cleanup resolve admitted-selector replay through the same
+  shared engine used by kubernetes and S3.
+
+### 7. Risks
+
+- Migrating the existing Vercel worker to admission-engine and frozen-snapshot execution can break
+  recorded fixtures that were captured under the inline path.
+- Snapshot shape changes can cause drift between provider workers if the contract is not centrally
+  versioned.
+
+### 8. Mitigations
+
+- Re-record affected Vercel fixtures alongside the migration and add cross-provider tests proving
+  the admission engine and frozen-snapshot contract are shared.
+- Treat the admitted execution snapshot as a versioned contract owned by the deployment design and
+  test it on the same path used by kubernetes and S3.
+
+### 9. Consequences of not implementing this PR
+
+Vercel control-plane execution remains structurally divergent from the design's frozen admission
+snapshot and admitted-selector replay model, leaving lane gating, admission evidence, and replay
+guarantees weaker for Vercel than for kubernetes and S3.
+
+### 10. Downsides for implementing this PR
+
+It requires reworking an already-shipped provider worker and re-recording its fixtures, increasing
+short-term churn and test maintenance.
+
+## PR-15: Vercel submit-layer idempotency dedup against payload fingerprint
+
+### 1. Intent
+
+Bring Vercel control-plane submissions into compliance with the design's submit-layer idempotency
+contract so duplicate Vercel deploy, preview, preview cleanup, retry, and rollback requests dedupe
+against a normalized payload fingerprint instead of always recording a synthetic
+`direct:<submissionId>` request fingerprint.
+
+### 2. Scope of changes
+
+- Compute a normalized Vercel submission payload fingerprint that includes operation kind, target
+  identity, admitted artifact reference, source run ID, preview cleanup inputs, smoke overrides, and
+  any other replay-relevant fields, on the same contract used by kubernetes and S3.
+- Replace the always-`created` synthetic `dedupe: {mode: "created", requestFingerprint:
+"direct:<submissionId>"}` write with the shared submit-layer idempotency engine that returns
+  `created` on first submit and `duplicate` on payload-fingerprint match.
+- Cover retry, rollback, and preview cleanup with the same submit-layer idempotency contract so
+  repeated requests collapse onto the recorded admitted submission instead of producing duplicate
+  records.
+- Preserve `local_only` Vercel fixture behavior outside the submit-layer idempotency boundary.
+
+### 3. External prerequisites
+
+- No live Vercel account is required.
+- Depends on PR-14's admission and frozen-snapshot integration so the payload fingerprint can be
+  computed from admitted inputs rather than raw request inputs.
+
+### 4. Tests to be added
+
+- Submit-layer idempotency tests proving identical Vercel deploy, preview, preview cleanup, retry,
+  and rollback payloads return `duplicate` and reuse the recorded admitted submission.
+- Tests proving payload-fingerprint differences across operation kind, target identity, admitted
+  artifact reference, source run ID, preview cleanup inputs, and smoke overrides each produce
+  distinct submissions.
+- Negative tests proving the synthetic `direct:<submissionId>` request fingerprint is never written
+  by the Vercel control plane.
+- Cross-provider tests proving Vercel, kubernetes, and S3 share the same submit-layer idempotency
+  engine and contract.
+
+### 5. Docs to be added or updated
+
+- Update deployment design and usage docs with the Vercel submit-layer idempotency contract and the
+  fields included in the payload fingerprint.
+- Update Vercel troubleshooting docs with `duplicate` submission outcomes and how to interpret
+  payload-fingerprint mismatches.
+
+### 6. Acceptance criteria
+
+- Vercel control-plane submissions always dedupe through the shared submit-layer idempotency engine
+  against a normalized payload fingerprint.
+- The synthetic `direct:<submissionId>` request fingerprint is removed from Vercel control-plane
+  writes.
+- Vercel retry, rollback, and preview cleanup honor submit-layer idempotency on the same code path
+  as kubernetes and S3.
+
+### 7. Risks
+
+- Choosing the wrong fields for the Vercel payload fingerprint can cause false `duplicate` matches
+  or miss true duplicates.
+- Adding submit-layer idempotency to retry, rollback, and preview cleanup can interact subtly with
+  admitted-selector replay if the two contracts are not aligned.
+
+### 8. Mitigations
+
+- Derive the Vercel payload fingerprint from the admitted execution snapshot from PR-14 so the field
+  set is bound to the admitted contract.
+- Test submit-layer idempotency and admitted-selector replay together for every Vercel operation
+  kind.
+
+### 9. Consequences of not implementing this PR
+
+Vercel control-plane submissions can record duplicate admitted submissions for the same payload and
+do not satisfy the design's submit-layer idempotency contract, leaving Vercel inconsistent with
+kubernetes and S3.
+
+### 10. Downsides for implementing this PR
+
+It introduces another shared contract dependency on the submit-layer idempotency engine and
+requires re-recording Vercel control-plane fixtures whose `dedupe` shape changes.

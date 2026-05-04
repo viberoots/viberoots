@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import type { CloudflarePagesDeployment } from "./contract.ts";
-import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
+import type { CloudflarePagesDeployment } from "./contract";
+import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission";
 import type {
   CloudflarePagesPreviewCleanupReason,
   CloudflarePagesPreviewIdentitySelector,
-} from "./cloudflare-pages-preview.ts";
-import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
+} from "./cloudflare-pages-preview";
+import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts";
 import type {
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneAuthorization,
@@ -15,9 +15,9 @@ import type {
   DeploymentControlPlaneServiceInstance,
   DeploymentControlPlaneSubmitRejectionCode,
   DeploymentControlPlaneTerminationReason,
-} from "./deployment-control-plane-contract.ts";
-import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
-import type { DeploymentWorkerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker.ts";
+} from "./deployment-control-plane-contract";
+import type { DeploymentPrincipal } from "./deployment-admission-evidence";
+import type { DeploymentWorkerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker";
 
 export const CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA =
   "cloudflare-pages-control-plane-snapshot@2";

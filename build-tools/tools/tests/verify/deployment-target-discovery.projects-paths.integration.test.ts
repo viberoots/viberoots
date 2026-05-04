@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { test } from "node:test";
-import { listDeploymentTargets } from "../../deployments/deployment-query.ts";
+import { listDeploymentTargets } from "../../deployments/deployment-query";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("deployment target discovery resolves projects/deployments labels from an isolated temp repo", async () => {

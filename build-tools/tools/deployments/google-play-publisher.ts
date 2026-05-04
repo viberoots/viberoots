@@ -2,7 +2,7 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { GooglePlayDeployment } from "./contract.ts";
+import type { GooglePlayDeployment } from "./contract";
 
 export type GooglePlayTrackState = {
   track: GooglePlayDeployment["providerTarget"]["track"];

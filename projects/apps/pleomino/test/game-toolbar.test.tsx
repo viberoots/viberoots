@@ -6,10 +6,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   loadPersistedGameStateFromHash,
   savePersistedGameStateToHash,
-} from "../src/game/persistence.ts";
-import { createInitialGameState } from "../src/game/state.ts";
-import { GameScreen } from "../src/ui/game-screen.tsx";
-import { GameToolbar } from "../src/ui/game-toolbar.tsx";
+} from "../src/game/persistence";
+import { createInitialGameState } from "../src/game/state";
+import { GameScreen } from "../src/ui/game-screen";
+import { GameToolbar } from "../src/ui/game-toolbar";
 
 function flushUi(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));

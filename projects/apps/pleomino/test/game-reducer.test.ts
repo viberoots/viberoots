@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { pleominoGameReducer } from "../src/game/reducer.ts";
-import { createInitialGameHistoryState } from "../src/game/state.ts";
-import type { GameAction } from "../src/game/reducer.ts";
-import type { GameHistoryState, GameState } from "../src/game/types.ts";
+import { pleominoGameReducer } from "../src/game/reducer";
+import { createInitialGameHistoryState } from "../src/game/state";
+import type { GameAction } from "../src/game/reducer";
+import type { GameHistoryState, GameState } from "../src/game/types";
 
 function reduce(state: GameHistoryState, action: GameAction): GameHistoryState {
   return pleominoGameReducer(state, action);

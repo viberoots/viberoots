@@ -4,8 +4,8 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { mintDeployVaultJwt, runDeployVaultJwtCli } from "../../deployments/deploy-vault-jwt.ts";
-import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers.ts";
+import { mintDeployVaultJwt, runDeployVaultJwtCli } from "../../deployments/deploy-vault-jwt";
+import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers";
 
 test("deploy-vault-jwt mints through discovery and writes a restricted token file", async () => {
   const server = await startFakeOidcServer();

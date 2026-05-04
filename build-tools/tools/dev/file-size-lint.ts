@@ -5,12 +5,12 @@ import * as fsp from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fg from "fast-glob";
-import { SOURCE_FILES_SCOPE, type FileSizeScope } from "./file-size-lint-scopes.ts";
-import { resolveSourceFileSizeExceptionPaths } from "./file-size-lint-exceptions.ts";
+import { SOURCE_FILES_SCOPE, type FileSizeScope } from "./file-size-lint-scopes";
+import { resolveSourceFileSizeExceptionPaths } from "./file-size-lint-exceptions";
 import {
   parseFileSizeLintArgs,
   type FileSizeLintOptions as Options,
-} from "./file-size-lint-options.ts";
+} from "./file-size-lint-options";
 export { SOURCE_FILES_SCOPE, type FileSizeScope };
 
 const execFileAsync = promisify(execFile);

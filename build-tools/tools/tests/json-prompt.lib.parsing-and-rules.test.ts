@@ -9,7 +9,7 @@ import {
   parsePromptAnswer,
   parsePromptOptions,
   parsePromptRuleSet,
-} from "../json-prompt-lib.ts";
+} from "../json-prompt-lib";
 
 test("json-prompt-lib: parses a flat object with primitives", () => {
   assert.deepEqual(parseJsonPromptObject('{"name":"demo","count":2,"enabled":true,"note":null}'), {

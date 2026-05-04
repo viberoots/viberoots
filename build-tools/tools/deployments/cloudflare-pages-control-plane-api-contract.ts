@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import type { CloudflarePagesDeployment } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract.ts";
+import type { CloudflarePagesDeployment } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract";
 import type {
   CloudflarePagesPublishBehavior,
   CloudflarePagesPublishMode,
   CloudflarePagesSmokeConnectOverride,
-} from "./cloudflare-pages-control-plane-contract.ts";
-import type { CloudflarePagesPreviewCleanupReason } from "./cloudflare-pages-preview.ts";
-import type { CloudflarePagesTargetTransitionOperationKind } from "./cloudflare-pages-target-transition.ts";
-import type { CloudflarePagesArtifactInput } from "./cloudflare-pages-artifact-input.ts";
+} from "./cloudflare-pages-control-plane-contract";
+import type { CloudflarePagesPreviewCleanupReason } from "./cloudflare-pages-preview";
+import type { CloudflarePagesTargetTransitionOperationKind } from "./cloudflare-pages-target-transition";
+import type { CloudflarePagesArtifactInput } from "./cloudflare-pages-artifact-input";
 
 export const CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA =
   "cloudflare-pages-control-plane-submit-request@1";

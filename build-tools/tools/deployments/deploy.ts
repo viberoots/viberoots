@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { findRepoRoot } from "../lib/repo.ts";
-import { runDeployCli } from "./deploy-cli.ts";
+import { findRepoRoot } from "../lib/repo";
+import { runDeployCli } from "./deploy-cli";
 
 async function main() {
   await runDeployCli({

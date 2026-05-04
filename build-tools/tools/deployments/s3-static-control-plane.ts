@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import fs from "node:fs/promises";
-import type { S3StaticDeployment } from "./contract.ts";
-import { terminalSubmissionFromAdmissionFailure } from "./deployment-provider-control-plane-admission-failure.ts";
-import { assertCrossDeploymentExactPromotionEligible } from "./deployment-provider-promotion.ts";
+import type { S3StaticDeployment } from "./contract";
+import { terminalSubmissionFromAdmissionFailure } from "./deployment-provider-control-plane-admission-failure";
+import { assertCrossDeploymentExactPromotionEligible } from "./deployment-provider-promotion";
 import {
   enqueueBackendSubmission,
   writeBackendDeployRecordDoc,
@@ -10,17 +10,17 @@ import {
   writeBackendSubmissionDoc,
   acquireBackendControlPlaneLock,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
+} from "./nixos-shared-host-control-plane-backend";
 import {
   executionSnapshotPathFor,
   submissionPathFor,
   writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
-import { submitResponseFromSubmission } from "./deployment-control-plane-status.ts";
-import { submitS3StaticDeploy } from "./s3-static-deploy.ts";
-import { submitS3StaticExactArtifactRun } from "./s3-static-exact-run.ts";
-import { submitS3StaticProvisionOnly } from "./s3-static-provision-only.ts";
-import { resolveS3StaticReplaySource } from "./s3-static-replay.ts";
+} from "./nixos-shared-host-control-plane-store";
+import { submitResponseFromSubmission } from "./deployment-control-plane-status";
+import { submitS3StaticDeploy } from "./s3-static-deploy";
+import { submitS3StaticExactArtifactRun } from "./s3-static-exact-run";
+import { submitS3StaticProvisionOnly } from "./s3-static-provision-only";
+import { resolveS3StaticReplaySource } from "./s3-static-replay";
 
 export const S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA =
   "s3-static-control-plane-submit-request@1";

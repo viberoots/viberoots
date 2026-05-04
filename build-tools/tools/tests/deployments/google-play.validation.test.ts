@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { GraphNode } from "../../lib/graph.ts";
-import { extractGooglePlayDeployments } from "../../deployments/contract.ts";
+import type { GraphNode } from "../../lib/graph";
+import { extractGooglePlayDeployments } from "../../deployments/contract";
 import {
   googlePlayAdmissionPolicyNodeFixture,
   googlePlayDeploymentNodeFixture,
   googlePlayLanePolicyNodeFixture,
-} from "./google-play.fixture.ts";
+} from "./google-play.fixture";
 
 function componentNode(label: string): GraphNode {
   return { name: label, labels: ["kind:app"] };

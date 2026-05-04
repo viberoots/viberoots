@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { writeJsonDocument } from "./nixos-shared-host-io.ts";
-import type { NixosSharedHostClientManifest } from "./nixos-shared-host-install-contract.ts";
+import { writeJsonDocument } from "./nixos-shared-host-io";
+import type { NixosSharedHostClientManifest } from "./nixos-shared-host-install-contract";
 import {
   clientManifestPath,
   createClientManifest,
   readClientManifest,
-} from "./nixos-shared-host-client-manifest.ts";
+} from "./nixos-shared-host-client-manifest";
 
 export type ClientInput = {
   profileName: string;

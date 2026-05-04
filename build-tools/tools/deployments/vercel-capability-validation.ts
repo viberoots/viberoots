@@ -1,12 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../lib/graph.ts";
-import { deploymentError } from "./contract-extract-shared.ts";
-import { SSR_WEBAPP_COMPONENT } from "./contract-types.ts";
-import {
-  isDeploymentComponentKind,
-  isSupportedComponentNode,
-} from "./deployment-component-kinds.ts";
-import { providerSupportsComponentKind } from "./deployment-provider-capabilities.ts";
+import type { GraphNode } from "../lib/graph";
+import { deploymentError } from "./contract-extract-shared";
+import { SSR_WEBAPP_COMPONENT } from "./contract-types";
+import { isDeploymentComponentKind, isSupportedComponentNode } from "./deployment-component-kinds";
+import { providerSupportsComponentKind } from "./deployment-provider-capabilities";
 
 export function pushVercelComponentKindErrors(opts: {
   label: string;

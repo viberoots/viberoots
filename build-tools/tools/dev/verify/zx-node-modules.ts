@@ -1,5 +1,5 @@
 import path from "node:path";
-import { runNodeWithZx } from "../../lib/node-run.ts";
+import { runNodeWithZx } from "../../lib/node-run";
 
 export async function computeZxTestNodeModulesOut(
   root: string,

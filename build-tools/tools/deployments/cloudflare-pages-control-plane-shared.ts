@@ -1,33 +1,33 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
-import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
+import type { DeploymentPrincipal } from "./deployment-admission-evidence";
 import type {
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneRequestDedupe,
-} from "./deployment-control-plane-contract.ts";
+} from "./deployment-control-plane-contract";
 import {
   type CloudflarePagesControlPlaneSnapshot,
   type CloudflarePagesControlPlaneSubmission,
-} from "./cloudflare-pages-control-plane-contract.ts";
+} from "./cloudflare-pages-control-plane-contract";
 import {
   createCloudflarePagesAdmittedTerminalSubmission,
   createCloudflarePagesControlPlaneSubmission,
   createCloudflarePagesLockConflictSubmission,
-} from "./cloudflare-pages-control-plane-submission.ts";
-import type { CloudflarePagesDeployRecord } from "./cloudflare-pages-records.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
+} from "./cloudflare-pages-control-plane-submission";
+import type { CloudflarePagesDeployRecord } from "./cloudflare-pages-records";
+import type { CloudflarePagesDeployment } from "./contract";
 import {
   lockWaitAbortReasonForSubmission,
   queueSubmissionForLock,
-} from "./deployment-control-plane-queue.ts";
-import { revalidateControlPlaneAdmission } from "./deployment-control-plane-revalidation.ts";
+} from "./deployment-control-plane-queue";
+import { revalidateControlPlaneAdmission } from "./deployment-control-plane-revalidation";
 import {
   acquireControlPlaneLock,
   executionSnapshotPathFor,
   readControlPlaneJson,
   submissionPathFor,
   writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
+} from "./nixos-shared-host-control-plane-store";
 
 export function createCloudflarePagesSubmissionId(): string {
   return `cp-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;

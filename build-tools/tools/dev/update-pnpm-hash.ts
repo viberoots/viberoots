@@ -1,28 +1,28 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { flakeRefForImporter } from "./install/common.ts";
-import { withExclusiveInstallLock } from "./install/lock.ts";
-import { newManagedCommandActivity } from "./update-pnpm-hash/activity.ts";
-import { withHeartbeat } from "./update-pnpm-hash/heartbeat.ts";
-import { parseUpdatePnpmHashArgs } from "./update-pnpm-hash/args.ts";
-import { withPnpmStoreBuildFlakeRef } from "./update-pnpm-hash/build-flake.ts";
-import * as hashesJson from "./update-pnpm-hash/hashes-json.ts";
+import { flakeRefForImporter } from "./install/common";
+import { withExclusiveInstallLock } from "./install/lock";
+import { newManagedCommandActivity } from "./update-pnpm-hash/activity";
+import { withHeartbeat } from "./update-pnpm-hash/heartbeat";
+import { parseUpdatePnpmHashArgs } from "./update-pnpm-hash/args";
+import { withPnpmStoreBuildFlakeRef } from "./update-pnpm-hash/build-flake";
+import * as hashesJson from "./update-pnpm-hash/hashes-json";
 import {
   ensureImporterLockfileFreshIfAllowed,
   generateImporterLockfile,
   withExactPrefetchedStore,
   withResolvedExactPrefetchedStore,
-} from "./update-pnpm-hash/lockfile.ts";
-import { handleNonDefaultImporter } from "./update-pnpm-hash/nondefault.ts";
-import { buildStore, buildUnfixedAndHash, extractHash } from "./update-pnpm-hash/nix.ts";
+} from "./update-pnpm-hash/lockfile";
+import { handleNonDefaultImporter } from "./update-pnpm-hash/nondefault";
+import { buildStore, buildUnfixedAndHash, extractHash } from "./update-pnpm-hash/nix";
 import {
   installLockKeyForImporter,
   normalizeImporter,
   pnpmStoreAttrFromImporter,
   pnpmStoreUnfixedAttrFromImporter,
   repoRelativeLockfilePath,
-} from "./update-pnpm-hash/paths.ts";
-import * as verifiedMarker from "./update-pnpm-hash/verified-marker.ts";
+} from "./update-pnpm-hash/paths";
+import * as verifiedMarker from "./update-pnpm-hash/verified-marker";
 
 async function inner() {
   const { lockfile, force } = parseUpdatePnpmHashArgs();

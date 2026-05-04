@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { submitKubernetesDeploy } from "../../deployments/kubernetes-deploy.ts";
-import { prepareKubernetesPublisherConfig } from "../../deployments/kubernetes-config.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
-import { kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
-import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+import { submitKubernetesDeploy } from "../../deployments/kubernetes-deploy";
+import { prepareKubernetesPublisherConfig } from "../../deployments/kubernetes-config";
+import { runInTemp } from "../lib/test-helpers";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
+import { kubernetesDeploymentFixture } from "./kubernetes.fixture";
+import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
 
 test("kubernetes rejects provider config drift before publish begins", async () => {
   await runInTemp("kubernetes-config-drift", async (tmp, $) => {

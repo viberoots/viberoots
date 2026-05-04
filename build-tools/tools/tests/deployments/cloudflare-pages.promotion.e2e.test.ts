@@ -3,31 +3,31 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { resolveCloudflarePagesPromotionSelection } from "../../deployments/cloudflare-pages-promotion.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { resolveCloudflarePagesPromotionSelection } from "../../deployments/cloudflare-pages-promotion";
+import { runInTemp } from "../lib/test-helpers";
 import {
   cloudflarePagesDeploymentFixture,
   installCloudflarePagesTargets,
-} from "./cloudflare-pages.fixture.ts";
-import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
+} from "./cloudflare-pages.fixture";
+import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
 import {
   fakeCloudflareEnv,
   pleominoDevDeployment,
   pleominoProdDeployment,
   writeDeploymentJson,
   writeWranglerConfig,
-} from "./cloudflare-pages.promotion.helpers.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
-import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
+} from "./cloudflare-pages.promotion.helpers";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
+import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
 import {
   ensureNixosSharedHostStageBranch,
   installNixosSharedHostTargets,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 import {
   startControlPlaneHarness,
   writeDemoArtifact,
-} from "./nixos-shared-host.control-plane.helpers.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+} from "./nixos-shared-host.control-plane.helpers";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
 test("cloudflare-pages allows reviewed cross-provider same-artifact promotion only on declared edges", async () => {
   await runInTemp("cloudflare-pages-promotion-e2e", async (tmp, $) => {

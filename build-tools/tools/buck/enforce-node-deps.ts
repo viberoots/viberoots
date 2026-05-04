@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagBool } from "../lib/cli.ts";
-import { writeIfChanged } from "../lib/fs-helpers.ts";
-import { normalizeTargetLabel } from "../lib/labels.ts";
+import { getFlagBool } from "../lib/cli";
+import { writeIfChanged } from "../lib/fs-helpers";
+import { normalizeTargetLabel } from "../lib/labels";
 import {
   applyEdits,
   collectDeps,
@@ -12,9 +12,9 @@ import {
   listImporters,
   loadWorkspaceMap,
   parseTargets,
-} from "../lib/node-deps-enforcement-core.ts";
-import { uniqSorted } from "../lib/posix-path.ts";
-import { repoRoot } from "../lib/repo.ts";
+} from "../lib/node-deps-enforcement-core";
+import { uniqSorted } from "../lib/posix-path";
+import { repoRoot } from "../lib/repo";
 
 async function readJsonFile<T>(filePath: string): Promise<T> {
   const txt = await fsp.readFile(filePath, "utf8");

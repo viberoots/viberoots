@@ -9,6 +9,7 @@
 , frameworkMissingError
 }:
 let
+  zx-wrapper = import ../lib/zx-wrapper.nix { inherit pkgs; };
   info = lockInfoOfName name;
   importerDir = info.importer;
   n = nodeOfName name;
@@ -34,7 +35,7 @@ in
     pname = "node-webapp-" + (sanitize name);
     version = sanitize importerDir;
     src = repoStoreRoot;
-    nativeBuildInputs = [ pkgs.nodejs_22 ];
+    nativeBuildInputs = [ pkgs.nodejs_22 zx-wrapper ];
     buildPhase = ''
       set -euo pipefail
       REPO_ROOT="$PWD"
@@ -105,6 +106,7 @@ EOF
         node --experimental-top-level-await \
           --disable-warning=ExperimentalWarning \
           --experimental-strip-types \
+          --import "${repoStoreRoot}/build-tools/tools/dev/zx-init.mjs" \
           "$SYNC_CONTRACTS_SCRIPT" \
           --cwd . \
           --app-target "//${importerDir}:$APP_STAGE_NAME" \

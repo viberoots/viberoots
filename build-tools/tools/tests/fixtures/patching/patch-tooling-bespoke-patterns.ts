@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { defaultImporterPatchDir } from "../../../build-tools/tools/lib/importers.ts";
+import { defaultImporterPatchDir } from "../../../build-tools/tools/lib/importers";
 import { getSession, setSession } from "../../../patch/state";
 
 export async function badExample(importerDirAbs: string) {

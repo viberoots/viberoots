@@ -2,7 +2,7 @@ import {
   type JsonPromptDefaults,
   type JsonPromptLabels,
   type JsonPromptRuleSet,
-} from "./json-prompt-types.ts";
+} from "./json-prompt-types";
 
 export function parseRulesJson(raw: string, source: string): unknown {
   try {

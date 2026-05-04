@@ -2,17 +2,17 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { sanitizeName } from "../lib/sanitize.ts";
+import { sanitizeName } from "../lib/sanitize";
 import {
   STATIC_WEBAPP_ARTIFACT_BUNDLE_SCHEMA,
   digestStaticWebappArtifactBundleBytes,
   materializeStaticWebappArtifactBundle,
   parseStaticWebappArtifactBundle,
-} from "./static-webapp-artifact-bundle.ts";
+} from "./static-webapp-artifact-bundle";
 import {
   admitStaticWebappArtifact,
   type AdmittedStaticWebappArtifact,
-} from "./static-webapp-artifacts.ts";
+} from "./static-webapp-artifacts";
 
 export const STATIC_WEBAPP_UPLOAD_SESSION_SCHEMA = "static-webapp-upload-session@1";
 const UPLOAD_SESSION_TTL_MS = 30 * 60 * 1000;

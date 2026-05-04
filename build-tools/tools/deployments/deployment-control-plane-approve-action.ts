@@ -1,17 +1,17 @@
 #!/usr/bin/env zx-wrapper
-import { evaluateNixosSharedHostControlPlaneAdmission } from "./nixos-shared-host-control-plane-admission.ts";
-import { queueSubmissionForLock } from "./deployment-control-plane-queue.ts";
+import { evaluateNixosSharedHostControlPlaneAdmission } from "./nixos-shared-host-control-plane-admission";
+import { queueSubmissionForLock } from "./deployment-control-plane-queue";
 import type {
   DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneApprovalGrantRequest,
   DeploymentControlPlaneRequestDedupe,
-} from "./deployment-control-plane-contract.ts";
+} from "./deployment-control-plane-contract";
 import type {
   DeploymentAdmissionEvidence,
   DeploymentPrincipal,
-} from "./deployment-admission-evidence.ts";
-import { approvalSourceSelection } from "./deployment-control-plane-approve-source.ts";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+} from "./deployment-admission-evidence";
+import { approvalSourceSelection } from "./deployment-control-plane-approve-source";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 import {
   approvalEvidenceFromGrant,
   approvalGrantPathFor,
@@ -19,11 +19,11 @@ import {
   approvalSummaryFromGrant,
   pendingApprovalSummaryFor,
   writeApprovalGrantRecord,
-} from "./deployment-control-plane-approval.ts";
+} from "./deployment-control-plane-approval";
 import {
   readControlPlaneJson,
   writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
+} from "./nixos-shared-host-control-plane-store";
 
 type SubmissionLike = {
   submissionId: string;

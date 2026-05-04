@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 import {
   parseTsModuleManifest,
   parseWasmModuleManifest,
-} from "../scaffolding/webapp-module-manifests.ts";
-import { findRepoRoot } from "../lib/repo.ts";
+} from "../scaffolding/webapp-module-manifests";
+import { findRepoRoot } from "../lib/repo";
 
 export type WasmModuleSpec = {
   moduleKey: string;
@@ -75,11 +75,9 @@ export async function specsFromWasmManifest(
     const moduleBasename = path.posix.basename(entry.sourcePath.replace(/\\/g, "/"), ".wasm");
     const basename = moduleBasename || entry.moduleKey;
     const buildOutRel = path.posix.join(".wasm-producer", `${basename}.wasm`);
-    const nodeBin = process.execPath;
     const buildCmd = entry.sourceLabel
       ? [
-          shellQuote(nodeBin),
-          "--experimental-strip-types",
+          "zx-wrapper",
           shellQuote(labelTool),
           "--label",
           shellQuote(entry.sourceLabel),
@@ -87,8 +85,7 @@ export async function specsFromWasmManifest(
           shellQuote(buildOutRel),
         ].join(" ")
       : [
-          shellQuote(nodeBin),
-          "--experimental-strip-types",
+          "zx-wrapper",
           shellQuote(producerTool),
           "--payload",
           shellQuote(choosePayloadPath(cwd, entry.sourcePath, basename)),

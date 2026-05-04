@@ -4,8 +4,8 @@ import { test } from "node:test";
 import {
   applyNixosSharedHostScopedDeployments,
   createNixosSharedHostPlatformState,
-} from "../../deployments/nixos-shared-host-platform.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+} from "../../deployments/nixos-shared-host-platform";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 test("nixos-shared-host platform state scoped apply does not delete out-of-scope deployments by omission", () => {
   const current = createNixosSharedHostPlatformState([

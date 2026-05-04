@@ -2,9 +2,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { getImporterRootsContract } from "../../../lib/importer-roots.ts";
+import { getImporterRootsContract } from "../../../lib/importer-roots";
 import { withSharedBuckIsolationStartupLock } from "../../../lib/shared-buck-isolation-lock";
-import { isRetryableCqueryError, resetBuckDaemon } from "./retry.ts";
+import { isRetryableCqueryError, resetBuckDaemon } from "./retry";
 
 export type CqueryRunnerOptions = {
   scope: string; // label selector used by attrfilter(labels, <scope>, <expr>)

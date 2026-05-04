@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli.ts";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
-import { getImporterRootsContract } from "../lib/importer-roots.ts";
-import { normalizeTargetLabel } from "../lib/labels.ts";
+import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { getImporterRootsContract } from "../lib/importer-roots";
+import { normalizeTargetLabel } from "../lib/labels";
 
 type InlineExportOptions = {
   workspaceRoot: string;

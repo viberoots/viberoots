@@ -9,7 +9,7 @@ test("providers: Python sync with no uv.lock writes stable header and no entries
   await runInTemp("python-no-uv-noop", async (tmp, $) => {
     // No uv.lock under projects/apps/* or projects/libs/* — narrow to python to exercise writer no-op behavior
     const runner = `#!/usr/bin/env zx-wrapper
-import { syncAllProviders } from "./build-tools/tools/buck/providers/index.ts";
+import { syncAllProviders } from "./build-tools/tools/buck/providers/index";
 await syncAllProviders({ lang: "python" });
 `;
     const runnerPath = path.join(tmp, "run-sync.mjs");

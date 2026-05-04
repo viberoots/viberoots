@@ -196,7 +196,7 @@ test("Phase-4 PR-1 shared helper reuse: representative template local-dep tests 
     ),
     "utf8",
   );
-  assert.match(staticLocalDep, /from "\.\/lib\/webapp-local-ts-dep\.ts"/);
+  assert.match(staticLocalDep, /from "\.\/lib\/webapp-local-ts-dep"/);
 
   const viteLocalDep = await fsp.readFile(
     path.join(
@@ -238,7 +238,7 @@ test("Phase-4 PR-1 shared helper reuse: representative template local-dep tests 
     ),
     "utf8",
   );
-  assert.match(staticLocalDepHelper, /from "\.\/wasm-watch\.ts"/);
+  assert.match(staticLocalDepHelper, /from "\.\/wasm-watch"/);
   assert.match(staticLocalDepHelper, /assertWorkspaceLinkedDependency/);
   assert.match(staticLocalDepHelper, /writeAndBumpMtime/);
 
@@ -253,7 +253,7 @@ test("Phase-4 PR-1 shared helper reuse: representative template local-dep tests 
     ),
     "utf8",
   );
-  assert.match(staticPwaLocalDep, /from "\.\/lib\/webapp-local-ts-dep\.ts"/);
+  assert.match(staticPwaLocalDep, /from "\.\/lib\/webapp-local-ts-dep"/);
 
   const nextLocalDep = await fsp.readFile(
     path.join(

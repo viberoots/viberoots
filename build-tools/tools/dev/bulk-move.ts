@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import path from "node:path";
-import { getFlagBool, getFlagStr, getPositionals } from "../lib/cli.ts";
-import { repoRoot } from "../lib/repo.ts";
+import { getFlagBool, getFlagStr, getPositionals } from "../lib/cli";
+import { repoRoot } from "../lib/repo";
 
 type MoveSpec = {
   from: string;

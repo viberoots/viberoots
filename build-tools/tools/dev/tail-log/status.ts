@@ -1,10 +1,10 @@
 import process from "node:process";
-import { formatVerifyStatusJsonLine, formatVerifyStatusText } from "../../lib/verify-log-status.ts";
-import type { TailLogArgs } from "./args.ts";
-import type { Resolution } from "./resolve.ts";
-import { pidAliveWithSignature, pidStartSignature, resolveLatest, resolvePid } from "./resolve.ts";
-import { computeStatusFromLogPath, emptyNdjson } from "./status-compute.ts";
-import { clearScreen, getExtraStatusLines, trimToTerminal } from "./status-helpers.ts";
+import { formatVerifyStatusJsonLine, formatVerifyStatusText } from "../../lib/verify-log-status";
+import type { TailLogArgs } from "./args";
+import type { Resolution } from "./resolve";
+import { pidAliveWithSignature, pidStartSignature, resolveLatest, resolvePid } from "./resolve";
+import { computeStatusFromLogPath, emptyNdjson } from "./status-compute";
+import { clearScreen, getExtraStatusLines, trimToTerminal } from "./status-helpers";
 
 async function resolveForArgs(args: TailLogArgs): Promise<Resolution> {
   if (args.selection.kind === "latest") return await resolveLatest();

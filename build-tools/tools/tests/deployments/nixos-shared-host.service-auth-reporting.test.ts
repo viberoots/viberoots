@@ -2,28 +2,28 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../deployments/nixos-shared-host-control-plane-api-contract.ts";
-import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
-import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-shared-host-control-plane-snapshot.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../deployments/nixos-shared-host-control-plane-api-contract";
+import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
+import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-shared-host-control-plane-snapshot";
+import { runInTemp } from "../lib/test-helpers";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostAdmissionPolicyFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 import {
   readBackendSnapshot,
   readJson,
   writeDemoArtifact,
-} from "./nixos-shared-host.control-plane.helpers.ts";
+} from "./nixos-shared-host.control-plane.helpers";
 import {
   authRequiredDeployment,
   evidenceWithoutPrincipal,
   postSubmission,
   withArtifactBinding,
   writeAuthSession,
-} from "./nixos-shared-host.service-auth-boundary.helpers.ts";
+} from "./nixos-shared-host.service-auth-boundary.helpers";
 
 function humanCheckEvidence(deployment: any, subject: string) {
   const { requestedBy: _requestedBy, ...evidence } = deploymentAdmissionEvidenceFixture({

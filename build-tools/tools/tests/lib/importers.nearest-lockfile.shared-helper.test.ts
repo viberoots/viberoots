@@ -4,7 +4,7 @@ import path from "node:path";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { findNearestLockfileForPackage } from "../../lib/importers.ts";
+import { findNearestLockfileForPackage } from "../../lib/importers";
 
 test("findNearestLockfileForPackage returns nearest ancestor lockfile path within repo root", async () => {
   await runInTemp("importers-nearest-lockfile", async (tmp) => {

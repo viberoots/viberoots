@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../lib/graph.ts";
-import type { DeploymentVaultRuntimeConfig } from "./deployment-vault-runtime-types.ts";
-import { readStringRecord } from "./deployment-graph-readers.ts";
-import { normalizeCredentialSource } from "./deployment-credential-source-selection.ts";
-import { readMetadataPkceCallbackProfile } from "./deployment-pkce-callback-profile.ts";
+import type { GraphNode } from "../lib/graph";
+import type { DeploymentVaultRuntimeConfig } from "./deployment-vault-runtime-types";
+import { readStringRecord } from "./deployment-graph-readers";
+import { normalizeCredentialSource } from "./deployment-credential-source-selection";
+import { readMetadataPkceCallbackProfile } from "./deployment-pkce-callback-profile";
 
 export function readVaultRuntimeConfig(node: GraphNode): DeploymentVaultRuntimeConfig | undefined {
   const raw = readStringRecord(node, "vault_runtime");

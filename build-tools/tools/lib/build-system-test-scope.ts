@@ -1,6 +1,6 @@
 import process from "node:process";
 import "../dev/zx-init.mjs";
-import { resolveNonBuildSystemBuckTargets } from "./non-build-system-scope.ts";
+import { resolveNonBuildSystemBuckTargets } from "./non-build-system-scope";
 
 export type BuildSystemTestMode = "auto" | "always" | "never";
 

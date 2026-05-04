@@ -1,1 +1,1 @@
-export { normalizeTemplateName } from "./taxonomy.ts";
+export { normalizeTemplateName } from "./taxonomy";

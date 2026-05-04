@@ -8,15 +8,15 @@ import {
   writeBackendSnapshotDoc,
   writeBackendSubmissionDoc,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
+} from "./nixos-shared-host-control-plane-backend";
 import type {
   NixosSharedHostControlPlaneSnapshot,
   NixosSharedHostControlPlaneSubmission,
-} from "./nixos-shared-host-control-plane-contract.ts";
+} from "./nixos-shared-host-control-plane-contract";
 import {
   readControlPlaneJson,
   writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
+} from "./nixos-shared-host-control-plane-store";
 
 export async function removeMirrorFile(filePath?: string) {
   if (!filePath) return;

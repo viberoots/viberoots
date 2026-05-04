@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { exportInlineGraph } from "../buck/export-inline.ts";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
-import { getImporterRootsContract } from "../lib/importer-roots.ts";
-import { normalizeTargetLabel } from "../lib/labels.ts";
-import { runNodeWithZx } from "../lib/node-run.ts";
-import { findRepoRoot } from "../lib/repo.ts";
+import { exportInlineGraph } from "../buck/export-inline";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { getImporterRootsContract } from "../lib/importer-roots";
+import { normalizeTargetLabel } from "../lib/labels";
+import { runNodeWithZx } from "../lib/node-run";
+import { findRepoRoot } from "../lib/repo";
 
 async function buck2Present(): Promise<boolean> {
   try {
@@ -191,7 +191,7 @@ export async function ensureGraph(opts: { exportGraph?: () => Promise<void> } = 
 // runGlue: sync providers (all languages) then generate auto_map deterministically
 export async function runGlue(): Promise<void> {
   // Delegate to the centralized glue pipeline to avoid drift between callsites.
-  const { runGluePipeline } = await import("../buck/glue-pipeline.ts");
+  const { runGluePipeline } = await import("../buck/glue-pipeline");
   await runGluePipeline({
     graphPath: DEFAULT_GRAPH_PATH,
     outAutoMap: "third_party/providers/auto_map.bzl",

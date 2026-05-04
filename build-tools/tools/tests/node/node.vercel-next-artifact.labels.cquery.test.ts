@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { isSupportedComponentNode } from "../../deployments/deployment-component-kinds.ts";
-import { normalizeTargetLabel } from "../../lib/labels.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { isSupportedComponentNode } from "../../deployments/deployment-component-kinds";
+import { normalizeTargetLabel } from "../../lib/labels";
+import { runInTemp } from "../lib/test-helpers";
 
 function parseLabels(stdout: string): string[] {
   const parsed = JSON.parse(stdout) as Record<string, { labels?: string[] }>;

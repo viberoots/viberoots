@@ -1,28 +1,28 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostDeployment, NixosSharedHostDeploymentComponent } from "./contract.ts";
+import type { NixosSharedHostDeployment, NixosSharedHostDeploymentComponent } from "./contract";
 import type {
   DeploymentSmokeException,
   DeploymentSmokeExecutionMode,
-} from "./deployment-smoke-policy.ts";
-import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
+} from "./deployment-smoke-policy";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts";
 import {
   baseNixosSharedHostComponentResult,
   buildNixosSharedHostPublishFailureResults,
   withNixosSharedHostPublishState,
   withNixosSharedHostSmokeState,
   type NixosSharedHostComponentResult,
-} from "./nixos-shared-host-component-results.ts";
+} from "./nixos-shared-host-component-results";
 import {
   orderedNixosSharedHostComponents,
   primaryNixosSharedHostComponent,
-} from "./nixos-shared-host-components.ts";
+} from "./nixos-shared-host-components";
 import {
   publishNixosSharedHostComponentRuntime,
   resolveNixosSharedHostLiveReuse,
   type NixosSharedHostPublishedSmokeInput,
-} from "./nixos-shared-host-publish-runtime.ts";
-import { smokeNixosSharedHostComponent } from "./nixos-shared-host-publish-smoke.ts";
-import type { NixosSharedHostConfig } from "./nixos-shared-host.ts";
+} from "./nixos-shared-host-publish-runtime";
+import { smokeNixosSharedHostComponent } from "./nixos-shared-host-publish-smoke";
+import type { NixosSharedHostConfig } from "./nixos-shared-host";
 
 type PublishedComponent = {
   component: NixosSharedHostDeploymentComponent;

@@ -1,14 +1,14 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
+import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results";
 import {
   compositeNixosSharedHostArtifactIdentity,
   type NixosSharedHostResolvedComponentArtifact,
-} from "./nixos-shared-host-component-artifacts.ts";
-import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
-import type { NixosSharedHostControlPlaneSourceSelection } from "./nixos-shared-host-control-plane-snapshot.ts";
-import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
-import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
-import type { NixosSharedHostPublishInput } from "./nixos-shared-host-publish-input.ts";
+} from "./nixos-shared-host-component-artifacts";
+import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts";
+import type { NixosSharedHostControlPlaneSourceSelection } from "./nixos-shared-host-control-plane-snapshot";
+import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records";
+import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay";
+import type { NixosSharedHostPublishInput } from "./nixos-shared-host-publish-input";
 
 export function recordedComponentResults(
   source?: NixosSharedHostControlPlaneSourceSelection,

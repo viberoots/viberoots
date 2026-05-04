@@ -169,3 +169,86 @@ Validate patch filenames and directory shape to prevent cache/key churn and misa
 - You can ask the exporter to write a small JSON metrics file for observability.
 - Usage: `node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json --metrics-out build-tools/tools/buck/export-metrics.json`
 - The metrics write is best-effort and does not change export behavior.
+
+## Vercel control-plane deployments
+
+Protected/shared Vercel deploy, preview, preview cleanup, retry, and rollback
+operations route through the reviewed deployment control-plane service. Use
+this section when one of those operations rejects, fails closed, or records an
+unexpected outcome.
+
+### Service submission rejections
+
+- Symptom: the public front door rejects a protected/shared Vercel mutation
+  before contacting the control-plane service.
+- Likely causes:
+  - The invocation passes a laptop-local artifact directory or records root
+    that the public front door does not accept for protected/shared targets.
+  - The invocation passes a direct local-publish flag that is reserved for
+    `local_only` Vercel fixtures.
+  - `--control-plane-url` (or the reviewed `--profile` workflow) is missing.
+- Fix:
+  - Re-run with `--control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"` (or the
+    reviewed profile) and remove laptop-local artifact or records overrides.
+  - For tests or development, use a `local_only` Vercel fixture deployment
+    target instead of a protected/shared label.
+
+### Admission and secret-runtime failures
+
+- Symptom: the control-plane service rejects the submission with an admission
+  or secret-runtime error before any provider API call.
+- Likely causes:
+  - Admission evidence is missing required checks for the admitted scope.
+  - The Vercel API token is not declared in `secret_requirements` for the step
+    that needs it (`publish`, `smoke`, or `preview_cleanup`), or the contract
+    is bound to a target scope that does not match the deployment's provider
+    target identity.
+- Fix:
+  - Run `deploy --deployment <label> --validate-only` and inspect
+    `admissionRequirements.required_checks` to confirm submit-time evidence.
+  - Declare a `vercel/api-token` `secret_requirement` for each step the
+    operation enters, and confirm the contract's `targetScopes` match the
+    `vercel:<team>/<project>#<environment>` lock-key shape.
+
+### Missing replay snapshot for retry or rollback
+
+- Symptom: retry (`--publish-only`) or rollback
+  (`--publish-only --rollback`) fails with `vercel deploy record is missing
+replaySnapshotPath` or rejects the source-run as unsuitable for replay.
+- Likely causes:
+  - The `--source-run-id` references a record that was not produced by a
+    successful normal Vercel deploy on the same deployment label.
+  - The recorded run pre-dates the introduction of the Vercel replay snapshot
+    contract.
+- Fix:
+  - Select a `--source-run-id` for a prior successful normal deploy run for
+    the same canonical live target identity.
+  - Do not retry preview or cleanup runs as the source-run for a replay;
+    only normal deploys produce replay snapshots.
+
+### Ambiguous publish or cleanup outcomes
+
+- Symptom: a Vercel deploy, retry, rollback, or preview cleanup run fails with
+  `ambiguous publish outcome` or `ambiguous cleanup outcome` and records a
+  failure result instead of a success.
+- Reason: the Vercel provider API returned an empty deployment id or did not
+  confirm cleanup. The control-plane service fails closed and never records a
+  false success.
+- Fix:
+  - Inspect the persisted record for the run id and provider release id; the
+    record is redacted of secret-runtime values.
+  - Re-run the operation when the provider returns a determinate outcome. Do
+    not bypass the failure by editing the recorded outcome.
+
+### Rejected laptop-local artifact paths
+
+- Symptom: a protected/shared Vercel deploy or retry rejects an artifact path
+  that points inside the laptop or worktree before the control-plane service
+  runs.
+- Reason: protected/shared Vercel mutations only accept admitted, identity-bound
+  artifact references through the reviewed staging path.
+- Fix:
+  - Use the reviewed staging or `mini` artifact admission flow so the
+    artifact identity is recomputed from the staged bytes.
+  - For tests or local development, switch to a `local_only` Vercel fixture
+    deployment label.

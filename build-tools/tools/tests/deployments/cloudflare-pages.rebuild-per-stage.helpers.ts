@@ -1,19 +1,19 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { CloudflarePagesDeployment } from "../../deployments/contract.ts";
-import { installCloudflarePagesTargets } from "./cloudflare-pages.fixture.ts";
-import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
-import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
-import { writeDeploymentJson } from "./nixos-shared-host.reuse.e2e.helpers.ts";
+import type { CloudflarePagesDeployment } from "../../deployments/contract";
+import { installCloudflarePagesTargets } from "./cloudflare-pages.fixture";
+import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
+import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
+import { writeDeploymentJson } from "./nixos-shared-host.reuse.e2e.helpers";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostLanePolicyFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
-import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture.ts";
+} from "./nixos-shared-host.fixture";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
+import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture";
 
 export async function writeCloudflareArtifact(root: string, html: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });

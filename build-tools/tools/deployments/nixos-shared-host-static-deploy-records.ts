@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
-import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
-import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
-import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
-import { writeNixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
+import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts";
+import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission";
+import type { NixosSharedHostDeployment } from "./contract";
+import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts";
+import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan";
+import { writeNixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay";
 
 export function artifactOutcomeFields(opts: {
   artifactIdentity?: string;

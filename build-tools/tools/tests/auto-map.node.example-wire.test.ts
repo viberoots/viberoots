@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { providerNameForImporter } from "../lib/providers.ts";
+import { providerNameForImporter } from "../lib/providers";
 import { runInTemp } from "./lib/test-helpers";
 
 test("auto-map includes importer-scoped provider for a temp projects/apps/example importer", async () => {

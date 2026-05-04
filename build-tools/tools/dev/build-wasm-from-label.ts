@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagStr } from "../lib/cli.ts";
-import { findRepoRoot } from "../lib/repo.ts";
-import { runManagedCommand } from "../lib/managed-command.ts";
-import { runNodeWithZx } from "../lib/node-run.ts";
-import { sanitizeName } from "../lib/sanitize.ts";
+import { getFlagStr } from "../lib/cli";
+import { findRepoRoot } from "../lib/repo";
+import { runManagedCommand } from "../lib/managed-command";
+import { runNodeWithZx } from "../lib/node-run";
+import { sanitizeName } from "../lib/sanitize";
 
 async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));

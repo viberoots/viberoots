@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { ensureTemplateVariables } from "../../scaffolding/lib/scaffold-utils/template-vars.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { ensureTemplateVariables } from "../../scaffolding/lib/scaffold-utils/template-vars";
+import { runInTemp } from "../lib/test-helpers";
 
 test("template vars infers missing importer from lockfilePath during update", async () => {
   await runInTemp("scaf-template-vars-importer", async (tmp) => {

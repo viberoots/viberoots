@@ -4,7 +4,7 @@ import { test } from "node:test";
 import {
   appTargetBoundaryErrors,
   mcpSourceResponseBoundaryErrors,
-} from "../../deployments/deployment-boundary-checks.ts";
+} from "../../deployments/deployment-boundary-checks";
 
 test("app target boundary rejects imports from another app target", () => {
   const errors = appTargetBoundaryErrors([

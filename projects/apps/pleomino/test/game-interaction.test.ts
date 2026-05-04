@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BOARD_CELL_SIZE } from "../src/game/board.ts";
-import { beginDragSession, previewCellFromDrag } from "../src/game/interaction.ts";
+import { BOARD_CELL_SIZE } from "../src/game/board";
+import { beginDragSession, previewCellFromDrag } from "../src/game/interaction";
 
 const BOARD_RECT = {
   left: 100,

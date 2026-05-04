@@ -1,5 +1,5 @@
 import timers from "node:timers";
-import { type ManagedCommandActivity } from "../../lib/managed-command.ts";
+import { type ManagedCommandActivity } from "../../lib/managed-command";
 
 export async function withHeartbeat<T>(
   label: string,

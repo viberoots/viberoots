@@ -1,33 +1,33 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import type { S3StaticDeployment } from "./contract.ts";
-import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
-import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import type { S3StaticDeployment } from "./contract";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
+import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy";
 import {
   classifySmokeRetry,
   noPublishAutoRetry,
   runWithAutomaticRetry,
-} from "./deployment-retry-policy.ts";
-import { prepareS3StaticPublisherConfig } from "./s3-static-config.ts";
-import { publishS3StaticWebapp } from "./s3-static-publisher.ts";
+} from "./deployment-retry-policy";
+import { prepareS3StaticPublisherConfig } from "./s3-static-config";
+import { publishS3StaticWebapp } from "./s3-static-publisher";
 import {
   createS3StaticDeployRecord,
   createS3StaticDeployRunId,
   writeS3StaticDeployRecord,
   type S3StaticDeployRecord,
-} from "./s3-static-records.ts";
-import { writeS3StaticReplaySnapshot } from "./s3-static-replay.ts";
-import { smokeS3StaticWebapp } from "./s3-static-smoke.ts";
-import { writeS3StaticProvisionerPlan } from "./s3-static-provisioner-plan.ts";
-import { resolveInitialS3StaticAdmittedContext } from "./s3-static-admission.ts";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
+} from "./s3-static-records";
+import { writeS3StaticReplaySnapshot } from "./s3-static-replay";
+import { smokeS3StaticWebapp } from "./s3-static-smoke";
+import { writeS3StaticProvisionerPlan } from "./s3-static-provisioner-plan";
+import { resolveInitialS3StaticAdmittedContext } from "./s3-static-admission";
+import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
 import {
   admitStaticWebappArtifact,
   requireAdmittedStaticWebappArtifactPath,
-} from "./static-webapp-artifacts.ts";
+} from "./static-webapp-artifacts";
 
 export async function submitS3StaticDeploy(opts: {
   workspaceRoot: string;

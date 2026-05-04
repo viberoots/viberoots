@@ -95,6 +95,10 @@ exec_in_dev_shell() {
 	local live_root="$1"; shift
 	local fastpath_enabled="${BUCK_DEV_SHELL_FASTPATH:-1}"
 	local zx_init_path="${ZX_INIT:-${live_root}/build-tools/tools/dev/zx-init.mjs}"
+	# zx-init resolver hook reachability is owned by the nix-built `zx-wrapper` itself, which
+	# auto-discovers zx-init.mjs via $ZX_INIT or by walking up from $PWD. Adding it to
+	# NODE_OPTIONS here would double-register the hook in every node descendant (including
+	# vite/rollup/next dev servers), measurably slowing module resolution.
 	local can_bypass_direnv="0"
 	if [[ "${fastpath_enabled}" != "0" ]]; then
 		# Safe fast-path: only bypass direnv when core runtime tools and zx bootstrap are already present.

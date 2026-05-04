@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { redactOperatorText } from "./deployment-control-plane-redaction.ts";
+import { redactOperatorText } from "./deployment-control-plane-redaction";
 import {
   ageMs,
   increment,
   readJsonDir,
   readJsonFile,
   recordRefs,
-} from "./deployment-control-plane-observability-helpers.ts";
+} from "./deployment-control-plane-observability-helpers";
 
 type SubmissionLike = {
   submissionId: string;

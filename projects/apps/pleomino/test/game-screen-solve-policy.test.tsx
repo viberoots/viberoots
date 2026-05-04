@@ -2,14 +2,14 @@
 import React from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_PIECE_TRANSFORM } from "../src/game/piece-transform.ts";
-import { pleominoGameReducer } from "../src/game/reducer.ts";
-import * as solverRuntime from "../src/game/solver/solver-runtime.ts";
-import type { GameHistoryState } from "../src/game/types.ts";
-import { useGameScreenSolve } from "../src/ui/game-screen-solve.ts";
+import { DEFAULT_PIECE_TRANSFORM } from "../src/game/piece-transform";
+import { pleominoGameReducer } from "../src/game/reducer";
+import * as solverRuntime from "../src/game/solver/solver-runtime";
+import type { GameHistoryState } from "../src/game/types";
+import { useGameScreenSolve } from "../src/ui/game-screen-solve";
 
 vi.mock("../src/game/solver/solver-runtime.ts", async () => {
-  const actual = await vi.importActual<typeof import("../src/game/solver/solver-runtime.ts")>(
+  const actual = await vi.importActual<typeof import("../src/game/solver/solver-runtime")>(
     "../src/game/solver/solver-runtime.ts",
   );
   return {

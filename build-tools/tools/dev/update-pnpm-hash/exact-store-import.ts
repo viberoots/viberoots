@@ -1,10 +1,10 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { runManagedCommand } from "../../lib/managed-command.ts";
-import { newManagedCommandActivity } from "./activity.ts";
-import { runExactStoreCommand } from "./exact-store-command.ts";
-import { withHeartbeat } from "./heartbeat.ts";
+import { runManagedCommand } from "../../lib/managed-command";
+import { newManagedCommandActivity } from "./activity";
+import { runExactStoreCommand } from "./exact-store-command";
+import { withHeartbeat } from "./heartbeat";
 
 async function createExactStoreArchive(opts: {
   repoRoot: string;

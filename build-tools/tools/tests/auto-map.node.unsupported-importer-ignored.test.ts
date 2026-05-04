@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "./lib/test-helpers";
-import { providerNameForImporter } from "../lib/providers.ts";
+import { providerNameForImporter } from "../lib/providers";
 
 test("unsupported importer labels do not generate Node providers or auto-map entries", async () => {
   await runInTemp("auto-map-node-unsupported-importer-ignored", async (tmp, $) => {

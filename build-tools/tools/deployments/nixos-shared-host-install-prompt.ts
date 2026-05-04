@@ -5,14 +5,14 @@ import {
   promptOptionsFromRuleSet,
   type JsonPromptObject,
   type JsonPromptRuleSet,
-} from "../json-prompt-lib.ts";
+} from "../json-prompt-lib";
 import {
   defaultRecordsRoot,
   defaultRuntimeRoot,
   defaultStatePath,
   type NixosSharedHostConfigTopology,
   type NixosSharedHostInstallMode,
-} from "./nixos-shared-host-install-contract.ts";
+} from "./nixos-shared-host-install-contract";
 
 type PromptRunner = (
   input: JsonPromptObject,

@@ -1,5 +1,5 @@
-import { getFlagBool, getFlagStr, hasFlag } from "../../lib/cli.ts";
-import type { PatchesLintConfig, PatchesLintFormat, PatchesLintLang } from "./types.ts";
+import { getFlagBool, getFlagStr, hasFlag } from "../../lib/cli";
+import type { PatchesLintConfig, PatchesLintFormat, PatchesLintLang } from "./types";
 
 function normalizeFormat(v: unknown): PatchesLintFormat {
   const raw = String(v || "text").toLowerCase();

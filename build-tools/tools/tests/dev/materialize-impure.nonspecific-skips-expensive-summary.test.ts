@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { maybePrintImpureMaterializedBins } from "../../dev/dev-build/materialize-impure.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { maybePrintImpureMaterializedBins } from "../../dev/dev-build/materialize-impure";
+import { runInTemp } from "../lib/test-helpers";
 
 test("materialize impure skips full graph summary for non-specific target sets", async () => {
   await runInTemp("materialize-impure-nonspecific-skip", async (tmp) => {

@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
-import { bzlDefBody } from "./nix-gaps-inventory-check-lib.ts";
+import { bzlDefBody } from "./nix-gaps-inventory-check-lib";
 
 type NodeRouteCheckInput = {
   hasNodeImplementationFiles: boolean;

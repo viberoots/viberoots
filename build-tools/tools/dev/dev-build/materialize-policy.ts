@@ -1,12 +1,12 @@
 import fs from "node:fs";
-import { checkFreshness } from "../../buck/prebuild/freshness.ts";
-import { computeCoverageMissing } from "../../buck/prebuild/coverage.ts";
+import { checkFreshness } from "../../buck/prebuild/freshness";
+import { computeCoverageMissing } from "../../buck/prebuild/coverage";
 import {
   computeMissingOutputs,
   findMissingNodeImporterProviders,
   findMissingPythonImporterProviders,
-} from "../../buck/prebuild/presence.ts";
-import { listInputs, listOutputs } from "../../buck/prebuild/scan.ts";
+} from "../../buck/prebuild/presence";
+import { listInputs, listOutputs } from "../../buck/prebuild/scan";
 
 type PrebuildSummary = {
   ageDeltaMs?: number;

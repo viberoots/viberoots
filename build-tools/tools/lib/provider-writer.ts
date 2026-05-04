@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { renderTargetsFile, writeIfChanged, maybeAssumeUnchanged } from "./fs-helpers.ts";
-import { ensureAutoSection } from "./auto-section.ts";
-import { providerNameForImporter } from "./providers.ts";
-import { providersHeaderFor, providersLoadFor } from "./providers-headers.ts";
+import { renderTargetsFile, writeIfChanged, maybeAssumeUnchanged } from "./fs-helpers";
+import { ensureAutoSection } from "./auto-section";
+import { providerNameForImporter } from "./providers";
+import { providersHeaderFor, providersLoadFor } from "./providers-headers";
 
 export type ImporterProvider = {
   lockfile: string; // POSIX relative path, e.g. apps/web/pnpm-lock.yaml

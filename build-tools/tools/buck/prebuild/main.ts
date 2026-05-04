@@ -1,23 +1,23 @@
 #!/usr/bin/env zx-wrapper
 import fs from "node:fs";
 import path from "node:path";
-import { getFlagBool, getFlagStr } from "../../lib/cli.ts";
+import { getFlagBool, getFlagStr } from "../../lib/cli";
 import { printSkip } from "../../lib/errors";
-import { checkNodeDepsInCi } from "../../lib/node-deps-enforcement.ts";
-import { computeCoverageMissing, type CoverageMiss } from "./coverage.ts";
-import { checkFreshness } from "./freshness.ts";
-import { handleGoMissingSum } from "./go-sum.ts";
-import { maybePrintLocalOverridesNotice } from "./notice.ts";
-import { maybePrintPatchInvalidationNotes } from "./patch-invalidation-notes.ts";
+import { checkNodeDepsInCi } from "../../lib/node-deps-enforcement";
+import { computeCoverageMissing, type CoverageMiss } from "./coverage";
+import { checkFreshness } from "./freshness";
+import { handleGoMissingSum } from "./go-sum";
+import { maybePrintLocalOverridesNotice } from "./notice";
+import { maybePrintPatchInvalidationNotes } from "./patch-invalidation-notes";
 import {
   computeMissingOutputs,
   findMissingGomod2nixToml,
   findMissingNodeImporterProviders,
   findMissingPythonImporterProviders,
-} from "./presence.ts";
-import { autoFixGlue } from "./repair.ts";
-import { collectDiagnostics, logList, mtimeSafe } from "./report.ts";
-import { listInputs, listOutputs } from "./scan.ts";
+} from "./presence";
+import { autoFixGlue } from "./repair";
+import { collectDiagnostics, logList, mtimeSafe } from "./report";
+import { listInputs, listOutputs } from "./scan";
 
 type Mode = "ci" | "local";
 

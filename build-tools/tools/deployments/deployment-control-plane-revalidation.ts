@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 import {
   approvalGrantIsValid,
   approvalSummaryFromGrant,
   readApprovalGrantRecord,
-} from "./deployment-control-plane-approval.ts";
-import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract.ts";
-import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence.ts";
-import type { DeploymentRunRecordLike } from "./deployment-admission-records.ts";
-import { readBackendDeployRecordByDeployRunId } from "./nixos-shared-host-control-plane-backend.ts";
-import { resolveDeploymentGitCommit } from "./deployment-git-ref.ts";
+} from "./deployment-control-plane-approval";
+import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract";
+import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence";
+import type { DeploymentRunRecordLike } from "./deployment-admission-records";
+import { readBackendDeployRecordByDeployRunId } from "./nixos-shared-host-control-plane-backend";
+import { resolveDeploymentGitCommit } from "./deployment-git-ref";
 
 type RevalidationContext = {
   targetEnvironment?: {

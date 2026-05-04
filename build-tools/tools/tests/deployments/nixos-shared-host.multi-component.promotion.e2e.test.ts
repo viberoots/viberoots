@@ -3,16 +3,16 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
+import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime";
+import { runInTemp } from "../lib/test-helpers";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers.ts";
-import { startStaticWebappHttpsMultiServer } from "./static-webapp.https-server.ts";
+} from "./nixos-shared-host.fixture";
+import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
+import { startStaticWebappHttpsMultiServer } from "./static-webapp.https-server";
 
 async function writeArtifact(root: string, marker: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });

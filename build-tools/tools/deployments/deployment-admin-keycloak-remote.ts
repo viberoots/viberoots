@@ -1,18 +1,18 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
-import type { DeploymentAuthAction } from "./deployment-auth-groups.ts";
-import { deploymentAdminKeycloakArtifactPaths } from "./deployment-admin-keycloak-artifacts.ts";
-import { resolveRemoteKeycloakAdminInputs } from "./deployment-admin-keycloak-remote-auth.ts";
-import { commandFailure, runCommand } from "./nixos-shared-host-remote-execution-transport.ts";
+import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli";
+import type { DeploymentAuthAction } from "./deployment-auth-groups";
+import { deploymentAdminKeycloakArtifactPaths } from "./deployment-admin-keycloak-artifacts";
+import { resolveRemoteKeycloakAdminInputs } from "./deployment-admin-keycloak-remote-auth";
+import { commandFailure, runCommand } from "./nixos-shared-host-remote-execution-transport";
 import {
   buildRemoteDeployAdminKeycloakGrantUserScript,
   buildRemoteDeployAdminKeycloakSyncScript,
   buildRemoteHostApplyScriptWithOptions,
   buildRemoteRepoPreflightScript,
   buildRemoteSshArgvWithFallback,
-} from "./nixos-shared-host-remote-shell.ts";
-import { createNixosSharedHostRemotePlan } from "./nixos-shared-host-remote-target.ts";
-import type { DeploymentTarget, NixosSharedHostDeployment } from "./contract.ts";
+} from "./nixos-shared-host-remote-shell";
+import { createNixosSharedHostRemotePlan } from "./nixos-shared-host-remote-target";
+import type { DeploymentTarget, NixosSharedHostDeployment } from "./contract";
 
 const REMOTE_PROFILE_FLAGS = [
   "profile",

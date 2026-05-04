@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getFlagStr } from "../lib/cli.ts";
-import { syncModuleContractsForApp } from "./sync-module-contracts-core.ts";
+import { getFlagStr } from "../lib/cli";
+import { syncModuleContractsForApp } from "./sync-module-contracts-core";
 
 async function main() {
   const appCwd = path.resolve(getFlagStr("cwd", process.cwd()) || process.cwd());

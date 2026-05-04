@@ -6,23 +6,23 @@ import { test } from "node:test";
 import {
   localHarnessControlPlaneDatabaseUrl,
   syncBackendDeployRecord,
-} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
-import { createNixosSharedHostPlatformState } from "../../deployments/nixos-shared-host-platform.ts";
-import { resolveNixosSharedHostReplaySelection } from "../../deployments/nixos-shared-host-replay.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "../../deployments/nixos-shared-host-control-plane-backend";
+import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
+import { createNixosSharedHostPlatformState } from "../../deployments/nixos-shared-host-platform";
+import { resolveNixosSharedHostReplaySelection } from "../../deployments/nixos-shared-host-replay";
+import { runInTemp } from "../lib/test-helpers";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 import {
   assertFrozenSnapshotExecution,
   smokeConnectOverride,
   withEnvOverrides,
   writeDemoArtifact,
-} from "./nixos-shared-host.control-plane.helpers.ts";
-import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+} from "./nixos-shared-host.control-plane.helpers";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
 test("shared control plane admits shared_nonprod deploys and executes from the frozen snapshot", async () => {
   await runInTemp("nixos-shared-host-control-plane-admit", async (tmp, $) => {

@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagStr } from "../lib/cli.ts";
+import { getFlagStr } from "../lib/cli";
 
 export function resolveSmokeConnectOverride() {
   const smokeConnectHost = getFlagStr("smoke-connect-host", "").trim();

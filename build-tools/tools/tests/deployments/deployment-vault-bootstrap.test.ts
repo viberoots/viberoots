@@ -8,11 +8,11 @@ import {
   buildVaultBootstrapDocument,
   buildVaultSecretTemplatesDocument,
   renderVaultBootstrapDocument,
-} from "../../deployments/deployment-vault-bootstrap.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
-import { installCloudflarePagesTargets } from "./deployment-targets.install.helpers.ts";
-import { deploymentRequirementFixture } from "./deployment-metadata.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "../../deployments/deployment-vault-bootstrap";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
+import { installCloudflarePagesTargets } from "./deployment-targets.install.helpers";
+import { deploymentRequirementFixture } from "./deployment-metadata.fixture";
+import { runInTemp } from "../lib/test-helpers";
 
 const repoRoot = process.cwd();
 
@@ -106,7 +106,7 @@ test("deploy read-only bootstrap path does not eagerly import provider front doo
     "s3-static-front-door",
   ]) {
     assert.ok(
-      !source.includes(`from "./${providerModule}.ts"`),
+      !source.includes(`from "./${providerModule}"`),
       `read-only deploy commands must not eagerly import ${providerModule}`,
     );
   }

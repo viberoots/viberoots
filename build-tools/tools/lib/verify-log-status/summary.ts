@@ -1,9 +1,9 @@
-import type { VerifyStatus } from "./types.ts";
+import type { VerifyStatus } from "./types";
 import {
   collectFailedLabels,
   parseFinalFailedTargetsBlock,
   parseLineFromBuckLogForMatching,
-} from "./parsing.ts";
+} from "./parsing";
 
 export function parseFinalSummary(lines: string[]): Omit<VerifyStatus, "logPath"> | null {
   // Example:

@@ -6,7 +6,7 @@ import {
   readGeneratedFile,
   readTemplateManifest,
   renderResolverJson,
-} from "../../scaffolding/template-manifest.ts";
+} from "../../scaffolding/template-manifest";
 
 test("parity: resolver mappings are generated from canonical manifest", async () => {
   const manifest = await readTemplateManifest();

@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { ControlPlaneLockAbortReason } from "./nixos-shared-host-control-plane-store.ts";
+import type { ControlPlaneLockAbortReason } from "./nixos-shared-host-control-plane-store";
 
 export function throwLockAbort(reason: ControlPlaneLockAbortReason): never {
   throw Object.assign(

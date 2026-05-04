@@ -410,6 +410,25 @@ step instead of editing Keycloak by hand.
 - supports `opentofu-stack` provision-only foundation runs when stack files live
   under the deployment package `opentofu/` directory and the plan is
   non-destructive
+- the OpenTofu reviewed apply path consumes the recorded plan artifact, plan
+  fingerprint, stack config fingerprint, stack identity, and state backend
+  identity; mismatches against admission evidence fail closed and never invoke
+  `tofu apply`
+- OpenTofu provider and backend credentials are resolved exclusively through
+  deployment `secret_requirements` at the `provision` step, never from ambient
+  process environment, and credential values are never written to deployment
+  records (only credential names plus the redacted apply diagnostics surface)
+- routine protected/shared flows reject `delete`, `replace`, or unknown plan
+  actions; reviewed destructive workflows must attach a
+  `destructiveExceptionRef` evidence entry before any destructive plan can apply
+- Kubernetes service publish credentials (kubeconfig, service-account token, or
+  control-plane-issued short-lived credential reference) are resolved through
+  deployment `secret_requirements` at the `publish` step, both for the normal
+  deploy path and for retry, rollback, and promotion replays. Protected/shared
+  Kubernetes service deployments without a reviewed publish-step contract fail
+  closed before Helm runs, ambient cluster credentials are scrubbed from the
+  publisher process, and only the resolved credential env names plus contract
+  refs are written to deploy records (never the credential values)
 - use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
 
 Scaffold-first examples:
@@ -469,6 +488,53 @@ kubernetes_service_deployment(
 - preview, preview cleanup, retry, and rollback are source-run scoped audited
   operations; protected/shared mutations must route through the reviewed
   control-plane service path
+
+Protected/shared Vercel control-plane examples:
+
+```bash
+# Deploy through the control-plane service
+deploy --deployment //projects/deployments/console-staging:deploy \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+```bash
+# Preview from an earlier accepted run through the control-plane service
+deploy --deployment //projects/deployments/console-staging:deploy \
+  --preview \
+  --source-run-id <deploy-run-id> \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+```bash
+# Preview cleanup through the control-plane service
+deploy --deployment //projects/deployments/console-staging:deploy \
+  --preview-cleanup \
+  --source-run-id <deploy-run-id> \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+```bash
+# Retry an earlier accepted run by replaying the recorded exact artifact
+deploy --deployment //projects/deployments/console-staging:deploy \
+  --publish-only \
+  --source-run-id <deploy-run-id> \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+```bash
+# Rollback to an earlier accepted run on the same canonical live target
+deploy --deployment //projects/deployments/console-staging:deploy \
+  --publish-only \
+  --rollback \
+  --source-run-id <deploy-run-id> \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+Protected/shared Vercel mutations reject laptop-local artifact paths,
+laptop-local records roots, and direct local-publish flags. Retry and rollback
+replay the recorded exact prebuilt artifact and never rebuild from current
+branch state. See [Vercel Troubleshooting](/Users/kiltyj/Code/bucknix-fresh/docs/handbook/troubleshooting.md#vercel-control-plane-deployments)
+for service submission, admission, replay, and provider API failure modes.
 
 `app-store-connect`
 

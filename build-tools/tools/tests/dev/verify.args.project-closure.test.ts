@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseVerifyArgs } from "../../dev/verify/args.ts";
+import { parseVerifyArgs } from "../../dev/verify/args";
 
 test("verify args: project-closure parses repeated flags and explain-selection", () => {
   const parsed = parseVerifyArgs({

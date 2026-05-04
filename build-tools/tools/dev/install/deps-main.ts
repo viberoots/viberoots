@@ -2,23 +2,23 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { getFlagBool, hasShortFlag } from "../../lib/cli.ts";
-import { runNodeWithZx } from "../../lib/node-run.ts";
+import { getFlagBool, hasShortFlag } from "../../lib/cli";
+import { runNodeWithZx } from "../../lib/node-run";
 import {
   warnNodeDepsInLocal,
   warnNodePatchRequirementsInLocal,
-} from "../../lib/node-deps-enforcement.ts";
-import { findRepoRoot } from "../../lib/repo.ts";
-import { nodeModulesAttr } from "./common.ts";
-import { runGoModTidyForMissingSum } from "./go-tidy.ts";
-import { runGlue } from "./glue.ts";
-import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix.ts";
-import { withExclusiveInstallLock } from "./lock.ts";
-import { syncModuleContractsForWebapps } from "./module-contracts.ts";
-import { runUvRefreshAll } from "./uv.ts";
-import { ensureToolchainPathsFiles } from "../toolchain-paths.ts";
-import { discoverImportersWithLock, sharedUnifiedStorePath } from "./importers.ts";
-import { pruneNodeModulesHashesJson } from "../update-pnpm-hash/hashes-json.ts";
+} from "../../lib/node-deps-enforcement";
+import { findRepoRoot } from "../../lib/repo";
+import { nodeModulesAttr } from "./common";
+import { runGoModTidyForMissingSum } from "./go-tidy";
+import { runGlue } from "./glue";
+import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix";
+import { withExclusiveInstallLock } from "./lock";
+import { syncModuleContractsForWebapps } from "./module-contracts";
+import { runUvRefreshAll } from "./uv";
+import { ensureToolchainPathsFiles } from "../toolchain-paths";
+import { discoverImportersWithLock, sharedUnifiedStorePath } from "./importers";
+import { pruneNodeModulesHashesJson } from "../update-pnpm-hash/hashes-json";
 
 type Flags = {
   force: boolean;

@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { getArgvTokens, getFlagStr, hasFlag } from "../lib/cli.ts";
-import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract.ts";
+import { getArgvTokens, getFlagStr, hasFlag } from "../lib/cli";
+import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract";
 
 const execFileAsync = promisify(execFile);
 

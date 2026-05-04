@@ -3,14 +3,14 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
+import { runInTemp } from "../lib/test-helpers";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+} from "./nixos-shared-host.fixture";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
 async function writeArtifact(root: string, files: Record<string, string>): Promise<void> {
   for (const [rel, body] of Object.entries(files)) {

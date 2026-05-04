@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import { printDeployJson } from "./deploy-front-door.ts";
+import { printDeployJson } from "./deploy-front-door";
 import {
   buildDeploymentAdminVaultPlan,
   checkDeploymentAdminVault,
   syncDeploymentAdminVault,
-} from "./deployment-admin-vault.ts";
-import type { DeploymentTarget } from "./contract.ts";
+} from "./deployment-admin-vault";
+import type { DeploymentTarget } from "./contract";
 
 export async function handleDeploymentAdminVaultCli(opts: {
   command: string;

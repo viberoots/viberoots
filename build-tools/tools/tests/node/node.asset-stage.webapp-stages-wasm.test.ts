@@ -6,7 +6,7 @@ import { test } from "node:test";
 import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
   stageTempRepoPaths,
-} from "../lib/test-helpers/git-stage.ts";
+} from "../lib/test-helpers/git-stage";
 import { runInTemp } from "../lib/test-helpers";
 
 const TEST_TIMEOUT_MS =

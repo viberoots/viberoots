@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
-import { mergePnpmStore } from "../../dev/update-pnpm-hash/prefetched-store.ts";
+import { mergePnpmStore } from "../../dev/update-pnpm-hash/prefetched-store";
 
 test("mergePnpmStore respects the shared sync lock for the target store", async () => {
   const tmp = await fsp.mkdtemp(path.join("/tmp", "prefetched-store-merge-lock-"));

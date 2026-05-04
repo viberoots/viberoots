@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { gitFetchEnvForReviewedRemote } from "./nixos-shared-host-reviewed-source-snapshot.ts";
+import { gitFetchEnvForReviewedRemote } from "./nixos-shared-host-reviewed-source-snapshot";
 
 export type DeploymentGitFetchMode = "never" | "if_missing" | "before_resolve";
 

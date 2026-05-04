@@ -4,7 +4,7 @@ import path from "node:path";
 import type { LanguageHandler } from "./types";
 import { repoRoot } from "./lib/apply";
 import { runGlue } from "./glue";
-import { readImporterArg, readPatchDirArg } from "../lib/cli.ts";
+import { readImporterArg, readPatchDirArg } from "../lib/cli";
 import { resolvePythonDist } from "./python-dist-resolve";
 import { requirePositional } from "./lib/args";
 import { resolveImporterLocalPatchDir } from "./lib/importer-local-patch-dir";
@@ -14,7 +14,7 @@ import {
   startWorkspaceWorkflow,
 } from "./lib/workspace-workflow";
 import { runSession } from "./lib/session";
-import { devOverrideEnvNameForLang } from "../lib/dev-override-envs.ts";
+import { devOverrideEnvNameForLang } from "../lib/dev-override-envs";
 
 function keyFor(dist: string, ver: string): string {
   return `${String(dist || "").toLowerCase()}@${String(ver || "").toLowerCase()}`;

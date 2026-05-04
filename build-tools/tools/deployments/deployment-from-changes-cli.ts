@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { collectChangedPaths } from "../lib/build-system-test-scope.ts";
-import { getFlagBool, getFlagList, getFlagStr, hasFlag } from "../lib/cli.ts";
-import { runNormalDeployment, summarizeDeploymentResult } from "./deployment-execution.ts";
-import { runDeploymentBatchFromChanges } from "./deployment-from-changes-run.ts";
-import { resolveDeploymentsFromChanges } from "./deployment-from-changes-selection.ts";
-import { resolveAllDeployments } from "./deployment-query.ts";
+import { collectChangedPaths } from "../lib/build-system-test-scope";
+import { getFlagBool, getFlagList, getFlagStr, hasFlag } from "../lib/cli";
+import { runNormalDeployment, summarizeDeploymentResult } from "./deployment-execution";
+import { runDeploymentBatchFromChanges } from "./deployment-from-changes-run";
+import { resolveDeploymentsFromChanges } from "./deployment-from-changes-selection";
+import { resolveAllDeployments } from "./deployment-query";
 
 function optionalResolvedFlag(name: string): string | undefined {
   if (!hasFlag(name)) return undefined;

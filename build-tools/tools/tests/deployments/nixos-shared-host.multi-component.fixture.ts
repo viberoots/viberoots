@@ -2,7 +2,7 @@
 import {
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 
 export function multiComponentDeployment(
   environmentStage: "dev" | "staging" = "dev",

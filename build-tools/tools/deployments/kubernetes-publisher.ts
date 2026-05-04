@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { KubernetesDeployment } from "./contract.ts";
-import { scrubDeploymentSecretEnv } from "./deployment-secret-env.ts";
+import type { KubernetesDeployment } from "./contract";
+import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
 
 function commandError(stdout: string, stderr: string): Error {
   return new Error([stderr.trim(), stdout.trim()].filter(Boolean)[0] || "helm release failed");
@@ -21,6 +21,7 @@ export async function publishKubernetesComponent(opts: {
   renderedConfigPath: string;
   componentId: string;
   artifactPath: string;
+  publishCredentialEnv?: Record<string, string>;
 }): Promise<{ providerReleaseId: string }> {
   const helmBin = process.env.BNX_KUBERNETES_HELM_BIN || "helm";
   const command = [
@@ -44,6 +45,7 @@ export async function publishKubernetesComponent(opts: {
     stdio: "pipe",
     env: {
       ...scrubDeploymentSecretEnv(),
+      ...(opts.publishCredentialEnv || {}),
       BNX_KUBERNETES_COMPONENT_ID: opts.componentId,
       BNX_KUBERNETES_COMPONENT_ARTIFACT: opts.artifactPath,
       BNX_KUBERNETES_RENDERED_CONFIG: opts.renderedConfigPath,

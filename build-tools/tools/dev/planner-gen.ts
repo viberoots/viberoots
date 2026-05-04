@@ -2,8 +2,8 @@
 import Ajv from "ajv";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { writeIfChanged as writeIfChangedDeterministic } from "../lib/fs-helpers.ts";
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
+import { writeIfChanged as writeIfChangedDeterministic } from "../lib/fs-helpers";
+import { getFlagBool, getFlagStr } from "../lib/cli";
 
 type PlannerConfig = {
   id: string;

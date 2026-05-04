@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { runInTemp } from "../lib/test-helpers";
 
 test("p uses graph-generator-selected and skips full graph-generator for runnable target", async () => {
   await runInTemp("runnable-selected-fast-path", async (tmp, $) => {

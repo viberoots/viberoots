@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-export type ReviewedRuntimeContractProvider = "s3-static" | "kubernetes";
+export type ReviewedRuntimeContractProvider = "s3-static" | "kubernetes" | "vercel";
 
 export type CapabilitySection =
   | "retryIdempotency"
@@ -7,7 +7,10 @@ export type CapabilitySection =
   | "provisionerSupport"
   | "protectedSharedEligibility";
 
-type ExactReuseSurface = "static-webapp-artifact" | "service-component-artifacts";
+type ExactReuseSurface =
+  | "static-webapp-artifact"
+  | "service-component-artifacts"
+  | "vercel-prebuilt-artifact";
 type RollbackIdentityScope = "canonical-live-target-identity" | "canonical-release-target-identity";
 type ImmutableReuseGuarantee =
   | "retained-artifact-unavailable-fails-closed"
@@ -46,12 +49,26 @@ const REVIEWED_RUNTIME_CONTRACTS: Record<ReviewedRuntimeContractProvider, Review
       rollbackIdentityScope: "canonical-release-target-identity",
       immutableReuseGuarantee: "recorded-release-inputs-preserved",
     },
+    vercel: {
+      provider: "vercel",
+      protectedSharedRequiresControlPlane: true,
+      sameDeploymentPublishOnlyClassification: "retry",
+      rollbackClassification: "rollback",
+      provisionOnlyClassification: "provision_only",
+      exactReuseSurface: "vercel-prebuilt-artifact",
+      rollbackIdentityScope: "canonical-live-target-identity",
+      immutableReuseGuarantee: "retained-artifact-unavailable-fails-closed",
+    },
   };
 
 function retryReuseText(surface: ExactReuseSurface): string {
-  return surface === "static-webapp-artifact"
-    ? "shared `--publish-only` reuses only an admitted exact artifact selected with `--source-run-id`"
-    : "shared `--publish-only` reuses only admitted exact component artifacts selected with `--source-run-id`";
+  if (surface === "static-webapp-artifact") {
+    return "shared `--publish-only` reuses only an admitted exact artifact selected with `--source-run-id`";
+  }
+  if (surface === "vercel-prebuilt-artifact") {
+    return "shared `--publish-only` reuses only an admitted exact prebuilt artifact selected with `--source-run-id`";
+  }
+  return "shared `--publish-only` reuses only admitted exact component artifacts selected with `--source-run-id`";
 }
 
 function rollbackIdentityText(scope: RollbackIdentityScope): string {

@@ -1,6 +1,6 @@
 export type Capabilities = Record<string, boolean>;
 
-import type { PatchInvalidationStrategy } from "../../lib/lang-contracts.ts";
+import type { PatchInvalidationStrategy } from "../../lib/lang-contracts";
 
 export type LangEntry = {
   id: string;

@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { resolveDeploymentVaultAdmittedReferences } from "./deployment-secret-vault.ts";
-import type { DeploymentSecretContext } from "./deployment-secret-context.ts";
-import type { DeploymentRequirement } from "./deployment-requirements.ts";
-import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec.ts";
+import { resolveDeploymentVaultAdmittedReferences } from "./deployment-secret-vault";
+import type { DeploymentSecretContext } from "./deployment-secret-context";
+import type { DeploymentRequirement } from "./deployment-requirements";
+import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec";
 
 type SourceAdmittedContextLike = {
   secretRequirements?: DeploymentRequirement[];

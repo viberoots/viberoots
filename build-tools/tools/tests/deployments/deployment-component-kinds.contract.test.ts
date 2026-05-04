@@ -5,7 +5,7 @@ import {
   DEPLOYMENT_COMPONENT_KINDS,
   componentKindRequiresRuntimeContract,
   defaultSmokeClassForComponentKind,
-} from "../../deployments/deployment-component-kinds.ts";
+} from "../../deployments/deployment-component-kinds";
 
 test("canonical deployment component kind registry includes the reviewed non-static kinds", () => {
   assert.deepEqual(DEPLOYMENT_COMPONENT_KINDS, [

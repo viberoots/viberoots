@@ -9,7 +9,7 @@ import {
   readAnswersMap,
   readTemplateVars,
   yamlScalar,
-} from "./template-vars-helpers.ts";
+} from "./template-vars-helpers";
 
 export async function ensureTemplateVariables(
   targetDir: string,

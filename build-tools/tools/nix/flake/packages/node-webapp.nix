@@ -1,4 +1,4 @@
-{ pkgs, nodeMods, importerDirs, filterRepo, repoSnapshot, repoRoot }:
+{ pkgs, nodeMods, importerDirs, filterRepo, repoSnapshot, repoRoot, zx-wrapper }:
 let
   sanitize = (import ../../templates-common.nix { inherit pkgs; }).sanitizeName;
   makeWebapp =
@@ -15,7 +15,7 @@ let
             wr = builtins.getEnv "WORKSPACE_ROOT";
           in
           if wr != "" then (builtins.path { path = filterRepo (builtins.toPath wr); name = "repo"; }) else repoSnapshot;
-        nativeBuildInputs = [ pkgs.nodejs_22 pkgs.esbuild pkgs.cacert pkgs.coreutils ];
+        nativeBuildInputs = [ pkgs.nodejs_22 pkgs.esbuild pkgs.cacert pkgs.coreutils zx-wrapper ];
         buildPhase = ''
           set -euo pipefail
           PHASE_T0="$(date +%s)"
@@ -81,6 +81,7 @@ let
             node --experimental-top-level-await \
               --disable-warning=ExperimentalWarning \
               --experimental-strip-types \
+              --import "$REPO_ROOT/build-tools/tools/dev/zx-init.mjs" \
               "$SYNC_CONTRACTS_SCRIPT" \
               --cwd . \
               --app-target "//${importerDir}:$APP_STAGE_NAME" \

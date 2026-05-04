@@ -1,16 +1,16 @@
 #!/usr/bin/env zx-wrapper
-import type { GooglePlayDeployment } from "./contract.ts";
-import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence.ts";
-import type { DeploymentRequirement } from "./deployment-requirements.ts";
+import type { GooglePlayDeployment } from "./contract";
+import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence";
+import type { DeploymentRequirement } from "./deployment-requirements";
 import {
   resolveInitialAdmittedSecretReferences,
   resolveSourceRunAdmittedSecretReferences,
-} from "./deployment-secret-admission.ts";
-import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec.ts";
+} from "./deployment-secret-admission";
+import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec";
 import {
   resolveDeploymentReviewedTargetEnvironment,
   type DeploymentReviewedTargetEnvironmentAdmission,
-} from "./deployment-reviewed-target-environment.ts";
+} from "./deployment-reviewed-target-environment";
 
 type GooglePlaySourceAdmission = {
   mode: "stage_branch_head" | "source_run_reuse" | "promotion_source_run";

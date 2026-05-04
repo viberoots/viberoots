@@ -1,4 +1,4 @@
-import { getFlagBool, getFlagStr } from "../../lib/cli.ts";
+import { getFlagBool, getFlagStr } from "../../lib/cli";
 
 export type UpdatePnpmHashArgs = {
   lockfile?: string;

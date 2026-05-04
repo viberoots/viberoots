@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
-import type { DeploymentTarget } from "./contract.ts";
+import { buildSelectedOutPath } from "../dev/run-runnable-graph";
+import type { DeploymentTarget } from "./contract";
 
 export function artifactDirFromBuiltOutPath(componentKind: string, outPath: string): string {
   return componentKind === "static-webapp" ? path.join(outPath, "dist") : outPath;

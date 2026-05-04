@@ -1,7 +1,7 @@
-import { type VerifyScopeDecision } from "./requested-scope.ts";
-import { printVerifySelection } from "./selection-output.ts";
-import { killBuckIsolation } from "./process-control.ts";
-import { resolveVerifyTargetPlan, summarizeVerifyTargetPlan } from "./target-passes.ts";
+import { type VerifyScopeDecision } from "./requested-scope";
+import { printVerifySelection } from "./selection-output";
+import { killBuckIsolation } from "./process-control";
+import { resolveVerifyTargetPlan, summarizeVerifyTargetPlan } from "./target-passes";
 
 export async function runExplainSelection(opts: {
   root: string;

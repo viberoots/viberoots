@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { readGraph, type GraphNode } from "./graph.ts";
-import { DEFAULT_GRAPH_PATH } from "./graph-const.ts";
+import { readGraph, type GraphNode } from "./graph";
+import { DEFAULT_GRAPH_PATH } from "./graph-const";
 
 export type ProviderIndexEntry = { kind: string; key: string };
 

@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
-import { resolveToolPathSync } from "../../lib/tool-paths.ts";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 
 export type VerifyProcessSnapshot = {
   total: number;

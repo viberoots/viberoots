@@ -2,16 +2,16 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { prepareBackendNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane-backend-prepare.ts";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { cleanupReviewedSourceSnapshot } from "../../deployments/nixos-shared-host-reviewed-source-snapshot.ts";
-import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
-import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers.ts";
+import { prepareBackendNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane-backend-prepare";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { cleanupReviewedSourceSnapshot } from "../../deployments/nixos-shared-host-reviewed-source-snapshot";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
+import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "./nixos-shared-host.fixture";
+import { runInTemp } from "../lib/test-helpers";
 
 async function gitStdout(cwd: string, $: any, ...args: string[]): Promise<string> {
   return String((await $({ cwd, stdio: "pipe" })`git ${args}`).stdout).trim();

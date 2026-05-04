@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator.ts";
-import { admissionEvalBase, admittedContextFixture } from "./deployment-admission.test-helpers.ts";
-import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator";
+import { admissionEvalBase, admittedContextFixture } from "./deployment-admission.test-helpers";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 const CHECK_NAME = "deploy/admission";
 

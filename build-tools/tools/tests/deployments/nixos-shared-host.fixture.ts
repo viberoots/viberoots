@@ -7,22 +7,22 @@ import {
   STATIC_WEBAPP_COMPONENT,
   type NixosSharedHostSsrRuntimeContract,
   type NixosSharedHostDeployment,
-} from "../../deployments/contract.ts";
+} from "../../deployments/contract";
 import {
   DEPLOYMENT_ADMISSION_POLICY_RULE,
   DEPLOYMENT_LANE_POLICY_RULE,
   type DeploymentAdmissionPolicy,
   type DeploymentLanePolicy,
-} from "../../deployments/deployment-policy.ts";
-import type { DeploymentLanePromotionCompatibility } from "../../deployments/deployment-lane-promotion-compatibility.ts";
-import type { GraphNode } from "../../lib/graph.ts";
+} from "../../deployments/deployment-policy";
+import type { DeploymentLanePromotionCompatibility } from "../../deployments/deployment-lane-promotion-compatibility";
+import type { GraphNode } from "../../lib/graph";
 import type {
   DeploymentAttestationPolicy,
   DeploymentSbomPolicy,
   DeploymentSupplyChainGatePolicy,
-} from "../../deployments/deployment-admission-supply-chain.ts";
-import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture.ts";
-export { installNixosSharedHostTargets } from "./deployment-targets.install.helpers.ts";
+} from "../../deployments/deployment-admission-supply-chain";
+import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture";
+export { installNixosSharedHostTargets } from "./deployment-targets.install.helpers";
 
 export function nixosSharedHostSsrRuntimeContractFixture(
   overrides: Partial<NixosSharedHostSsrRuntimeContract> = {},

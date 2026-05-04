@@ -3,9 +3,9 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
-import { readCompositeGraph } from "../../lib/graph-view.ts";
-import { importerScopedProviderContractForLang } from "../../lib/lang-contracts.ts";
+import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
+import { readCompositeGraph } from "../../lib/graph-view";
+import { importerScopedProviderContractForLang } from "../../lib/lang-contracts";
 import { runInTemp } from "../lib/test-helpers";
 
 test("exporter attaches importer lockfile labels only for kind:* (node + python)", async () => {

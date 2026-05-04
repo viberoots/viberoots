@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveVerifyTemplateTestScope } from "../../dev/verify/template-test-scope.ts";
+import { resolveVerifyTemplateTestScope } from "../../dev/verify/template-test-scope";
 
 test("project-local methodology exception changes stay on the project-impact verify path", async () => {
   const result = await resolveVerifyTemplateTestScope({

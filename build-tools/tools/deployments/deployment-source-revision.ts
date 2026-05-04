@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { DeploymentTarget } from "./contract.ts";
-import { requiredDeploymentStageBranch } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
+import type { DeploymentTarget } from "./contract";
+import { requiredDeploymentStageBranch } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
 
 const execFileAsync = promisify(execFile);
 

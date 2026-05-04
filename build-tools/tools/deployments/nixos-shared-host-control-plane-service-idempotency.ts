@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { submitResponseFromSubmission } from "./deployment-control-plane-status.ts";
+import { submitResponseFromSubmission } from "./deployment-control-plane-status";
 import {
   readBackendSubmissionBySubmissionId,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
+} from "./nixos-shared-host-control-plane-backend";
 
 export async function reusedBackendSubmitResponse(
   backend: NixosSharedHostControlPlaneBackendTarget,

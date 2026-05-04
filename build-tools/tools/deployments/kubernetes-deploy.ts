@@ -1,38 +1,31 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import type { KubernetesDeployment } from "./contract.ts";
-import { withFailedStep } from "./deployment-failed-step.ts";
-import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
-import {
-  classifySmokeRetry,
-  noPublishAutoRetry,
-  runWithAutomaticRetry,
-} from "./deployment-retry-policy.ts";
-import { executionPolicyWithRetry, retryAuditFrom } from "./deployment-retry-records.ts";
-import {
-  deploymentMetadataFingerprintFor,
-  fingerprintValue,
-} from "./nixos-shared-host-deployment-fingerprint.ts";
-import { admitKubernetesComponentArtifacts } from "./kubernetes-artifacts.ts";
-import {
-  artifactByComponentId,
-  orderedComponentIds,
-  requiredArtifactPaths,
-} from "./kubernetes-deploy-helpers.ts";
-import { resolveInitialKubernetesAdmittedContext } from "./kubernetes-admission.ts";
-import { prepareKubernetesPublisherConfig } from "./kubernetes-config.ts";
-import { publishKubernetesComponent } from "./kubernetes-publisher.ts";
-import {
-  createKubernetesDeployRecord,
-  createKubernetesDeployRunId,
-  writeKubernetesDeployRecord,
-  type KubernetesDeployRecord,
-} from "./kubernetes-records.ts";
-import { writeKubernetesReplaySnapshot } from "./kubernetes-replay.ts";
-import { smokeKubernetesRelease } from "./kubernetes-smoke.ts";
-import { writeKubernetesProvisionerPlan } from "./kubernetes-provisioner-plan.ts";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import type { KubernetesDeployment } from "./contract";
+import { withFailedStep } from "./deployment-failed-step";
+import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy";
+// prettier-ignore
+import { classifySmokeRetry, noPublishAutoRetry, runWithAutomaticRetry } from "./deployment-retry-policy";
+import { executionPolicyWithRetry, retryAuditFrom } from "./deployment-retry-records";
+// prettier-ignore
+import { deploymentMetadataFingerprintFor, fingerprintValue } from "./nixos-shared-host-deployment-fingerprint";
+import { admitKubernetesComponentArtifacts } from "./kubernetes-artifacts";
+// prettier-ignore
+import { artifactByComponentId, orderedComponentIds, requiredArtifactPaths } from "./kubernetes-deploy-helpers";
+import { resolveInitialKubernetesAdmittedContext } from "./kubernetes-admission";
+import { prepareKubernetesPublisherConfig } from "./kubernetes-config";
+import { publishKubernetesComponent } from "./kubernetes-publisher";
+// prettier-ignore
+import { publisherCredentialFields, resolveKubernetesPublishCredentialsForDeployment, type KubernetesPublishCredentialsHooks } from "./kubernetes-publish-credentials-orchestration";
+// prettier-ignore
+import { createKubernetesDeployRecord, createKubernetesDeployRunId, writeKubernetesDeployRecord, type KubernetesDeployRecord } from "./kubernetes-records";
+import { createKubernetesDeployFailureRecord } from "./kubernetes-deploy-records";
+import { writeKubernetesReplaySnapshot } from "./kubernetes-replay";
+import { smokeKubernetesRelease } from "./kubernetes-smoke";
+import { writeKubernetesProvisionerPlan } from "./kubernetes-provisioner-plan";
+// prettier-ignore
+import { maybeRunOpenTofuReviewedApply, type OpenTofuApplyHooks } from "./opentofu-apply-orchestration";
 
 export async function submitKubernetesDeploy(opts: {
   workspaceRoot: string;
@@ -43,6 +36,8 @@ export async function submitKubernetesDeploy(opts: {
   submissionId?: string;
   expectedSourceRevision?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
+  openTofuApply?: OpenTofuApplyHooks;
+  publishCredentials?: KubernetesPublishCredentialsHooks;
   smokeConnectOverride?: {
     protocol: "http:" | "https:";
     hostname: string;
@@ -92,6 +87,12 @@ export async function submitKubernetesDeploy(opts: {
       ...(provisionerPlan ? { provisionerPlanFingerprint: provisionerPlan.fingerprint } : {}),
     },
   });
+  const provisionerApplyOutcome = await maybeRunOpenTofuReviewedApply({
+    deployment: opts.deployment,
+    admittedContext,
+    provisionerPlan,
+    hooks: opts.openTofuApply,
+  });
   const smokeMode = resolveDeploymentSmokeExecutionMode({ deployment: opts.deployment });
   const deploymentMetadataFingerprint = deploymentMetadataFingerprintFor(opts.deployment);
   const componentResults: NonNullable<KubernetesDeployRecord["componentResults"]> = [];
@@ -99,6 +100,9 @@ export async function submitKubernetesDeploy(opts: {
   let providerReleaseId = "";
   let providerConfigFingerprint = "";
   let preparedConfig: Awaited<ReturnType<typeof prepareKubernetesPublisherConfig>> | undefined;
+  let publisherCredentials: Awaited<
+    ReturnType<typeof resolveKubernetesPublishCredentialsForDeployment>
+  > = { env: {}, envNames: [], contractRefs: [] };
   try {
     preparedConfig = await prepareKubernetesPublisherConfig({
       workspaceRoot: opts.workspaceRoot,
@@ -112,6 +116,11 @@ export async function submitKubernetesDeploy(opts: {
       outputPath: path.join(opts.recordsRoot, "provider-config", `${deployRunId}.helm-values.json`),
     });
     providerConfigFingerprint = preparedConfig.fingerprint;
+    publisherCredentials = await resolveKubernetesPublishCredentialsForDeployment({
+      deployment: opts.deployment,
+      admittedContext,
+      hooks: opts.publishCredentials,
+    });
     for (const componentId of orderedComponentIds(opts.deployment)) {
       const artifact = artifactsByComponent[componentId];
       const published = await runWithAutomaticRetry({
@@ -124,6 +133,7 @@ export async function submitKubernetesDeploy(opts: {
             renderedConfigPath: preparedConfig.renderedConfigPath,
             componentId,
             artifactPath: artifact.storedArtifactPath,
+            publishCredentialEnv: publisherCredentials.env,
           }),
         classifyError: () => noPublishAutoRetry(),
       }).catch((error) => {
@@ -187,6 +197,7 @@ export async function submitKubernetesDeploy(opts: {
       admittedContext,
       ...(opts.deployment.provisioner ? { provisionerType: opts.deployment.provisioner.type } : {}),
       ...(provisionerPlan ? { provisionerPlan } : {}),
+      ...(provisionerApplyOutcome ? { provisionerApplyOutcome } : {}),
       smokeOutcome: "passed",
       executionPolicy,
       deploymentMetadataFingerprint,
@@ -206,33 +217,25 @@ export async function submitKubernetesDeploy(opts: {
       }),
       publicUrl: smoke.result.publicUrl,
       ...(providerReleaseId ? { providerReleaseId } : {}),
+      ...publisherCredentialFields(publisherCredentials),
     });
     return { record, recordPath: await writeKubernetesDeployRecord(opts.recordsRoot, record) };
   } catch (error) {
-    const record = createKubernetesDeployRecord(opts.deployment, {
+    const record = createKubernetesDeployFailureRecord({
+      deployment: opts.deployment,
       deployRunId,
-      operationKind: "deploy",
-      runClassification: "deploy",
-      lifecycleState: "finished",
-      terminationReason: null,
-      finalOutcome:
-        (error as any)?.failedStep === "smoke" ? "smoke_failed_after_publish" : "publish_failed",
-      artifact: { identity: compositeArtifactIdentity },
-      componentArtifacts: admittedArtifacts.map((artifact) => ({
-        componentId: artifact.componentId,
-        identity: artifact.identity,
-        storedArtifactPath: artifact.storedArtifactPath,
-      })),
-      ...(componentResults.length > 0 ? { componentResults } : {}),
+      error,
+      compositeArtifactIdentity,
+      admittedArtifacts,
+      componentResults,
       admittedContext,
-      ...(opts.deployment.provisioner ? { provisionerType: opts.deployment.provisioner.type } : {}),
-      ...(provisionerPlan ? { provisionerPlan } : {}),
+      provisionerPlan,
+      provisionerApplyOutcome,
       executionPolicy,
       deploymentMetadataFingerprint,
-      ...(providerConfigFingerprint ? { providerConfigFingerprint } : {}),
-      failedStep: (error as any)?.failedStep === "smoke" ? "smoke" : "publish",
-      error: error instanceof Error ? error.message : String(error),
-      ...(providerReleaseId ? { providerReleaseId } : {}),
+      providerConfigFingerprint,
+      providerReleaseId,
+      publisherCredentials,
     });
     const recordPath = await writeKubernetesDeployRecord(opts.recordsRoot, record);
     throw Object.assign(error instanceof Error ? error : new Error(String(error)), {

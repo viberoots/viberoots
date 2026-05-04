@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../lib/graph.ts";
+import type { GraphNode } from "../lib/graph";
 
 export function readString(node: GraphNode, key: string): string {
   return typeof node[key] === "string" ? String(node[key]).trim() : "";

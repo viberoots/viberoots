@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli.ts";
-import type { DeploymentTarget } from "./contract.ts";
+import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli";
+import type { DeploymentTarget } from "./contract";
 import {
   selectedDeployControlPlaneOperatorAction,
   type DeployControlPlaneOperatorAction,
-} from "./deploy-control-plane-operator-flags.ts";
+} from "./deploy-control-plane-operator-flags";
 import {
   printDeployJson,
   printProviderTargetIdentityForCli,
   validateDeploymentForCli,
-} from "./deploy-front-door.ts";
+} from "./deploy-front-door";
 import {
   assertVaultBootstrapExecutableDocument,
   buildVaultBootstrapDocument,
@@ -19,11 +19,11 @@ import {
   type VaultBootstrapFormat,
   type VaultBootstrapInputs,
   type VaultSecretTemplateFormat,
-} from "./deployment-vault-bootstrap.ts";
+} from "./deployment-vault-bootstrap";
 import {
   readDeploymentVaultRuntimeInputsFromFlags,
   type DeploymentVaultRuntimeInputs,
-} from "./deployment-vault-runtime.ts";
+} from "./deployment-vault-runtime";
 export type DeployCliReadonlyFlags = {
   printTargetIdentity: boolean;
   printVaultBootstrap: boolean;

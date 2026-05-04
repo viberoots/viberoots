@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { attachGoModuleLabels } from "../../buck/exporter/labeler.ts";
-import type { Batch, Node } from "../../buck/exporter/types.ts";
+import { attachGoModuleLabels } from "../../buck/exporter/labeler";
+import type { Batch, Node } from "../../buck/exporter/types";
 
 test("go labeler throws if go list results are not provided for labeling", async () => {
   const n: Node = {

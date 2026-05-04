@@ -3,25 +3,25 @@ import path from "node:path";
 import {
   resolvePromotionS3StaticAdmittedContext,
   resolveSourceRunS3StaticAdmittedContext,
-} from "./s3-static-admission.ts";
-import { prepareS3StaticPublisherConfig } from "./s3-static-config.ts";
-import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
-import { requireAdmittedStaticWebappArtifactPath } from "./static-webapp-artifacts.ts";
-import type { S3StaticDeployment } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
-import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
+} from "./s3-static-admission";
+import { prepareS3StaticPublisherConfig } from "./s3-static-config";
+import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts";
+import { requireAdmittedStaticWebappArtifactPath } from "./static-webapp-artifacts";
+import type { S3StaticDeployment } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
+import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy";
 import {
   classifySmokeRetry,
   noPublishAutoRetry,
   runWithAutomaticRetry,
-} from "./deployment-retry-policy.ts";
-import { publishS3StaticWebapp } from "./s3-static-publisher.ts";
-import { createS3StaticDeployRecord, writeS3StaticDeployRecord } from "./s3-static-records.ts";
-import { writeS3StaticReplaySnapshot } from "./s3-static-replay.ts";
-import { smokeS3StaticWebapp } from "./s3-static-smoke.ts";
+} from "./deployment-retry-policy";
+import { publishS3StaticWebapp } from "./s3-static-publisher";
+import { createS3StaticDeployRecord, writeS3StaticDeployRecord } from "./s3-static-records";
+import { writeS3StaticReplaySnapshot } from "./s3-static-replay";
+import { smokeS3StaticWebapp } from "./s3-static-smoke";
 
 type SourceRecordLike = { deployRunId: string; deploymentId: string; admittedContext?: any };
 

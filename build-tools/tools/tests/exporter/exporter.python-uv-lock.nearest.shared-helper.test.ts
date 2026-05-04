@@ -4,9 +4,9 @@ import path from "node:path";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { readCompositeGraph } from "../../lib/graph-view.ts";
-import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
-import { computeImporterLabel, findNearestUvLockForPackage } from "../../lib/importers.ts";
+import { readCompositeGraph } from "../../lib/graph-view";
+import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
+import { computeImporterLabel, findNearestUvLockForPackage } from "../../lib/importers";
 
 test("python exporter and shared helper agree on nearest uv.lock and importer label", async () => {
   await runInTemp("exp-python-nearest-uv", async (tmp, $) => {

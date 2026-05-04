@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
-import type { DeploymentTarget } from "./contract.ts";
+import type { DeploymentTarget } from "./contract";
 import type {
   DeploymentChangeReason,
   DeploymentFromChangesPlan,
-} from "./deployment-from-changes-selection.ts";
+} from "./deployment-from-changes-selection";
 
 export type DeploymentBatchRunResult = {
   deploymentId: string;

@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getImporterRootsContract } from "../../lib/importer-roots.ts";
+import { getImporterRootsContract } from "../../lib/importer-roots";
 
 function isWorkspaceImporter(importer: string, workspaceRoots: readonly string[]): boolean {
   return workspaceRoots.some((base) => importer.startsWith(`${base}/`));

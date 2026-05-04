@@ -5,7 +5,7 @@ import { test } from "node:test";
 import {
   launchBrowser,
   shouldSuppressBrowserLaunch,
-} from "../../deployments/deployment-browser-launch.ts";
+} from "../../deployments/deployment-browser-launch";
 
 class FakeChild extends EventEmitter {
   unref() {}

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { toPosixPath, uniqSorted } from "../../lib/posix-path.ts";
+import { toPosixPath, uniqSorted } from "../../lib/posix-path";
 
 test("toPosixPath normalizes separators, trims leading ./, and uses '.' for empty", async () => {
   assert.equal(toPosixPath(""), ".");

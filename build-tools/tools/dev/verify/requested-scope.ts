@@ -1,27 +1,27 @@
-import { collectChangedPaths } from "../../lib/build-system-test-scope.ts";
+import { collectChangedPaths } from "../../lib/build-system-test-scope";
 import {
   type DeploymentImpactDiagnostics,
   deploymentProjectPrefixesFromLabels,
   resolveDeploymentImpactSelection,
-} from "../../lib/deployment-impact-selector.ts";
-import { listDeploymentTargets } from "../../deployments/deployment-query.ts";
+} from "../../lib/deployment-impact-selector";
+import { listDeploymentTargets } from "../../deployments/deployment-query";
 import {
   DEPLOYMENT_SAFETY_FLOOR_TARGETS,
   queryDeploymentDomainTargets,
-} from "../../lib/deployment-test-targets.ts";
+} from "../../lib/deployment-test-targets";
 import {
   type ProjectImpactSelectorDiagnostics,
   type ProjectImpactSelectorResult,
   resolveProjectImpactSelection,
-} from "../../lib/project-impact-selector.ts";
-import { toSortedUnique } from "../../lib/project-graph.ts";
-import type { VerifyArgs } from "./args.ts";
-import { normalizeVerifyTargets } from "./args.ts";
+} from "../../lib/project-impact-selector";
+import { toSortedUnique } from "../../lib/project-graph";
+import type { VerifyArgs } from "./args";
+import { normalizeVerifyTargets } from "./args";
 import {
   resolveVerifyTemplateTestScope,
   type VerifyTemplateScopeDecision,
   type VerifySelectionDiagnostics as VerifyTemplateSelectionDiagnostics,
-} from "./template-test-scope.ts";
+} from "./template-test-scope";
 
 export type VerifyDeploymentScopeMode = "auto" | "always" | "never";
 

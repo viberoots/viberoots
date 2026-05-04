@@ -3,28 +3,25 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import {
-  classifyOpenTofuPlan,
-  OPENTOFU_STACK_PROVISIONER,
-} from "../../deployments/opentofu-stack.ts";
-import { promotionCompatibilityErrors } from "../../deployments/deployment-promotion-compatibility.ts";
+import { classifyOpenTofuPlan, OPENTOFU_STACK_PROVISIONER } from "../../deployments/opentofu-stack";
+import { promotionCompatibilityErrors } from "../../deployments/deployment-promotion-compatibility";
 import {
   extractKubernetesDeployments,
   type KubernetesDeployment,
-} from "../../deployments/contract.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "../../deployments/contract";
+import { runInTemp } from "../lib/test-helpers";
 import {
   nixosSharedHostLaneGovernanceNodeFixture,
   writeReviewedLaneAdmissionEvidenceJson,
-} from "./deployment-lane-governance.fixture.ts";
+} from "./deployment-lane-governance.fixture";
 import {
   installKubernetesTargets,
   kubernetesAdmissionPolicyNodeFixture,
   kubernetesDeploymentFixture,
   kubernetesLanePolicyNodeFixture,
-} from "./kubernetes.fixture.ts";
-import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+} from "./kubernetes.fixture";
+import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
 
 function openTofuDeployment(): KubernetesDeployment {
   return kubernetesDeploymentFixture({

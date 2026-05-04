@@ -2,26 +2,26 @@
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { GraphNode } from "../lib/graph.ts";
-import type { DeploymentComponent, DeploymentTarget } from "./contract.ts";
-import { DEPLOYMENT_CQUERY_ATTRS } from "./deployment-query-attrs.ts";
-import { queryDeploymentNodesWithAttrs } from "./deployment-query.ts";
-import { pushAppStoreConnectComponentKindErrors } from "./app-store-connect-capability-validation.ts";
-import { prepareAppStoreConnectPublisherConfig } from "./app-store-connect-config.ts";
-import { pushCloudflareComponentKindErrors } from "./cloudflare-pages-capability-validation.ts";
-import { prepareCloudflarePagesWranglerConfig } from "./cloudflare-pages-config.ts";
-import { pushGooglePlayComponentKindErrors } from "./google-play-capability-validation.ts";
-import { prepareGooglePlayPublisherConfig } from "./google-play-config.ts";
-import { isSupportedComponentNode } from "./deployment-component-kinds.ts";
-import { prepareKubernetesPublisherConfig } from "./kubernetes-config.ts";
-import { pushKubernetesComponentKindErrors } from "./kubernetes-capability-validation.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import { pushS3StaticComponentKindErrors } from "./s3-static-capability-validation.ts";
-import { prepareS3StaticPublisherConfig } from "./s3-static-config.ts";
-import { pushVercelComponentKindErrors } from "./vercel-capability-validation.ts";
-import { prepareVercelPublisherConfig } from "./vercel-config.ts";
-import { appTargetBoundaryErrors } from "./deployment-boundary-checks.ts";
-import { ambientProviderEnvBypassErrors } from "./external-deployment-requirements.ts";
+import type { GraphNode } from "../lib/graph";
+import type { DeploymentComponent, DeploymentTarget } from "./contract";
+import { DEPLOYMENT_CQUERY_ATTRS } from "./deployment-query-attrs";
+import { queryDeploymentNodesWithAttrs } from "./deployment-query";
+import { pushAppStoreConnectComponentKindErrors } from "./app-store-connect-capability-validation";
+import { prepareAppStoreConnectPublisherConfig } from "./app-store-connect-config";
+import { pushCloudflareComponentKindErrors } from "./cloudflare-pages-capability-validation";
+import { prepareCloudflarePagesWranglerConfig } from "./cloudflare-pages-config";
+import { pushGooglePlayComponentKindErrors } from "./google-play-capability-validation";
+import { prepareGooglePlayPublisherConfig } from "./google-play-config";
+import { isSupportedComponentNode } from "./deployment-component-kinds";
+import { prepareKubernetesPublisherConfig } from "./kubernetes-config";
+import { pushKubernetesComponentKindErrors } from "./kubernetes-capability-validation";
+import type { NixosSharedHostDeployment } from "./contract";
+import { pushS3StaticComponentKindErrors } from "./s3-static-capability-validation";
+import { prepareS3StaticPublisherConfig } from "./s3-static-config";
+import { pushVercelComponentKindErrors } from "./vercel-capability-validation";
+import { prepareVercelPublisherConfig } from "./vercel-config";
+import { appTargetBoundaryErrors } from "./deployment-boundary-checks";
+import { ambientProviderEnvBypassErrors } from "./external-deployment-requirements";
 
 function componentsForValidation(deployment: DeploymentTarget): DeploymentComponent[] {
   return deployment.components.length > 0

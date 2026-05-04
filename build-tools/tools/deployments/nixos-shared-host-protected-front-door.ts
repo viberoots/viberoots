@@ -1,18 +1,18 @@
 #!/usr/bin/env zx-wrapper
-import { summarizeDeploymentResult } from "./deployment-execution.ts";
+import { summarizeDeploymentResult } from "./deployment-execution";
 import {
   resolveArtifactDirForCli,
   resolveComponentArtifactDirsForCli,
-} from "./deployment-cli-resolve.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
-import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door.ts";
-import { resolveServiceClientFromFlags } from "./nixos-shared-host-service-client-config.ts";
-import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
+} from "./deployment-cli-resolve";
+import type { NixosSharedHostDeployment } from "./contract";
+import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components";
+import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door";
+import { resolveServiceClientFromFlags } from "./nixos-shared-host-service-client-config";
+import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs";
 import {
   createAndWaitForServiceOwnedAuthSession,
   shouldUseServiceOwnedInteractiveAuth,
-} from "./deployment-service-auth-client.ts";
+} from "./deployment-service-auth-client";
 
 const SERVICE_ONLY_LOCAL_FLAGS = [
   "host-root",

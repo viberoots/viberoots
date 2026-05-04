@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { findFileSizeOffenders, SOURCE_FILES_SCOPE } from "../../dev/file-size-lint";
-import { resolveSourceFileSizeExceptionPaths } from "../../dev/file-size-lint-exceptions.ts";
+import { resolveSourceFileSizeExceptionPaths } from "../../dev/file-size-lint-exceptions";
 
 test("repo-owned code files remain under the 250 LOC methodology gate", async () => {
   const root = (process.env.WORKSPACE_ROOT || process.cwd()).trim();

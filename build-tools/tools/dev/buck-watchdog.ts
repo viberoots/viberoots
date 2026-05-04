@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import "zx/globals";
-import { getFlagStr } from "../lib/cli.ts";
-import { resolveToolPath } from "../lib/tool-paths.ts";
-import { ownerPidForIsolation } from "./buck-watchdog-lib.ts";
+import { getFlagStr } from "../lib/cli";
+import { resolveToolPath } from "../lib/tool-paths";
+import { ownerPidForIsolation } from "./buck-watchdog-lib";
 import * as fsp from "node:fs/promises";
 
 function isPidAlive(pid: number): boolean {

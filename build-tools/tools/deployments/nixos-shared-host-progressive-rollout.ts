@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
+import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results";
+import type { NixosSharedHostDeployment } from "./contract";
 
 export type NixosSharedHostProgressivePhaseState =
   | "pending"

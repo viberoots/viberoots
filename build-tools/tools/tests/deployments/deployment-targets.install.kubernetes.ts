@@ -1,23 +1,59 @@
-import type { KubernetesDeployment } from "../../deployments/contract.ts";
-import { installAppTargetsForDeployments } from "./deployment-targets.install.app-targets.ts";
+import type { KubernetesDeployment } from "../../deployments/contract";
+import { installAppTargetsForDeployments } from "./deployment-targets.install.app-targets";
 import {
   appendTargetsFragment,
   labelDir,
   labelName,
   synchronizeInstalledDeployments,
   writeTargetsFragments,
-} from "./deployment-targets.install.fragments.ts";
+} from "./deployment-targets.install.fragments";
 import {
   renderPrerequisiteList,
   renderRequirementList,
   renderSmokeLines,
+  renderStringDictLines,
   renderStringList,
   renderStringRecordList,
-} from "./deployment-targets.install.render.ts";
+} from "./deployment-targets.install.render";
 import {
   sharedPolicyTargetsByDir,
   synchronizeGovernanceChecks,
-} from "./deployment-targets.install.shared-policies.ts";
+} from "./deployment-targets.install.shared-policies";
+
+function renderVaultRuntime(deployment: KubernetesDeployment): Record<string, string> {
+  const config = deployment.vaultRuntime;
+  if (!config) return {};
+  const callback = config.pkceCallback;
+  const fields: Array<[string, unknown]> = [
+    ["addr", config.addr],
+    ["oidc_issuer", config.oidcIssuer],
+    ["audience", config.audience],
+    ["deployment_client_id", config.deploymentClientId],
+    ["cli_public_client_id", config.cliPublicClientId],
+    ["service_account_client_id", config.serviceAccountClientId],
+    ["deployment_environment", config.deploymentEnvironment],
+    ["jwt_role", config.roleName],
+    ["jwt_file", config.jwtFile],
+    ["client_secret_env", config.clientSecretEnv],
+    ["preferred_credential_source", config.preferredCredentialSource],
+    ["jenkins_client_secret_env", config.jenkinsClientSecretEnv],
+    ["external_oidc_token_env", config.externalOidcTokenEnv],
+    ["pkce_callback_mode", callback?.mode],
+    ["pkce_callback_external_scheme", callback?.externalScheme],
+    ["pkce_callback_external_host", callback?.externalHost],
+    ["pkce_callback_external_port", callback?.externalPort],
+    ["pkce_callback_external_path", callback?.externalPath],
+    ["pkce_callback_bind_host", callback?.bindHost],
+    ["pkce_callback_bind_port", callback?.bindPort],
+    ["pkce_callback_bind_path", callback?.bindPath],
+    ["pkce_callback_open_firewall", callback?.openFirewall],
+  ];
+  return Object.fromEntries(
+    fields.flatMap(([key, value]) =>
+      value === undefined || value === null || value === "" ? [] : [[key, String(value)]],
+    ),
+  );
+}
 
 export async function installKubernetesTargets(
   workspaceRoot: string,
@@ -88,6 +124,9 @@ export async function installKubernetesTargets(
             ]
           : []),
         "    },",
+        ...(deployment.vaultRuntime
+          ? ["    vault_runtime =", ...renderStringDictLines(renderVaultRuntime(deployment))]
+          : []),
         ...["    prerequisites =", ...renderStringRecordList(renderPrerequisiteList(deployment))],
         ...[
           "    secret_requirements =",

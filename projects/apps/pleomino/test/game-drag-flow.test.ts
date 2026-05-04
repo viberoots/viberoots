@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { BOARD_CELL_SIZE } from "../src/game/board.ts";
-import { beginDragSession, previewCellFromDrag } from "../src/game/interaction.ts";
-import { pleominoGameReducer } from "../src/game/reducer.ts";
-import { createInitialGameState } from "../src/game/state.ts";
-import type { GameAction } from "../src/game/reducer.ts";
-import type { GameState } from "../src/game/types.ts";
+import { BOARD_CELL_SIZE } from "../src/game/board";
+import { beginDragSession, previewCellFromDrag } from "../src/game/interaction";
+import { pleominoGameReducer } from "../src/game/reducer";
+import { createInitialGameState } from "../src/game/state";
+import type { GameAction } from "../src/game/reducer";
+import type { GameState } from "../src/game/types";
 
 const BOARD_RECT = {
   left: 100,

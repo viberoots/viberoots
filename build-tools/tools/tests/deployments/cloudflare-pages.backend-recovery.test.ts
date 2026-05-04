@@ -9,11 +9,11 @@ import {
   readBackendSubmissionBySubmissionId,
   syncBackendSnapshot,
   syncBackendSubmission,
-} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { queryBackend } from "../../deployments/nixos-shared-host-control-plane-backend-db.ts";
-import { runNixosSharedHostControlPlaneWorkerOnce } from "../../deployments/nixos-shared-host-control-plane-worker-loop.ts";
-import { writeControlPlaneJson } from "../../deployments/nixos-shared-host-control-plane-store.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "../../deployments/nixos-shared-host-control-plane-backend";
+import { queryBackend } from "../../deployments/nixos-shared-host-control-plane-backend-db";
+import { runNixosSharedHostControlPlaneWorkerOnce } from "../../deployments/nixos-shared-host-control-plane-worker-loop";
+import { writeControlPlaneJson } from "../../deployments/nixos-shared-host-control-plane-store";
+import { runInTemp } from "../lib/test-helpers";
 
 async function writeCloudflareSubmission(opts: {
   recordsRoot: string;

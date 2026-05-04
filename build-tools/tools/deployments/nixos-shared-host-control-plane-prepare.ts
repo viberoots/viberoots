@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
-import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import type { NixosSharedHostGateEvaluator } from "./nixos-shared-host-progressive-execution.ts";
+import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts";
+import type { NixosSharedHostDeployment } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import type { NixosSharedHostGateEvaluator } from "./nixos-shared-host-progressive-execution";
 import {
   type NixosSharedHostControlPlaneOperationKind,
   type NixosSharedHostControlPlanePaths,
@@ -11,30 +11,30 @@ import {
   type NixosSharedHostControlPlaneSubmission,
   type NixosSharedHostSmokeConnectOverride,
   type NixosSharedHostControlPlaneSnapshot,
-} from "./nixos-shared-host-control-plane-contract.ts";
+} from "./nixos-shared-host-control-plane-contract";
 import type {
   DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneRequestDedupe,
-} from "./deployment-control-plane-contract.ts";
-import { defaultRequestedBy } from "./deployment-admission-evidence.ts";
-import { createNixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-submission.ts";
+} from "./deployment-control-plane-contract";
+import { defaultRequestedBy } from "./deployment-admission-evidence";
+import { createNixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-submission";
 import {
   createNixosSharedHostControlPlaneSnapshot,
   createNixosSharedHostSubmissionId,
   type NixosSharedHostControlPlaneSourceSelection,
-} from "./nixos-shared-host-control-plane-snapshot.ts";
-import { evaluateNixosSharedHostControlPlaneAdmission } from "./nixos-shared-host-control-plane-admission.ts";
-import { createAdmissionFailureSubmission } from "./nixos-shared-host-control-plane-admission-failure.ts";
-import { ensureNoActiveProgressiveRun } from "./nixos-shared-host-control-plane-progressive-guard.ts";
-import { queueSubmissionForLock } from "./deployment-control-plane-queue.ts";
-import { writeNixosSharedHostProvisionerPlan } from "./nixos-shared-host-provisioner-plan.ts";
+} from "./nixos-shared-host-control-plane-snapshot";
+import { evaluateNixosSharedHostControlPlaneAdmission } from "./nixos-shared-host-control-plane-admission";
+import { createAdmissionFailureSubmission } from "./nixos-shared-host-control-plane-admission-failure";
+import { ensureNoActiveProgressiveRun } from "./nixos-shared-host-control-plane-progressive-guard";
+import { queueSubmissionForLock } from "./deployment-control-plane-queue";
+import { writeNixosSharedHostProvisionerPlan } from "./nixos-shared-host-provisioner-plan";
 import {
   executionSnapshotPathFor,
   submissionPathFor,
   writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
-import { createNixosSharedHostDeployRunId } from "./nixos-shared-host-records.ts";
+} from "./nixos-shared-host-control-plane-store";
+import { createNixosSharedHostDeployRunId } from "./nixos-shared-host-records";
 
 export type PrepareNixosSharedHostControlPlaneRunOpts = {
   workspaceRoot: string;

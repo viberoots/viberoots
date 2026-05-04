@@ -6,9 +6,9 @@ import { test } from "node:test";
 import {
   DEPLOYMENT_SAFETY_FLOOR_TARGETS,
   queryDeploymentDomainTargets,
-} from "../../lib/deployment-test-targets.ts";
-import { REVIEWED_DEPLOYMENT_TEST_AREA } from "../../lib/deployment-verify-scope.ts";
-import { targetLabelFromScript } from "../../lib/template-owned-tests.ts";
+} from "../../lib/deployment-test-targets";
+import { REVIEWED_DEPLOYMENT_TEST_AREA } from "../../lib/deployment-verify-scope";
+import { targetLabelFromScript } from "../../lib/template-owned-tests";
 
 async function deploymentTestTargets(root: string): Promise<string[]> {
   const dir = path.join(root, REVIEWED_DEPLOYMENT_TEST_AREA);

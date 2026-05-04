@@ -4,7 +4,7 @@ import { test } from "node:test";
 import {
   computeVerifyDiskGateFailure,
   VERIFY_DISK_GATE_EXIT_CODE,
-} from "../../dev/verify/housekeeping.ts";
+} from "../../dev/verify/housekeeping";
 
 test("verify disk gate decision is deterministic and message is stable", () => {
   assert.equal(VERIFY_DISK_GATE_EXIT_CODE, 2);

@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentPrerequisiteMode } from "./contract-types.ts";
+import type { DeploymentPrerequisiteMode } from "./contract-types";
 import {
   type DeploymentAdmissionCheckFact,
   type DeploymentCheckEvidence,
-} from "./deployment-admission-checks.ts";
-import { type DeploymentLaneGovernanceFact } from "./deployment-admission-governance.ts";
+} from "./deployment-admission-checks";
+import { type DeploymentLaneGovernanceFact } from "./deployment-admission-governance";
 import {
   type DeploymentAttestationEvidence,
   type DeploymentAttestationFact,
@@ -12,18 +12,18 @@ import {
   type DeploymentSbomFact,
   type DeploymentSupplyChainGateEvidence,
   type DeploymentSupplyChainGateFact,
-} from "./deployment-admission-supply-chain.ts";
+} from "./deployment-admission-supply-chain";
 import type {
   DeploymentReadinessGateEvidence,
   DeploymentReadinessGateFact,
-} from "./deployment-readiness-gates.ts";
-export { normalizeAdmissionEvidence } from "./deployment-admission-evidence-normalize.ts";
+} from "./deployment-readiness-gates";
+export { normalizeAdmissionEvidence } from "./deployment-admission-evidence-normalize";
 
 export type {
   DeploymentAdmissionCheckFact,
   DeploymentCheckEvidence,
   DeploymentCheckReportingKind,
-} from "./deployment-admission-checks.ts";
+} from "./deployment-admission-checks";
 
 export type DeploymentPrincipal = {
   principalId: string;

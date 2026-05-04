@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { providerTargetIdentityFor, type DeploymentTarget } from "../../deployments/contract.ts";
-import { writeBackendDeployRecordDoc } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
+import { providerTargetIdentityFor, type DeploymentTarget } from "../../deployments/contract";
+import { writeBackendDeployRecordDoc } from "../../deployments/nixos-shared-host-control-plane-backend";
 
 export function admittedContextFixture(deployment: DeploymentTarget) {
   return {

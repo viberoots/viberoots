@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { JwtClaims } from "./deploy-vault-jwt-claims.ts";
-import { normalizeReviewedDeployAdminGroups } from "./deployment-admin-keycloak-auth.ts";
+import type { JwtClaims } from "./deploy-vault-jwt-claims";
+import { normalizeReviewedDeployAdminGroups } from "./deployment-admin-keycloak-auth";
 
 function claimText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";

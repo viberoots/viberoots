@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import { shSingleQuote } from "../lib/shell-quote.ts";
+import { shSingleQuote } from "../lib/shell-quote";
 import {
   buildReviewedRemoteRsyncShell,
   buildReviewedRemoteSshArgvPrefix,
-} from "./nixos-shared-host-remote-ssh.ts";
-import { stagedUploadCompleteMarkerPath } from "./nixos-shared-host-staged-artifact.ts";
-import type { NixosSharedHostRemotePlan } from "./nixos-shared-host-remote-target.ts";
+} from "./nixos-shared-host-remote-ssh";
+import { stagedUploadCompleteMarkerPath } from "./nixos-shared-host-staged-artifact";
+import type { NixosSharedHostRemotePlan } from "./nixos-shared-host-remote-target";
 
 export type NixosSharedHostRemoteSmokeConnectOverride = {
   protocol: "http:" | "https:";

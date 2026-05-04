@@ -4,7 +4,7 @@ import { test } from "node:test";
 import {
   resolveVerifyTemplateTestScope,
   summarizeTemplateScopeDecision,
-} from "../../dev/verify/template-test-scope.ts";
+} from "../../dev/verify/template-test-scope";
 
 test("auto mode uses template-selected targets for template-only changes", async () => {
   const result = await resolveVerifyTemplateTestScope({

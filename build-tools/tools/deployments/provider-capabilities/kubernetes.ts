@@ -2,10 +2,10 @@
 import {
   SERVICE_COMPONENT_KIND,
   THIRD_PARTY_SERVICE_COMPONENT_KIND,
-} from "../deployment-component-kinds.ts";
-import { KUBERNETES_PROVIDER } from "../deployment-provider-targets.ts";
-import type { DeploymentProviderCapability } from "./types.ts";
-import { bullet } from "./types.ts";
+} from "../deployment-component-kinds";
+import { KUBERNETES_PROVIDER } from "../deployment-provider-targets";
+import type { DeploymentProviderCapability } from "./types";
+import { bullet } from "./types";
 
 export const KUBERNETES_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
   provider: KUBERNETES_PROVIDER,
@@ -148,6 +148,9 @@ export const KUBERNETES_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
     ),
     bullet(
       "protected/shared execution must stay inside vetted built-in publisher, provisioner, and service-health smoke code",
+    ),
+    bullet(
+      "protected/shared kubernetes service publish, retry, rollback, and promotion must declare `secret_requirements` at the `publish` step; ambient Helm or cluster credentials are rejected and the publisher process receives only the resolved reviewed credential env",
     ),
   ],
 };

@@ -2,18 +2,18 @@
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagStr } from "../lib/cli.ts";
-import { resolveModuleContractsPaths } from "./module-contract-paths.ts";
-import { syncModuleContractsForApp } from "./sync-module-contracts-core.ts";
-import { findRepoRoot } from "../lib/repo.ts";
-import { specsFromWasmManifest, validateTsManifestProbes } from "./wasm-watch-manifest.ts";
+import { getFlagStr } from "../lib/cli";
+import { resolveModuleContractsPaths } from "./module-contract-paths";
+import { syncModuleContractsForApp } from "./sync-module-contracts-core";
+import { findRepoRoot } from "../lib/repo";
+import { specsFromWasmManifest, validateTsManifestProbes } from "./wasm-watch-manifest";
 import {
   computeFingerprintMap,
   mapsEqual,
   refreshTriggerPaths,
   type Fingerprint,
-} from "./watch-wasm-producer-ops.ts";
-import { computeTaskKey, type CoordinatorLease } from "./wasm-watch-coordinator-types.ts";
+} from "./watch-wasm-producer-ops";
+import { computeTaskKey, type CoordinatorLease } from "./wasm-watch-coordinator-types";
 
 function uniqueSorted(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
@@ -63,16 +63,12 @@ async function ensureDaemon(root: string, pollMs: number): Promise<void> {
     return;
   }
   try {
-    const child = spawn(
-      process.execPath,
-      ["--experimental-strip-types", daemonScript, "--root", root, "--poll-ms", String(pollMs)],
-      {
-        cwd: root,
-        env: process.env,
-        detached: true,
-        stdio: "ignore",
-      },
-    );
+    const child = spawn("zx-wrapper", [daemonScript, "--root", root, "--poll-ms", String(pollMs)], {
+      cwd: root,
+      env: process.env,
+      detached: true,
+      stdio: "ignore",
+    });
     child.unref();
   } finally {
     await fsp.rm(lockDir, { recursive: true, force: true }).catch(() => {});

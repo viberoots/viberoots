@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import type { S3StaticDeployment } from "../../deployments/contract.ts";
-import { startStaticWebappHttpsServer } from "./static-webapp.https-server.ts";
+import type { S3StaticDeployment } from "../../deployments/contract";
+import { startStaticWebappHttpsServer } from "./static-webapp.https-server";
 
 export async function startS3StaticPublicServer(opts: {
   deployment: S3StaticDeployment;

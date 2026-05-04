@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { exists } from "./fs.ts";
+import { exists } from "./fs";
 
 export async function isLanguageEnabled(language: string): Promise<boolean> {
   if (language === "go") {

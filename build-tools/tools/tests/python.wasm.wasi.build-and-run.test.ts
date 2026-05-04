@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import path from "node:path";
-import { runInTemp } from "./lib/test-helpers.ts";
+import { runInTemp } from "./lib/test-helpers";
 
 test("python wasm (wasi): build-and-run prints wasi banner", async () => {
   await runInTemp("py-wasm-wasi-build-run", async (tmp, $) => {

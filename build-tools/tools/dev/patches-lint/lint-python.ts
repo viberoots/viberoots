@@ -4,10 +4,10 @@ import {
   defaultImporterPatchDir,
   findImporterLockfiles,
   listImporterPatches,
-} from "../../lib/importers.ts";
-import { lintFlatPatchDir } from "./flat-patch-dir-lint.ts";
-import { countErrors, reportViolations } from "./report.ts";
-import type { PatchesLintConfig, Violation } from "./types.ts";
+} from "../../lib/importers";
+import { lintFlatPatchDir } from "./flat-patch-dir-lint";
+import { countErrors, reportViolations } from "./report";
+import type { PatchesLintConfig, Violation } from "./types";
 
 export async function lintPython(cfg: PatchesLintConfig): Promise<number> {
   const lockfiles = await findImporterLockfiles(["uv.lock"]);

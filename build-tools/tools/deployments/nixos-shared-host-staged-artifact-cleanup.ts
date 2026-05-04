@@ -2,16 +2,16 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
+import { redactDeploymentAuthText } from "./deployment-auth-redaction";
 import {
   stagedUploadCompleteMarkerPath,
   stagedUploadTempPath,
-} from "./nixos-shared-host-staged-artifact.ts";
+} from "./nixos-shared-host-staged-artifact";
 import {
   queryBackend,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend-db.ts";
-import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
+} from "./nixos-shared-host-control-plane-backend-db";
+import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract";
 
 export type StagedArtifactCleanupReason =
   | "challenge_rejected"

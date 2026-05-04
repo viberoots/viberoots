@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { copyTree } from "../lib/copy-tree.ts";
-import { sanitizeName } from "../lib/sanitize.ts";
+import { copyTree } from "../lib/copy-tree";
+import { sanitizeName } from "../lib/sanitize";
 
 export const KUBERNETES_ARTIFACT_PROVENANCE_SCHEMA = "kubernetes-component-artifact@1";
 

@@ -1,19 +1,19 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { readVersionedJson } from "./deployment-schema-compat.ts";
-import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention.ts";
+import { readVersionedJson } from "./deployment-schema-compat";
+import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention";
 import {
   runnerIdentityCompatibilityErrors,
   s3StaticRunnerIdentities,
   type DeploymentRunnerIdentities,
-} from "./deployment-runner-identities.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
-import { readS3StaticDeployRecord, type S3StaticDeployRecord } from "./s3-static-records-read.ts";
-import type { S3StaticAdmittedContext } from "./s3-static-admission.ts";
-import type { S3StaticDeployment } from "./contract.ts";
-import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
-import { requireAdmittedStaticWebappArtifactPath } from "./static-webapp-artifacts.ts";
+} from "./deployment-runner-identities";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
+import { readS3StaticDeployRecord, type S3StaticDeployRecord } from "./s3-static-records-read";
+import type { S3StaticAdmittedContext } from "./s3-static-admission";
+import type { S3StaticDeployment } from "./contract";
+import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts";
+import { requireAdmittedStaticWebappArtifactPath } from "./static-webapp-artifacts";
 
 export const S3_STATIC_REPLAY_SNAPSHOT_SCHEMA = "s3-static-replay-snapshot@1";
 

@@ -1,33 +1,33 @@
 #!/usr/bin/env zx-wrapper
 import { randomUUID } from "node:crypto";
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
-import type { DeploymentTarget } from "./contract.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli";
+import type { DeploymentTarget } from "./contract";
 import {
   createAndWaitForServiceOwnedAuthSession,
   shouldUseServiceOwnedInteractiveAuth,
-} from "./deployment-service-auth-client.ts";
-import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
+} from "./deployment-service-auth-client";
+import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs";
 import {
   DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA,
   type DeploymentControlPlaneRunAction,
   type DeploymentControlPlaneStatus,
-} from "./deployment-control-plane-contract.ts";
+} from "./deployment-control-plane-contract";
 import {
   selectedDeployControlPlaneOperatorAction,
   type DeployControlPlaneOperatorAction,
-} from "./deploy-control-plane-operator-flags.ts";
-import { printDeployJson } from "./deploy-front-door.ts";
+} from "./deploy-control-plane-operator-flags";
+import { printDeployJson } from "./deploy-front-door";
 import {
   formatDeploymentControlPlaneRecordText,
   formatDeploymentControlPlaneStatusText,
-} from "./deployment-control-plane-status-format.ts";
-import { submitNixosSharedHostControlPlaneRunActionViaService } from "./nixos-shared-host-control-plane-client.ts";
+} from "./deployment-control-plane-status-format";
+import { submitNixosSharedHostControlPlaneRunActionViaService } from "./nixos-shared-host-control-plane-client";
 import {
   readRecordForOperator,
   readStatusForOperator,
   requireLookupSelector,
   resolveServiceClientForOperator,
-} from "./deploy-control-plane-operator-client.ts";
+} from "./deploy-control-plane-operator-client";
 
 function operatorActionLabel(action: DeployControlPlaneOperatorAction): string {
   return `deploy --${action}`;

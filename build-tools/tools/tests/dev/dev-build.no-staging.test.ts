@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import "zx/globals";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { runInTemp } from "../lib/test-helpers";
 
 void (async function main() {
   console.log("TAP version 13");

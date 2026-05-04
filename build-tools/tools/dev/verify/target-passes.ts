@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import process from "node:process";
-import { normalizeTargetLabel } from "../../lib/labels.ts";
-import { resolveToolPathSync } from "../../lib/tool-paths.ts";
+import { normalizeTargetLabel } from "../../lib/labels";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 
 export const VERIFY_ISOLATED_LABEL = "verify:isolated";
 export const VERIFY_RESOURCE_LIMITED_LABEL = "verify:resource-limited";

@@ -14,7 +14,7 @@ import { debugEnabled, pathExists } from "../lib/util";
 import { encodeNixAttrForPatchPrefix, normalizeNixAttr } from "../../lib/providers";
 import { resolveNixpkg } from "./resolve";
 import { clearOverride } from "../dev-overrides";
-import { devOverrideEnvNameForLang } from "../../lib/dev-override-envs.ts";
+import { devOverrideEnvNameForLang } from "../../lib/dev-override-envs";
 
 export async function doApply(args: string[]) {
   console.error("[patch-cpp] apply: begin");

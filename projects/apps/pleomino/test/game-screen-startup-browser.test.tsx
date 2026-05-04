@@ -2,9 +2,9 @@
 import React from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { savePersistedGameStateToHash } from "../src/game/persistence.ts";
-import { createInitialGameState } from "../src/game/state.ts";
-import { GameScreen } from "../src/ui/game-screen.tsx";
+import { savePersistedGameStateToHash } from "../src/game/persistence";
+import { createInitialGameState } from "../src/game/state";
+import { GameScreen } from "../src/ui/game-screen";
 
 function flushUi(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));

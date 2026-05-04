@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { DeploymentTargetException } from "./deployment-target-exceptions.ts";
+import type { DeploymentTargetException } from "./deployment-target-exceptions";
 
 export const CLOUDFLARE_PAGES_TARGET_TRANSITION_RECORD_SCHEMA =
   "cloudflare-pages-target-transition-record@1";

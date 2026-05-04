@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { createDeploymentAdmissionBinding } from "./deployment-admission-binding.ts";
+import { createDeploymentAdmissionBinding } from "./deployment-admission-binding";
 import type {
   DeploymentAdmissionEvidence,
   DeploymentPrincipal,
-} from "./deployment-admission-evidence.ts";
-import type { DeploymentControlPlaneApprovalSummary } from "./deployment-control-plane-contract.ts";
+} from "./deployment-admission-evidence";
+import type { DeploymentControlPlaneApprovalSummary } from "./deployment-control-plane-contract";
 import {
   readControlPlaneJson,
   writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
+} from "./nixos-shared-host-control-plane-store";
 
 export const DEPLOYMENT_CONTROL_PLANE_APPROVAL_GRANT_SCHEMA =
   "deployment-control-plane-approval-grant@1";

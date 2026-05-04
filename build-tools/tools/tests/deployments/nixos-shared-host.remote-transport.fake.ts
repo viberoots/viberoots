@@ -4,7 +4,7 @@ import path from "node:path";
 import {
   REMOTE_SSH_IDENTITY_FILE_ENV,
   REMOTE_SSH_KNOWN_HOSTS_FILE_ENV,
-} from "../../deployments/nixos-shared-host-remote-ssh.ts";
+} from "../../deployments/nixos-shared-host-remote-ssh";
 
 const FAKE_SSH = `#!/usr/bin/env bash
 set -euo pipefail

@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
+import { buildSelectedOutPath } from "../dev/run-runnable-graph";
 import {
   isAppStoreConnectDeployment,
   isGooglePlayDeployment,
@@ -9,20 +9,20 @@ import {
   isS3StaticDeployment,
   isVercelDeployment,
   type DeploymentTarget,
-} from "./contract.ts";
-import { submitAppStoreConnectDeploy } from "./app-store-connect-deploy.ts";
-import { submitGooglePlayDeploy } from "./google-play-deploy.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
+} from "./contract";
+import { submitAppStoreConnectDeploy } from "./app-store-connect-deploy";
+import { submitGooglePlayDeploy } from "./google-play-deploy";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
 import {
   artifactDirFromBuiltOutPath,
   buildArtifactDirsByComponentId,
-} from "./deployment-component-artifact-dirs.ts";
-import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
-import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-control-plane.ts";
-import { submitKubernetesDeploy } from "./kubernetes-deploy.ts";
-import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
-import { submitS3StaticDeploy } from "./s3-static-deploy.ts";
-import { submitVercelDeploy, summarizeVercelResult } from "./vercel-deploy.ts";
+} from "./deployment-component-artifact-dirs";
+import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components";
+import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-control-plane";
+import { submitKubernetesDeploy } from "./kubernetes-deploy";
+import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane";
+import { submitS3StaticDeploy } from "./s3-static-deploy";
+import { submitVercelDeploy, summarizeVercelResult } from "./vercel-deploy";
 
 export type DeploymentSmokeConnectOverride = {
   protocol: "http:" | "https:";

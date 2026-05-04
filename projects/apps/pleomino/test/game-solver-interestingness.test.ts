@@ -3,8 +3,8 @@ import {
   canonicalPlacementSignature,
   rankSolutionsByInterestingness,
   scoreInterestingness,
-} from "../src/game/solver/interestingness.ts";
-import type { SolverPlacement } from "../src/game/solver/solver-types.ts";
+} from "../src/game/solver/interestingness";
+import type { SolverPlacement } from "../src/game/solver/solver-types";
 
 const MONOMINO_CATALOG = [
   { pieceId: "alpha", color: "#aa1111", baseCells: [{ x: 0, y: 0 }] },

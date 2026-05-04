@@ -2,8 +2,8 @@
 import React from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { BOARD_CELL_SIZE } from "../src/game/board.ts";
-import { GameScreen } from "../src/ui/game-screen.tsx";
+import { BOARD_CELL_SIZE } from "../src/game/board";
+import { GameScreen } from "../src/ui/game-screen";
 import {
   cardByPieceId,
   flushUi,
@@ -11,7 +11,7 @@ import {
   snapTargetKeys,
   tapCard,
   wait,
-} from "./game-drag-browser-helpers.ts";
+} from "./game-drag-browser-helpers";
 
 describe("game drag browser flow", () => {
   let container: HTMLDivElement | null = null;

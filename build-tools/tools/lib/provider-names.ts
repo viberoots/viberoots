@@ -1,4 +1,4 @@
-import { shortHash } from "./short-hash.ts";
+import { shortHash } from "./short-hash";
 import * as fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import * as path from "node:path";

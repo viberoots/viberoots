@@ -2,10 +2,10 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { printSkip } from "../../lib/errors.ts";
-import { nodeFlagsWithZx } from "../../lib/node-run.ts";
-import { findRepoRoot } from "../../lib/repo.ts";
-import { discoverImportersWithLock } from "./importers.ts";
+import { printSkip } from "../../lib/errors";
+import { nodeFlagsWithZx } from "../../lib/node-run";
+import { findRepoRoot } from "../../lib/repo";
+import { discoverImportersWithLock } from "./importers";
 
 function repoRoot(): string {
   const here = path.dirname(new URL(import.meta.url).pathname);

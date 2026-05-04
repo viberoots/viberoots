@@ -1,16 +1,16 @@
 #!/usr/bin/env zx-wrapper
-import type { AdmittedMobileAppArtifact } from "./app-store-connect-artifacts.ts";
-import type { AppStoreConnectDeployRecord } from "./app-store-connect-records.ts";
-import type { AppStoreConnectReplaySnapshot } from "./app-store-connect-replay.ts";
-import type { DeploymentTarget } from "./contract.ts";
-import type { CloudflarePagesDeployRecord } from "./cloudflare-pages-records.ts";
-import type { CloudflarePagesReplaySnapshot } from "./cloudflare-pages-replay.ts";
-import type { AdmittedGooglePlayArtifact } from "./google-play-artifacts.ts";
-import type { GooglePlayDeployRecord } from "./google-play-records.ts";
-import type { GooglePlayReplaySnapshot } from "./google-play-replay.ts";
-import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
-import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
-import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
+import type { AdmittedMobileAppArtifact } from "./app-store-connect-artifacts";
+import type { AppStoreConnectDeployRecord } from "./app-store-connect-records";
+import type { AppStoreConnectReplaySnapshot } from "./app-store-connect-replay";
+import type { DeploymentTarget } from "./contract";
+import type { CloudflarePagesDeployRecord } from "./cloudflare-pages-records";
+import type { CloudflarePagesReplaySnapshot } from "./cloudflare-pages-replay";
+import type { AdmittedGooglePlayArtifact } from "./google-play-artifacts";
+import type { GooglePlayDeployRecord } from "./google-play-records";
+import type { GooglePlayReplaySnapshot } from "./google-play-replay";
+import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records";
+import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay";
+import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts";
 
 export type PromotionArtifact =
   | AdmittedMobileAppArtifact

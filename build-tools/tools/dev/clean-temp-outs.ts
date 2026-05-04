@@ -12,8 +12,8 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { getFlagStr } from "../lib/cli.ts";
-import { pruneDeadOwnedBuckIsolationDirs } from "./clean-temp-outs-lib.ts";
+import { getFlagStr } from "../lib/cli";
+import { pruneDeadOwnedBuckIsolationDirs } from "./clean-temp-outs-lib";
 
 type Args = { minutes?: string };
 

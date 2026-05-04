@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
-import type { ResolvedCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit.ts";
+import type { ResolvedCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit";
 import {
   approvalSatisfied,
   CLOUDFLARE_PAGES_TARGET_TRANSITION_SNAPSHOT_SCHEMA,
-} from "./cloudflare-pages-target-transition.ts";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+} from "./cloudflare-pages-target-transition";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 
 export function targetTransitionSnapshot(
   resolved: Extract<ResolvedCloudflarePagesServiceSubmitRequest, { kind: "target_transition" }>,

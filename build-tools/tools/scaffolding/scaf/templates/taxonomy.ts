@@ -1,7 +1,4 @@
-import {
-  TEMPLATE_NAME_ALIASES,
-  TEMPLATE_TAXONOMY,
-} from "./generated/template-taxonomy.generated.ts";
+import { TEMPLATE_NAME_ALIASES, TEMPLATE_TAXONOMY } from "./generated/template-taxonomy.generated";
 export { TEMPLATE_NAME_ALIASES, TEMPLATE_TAXONOMY };
 
 type CanonicalTemplateLanguage = keyof typeof TEMPLATE_TAXONOMY;

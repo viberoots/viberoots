@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { runManagedCommand } from "../../lib/managed-command.ts";
-import { withExactPrefetchedStore } from "./exact-store.ts";
+import { runManagedCommand } from "../../lib/managed-command";
+import { withExactPrefetchedStore } from "./exact-store";
 
 const REALIZED_FIXED_STORE_TIMEOUT_MS = 30_000;
 

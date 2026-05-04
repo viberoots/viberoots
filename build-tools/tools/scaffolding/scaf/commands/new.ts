@@ -1,30 +1,30 @@
-import type { ScafFlags } from "../types.ts";
+import type { ScafFlags } from "../types";
 
 import path from "node:path";
 
 import * as fsp from "node:fs/promises";
 
-import { ensureImporterLockfileFresh } from "../../../dev/update-pnpm-hash/lockfile.ts";
-import { printSkip } from "../../../lib/errors.ts";
-import { timeAsyncDetail } from "../../../lib/timing-detail.ts";
-import { confirmOrExit } from "../confirm.ts";
-import { runScafNodeTool } from "../command-runner.ts";
+import { ensureImporterLockfileFresh } from "../../../dev/update-pnpm-hash/lockfile";
+import { printSkip } from "../../../lib/errors";
+import { timeAsyncDetail } from "../../../lib/timing-detail";
+import { confirmOrExit } from "../confirm";
+import { runScafNodeTool } from "../command-runner";
 import {
   formatImporterLockfiles,
   formatScaffoldOutput,
   removeScaffoldTemplateConfig,
   refreshImporterStoreHash,
   templateImportersToRefresh,
-} from "./new-helpers.ts";
-import { runCopierCopy } from "../copier/copy.ts";
-import { runPostSteps } from "../copier/post-steps.ts";
-import { recordSource } from "../copier/record-source.ts";
-import { exists } from "../fs.ts";
-import { isLanguageEnabled } from "../language-enablement.ts";
-import { resolveDestination } from "../templates/destination.ts";
-import { normalizeTemplateName } from "../templates/names.ts";
-import { canonicalTemplateLanguage, isCanonicalTypeScriptTemplate } from "../templates/taxonomy.ts";
-import { usage } from "../usage.ts";
+} from "./new-helpers";
+import { runCopierCopy } from "../copier/copy";
+import { runPostSteps } from "../copier/post-steps";
+import { recordSource } from "../copier/record-source";
+import { exists } from "../fs";
+import { isLanguageEnabled } from "../language-enablement";
+import { resolveDestination } from "../templates/destination";
+import { normalizeTemplateName } from "../templates/names";
+import { canonicalTemplateLanguage, isCanonicalTypeScriptTemplate } from "../templates/taxonomy";
+import { usage } from "../usage";
 
 export async function cmdNew(args: string[], flags: ScafFlags) {
   const [language, templateRaw, name] = args;

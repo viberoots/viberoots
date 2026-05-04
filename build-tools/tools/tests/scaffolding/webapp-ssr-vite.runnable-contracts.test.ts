@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { inferRunnableFromOutPath } from "../../lib/runnables.ts";
-import { assertSsrAdapterConformance } from "../lib/ssr-adapter-conformance.ts";
+import { inferRunnableFromOutPath } from "../../lib/runnables";
+import { assertSsrAdapterConformance } from "../lib/ssr-adapter-conformance";
 import { runInTemp } from "../lib/test-helpers";
 import {
   TEST_TIMEOUT_MS,
@@ -12,7 +12,7 @@ import {
   runExpressDockerSmoke,
   scaffoldAndPrepareWorkspace,
   withTempRoots,
-} from "./lib/webapp-ssr.ts";
+} from "./lib/webapp-ssr";
 
 async function expectMissingArtifactFailure(
   scratchRoot: string,

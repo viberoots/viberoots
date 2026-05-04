@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { pruneNodeModulesHashesJson } from "../../dev/update-pnpm-hash/hashes-json.ts";
+import { pruneNodeModulesHashesJson } from "../../dev/update-pnpm-hash/hashes-json";
 
 test("pruneNodeModulesHashesJson removes stale lockfile keys", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "hashes-prune-"));

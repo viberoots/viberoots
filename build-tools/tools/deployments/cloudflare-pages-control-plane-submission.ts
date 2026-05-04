@@ -1,17 +1,17 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
+import type { DeploymentPrincipal } from "./deployment-admission-evidence";
 import type {
   DeploymentControlPlaneArtifactStatus,
   DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneRequestDedupe,
-} from "./deployment-control-plane-contract.ts";
+} from "./deployment-control-plane-contract";
 import {
   CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMISSION_SCHEMA,
   type CloudflarePagesControlPlaneSnapshot,
   type CloudflarePagesControlPlaneSubmission,
-} from "./cloudflare-pages-control-plane-contract.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
+} from "./cloudflare-pages-control-plane-contract";
+import type { CloudflarePagesDeployment } from "./contract";
 
 function digestFromIdentity(identity: string): string | undefined {
   return identity.startsWith("static-webapp:")

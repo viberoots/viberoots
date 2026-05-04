@@ -6,17 +6,17 @@ import { test } from "node:test";
 import {
   cloudflarePagesDeploymentFixture,
   installCloudflarePagesTargets,
-} from "./cloudflare-pages.fixture.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
-import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "./cloudflare-pages.fixture";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
+import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { runInTemp } from "../lib/test-helpers";
 import {
   writeCloudflareServiceArtifact,
   writeWranglerConfig,
-} from "./cloudflare-pages.service-flow.helpers.ts";
-import { terminalControlPlaneRejectionMessage } from "../../deployments/deployment-provider-protected-front-door.ts";
-import { controlPlaneRecordFailureMessage } from "../../deployments/deployment-control-plane-record-failure.ts";
+} from "./cloudflare-pages.service-flow.helpers";
+import { terminalControlPlaneRejectionMessage } from "../../deployments/deployment-provider-protected-front-door";
+import { controlPlaneRecordFailureMessage } from "../../deployments/deployment-control-plane-record-failure";
 
 async function gitStdout(cwd: string, $: any, ...args: string[]): Promise<string> {
   return String((await $({ cwd, stdio: "pipe" })`git ${args}`).stdout).trim();

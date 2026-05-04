@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { computeVerifyStatusFromLogText } from "../../lib/verify-log-status.ts";
+import { computeVerifyStatusFromLogText } from "../../lib/verify-log-status";
 
 test("verify-log-status: prefers final summary when present (verify window, after exit marker)", () => {
   const log = [

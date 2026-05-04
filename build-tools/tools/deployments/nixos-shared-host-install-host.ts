@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { writeJsonDocument } from "./nixos-shared-host-io.ts";
+import { writeJsonDocument } from "./nixos-shared-host-io";
 import {
   installManagedConfigEntry,
   renderConfigEntryInstruction,
   uninstallManagedConfigEntry,
-} from "./nixos-shared-host-install-config-entry.ts";
+} from "./nixos-shared-host-install-config-entry";
 import {
   createEmptyPlatformStateJson,
   createInstallManifestV1,
@@ -22,7 +22,7 @@ import {
   type NixosSharedHostWiringState,
   renderManagedAnchor,
   renderManagedModule,
-} from "./nixos-shared-host-install-contract.ts";
+} from "./nixos-shared-host-install-contract";
 import {
   assertUninstallInventoryIsConfigOnly,
   detectConfigTopology,
@@ -34,7 +34,7 @@ import {
   readManifestIfPresent,
   readText,
   removeManagedInstallPaths,
-} from "./nixos-shared-host-install-host-support.ts";
+} from "./nixos-shared-host-install-host-support";
 
 export async function installNixosSharedHost(opts: {
   hostRoot: string;

@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { writeIfChanged } from "../lib/fs-helpers.ts";
-import { readCompositeGraph } from "../lib/graph-view.ts";
-import { getFlagStr } from "../lib/cli.ts";
-import { parseLockfileLabel } from "../lib/labels.ts";
-import { isSupportedImporterLabel } from "../lib/importers.ts";
-import { normalizeNixAttr } from "../lib/providers.ts";
-import { readImporterProviderIndexEntriesForSingleImporterLockfileBasenames } from "../lib/provider-index.ts";
+import { writeIfChanged } from "../lib/fs-helpers";
+import { readCompositeGraph } from "../lib/graph-view";
+import { getFlagStr } from "../lib/cli";
+import { parseLockfileLabel } from "../lib/labels";
+import { isSupportedImporterLabel } from "../lib/importers";
+import { normalizeNixAttr } from "../lib/providers";
+import { readImporterProviderIndexEntriesForSingleImporterLockfileBasenames } from "../lib/provider-index";
 
 type PatchScope = "package-local" | "importer-local";
 

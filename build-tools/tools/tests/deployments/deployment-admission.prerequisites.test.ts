@@ -2,18 +2,18 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator.ts";
-import { revalidateControlPlaneAdmission } from "../../deployments/deployment-control-plane-revalidation.ts";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
-import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
+import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator";
+import { revalidateControlPlaneAdmission } from "../../deployments/deployment-control-plane-revalidation";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { runInTemp } from "../lib/test-helpers";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
   admittedContextFixture,
   writeCloudflarePrerequisiteRecord,
   writeSuccessfulPrerequisiteRecord,
-} from "./deployment-admission.prerequisites.helpers.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+} from "./deployment-admission.prerequisites.helpers";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 test("ordering_only prerequisites require a prior successful run and health_gated requires fresh health evidence", async () => {
   await runInTemp("deployment-admission-prereqs", async (tmp) => {

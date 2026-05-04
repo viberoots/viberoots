@@ -3,13 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { nodesFromCqueryJson } from "../../buck/exporter/cquery/nodes.ts";
-import {
-  extractKubernetesDeployments,
-  extractVercelDeployments,
-} from "../../deployments/contract.ts";
-import { DEPLOYMENT_GOLDENS } from "./deployment-goldens.ts";
-import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers.ts";
+import { nodesFromCqueryJson } from "../../buck/exporter/cquery/nodes";
+import { extractKubernetesDeployments, extractVercelDeployments } from "../../deployments/contract";
+import { DEPLOYMENT_GOLDENS } from "./deployment-goldens";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 const CQUERY_ATTRS =
   "name,rule_type,buck.type,provider,component,component_kind,publisher,publisher_config,provisioner,provisioner_config,protection_class,lane_policy,environment_stage,admission_policy,provider_target,components,prerequisites,secret_requirements,runtime_config_requirements,governance_policy,defaults,default_client_profile,scm_backend,repository,branch_protections,stages,stage_branches,allowed_promotion_edges,promotion_compatibility,allowed_refs,required_checks,required_approvals,retry_branch_policy,retry_approval_reuse,artifact_attestation_mode,labels".split(

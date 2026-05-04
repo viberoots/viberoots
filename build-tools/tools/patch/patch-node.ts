@@ -2,14 +2,14 @@
 import * as fsp from "node:fs/promises";
 import fs from "node:fs";
 import path from "node:path";
-import { readImporterArg } from "../lib/cli.ts";
-import { resolveImporterDir } from "../lib/lockfiles.ts";
+import { readImporterArg } from "../lib/cli";
+import { resolveImporterDir } from "../lib/lockfiles";
 import { runGlue } from "./glue";
 import { repoRoot } from "./lib/apply";
 import { requirePositional } from "./lib/args";
 import { resolveImporterLocalPatchDir } from "./lib/importer-local-patch-dir";
 import { runSession } from "./lib/session";
-import { runNodeSyncRequired } from "./node-sync-required.ts";
+import { runNodeSyncRequired } from "./node-sync-required";
 import {
   deleteSession,
   deleteSessionAtPath,

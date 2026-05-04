@@ -4,7 +4,7 @@ import {
   type JsonPromptObject,
   type JsonPromptPrimitive,
   type JsonPromptValue,
-} from "./json-prompt-types.ts";
+} from "./json-prompt-types";
 
 function parseJson(raw: string, source: string): unknown {
   try {

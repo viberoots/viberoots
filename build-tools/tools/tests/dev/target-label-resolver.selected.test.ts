@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { resolveSelectedTargetLabel } from "../../dev/target-label-resolver.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { resolveSelectedTargetLabel } from "../../dev/target-label-resolver";
+import { runInTemp } from "../lib/test-helpers";
 
 test("resolveSelectedTargetLabel supports label, relative, absolute, and dot inputs", async () => {
   await runInTemp("target-label-resolver-selected", async (tmp) => {

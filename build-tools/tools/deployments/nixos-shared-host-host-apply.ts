@@ -1,17 +1,17 @@
 #!/usr/bin/env zx-wrapper
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { getFlagBool, getFlagList, getFlagStr, hasFlag } from "../lib/cli.ts";
-import { scrubDeploymentSecretEnv } from "./deployment-secret-env.ts";
+import { getFlagBool, getFlagList, getFlagStr, hasFlag } from "../lib/cli";
+import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
 import {
   defaultManagedRoot,
   hostPath,
   manifestPathFor,
   normalizeHostLogicalPath,
   type NixosSharedHostInstallManifestV1,
-} from "./nixos-shared-host-install-contract.ts";
-import { statusNixosSharedHost } from "./nixos-shared-host-install-host.ts";
-import { pathExists } from "./nixos-shared-host-install-host-support.ts";
+} from "./nixos-shared-host-install-contract";
+import { statusNixosSharedHost } from "./nixos-shared-host-install-host";
+import { pathExists } from "./nixos-shared-host-install-host-support";
 
 const execFileAsync = promisify(execFile);
 const APPLY_MAX_BUFFER = 10 * 1024 * 1024;

@@ -3,25 +3,25 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
-import { multiComponentDeployment } from "./nixos-shared-host.multi-component.fixture.ts";
+import { runInTemp } from "../lib/test-helpers";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { multiComponentDeployment } from "./nixos-shared-host.multi-component.fixture";
 import {
   readRecord,
   readStatus,
   startControlPlaneHarness,
   submitServiceRequest,
   waitFor,
-} from "./nixos-shared-host.control-plane.helpers.ts";
+} from "./nixos-shared-host.control-plane.helpers";
 import {
   componentArtifactFlag,
   liveIndexPath,
   liveRootPath,
   writeArtifact,
   writeDeploymentJson,
-} from "./nixos-shared-host.reuse.e2e.helpers.ts";
-import { startStaticWebappHttpsMultiServer } from "./static-webapp.https-server.ts";
+} from "./nixos-shared-host.reuse.e2e.helpers";
+import { startStaticWebappHttpsMultiServer } from "./static-webapp.https-server";
 
 test("nixos-shared-host multi-component retry reuses a live proven component and republishes the failed one", async () => {
   await runInTemp("nixos-shared-host-multi-component-retry", async (tmp, $) => {

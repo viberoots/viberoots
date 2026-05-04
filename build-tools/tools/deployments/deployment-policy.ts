@@ -1,22 +1,22 @@
 #!/usr/bin/env zx-wrapper
-import { normalizeTargetLabel } from "../lib/labels.ts";
-import type { GraphNode } from "../lib/graph.ts";
-import { readString, readStringArray, readStringRecord } from "./deployment-graph-readers.ts";
-import type { DeploymentLaneGovernance } from "./deployment-lane-governance.ts";
+import { normalizeTargetLabel } from "../lib/labels";
+import type { GraphNode } from "../lib/graph";
+import { readString, readStringArray, readStringRecord } from "./deployment-graph-readers";
+import type { DeploymentLaneGovernance } from "./deployment-lane-governance";
 import type {
   DeploymentAttestationPolicy,
   DeploymentSbomPolicy,
   DeploymentSupplyChainGatePolicy,
-} from "./deployment-admission-supply-chain.ts";
-import type { DeploymentReadinessGatePolicy } from "./deployment-readiness-gates.ts";
+} from "./deployment-admission-supply-chain";
+import type { DeploymentReadinessGatePolicy } from "./deployment-readiness-gates";
 import {
   lanePromotionCompatibilityFingerprintPart,
   readLanePromotionCompatibility,
   type DeploymentLanePromotionCompatibility,
-} from "./deployment-lane-promotion-compatibility.ts";
-import { extractDeploymentDefaults } from "./deployment-defaults.ts";
-import { fingerprintPolicy } from "./deployment-policy-fingerprint.ts";
-export { extractDeploymentAdmissionPolicies } from "./deployment-admission-policy.ts";
+} from "./deployment-lane-promotion-compatibility";
+import { extractDeploymentDefaults } from "./deployment-defaults";
+import { fingerprintPolicy } from "./deployment-policy-fingerprint";
+export { extractDeploymentAdmissionPolicies } from "./deployment-admission-policy";
 
 export const DEPLOYMENT_LANE_POLICY_RULE = "deployment_lane_policy";
 export const DEPLOYMENT_ADMISSION_POLICY_RULE = "deployment_admission_policy";

@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
-import { assertJwtClaims, decodeJwtPayload, type JwtClaims } from "./deploy-vault-jwt-claims.ts";
+import { assertJwtClaims, decodeJwtPayload, type JwtClaims } from "./deploy-vault-jwt-claims";
 
 export type OidcDiscovery = {
   issuer: string;

@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 import {
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 
 export async function writeDeploymentJson(filePath: string, deployment: unknown) {
   await fsp.writeFile(filePath, JSON.stringify(deployment, null, 2) + "\n", "utf8");

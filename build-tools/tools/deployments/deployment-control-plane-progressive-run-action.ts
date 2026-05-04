@@ -2,16 +2,16 @@
 import {
   acquireNixosSharedHostControlPlaneLocks,
   runNixosSharedHostControlPlaneWorker,
-} from "./nixos-shared-host-control-plane-execution.ts";
-import { createNixosSharedHostWorkerId } from "./nixos-shared-host-control-plane-snapshot-helpers.ts";
+} from "./nixos-shared-host-control-plane-execution";
+import { createNixosSharedHostWorkerId } from "./nixos-shared-host-control-plane-snapshot-helpers";
 import {
   readControlPlaneJson,
   writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
+} from "./nixos-shared-host-control-plane-store";
 import {
   createNixosSharedHostDeployRecord,
   writeNixosSharedHostDeployRecord,
-} from "./nixos-shared-host-records.ts";
+} from "./nixos-shared-host-records";
 
 export async function abortPausedProgressiveRun(opts: {
   recordsRoot: string;

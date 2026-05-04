@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { computeImporterLabel, isSupportedImporterLabel } from "../../../lib/importers.ts";
-import { inspectLockfileLabel } from "../../../lib/labels.ts";
-import { packageDirFromTargetName } from "../batch.ts";
-import type { Node } from "../types.ts";
+import { computeImporterLabel, isSupportedImporterLabel } from "../../../lib/importers";
+import { inspectLockfileLabel } from "../../../lib/labels";
+import { packageDirFromTargetName } from "../batch";
+import type { Node } from "../types";
 
 function labelsOf(n: Node): string[] {
   return Array.isArray(n.labels) ? n.labels : [];

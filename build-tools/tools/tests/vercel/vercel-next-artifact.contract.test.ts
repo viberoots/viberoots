@@ -3,11 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import {
-  createVercelNextArtifact,
-  VERCEL_NEXT_ARTIFACT_SCHEMA,
-} from "../../vercel/next-artifact.ts";
-import { mktemp } from "../lib/test-helpers.ts";
+import { createVercelNextArtifact, VERCEL_NEXT_ARTIFACT_SCHEMA } from "../../vercel/next-artifact";
+import { mktemp } from "../lib/test-helpers";
 
 function declaredVercelEnv(extra: string[] = []): string[] {
   return [

@@ -1,8 +1,8 @@
 import {
   resetSolverRuntimeForTests,
   setSolverWorkerFactoryForTests,
-} from "../src/game/solver/solver-runtime.ts";
-import type { SolverResult } from "../src/game/solver/solver-types.ts";
+} from "../src/game/solver/solver-runtime";
+import type { SolverResult } from "../src/game/solver/solver-types";
 
 type SolveRequestMessage = {
   type: "solve-request";

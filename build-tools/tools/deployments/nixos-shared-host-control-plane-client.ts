@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
 // prettier-ignore
-import type { DeploymentControlPlaneRunActionResponse, DeploymentControlPlaneRunActionRequest, DeploymentControlPlaneStatus, DeploymentControlPlaneSubmitResponse, DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract.ts";
-import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
-import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract.ts";
+import type { DeploymentControlPlaneRunActionResponse, DeploymentControlPlaneRunActionRequest, DeploymentControlPlaneStatus, DeploymentControlPlaneSubmitResponse, DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract";
+import type { DeploymentPrincipal } from "./deployment-admission-evidence";
+import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract";
 // prettier-ignore
-import type { DeploymentArtifactChallengeRequest, DeploymentArtifactChallengeResponse } from "./deployment-artifact-binding.ts";
+import type { DeploymentArtifactChallengeRequest, DeploymentArtifactChallengeResponse } from "./deployment-artifact-binding";
 // prettier-ignore
-import type { DeploymentAuthLoginRequest, DeploymentAuthLoginResponse, DeploymentAuthSessionStatus } from "./deployment-auth-session-types.ts";
+import type { DeploymentAuthLoginRequest, DeploymentAuthLoginResponse, DeploymentAuthSessionStatus } from "./deployment-auth-session-types";
 
 const ACTIVE_LIFECYCLE_STATES = new Set(["queued", "waiting_for_lock", "running", "cancelling"]);
 const CONTROL_PLANE_REQUEST_TIMEOUT_MS = 15_000;

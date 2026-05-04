@@ -2,22 +2,22 @@ import process from "node:process";
 import {
   type TemplateTestSelectorDiagnostics,
   resolveTemplateTestSelection,
-} from "../../lib/template-test-selector.ts";
+} from "../../lib/template-test-selector";
 import {
   type ProjectClosureSelectorDiagnostics,
   resolveProjectClosureSelection,
-} from "../../lib/project-closure-selector.ts";
+} from "../../lib/project-closure-selector";
 import {
   type ProjectImpactSelectorDiagnostics,
   resolveProjectImpactSelection,
-} from "../../lib/project-impact-selector.ts";
+} from "../../lib/project-impact-selector";
 import {
   isIgnoredBuildSystemScopePath,
   resolveBuildSystemBuckTestScope,
-} from "../../lib/build-system-test-scope.ts";
-import { packagePathFromLabel } from "../../lib/labels.ts";
-import { isNonBuildSystemScopeRoot } from "../../lib/non-build-system-scope.ts";
-import { resolveProjectClosureVerifyScope } from "./project-closure-scope.ts";
+} from "../../lib/build-system-test-scope";
+import { packagePathFromLabel } from "../../lib/labels";
+import { isNonBuildSystemScopeRoot } from "../../lib/non-build-system-scope";
+import { resolveProjectClosureVerifyScope } from "./project-closure-scope";
 
 export type VerifyTemplateScopeMode = "auto" | "always" | "never";
 

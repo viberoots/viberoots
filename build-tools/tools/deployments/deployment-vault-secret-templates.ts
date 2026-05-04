@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { sanitizeName } from "../lib/sanitize.ts";
-import { providerTargetIdentityFor, type DeploymentTarget } from "./contract.ts";
-import type { DeploymentRequirement } from "./deployment-requirements.ts";
-import { requireVaultContractPath } from "./deployment-secret-vault-paths.ts";
+import { sanitizeName } from "../lib/sanitize";
+import { providerTargetIdentityFor, type DeploymentTarget } from "./contract";
+import type { DeploymentRequirement } from "./deployment-requirements";
+import { requireVaultContractPath } from "./deployment-secret-vault-paths";
 
 export const DEPLOYMENT_VAULT_SECRET_TEMPLATES_SCHEMA = "deployment-vault-secret-templates@1";
 

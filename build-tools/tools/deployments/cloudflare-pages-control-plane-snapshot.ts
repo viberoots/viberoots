@@ -3,21 +3,21 @@ import path from "node:path";
 import {
   resolveInitialCloudflarePagesAdmittedContext,
   resolvePromotionCloudflarePagesAdmittedContext,
-} from "./cloudflare-pages-admission.ts";
+} from "./cloudflare-pages-admission";
 import {
   CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA,
   type CloudflarePagesControlPlaneOperationKind,
   type CloudflarePagesControlPlaneSnapshot,
   type CloudflarePagesPublishBehavior,
   type CloudflarePagesSmokeConnectOverride,
-} from "./cloudflare-pages-control-plane-contract.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
-import type { DeploymentRunRecordLike } from "./deployment-admission-records.ts";
+} from "./cloudflare-pages-control-plane-contract";
+import type { CloudflarePagesDeployment } from "./contract";
+import type { DeploymentRunRecordLike } from "./deployment-admission-records";
 import {
   admitStaticWebappArtifact,
   type AdmittedStaticWebappArtifact,
-} from "./static-webapp-artifacts.ts";
-import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker.ts";
+} from "./static-webapp-artifacts";
+import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker";
 
 export type CloudflarePagesPromotionSourceSelection = {
   record: DeploymentRunRecordLike;

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { defaultImporterPatchDir } from "../../lib/importers.ts";
-import { toPosixPath } from "../../lib/posix-path.ts";
+import { defaultImporterPatchDir } from "../../lib/importers";
+import { toPosixPath } from "../../lib/posix-path";
 
 type Lang = "node" | "python";
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { getFlagStr, hasFlag } from "../lib/cli.ts";
-import { readBackendDeployRecordByDeployRunId } from "./nixos-shared-host-control-plane-backend.ts";
+import { getFlagStr, hasFlag } from "../lib/cli";
+import { readBackendDeployRecordByDeployRunId } from "./nixos-shared-host-control-plane-backend";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();

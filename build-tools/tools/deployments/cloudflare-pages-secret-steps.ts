@@ -1,11 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import type { CloudflarePagesControlPlaneWorkerAuthority } from "./cloudflare-pages-control-plane-contract.ts";
-import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
-import type {
-  DeploymentRequirement,
-  DeploymentRequirementStep,
-} from "./deployment-requirements.ts";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
+import type { CloudflarePagesControlPlaneWorkerAuthority } from "./cloudflare-pages-control-plane-contract";
+import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission";
+import type { DeploymentRequirement, DeploymentRequirementStep } from "./deployment-requirements";
+import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
 
 const CLOUDFLARE_API_TOKEN_SECRET = "cloudflare_api_token";
 

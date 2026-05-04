@@ -4,7 +4,7 @@ import { test } from "node:test";
 import {
   maybePromptClientInstallInput,
   maybePromptServerInstallInput,
-} from "../../deployments/nixos-shared-host-install-prompt.ts";
+} from "../../deployments/nixos-shared-host-install-prompt";
 
 test("nixos-shared-host prompt helper uses inline rules for server install", async () => {
   const calls: Array<{ input: Record<string, unknown>; rules: Record<string, unknown> }> = [];

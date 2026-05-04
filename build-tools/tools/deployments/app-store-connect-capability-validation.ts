@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../lib/graph.ts";
-import { deploymentError } from "./contract-extract-shared.ts";
-import { isDeploymentComponentKind } from "./deployment-component-kinds.ts";
-import { providerSupportsComponentKind } from "./deployment-provider-capabilities.ts";
+import type { GraphNode } from "../lib/graph";
+import { deploymentError } from "./contract-extract-shared";
+import { isDeploymentComponentKind } from "./deployment-component-kinds";
+import { providerSupportsComponentKind } from "./deployment-provider-capabilities";
 
 export function pushAppStoreConnectComponentKindErrors(opts: {
   label: string;

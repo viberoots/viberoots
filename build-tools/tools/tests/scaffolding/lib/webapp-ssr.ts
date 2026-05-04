@@ -7,12 +7,12 @@ import http from "node:http";
 import net from "node:net";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { formatRunnableLine, inferRunnableFromOutPath } from "../../../lib/runnables.ts";
-import { terminateChildTree } from "../../lib/process-tree.ts";
+import { formatRunnableLine, inferRunnableFromOutPath } from "../../../lib/runnables";
+import { terminateChildTree } from "../../lib/process-tree";
 import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
   stageTempRepoPaths,
-} from "../../lib/test-helpers/git-stage.ts";
+} from "../../lib/test-helpers/git-stage";
 
 export const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;

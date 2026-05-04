@@ -5,36 +5,33 @@ import {
   exchangePkceCodeForToken,
   randomSecret,
   validateOidcToken,
-} from "./deployment-credential-source-oidc.ts";
-import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan.ts";
-import {
-  authBlockingMissing,
-  publicRedirectUri,
-} from "./deployment-auth-session-service-helpers.ts";
-import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
+} from "./deployment-credential-source-oidc";
+import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan";
+import { authBlockingMissing, publicRedirectUri } from "./deployment-auth-session-service-helpers";
+import { redactDeploymentAuthText } from "./deployment-auth-redaction";
 import {
   DEPLOYMENT_AUTH_LOGIN_RESPONSE_SCHEMA,
   DEPLOYMENT_AUTH_SESSION_RECORD_SCHEMA,
   DEPLOYMENT_AUTH_SESSION_STATUS_SCHEMA,
   type DeploymentAuthLoginRequest,
   type DeploymentAuthSessionRecord,
-} from "./deployment-auth-session-types.ts";
+} from "./deployment-auth-session-types";
 import {
   findDeploymentAuthSessionByState,
   readDeploymentAuthSession,
   writeDeploymentAuthSession,
-} from "./deployment-auth-session-store.ts";
+} from "./deployment-auth-session-store";
 import {
   assertNonceIfPresent,
   authorizationForOidcPrincipal,
   principalFromOidcClaims,
-} from "./deployment-auth-session-principal.ts";
+} from "./deployment-auth-session-principal";
 import {
   principalEmailFromOidcClaims,
   reviewedPrincipalEmailRequirementMessage,
   reviewedIdentityAdminGroupsFromOidcClaims,
-} from "./deployment-auth-session-reviewed-identity.ts";
-import { normalizeAuthorizationSnapshot } from "./deployment-control-plane-authz.ts";
+} from "./deployment-auth-session-reviewed-identity";
+import { normalizeAuthorizationSnapshot } from "./deployment-control-plane-authz";
 
 const DEFAULT_SESSION_MS = 5 * 60 * 1000;
 

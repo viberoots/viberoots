@@ -5,7 +5,7 @@ import type {
   GooglePlayDeployment,
   KubernetesDeployment,
   S3StaticDeployment,
-} from "./contract.ts";
+} from "./contract";
 
 export type DeploymentRunnerIdentities = {
   publisher?: string;

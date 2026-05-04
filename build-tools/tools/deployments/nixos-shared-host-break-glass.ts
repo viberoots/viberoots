@@ -1,22 +1,22 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
-import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract.ts";
-import { authorizeControlPlaneBreakGlass } from "./deployment-control-plane-authz.ts";
+import type { DeploymentPrincipal } from "./deployment-admission-evidence";
+import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract";
+import { authorizeControlPlaneBreakGlass } from "./deployment-control-plane-authz";
 import {
   acquireBreakGlassFreeze,
   assertNoBreakGlassFreeze as assertNoBreakGlassFreezeActive,
-} from "./nixos-shared-host-break-glass-freeze.ts";
+} from "./nixos-shared-host-break-glass-freeze";
 import type {
   NixosSharedHostControlPlanePaths,
   NixosSharedHostMutationAuthority,
   NixosSharedHostPublishBehavior,
   NixosSharedHostSmokeConnectOverride,
-} from "./nixos-shared-host-control-plane-contract.ts";
-import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import { runNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy.ts";
-import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
+} from "./nixos-shared-host-control-plane-contract";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts";
+import type { NixosSharedHostDeployment } from "./contract";
+import { runNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy";
+import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store";
 
 function evidencePath(recordsRoot: string, freezeId: string): string {
   return path.join(

@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { normalizeTargetLabel } from "../lib/labels.ts";
+import { normalizeTargetLabel } from "../lib/labels";
 
 const CONFIG_SUFFIX = /\s+\([^)]*\)$/;
 

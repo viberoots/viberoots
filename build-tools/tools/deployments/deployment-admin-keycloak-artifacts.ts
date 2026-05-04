@@ -1,9 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import {
-  defaultManagedRoot,
-  normalizeHostLogicalPath,
-} from "./nixos-shared-host-install-contract.ts";
+import { defaultManagedRoot, normalizeHostLogicalPath } from "./nixos-shared-host-install-contract";
 
 const IDENTITY_PROVIDER_DIR = "identity-provider";
 const REALM_FILE = "deployment-auth-realm.json";

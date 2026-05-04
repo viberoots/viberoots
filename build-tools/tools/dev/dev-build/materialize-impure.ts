@@ -1,9 +1,9 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
-import { inferRunnableFromOutPath } from "../../lib/runnables.ts";
-import { nodeBin, zxNodeBase } from "./paths.ts";
-import { runNixBuildWithProgress } from "../run-runnable-nix.ts";
+import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
+import { inferRunnableFromOutPath } from "../../lib/runnables";
+import { nodeBin, zxNodeBase } from "./paths";
+import { runNixBuildWithProgress } from "../run-runnable-nix";
 
 function materializeTimeoutSec(): number {
   const raw = String(process.env.BNX_MATERIALIZE_TIMEOUT_SEC || "").trim();

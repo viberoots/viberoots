@@ -1,27 +1,27 @@
 #!/usr/bin/env zx-wrapper
-import type { CloudflarePagesDeployment } from "./contract.ts";
-import { authorizeControlPlaneSubmit } from "./deployment-control-plane-authz.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { defaultRequestedBy } from "./deployment-admission-evidence.ts";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
-import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract.ts";
-import { createCloudflarePagesSubmissionId } from "./cloudflare-pages-control-plane-shared.ts";
+import type { CloudflarePagesDeployment } from "./contract";
+import { authorizeControlPlaneSubmit } from "./deployment-control-plane-authz";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { defaultRequestedBy } from "./deployment-admission-evidence";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
+import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract";
+import { createCloudflarePagesSubmissionId } from "./cloudflare-pages-control-plane-shared";
 import {
   acquireControlPlaneLock,
   executionSnapshotPathFor,
   submissionPathFor,
   writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
-import { createCloudflarePagesDeployRunId } from "./cloudflare-pages-records.ts";
+} from "./nixos-shared-host-control-plane-store";
+import { createCloudflarePagesDeployRunId } from "./cloudflare-pages-records";
 import {
   CLOUDFLARE_PAGES_TARGET_TRANSITION_RECORD_SCHEMA,
   type CloudflarePagesTargetTransitionRecord,
   writeTransitionRecord,
-} from "./cloudflare-pages-target-transition-records.ts";
+} from "./cloudflare-pages-target-transition-records";
 import {
   type DeploymentTargetException,
   isTargetExceptionActive,
-} from "./deployment-target-exceptions.ts";
+} from "./deployment-target-exceptions";
 
 export const CLOUDFLARE_PAGES_TARGET_TRANSITION_SNAPSHOT_SCHEMA =
   "cloudflare-pages-target-transition-snapshot@1";

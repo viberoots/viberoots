@@ -2,8 +2,8 @@
 import {
   writeBackendSubmissionDoc,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
-import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
+} from "./nixos-shared-host-control-plane-backend";
+import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store";
 
 export type CloudflareBackendSubmissionLike = {
   submissionId: string;

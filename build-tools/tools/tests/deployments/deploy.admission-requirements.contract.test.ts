@@ -2,13 +2,13 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
-import { resolveDeploymentAdmissionEvidence } from "../../deployments/deployment-admission-cli.ts";
-import { resolveDeploymentForCli } from "../../deployments/deployment-cli-resolve.ts";
+import { resolveDeploymentAdmissionEvidence } from "../../deployments/deployment-admission-cli";
+import { resolveDeploymentForCli } from "../../deployments/deployment-cli-resolve";
 import {
   writeTempCloudflareValidationWorkspace,
   writeTempListedDeploymentWorkspace,
-} from "./deploy.front-door.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "./deploy.front-door.fixture";
+import { runInTemp } from "../lib/test-helpers";
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

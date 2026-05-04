@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeVerifyStatusFromLogText } from "../../lib/verify-log-status.ts";
+import { computeVerifyStatusFromLogText } from "../../lib/verify-log-status";
 
 test("verify-log-status: parses Remaining count when present", () => {
   const log = `

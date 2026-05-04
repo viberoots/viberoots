@@ -1,22 +1,22 @@
 #!/usr/bin/env zx-wrapper
-import type { CloudflarePagesDeployment } from "./contract.ts";
+import type { CloudflarePagesDeployment } from "./contract";
 import {
   CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
   type CloudflarePagesControlPlaneSubmitRequest,
-} from "./cloudflare-pages-control-plane-api-contract.ts";
-import { createCloudflarePagesSubmissionId } from "./cloudflare-pages-control-plane-shared.ts";
-import { resolveArtifactDirForCli } from "./deployment-cli-resolve.ts";
-import type { DeploymentControlPlaneStatus } from "./deployment-control-plane-contract.ts";
-import { summarizeDeploymentResult } from "./deployment-execution.ts";
+} from "./cloudflare-pages-control-plane-api-contract";
+import { createCloudflarePagesSubmissionId } from "./cloudflare-pages-control-plane-shared";
+import { resolveArtifactDirForCli } from "./deployment-cli-resolve";
+import type { DeploymentControlPlaneStatus } from "./deployment-control-plane-contract";
+import { summarizeDeploymentResult } from "./deployment-execution";
 import {
   readNixosSharedHostControlPlaneRecordViaService,
   submitNixosSharedHostControlPlaneViaService,
-} from "./nixos-shared-host-control-plane-client.ts";
-import { resolveServiceClientFromCliProfileOrFlags } from "./deployment-service-client-profile.ts";
-import { uploadCloudflarePagesClientArtifact } from "./cloudflare-pages-artifact-upload-client.ts";
-import { serviceSubmissionAdmissionEvidence } from "./deployment-service-client-contract.ts";
-import { terminalControlPlaneRejectionMessage } from "./deployment-provider-protected-front-door.ts";
-import { controlPlaneRecordFailureMessage } from "./deployment-control-plane-record-failure.ts";
+} from "./nixos-shared-host-control-plane-client";
+import { resolveServiceClientFromCliProfileOrFlags } from "./deployment-service-client-profile";
+import { uploadCloudflarePagesClientArtifact } from "./cloudflare-pages-artifact-upload-client";
+import { serviceSubmissionAdmissionEvidence } from "./deployment-service-client-contract";
+import { terminalControlPlaneRejectionMessage } from "./deployment-provider-protected-front-door";
+import { controlPlaneRecordFailureMessage } from "./deployment-control-plane-record-failure";
 
 const SERVICE_ONLY_LOCAL_FLAGS = ["records-root", "control-plane-database-url"] as const;
 

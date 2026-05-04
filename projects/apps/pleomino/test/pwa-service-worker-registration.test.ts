@@ -4,7 +4,7 @@ import {
   ensureServiceWorkerControlsPage,
   registerServiceWorker,
   SERVICE_WORKER_TAKEOVER_RELOAD_KEY,
-} from "../src/pwa/service-worker-registration.ts";
+} from "../src/pwa/service-worker-registration";
 
 type ServiceWorkerListener = () => void;
 

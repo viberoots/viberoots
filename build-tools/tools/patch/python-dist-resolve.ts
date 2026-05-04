@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import type { ResolveResult } from "./types";
-import { parseUvLockKeys } from "../lib/uv-lock.ts";
-import { findNearestLockfileForPackage } from "../lib/importers.ts";
-import { toPosixPath } from "../lib/posix-path.ts";
+import { parseUvLockKeys } from "../lib/uv-lock";
+import { findNearestLockfileForPackage } from "../lib/importers";
+import { toPosixPath } from "../lib/posix-path";
 import { repoRoot as _repoRoot } from "./lib/apply";
 import { createDbg } from "./lib/util";
 

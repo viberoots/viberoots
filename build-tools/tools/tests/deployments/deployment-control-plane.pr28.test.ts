@@ -3,20 +3,20 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { acquireControlPlaneLock } from "../../deployments/nixos-shared-host-control-plane-store.ts";
-import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { acquireControlPlaneLock } from "../../deployments/nixos-shared-host-control-plane-store";
+import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
+import { runInTemp } from "../lib/test-helpers";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 import {
   waitFor,
   withEnvOverrides,
   writeDemoArtifact,
-} from "./nixos-shared-host.control-plane.helpers.ts";
-import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+} from "./nixos-shared-host.control-plane.helpers";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
 async function submissionPaths(recordsRoot: string): Promise<string[]> {
   const dir = path.join(recordsRoot, "control-plane", "submissions");

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { formatDeploymentControlPlaneRecordText } from "../../deployments/deployment-control-plane-status-format.ts";
+import { formatDeploymentControlPlaneRecordText } from "../../deployments/deployment-control-plane-status-format";
 
 test("record text includes failure and control-plane context", () => {
   const text = formatDeploymentControlPlaneRecordText({

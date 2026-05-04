@@ -1,15 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import {
-  deploymentAuthMissingGrantHint,
-  type DeploymentAuthRole,
-} from "./deployment-auth-groups.ts";
-import { scrubDeploymentSecretEnv } from "./deployment-secret-env.ts";
-import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
-import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door.ts";
+import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { deploymentAuthMissingGrantHint, type DeploymentAuthRole } from "./deployment-auth-groups";
+import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
+import { redactDeploymentAuthText } from "./deployment-auth-redaction";
+import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door";
 
 const execFileAsync = promisify(execFile);
 const TRANSPORT_MAX_BUFFER = 10 * 1024 * 1024;

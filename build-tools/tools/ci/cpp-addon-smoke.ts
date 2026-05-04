@@ -9,7 +9,7 @@
  *
  * This is a build-only smoke check (no behavior change, no providers required).
  */
-import { runInTemp } from "../tests/lib/test-helpers.ts";
+import { runInTemp } from "../tests/lib/test-helpers";
 
 async function main() {
   // Minimize rsync size to speed up CI temp setup

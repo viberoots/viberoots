@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { shouldRunNixStoreOptimizeForRequestedTargets } from "../../dev/verify/housekeeping.ts";
+import { shouldRunNixStoreOptimizeForRequestedTargets } from "../../dev/verify/housekeeping";
 
 test("nix store optimize is opt-in even for full-suite verify target sets", () => {
   assert.equal(shouldRunNixStoreOptimizeForRequestedTargets(["//..."], {}), false);

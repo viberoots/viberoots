@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createIsolation } from "../../dev/dev-build/isolation.ts";
+import { createIsolation } from "../../dev/dev-build/isolation";
 
 test("dev-build reuses buck daemon by default", () => {
   const prevReuse = process.env.BUCK_DEVBUILD_REUSE_DAEMON;

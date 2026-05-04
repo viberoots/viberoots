@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import type { CloudflarePagesDeployment, CloudflarePagesProviderTarget } from "./contract.ts";
-import { cloudflarePagesPublishedPath } from "./cloudflare-pages-preview.ts";
+import type { CloudflarePagesDeployment, CloudflarePagesProviderTarget } from "./contract";
+import { cloudflarePagesPublishedPath } from "./cloudflare-pages-preview";
 
 async function cleanupFakePreviewTarget(
   effectiveRunTarget: Pick<CloudflarePagesProviderTarget, "project" | "previewBranch">,

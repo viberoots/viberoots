@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentAdmissionBinding } from "./deployment-admission-evidence.ts";
-import type { DeploymentAdmissionOperationKind } from "./deployment-admission-binding.ts";
-import type { DeploymentTarget } from "./contract-types.ts";
-import { providerTargetIdentityFor } from "./deployment-targets.ts";
-import { mcpSourceResponseBoundaryErrors } from "./deployment-boundary-checks.ts";
+import type { DeploymentAdmissionBinding } from "./deployment-admission-evidence";
+import type { DeploymentAdmissionOperationKind } from "./deployment-admission-binding";
+import type { DeploymentTarget } from "./contract-types";
+import { providerTargetIdentityFor } from "./deployment-targets";
+import { mcpSourceResponseBoundaryErrors } from "./deployment-boundary-checks";
 
 export type DeploymentReadinessGateType =
   | "ragie_acl_semantics"

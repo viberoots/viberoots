@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
-import { resolveSelectedTargetLabel } from "../dev/target-label-resolver.ts";
-import { getFlagStr, getPositionalsWithValueFlags } from "../lib/cli.ts";
-import type { DeploymentTarget } from "./contract.ts";
-import { resolveDeploymentFromTarget } from "./deployment-query.ts";
+import { buildSelectedOutPath } from "../dev/run-runnable-graph";
+import { resolveSelectedTargetLabel } from "../dev/target-label-resolver";
+import { getFlagStr, getPositionalsWithValueFlags } from "../lib/cli";
+import type { DeploymentTarget } from "./contract";
+import { resolveDeploymentFromTarget } from "./deployment-query";
 import {
   artifactDirFromBuiltOutPath,
   buildArtifactDirsByComponentId,
   parseComponentArtifactDirs,
-} from "./deployment-component-artifact-dirs.ts";
+} from "./deployment-component-artifact-dirs";
 
 const DEPLOY_POSITIONAL_PRECEDING_VALUE_FLAGS = [
   "admission-evidence-json",

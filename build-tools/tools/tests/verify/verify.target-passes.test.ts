@@ -6,12 +6,12 @@ import {
   VERIFY_ISOLATED_LABEL,
   VERIFY_RESOURCE_LIMITED_LABEL,
   VERIFY_RESOURCE_LIMITED_THREADS,
-} from "../../dev/verify/target-passes.ts";
+} from "../../dev/verify/target-passes";
 import {
   groupVerifyPassesForExecution,
   resourceLimitedStartDelaySeconds,
   verifyPassIsolationDir,
-} from "../../dev/verify/verify-pass-scheduling.ts";
+} from "../../dev/verify/verify-pass-scheduling";
 
 test("verify target passes batch isolated targets ahead of the shared batch", () => {
   const passes = planVerifyTargetPasses([

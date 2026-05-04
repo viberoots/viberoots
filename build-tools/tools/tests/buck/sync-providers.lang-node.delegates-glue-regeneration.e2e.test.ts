@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { exists, runInTemp } from "../lib/test-helpers.ts";
+import { exists, runInTemp } from "../lib/test-helpers";
 
 test("sync-providers --lang node regenerates downstream glue via the centralized pipeline", async () => {
   await runInTemp("sync-providers-node-glue", async (tmp, $) => {

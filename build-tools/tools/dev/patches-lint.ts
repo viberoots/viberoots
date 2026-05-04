@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { readPatchesLintConfig } from "./patches-lint/config.ts";
-import { lintCpp } from "./patches-lint/lint-cpp.ts";
-import { lintGo } from "./patches-lint/lint-go.ts";
-import { lintNode } from "./patches-lint/lint-node.ts";
-import { lintPython } from "./patches-lint/lint-python.ts";
+import { readPatchesLintConfig } from "./patches-lint/config";
+import { lintCpp } from "./patches-lint/lint-cpp";
+import { lintGo } from "./patches-lint/lint-go";
+import { lintNode } from "./patches-lint/lint-node";
+import { lintPython } from "./patches-lint/lint-python";
 
 async function main() {
   const cfg = readPatchesLintConfig();

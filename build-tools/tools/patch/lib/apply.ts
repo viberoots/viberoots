@@ -4,8 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { debugEnabled } from "./util";
-import { repoRoot as _repoRoot } from "../../lib/repo.ts";
-import { copyFileCloneAware, copyTree } from "../../lib/copy-tree.ts";
+import { repoRoot as _repoRoot } from "../../lib/repo";
+import { copyFileCloneAware, copyTree } from "../../lib/copy-tree";
 import { runPatchCommand } from "./command-runner";
 import {
   readForceFlag,
@@ -15,7 +15,7 @@ import {
   removeKnownFlags,
   readTargetArg,
   normalizeTargetToPkg,
-} from "../../lib/cli.ts";
+} from "../../lib/cli";
 
 export type ApplyFlags = {
   targetPkg: string;

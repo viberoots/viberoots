@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import path from "node:path";
 import { test } from "node:test";
-import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy.ts";
-import { installNixosSharedHostClient } from "../../deployments/nixos-shared-host-install-dev-machine.ts";
+import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy";
+import { installNixosSharedHostClient } from "../../deployments/nixos-shared-host-install-dev-machine";
 import {
   cloudflarePagesDeploymentFixture,
   installCloudflarePagesTargets,
-} from "./cloudflare-pages.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "./cloudflare-pages.fixture";
+import { runInTemp } from "../lib/test-helpers";
 
 async function startMockControlPlaneServer(config: { onStatus: (url: URL) => unknown }) {
   const requests: Array<{ method: string; path: string }> = [];

@@ -2,20 +2,20 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../deployments/nixos-shared-host-control-plane-api-contract.ts";
-import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
-import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-shared-host-control-plane-snapshot.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
-import { readJson, writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../deployments/nixos-shared-host-control-plane-api-contract";
+import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
+import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-shared-host-control-plane-snapshot";
+import { runInTemp } from "../lib/test-helpers";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { readJson, writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 import {
   authRequiredDeployment,
   evidenceWithoutPrincipal,
   postSubmission,
   withArtifactBinding,
   writeAuthSession,
-} from "./nixos-shared-host.service-auth-boundary.helpers.ts";
+} from "./nixos-shared-host.service-auth-boundary.helpers";
 
 function casePaths(tmp: string, name: string) {
   const root = path.join(tmp, name);

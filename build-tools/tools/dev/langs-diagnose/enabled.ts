@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { LangEntry } from "./types";
 import { pathExists } from "./fs";
-import { findImporterLockfiles } from "../../lib/importers.ts";
+import { findImporterLockfiles } from "../../lib/importers";
 
 export async function detectEnabledAndMissing(
   langs: Map<string, LangEntry>,

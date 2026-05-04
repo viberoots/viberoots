@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
-import type { CloudflarePagesControlPlaneSubmitRequest } from "./cloudflare-pages-control-plane-api-contract.ts";
-import type { DeploymentControlPlaneServiceInstance } from "./deployment-control-plane-contract.ts";
-import { fingerprintControlPlanePayload } from "./deployment-control-plane-idempotency.ts";
-import { resolveReviewedControlPlaneServiceInstance } from "./deployment-control-plane-service-identity.ts";
-import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution.ts";
-import { createServiceOwnedLaneGovernanceResolver } from "./deployment-lane-governance-service.ts";
-import type { DeploymentProviderServiceSubmitRequest } from "./deployment-provider-control-plane-submit.ts";
-import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract.ts";
-import type { DeploymentTarget } from "./contract.ts";
+import type { CloudflarePagesControlPlaneSubmitRequest } from "./cloudflare-pages-control-plane-api-contract";
+import type { DeploymentControlPlaneServiceInstance } from "./deployment-control-plane-contract";
+import { fingerprintControlPlanePayload } from "./deployment-control-plane-idempotency";
+import { resolveReviewedControlPlaneServiceInstance } from "./deployment-control-plane-service-identity";
+import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution";
+import { createServiceOwnedLaneGovernanceResolver } from "./deployment-lane-governance-service";
+import type { DeploymentProviderServiceSubmitRequest } from "./deployment-provider-control-plane-submit";
+import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract";
+import type { DeploymentTarget } from "./contract";
 
 type ServiceSubmitRequest =
   | NixosSharedHostControlPlaneSubmitRequest

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import { normalizeTargetLabel } from "../lib/labels.ts";
-import type { GraphNode } from "../lib/graph.ts";
-import { readString } from "./deployment-graph-readers.ts";
+import { normalizeTargetLabel } from "../lib/labels";
+import type { GraphNode } from "../lib/graph";
+import { readString } from "./deployment-graph-readers";
 
 export const DEPLOYMENT_DEFAULTS_RULE = "deployment_defaults";
 

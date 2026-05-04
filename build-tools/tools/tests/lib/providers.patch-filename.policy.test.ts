@@ -7,7 +7,7 @@ import {
   decodeNameVersionFromPatch,
   decodeNameVersionFromPatchLoose,
   encodeForPatchFilename,
-} from "../../lib/providers.ts";
+} from "../../lib/providers";
 
 test("patch filename encoding/decoding policy (strict vs loose)", async () => {
   assert.equal(encodeForPatchFilename("golang.org/x/net"), "golang.org__x__net");

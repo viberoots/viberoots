@@ -1,9 +1,9 @@
-import type { ScafFlags } from "../types.ts";
+import type { ScafFlags } from "../types";
 
 import * as fsp from "node:fs/promises";
 
-import { confirmOrExit } from "../confirm.ts";
-import { discoverScaffolds } from "../scaffolds/discover.ts";
+import { confirmOrExit } from "../confirm";
+import { discoverScaffolds } from "../scaffolds/discover";
 
 export async function cmdDelete(args: string[], flags: ScafFlags) {
   const yes = flags["yes"] === "true";

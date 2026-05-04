@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import type { CloudflarePagesDeployment } from "./contract.ts";
-import type { DeploymentPreviewPolicy } from "./contract-types.ts";
-import { deploymentError, duplicateValueEntries } from "./contract-extract-shared.ts";
-import { allowsSharedTargetTransition } from "./deployment-target-exceptions.ts";
+import type { CloudflarePagesDeployment } from "./contract";
+import type { DeploymentPreviewPolicy } from "./contract-types";
+import { deploymentError, duplicateValueEntries } from "./contract-extract-shared";
+import { allowsSharedTargetTransition } from "./deployment-target-exceptions";
 
 export function pushCloudflarePreviewErrors(
   label: string,

@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { submitS3StaticDeploy } from "../../deployments/s3-static-deploy.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
-import { s3StaticDeploymentFixture } from "./s3-static.fixture.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+import { submitS3StaticDeploy } from "../../deployments/s3-static-deploy";
+import { runInTemp } from "../lib/test-helpers";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
+import { s3StaticDeploymentFixture } from "./s3-static.fixture";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
 
 async function writeArtifact(root: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });

@@ -4,32 +4,32 @@ import {
   admitMobileAppArtifact,
   requireAdmittedMobileAppArtifactPath,
   type AdmittedMobileAppArtifact,
-} from "./app-store-connect-artifacts.ts";
-import { resolveInitialAppStoreConnectAdmittedContext } from "./app-store-connect-admission.ts";
-import { prepareAppStoreConnectPublisherConfig } from "./app-store-connect-config.ts";
+} from "./app-store-connect-artifacts";
+import { resolveInitialAppStoreConnectAdmittedContext } from "./app-store-connect-admission";
+import { prepareAppStoreConnectPublisherConfig } from "./app-store-connect-config";
 import {
   assertHealthyAppStoreConnectRelease,
   publishAppStoreConnectMobileApp,
-} from "./app-store-connect-publisher.ts";
+} from "./app-store-connect-publisher";
 import {
   createAppStoreConnectDeployRecord,
   createAppStoreConnectDeployRunId,
   writeAppStoreConnectDeployRecord,
   type AppStoreConnectDeployRecord,
-} from "./app-store-connect-records.ts";
-import { writeAppStoreConnectReplaySnapshot } from "./app-store-connect-replay.ts";
-import type { AppStoreConnectDeployment } from "./contract.ts";
-import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
+} from "./app-store-connect-records";
+import { writeAppStoreConnectReplaySnapshot } from "./app-store-connect-replay";
+import type { AppStoreConnectDeployment } from "./contract";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy";
 import {
   mergeExecutionPolicyFacts,
   publishWithFailClosedRetry,
-} from "./mobile-store-deploy-shared.ts";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
-import { evaluateMobileStoreReleaseHealth } from "./mobile-store-secret-runtime.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
+} from "./mobile-store-deploy-shared";
+import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
+import { evaluateMobileStoreReleaseHealth } from "./mobile-store-secret-runtime";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
 
 export async function publishRecordedAppStoreConnectArtifact(opts: {
   workspaceRoot: string;

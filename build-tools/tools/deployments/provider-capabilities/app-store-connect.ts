@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { MOBILE_APP_COMPONENT_KIND } from "../deployment-component-kinds.ts";
-import { APP_STORE_CONNECT_PROVIDER } from "../deployment-provider-targets.ts";
-import type { DeploymentProviderCapability } from "./types.ts";
-import { bullet } from "./types.ts";
+import { MOBILE_APP_COMPONENT_KIND } from "../deployment-component-kinds";
+import { APP_STORE_CONNECT_PROVIDER } from "../deployment-provider-targets";
+import type { DeploymentProviderCapability } from "./types";
+import { bullet } from "./types";
 
 export const APP_STORE_CONNECT_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
   provider: APP_STORE_CONNECT_PROVIDER,

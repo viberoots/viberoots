@@ -1,14 +1,6 @@
 { pkgs, buck2Input }:
 let
-  zx-wrapper = pkgs.writeShellScriptBin "zx-wrapper" ''
-    set -euo pipefail
-    exec ${pkgs.nodejs_22}/bin/node \
-      --experimental-strip-types \
-      --experimental-top-level-await \
-      --disable-warning=ExperimentalWarning \
-      --import="${pkgs.nodePackages.zx}/lib/node_modules/zx/build/globals.js" \
-      "$@"
-  '';
+  zx-wrapper = import ./lib/zx-wrapper.nix { inherit pkgs; };
 in {
   default = pkgs.mkShell {
     shellHook = ''

@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagStr } from "../lib/cli.ts";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
-import { readCompositeGraph } from "../lib/graph-view.ts";
-import { DEPLOYMENT_EXTRACTED_METADATA_SCHEMA } from "./deployment-control-plane-contract.ts";
-import { extractDeployments } from "./contract.ts";
+import { getFlagStr } from "../lib/cli";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { readCompositeGraph } from "../lib/graph-view";
+import { DEPLOYMENT_EXTRACTED_METADATA_SCHEMA } from "./deployment-control-plane-contract";
+import { extractDeployments } from "./contract";
 
 async function main() {
   const graphPath = getFlagStr("graph", DEFAULT_GRAPH_PATH);

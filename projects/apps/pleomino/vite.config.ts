@@ -59,11 +59,8 @@ function staticPwaPrecachePlugin() {
     },
     closeBundle() {
       execFileSync(
-        process.execPath,
+        "zx-wrapper",
         [
-          "--experimental-top-level-await",
-          "--disable-warning=ExperimentalWarning",
-          "--experimental-strip-types",
           "../../../build-tools/tools/dev/materialize-static-pwa-precache.ts",
           "--client-dir",
           path.resolve(appRoot, outDir),

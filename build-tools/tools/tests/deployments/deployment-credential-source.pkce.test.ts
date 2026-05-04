@@ -5,9 +5,9 @@ import { test } from "node:test";
 import {
   runPkceLogin,
   startPkceCallbackListener,
-} from "../../deployments/deployment-credential-source-pkce.ts";
-import { decodeJwtPayload } from "../../deployments/deploy-vault-jwt-claims.ts";
-import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers.ts";
+} from "../../deployments/deployment-credential-source-pkce";
+import { decodeJwtPayload } from "../../deployments/deploy-vault-jwt-claims";
+import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers";
 
 async function waitForUrl(messages: string[]): Promise<URL> {
   for (let i = 0; i < 50; i++) {

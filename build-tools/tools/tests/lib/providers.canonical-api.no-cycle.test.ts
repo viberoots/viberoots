@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { readFile } from "node:fs/promises";
 
 test("providers.ts is the canonical API surface for provider naming helpers", async () => {
-  const providers = await import("../../lib/providers.ts");
+  const providers = await import("../../lib/providers");
 
   assert.equal(typeof providers.normalizeNixAttr, "function");
   assert.equal(typeof providers.providerNameForImporter, "function");

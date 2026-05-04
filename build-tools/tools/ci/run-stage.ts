@@ -3,12 +3,12 @@
 import assert from "node:assert";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { ensureGraph, runGlue } from "../buck/glue-run.ts";
-import { getFlagStr } from "../lib/cli.ts";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
-import { runNodeWithZx } from "../lib/node-run.ts";
-import { resolveRequestedVerifyScope } from "../dev/verify/requested-scope.ts";
-import { summarizeVerifyScopeDecision } from "../dev/verify/selection-output.ts";
+import { ensureGraph, runGlue } from "../buck/glue-run";
+import { getFlagStr } from "../lib/cli";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { runNodeWithZx } from "../lib/node-run";
+import { resolveRequestedVerifyScope } from "../dev/verify/requested-scope";
+import { summarizeVerifyScopeDecision } from "../dev/verify/selection-output";
 
 type Stage =
   | "codegen"

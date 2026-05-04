@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
-import type { ControlPlaneLockAbortReason } from "./nixos-shared-host-control-plane-store.ts";
+import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store";
+import type { ControlPlaneLockAbortReason } from "./nixos-shared-host-control-plane-store";
 
 type SubmissionLike = {
   submissionId: string;

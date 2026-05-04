@@ -4,8 +4,8 @@ import { test } from "node:test";
 import {
   LOCAL_FIXTURE_SERVICE_ENV,
   validateProtectedSharedServiceTransport,
-} from "../../deployments/deployment-service-transport-policy.ts";
-import { resolveServiceClientFromFlags } from "../../deployments/nixos-shared-host-service-client-config.ts";
+} from "../../deployments/deployment-service-transport-policy";
+import { resolveServiceClientFromFlags } from "../../deployments/nixos-shared-host-service-client-config";
 
 test("nixos shared-host service client resolves the reviewed mini remote alias", () => {
   assert.equal(

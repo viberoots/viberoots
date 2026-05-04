@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { echoSnippetRequested } from "../../lib/cli.ts";
+import { echoSnippetRequested } from "../../lib/cli";
 
 test("cli helpers: echoSnippetRequested respects --echo-snippet flag", () => {
   const oldGlobal = (globalThis as any).argv;

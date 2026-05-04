@@ -1,6 +1,6 @@
 import path from "node:path";
-import { stripAnsiAndCrs } from "./types.ts";
-import type { VerifyStatus } from "./types.ts";
+import { stripAnsiAndCrs } from "./types";
+import type { VerifyStatus } from "./types";
 import {
   findLastFullSuiteWindowStart,
   formatElapsed,
@@ -8,15 +8,15 @@ import {
   parseGcDetected,
   parseVerifyBeginEpochSec,
   parseVerifyStoppedMarker,
-} from "./parsing.ts";
-import { deriveInProgressCounts } from "./derived.ts";
+} from "./parsing";
+import { deriveInProgressCounts } from "./derived";
 import {
   parseExpandedTargetCount,
   parsePassBegins,
   parsePassExits,
   passExitForBegin,
-} from "./passes.ts";
-import { parseFinalSummary } from "./summary.ts";
+} from "./passes";
+import { parseFinalSummary } from "./summary";
 
 function aggregateVerifyPassStatus(
   lines: string[],

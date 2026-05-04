@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator.ts";
+import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator";
 import {
   admissionBindingFixture,
   deploymentAdmissionEvidenceFixture,
-} from "./deployment-admission.fixture.ts";
-import { admissionEvalBase, admittedContextFixture } from "./deployment-admission.test-helpers.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
-import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
+} from "./deployment-admission.fixture";
+import { admissionEvalBase, admittedContextFixture } from "./deployment-admission.test-helpers";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 
 test("admission rejects deploys without required check evidence", async () => {
   const deployment = nixosSharedHostDeploymentFixture({

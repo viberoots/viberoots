@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import type { CloudflarePagesDeployment } from "./contract.ts";
+import type { CloudflarePagesDeployment } from "./contract";
 import {
   resolveCrossDeploymentPromotionSelection,
   resolveCrossDeploymentPromotionSourceSelection,
   resolveDeploymentPromotionSourceRecordPath,
   type CrossDeploymentPromotionSelection,
   type CrossDeploymentPromotionSourceSelection,
-} from "./deployment-promotion.ts";
-import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-control-plane.ts";
-import type { CloudflarePagesSmokeConnectOverride } from "./cloudflare-pages-control-plane-contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
+} from "./deployment-promotion";
+import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-control-plane";
+import type { CloudflarePagesSmokeConnectOverride } from "./cloudflare-pages-control-plane-contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
 
 export type CloudflarePagesPromotionSelection =
   CrossDeploymentPromotionSelection<CloudflarePagesDeployment> & {

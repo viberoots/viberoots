@@ -4,9 +4,9 @@ import {
   buckCommandEnv,
   isBuckDaemonInitTransient,
   resolveNestedBuckIsolation,
-} from "./buck-command-env.ts";
-import { DEPLOYMENT_DOMAIN_LABEL } from "./deployment-verify-scope.ts";
-import { targetLabelFromScript } from "./template-owned-tests.ts";
+} from "./buck-command-env";
+import { DEPLOYMENT_DOMAIN_LABEL } from "./deployment-verify-scope";
+import { targetLabelFromScript } from "./template-owned-tests";
 
 const CONFIG_SUFFIX = /\s+\([^)]*\)$/;
 

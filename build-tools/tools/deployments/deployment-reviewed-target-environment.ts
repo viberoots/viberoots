@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
-import { requiredDeploymentStageBranch } from "./contract.ts";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+import type { DeploymentTarget } from "./contract";
+import { requiredDeploymentStageBranch } from "./contract";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 import {
   snapshotReviewedSourceForSubmission,
   type DeploymentReviewedSourceSnapshot,
-} from "./nixos-shared-host-reviewed-source-snapshot.ts";
-import { resolveDeploymentGitCommit } from "./deployment-git-ref.ts";
+} from "./nixos-shared-host-reviewed-source-snapshot";
+import { resolveDeploymentGitCommit } from "./deployment-git-ref";
 
 export type DeploymentReviewedTargetEnvironmentAdmission = {
   mode: "stage_branch_snapshot";

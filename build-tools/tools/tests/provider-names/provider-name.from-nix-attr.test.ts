@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { providerNameForNixAttr } from "../../lib/providers.ts";
+import { providerNameForNixAttr } from "../../lib/providers";
 
 test("providerNameForNixAttr derives stable provider names", async () => {
   const cases: Array<[string, string]> = [

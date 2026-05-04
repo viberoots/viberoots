@@ -2,10 +2,10 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import YAML from "yaml";
-import { packagePathFromLabel } from "../lib/labels.ts";
-import type { KubernetesDeployment } from "./contract.ts";
-import { parseJsoncObject } from "./cloudflare-pages-config.ts";
-import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint.ts";
+import { packagePathFromLabel } from "../lib/labels";
+import type { KubernetesDeployment } from "./contract";
+import { parseJsoncObject } from "./cloudflare-pages-config";
+import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint";
 
 type KubernetesRenderedConfig = {
   chart: string;

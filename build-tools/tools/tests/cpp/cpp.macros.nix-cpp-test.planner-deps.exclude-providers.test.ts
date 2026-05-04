@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { normalizeTargetLabel } from "../../lib/labels.ts";
+import { normalizeTargetLabel } from "../../lib/labels";
 
 test("nix_cpp_test planner stub deps exclude //third_party/providers:* targets", async () => {
   await runInTemp("cpp-nix-cpp-test-planner-deps", async (tmp, $) => {

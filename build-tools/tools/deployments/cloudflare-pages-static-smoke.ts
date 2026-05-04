@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import type { CloudflarePagesDeployment } from "./contract.ts";
+import type { CloudflarePagesDeployment } from "./contract";
 import {
   checkNixosSharedHostStaticWebappAvailable,
   smokeNixosSharedHostStaticWebapp,
-} from "./nixos-shared-host-static-smoke.ts";
+} from "./nixos-shared-host-static-smoke";
 
 export async function smokeCloudflarePagesStaticWebapp(opts: {
   deployment: CloudflarePagesDeployment;

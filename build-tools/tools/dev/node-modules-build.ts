@@ -2,14 +2,14 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { resolveToolPathSync } from "../lib/tool-paths.ts";
-import { findNearestImporterLock, nodeModulesAttr } from "./install/common.ts";
+import { resolveToolPathSync } from "../lib/tool-paths";
+import { findNearestImporterLock, nodeModulesAttr } from "./install/common";
 import {
   currentVerifiedMarkerFingerprint,
   readVerifiedMarker,
   sha256File,
   verifiedMarkerPath,
-} from "./update-pnpm-hash/verified-marker.ts";
+} from "./update-pnpm-hash/verified-marker";
 
 async function findFlakeRoot(start: string): Promise<string> {
   let dir = path.resolve(start);

@@ -1,14 +1,14 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { getFlagStr } from "../lib/cli.ts";
-import { resolveModuleContractsPaths } from "./module-contract-paths.ts";
-import { syncModuleContractsForApp } from "./sync-module-contracts-core.ts";
+import { getFlagStr } from "../lib/cli";
+import { resolveModuleContractsPaths } from "./module-contract-paths";
+import { syncModuleContractsForApp } from "./sync-module-contracts-core";
 import {
   specsFromWasmManifest,
   type WasmModuleSpec,
   validateTsManifestProbes,
-} from "./wasm-watch-manifest.ts";
+} from "./wasm-watch-manifest";
 import {
   type Fingerprint,
   computeFingerprintMap,
@@ -17,7 +17,7 @@ import {
   refreshTriggerPaths,
   refreshWatcherSpecs,
   runBuildStep,
-} from "./watch-wasm-producer-ops.ts";
+} from "./watch-wasm-producer-ops";
 
 function uniqueSorted(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));

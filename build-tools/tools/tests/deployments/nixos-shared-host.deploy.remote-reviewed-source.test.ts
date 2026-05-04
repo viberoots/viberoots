@@ -3,15 +3,15 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
+import { runInTemp } from "../lib/test-helpers";
 import {
   installClientProfile,
   prepareRemoteExecFixture,
   remoteExecEnv,
   REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
-} from "./nixos-shared-host.deploy.remote-exec.helpers.ts";
+} from "./nixos-shared-host.deploy.remote-exec.helpers";
 
 const CONTROL_PLANE_TOKEN = "test-control-plane-token";
 

@@ -4,11 +4,11 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { handleNonDefaultImporter } from "../../dev/update-pnpm-hash/nondefault.ts";
+import { handleNonDefaultImporter } from "../../dev/update-pnpm-hash/nondefault";
 import {
   readSharedHashCache,
   writeSharedHashCache,
-} from "../../dev/update-pnpm-hash/verified-marker.ts";
+} from "../../dev/update-pnpm-hash/verified-marker";
 
 test("shared pnpm-store hash cache is keyed by lock hash and builder fingerprint", async () => {
   const repoRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "pnpm-shared-cache-"));

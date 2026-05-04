@@ -2,7 +2,7 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagStr } from "../lib/cli.ts";
+import { getFlagStr } from "../lib/cli";
 
 export const NODE_SERVICE_CONTRACT_SCHEMA = "node-service-runtime@1";
 export const NODE_SERVICE_IDENTITY_SCHEMA = "node-service-artifact-identity@1";

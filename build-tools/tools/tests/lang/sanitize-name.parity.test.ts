@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 // Verifies Starlark sanitize_name matches Nix/TS sanitizer
 import { sanitizeName } from "../../lib/sanitize";
-import { buckCommandEnv, isBuckDaemonInitTransient } from "../../lib/buck-command-env.ts";
+import { buckCommandEnv, isBuckDaemonInitTransient } from "../../lib/buck-command-env";
 
 const cases: Array<{ name: string; value: string }> = [
   { name: "case1", value: "//projects/apps/foo:bin" },

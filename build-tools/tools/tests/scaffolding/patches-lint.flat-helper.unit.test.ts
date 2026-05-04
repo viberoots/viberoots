@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { lintFlatPatchDir } from "../../dev/patches-lint/flat-patch-dir-lint.ts";
+import { lintFlatPatchDir } from "../../dev/patches-lint/flat-patch-dir-lint";
 import { runInTemp } from "../lib/test-helpers";
 
 test("patches-lint: shared flat helper reports nonpatch, filename shape, and duplicates", async () => {

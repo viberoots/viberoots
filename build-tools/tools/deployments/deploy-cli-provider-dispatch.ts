@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
+import type { DeploymentTarget } from "./contract";
 import {
   isAppStoreConnectDeployment,
   isCloudflarePagesDeployment,
@@ -7,8 +7,8 @@ import {
   isKubernetesDeployment,
   isNixosSharedHostDeployment,
   isS3StaticDeployment,
-} from "./contract.ts";
-import type { DeployCliReadonlyFlags } from "./deploy-cli-readonly.ts";
+} from "./contract";
+import type { DeployCliReadonlyFlags } from "./deploy-cli-readonly";
 
 export async function runProviderDeployFrontDoor(opts: {
   workspaceRoot: string;
@@ -21,7 +21,7 @@ export async function runProviderDeployFrontDoor(opts: {
 }) {
   const { deployment, flags } = opts;
   if (isS3StaticDeployment(deployment)) {
-    const { runS3StaticDeployFrontDoor } = await import("./s3-static-front-door.ts");
+    const { runS3StaticDeployFrontDoor } = await import("./s3-static-front-door");
     await runS3StaticDeployFrontDoor({
       workspaceRoot: opts.workspaceRoot,
       deployment,
@@ -40,7 +40,7 @@ export async function runProviderDeployFrontDoor(opts: {
     return;
   }
   if (isCloudflarePagesDeployment(deployment)) {
-    const { runCloudflareDeployFrontDoor } = await import("./cloudflare-pages-front-door.ts");
+    const { runCloudflareDeployFrontDoor } = await import("./cloudflare-pages-front-door");
     await runCloudflareDeployFrontDoor({
       workspaceRoot: opts.workspaceRoot,
       deployment,
@@ -64,7 +64,7 @@ export async function runProviderDeployFrontDoor(opts: {
     return;
   }
   if (isAppStoreConnectDeployment(deployment)) {
-    const { runAppStoreConnectDeployFrontDoor } = await import("./app-store-connect-front-door.ts");
+    const { runAppStoreConnectDeployFrontDoor } = await import("./app-store-connect-front-door");
     await runAppStoreConnectDeployFrontDoor({
       workspaceRoot: opts.workspaceRoot,
       deployment,
@@ -77,7 +77,7 @@ export async function runProviderDeployFrontDoor(opts: {
     return;
   }
   if (isGooglePlayDeployment(deployment)) {
-    const { runGooglePlayDeployFrontDoor } = await import("./google-play-front-door.ts");
+    const { runGooglePlayDeployFrontDoor } = await import("./google-play-front-door");
     await runGooglePlayDeployFrontDoor({
       workspaceRoot: opts.workspaceRoot,
       deployment,
@@ -90,7 +90,7 @@ export async function runProviderDeployFrontDoor(opts: {
     return;
   }
   if (isKubernetesDeployment(deployment)) {
-    const { runKubernetesDeployFrontDoor } = await import("./kubernetes-front-door.ts");
+    const { runKubernetesDeployFrontDoor } = await import("./kubernetes-front-door");
     await runKubernetesDeployFrontDoor({
       workspaceRoot: opts.workspaceRoot,
       deployment,
@@ -110,12 +110,14 @@ export async function runProviderDeployFrontDoor(opts: {
   }
   if (deployment.provider === "vercel") {
     await (
-      await import("./vercel-front-door.ts")
+      await import("./vercel-front-door")
     ).runVercelDeployFrontDoorForCli(
       opts.workspaceRoot,
       deployment as any,
       flags,
       opts.publicFrontDoor,
+      opts.hasFlag,
+      opts.admissionEvidence,
       opts.smokeConnectOverride,
     );
     return;
@@ -137,7 +139,7 @@ export async function runProviderDeployFrontDoor(opts: {
   ) {
     return;
   }
-  const { runNixosSharedHostDeployFrontDoor } = await import("./deploy-provider-front-door.ts");
+  const { runNixosSharedHostDeployFrontDoor } = await import("./deploy-provider-front-door");
   await runNixosSharedHostDeployFrontDoor({
     workspaceRoot: opts.workspaceRoot,
     deployment,

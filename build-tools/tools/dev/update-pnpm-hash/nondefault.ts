@@ -1,12 +1,12 @@
-import { updateNodeModulesHashesJson } from "./hashes-json.ts";
-import { generateImporterLockfile } from "./lockfile.ts";
-import { extractHash } from "./nix.ts";
+import { updateNodeModulesHashesJson } from "./hashes-json";
+import { generateImporterLockfile } from "./lockfile";
+import { extractHash } from "./nix";
 import {
   type PnpmStoreVerifiedMarker,
   persistVerifiedHash,
   restoreHashFromSharedCache,
   withSharedHashCacheLock,
-} from "./verified-marker.ts";
+} from "./verified-marker";
 
 export async function handleNonDefaultImporter(opts: {
   importer: string;

@@ -12,7 +12,7 @@ import {
   renderPromptText,
   resolvePromptResponse,
   shouldEmitNothingForRawInput,
-} from "../json-prompt-lib.ts";
+} from "../json-prompt-lib";
 
 test("json-prompt-lib: renders prompts with unix-style defaults from templates", () => {
   const inputObject = parseJsonPromptObject('{"configRoot":"/etc/nixos","configEntryPath":null}');

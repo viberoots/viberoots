@@ -4,8 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
-import { copyTree } from "../../lib/copy-tree.ts";
-import { pidAlive } from "./seed-utils.ts";
+import { copyTree } from "../../lib/copy-tree";
+import { pidAlive } from "./seed-utils";
 
 const WRITABLE_MARKER = ".seed-store-writable";
 

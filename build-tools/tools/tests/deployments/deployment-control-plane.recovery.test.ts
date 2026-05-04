@@ -3,17 +3,17 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { reconcileNixosSharedHostRecoveredSubmission } from "../../deployments/nixos-shared-host-recovery.ts";
+import { reconcileNixosSharedHostRecoveredSubmission } from "../../deployments/nixos-shared-host-recovery";
 import {
   localHarnessControlPlaneDatabaseUrl,
   syncBackendDeployRecord,
-} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
+} from "../../deployments/nixos-shared-host-control-plane-backend";
 import {
   createNixosSharedHostDeployRecord,
   writeNixosSharedHostDeployRecord,
-} from "../../deployments/nixos-shared-host-records.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "../../deployments/nixos-shared-host-records";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
+import { runInTemp } from "../lib/test-helpers";
 
 async function writeSubmission(filePath: string, value: Record<string, unknown>) {
   await fsp.mkdir(path.dirname(filePath), { recursive: true });

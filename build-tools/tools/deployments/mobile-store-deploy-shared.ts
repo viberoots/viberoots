@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
-import { noPublishAutoRetry, runWithAutomaticRetry } from "./deployment-retry-policy.ts";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy";
+import { noPublishAutoRetry, runWithAutomaticRetry } from "./deployment-retry-policy";
 
 export async function publishWithFailClosedRetry<T>(run: () => Promise<T>): Promise<{
   result: T;

@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import type { JwtClaims } from "./deploy-vault-jwt-claims.ts";
-import { mintDeployVaultJwt } from "./deploy-vault-jwt.ts";
-import { runDeviceLogin } from "./deployment-credential-source-device.ts";
-import { validateOidcToken } from "./deployment-credential-source-oidc.ts";
-import { runPkceLogin } from "./deployment-credential-source-pkce.ts";
-import type { DeploymentCredentialSource } from "./deployment-credential-source-selection.ts";
-import type { DeploymentPkceCallbackProfileInput } from "./deployment-pkce-callback-profile.ts";
+import type { JwtClaims } from "./deploy-vault-jwt-claims";
+import { mintDeployVaultJwt } from "./deploy-vault-jwt";
+import { runDeviceLogin } from "./deployment-credential-source-device";
+import { validateOidcToken } from "./deployment-credential-source-oidc";
+import { runPkceLogin } from "./deployment-credential-source-pkce";
+import type { DeploymentCredentialSource } from "./deployment-credential-source-selection";
+import type { DeploymentPkceCallbackProfileInput } from "./deployment-pkce-callback-profile";
 
 export type CredentialSourceRuntimeOptions = {
   source: DeploymentCredentialSource;

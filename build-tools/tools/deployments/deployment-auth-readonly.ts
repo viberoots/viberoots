@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
-import { reviewedDeployAdminGroupsByCapability } from "./deployment-admin-keycloak-auth.ts";
+import type { DeploymentTarget } from "./contract";
+import { reviewedDeployAdminGroupsByCapability } from "./deployment-admin-keycloak-auth";
 import {
   deploymentAuthActionCommand,
   deploymentAuthActionRole,
@@ -11,8 +11,8 @@ import {
   reviewedAutomationGroupsForPrincipal,
   reviewedHumanGroupName,
   reviewedHumanGroupsForDeployment,
-} from "./deployment-auth-groups.ts";
-import { buildDeploymentAuthKeycloakRealmImport } from "./deployment-auth-keycloak-realm.ts";
+} from "./deployment-auth-groups";
+import { buildDeploymentAuthKeycloakRealmImport } from "./deployment-auth-keycloak-realm";
 
 export const DEPLOYMENT_AUTH_GROUPS_SCHEMA = "deployment-auth-groups@1";
 export const DEPLOYMENT_AUTH_ACTION_SCHEMA = "deployment-auth-action@1";

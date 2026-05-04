@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { publishNixosSharedHostStaticWebapp } from "../../deployments/nixos-shared-host-static-publisher.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { publishNixosSharedHostStaticWebapp } from "../../deployments/nixos-shared-host-static-publisher";
+import { runInTemp } from "../lib/test-helpers";
 
 test("nixos-shared-host publisher rejects publish into a missing realized target", async () => {
   await runInTemp("nixos-shared-host-missing-target", async (tmp) => {

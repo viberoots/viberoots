@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { decodeNameVersionFromPatch } from "../../lib/providers.ts";
+import { decodeNameVersionFromPatch } from "../../lib/providers";
 import { runInTemp } from "../lib/test-helpers";
 
 function expectedOverlayKeys(filenames: string[], versions: Record<string, string>): string[] {

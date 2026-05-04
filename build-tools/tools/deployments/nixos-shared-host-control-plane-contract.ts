@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
-import type { NixosSharedHostPublishInput } from "./nixos-shared-host-publish-input.ts";
-import type { NixosSharedHostRecordedReleaseAction } from "./nixos-shared-host-provenance.ts";
-import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
-import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
+import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results";
+import type { NixosSharedHostDeployment } from "./contract";
+import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission";
+import type { NixosSharedHostPublishInput } from "./nixos-shared-host-publish-input";
+import type { NixosSharedHostRecordedReleaseAction } from "./nixos-shared-host-provenance";
+import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout";
+import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan";
 import type {
   DeploymentControlPlaneApprovalSummary,
   DeploymentControlPlaneArtifactStatus,
@@ -16,13 +16,13 @@ import type {
   DeploymentControlPlaneSubmitRejectionCode,
   DeploymentControlPlaneServiceInstance,
   DeploymentControlPlaneTerminationReason,
-} from "./deployment-control-plane-contract.ts";
+} from "./deployment-control-plane-contract";
 import type {
   DeploymentAdmissionEvidence,
   DeploymentPrincipal,
-} from "./deployment-admission-evidence.ts";
-import type { DeploymentWorkerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker.ts";
-import type { DeploymentArtifactBindingProvenance } from "./deployment-artifact-binding.ts";
+} from "./deployment-admission-evidence";
+import type { DeploymentWorkerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker";
+import type { DeploymentArtifactBindingProvenance } from "./deployment-artifact-binding";
 
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA =
   "nixos-shared-host-control-plane-snapshot@4";

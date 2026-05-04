@@ -52,7 +52,7 @@ packages:
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
     const out = await readText(path.join(tmp, "third_party/providers/TARGETS.node.auto"));
 
-    const { providerNameForImporter } = await import("../../lib/providers.ts");
+    const { providerNameForImporter } = await import("../../lib/providers");
     const name = providerNameForImporter("projects/apps/web/pnpm-lock.yaml", "projects/apps/web");
     const expected = [
       "# GENERATED FILE — DO NOT EDIT.",
@@ -98,7 +98,7 @@ test("golden: Python importer provider TARGETS.python.auto is stable for represe
     await $`node build-tools/tools/buck/sync-providers.ts --lang python`;
     const out = await readText(path.join(tmp, "third_party/providers/TARGETS.python.auto"));
 
-    const { providerNameForImporter } = await import("../../lib/providers.ts");
+    const { providerNameForImporter } = await import("../../lib/providers");
     const name = providerNameForImporter("projects/libs/api/uv.lock", "projects/libs/api");
     const expected = [
       "# GENERATED FILE — DO NOT EDIT.",

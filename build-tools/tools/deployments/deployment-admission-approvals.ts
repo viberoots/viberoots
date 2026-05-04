@@ -1,20 +1,20 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
-import { OPENTOFU_STACK_PROVISIONER } from "./opentofu-stack.ts";
+import type { DeploymentTarget } from "./contract";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
+import { OPENTOFU_STACK_PROVISIONER } from "./opentofu-stack";
 
 const REVIEWED_STACK_PROVISIONERS = ["terraform-stack", "cdktf-stack", OPENTOFU_STACK_PROVISIONER];
-import { destructiveReleaseActions, releaseActionRefs } from "./deployment-release-actions.ts";
-import { providerDeclaresReleaseActionType } from "./deployment-provider-capabilities.ts";
+import { destructiveReleaseActions, releaseActionRefs } from "./deployment-release-actions";
+import { providerDeclaresReleaseActionType } from "./deployment-provider-capabilities";
 import type {
   DeploymentAdmissionApprovalFact,
   DeploymentAdmissionEvidence,
-} from "./deployment-admission-evidence.ts";
+} from "./deployment-admission-evidence";
 import {
   sourceAdmissionApprovals,
   sourceAdmissionBinding,
   type DeploymentRunRecordLike,
-} from "./deployment-admission-records.ts";
+} from "./deployment-admission-records";
 
 function isExpired(value?: string): boolean {
   if (!value) return false;

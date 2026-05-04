@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { remoteServiceSubmissionError } from "../../deployments/nixos-shared-host-remote-execution-transport.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import { remoteServiceSubmissionError } from "../../deployments/nixos-shared-host-remote-execution-transport";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 test("remote service submission error explains when the service requires a different commit than the submitted admission evidence", () => {
   const deployment = nixosSharedHostDeploymentFixture({

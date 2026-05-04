@@ -29,7 +29,7 @@ test("readImporterProviderIndexEntriesForSingleImporterLockfiles returns stable 
     await $`git add projects/apps/web/pnpm-lock.yaml projects/apps/api/pnpm-lock.yaml projects/apps/web/uv.lock projects/apps/api/uv.lock`;
 
     const { stdout } = await $({ stdio: "pipe" })`node -e ${`
-        import { readImporterProviderIndexEntriesForSingleImporterLockfileBasenames } from './build-tools/tools/lib/provider-index.ts';
+        import { readImporterProviderIndexEntriesForSingleImporterLockfileBasenames } from './build-tools/tools/lib/provider-index';
 
         const pnpm = await readImporterProviderIndexEntriesForSingleImporterLockfileBasenames({
           lockfileBasenames: ['pnpm-lock.yaml'],

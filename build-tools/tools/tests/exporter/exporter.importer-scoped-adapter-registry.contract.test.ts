@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { importerScopedAdapterRegistryEntry } from "../../buck/exporter/lang/importer-scoped-registry.ts";
+import { importerScopedAdapterRegistryEntry } from "../../buck/exporter/lang/importer-scoped-registry";
 import { runInTemp } from "../lib/test-helpers";
 
 test("importer-scoped adapter registry is stable contract data for node + python", async () => {

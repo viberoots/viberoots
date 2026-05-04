@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import { createNixosSharedHostSubmissionId } from "./nixos-shared-host-control-plane-snapshot.ts";
-import { resolveArtifactDirForCli } from "./deployment-cli-resolve.ts";
-import type { S3StaticDeployment } from "./contract.ts";
-import { resolveServiceClientFromCliProfileOrFlags } from "./deployment-service-client-profile.ts";
+import { createNixosSharedHostSubmissionId } from "./nixos-shared-host-control-plane-snapshot";
+import { resolveArtifactDirForCli } from "./deployment-cli-resolve";
+import type { S3StaticDeployment } from "./contract";
+import { resolveServiceClientFromCliProfileOrFlags } from "./deployment-service-client-profile";
 import {
   finalizeProtectedFrontDoorSubmission,
   rejectServiceOnlyLocalFlags,
-} from "./deployment-provider-protected-front-door.ts";
-import { S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "./s3-static-control-plane.ts";
-import { serviceSubmissionAdmissionEvidence } from "./deployment-service-client-contract.ts";
-import { resolveExpectedDeploymentSourceRevision } from "./deployment-source-revision.ts";
+} from "./deployment-provider-protected-front-door";
+import { S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "./s3-static-control-plane";
+import { serviceSubmissionAdmissionEvidence } from "./deployment-service-client-contract";
+import { resolveExpectedDeploymentSourceRevision } from "./deployment-source-revision";
 
 export async function runProtectedS3StaticDeployFrontDoor(opts: {
   workspaceRoot: string;

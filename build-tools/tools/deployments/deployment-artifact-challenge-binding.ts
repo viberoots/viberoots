@@ -3,13 +3,13 @@ import {
   artifactBindingFingerprint,
   baseArtifactChallengeRequest,
   type DeploymentArtifactChallengeRequest,
-} from "./deployment-artifact-binding.ts";
-import { DeploymentUnauthorizedError } from "./deployment-control-plane-errors.ts";
+} from "./deployment-artifact-binding";
+import { DeploymentUnauthorizedError } from "./deployment-control-plane-errors";
 import type {
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneScope,
-} from "./deployment-control-plane-contract.ts";
-import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
+} from "./deployment-control-plane-contract";
+import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components";
 
 export type DeploymentArtifactAuthorizationBinding = {
   principalId: string;

@@ -1,5 +1,5 @@
-import type { VerifyStatus } from "./types.ts";
-import { collectFailedLabels, parseLineFromBuckLogForMatching, parseRemaining } from "./parsing.ts";
+import type { VerifyStatus } from "./types";
+import { collectFailedLabels, parseLineFromBuckLogForMatching, parseRemaining } from "./parsing";
 
 export function normalizeBuckTestLabel(label: string): string {
   return label

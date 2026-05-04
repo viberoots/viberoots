@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import type { GraphNode } from "./graph.ts";
-import { normalizeTargetLabel } from "./labels.ts";
-import { defaultImporterPatchDir, listImporterPatches } from "./importers.ts";
-import { decodeNameVersionFromPatch, encodeForPatchFilename } from "./providers.ts";
+import type { GraphNode } from "./graph";
+import { normalizeTargetLabel } from "./labels";
+import { defaultImporterPatchDir, listImporterPatches } from "./importers";
+import { decodeNameVersionFromPatch, encodeForPatchFilename } from "./providers";
 
 const REQUIRED_PREFIX = "node_patch_required:";
 const OPTIONAL_PREFIX = "node_patch_optional:";

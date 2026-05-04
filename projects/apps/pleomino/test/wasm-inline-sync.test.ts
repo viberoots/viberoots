@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
-import { SOLVER_WASM_BASE64 } from "../src/game/solver/wasm-inline.ts";
+import { SOLVER_WASM_BASE64 } from "../src/game/solver/wasm-inline";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

@@ -6,17 +6,17 @@ import { test } from "node:test";
 import {
   deriveCloudflarePagesPreviewTarget,
   cloudflarePagesPublishedPath,
-} from "../../deployments/cloudflare-pages-preview.ts";
+} from "../../deployments/cloudflare-pages-preview";
 import {
   cloudflarePagesDeploymentFixture,
   cloudflarePagesPreviewFixture,
   installCloudflarePagesTargets,
-} from "./cloudflare-pages.fixture.ts";
-import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
-import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "./cloudflare-pages.fixture";
+import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
+import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { runInTemp } from "../lib/test-helpers";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });

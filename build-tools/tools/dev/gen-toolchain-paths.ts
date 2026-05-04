@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { ensureToolchainPathsFiles } from "./toolchain-paths.ts";
-import { repoRoot } from "../lib/repo.ts";
+import { ensureToolchainPathsFiles } from "./toolchain-paths";
+import { repoRoot } from "../lib/repo";
 
 ensureToolchainPathsFiles(repoRoot())
   .then(() => {

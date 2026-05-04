@@ -4,8 +4,8 @@ import { test } from "node:test";
 import {
   createDeploymentSecretRuntime,
   type DeploymentSecretBackend,
-} from "../../deployments/deployment-secret-runtime.ts";
-import { deploymentRequirementFixture } from "./deployment-metadata.fixture.ts";
+} from "../../deployments/deployment-secret-runtime";
+import { deploymentRequirementFixture } from "./deployment-metadata.fixture";
 
 function backendFor(
   resolve: (

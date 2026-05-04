@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { ProviderCapabilityBullet } from "./types.ts";
-import { bullet } from "./types.ts";
+import type { ProviderCapabilityBullet } from "./types";
+import { bullet } from "./types";
 
 export const NIXOS_SHARED_HOST_BUILT_IN_PUBLISHER_FACTS: ProviderCapabilityBullet[] = [
   bullet("reviewed SSR runtime contract for `nixos-shared-host-ssr-webapp`:", [

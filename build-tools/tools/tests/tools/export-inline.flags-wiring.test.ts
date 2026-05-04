@@ -2,8 +2,8 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { buildInlinePlan } from "../../buck/export-inline.ts";
-import { getImporterRootsContract } from "../../lib/importer-roots.ts";
+import { buildInlinePlan } from "../../buck/export-inline";
+import { getImporterRootsContract } from "../../lib/importer-roots";
 
 test("export-inline: with --target includes platform flags and deps(target)", async () => {
   const prevNoIso = process.env.BUCK_NO_ISOLATION;

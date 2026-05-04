@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { deploymentError, duplicateValueEntries } from "./contract-extract-shared.ts";
+import { deploymentError, duplicateValueEntries } from "./contract-extract-shared";
 
 export const MOBILE_STORE_TARGET_TOKEN_RE = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$/;
 export const MOBILE_STORE_VALID_PROTECTION_CLASSES = new Set([

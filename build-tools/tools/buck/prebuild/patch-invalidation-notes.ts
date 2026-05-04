@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { patchInvalidationStrategyForLang } from "../../lib/lang-contracts.ts";
+import { patchInvalidationStrategyForLang } from "../../lib/lang-contracts";
 
 async function gitLsFiles(glob: string): Promise<string[]> {
   try {

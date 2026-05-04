@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { NixosSharedHostDeployment } from "../../deployments/contract.ts";
-import { syncBackendDeployRecord } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
-import { resolveNixosSharedHostReplaySelection } from "../../deployments/nixos-shared-host-replay.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import type { NixosSharedHostDeployment } from "../../deployments/contract";
+import { syncBackendDeployRecord } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
+import { resolveNixosSharedHostReplaySelection } from "../../deployments/nixos-shared-host-replay";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 export type ReplayPaths = {
   statePath: string;

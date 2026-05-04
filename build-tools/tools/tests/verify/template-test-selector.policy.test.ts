@@ -7,7 +7,7 @@ import {
   classifyTemplateSelectorMode,
   resolveTemplateTestSelection,
   templateIdFromPath,
-} from "../../lib/template-test-selector.ts";
+} from "../../lib/template-test-selector";
 
 test("template id extraction supports direct, delete, and rename paths", () => {
   assert.equal(

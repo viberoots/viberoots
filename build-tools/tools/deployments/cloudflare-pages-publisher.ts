@@ -2,8 +2,8 @@
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { CloudflarePagesDeployment } from "./contract.ts";
-import { scrubDeploymentSecretEnv } from "./deployment-secret-env.ts";
+import type { CloudflarePagesDeployment } from "./contract";
+import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
 
 type CloudflarePagesPublishResult = {
   publicUrl: string;

@@ -5,8 +5,8 @@ import {
   formatTimingDuration,
   readDirtyGitStats,
   readSnapshotStats,
-} from "../filtered-flake-diagnostics.ts";
-import { emitTimingDetail } from "../../lib/timing-detail.ts";
+} from "../filtered-flake-diagnostics";
+import { emitTimingDetail } from "../../lib/timing-detail";
 
 export async function makeFilteredFlakeRef(opts: {
   repoRoot: string;

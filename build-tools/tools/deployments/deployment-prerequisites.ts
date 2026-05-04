@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
+import type { DeploymentTarget } from "./contract";
 
 function toSortedUnique(values: Iterable<string>): string[] {
   return Array.from(new Set(Array.from(values).filter(Boolean))).sort();

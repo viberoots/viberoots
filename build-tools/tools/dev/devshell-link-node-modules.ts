@@ -3,8 +3,8 @@ import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { findRepoRoot } from "../lib/repo.ts";
-import { findNearestImporterLock } from "./install/common.ts";
+import { findRepoRoot } from "../lib/repo";
+import { findNearestImporterLock } from "./install/common";
 
 type Marker = {
   importer: string;

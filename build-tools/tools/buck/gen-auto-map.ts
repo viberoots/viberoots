@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import { writeIfChanged, maybeAssumeUnchanged } from "../lib/fs-helpers.ts";
+import { writeIfChanged, maybeAssumeUnchanged } from "../lib/fs-helpers";
 // zx is available via shebang; we'll use `$` to interact with git when present.
-import { readCompositeGraph } from "../lib/graph-view.ts";
+import { readCompositeGraph } from "../lib/graph-view";
 // Provider mapping is Node-only (lockfile:...) and nixpkg; Go `module:`
 // labels are kept for diagnostics and are intentionally ignored here.
-import { providersForLabels, parseLockfileLabel } from "../lib/labels.ts";
-import { getFlagStr } from "../lib/cli.ts";
-import { ensureGraph } from "./glue-run.ts";
-import { isProviderPackageNode } from "../lib/graph-utils.ts";
-import { isSupportedImporterLabel } from "../lib/importers.ts";
+import { providersForLabels, parseLockfileLabel } from "../lib/labels";
+import { getFlagStr } from "../lib/cli";
+import { ensureGraph } from "./glue-run";
+import { isProviderPackageNode } from "../lib/graph-utils";
+import { isSupportedImporterLabel } from "../lib/importers";
 // no path import needed when not checking provider existence
 
 type Node = {

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "./test-helpers";
-import { runNodeWithZx } from "../../lib/node-run.ts";
+import { runNodeWithZx } from "../../lib/node-run";
 
 test("graph-view: works when zx global argv is absent (process.argv fallback)", async () => {
   await runInTemp("graph-view-cli", async (tmp) => {

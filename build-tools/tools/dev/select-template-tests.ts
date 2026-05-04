@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import process from "node:process";
-import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli.ts";
-import { resolveTemplateTestSelection } from "../lib/template-test-selector.ts";
+import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli";
+import { resolveTemplateTestSelection } from "../lib/template-test-selector";
 
 async function main() {
   const root = getFlagStr("root", process.cwd());

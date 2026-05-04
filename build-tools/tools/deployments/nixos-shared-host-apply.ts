@@ -1,10 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagStr } from "../lib/cli.ts";
-import { renderNixosSharedHostConfig } from "./nixos-shared-host.ts";
-import {
-  readNixosSharedHostPlatformStateOrEmpty,
-  writeJsonDocument,
-} from "./nixos-shared-host-io.ts";
+import { getFlagStr } from "../lib/cli";
+import { renderNixosSharedHostConfig } from "./nixos-shared-host";
+import { readNixosSharedHostPlatformStateOrEmpty, writeJsonDocument } from "./nixos-shared-host-io";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();

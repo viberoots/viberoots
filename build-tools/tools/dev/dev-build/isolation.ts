@@ -1,7 +1,7 @@
 import path from "node:path";
 import crypto from "node:crypto";
-import { nodeFlagsWithZx } from "../../lib/node-run.ts";
-import { resolveToolPath } from "../../lib/tool-paths.ts";
+import { nodeFlagsWithZx } from "../../lib/node-run";
+import { resolveToolPath } from "../../lib/tool-paths";
 
 export type Isolation = {
   buckIsolation: string;

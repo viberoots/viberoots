@@ -5,7 +5,7 @@ import {
   SSR_WEBAPP_COMPONENT_KIND,
   THIRD_PARTY_SERVICE_COMPONENT_KIND,
   type DeploymentComponentKind,
-} from "../deployment-component-kinds.ts";
+} from "../deployment-component-kinds";
 import {
   APP_STORE_CONNECT_PROVIDER,
   CLOUDFLARE_PAGES_PROVIDER,
@@ -13,17 +13,17 @@ import {
   KUBERNETES_PROVIDER,
   NIXOS_SHARED_HOST_PROVIDER,
   S3_STATIC_PROVIDER,
-} from "../deployment-provider-targets.ts";
-import { VERCEL_PROVIDER } from "../vercel-provider-target.ts";
-import { APP_STORE_CONNECT_PROVIDER_CAPABILITY } from "./app-store-connect.ts";
-import { CLOUDFLARE_PAGES_PROVIDER_CAPABILITY } from "./cloudflare-pages.ts";
-import { GOOGLE_PLAY_PROVIDER_CAPABILITY } from "./google-play.ts";
-import { KUBERNETES_PROVIDER_CAPABILITY } from "./kubernetes.ts";
-import { NIXOS_SHARED_HOST_PROVIDER_CAPABILITY } from "./nixos-shared-host.ts";
-import { S3_STATIC_PROVIDER_CAPABILITY } from "./s3-static.ts";
-import { VERCEL_PROVIDER_CAPABILITY } from "./vercel.ts";
-import type { DeploymentProviderCapability } from "./types.ts";
-import { validateProviderCapabilityRegistry } from "./validate.ts";
+} from "../deployment-provider-targets";
+import { VERCEL_PROVIDER } from "../vercel-provider-target";
+import { APP_STORE_CONNECT_PROVIDER_CAPABILITY } from "./app-store-connect";
+import { CLOUDFLARE_PAGES_PROVIDER_CAPABILITY } from "./cloudflare-pages";
+import { GOOGLE_PLAY_PROVIDER_CAPABILITY } from "./google-play";
+import { KUBERNETES_PROVIDER_CAPABILITY } from "./kubernetes";
+import { NIXOS_SHARED_HOST_PROVIDER_CAPABILITY } from "./nixos-shared-host";
+import { S3_STATIC_PROVIDER_CAPABILITY } from "./s3-static";
+import { VERCEL_PROVIDER_CAPABILITY } from "./vercel";
+import type { DeploymentProviderCapability } from "./types";
+import { validateProviderCapabilityRegistry } from "./validate";
 
 export const REVIEWED_PROVIDER_IDS = [
   NIXOS_SHARED_HOST_PROVIDER,

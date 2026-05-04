@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
-import type { DeploymentAdmissionOperationKind } from "./deployment-admission-binding.ts";
-import type { DeploymentAdmissionBinding } from "./deployment-admission-evidence.ts";
-import type { DeploymentRunRecordLike } from "./deployment-admission-records.ts";
-import type { DeploymentAdmissionPolicy } from "./deployment-policy.ts";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
+import type { DeploymentAdmissionOperationKind } from "./deployment-admission-binding";
+import type { DeploymentAdmissionBinding } from "./deployment-admission-evidence";
+import type { DeploymentRunRecordLike } from "./deployment-admission-records";
+import type { DeploymentAdmissionPolicy } from "./deployment-policy";
 import type {
   DeploymentAttestationEvidence,
   DeploymentAttestationFact,
@@ -12,7 +12,7 @@ import type {
   DeploymentSupplyChainGateEvidence,
   DeploymentSupplyChainGateFact,
   DeploymentSupplyChainGateTiming,
-} from "./deployment-admission-supply-chain.ts";
+} from "./deployment-admission-supply-chain";
 
 type AdmittedContextLike = {
   source: {

@@ -4,10 +4,10 @@ import * as fsp from "node:fs/promises";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { findImporterLockfiles, computeImporterLabel } from "../lib/importers.ts";
-import { unifiedPnpmStoreEpochDigest } from "./unified-pnpm-store-epoch.ts";
-import { prepareExactPnpmStore } from "./update-pnpm-hash/lockfile.ts";
-import { mergePnpmStore } from "./update-pnpm-hash/prefetched-store.ts";
+import { findImporterLockfiles, computeImporterLabel } from "../lib/importers";
+import { unifiedPnpmStoreEpochDigest } from "./unified-pnpm-store-epoch";
+import { prepareExactPnpmStore } from "./update-pnpm-hash/lockfile";
+import { mergePnpmStore } from "./update-pnpm-hash/prefetched-store";
 
 function sha256Hex(s: string) {
   return crypto.createHash("sha256").update(s).digest("hex");

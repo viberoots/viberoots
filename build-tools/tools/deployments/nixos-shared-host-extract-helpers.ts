@@ -1,22 +1,22 @@
 #!/usr/bin/env zx-wrapper
-import type { RawNixosSharedHostComponent } from "./contract-extract-components.ts";
-import { componentError } from "./contract-extract-components.ts";
-import type { DeploymentExtractionContext } from "./contract-extract-shared.ts";
+import type { RawNixosSharedHostComponent } from "./contract-extract-components";
+import { componentError } from "./contract-extract-components";
+import type { DeploymentExtractionContext } from "./contract-extract-shared";
 import {
   deriveNixosSharedHostProviderTarget,
   SSR_WEBAPP_COMPONENT,
   STATIC_WEBAPP_COMPONENT,
   type NixosSharedHostSsrRuntimeContract,
   type NixosSharedHostDeploymentComponent,
-} from "./contract-types.ts";
-import { isSupportedComponentNode } from "./deployment-component-kinds.ts";
-import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
+} from "./contract-types";
+import { isSupportedComponentNode } from "./deployment-component-kinds";
+import type { DeploymentReleaseAction } from "./deployment-release-actions";
 import {
   providerDeclaresReleaseActionType,
   providerSupportsComponentKind,
-} from "./deployment-provider-capabilities.ts";
-import { missingRequirementNames, type DeploymentRequirement } from "./deployment-requirements.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
+} from "./deployment-provider-capabilities";
+import { missingRequirementNames, type DeploymentRequirement } from "./deployment-requirements";
+import type { NixosSharedHostDeployment } from "./contract";
 
 const APP_NAME_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const TARGET_GROUP_RE = APP_NAME_RE;

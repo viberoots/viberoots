@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createNixosSharedHostDeployRecord } from "../../deployments/nixos-shared-host-records.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import { createNixosSharedHostDeployRecord } from "../../deployments/nixos-shared-host-records";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 test("nixos-shared-host durable records persist canonical provider-target identity and artifact identity", () => {
   const deployment = nixosSharedHostDeploymentFixture({

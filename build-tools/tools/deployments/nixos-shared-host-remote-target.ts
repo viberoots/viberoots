@@ -1,18 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { sanitizeName } from "../lib/sanitize.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import {
-  defaultManagedRoot,
-  normalizeHostLogicalPath,
-} from "./nixos-shared-host-install-contract.ts";
+import { sanitizeName } from "../lib/sanitize";
+import type { NixosSharedHostDeployment } from "./contract";
+import { defaultManagedRoot, normalizeHostLogicalPath } from "./nixos-shared-host-install-contract";
 import {
   readNixosSharedHostClientProfile,
   type ClientInput,
-} from "./nixos-shared-host-install-dev-machine.ts";
-import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
-import type { ReviewedRemoteSshAuth } from "./nixos-shared-host-remote-ssh.ts";
-import { serviceClientPlanFromManifest } from "./nixos-shared-host-service-client-config.ts";
+} from "./nixos-shared-host-install-dev-machine";
+import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components";
+import type { ReviewedRemoteSshAuth } from "./nixos-shared-host-remote-ssh";
+import { serviceClientPlanFromManifest } from "./nixos-shared-host-service-client-config";
 
 export type NixosSharedHostRemoteArtifactSource =
   | {

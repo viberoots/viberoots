@@ -3,21 +3,21 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloudflare-pages-control-plane.ts";
-import { maxCloudflarePagesCustomDomainSmokeRetries } from "../../deployments/cloudflare-pages-smoke-retries.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloudflare-pages-control-plane";
+import { maxCloudflarePagesCustomDomainSmokeRetries } from "../../deployments/cloudflare-pages-smoke-retries";
+import { runInTemp } from "../lib/test-helpers";
 import {
   cloudflarePagesDeploymentFixture,
   installCloudflarePagesTargets,
-} from "./cloudflare-pages.fixture.ts";
+} from "./cloudflare-pages.fixture";
 import {
   reviewedLaneAdmissionEvidenceFixture,
   writeReviewedLaneAdmissionEvidenceJson,
-} from "./deployment-lane-governance.fixture.ts";
-import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
-import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
-import { startStaticWebappHttpsServer } from "./static-webapp.https-server.ts";
+} from "./deployment-lane-governance.fixture";
+import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
+import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { startStaticWebappHttpsServer } from "./static-webapp.https-server";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });

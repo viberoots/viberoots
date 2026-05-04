@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator.ts";
-import { normalizeAdmissionEvidence } from "../../deployments/deployment-admission-evidence.ts";
-import { extractDeploymentAdmissionPolicies } from "../../deployments/deployment-policy.ts";
-import type { DeploymentReadinessGateType } from "../../deployments/deployment-readiness-gates.ts";
-import { admissionEvalBase, admittedContextFixture } from "./deployment-admission.test-helpers.ts";
-import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator";
+import { normalizeAdmissionEvidence } from "../../deployments/deployment-admission-evidence";
+import { extractDeploymentAdmissionPolicies } from "../../deployments/deployment-policy";
+import type { DeploymentReadinessGateType } from "../../deployments/deployment-readiness-gates";
+import { admissionEvalBase, admittedContextFixture } from "./deployment-admission.test-helpers";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 const READINESS_GATE_TYPES: DeploymentReadinessGateType[] = [
   "ragie_acl_semantics",

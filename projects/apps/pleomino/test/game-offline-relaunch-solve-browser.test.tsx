@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   restoreWorkerForTests,
   installWorkerBackedRuntime,
-} from "./game-solve-worker-browser-helpers.ts";
+} from "./game-solve-worker-browser-helpers";
 import {
   currentSolveState,
   flushUi,
@@ -11,7 +11,7 @@ import {
   renderGameScreen,
   seedSinglePurplePlacement,
   waitFor,
-} from "./game-solve-browser-helpers.tsx";
+} from "./game-solve-browser-helpers";
 
 describe("game screen offline relaunch solve acceptance", () => {
   let firstRoot: ReturnType<typeof renderGameScreen>["root"] | null = null;

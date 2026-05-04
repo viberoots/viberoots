@@ -2,7 +2,7 @@ import type { Dirent } from "node:fs";
 
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runScafCommand } from "../command-runner.ts";
+import { runScafCommand } from "../command-runner";
 
 const FORMAT_EXTENSIONS = new Set([
   ".ts",

@@ -3,13 +3,13 @@ import path from "node:path";
 import {
   resolvePromotionGooglePlayAdmittedContext,
   resolveSourceRunGooglePlayAdmittedContext,
-} from "./google-play-admission.ts";
-import { prepareGooglePlayPublisherConfig } from "./google-play-config.ts";
-import type { AdmittedGooglePlayArtifact } from "./google-play-artifacts.ts";
-import type { GooglePlayDeployment } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import { publishRecordedGooglePlayArtifact } from "./google-play-deploy.ts";
+} from "./google-play-admission";
+import { prepareGooglePlayPublisherConfig } from "./google-play-config";
+import type { AdmittedGooglePlayArtifact } from "./google-play-artifacts";
+import type { GooglePlayDeployment } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import { publishRecordedGooglePlayArtifact } from "./google-play-deploy";
 
 type SourceRecordLike = { deployRunId: string; deploymentId: string; admittedContext?: any };
 

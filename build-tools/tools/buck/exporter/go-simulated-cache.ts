@@ -2,8 +2,8 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { recordCacheHit, recordCacheMiss } from "./golist.ts";
-import type { Batch } from "./types.ts";
+import { recordCacheHit, recordCacheMiss } from "./golist";
+import type { Batch } from "./types";
 
 export async function readOrBuildSimulatedBatchCache(
   batch: Batch,

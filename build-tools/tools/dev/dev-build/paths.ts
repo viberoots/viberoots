@@ -1,6 +1,6 @@
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { nodeFlagsWithZx } from "../../lib/node-run.ts";
+import { nodeFlagsWithZx } from "../../lib/node-run";
 
 export function repoRoot(): string {
   // Resolve from git so commands work when invoked from subdirectories.

@@ -4,7 +4,7 @@ import path from "node:path";
 import {
   createReferenceOnlyPayload,
   type DeploymentOperatorVisiblePayload,
-} from "./deployment-control-plane-redaction.ts";
+} from "./deployment-control-plane-redaction";
 
 export type ObservabilityArtifactRefsInput = {
   replaySnapshotPath?: string;

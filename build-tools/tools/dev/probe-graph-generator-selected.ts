@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { findRepoRoot } from "../lib/repo.ts";
-import { getArgvTokens } from "../lib/cli.ts";
-import { buildSelectedOutPath } from "./run-runnable-graph.ts";
-import { resolveSelectedTargetLabel } from "./target-label-resolver.ts";
+import { findRepoRoot } from "../lib/repo";
+import { getArgvTokens } from "../lib/cli";
+import { buildSelectedOutPath } from "./run-runnable-graph";
+import { resolveSelectedTargetLabel } from "./target-label-resolver";
 
 async function main() {
   const args = getArgvTokens();

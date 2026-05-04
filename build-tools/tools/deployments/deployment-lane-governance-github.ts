@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentLaneGovernanceSnapshot } from "./deployment-admission-governance.ts";
+import type { DeploymentLaneGovernanceSnapshot } from "./deployment-admission-governance";
 import {
   githubRulesetGovernanceFor,
   type GithubRulesetNode,
-} from "./deployment-lane-governance-github-rulesets.ts";
-import type { DeploymentLanePolicy } from "./deployment-policy.ts";
+} from "./deployment-lane-governance-github-rulesets";
+import type { DeploymentLanePolicy } from "./deployment-policy";
 
 const GITHUB_GRAPHQL_URL = "https://api.github.com/graphql";
 const GITHUB_TOKEN_ENV = "BNX_DEPLOY_GITHUB_TOKEN";

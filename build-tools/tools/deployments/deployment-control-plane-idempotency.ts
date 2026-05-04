@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
-import { DeploymentIdempotencyConflictError } from "./deployment-control-plane-errors.ts";
+import { DeploymentIdempotencyConflictError } from "./deployment-control-plane-errors";
 import {
   readControlPlaneJson,
   submitIdempotencyPathFor,
   writeControlPlaneJson,
   runActionIdempotencyPathFor,
-} from "./nixos-shared-host-control-plane-store.ts";
+} from "./nixos-shared-host-control-plane-store";
 
 export const DEPLOYMENT_CONTROL_PLANE_IDEMPOTENCY_SCHEMA = "deployment-control-plane-idempotency@1";
 

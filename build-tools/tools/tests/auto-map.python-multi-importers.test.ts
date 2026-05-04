@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { providerNameForImporter } from "../lib/providers.ts";
+import { providerNameForImporter } from "../lib/providers";
 import { runInTemp } from "./lib/test-helpers";
 
 test("gen-auto-map: Python two importers map to distinct providers", async () => {

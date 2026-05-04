@@ -4,12 +4,12 @@ import type {
   DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneServiceInstance,
-} from "./deployment-control-plane-contract.ts";
-import { statusFromSubmission } from "./deployment-control-plane-status.ts";
+} from "./deployment-control-plane-contract";
+import { statusFromSubmission } from "./deployment-control-plane-status";
 import {
   readBackendSubmissionByDeployRunId,
   readBackendSubmissionBySubmissionId,
-} from "./nixos-shared-host-control-plane-backend.ts";
+} from "./nixos-shared-host-control-plane-backend";
 
 type SubmissionRecord = {
   submissionId: string;

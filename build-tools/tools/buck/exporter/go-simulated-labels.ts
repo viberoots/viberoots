@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { readOrBuildSimulatedBatchCache } from "./go-simulated-cache.ts";
-import type { Batch, Node } from "./types.ts";
+import { readOrBuildSimulatedBatchCache } from "./go-simulated-cache";
+import type { Batch, Node } from "./types";
 
 type GoModuleContract = {
   modulePath: string;

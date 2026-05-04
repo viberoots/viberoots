@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { ensureCloudflarePagesDnsRecord } from "./cloudflare-dns-records.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
+import { ensureCloudflarePagesDnsRecord } from "./cloudflare-dns-records";
+import type { CloudflarePagesDeployment } from "./contract";
 
 type CloudflarePagesDomain = {
   name?: string;

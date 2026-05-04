@@ -8,9 +8,9 @@ import {
   assertCanonicalTemplateIdsUnique,
   canonicalTemplateIdsForLanguage,
   hasCanonicalTemplateId,
-} from "../../scaffolding/scaf/templates/taxonomy.ts";
-import { readTemplateMeta } from "../../scaffolding/scaf/templates/meta.ts";
-import { TEMPLATE_SAFETY_FLOOR_TARGETS } from "../../lib/template-test-selector.ts";
+} from "../../scaffolding/scaf/templates/taxonomy";
+import { readTemplateMeta } from "../../scaffolding/scaf/templates/meta";
+import { TEMPLATE_SAFETY_FLOOR_TARGETS } from "../../lib/template-test-selector";
 
 function sortedUnique(values: readonly string[]): string[] {
   return Array.from(new Set(values)).sort();

@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
-import { readGraph, type GraphNode } from "../lib/graph.ts";
-import { runNodeWithZx } from "../lib/node-run.ts";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { readGraph, type GraphNode } from "../lib/graph";
+import { runNodeWithZx } from "../lib/node-run";
 
 type SurfaceGraphData = {
   tsRoots: string[];

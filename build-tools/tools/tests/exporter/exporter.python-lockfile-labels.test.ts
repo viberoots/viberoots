@@ -2,8 +2,8 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
-import { readCompositeGraph } from "../../lib/graph-view.ts";
+import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
+import { readCompositeGraph } from "../../lib/graph-view";
 import { runInTemp } from "../lib/test-helpers";
 
 test("exporter attaches importer-scoped uv.lock label to python targets", async () => {

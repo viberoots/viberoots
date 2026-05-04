@@ -1,4 +1,4 @@
-import type { PatchesLintConfig, Violation } from "./types.ts";
+import type { PatchesLintConfig, Violation } from "./types";
 
 function printHuman(vs: Violation[]) {
   for (const v of vs) {

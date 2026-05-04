@@ -2,7 +2,7 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { sanitizeName } from "../lib/sanitize.ts";
+import { sanitizeName } from "../lib/sanitize";
 
 export const APP_STORE_CONNECT_ARTIFACT_PROVENANCE_SCHEMA =
   "app-store-connect-artifact-provenance@1";

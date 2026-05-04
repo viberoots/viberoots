@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentComponentKind } from "./deployment-component-kinds.ts";
+import type { DeploymentComponentKind } from "./deployment-component-kinds";
 import {
   REVIEWED_NON_STATIC_COMPONENT_KINDS,
   REVIEWED_PROVIDER_CAPABILITIES,
   REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER,
   REVIEWED_PROVIDER_IDS,
-} from "./provider-capabilities/registry.ts";
+} from "./provider-capabilities/registry";
 
-export type { DeploymentProviderCapability } from "./provider-capabilities/types.ts";
+export type { DeploymentProviderCapability } from "./provider-capabilities/types";
 export {
   REVIEWED_NON_STATIC_COMPONENT_KINDS,
   REVIEWED_PROVIDER_CAPABILITIES,

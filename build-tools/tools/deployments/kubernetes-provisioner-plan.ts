@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { packagePathFromLabel } from "../lib/labels.ts";
-import type { KubernetesDeployment } from "./contract.ts";
-import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint.ts";
-import { OPENTOFU_STACK_PROVISIONER, readOpenTofuResolvedPlan } from "./opentofu-stack.ts";
+import { packagePathFromLabel } from "../lib/labels";
+import type { KubernetesDeployment } from "./contract";
+import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint";
+import { OPENTOFU_STACK_PROVISIONER, readOpenTofuResolvedPlan } from "./opentofu-stack";
 
 export const KUBERNETES_PROVISIONER_PLAN_SCHEMA = "kubernetes-provisioner-plan@1";
 

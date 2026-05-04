@@ -1,10 +1,10 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
-import { ensureGraph } from "../buck/glue-run.ts";
-import { runNixBuildWithProgress } from "./run-runnable-nix.ts";
-import { untrackedRequiresImpureForTargets } from "./dev-build/untracked.ts";
-import { makeFilteredFlakeRef } from "./filtered-flake.ts";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { ensureGraph } from "../buck/glue-run";
+import { runNixBuildWithProgress } from "./run-runnable-nix";
+import { untrackedRequiresImpureForTargets } from "./dev-build/untracked";
+import { makeFilteredFlakeRef } from "./filtered-flake";
 
 async function withScopedGraphEnv<T>(
   workspaceRoot: string,

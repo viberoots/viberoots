@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { toPosixPath } from "../lib/posix-path.ts";
-import { sanitizeName } from "../lib/sanitize.ts";
+import { toPosixPath } from "../lib/posix-path";
+import { sanitizeName } from "../lib/sanitize";
 
 export type WasmEntry = {
   moduleKey: string;

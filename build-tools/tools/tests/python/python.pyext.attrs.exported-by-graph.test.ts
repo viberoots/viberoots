@@ -3,8 +3,8 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { readGraph } from "../../lib/graph.ts";
-import { normalizeTargetLabel } from "../../lib/labels.ts";
+import { readGraph } from "../../lib/graph";
+import { normalizeTargetLabel } from "../../lib/labels";
 import { runInTemp } from "../lib/test-helpers";
 
 function normalizeLabelList(xs: unknown): string[] {

@@ -1,23 +1,23 @@
 #!/usr/bin/env zx-wrapper
-import { hasRelevantBuildSystemChanges } from "../lib/build-system-test-scope.ts";
-import { packagePathFromLabel } from "../lib/labels.ts";
-import { resolveProjectImpactSelection } from "../lib/project-impact-selector.ts";
+import { hasRelevantBuildSystemChanges } from "../lib/build-system-test-scope";
+import { packagePathFromLabel } from "../lib/labels";
+import { resolveProjectImpactSelection } from "../lib/project-impact-selector";
 import {
   normalizeRepoPath,
   projectFromRepoPath,
   projectFromTargetLabel,
   toSortedUnique,
-} from "../lib/project-graph.ts";
-import { componentTargetsFor, type DeploymentTarget } from "./contract.ts";
+} from "../lib/project-graph";
+import { componentTargetsFor, type DeploymentTarget } from "./contract";
 import {
   ownedComponentProjectPrefixes,
   ownedDeploymentPrefixes,
   ownedWorkspaceRoots,
-} from "./deployment-from-changes-owned-paths.ts";
+} from "./deployment-from-changes-owned-paths";
 import {
   resolveDirectPrerequisiteDependents,
   sortDeploymentsTopologically,
-} from "./deployment-prerequisites.ts";
+} from "./deployment-prerequisites";
 
 export type DeploymentChangeReason =
   | { kind: "broad-change"; paths: string[] }

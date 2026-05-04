@@ -1,20 +1,20 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createDeploymentSecretRuntime } from "../../deployments/deployment-secret-runtime.ts";
+import { createDeploymentSecretRuntime } from "../../deployments/deployment-secret-runtime";
 import {
   createDeploymentVaultSecretBackend,
   resolveDeploymentVaultAdmittedReferences,
-} from "../../deployments/deployment-secret-vault.ts";
+} from "../../deployments/deployment-secret-vault";
 import {
   resetVaultCredentialCacheForTests,
   resolveVaultClientCredential,
   type VaultCredentialConfig,
-} from "../../deployments/deployment-secret-vault-credentials.ts";
-import type { DeploymentSecretContext } from "../../deployments/deployment-secret-context.ts";
-import { scrubDeploymentSecretEnv } from "../../deployments/deployment-secret-env.ts";
-import { deploymentRequirementFixture } from "./deployment-metadata.fixture.ts";
-import { startFakeVaultServer } from "./vault.test-server.ts";
+} from "../../deployments/deployment-secret-vault-credentials";
+import type { DeploymentSecretContext } from "../../deployments/deployment-secret-context";
+import { scrubDeploymentSecretEnv } from "../../deployments/deployment-secret-env";
+import { deploymentRequirementFixture } from "./deployment-metadata.fixture";
+import { startFakeVaultServer } from "./vault.test-server";
 
 function jwtCredential(addr: string, role = "deploy-pleomino-read"): VaultCredentialConfig {
   return { kind: "jwt", addr, role, workloadJwt: "signed.workload.jwt" };

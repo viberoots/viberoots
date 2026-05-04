@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 import type {
   DeploymentLaneBranchGovernance,
   DeploymentLaneGovernance,
-} from "./deployment-lane-governance.ts";
-import type { DeploymentLanePolicy } from "./deployment-policy.ts";
+} from "./deployment-lane-governance";
+import type { DeploymentLanePolicy } from "./deployment-policy";
 
 export type DeploymentLaneGovernanceFact = {
   lanePolicyRef: string;

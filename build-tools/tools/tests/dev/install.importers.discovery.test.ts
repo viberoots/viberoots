@@ -5,7 +5,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
-import { discoverImportersWithLock } from "../../dev/install/importers.ts";
+import { discoverImportersWithLock } from "../../dev/install/importers";
 
 const cleanupDirs: string[] = [];
 

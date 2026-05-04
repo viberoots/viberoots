@@ -5,9 +5,9 @@ import type {
   KubernetesDeployment,
   NixosSharedHostDeployment,
   S3StaticDeployment,
-} from "../../deployments/contract.ts";
-import { resolveDeploymentFromTarget } from "../../deployments/deployment-query.ts";
-import { stableBuckIsolation } from "../../lib/buck-command-env.ts";
+} from "../../deployments/contract";
+import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
+import { stableBuckIsolation } from "../../lib/buck-command-env";
 
 export type ReviewedDeployment =
   | CloudflarePagesDeployment

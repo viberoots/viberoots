@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { runInTemp } from "../lib/test-helpers";
 
 test("shared-host deploy auth callback module routes public HTTPS to deployment service", async () => {
   await runInTemp("shared-host-deploy-auth-callback-module-eval", async (tmp, $) => {

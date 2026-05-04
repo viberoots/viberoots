@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fetchGithubLaneGovernanceSnapshot } from "../../deployments/deployment-lane-governance-github.ts";
-import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture.ts";
+import { fetchGithubLaneGovernanceSnapshot } from "../../deployments/deployment-lane-governance-github";
+import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture";
 
 type FetchCall = {
   owner: string;

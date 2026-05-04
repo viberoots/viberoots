@@ -3,14 +3,14 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
-import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers.ts";
+import { runInTemp } from "../lib/test-helpers";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
+import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostAdmissionPolicyFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { installS3StaticTargets, s3StaticDeploymentFixture } from "./s3-static.fixture.ts";
+} from "./nixos-shared-host.fixture";
+import { installS3StaticTargets, s3StaticDeploymentFixture } from "./s3-static.fixture";
 
 async function gitStdout(cwd: string, $: any, ...args: string[]): Promise<string> {
   return String((await $({ cwd, stdio: "pipe" })`git ${args}`).stdout).trim();

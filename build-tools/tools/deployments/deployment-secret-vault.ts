@@ -2,7 +2,7 @@
 import type {
   DeploymentSecretBackend,
   DeploymentSecretMaterial,
-} from "./deployment-secret-runtime.ts";
+} from "./deployment-secret-runtime";
 import {
   deploymentSecretFixturePath,
   deploymentSecretFixtureSelector,
@@ -11,24 +11,24 @@ import {
   readDeploymentSecretFixture,
   type DeploymentSecretFixture,
   type DeploymentSecretFixtureEntry,
-} from "./deployment-secret-fixture.ts";
+} from "./deployment-secret-fixture";
 import {
   acquireDirectVaultSecretReference,
   resolveDirectVaultSecretReference,
-} from "./deployment-secret-vault-direct.ts";
+} from "./deployment-secret-vault-direct";
 import {
   deploymentSecretContext,
   missingDeploymentSecretContextError,
   type DeploymentSecretContext,
-} from "./deployment-secret-context.ts";
+} from "./deployment-secret-context";
 import {
   deploymentSecretContractBindings,
   isDeploymentSecretAdmittedReference,
   type DeploymentSecretAdmittedReference,
   type DeploymentSecretContractBinding,
   type DeploymentSecretReference,
-} from "./deployment-secretspec.ts";
-import type { DeploymentRequirement } from "./deployment-requirements.ts";
+} from "./deployment-secretspec";
+import type { DeploymentRequirement } from "./deployment-requirements";
 
 function materialFromEntry(
   binding: DeploymentSecretReference,

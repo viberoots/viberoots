@@ -7,15 +7,15 @@ import { test } from "node:test";
 import {
   DEPLOYMENT_SECRET_FIXTURE_PATH_ENV,
   DEPLOYMENT_SECRET_FIXTURE_SCHEMA,
-} from "../../deployments/deployment-secret-fixture.ts";
-import { createDeploymentSecretRuntime } from "../../deployments/deployment-secret-runtime.ts";
+} from "../../deployments/deployment-secret-fixture";
+import { createDeploymentSecretRuntime } from "../../deployments/deployment-secret-runtime";
 import {
   createDeploymentVaultSecretBackend,
   resolveDeploymentVaultAdmittedReferences,
-} from "../../deployments/deployment-secret-vault.ts";
-import type { DeploymentSecretContext } from "../../deployments/deployment-secret-context.ts";
-import { deploymentRequirementFixture } from "./deployment-metadata.fixture.ts";
-import { startFakeVaultServer } from "./vault.test-server.ts";
+} from "../../deployments/deployment-secret-vault";
+import type { DeploymentSecretContext } from "../../deployments/deployment-secret-context";
+import { deploymentRequirementFixture } from "./deployment-metadata.fixture";
+import { startFakeVaultServer } from "./vault.test-server";
 
 const originalEnv = { ...process.env };
 

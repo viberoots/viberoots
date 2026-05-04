@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { runDeviceLogin } from "../../deployments/deployment-credential-source-device.ts";
-import { decodeJwtPayload } from "../../deployments/deploy-vault-jwt-claims.ts";
-import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers.ts";
+import { runDeviceLogin } from "../../deployments/deployment-credential-source-device";
+import { decodeJwtPayload } from "../../deployments/deploy-vault-jwt-claims";
+import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers";
 
 function deviceLogin(issuer: string, messages: string[]) {
   return runDeviceLogin({

@@ -1,14 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostMutationAuthority } from "./nixos-shared-host-control-plane-contract.ts";
+import type { NixosSharedHostMutationAuthority } from "./nixos-shared-host-control-plane-contract";
 import {
   deploymentSecretBindingsForStep,
   deploymentSecretContractBindings,
   type DeploymentSecretReference,
-} from "./deployment-secretspec.ts";
-import type {
-  DeploymentRequirement,
-  DeploymentRequirementStep,
-} from "./deployment-requirements.ts";
+} from "./deployment-secretspec";
+import type { DeploymentRequirement, DeploymentRequirementStep } from "./deployment-requirements";
 
 export type DeploymentSecretMaterial = {
   binding: DeploymentSecretReference;

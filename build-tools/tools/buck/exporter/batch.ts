@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { deriveTupleForNode, tupleKey } from "./env.ts";
-import type { Batch, Node, Tuple } from "./types.ts";
+import { deriveTupleForNode, tupleKey } from "./env";
+import type { Batch, Node, Tuple } from "./types";
 
 export function packageDirFromTargetName(name: string): string {
   const m = name.match(/^\/\/(.+):[^:]+$/);

@@ -3,19 +3,19 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { resolveDeploymentPromotionSource } from "../../deployments/deployment-promotion.ts";
+import { resolveDeploymentPromotionSource } from "../../deployments/deployment-promotion";
 import {
   localHarnessControlPlaneDatabaseUrl,
   syncBackendDeployRecord,
-} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
+} from "../../deployments/nixos-shared-host-control-plane-backend";
+import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
+import { runInTemp } from "../lib/test-helpers";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+} from "./nixos-shared-host.fixture";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
 async function writeArtifact(root: string) {
   await fsp.mkdir(root, { recursive: true });

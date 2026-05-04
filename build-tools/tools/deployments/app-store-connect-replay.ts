@@ -1,23 +1,23 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { readVersionedJson } from "./deployment-schema-compat.ts";
-import type { AppStoreConnectAdmittedContext } from "./app-store-connect-admission.ts";
-import type { AdmittedMobileAppArtifact } from "./app-store-connect-artifacts.ts";
-import { requireAdmittedMobileAppArtifactPath } from "./app-store-connect-artifacts.ts";
-import type { AppStoreConnectDeployment } from "./contract.ts";
-import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention.ts";
+import { readVersionedJson } from "./deployment-schema-compat";
+import type { AppStoreConnectAdmittedContext } from "./app-store-connect-admission";
+import type { AdmittedMobileAppArtifact } from "./app-store-connect-artifacts";
+import { requireAdmittedMobileAppArtifactPath } from "./app-store-connect-artifacts";
+import type { AppStoreConnectDeployment } from "./contract";
+import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention";
 import {
   appStoreConnectRunnerIdentities,
   runnerIdentityCompatibilityErrors,
   type DeploymentRunnerIdentities,
-} from "./deployment-runner-identities.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
+} from "./deployment-runner-identities";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
 import {
   deployRecordPathFor,
   readAppStoreConnectDeployRecord,
   type AppStoreConnectDeployRecord,
-} from "./app-store-connect-records.ts";
+} from "./app-store-connect-records";
 
 export const APP_STORE_CONNECT_REPLAY_SNAPSHOT_SCHEMA = "app-store-connect-replay-snapshot@2";
 

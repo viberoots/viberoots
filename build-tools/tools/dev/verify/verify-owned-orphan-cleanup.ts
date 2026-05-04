@@ -60,7 +60,7 @@ export async function cleanupCurrentVerifyEnvProcesses(opts: {
   // unwinding. Give normal teardown a brief chance to finish before treating
   // same-run env-bearing processes as leaks.
   await new Promise((resolve) => setTimeout(resolve, 750));
-  const lines = await psLinesWithEnv(2500);
+  const lines = await psLinesWithEnv(10000);
   const scanned = dedupeByProcessGroup(parseEnvVerifyProcesses(lines));
   const procs = scanned.filter(
     (proc) => path.resolve(proc.stateFile) === stateFile && path.resolve(proc.logFile) === logFile,
@@ -79,7 +79,7 @@ async function cleanupOrphanVerifyEnvProcesses(opts: {
   staleGraceSec: number;
 }): Promise<{ scanned: number; candidates: number; killed: number }> {
   const maxKills = Math.max(0, opts.maxKills ?? 50);
-  const lines = await psLinesWithEnv(2500);
+  const lines = await psLinesWithEnv(10000);
   const procs = dedupeByProcessGroup(parseEnvVerifyProcesses(lines)).filter((proc) => {
     const ownerPid = ownerPidFromStateFile(proc.stateFile);
     if (!ownerPid || isPidAlive(ownerPid)) return false;
@@ -108,7 +108,7 @@ export async function cleanupOrphanVerifyProcesses(opts: {
     10,
   );
   const staleGraceSec = Math.max(0, Number.isFinite(staleGraceRaw) ? staleGraceRaw : 120);
-  const lines = await psLinesWithEnv(2500);
+  const lines = await psLinesWithEnv(10000);
   const liveRows = parseProcessRows(lines);
   const registered = await readRegisteredProcessesFromStateFiles();
   const procs = mergeWithLiveProcessRows(registered, liveRows);

@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { copyTree } from "../lib/copy-tree.ts";
-import type { NixosSharedHostSsrRuntimeContract } from "./contract.ts";
-import type { NixosSharedHostContainer } from "./nixos-shared-host.ts";
+import { copyTree } from "../lib/copy-tree";
+import type { NixosSharedHostSsrRuntimeContract } from "./contract";
+import type { NixosSharedHostContainer } from "./nixos-shared-host";
 
 export type NixosSharedHostSsrPublishResult = {
   artifactIdentity: string;

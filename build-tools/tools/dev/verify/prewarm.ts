@@ -1,7 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { runNodeWithZx } from "../../lib/node-run.ts";
+import { runNodeWithZx } from "../../lib/node-run";
 
 async function exists(p: string): Promise<boolean> {
   try {

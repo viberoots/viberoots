@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import type { DeploymentTarget } from "./contract.ts";
-import { projectScopeValueFor } from "./deployment-control-plane-authorization-shared.ts";
-import type { DeploymentControlPlaneRole } from "./deployment-control-plane-contract.ts";
+import type { DeploymentTarget } from "./contract";
+import { projectScopeValueFor } from "./deployment-control-plane-authorization-shared";
+import type { DeploymentControlPlaneRole } from "./deployment-control-plane-contract";
 
 export type DeploymentAuthRole = Extract<
   DeploymentControlPlaneRole,

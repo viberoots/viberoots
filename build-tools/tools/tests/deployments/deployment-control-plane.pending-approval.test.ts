@@ -3,16 +3,16 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { readDeploymentControlPlaneStatus } from "../../deployments/deployment-control-plane-read.ts";
-import { submitDeploymentControlPlaneRunAction } from "../../deployments/deployment-control-plane-run-action.ts";
-import { statusFromSubmission } from "../../deployments/deployment-control-plane-status.ts";
-import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
-import { readControlPlaneJson } from "../../deployments/nixos-shared-host-control-plane-store.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { readDeploymentControlPlaneStatus } from "../../deployments/deployment-control-plane-read";
+import { submitDeploymentControlPlaneRunAction } from "../../deployments/deployment-control-plane-run-action";
+import { statusFromSubmission } from "../../deployments/deployment-control-plane-status";
+import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
+import { readControlPlaneJson } from "../../deployments/nixos-shared-host-control-plane-store";
+import { runInTemp } from "../lib/test-helpers";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 
 async function writeArtifact(root: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });

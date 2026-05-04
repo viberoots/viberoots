@@ -1,7 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 
-import { pathExists } from "../../../lib/repo.ts";
+import { pathExists } from "../../../lib/repo";
 
 export const AUTO_INFERRED_KEYS = new Set(["importer", "lockfilePath", "pkgScope"]);
 

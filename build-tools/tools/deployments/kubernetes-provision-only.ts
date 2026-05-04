@@ -1,11 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import { resolveInitialKubernetesAdmittedContext } from "./kubernetes-admission.ts";
-import type { KubernetesDeployment } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
-import { createKubernetesDeployRecord, writeKubernetesDeployRecord } from "./kubernetes-records.ts";
-import { writeKubernetesProvisionerPlan } from "./kubernetes-provisioner-plan.ts";
+import { resolveInitialKubernetesAdmittedContext } from "./kubernetes-admission";
+import type { KubernetesDeployment } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
+import { createKubernetesDeployRecord, writeKubernetesDeployRecord } from "./kubernetes-records";
+import { writeKubernetesProvisionerPlan } from "./kubernetes-provisioner-plan";
+import {
+  maybeRunOpenTofuReviewedApply,
+  type OpenTofuApplyHooks,
+} from "./opentofu-apply-orchestration";
 
 export async function submitKubernetesProvisionOnly(opts: {
   workspaceRoot: string;
@@ -14,6 +18,7 @@ export async function submitKubernetesProvisionOnly(opts: {
   submissionId?: string;
   expectedSourceRevision?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
+  openTofuApply?: OpenTofuApplyHooks;
 }) {
   const deployRunId = `deploy-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
   const admittedContext = await resolveInitialKubernetesAdmittedContext({
@@ -40,18 +45,28 @@ export async function submitKubernetesProvisionOnly(opts: {
       ...(provisionerPlan ? { provisionerPlanFingerprint: provisionerPlan.fingerprint } : {}),
     },
   });
+  const provisionerApplyOutcome = await maybeRunOpenTofuReviewedApply({
+    deployment: opts.deployment,
+    admittedContext,
+    provisionerPlan,
+    hooks: opts.openTofuApply,
+  });
   const record = createKubernetesDeployRecord(opts.deployment, {
     deployRunId,
     operationKind: "provision_only",
     runClassification: "provision_only",
     lifecycleState: "finished",
     terminationReason: null,
-    finalOutcome: "succeeded",
+    finalOutcome:
+      provisionerApplyOutcome && provisionerApplyOutcome.status === "failed"
+        ? "publish_failed"
+        : "succeeded",
     artifact: { identity: admittedContext.source.artifactIdentity },
     componentArtifacts: [],
     admittedContext,
     ...(opts.deployment.provisioner ? { provisionerType: opts.deployment.provisioner.type } : {}),
     ...(provisionerPlan ? { provisionerPlan } : {}),
+    ...(provisionerApplyOutcome ? { provisionerApplyOutcome } : {}),
     deploymentMetadataFingerprint: deploymentMetadataFingerprintFor(opts.deployment),
   });
   return { record, recordPath: await writeKubernetesDeployRecord(opts.recordsRoot, record) };

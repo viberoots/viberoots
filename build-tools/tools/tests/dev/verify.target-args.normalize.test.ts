@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { normalizeVerifyTargets } from "../../dev/verify/args.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { normalizeVerifyTargets } from "../../dev/verify/args";
+import { runInTemp } from "../lib/test-helpers";
 
 test("verify normalizes path-like targets from invocation directory", async () => {
   await runInTemp("verify-target-args-normalize", async (tmp) => {

@@ -1,19 +1,19 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
-import { readCompositeGraph } from "../lib/graph-view.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli";
+import { readCompositeGraph } from "../lib/graph-view";
 import {
   buildImporterRequirementReport,
   importerPatchDir,
   patchFilenameForId,
   remediationCommand,
-} from "../lib/node-patch-requirements.ts";
+} from "../lib/node-patch-requirements";
 import {
   computeImporterLabel,
   findImporterLockfiles,
   isSupportedImporterLabel,
-} from "../lib/importers.ts";
+} from "../lib/importers";
 
 function deterministicImporters(lockfiles: string[]): string[] {
   const out = new Set<string>();

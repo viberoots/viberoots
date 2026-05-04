@@ -2,13 +2,13 @@
 import {
   consumeDeploymentArtifactChallenge,
   deploymentServicePrincipalForToken,
-} from "./deployment-artifact-challenges.ts";
-import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract.ts";
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
+} from "./deployment-artifact-challenges";
+import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
 import {
   assertProtectedSharedArtifactIdentityFields,
   finalizedStagedArtifactReference,
-} from "./nixos-shared-host-artifact-submit-request.ts";
+} from "./nixos-shared-host-artifact-submit-request";
 
 export async function consumeRequiredArtifactBinding(opts: {
   backend: NixosSharedHostControlPlaneBackendTarget;

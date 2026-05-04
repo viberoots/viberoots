@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { createDbg } from "../lib/util";
 import { encodeNixAttrForPatchPrefix, normalizeNixAttr } from "../../lib/providers";
-import { copyTree } from "../../lib/copy-tree.ts";
+import { copyTree } from "../../lib/copy-tree";
 import { resolveNixpkg } from "./resolve";
 import { chmodRecursive } from "../cross-platform";
 

@@ -2,12 +2,12 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
-import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy";
+import { runInTemp } from "../lib/test-helpers";
 import {
   installNixosSharedHostTargets,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 
 async function installClientProfile(
   $: any,

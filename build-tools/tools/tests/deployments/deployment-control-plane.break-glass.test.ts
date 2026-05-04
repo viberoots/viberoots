@@ -3,21 +3,21 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { grantsFor } from "../../deployments/deployment-control-plane-authz.ts";
-import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
-import { acquireBreakGlassFreeze } from "../../deployments/nixos-shared-host-break-glass-freeze.ts";
-import { runNixosSharedHostBreakGlassDeploy } from "../../deployments/nixos-shared-host-break-glass.ts";
+import { grantsFor } from "../../deployments/deployment-control-plane-authz";
+import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
+import { acquireBreakGlassFreeze } from "../../deployments/nixos-shared-host-break-glass-freeze";
+import { runNixosSharedHostBreakGlassDeploy } from "../../deployments/nixos-shared-host-break-glass";
 import {
   admitNixosSharedHostComponentArtifacts,
   compositeNixosSharedHostArtifactIdentity,
-} from "../../deployments/nixos-shared-host-component-artifacts.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
+} from "../../deployments/nixos-shared-host-component-artifacts";
+import { runInTemp } from "../lib/test-helpers";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+} from "./nixos-shared-host.fixture";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
 async function writeArtifact(root: string, body: string) {
   await fsp.mkdir(root, { recursive: true });

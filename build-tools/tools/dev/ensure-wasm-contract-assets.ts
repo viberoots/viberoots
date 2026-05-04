@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagStr } from "../lib/cli.ts";
-import { runManagedCommand } from "../lib/managed-command.ts";
-import { specsFromWasmManifest } from "./wasm-watch-manifest.ts";
+import { getFlagStr } from "../lib/cli";
+import { runManagedCommand } from "../lib/managed-command";
+import { specsFromWasmManifest } from "./wasm-watch-manifest";
 
 async function exists(absPath: string): Promise<boolean> {
   try {

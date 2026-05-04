@@ -4,12 +4,12 @@ import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { after, test } from "node:test";
-import { resolveModuleContractsPaths } from "../../dev/module-contract-paths.ts";
-import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core.ts";
+import { resolveModuleContractsPaths } from "../../dev/module-contract-paths";
+import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core";
 import {
   parseWasmModuleManifest,
   type WasmModuleManifest,
-} from "../../scaffolding/webapp-module-manifests.ts";
+} from "../../scaffolding/webapp-module-manifests";
 import { runInTemp } from "../lib/test-helpers";
 import { waitForValue, writeAndBumpMtime } from "./lib/wasm-watch";
 import { stopServer } from "./lib/webapp-static-hmr";

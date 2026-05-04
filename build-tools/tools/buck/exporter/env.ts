@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
 import os from "node:os";
-import { requireGoToolchainBin } from "../../lib/toolchain-paths.ts";
-import type { Node, Tuple } from "./types.ts";
+import { requireGoToolchainBin } from "../../lib/toolchain-paths";
+import type { Node, Tuple } from "./types";
 
 export function parseTagsFromLabels(labels: string[] | undefined): string[] {
   const out = new Set<string>();

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { test } from "node:test";
-import { resolveToolPathSync } from "../../lib/tool-paths.ts";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 
 function psForkserversForToken(token: string): Promise<string[]> {
   const psPath = resolveToolPathSync("ps");

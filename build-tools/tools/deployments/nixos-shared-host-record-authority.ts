@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostMutationAuthority } from "./nixos-shared-host-control-plane-contract.ts";
+import type { NixosSharedHostMutationAuthority } from "./nixos-shared-host-control-plane-contract";
 
 export function recordAuthorityFields(authority?: NixosSharedHostMutationAuthority) {
   if (authority?.kind === "control-plane-worker") {

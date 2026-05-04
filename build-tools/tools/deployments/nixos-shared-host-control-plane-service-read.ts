@@ -5,8 +5,8 @@ import {
   readBackendSubmissionByDeployRunId,
   readBackendSubmissionBySubmissionId,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
-import { statusFromSubmission } from "./deployment-control-plane-status.ts";
+} from "./nixos-shared-host-control-plane-backend";
+import { statusFromSubmission } from "./deployment-control-plane-status";
 
 export async function readControlPlaneStatus(
   backend: NixosSharedHostControlPlaneBackendTarget,

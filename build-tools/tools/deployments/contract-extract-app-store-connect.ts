@@ -5,9 +5,9 @@ import {
   MOBILE_APP_COMPONENT_KIND,
   targetName,
   type AppStoreConnectDeployment,
-} from "./contract-types.ts";
-import { deriveAppStoreConnectProviderTarget } from "./deployment-provider-targets.ts";
-import { readPrimaryDeploymentComponent } from "./contract-extract-components.ts";
+} from "./contract-types";
+import { deriveAppStoreConnectProviderTarget } from "./deployment-provider-targets";
+import { readPrimaryDeploymentComponent } from "./contract-extract-components";
 import {
   deploymentError,
   pushTokenFieldErrors,
@@ -19,24 +19,24 @@ import {
   readString,
   readStringRecord,
   type DeploymentExtractionContext,
-} from "./contract-extract-shared.ts";
-import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata.ts";
-import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
+} from "./contract-extract-shared";
+import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata";
+import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding";
 import {
   resolveDeploymentMetadataRefs,
   validateExplicitDeploymentRequirements,
-} from "./deployment-extract-metadata.ts";
-import { readDeploymentRequirements } from "./deployment-requirements.ts";
-import { pushAppStoreConnectComponentKindErrors } from "./app-store-connect-capability-validation.ts";
-import { pushAppStoreConnectRolloutErrors } from "./app-store-connect-rollout-validation.ts";
+} from "./deployment-extract-metadata";
+import { readDeploymentRequirements } from "./deployment-requirements";
+import { pushAppStoreConnectComponentKindErrors } from "./app-store-connect-capability-validation";
+import { pushAppStoreConnectRolloutErrors } from "./app-store-connect-rollout-validation";
 import {
   APP_STORE_CONNECT_VALID_SIGNING_MODELS,
   APP_STORE_CONNECT_VALID_TRACKS,
   MOBILE_STORE_TARGET_TOKEN_RE,
   pushDuplicateProviderTargetIdentityErrors,
   pushMobileStoreProtectionClassError,
-} from "./mobile-store-extract-helpers.ts";
-import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
+} from "./mobile-store-extract-helpers";
+import { pushSmokePolicyErrors } from "./deployment-smoke-policy";
 export function extractAppStoreConnectDeploymentsFromContext(
   context: DeploymentExtractionContext,
 ): AppStoreConnectDeployment[] {

@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { copyTree } from "../lib/copy-tree.ts";
-import { artifactIdentityForStaticWebappDir } from "./nixos-shared-host-artifacts.ts";
+import { copyTree } from "../lib/copy-tree";
+import { artifactIdentityForStaticWebappDir } from "./nixos-shared-host-artifacts";
 
 type PublishRootLayout = {
   releaseRoot: string;

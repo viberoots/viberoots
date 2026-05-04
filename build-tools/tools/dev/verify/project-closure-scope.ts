@@ -1,9 +1,6 @@
-import type { ProjectClosureSelectorResult } from "../../lib/project-closure-selector.ts";
-import type { BuildSystemTestMode } from "../../lib/build-system-test-scope.ts";
-import type {
-  VerifyTemplateScopeDecision,
-  VerifyTemplateScopeMode,
-} from "./template-test-scope.ts";
+import type { ProjectClosureSelectorResult } from "../../lib/project-closure-selector";
+import type { BuildSystemTestMode } from "../../lib/build-system-test-scope";
+import type { VerifyTemplateScopeDecision, VerifyTemplateScopeMode } from "./template-test-scope";
 
 type RequestedSelector = { mode: "project-closure"; projects: string[] } | null | undefined;
 type BuildScope = {

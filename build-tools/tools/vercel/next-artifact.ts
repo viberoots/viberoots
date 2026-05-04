@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { getFlagStr } from "../lib/cli.ts";
+import { getFlagStr } from "../lib/cli";
 
 export const VERCEL_NEXT_ARTIFACT_SCHEMA = "vercel-next-artifact@1";
 export const VERCEL_NEXT_IDENTITY_SCHEMA = "vercel-next-artifact-identity@1";

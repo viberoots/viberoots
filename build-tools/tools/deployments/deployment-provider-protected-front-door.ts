@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentControlPlaneStatus } from "./deployment-control-plane-contract.ts";
+import type { DeploymentControlPlaneStatus } from "./deployment-control-plane-contract";
 import {
   readNixosSharedHostControlPlaneRecordViaService,
   submitNixosSharedHostControlPlaneViaService,
-} from "./nixos-shared-host-control-plane-client.ts";
-import { controlPlaneRecordFailureMessage } from "./deployment-control-plane-record-failure.ts";
+} from "./nixos-shared-host-control-plane-client";
+import { controlPlaneRecordFailureMessage } from "./deployment-control-plane-record-failure";
 
 const SERVICE_ONLY_LOCAL_FLAGS = ["records-root", "control-plane-database-url"] as const;
 

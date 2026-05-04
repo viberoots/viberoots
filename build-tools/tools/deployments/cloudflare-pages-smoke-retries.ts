@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { CloudflarePagesDeployment } from "./contract.ts";
+import type { CloudflarePagesDeployment } from "./contract";
 
 const SMOKE_RETRY_LINEAR_BACKOFF_MS = 100;
 

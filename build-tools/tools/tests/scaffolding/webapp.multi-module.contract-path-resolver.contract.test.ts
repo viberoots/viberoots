@@ -6,7 +6,7 @@ import {
   deriveAppIdFromTargetLabel,
   deriveAppTargetLabelFromCwd,
   resolveModuleContractsPaths,
-} from "../../dev/module-contract-paths.ts";
+} from "../../dev/module-contract-paths";
 
 test("PR-2 resolver derives deterministic app-id and canonical output paths", () => {
   const appTarget = "//projects/apps/demo-web:app";

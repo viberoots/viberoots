@@ -1,23 +1,23 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
-import type { NixosSharedHostDeployment, NixosSharedHostDeploymentComponent } from "./contract.ts";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts";
+import type { NixosSharedHostDeployment, NixosSharedHostDeploymentComponent } from "./contract";
 import {
   baseNixosSharedHostComponentResult,
   buildNixosSharedHostPublishFailureResults,
   withNixosSharedHostSmokeState,
   type NixosSharedHostComponentResult,
-} from "./nixos-shared-host-component-results.ts";
-import { publishComponent } from "./nixos-shared-host-progressive-publish.ts";
+} from "./nixos-shared-host-component-results";
+import { publishComponent } from "./nixos-shared-host-progressive-publish";
 import {
   summarizeProgressiveRolloutState,
   updateProgressiveRolloutPhase,
   withProgressiveRolloutState,
   type NixosSharedHostProgressiveGateDecision,
   type NixosSharedHostProgressiveRollout,
-} from "./nixos-shared-host-progressive-rollout.ts";
-import { smokeNixosSharedHostStaticWebapp } from "./nixos-shared-host-static-smoke.ts";
-import type { NixosSharedHostConfig } from "./nixos-shared-host.ts";
+} from "./nixos-shared-host-progressive-rollout";
+import { smokeNixosSharedHostStaticWebapp } from "./nixos-shared-host-static-smoke";
+import type { NixosSharedHostConfig } from "./nixos-shared-host";
 
 export type NixosSharedHostGateEvaluator = (opts: {
   phaseId: string;

@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentAdmissionPolicy, DeploymentLanePolicy } from "./deployment-policy.ts";
-import type { DeploymentExtractionContext } from "./contract-extract-shared.ts";
+import type { DeploymentAdmissionPolicy, DeploymentLanePolicy } from "./deployment-policy";
+import type { DeploymentExtractionContext } from "./contract-extract-shared";
 
 function deploymentError(label: string, message: string): string {
   return `${label}: ${message}`;

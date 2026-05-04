@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { resolveToolPath } from "../../lib/tool-paths.ts";
+import { resolveToolPath } from "../../lib/tool-paths";
 
 export async function killBuckIsolation(root: string, iso: string): Promise<void> {
   await $({ stdio: "ignore", cwd: root })`buck2 --isolation-dir ${iso} kill`.nothrow();

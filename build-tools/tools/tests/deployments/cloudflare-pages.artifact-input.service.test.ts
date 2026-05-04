@@ -2,11 +2,11 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../deployments/cloudflare-pages-control-plane-api-contract.ts";
-import { assertNoProtectedSharedClientCredentialInputs } from "../../deployments/deployment-service-client-contract.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
-import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers.ts";
+import { CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../deployments/cloudflare-pages-control-plane-api-contract";
+import { assertNoProtectedSharedClientCredentialInputs } from "../../deployments/deployment-service-client-contract";
+import { runInTemp } from "../lib/test-helpers";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
+import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
 
 test("cloudflare-pages service rejects laptop-local artifactDir submissions", async () => {
   await runInTemp("cloudflare-pages-service-rejects-artifact-dir", async (tmp) => {

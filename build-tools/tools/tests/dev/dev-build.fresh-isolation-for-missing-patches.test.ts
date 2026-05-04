@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { missingOptionalPatchDirsForFreshIsolation } from "../../dev/dev-build/run-dev-build.ts";
+import { missingOptionalPatchDirsForFreshIsolation } from "../../dev/dev-build/run-dev-build";
 
 test("dev-build uses fresh isolation for full recursive builds when optional patch dirs are missing", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "devbuild-missing-patches-"));

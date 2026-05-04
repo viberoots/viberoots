@@ -1,23 +1,23 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { readVersionedJson } from "./deployment-schema-compat.ts";
-import type { GooglePlayAdmittedContext } from "./google-play-admission.ts";
-import type { AdmittedGooglePlayArtifact } from "./google-play-artifacts.ts";
-import { requireAdmittedGooglePlayArtifactPath } from "./google-play-artifacts.ts";
-import type { GooglePlayDeployment } from "./contract.ts";
-import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention.ts";
+import { readVersionedJson } from "./deployment-schema-compat";
+import type { GooglePlayAdmittedContext } from "./google-play-admission";
+import type { AdmittedGooglePlayArtifact } from "./google-play-artifacts";
+import { requireAdmittedGooglePlayArtifactPath } from "./google-play-artifacts";
+import type { GooglePlayDeployment } from "./contract";
+import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention";
 import {
   googlePlayRunnerIdentities,
   runnerIdentityCompatibilityErrors,
   type DeploymentRunnerIdentities,
-} from "./deployment-runner-identities.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
+} from "./deployment-runner-identities";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
 import {
   deployRecordPathFor,
   readGooglePlayDeployRecord,
   type GooglePlayDeployRecord,
-} from "./google-play-records.ts";
+} from "./google-play-records";
 
 export const GOOGLE_PLAY_REPLAY_SNAPSHOT_SCHEMA = "google-play-replay-snapshot@2";
 

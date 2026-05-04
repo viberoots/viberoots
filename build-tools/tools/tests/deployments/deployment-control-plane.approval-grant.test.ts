@@ -2,23 +2,23 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { readDeploymentControlPlaneStatus } from "../../deployments/deployment-control-plane-read.ts";
-import { approvalGrantPathFor } from "../../deployments/deployment-control-plane-approval.ts";
-import { statusFromSubmission } from "../../deployments/deployment-control-plane-status.ts";
-import { executeSubmittedNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane-submit-helpers.ts";
+import { readDeploymentControlPlaneStatus } from "../../deployments/deployment-control-plane-read";
+import { approvalGrantPathFor } from "../../deployments/deployment-control-plane-approval";
+import { statusFromSubmission } from "../../deployments/deployment-control-plane-status";
+import { executeSubmittedNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane-submit-helpers";
 import {
   readControlPlaneJson,
   writeControlPlaneJson,
-} from "../../deployments/nixos-shared-host-control-plane-store.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "../../deployments/nixos-shared-host-control-plane-store";
+import { runInTemp } from "../lib/test-helpers";
 import {
   approvePendingRun,
   pendingApprovalRun,
   requiredApprovalDeployment,
-} from "./deployment-control-plane.approval-grant.helpers.ts";
-import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
-import { smokeConnectOverride } from "./nixos-shared-host.control-plane.helpers.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+} from "./deployment-control-plane.approval-grant.helpers";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
+import { smokeConnectOverride } from "./nixos-shared-host.control-plane.helpers";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
 test("approve advances a pending run on the same deployRunId and executes that run", async () => {
   await runInTemp("deployment-control-plane-approval-grant", async (tmp, $) => {

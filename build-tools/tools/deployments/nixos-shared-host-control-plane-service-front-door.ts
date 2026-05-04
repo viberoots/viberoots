@@ -1,32 +1,32 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import type { DeploymentControlPlaneStatus } from "./deployment-control-plane-contract.ts";
+import type { NixosSharedHostDeployment } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import type { DeploymentControlPlaneStatus } from "./deployment-control-plane-contract";
 import {
   readNixosSharedHostControlPlaneRecordViaService,
   createNixosSharedHostArtifactChallengeViaService,
   submitNixosSharedHostControlPlaneViaService,
-} from "./nixos-shared-host-control-plane-client.ts";
-import type { NixosSharedHostControlPlaneOperationKind } from "./nixos-shared-host-control-plane-contract.ts";
+} from "./nixos-shared-host-control-plane-client";
+import type { NixosSharedHostControlPlaneOperationKind } from "./nixos-shared-host-control-plane-contract";
 import {
   NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
   type NixosSharedHostControlPlaneSubmitRequest,
-} from "./nixos-shared-host-control-plane-api-contract.ts";
-import { createNixosSharedHostSubmissionId } from "./nixos-shared-host-control-plane-snapshot.ts";
+} from "./nixos-shared-host-control-plane-api-contract";
+import { createNixosSharedHostSubmissionId } from "./nixos-shared-host-control-plane-snapshot";
 import {
   artifactBindingEnvelope,
   createArtifactBindingProof,
   expectedNixosSharedHostArtifactIdentities,
   type DeploymentExpectedArtifactIdentities,
-} from "./deployment-artifact-binding.ts";
-import { deploymentServicePrincipalForToken } from "./deployment-artifact-challenges.ts";
-import { terminalControlPlaneRejectionMessage } from "./deployment-provider-protected-front-door.ts";
-import { controlPlaneRecordFailureMessage } from "./deployment-control-plane-record-failure.ts";
+} from "./deployment-artifact-binding";
+import { deploymentServicePrincipalForToken } from "./deployment-artifact-challenges";
+import { terminalControlPlaneRejectionMessage } from "./deployment-provider-protected-front-door";
+import { controlPlaneRecordFailureMessage } from "./deployment-control-plane-record-failure";
 import {
   clientServiceAdmissionEvidence,
   resolveExpectedDeploymentSourceRevision,
-} from "./deployment-source-revision.ts";
+} from "./deployment-source-revision";
 
 export type NixosSharedHostServiceFrontDoorResponse =
   | { kind: "result"; result: { record: any } }

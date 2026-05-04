@@ -3,20 +3,20 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { installCloudflarePagesTargets } from "./cloudflare-pages.fixture.ts";
-import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
-import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
+import { runInTemp } from "../lib/test-helpers";
+import { installCloudflarePagesTargets } from "./cloudflare-pages.fixture";
+import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
+import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
 import {
   createSourceRun,
   fakeCloudflareEnv,
   rebuildStagingDeployment,
   writeCloudflareArtifact,
   writeWranglerConfig,
-} from "./cloudflare-pages.rebuild-per-stage.helpers.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
-import { writeDeploymentJson } from "./nixos-shared-host.reuse.e2e.helpers.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+} from "./cloudflare-pages.rebuild-per-stage.helpers";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
+import { writeDeploymentJson } from "./nixos-shared-host.reuse.e2e.helpers";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
 
 test("cloudflare-pages rebuild-per-stage promotion rejects publish-only exact-artifact reuse", async () => {
   await runInTemp("cloudflare-pages-rebuild-per-stage-guardrail", async (tmp, $) => {

@@ -1,6 +1,6 @@
 import path from "node:path";
 import process from "node:process";
-import { runNodeWithZx } from "../../lib/node-run.ts";
+import { runNodeWithZx } from "../../lib/node-run";
 
 export async function runTemplateManifestCheck(opts: {
   root: string;

@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
-import { deploymentAuthFailureDiagnostic } from "./deployment-auth-failure-diagnostics.ts";
-import { deploymentSecretFixturePath } from "./deployment-secret-fixture.ts";
-import type { DeploymentSecretContext } from "./deployment-secret-context.ts";
-import { resolveCredentialSourceVaultJwt } from "./deployment-credential-source-runtime.ts";
-import type { DeploymentCredentialSource } from "./deployment-credential-source-selection.ts";
-import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
-import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan.ts";
-import { resolveDeploymentPkceCallbackProfile } from "./deployment-pkce-callback-profile.ts";
-export type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
-export { readDeploymentVaultRuntimeInputsFromFlags } from "./deployment-vault-runtime-inputs.ts";
+import type { DeploymentTarget } from "./contract";
+import { deploymentAuthFailureDiagnostic } from "./deployment-auth-failure-diagnostics";
+import { deploymentSecretFixturePath } from "./deployment-secret-fixture";
+import type { DeploymentSecretContext } from "./deployment-secret-context";
+import { resolveCredentialSourceVaultJwt } from "./deployment-credential-source-runtime";
+import type { DeploymentCredentialSource } from "./deployment-credential-source-selection";
+import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs";
+import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan";
+import { resolveDeploymentPkceCallbackProfile } from "./deployment-pkce-callback-profile";
+export type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs";
+export { readDeploymentVaultRuntimeInputsFromFlags } from "./deployment-vault-runtime-inputs";
 export {
   DEFAULT_DEPLOYMENT_CLI_PUBLIC_CLIENT_ID,
   DEFAULT_DEPLOYMENT_CLIENT_ID,
@@ -25,7 +25,7 @@ export {
   VAULT_AUDIENCE_ENV,
   VAULT_OIDC_ISSUER_ENV,
   defaultVaultJwtRoleName,
-} from "./deployment-vault-runtime-plan.ts";
+} from "./deployment-vault-runtime-plan";
 
 export type PreparedDeploymentVaultRuntime = {
   minted: boolean;

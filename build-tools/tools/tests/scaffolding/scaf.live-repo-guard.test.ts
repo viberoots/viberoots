@@ -5,7 +5,7 @@ import { test } from "node:test";
 import {
   liveRepoScaffoldGuardMessage,
   shouldRefuseLiveRepoScaffold,
-} from "../../scaffolding/scaf/live-repo-guard.ts";
+} from "../../scaffolding/scaf/live-repo-guard";
 
 const REPO_ROOT = process.cwd();
 

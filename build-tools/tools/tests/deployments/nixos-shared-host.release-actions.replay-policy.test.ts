@@ -3,19 +3,19 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { runInTemp } from "../lib/test-helpers";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 import {
   startControlPlaneHarness,
   withEnvOverrides,
-} from "./nixos-shared-host.control-plane.helpers.ts";
-import { deploymentReleaseActionFixture } from "./deployment-metadata.fixture.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+} from "./nixos-shared-host.control-plane.helpers";
+import { deploymentReleaseActionFixture } from "./deployment-metadata.fixture";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
 async function writeArtifact(root: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });

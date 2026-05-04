@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
+import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 
 export async function writeArtifact(root: string, marker: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });

@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
-import { printDeployJson } from "./deploy-front-door.ts";
-import { resolveArtifactDirForCli } from "./deployment-cli-resolve.ts";
-import { summarizeDeploymentResult } from "./deployment-execution.ts";
-import type { AppStoreConnectDeployment } from "./contract.ts";
-import { invalidatingTargetException } from "./deployment-target-exceptions.ts";
-import { resolveCrossDeploymentPromotionSelection } from "./deployment-promotion.ts";
-import { resolveAppStoreConnectReplaySource } from "./app-store-connect-replay.ts";
-import { submitAppStoreConnectDeploy } from "./app-store-connect-deploy.ts";
-import { submitAppStoreConnectExactArtifactRun } from "./app-store-connect-exact-run.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli";
+import { printDeployJson } from "./deploy-front-door";
+import { resolveArtifactDirForCli } from "./deployment-cli-resolve";
+import { summarizeDeploymentResult } from "./deployment-execution";
+import type { AppStoreConnectDeployment } from "./contract";
+import { invalidatingTargetException } from "./deployment-target-exceptions";
+import { resolveCrossDeploymentPromotionSelection } from "./deployment-promotion";
+import { resolveAppStoreConnectReplaySource } from "./app-store-connect-replay";
+import { submitAppStoreConnectDeploy } from "./app-store-connect-deploy";
+import { submitAppStoreConnectExactArtifactRun } from "./app-store-connect-exact-run";
 
 function sameDeploymentRollbackErrors(
   current: AppStoreConnectDeployment,

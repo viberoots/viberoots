@@ -2,18 +2,18 @@
 import {
   createDeploymentArtifactChallenge,
   deploymentServicePrincipalForToken,
-} from "./deployment-artifact-challenges.ts";
-import { authorizeControlPlaneSubmit } from "./deployment-control-plane-authz.ts";
-import { resolveSubmitAuthorizationBoundary } from "./deployment-service-authorization-boundary.ts";
-import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract.ts";
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
-import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
+} from "./deployment-artifact-challenges";
+import { authorizeControlPlaneSubmit } from "./deployment-control-plane-authz";
+import { resolveSubmitAuthorizationBoundary } from "./deployment-service-authorization-boundary";
+import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
+import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract";
 import {
   assertProtectedSharedArtifactIdentityFields,
   finalizedStagedArtifactReference,
-} from "./nixos-shared-host-artifact-submit-request.ts";
-import { cleanupThenRethrowRejectedNixosSubmit } from "./nixos-shared-host-control-plane-rejection-cleanup.ts";
-import { assertReviewedServiceBearerToken } from "./nixos-shared-host-control-plane-service-auth.ts";
+} from "./nixos-shared-host-artifact-submit-request";
+import { cleanupThenRethrowRejectedNixosSubmit } from "./nixos-shared-host-control-plane-rejection-cleanup";
+import { assertReviewedServiceBearerToken } from "./nixos-shared-host-control-plane-service-auth";
 
 export async function handleControlPlaneArtifactChallenge(
   request: NixosSharedHostControlPlaneSubmitRequest,

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { readGraph } from "../../lib/graph.ts";
+import { readGraph } from "../../lib/graph";
 import { runInTemp } from "../lib/test-helpers";
 
 test("exporter: python pyext_wasm nodes include module attrs in build-tools/tools/buck/graph.json", async () => {

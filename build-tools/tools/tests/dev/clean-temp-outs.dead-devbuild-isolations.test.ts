@@ -9,7 +9,7 @@ import {
   pruneDeadOwnedBuckIsolationDirs,
   shouldRemoveDeadDevBuildIsolationDir,
   shouldRemoveDeadOwnedBuckIsolationDir,
-} from "../../dev/clean-temp-outs-lib.ts";
+} from "../../dev/clean-temp-outs-lib";
 
 test("clean-temp-outs removes dead one-shot devbuild isolation dirs", () => {
   assert.equal(

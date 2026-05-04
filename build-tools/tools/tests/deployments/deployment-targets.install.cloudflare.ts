@@ -1,12 +1,12 @@
-import type { CloudflarePagesDeployment } from "../../deployments/contract.ts";
-import { installAppTargetsForDeployments } from "./deployment-targets.install.app-targets.ts";
+import type { CloudflarePagesDeployment } from "../../deployments/contract";
+import { installAppTargetsForDeployments } from "./deployment-targets.install.app-targets";
 import {
   appendTargetsFragment,
   labelDir,
   labelName,
   synchronizeInstalledDeployments,
   writeTargetsFragments,
-} from "./deployment-targets.install.fragments.ts";
+} from "./deployment-targets.install.fragments";
 import {
   renderPreviewLines,
   renderPrerequisiteList,
@@ -15,11 +15,11 @@ import {
   renderStringDictLines,
   renderStringList,
   renderStringRecordList,
-} from "./deployment-targets.install.render.ts";
+} from "./deployment-targets.install.render";
 import {
   sharedPolicyTargetsByDir,
   synchronizeGovernanceChecks,
-} from "./deployment-targets.install.shared-policies.ts";
+} from "./deployment-targets.install.shared-policies";
 
 function renderVaultRuntime(deployment: CloudflarePagesDeployment): Record<string, string> {
   const config = deployment.vaultRuntime;

@@ -3,23 +3,23 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { readDeploymentControlPlaneStatus } from "../../deployments/deployment-control-plane-read.ts";
-import { submitDeploymentControlPlaneRunAction } from "../../deployments/deployment-control-plane-run-action.ts";
-import { statusFromSubmission } from "../../deployments/deployment-control-plane-status.ts";
-import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
-import { readControlPlaneJson } from "../../deployments/nixos-shared-host-control-plane-store.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
+import { readDeploymentControlPlaneStatus } from "../../deployments/deployment-control-plane-read";
+import { submitDeploymentControlPlaneRunAction } from "../../deployments/deployment-control-plane-run-action";
+import { statusFromSubmission } from "../../deployments/deployment-control-plane-status";
+import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
+import { readControlPlaneJson } from "../../deployments/nixos-shared-host-control-plane-store";
+import { runInTemp } from "../lib/test-helpers";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
   pauseOnFinalSmoke,
   progressiveCasePaths,
   progressiveFixture,
   progressiveHosts,
   writeProgressiveArtifacts,
-} from "./deployment-control-plane.progressive-rollout.helpers.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
-import { expectPausedSubmission } from "./nixos-shared-host.control-plane.helpers.ts";
-import { startStaticWebappHttpsMultiServer } from "./static-webapp.https-server.ts";
+} from "./deployment-control-plane.progressive-rollout.helpers";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { expectPausedSubmission } from "./nixos-shared-host.control-plane.helpers";
+import { startStaticWebappHttpsMultiServer } from "./static-webapp.https-server";
 
 test("deployment control-plane progressive rollout flows", async (t) => {
   await runInTemp("deployment-control-plane-progressive-rollout", async (tmp, $) => {

@@ -2,8 +2,8 @@ import "zx/globals";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { resolveToolPath } from "../../lib/tool-paths.ts";
-import { activeNixGcProcesses } from "./preflight.ts";
+import { resolveToolPath } from "../../lib/tool-paths";
+import { activeNixGcProcesses } from "./preflight";
 import { writeVerifySafetyRailsTriggerSnapshot } from "./safety-rails-snapshot";
 import {
   formatLoadAvg,

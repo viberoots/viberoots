@@ -15,8 +15,8 @@ import {
   parseStarlarkIndexMacrosByModule,
   type ArtifactRouteAllowlistEntry,
   type NixGapsException,
-} from "./nix-gaps-inventory-check-lib.ts";
-import { enforceNodeImplementationRouteChecks } from "./nix-gaps-inventory-node-routes.ts";
+} from "./nix-gaps-inventory-check-lib";
+import { enforceNodeImplementationRouteChecks } from "./nix-gaps-inventory-node-routes";
 
 const defaultExceptionsPath = "docs/handbook/nix-gaps-exceptions.json";
 

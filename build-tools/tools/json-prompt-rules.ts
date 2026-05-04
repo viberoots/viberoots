@@ -5,7 +5,7 @@ import {
   type JsonPromptOptions,
   type JsonPromptRuleSet,
   type JsonPromptRuleSource,
-} from "./json-prompt-types.ts";
+} from "./json-prompt-types";
 import {
   collectDeclaredArgKeys,
   collectDeclaredRuleKeys,
@@ -15,8 +15,8 @@ import {
   readOptionValue,
   requireKnownKey,
   rewriteReservedFieldFlags,
-} from "./json-prompt-rule-helpers.ts";
-import { isAllowedValue, parsePromptAnswer } from "./json-prompt-values.ts";
+} from "./json-prompt-rule-helpers";
+import { isAllowedValue, parsePromptAnswer } from "./json-prompt-values";
 
 export async function extractPromptRuleSource(
   argv: string[],

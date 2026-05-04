@@ -2,7 +2,7 @@
 import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagBool } from "../lib/cli.ts";
+import { getFlagBool } from "../lib/cli";
 
 async function openInBrowser(filePath: string): Promise<void> {
   try {

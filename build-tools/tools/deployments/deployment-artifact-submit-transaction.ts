@@ -2,28 +2,28 @@
 import {
   type DeploymentArtifactBindingProof,
   type DeploymentArtifactChallengeRequest,
-} from "./deployment-artifact-binding.ts";
+} from "./deployment-artifact-binding";
 import {
   keyHash,
   reuseChallengedArtifactSubmissionIfPresent,
-} from "./deployment-artifact-submit-idempotency.ts";
+} from "./deployment-artifact-submit-idempotency";
 import {
   admittedArtifactBindingIdentities,
   admittedStoredArtifactReference,
   verifyArtifactChallengeForSubmit,
   type ArtifactChallengeRow,
-} from "./deployment-artifact-submit-provenance.ts";
-import type { DeploymentArtifactProofKeyRegistry } from "./deployment-artifact-proof-keys.ts";
-import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract.ts";
+} from "./deployment-artifact-submit-provenance";
+import type { DeploymentArtifactProofKeyRegistry } from "./deployment-artifact-proof-keys";
+import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract";
 import {
   withBackendClient,
   type BackendQueryable,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend-db.ts";
+} from "./nixos-shared-host-control-plane-backend-db";
 import type {
   NixosSharedHostControlPlaneSnapshot,
   NixosSharedHostControlPlaneSubmission,
-} from "./nixos-shared-host-control-plane-contract.ts";
+} from "./nixos-shared-host-control-plane-contract";
 
 async function assertSubmissionSlotsFree(client: BackendQueryable, submissionId: string) {
   const [snapshots, submissions, queue] = await Promise.all([

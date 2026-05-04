@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
 
-import { ensureTemplateVariables } from "./template-vars.ts";
-import { pathExists } from "../../../lib/repo.ts";
+import { ensureTemplateVariables } from "./template-vars";
+import { pathExists } from "../../../lib/repo";
 
 function workspaceRoot(): string {
   const envRoot = String(process.env.WORKSPACE_ROOT || process.env.BUCK_TEST_SRC || "").trim();

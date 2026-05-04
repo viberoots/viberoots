@@ -1,23 +1,20 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { activeNixGcPids, gcWaitConfig, waitForNoActiveNixGc } from "../../lib/nix-gc-lock.ts";
-import { importerLockfileNeedsRegen } from "../../lib/pnpm-importer-lockfile.ts";
-import {
-  externalPnpmStateDirs,
-  removeLegacyImporterPnpmState,
-} from "../../lib/pnpm-state-paths.ts";
-import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard.ts";
+import { activeNixGcPids, gcWaitConfig, waitForNoActiveNixGc } from "../../lib/nix-gc-lock";
+import { importerLockfileNeedsRegen } from "../../lib/pnpm-importer-lockfile";
+import { externalPnpmStateDirs, removeLegacyImporterPnpmState } from "../../lib/pnpm-state-paths";
+import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard";
 import {
   syncLocalPrefetchIntoPnpmStore,
   syncSourcePnpmStoreIntoLocalPrefetch,
-} from "./prefetched-store.ts";
+} from "./prefetched-store";
 import {
   cleanupLocalWorkspaceMarker,
   ensureLocalWorkspaceMarker,
   pnpmFlakeRef,
   preferredPnpmStoreDir,
-} from "./lockfile-shared.ts";
+} from "./lockfile-shared";
 
 async function runLockfileCommandsWithGcRetry(opts: {
   importerAbs: string;

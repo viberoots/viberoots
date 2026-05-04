@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import { test } from "node:test";
-import { writeIfChanged } from "../../lib/fs-helpers.ts";
+import { writeIfChanged } from "../../lib/fs-helpers";
 import { runInTemp } from "../lib/test-helpers";
 
 test("writeIfChanged: second write is no-op", async () => {

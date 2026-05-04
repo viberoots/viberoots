@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import { nodesFromCqueryJson } from "../buck/exporter/cquery/nodes.ts";
-import { normalizeTargetLabel } from "../lib/labels.ts";
-import { componentTargetsFor, extractDeployments, type DeploymentTarget } from "./contract.ts";
-import { DEPLOYMENT_CQUERY_ATTRS } from "./deployment-query-attrs.ts";
+import { nodesFromCqueryJson } from "../buck/exporter/cquery/nodes";
+import { normalizeTargetLabel } from "../lib/labels";
+import { componentTargetsFor, extractDeployments, type DeploymentTarget } from "./contract";
+import { DEPLOYMENT_CQUERY_ATTRS } from "./deployment-query-attrs";
 import {
   deploymentBuckEnv,
   deploymentIsolationArgs,
   normalizeQueryTarget,
   queryComponentLabels,
   queryLabelList,
-} from "./deployment-query-helpers.ts";
+} from "./deployment-query-helpers";
 
 function relatedLabelsForNodes(
   nodes: ReturnType<typeof nodesFromCqueryJson>,

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { shouldPrepareVerifySeedForRequestedTargets } from "../../dev/verify/seed.ts";
+import { shouldPrepareVerifySeedForRequestedTargets } from "../../dev/verify/seed";
 
 test("verify seed build policy defaults to full-suite only", () => {
   assert.equal(shouldPrepareVerifySeedForRequestedTargets(["//..."], {}), true);

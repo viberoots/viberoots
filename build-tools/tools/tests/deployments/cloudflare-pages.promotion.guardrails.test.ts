@@ -3,25 +3,25 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloudflare-pages-control-plane.ts";
-import { resolveCloudflarePagesPromotionSelection } from "../../deployments/cloudflare-pages-promotion.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloudflare-pages-control-plane";
+import { resolveCloudflarePagesPromotionSelection } from "../../deployments/cloudflare-pages-promotion";
+import { runInTemp } from "../lib/test-helpers";
 import {
   cloudflarePagesDeploymentFixture,
   installCloudflarePagesTargets,
-} from "./cloudflare-pages.fixture.ts";
-import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
-import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
-import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
+} from "./cloudflare-pages.fixture";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
+import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
+import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import {
   ensureNixosSharedHostStageBranch,
   installNixosSharedHostTargets,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+} from "./nixos-shared-host.fixture";
+import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });

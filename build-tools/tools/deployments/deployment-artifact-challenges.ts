@@ -8,25 +8,25 @@ import {
   type DeploymentArtifactBindingProof,
   type DeploymentArtifactChallengeRequest,
   type DeploymentArtifactChallengeResponse,
-} from "./deployment-artifact-binding.ts";
+} from "./deployment-artifact-binding";
 import {
   artifactChallengeBinding,
   assertArtifactChallengeBindingMatches,
   decodeArtifactChallengeBinding,
-} from "./deployment-artifact-challenge-binding.ts";
+} from "./deployment-artifact-challenge-binding";
 import {
   assertDeploymentArtifactProofKeyActive,
   defaultDeploymentArtifactProofKeyRegistry,
   resolveDeploymentArtifactProofKey,
   type DeploymentArtifactProofKeyRegistry,
-} from "./deployment-artifact-proof-keys.ts";
+} from "./deployment-artifact-proof-keys";
 import {
   decodeBackendJson,
   queryBackend,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend-db.ts";
-import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract.ts";
-import { finalizedStagedArtifactReference } from "./nixos-shared-host-artifact-submit-request.ts";
+} from "./nixos-shared-host-control-plane-backend-db";
+import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract";
+import { finalizedStagedArtifactReference } from "./nixos-shared-host-artifact-submit-request";
 
 const CHALLENGE_TTL_MS = 2 * 60_000;
 

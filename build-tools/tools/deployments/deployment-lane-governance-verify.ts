@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import { getFlagStr } from "../lib/cli.ts";
-import { resolveDeploymentForCli } from "./deployment-cli-resolve.ts";
+import { getFlagStr } from "../lib/cli";
+import { resolveDeploymentForCli } from "./deployment-cli-resolve";
 import {
   normalizeLaneGovernanceSnapshot,
   verifyLaneGovernanceSnapshot,
-} from "./deployment-admission-governance.ts";
+} from "./deployment-admission-governance";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveRequestedVerifyScope } from "../../dev/verify/requested-scope.ts";
+import { resolveRequestedVerifyScope } from "../../dev/verify/requested-scope";
 
 const defaultArgs = {
   coverage: false,

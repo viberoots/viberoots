@@ -7,14 +7,11 @@ import http from "node:http";
 import net from "node:net";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { inferRunnableFromOutPath } from "../../lib/runnables.ts";
-import { parseWasmModuleManifest } from "../../scaffolding/webapp-module-manifests.ts";
-import { terminateChildTree } from "./process-tree.ts";
-import {
-  DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
-  stageTempRepoPaths,
-} from "./test-helpers/git-stage.ts";
-import { exists } from "./test-helpers.ts";
+import { inferRunnableFromOutPath } from "../../lib/runnables";
+import { parseWasmModuleManifest } from "../../scaffolding/webapp-module-manifests";
+import { terminateChildTree } from "./process-tree";
+import { DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS, stageTempRepoPaths } from "./test-helpers/git-stage";
+import { exists } from "./test-helpers";
 
 async function httpGet(
   url: string,

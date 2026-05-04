@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+import { redactDeploymentAuthText } from "./deployment-auth-redaction";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 
 export function terminalSubmissionFromAdmissionFailure(opts: {
   error: unknown;

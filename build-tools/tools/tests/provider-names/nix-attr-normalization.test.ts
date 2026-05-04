@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { normalizeNixAttr } from "../../lib/providers.ts";
+import { normalizeNixAttr } from "../../lib/providers";
 
 test("normalizeNixAttr enforces pkgs. prefix, lowercases, and maps gtest", async () => {
   const cases: Array<[string, string]> = [

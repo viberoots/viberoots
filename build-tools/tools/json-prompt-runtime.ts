@@ -4,8 +4,8 @@ import {
   type JsonPromptResolution,
   type JsonPromptRuntime,
   type JsonPromptValue,
-} from "./json-prompt-types.ts";
-import { isUnsetValue, parsePromptAnswer } from "./json-prompt-values.ts";
+} from "./json-prompt-types";
+import { isUnsetValue, parsePromptAnswer } from "./json-prompt-values";
 
 export function formatPromptDefault(value: JsonPromptValue): string {
   return typeof value === "string" ? value : String(value);

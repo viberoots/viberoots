@@ -4,8 +4,8 @@ import { test } from "node:test";
 import {
   applyNixosSharedHostScopedDeployments,
   emptyNixosSharedHostPlatformState,
-} from "../../deployments/nixos-shared-host-platform.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+} from "../../deployments/nixos-shared-host-platform";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 test("nixos-shared-host platform state scoped apply creates entries from an empty state", () => {
   const next = applyNixosSharedHostScopedDeployments(emptyNixosSharedHostPlatformState(), [

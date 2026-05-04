@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { spawn } from "node:child_process";
-import { echoSnippetRequested } from "../../lib/cli.ts";
+import { echoSnippetRequested } from "../../lib/cli";
 import { makeWorkspace } from "../cross-platform";
 import { setOverride, clearOverride, printOverrideSnippet } from "../dev-overrides";
 import { makeUnifiedDiff } from "../diff";

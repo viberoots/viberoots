@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
-import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution.ts";
-import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-control-plane-contract.ts";
-import type { NixosSharedHostControlPlaneSourceSelection } from "./nixos-shared-host-control-plane-snapshot.ts";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
+import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution";
+import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-control-plane-contract";
+import type { NixosSharedHostControlPlaneSourceSelection } from "./nixos-shared-host-control-plane-snapshot";
 
 function mergedEvidence(
   evidence: DeploymentAdmissionEvidence | undefined,

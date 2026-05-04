@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { resolveDeploymentPromotionSource } from "./deployment-promotion-source.ts";
+import { resolveDeploymentPromotionSource } from "./deployment-promotion-source";
 
 export type ApprovalActionSnapshotLike = {
   action?: {

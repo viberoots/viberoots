@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { readVersionedJson } from "./deployment-schema-compat.ts";
-import { KUBERNETES_RECORD_SCHEMA, type KubernetesDeployRecord } from "./kubernetes-records.ts";
+import { readVersionedJson } from "./deployment-schema-compat";
+import { KUBERNETES_RECORD_SCHEMA, type KubernetesDeployRecord } from "./kubernetes-records";
 
 export async function readKubernetesDeployRecord(
   recordPath: string,

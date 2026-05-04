@@ -1,22 +1,17 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagStr } from "../../lib/cli.ts";
-import {
-  dirsForTarget,
-  findModuleRootForDirs,
-  isGoNode,
-  packageDirFromTargetName,
-} from "./batch.ts";
-import { attrList } from "./cquery/attrs.ts";
-import { cqueryNodes } from "./cquery/index.ts";
-import { deriveTupleForNode } from "./env.ts";
-import { attachSimulatedGoModuleLabels } from "./go-simulated-labels.ts";
-import { cacheHits, cacheMisses, runGoList } from "./golist.ts";
-import { parseArgs, readSimulatedNodes, writeIfChangedJSON } from "./io.ts";
-import { loadPresentAdapters } from "./lang/contract.ts";
-import type { Adapter, Batch, GoListByBatch, Metrics, Node } from "./types.ts";
-import { collectFindings, determineMode, emitFindings, logValidationMode } from "./validation.ts";
+import { getFlagStr } from "../../lib/cli";
+import { dirsForTarget, findModuleRootForDirs, isGoNode, packageDirFromTargetName } from "./batch";
+import { attrList } from "./cquery/attrs";
+import { cqueryNodes } from "./cquery/index";
+import { deriveTupleForNode } from "./env";
+import { attachSimulatedGoModuleLabels } from "./go-simulated-labels";
+import { cacheHits, cacheMisses, runGoList } from "./golist";
+import { parseArgs, readSimulatedNodes, writeIfChangedJSON } from "./io";
+import { loadPresentAdapters } from "./lang/contract";
+import type { Adapter, Batch, GoListByBatch, Metrics, Node } from "./types";
+import { collectFindings, determineMode, emitFindings, logValidationMode } from "./validation";
 
 export async function run() {
   const { out, scope, simulate, maxParallel, cacheDir, metricsOut, validation } = parseArgs();

@@ -1,27 +1,27 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { readVersionedJson } from "./deployment-schema-compat.ts";
-import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
-import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention.ts";
+import { readVersionedJson } from "./deployment-schema-compat";
+import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission";
+import type { CloudflarePagesDeployment } from "./contract";
+import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention";
 import {
   cloudflarePagesRunnerIdentities,
   runnerIdentityCompatibilityErrors,
   type DeploymentRunnerIdentities,
-} from "./deployment-runner-identities.ts";
+} from "./deployment-runner-identities";
 import {
   readBackendDeployRecordEnvelopeByDeployRunId,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
-import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
-import { requireAdmittedStaticWebappArtifactPath } from "./static-webapp-artifacts.ts";
+} from "./nixos-shared-host-control-plane-backend";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
+import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts";
+import { requireAdmittedStaticWebappArtifactPath } from "./static-webapp-artifacts";
 import {
   deployRecordPathFor,
   readCloudflarePagesDeployRecord,
   type CloudflarePagesDeployRecord,
-} from "./cloudflare-pages-records.ts";
+} from "./cloudflare-pages-records";
 
 export const CLOUDFLARE_PAGES_REPLAY_SNAPSHOT_SCHEMA = "cloudflare-pages-replay-snapshot@2";
 

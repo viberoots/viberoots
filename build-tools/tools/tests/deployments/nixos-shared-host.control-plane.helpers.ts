@@ -2,15 +2,15 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA } from "../../deployments/deployment-control-plane-contract.ts";
-import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy.ts";
+import { DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA } from "../../deployments/deployment-control-plane-contract";
+import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy";
 import {
   localHarnessControlPlaneDatabaseUrl,
   readBackendSnapshotBySubmissionId,
-} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
-import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop.ts";
-export { submitServiceRequest } from "./nixos-shared-host.control-plane.artifact-binding.helpers.ts";
+} from "../../deployments/nixos-shared-host-control-plane-backend";
+import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
+import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop";
+export { submitServiceRequest } from "./nixos-shared-host.control-plane.artifact-binding.helpers";
 
 export async function writeDemoArtifact(root: string, body = "demoapp"): Promise<void> {
   await fsp.mkdir(root, { recursive: true });

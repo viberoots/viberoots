@@ -9,7 +9,7 @@ import {
   isReviewedDeploymentOwnedTestPath,
   isReviewedSharedBuildSystemPath,
   REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS,
-} from "../../lib/deployment-verify-scope.ts";
+} from "../../lib/deployment-verify-scope";
 
 test("deployment verify scope marks reviewed deployment-owned paths explicitly", () => {
   const deploymentOwned = [

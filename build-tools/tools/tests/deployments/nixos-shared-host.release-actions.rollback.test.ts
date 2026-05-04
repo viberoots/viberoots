@@ -3,18 +3,18 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { DEPLOYMENT_SECRET_FIXTURE_SCHEMA } from "../../deployments/deployment-secret-fixture.ts";
-import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { DEPLOYMENT_SECRET_FIXTURE_SCHEMA } from "../../deployments/deployment-secret-fixture";
+import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
+import { runInTemp } from "../lib/test-helpers";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { withEnvOverrides } from "./nixos-shared-host.control-plane.helpers.ts";
+} from "./nixos-shared-host.fixture";
+import { withEnvOverrides } from "./nixos-shared-host.control-plane.helpers";
 import {
   deploymentReleaseActionFixture,
   deploymentRequirementFixture,
-} from "./deployment-metadata.fixture.ts";
+} from "./deployment-metadata.fixture";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });

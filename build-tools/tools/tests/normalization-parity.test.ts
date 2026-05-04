@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fs from "node:fs";
-import { decodeNameVersionFromPatch, normalizeNixAttr } from "../lib/providers.ts";
-import { buckCommandEnv, isBuckDaemonInitTransient } from "../lib/buck-command-env.ts";
+import { decodeNameVersionFromPatch, normalizeNixAttr } from "../lib/providers";
+import { buckCommandEnv, isBuckDaemonInitTransient } from "../lib/buck-command-env";
 
 const cases: Array<{ name: string; attr: string }> = [
   { name: "case1", attr: "gtest" },

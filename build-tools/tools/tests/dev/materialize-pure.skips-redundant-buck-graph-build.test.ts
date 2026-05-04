@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { materializePureGraphIfEnabled } from "../../dev/dev-build/materialize-pure.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { materializePureGraphIfEnabled } from "../../dev/dev-build/materialize-pure";
+import { runInTemp } from "../lib/test-helpers";
 
 test("materialize pure does not run redundant .#buck-graph build", async () => {
   await runInTemp("materialize-pure-skip-buck-graph", async (tmp) => {

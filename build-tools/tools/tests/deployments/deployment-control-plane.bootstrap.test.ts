@@ -3,22 +3,22 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { grantsFor } from "../../deployments/deployment-control-plane-authz.ts";
+import { grantsFor } from "../../deployments/deployment-control-plane-authz";
 import {
   reconcileNixosSharedHostBootstrapRecord,
   runNixosSharedHostBootstrapDeploy,
-} from "../../deployments/nixos-shared-host-bootstrap.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "../../deployments/nixos-shared-host-bootstrap";
+import { runInTemp } from "../lib/test-helpers";
 import {
   bootstrapArtifacts,
   bootstrapCasePaths,
   bootstrapDeploymentFixture,
-} from "./deployment-control-plane.bootstrap.helpers.ts";
+} from "./deployment-control-plane.bootstrap.helpers";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+} from "./nixos-shared-host.fixture";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
 test("deployment control-plane bootstrap flows", async (t) => {
   await runInTemp("deployment-control-plane-bootstrap", async (tmp, $) => {

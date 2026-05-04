@@ -3,9 +3,9 @@ import "zx/globals";
 
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { isAllowedKindLabel } from "../lib/kind-vocabulary.ts";
-import { patchInvalidationStrategyForLang } from "../lib/lang-contracts.ts";
-import { normalizeTargetLabel } from "../lib/labels.ts";
+import { isAllowedKindLabel } from "../lib/kind-vocabulary";
+import { patchInvalidationStrategyForLang } from "../lib/lang-contracts";
+import { normalizeTargetLabel } from "../lib/labels";
 
 type Row = {
   name: string;

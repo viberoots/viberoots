@@ -4,7 +4,7 @@ import { test } from "node:test";
 import {
   normalizeCredentialSource,
   selectDeploymentCredentialSource,
-} from "../../deployments/deployment-credential-source-selection.ts";
+} from "../../deployments/deployment-credential-source-selection";
 
 test("local desktop sessions choose browser-capable PKCE by default", () => {
   const selected = selectDeploymentCredentialSource({

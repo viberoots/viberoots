@@ -4,7 +4,7 @@ import path from "node:path";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { findNearestPnpmLockForPackage } from "../../lib/importers.ts";
+import { findNearestPnpmLockForPackage } from "../../lib/importers";
 
 test("findNearestPnpmLockForPackage finds the nearest pnpm-lock.yaml and returns a repo-relative POSIX path", async () => {
   await runInTemp("importers-nearest-pnpm-lock", async (tmp) => {

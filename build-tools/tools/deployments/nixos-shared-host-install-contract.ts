@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { emptyNixosSharedHostPlatformState } from "./nixos-shared-host-platform.ts";
+import { emptyNixosSharedHostPlatformState } from "./nixos-shared-host-platform";
 
 export const NIXOS_SHARED_HOST_INSTALL_SCHEMA_V1 = "nixos-shared-host-install@1";
 export const NIXOS_SHARED_HOST_CLIENT_SCHEMA_V1 = "nixos-shared-host-client@1";

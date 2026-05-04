@@ -2,10 +2,10 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getImporterRootsContract } from "../../lib/importer-roots.ts";
-import { parseLockfileLabel } from "../../lib/labels.ts";
-import { findUvLockfiles } from "../../lib/lockfiles.ts";
-import { providerNameForImporter } from "../../lib/providers.ts";
+import { getImporterRootsContract } from "../../lib/importer-roots";
+import { parseLockfileLabel } from "../../lib/labels";
+import { findUvLockfiles } from "../../lib/lockfiles";
+import { providerNameForImporter } from "../../lib/providers";
 
 type NodeLockIndexSidecar = Partial<{
   index: Record<string, string>;

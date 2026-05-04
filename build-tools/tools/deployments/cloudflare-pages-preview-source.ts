@@ -1,20 +1,20 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { CloudflarePagesDeployment } from "./contract.ts";
+import type { CloudflarePagesDeployment } from "./contract";
 import {
   resolveCloudflarePagesReplaySource,
   type CloudflarePagesReplaySnapshot,
-} from "./cloudflare-pages-replay.ts";
+} from "./cloudflare-pages-replay";
 import {
   readCloudflarePagesDeployRecord,
   type CloudflarePagesDeployRecord,
-} from "./cloudflare-pages-records.ts";
+} from "./cloudflare-pages-records";
 import {
   readBackendLatestCloudflarePagesPreviewRecordEnvelope,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
-import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
+} from "./nixos-shared-host-control-plane-backend";
+import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts";
 
 export type CloudflarePagesPreviewSourceSelection = {
   operationKind: "deploy";

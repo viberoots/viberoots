@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentRequirement } from "./deployment-requirements.ts";
+import type { DeploymentRequirement } from "./deployment-requirements";
 
 export type ExternalDeploymentRequirementProfile =
   | "workos_authkit"

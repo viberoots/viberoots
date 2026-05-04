@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { Adapter } from "../types.ts";
+import type { Adapter } from "../types";
 
 export type ExporterAdapter = Adapter;
 
@@ -54,7 +54,7 @@ export async function loadPresentAdapters(): Promise<Adapter[]> {
     const goPath = repoPath("build-tools/tools/buck/exporter/lang/go.ts");
     try {
       await fsp.access(goPath);
-      const { goAdapter } = await import("./go.ts");
+      const { goAdapter } = await import("./go");
       adapters.push(goAdapter);
     } catch {}
   }

@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { VaultCredentialConfig } from "./deployment-secret-vault-credentials.ts";
+import type { VaultCredentialConfig } from "./deployment-secret-vault-credentials";
 
 export type DeploymentSecretContext =
   | { kind: "fixture" }

@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { LOCAL_FIXTURE_SERVICE_ENV } from "./deployment-service-transport-policy.ts";
+import { LOCAL_FIXTURE_SERVICE_ENV } from "./deployment-service-transport-policy";
 
 function fixtureModeEnabled(localFixture: boolean | undefined, env: NodeJS.ProcessEnv): boolean {
   if (localFixture !== undefined) return localFixture;

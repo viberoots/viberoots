@@ -29,7 +29,7 @@ test("patch-cpp applies overlay to real nixpkgs zlib and changes runtime zlibVer
 
     // Ensure a fresh session so workspace headers are unmodified
     // Use the language handler directly to avoid shell wrapper differences in the Buck action sandbox
-    const { default: cppHandler } = (await import("../../patch/patch-cpp.ts")) as any;
+    const { default: cppHandler } = (await import("../../patch/patch-cpp")) as any;
     process.env.NIX_CPP_TEST_RESOLVE_JSON = resolveMap;
     await cppHandler.reset(["zlib"]);
 

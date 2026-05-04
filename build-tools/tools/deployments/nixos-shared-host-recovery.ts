@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
-import { readBackendDeployRecordEnvelopeBySubmissionId } from "./nixos-shared-host-control-plane-backend.ts";
-import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-contract.ts";
-import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
+import type { DeploymentPrincipal } from "./deployment-admission-evidence";
+import { readBackendDeployRecordEnvelopeBySubmissionId } from "./nixos-shared-host-control-plane-backend";
+import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-contract";
+import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records";
 import {
   readControlPlaneJson,
   writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
+} from "./nixos-shared-host-control-plane-store";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
 
 function currentStepFor(
   submission: Pick<NixosSharedHostControlPlaneSubmission, "execution">,

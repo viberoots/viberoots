@@ -20,7 +20,7 @@ test("providers: Node activation via pnpm-lock.yaml in sparse clone (no --lang)"
 
     // Runner: call syncAllProviders() without narrowing so detection must enable Node
     const runner = `#!/usr/bin/env zx-wrapper
-import { syncAllProviders } from "./build-tools/tools/buck/providers/index.ts";
+import { syncAllProviders } from "./build-tools/tools/buck/providers/index";
 await syncAllProviders();
 `;
     const runnerPath = path.join(tmp, "run-sync.mjs");

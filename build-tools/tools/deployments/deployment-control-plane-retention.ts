@@ -4,7 +4,7 @@ import path from "node:path";
 import {
   resiliencePolicyForProtectionClass,
   type ProtectedDeploymentClass,
-} from "./deployment-control-plane-resilience-policy.ts";
+} from "./deployment-control-plane-resilience-policy";
 
 type EvidenceLike = {
   requiredChecks?: Array<{ recordRef?: string }>;

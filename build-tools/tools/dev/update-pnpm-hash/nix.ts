@@ -1,6 +1,6 @@
 import process from "node:process";
-import { gcWaitConfig, nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock.ts";
-import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command.ts";
+import { gcWaitConfig, nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock";
+import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command";
 
 export function extractHash(text: string): string | null {
   const mismatchGot = text.match(/got:\s*(sha256-[A-Za-z0-9+/=\-_]{43,})/);

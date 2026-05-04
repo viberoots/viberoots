@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { createNixosSharedHostPlatformState } from "../../deployments/nixos-shared-host-platform.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import { runInTemp } from "../lib/test-helpers";
+import { createNixosSharedHostPlatformState } from "../../deployments/nixos-shared-host-platform";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 test("nixos-shared-host Nix module fails closed on duplicate hostnames", async () => {
   await runInTemp("nixos-shared-host-module-dup-host", async (tmp, $) => {

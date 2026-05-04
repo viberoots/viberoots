@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import { readFileSync } from "node:fs";
-import { getFlagStr } from "../lib/cli.ts";
-import type { DeploymentTarget } from "./contract.ts";
+import { getFlagStr } from "../lib/cli";
+import type { DeploymentTarget } from "./contract";
 import {
   buildVaultBootstrapDocument,
   type VaultBootstrapInputs,
-} from "./deployment-vault-bootstrap.ts";
+} from "./deployment-vault-bootstrap";
 import {
   deploymentAdminVaultDrift,
   deploymentAdminVaultInSync,
@@ -13,9 +13,9 @@ import {
   readDeploymentAdminVaultLiveState,
   writeDeploymentAdminVaultState,
   type VaultAdminCredential,
-} from "./deployment-admin-vault-client.ts";
-import { VAULT_ADDR_ENV, VAULT_TOKEN_ENV } from "./deployment-secret-vault-credentials.ts";
-import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan.ts";
+} from "./deployment-admin-vault-client";
+import { VAULT_ADDR_ENV, VAULT_TOKEN_ENV } from "./deployment-secret-vault-credentials";
+import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan";
 
 export const DEPLOYMENT_ADMIN_VAULT_PLAN_SCHEMA = "deploy-admin-vault-plan@1";
 export const DEPLOYMENT_ADMIN_VAULT_CHECK_SCHEMA = "deploy-admin-vault-check@1";

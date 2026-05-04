@@ -10,8 +10,8 @@ import {
   type DeploymentControlPlaneRunActionResponse,
   type DeploymentControlPlaneStatus,
   type DeploymentControlPlaneSubmitResponse,
-} from "./deployment-control-plane-contract.ts";
-import { normalizeAuthorizationSnapshot } from "./deployment-control-plane-authz.ts";
+} from "./deployment-control-plane-contract";
+import { normalizeAuthorizationSnapshot } from "./deployment-control-plane-authz";
 
 type SubmissionLike = DeploymentControlPlaneResponseBase;
 

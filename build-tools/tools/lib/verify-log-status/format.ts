@@ -1,4 +1,4 @@
-import type { VerifyStatus } from "./types.ts";
+import type { VerifyStatus } from "./types";
 
 export function formatVerifyStatusJsonLine(st: VerifyStatus): string {
   // Stable JSON keys for scripting.

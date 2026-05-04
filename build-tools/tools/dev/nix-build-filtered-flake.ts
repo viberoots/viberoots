@@ -1,14 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
+import { runNixBuildWithTransientRetry } from "./build-selected-nix-retry";
+import { getFlagBool, getFlagStr } from "../lib/cli";
 import {
   computeSelectedCppPackageClosure,
   FILTERED_FLAKE_RSYNC_EXCLUDES,
   graphNodesFromJson,
   selectedCppSnapshotRsyncSources,
   selectedCppSnapshotRelPaths,
-} from "./nix-build-filtered-flake-lib.ts";
+} from "./nix-build-filtered-flake-lib";
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
@@ -159,13 +160,23 @@ async function main(): Promise<void> {
             BNX_FILTERED_FLAKE_SNAPSHOT: "1",
           };
     const buildStart = Date.now();
-    const res = await withHeartbeat(
-      "nix-build",
-      $({
-        stdio: "pipe",
-        env: nixEnv,
-      })`nix build --impure ${flakeRef} --accept-flake-config --option min-free 0 --option max-free 0 --no-link --print-out-paths`,
-    );
+    const runOnce = () =>
+      withHeartbeat(
+        "nix-build",
+        $({
+          stdio: "pipe",
+          env: nixEnv,
+          reject: false,
+          nothrow: true,
+        })`nix build --impure ${flakeRef} --accept-flake-config --option min-free 0 --option max-free 0 --no-link --print-out-paths`,
+      );
+    const res = await runNixBuildWithTransientRetry({ runOnce });
+    if (Number(res.exitCode || 0) !== 0) {
+      const err = new Error(`nix build exited with code ${res.exitCode}`);
+      (err as Error & { stderr?: string }).stderr = String(res.stderr || "");
+      process.stderr.write(String(res.stderr || ""));
+      throw err;
+    }
     const outPath =
       String(res.stdout || "")
         .trim()

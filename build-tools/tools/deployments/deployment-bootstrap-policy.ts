@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../lib/graph.ts";
-import type { DeploymentBootstrapMode, DeploymentBootstrapPolicy } from "./contract-types.ts";
-import { readStringRecord } from "./contract-extract-shared.ts";
+import type { GraphNode } from "../lib/graph";
+import type { DeploymentBootstrapMode, DeploymentBootstrapPolicy } from "./contract-types";
+import { readStringRecord } from "./contract-extract-shared";
 
 export function readBootstrapPolicy(
   node: GraphNode,

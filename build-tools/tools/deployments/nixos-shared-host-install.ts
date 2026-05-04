@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { findRepoRoot } from "../lib/repo.ts";
-import { getFlagBool, getFlagStr, getPositionals, hasFlag } from "../lib/cli.ts";
-import { mergeFlatPromptObjects } from "../json-prompt-lib.ts";
+import { findRepoRoot } from "../lib/repo";
+import { getFlagBool, getFlagStr, getPositionals, hasFlag } from "../lib/cli";
+import { mergeFlatPromptObjects } from "../json-prompt-lib";
 import {
   defaultManagedRoot,
   defaultRecordsRoot,
@@ -11,26 +11,26 @@ import {
   manifestPathFor,
   type NixosSharedHostConfigTopology,
   type NixosSharedHostInstallMode,
-} from "./nixos-shared-host-install-contract.ts";
+} from "./nixos-shared-host-install-contract";
 import {
   type ClientInput,
   installNixosSharedHostClient,
   listNixosSharedHostClients,
   uninstallNixosSharedHostClient,
-} from "./nixos-shared-host-install-dev-machine.ts";
+} from "./nixos-shared-host-install-dev-machine";
 import {
   maybePromptClientInstallInput,
   maybePromptServerInstallInput,
-} from "./nixos-shared-host-install-prompt.ts";
-import { resolveClientInstallSshAuthDefaults } from "./nixos-shared-host-install-ssh-guess.ts";
-import { readStructuredInstallInputFromStdin } from "./nixos-shared-host-install-stdin.ts";
+} from "./nixos-shared-host-install-prompt";
+import { resolveClientInstallSshAuthDefaults } from "./nixos-shared-host-install-ssh-guess";
+import { readStructuredInstallInputFromStdin } from "./nixos-shared-host-install-stdin";
 import {
   installNixosSharedHost,
   statusNixosSharedHost,
   uninstallNixosSharedHost,
-} from "./nixos-shared-host-install-host.ts";
-import { clientOutputRoot } from "./nixos-shared-host-install-client-root.ts";
-import { detectDefaultConfigEntryPath } from "./nixos-shared-host-install-host-support.ts";
+} from "./nixos-shared-host-install-host";
+import { clientOutputRoot } from "./nixos-shared-host-install-client-root";
+import { detectDefaultConfigEntryPath } from "./nixos-shared-host-install-host-support";
 
 type HostInstallInput = {
   serverRoot: string;

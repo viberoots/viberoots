@@ -793,6 +793,7 @@ Normative-source note:
 - in policy for protected/shared reviewed multi-component service plus sidecar or shared-platform deployments only when the deployment declares the reviewed explicit rollout policy
 - protected/shared mutation, exact-artifact retry or rollback reuse, and reviewed `--provision-only` execution must route through the reviewed control-plane service / worker front door
 - protected/shared execution must stay inside vetted built-in publisher, provisioner, and service-health smoke code
+- protected/shared kubernetes service publish, retry, rollback, and promotion must declare `secret_requirements` at the `publish` step; ambient Helm or cluster credentials are rejected and the publisher process receives only the resolved reviewed credential env
 
 ## Capability Entry: `vercel`
 
@@ -860,6 +861,15 @@ Normative-source note:
 - fake API publishes are deterministic for target identity plus artifact identity
 - retry and rollback use recorded exact artifacts and never rebuild from branch state
 - ambiguous provider API outcomes fail closed with explicit records
+- shared `--publish-only` reuses only an admitted exact prebuilt artifact selected with `--source-run-id`
+- same-deployment `--publish-only` is reviewed as `retry`
+- same-deployment rollback is reviewed only for prior successful normal runs on the same canonical live target identity
+
+### Immutable-Reuse Operator Flows
+
+- same-deployment rollback requires both `--publish-only` and `--rollback`
+- rollback source selection is limited to prior successful normal live-target runs for the same deployment
+- retry or rollback fails closed when the retained exact artifact is unavailable
 
 ### Partial Publish Observability
 
@@ -868,6 +878,7 @@ Normative-source note:
 ### Provisioner Support
 
 - not supported in the initial Vercel provider slice
+- `--provision-only` is reviewed for protected/shared deployments through the control-plane service when the deployment declares one reviewed built-in provisioner
 
 ### Built-In `release_actions` Support
 
@@ -878,6 +889,7 @@ Normative-source note:
 
 - protected/shared Vercel mutation is routed through the reviewed control-plane service
 - laptop-local protected/shared artifact paths are rejected by the public front door
+- protected/shared mutation, exact-artifact retry or rollback reuse, and reviewed `--provision-only` execution must route through the reviewed control-plane service / worker front door
 
 <!-- END GENERATED PROVIDER CAPABILITIES -->
 

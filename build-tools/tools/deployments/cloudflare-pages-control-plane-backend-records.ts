@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import { type CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
+import { type CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission";
 import {
   cloudflarePagesPreviewIdentitySelector,
   type CloudflarePagesPreviewCleanupReason,
-} from "./cloudflare-pages-preview.ts";
+} from "./cloudflare-pages-preview";
 import {
   createCloudflarePagesDeployRecord,
   createCloudflarePagesDeployRunId,
-} from "./cloudflare-pages-records.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
+} from "./cloudflare-pages-records";
+import type { CloudflarePagesDeployment } from "./contract";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
 
 export function createBackendPreviewCleanupRecord(opts: {
   deployment: CloudflarePagesDeployment;

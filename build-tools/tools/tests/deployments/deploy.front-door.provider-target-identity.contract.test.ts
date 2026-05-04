@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { writeTempCloudflareValidationWorkspace } from "./deploy.front-door.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { writeTempCloudflareValidationWorkspace } from "./deploy.front-door.fixture";
+import { runInTemp } from "../lib/test-helpers";
 
 test("deploy --print-target-identity prints the canonical normal-flow target identity", async () => {
   await runInTemp("deploy-print-target-identity", async (tmp, $) => {

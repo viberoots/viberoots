@@ -1,4 +1,4 @@
-import { stripAnsiAndCrs } from "../lib/verify-log-status/types.ts";
+import { stripAnsiAndCrs } from "../lib/verify-log-status/types";
 
 export type VerifyPhaseTiming = {
   name: string;

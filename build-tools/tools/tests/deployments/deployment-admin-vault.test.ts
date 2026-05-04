@@ -6,13 +6,13 @@ import {
   buildDeploymentAdminVaultDesiredState,
   checkDeploymentAdminVault,
   syncDeploymentAdminVault,
-} from "../../deployments/deployment-admin-vault.ts";
+} from "../../deployments/deployment-admin-vault";
 import {
   cloudflarePagesApiTokenRequirements,
   cloudflarePagesDeploymentFixture,
-} from "./cloudflare-pages.fixture.ts";
-import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture.ts";
-import { nixosSharedHostLanePolicyFixture } from "./nixos-shared-host.fixture.ts";
+} from "./cloudflare-pages.fixture";
+import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture";
+import { nixosSharedHostLanePolicyFixture } from "./nixos-shared-host.fixture";
 
 const ADMIN_TOKEN = "test-admin-token";
 

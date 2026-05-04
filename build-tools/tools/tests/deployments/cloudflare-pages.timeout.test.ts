@@ -3,22 +3,22 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { resolveInitialCloudflarePagesAdmittedContext } from "../../deployments/cloudflare-pages-admission.ts";
-import { updateCloudflareBackendStep } from "../../deployments/cloudflare-pages-control-plane-backend-execution.ts";
-import { effectiveCloudflarePagesSmokeTimeoutMs } from "../../deployments/cloudflare-pages-smoke-retries.ts";
-import { runCloudflarePagesStaticDeploy } from "../../deployments/cloudflare-pages-static-deploy.ts";
-import { admitStaticWebappArtifact } from "../../deployments/static-webapp-artifacts.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { resolveInitialCloudflarePagesAdmittedContext } from "../../deployments/cloudflare-pages-admission";
+import { updateCloudflareBackendStep } from "../../deployments/cloudflare-pages-control-plane-backend-execution";
+import { effectiveCloudflarePagesSmokeTimeoutMs } from "../../deployments/cloudflare-pages-smoke-retries";
+import { runCloudflarePagesStaticDeploy } from "../../deployments/cloudflare-pages-static-deploy";
+import { admitStaticWebappArtifact } from "../../deployments/static-webapp-artifacts";
+import { runInTemp } from "../lib/test-helpers";
 import {
   cloudflarePagesDeploymentFixture,
   installCloudflarePagesTargets,
-} from "./cloudflare-pages.fixture.ts";
-import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+} from "./cloudflare-pages.fixture";
+import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
 import {
   writeCloudflareServiceArtifact,
   writeWranglerConfig,
-} from "./cloudflare-pages.service-flow.helpers.ts";
+} from "./cloudflare-pages.service-flow.helpers";
 
 test("cloudflare backend progress keeps current step and first mutation start", () => {
   const vault = updateCloudflareBackendStep(

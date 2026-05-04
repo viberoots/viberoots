@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import { createDeploymentSecretRuntime } from "./deployment-secret-runtime.ts";
-import { createDeploymentVaultSecretBackend } from "./deployment-secret-vault.ts";
-import type { DeploymentSecretContext } from "./deployment-secret-context.ts";
+import { createDeploymentSecretRuntime } from "./deployment-secret-runtime";
+import { createDeploymentVaultSecretBackend } from "./deployment-secret-vault";
+import type { DeploymentSecretContext } from "./deployment-secret-context";
 
 export function createVaultDeploymentSecretRuntime(opts: {
   authority?: { kind?: string };

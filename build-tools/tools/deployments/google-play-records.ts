@@ -2,26 +2,23 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { readVersionedJson } from "./deployment-schema-compat.ts";
-import type { GooglePlayAdmittedContext } from "./google-play-admission.ts";
+import { readVersionedJson } from "./deployment-schema-compat";
+import type { GooglePlayAdmittedContext } from "./google-play-admission";
 import type {
   GooglePlayReleaseHealth,
   GooglePlayRolloutState,
   GooglePlayTrackState,
-} from "./google-play-publisher.ts";
-import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
-import type {
-  DeploymentSmokeException,
-  DeploymentSmokeOutcome,
-} from "./deployment-smoke-policy.ts";
-import type { GooglePlayDeployment } from "./contract.ts";
+} from "./google-play-publisher";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy";
+import type { DeploymentSmokeException, DeploymentSmokeOutcome } from "./deployment-smoke-policy";
+import type { GooglePlayDeployment } from "./contract";
 import {
   googlePlayRunnerIdentities,
   type DeploymentRunnerIdentities,
-} from "./deployment-runner-identities.ts";
-import type { AdmittedGooglePlayArtifact } from "./google-play-artifacts.ts";
-import { GOOGLE_PLAY_PROVIDER } from "./contract.ts";
-import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
+} from "./deployment-runner-identities";
+import type { AdmittedGooglePlayArtifact } from "./google-play-artifacts";
+import { GOOGLE_PLAY_PROVIDER } from "./contract";
+import { operatorErrorFields } from "./deployment-control-plane-redaction";
 
 export const GOOGLE_PLAY_RECORD_SCHEMA = "google-play-deploy-record@2";
 export type GooglePlayOperationKind = "deploy" | "promotion" | "retry" | "rollback";

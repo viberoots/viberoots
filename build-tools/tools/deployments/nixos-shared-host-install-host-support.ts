@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { configEntryContainsManagedAnchorVariant } from "./nixos-shared-host-install-config-entry.ts";
+import { configEntryContainsManagedAnchorVariant } from "./nixos-shared-host-install-config-entry";
 import {
   hostPath,
   normalizeHostLogicalPath,
@@ -10,7 +10,7 @@ import {
   type NixosSharedHostConfigTopology,
   type NixosSharedHostInstallManifestV1,
   type NixosSharedHostWiringState,
-} from "./nixos-shared-host-install-contract.ts";
+} from "./nixos-shared-host-install-contract";
 
 export function manifestDataDirectories(manifest: NixosSharedHostInstallManifestV1): string[] {
   return Array.from(

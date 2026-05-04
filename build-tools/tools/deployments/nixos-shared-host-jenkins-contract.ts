@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostRemotePlan } from "./nixos-shared-host-remote-target.ts";
+import type { NixosSharedHostRemotePlan } from "./nixos-shared-host-remote-target";
 
 export const JENKINS_DEPLOY_SCHEMA_VERSION = "nixos-shared-host-jenkins-deploy@1";
 

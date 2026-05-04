@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { resolveToolPathSync } from "../../lib/tool-paths.ts";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 
 async function exists(p: string): Promise<boolean> {
   try {

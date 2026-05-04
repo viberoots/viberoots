@@ -2,15 +2,15 @@
 import type {
   DeploymentAdmissionEvidence,
   DeploymentPrincipal,
-} from "./deployment-admission-evidence.ts";
-import { normalizeCheckReportingKind } from "./deployment-admission-checks.ts";
-import { normalizeLaneGovernanceEvidence } from "./deployment-admission-governance.ts";
+} from "./deployment-admission-evidence";
+import { normalizeCheckReportingKind } from "./deployment-admission-checks";
+import { normalizeLaneGovernanceEvidence } from "./deployment-admission-governance";
 import {
   normalizeAttestationEvidence,
   normalizeSbomEvidence,
   normalizeSupplyChainGateEvidence,
-} from "./deployment-admission-supply-chain.ts";
-import { normalizeReadinessGateEvidence } from "./deployment-readiness-gates.ts";
+} from "./deployment-admission-supply-chain";
+import { normalizeReadinessGateEvidence } from "./deployment-readiness-gates";
 
 function normalizePrincipal(value: unknown): DeploymentPrincipal | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;

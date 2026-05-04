@@ -2,9 +2,9 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { isProviderPackageNode } from "../../lib/graph-utils.ts";
-import { readCompositeGraph } from "../../lib/graph-view.ts";
-import { providersForLabels } from "../../lib/labels.ts";
+import { isProviderPackageNode } from "../../lib/graph-utils";
+import { readCompositeGraph } from "../../lib/graph-view";
+import { providersForLabels } from "../../lib/labels";
 
 export type CoverageMiss =
   | { kind: "provider"; node: string; provider: string }

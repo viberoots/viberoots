@@ -1,9 +1,9 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { validateFlatDir } from "../../lib/provider-sync.ts";
-import { decodeNameVersionFromPatchLoose } from "../../lib/providers.ts";
-import { isKeeperOrDotfile, isPatchFile } from "./fs.ts";
-import type { PatchesLintConfig, Violation } from "./types.ts";
+import { validateFlatDir } from "../../lib/provider-sync";
+import { decodeNameVersionFromPatchLoose } from "../../lib/providers";
+import { isKeeperOrDotfile, isPatchFile } from "./fs";
+import type { PatchesLintConfig, Violation } from "./types";
 
 type CommonNameVersionMessages = {
   nonPatchInDir: string;

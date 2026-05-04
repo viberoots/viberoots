@@ -1,14 +1,14 @@
 #!/usr/bin/env zx-wrapper
-import { authorizeControlPlaneSubmit } from "./deployment-control-plane-authz.ts";
-import { resolveSubmitAuthorizationBoundary } from "./deployment-service-authorization-boundary.ts";
-import { acceptChallengedNixosSharedHostSubmit } from "./nixos-shared-host-control-plane-challenged-submit.ts";
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
-import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
-import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract.ts";
-import { cleanupThenRethrowRejectedNixosSubmit } from "./nixos-shared-host-control-plane-rejection-cleanup.ts";
-import { assertReviewedServiceBearerToken } from "./nixos-shared-host-control-plane-service-auth.ts";
-import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution.ts";
-import type { DeploymentControlPlaneServiceInstance } from "./deployment-control-plane-contract.ts";
+import { authorizeControlPlaneSubmit } from "./deployment-control-plane-authz";
+import { resolveSubmitAuthorizationBoundary } from "./deployment-service-authorization-boundary";
+import { acceptChallengedNixosSharedHostSubmit } from "./nixos-shared-host-control-plane-challenged-submit";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
+import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract";
+import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract";
+import { cleanupThenRethrowRejectedNixosSubmit } from "./nixos-shared-host-control-plane-rejection-cleanup";
+import { assertReviewedServiceBearerToken } from "./nixos-shared-host-control-plane-service-auth";
+import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution";
+import type { DeploymentControlPlaneServiceInstance } from "./deployment-control-plane-contract";
 
 export async function handleProtectedChallengedNixosServiceSubmit(opts: {
   workspaceRoot: string;

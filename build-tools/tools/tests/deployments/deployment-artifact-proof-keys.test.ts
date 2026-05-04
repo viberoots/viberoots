@@ -5,24 +5,24 @@ import { test } from "node:test";
 import {
   artifactBindingEnvelope,
   createArtifactBindingProof,
-} from "../../deployments/deployment-artifact-binding.ts";
+} from "../../deployments/deployment-artifact-binding";
 import {
   createDeploymentArtifactChallenge,
   deploymentServicePrincipalForToken,
-} from "../../deployments/deployment-artifact-challenges.ts";
-import type { DeploymentArtifactProofKeyRegistry } from "../../deployments/deployment-artifact-proof-keys.ts";
-import { acceptChallengedArtifactSubmission } from "../../deployments/deployment-artifact-submit-transaction.ts";
-import { fingerprintControlPlanePayload } from "../../deployments/deployment-control-plane-idempotency.ts";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { queryBackend } from "../../deployments/nixos-shared-host-control-plane-backend-db.ts";
-import { prepareBackendNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane-backend-prepare.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "../../deployments/deployment-artifact-challenges";
+import type { DeploymentArtifactProofKeyRegistry } from "../../deployments/deployment-artifact-proof-keys";
+import { acceptChallengedArtifactSubmission } from "../../deployments/deployment-artifact-submit-transaction";
+import { fingerprintControlPlanePayload } from "../../deployments/deployment-control-plane-idempotency";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { queryBackend } from "../../deployments/nixos-shared-host-control-plane-backend-db";
+import { prepareBackendNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane-backend-prepare";
+import { runInTemp } from "../lib/test-helpers";
 import {
   challengedSubmitRequest,
   countBackendRows,
-} from "./nixos-shared-host.challenged-submit.helpers.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
-import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers.ts";
+} from "./nixos-shared-host.challenged-submit.helpers";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 
 const TOKEN = "proof-key-token";
 

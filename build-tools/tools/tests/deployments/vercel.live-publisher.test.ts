@@ -5,9 +5,9 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { submitVercelDeploy, submitVercelPreviewCleanup } from "../../deployments/vercel-deploy.ts";
-import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "../../deployments/deployment-secret-fixture.ts";
-import { vercelDeploymentFixture } from "./vercel.fixture.ts";
+import { submitVercelDeploy, submitVercelPreviewCleanup } from "../../deployments/vercel-deploy";
+import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "../../deployments/deployment-secret-fixture";
+import { vercelDeploymentFixture } from "./vercel.fixture";
 
 async function writeArtifact(root: string) {
   const output = path.join(root, ".vercel", "output");

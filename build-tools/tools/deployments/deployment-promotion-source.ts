@@ -4,25 +4,22 @@ import path from "node:path";
 import {
   resolveAppStoreConnectReplaySource,
   type AppStoreConnectReplaySnapshot,
-} from "./app-store-connect-replay.ts";
+} from "./app-store-connect-replay";
 import {
   resolveCloudflarePagesReplaySource,
   type CloudflarePagesReplaySnapshot,
-} from "./cloudflare-pages-replay.ts";
+} from "./cloudflare-pages-replay";
 import {
   readBackendDeployRecordEnvelopeByDeployRunId,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
-import {
-  resolveGooglePlayReplaySource,
-  type GooglePlayReplaySnapshot,
-} from "./google-play-replay.ts";
+} from "./nixos-shared-host-control-plane-backend";
+import { resolveGooglePlayReplaySource, type GooglePlayReplaySnapshot } from "./google-play-replay";
 import {
   nixosSharedHostReplayArtifactIdentity,
   resolveNixosSharedHostReplaySource,
   type NixosSharedHostReplaySnapshot,
-} from "./nixos-shared-host-replay.ts";
-import type { DeploymentPromotionSource } from "./deployment-promotion-types.ts";
+} from "./nixos-shared-host-replay";
+import type { DeploymentPromotionSource } from "./deployment-promotion-types";
 
 export type {
   AppStoreConnectReplaySnapshot,

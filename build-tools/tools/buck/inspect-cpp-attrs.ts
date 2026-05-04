@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import { readCompositeGraph } from "../lib/graph-view.ts";
-import { normalizeTargetLabel } from "../lib/labels.ts";
-import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli.ts";
+import { readCompositeGraph } from "../lib/graph-view";
+import { normalizeTargetLabel } from "../lib/labels";
+import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli";
 
 type Args = {
   target?: string | string[];

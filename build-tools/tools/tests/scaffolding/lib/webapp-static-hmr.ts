@@ -6,7 +6,7 @@ import http from "node:http";
 import net from "node:net";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { terminateChildTree } from "../../lib/process-tree.ts";
+import { terminateChildTree } from "../../lib/process-tree";
 
 export async function pickFreePort(): Promise<number> {
   const server = net.createServer();

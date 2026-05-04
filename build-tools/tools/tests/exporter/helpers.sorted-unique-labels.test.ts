@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 test("sortedUniqueLabels dedupes labels and sorts nodes by name", async () => {
-  const { sortedUniqueLabels } = await import("../../buck/exporter/lang/helpers.ts");
+  const { sortedUniqueLabels } = await import("../../buck/exporter/lang/helpers");
   const nodes = [
     { name: "//b:bin", rule_type: "go_binary", labels: ["x", "a", "x"] },
     { name: "//a:lib", rule_type: "go_library", labels: ["b", "a", "b"] },

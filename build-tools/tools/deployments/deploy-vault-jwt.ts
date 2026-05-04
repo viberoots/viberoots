@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getArgvTokens, readFlagBoolFromTokens, readFlagStrFromTokens } from "../lib/argv.ts";
-import { assertJwtClaims, decodeJwtPayload } from "./deploy-vault-jwt-claims.ts";
+import { getArgvTokens, readFlagBoolFromTokens, readFlagStrFromTokens } from "../lib/argv";
+import { assertJwtClaims, decodeJwtPayload } from "./deploy-vault-jwt-claims";
 
 export type DeployVaultJwtOptions = {
   issuer: string;

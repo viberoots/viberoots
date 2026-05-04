@@ -1,38 +1,35 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../lib/graph.ts";
-import { normalizeTargetLabel } from "../lib/labels.ts";
-import { readString, readStringRecord } from "./deployment-graph-readers.ts";
+import type { GraphNode } from "../lib/graph";
+import { normalizeTargetLabel } from "../lib/labels";
+import { readString, readStringRecord } from "./deployment-graph-readers";
 import type {
   DeploymentPrerequisite,
   DeploymentPrerequisiteMode,
   DeploymentPreviewIdentitySelector,
   DeploymentPreviewPolicy,
-} from "./contract-types.ts";
+} from "./contract-types";
 import {
   extractDeploymentReleaseActions,
   type DeploymentReleaseAction,
-} from "./deployment-release-actions.ts";
+} from "./deployment-release-actions";
 import {
   extractDeploymentTargetExceptions,
   type DeploymentTargetException,
-} from "./deployment-target-exceptions.ts";
+} from "./deployment-target-exceptions";
 import {
   DEPLOYMENT_ROLLOUT_ABORT_BEHAVIORS,
   DEPLOYMENT_ROLLOUT_MODES,
   DEPLOYMENT_ROLLOUT_SMOKE_MODES,
   type DeploymentRolloutPolicy,
-} from "./deployment-rollout.ts";
+} from "./deployment-rollout";
 import {
   extractDeploymentAdmissionPolicies,
   extractDeploymentLanePoliciesWithGovernance,
   type DeploymentAdmissionPolicy,
   type DeploymentLanePolicy,
-} from "./deployment-policy.ts";
-import { extractDeploymentLaneGovernancePolicies } from "./deployment-lane-governance.ts";
-import {
-  readDeploymentSmokePolicy,
-  type DeploymentSmokePolicy,
-} from "./deployment-smoke-policy.ts";
+} from "./deployment-policy";
+import { extractDeploymentLaneGovernancePolicies } from "./deployment-lane-governance";
+import { readDeploymentSmokePolicy, type DeploymentSmokePolicy } from "./deployment-smoke-policy";
 export type DeploymentExtractionContext = {
   nodes: GraphNode[];
   components: Map<string, GraphNode>;

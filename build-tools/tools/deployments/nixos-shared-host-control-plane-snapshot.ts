@@ -4,17 +4,17 @@ import path from "node:path";
 import {
   admitNixosSharedHostComponentArtifacts,
   type NixosSharedHostResolvedComponentArtifact,
-} from "./nixos-shared-host-component-artifacts.ts";
+} from "./nixos-shared-host-component-artifacts";
 import {
   admitNixosSharedHostArtifact,
   type NixosSharedHostAdmittedArtifact,
-} from "./nixos-shared-host-artifacts.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
+} from "./nixos-shared-host-artifacts";
+import type { NixosSharedHostDeployment } from "./contract";
 import {
   resolveInitialNixosSharedHostAdmittedContext,
   resolvePromotionNixosSharedHostAdmittedContext,
   resolveReplayNixosSharedHostAdmittedContext,
-} from "./nixos-shared-host-admission.ts";
+} from "./nixos-shared-host-admission";
 import {
   NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA,
   type NixosSharedHostControlPlaneOperationKind,
@@ -22,24 +22,24 @@ import {
   type NixosSharedHostControlPlaneSnapshot,
   type NixosSharedHostPublishBehavior,
   type NixosSharedHostSmokeConnectOverride,
-} from "./nixos-shared-host-control-plane-contract.ts";
+} from "./nixos-shared-host-control-plane-contract";
 import {
   isMultiComponentNixosSharedHostDeployment,
   nixosSharedHostDeploymentTargetIdentity,
-} from "./nixos-shared-host-components.ts";
-import { nixosSharedHostPublishInputArtifactIdentity } from "./nixos-shared-host-publish-input.ts";
-import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
-import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay.ts";
-import { createNixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
-import { normalizeSingleComponentArtifactInput } from "./nixos-shared-host-single-component-artifact-input.ts";
+} from "./nixos-shared-host-components";
+import { nixosSharedHostPublishInputArtifactIdentity } from "./nixos-shared-host-publish-input";
+import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records";
+import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay";
+import { createNixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout";
+import { normalizeSingleComponentArtifactInput } from "./nixos-shared-host-single-component-artifact-input";
 import {
   hasReplaySnapshot,
   publishInputFor,
   recordedComponentResults,
-} from "./nixos-shared-host-control-plane-snapshot-helpers.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import type { NixosSharedHostReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot.ts";
-import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker.ts";
+} from "./nixos-shared-host-control-plane-snapshot-helpers";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import type { NixosSharedHostReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot";
+import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker";
 export type NixosSharedHostControlPlaneSourceSelection = {
   record: NixosSharedHostDeployRecord | { deployRunId: string; deploymentId: string };
   replaySnapshotPath?: string;
