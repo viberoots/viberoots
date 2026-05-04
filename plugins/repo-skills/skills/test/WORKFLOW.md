@@ -25,7 +25,7 @@ Validation command:
 - If a test selector was requested, run `i && b && v <test selector>`.
 
 Conserve tokens:
-- Pipe the full combined command output to a timestamped log file under buck-out/tmp/codex-test-logs/.
+- Pipe the full combined command output to a timestamped log file under buck-out/tmp/agent-test-logs/.
 - Do not paste verbose output into the conversation.
 - If the command passes, report only the commands run, the log path, elapsed timing, and a concise success summary.
 - If the command fails, inspect the log with targeted tools such as tail, rg, and focused sed ranges. Report the failing command or phase, elapsed timing, the relevant error lines, and the log path. Include enough detail for the main agent to fix the issue without reading the entire log.
@@ -38,8 +38,8 @@ Do not modify source files unless explicitly asked to investigate and fix failur
 Instruct the tester to use a command equivalent to:
 
 ```bash
-mkdir -p buck-out/tmp/codex-test-logs
-log="buck-out/tmp/codex-test-logs/i-b-v-$(date +%Y%m%d-%H%M%S).log"
+mkdir -p buck-out/tmp/agent-test-logs
+log="buck-out/tmp/agent-test-logs/i-b-v-$(date +%Y%m%d-%H%M%S).log"
 v_args=()
 set -euo pipefail
 start_epoch="$(date +%s)"
@@ -83,8 +83,8 @@ When the tester finishes:
 Prefer `rg`, `tail`, and narrow `sed -n` ranges when reviewing logs. Search first for high-signal patterns:
 
 ```bash
-rg -n "error|failed|failure|exception|panic|timeout|Command failed|Exit code|FAIL|FAILED" buck-out/tmp/codex-test-logs/<log>
-tail -n 200 buck-out/tmp/codex-test-logs/<log>
+rg -n "error|failed|failure|exception|panic|timeout|Command failed|Exit code|FAIL|FAILED" buck-out/tmp/agent-test-logs/<log>
+tail -n 200 buck-out/tmp/agent-test-logs/<log>
 ```
 
 Only read broader ranges when the first failing signature lacks context.
