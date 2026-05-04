@@ -1055,23 +1055,27 @@ evolves.
 ### 1. Intent
 
 Close the Vercel parity gap in the deploy CLI client subprocess so protected/shared Vercel
-mutations always run through the reviewed control-plane service path, never minting a vault JWT or
-preparing a deployment vault runtime locally, and prove that path end to end with a control-plane
-service test and the front-door negative tests left open by PR-10.
+mutations never mint a vault JWT or prepare a deployment vault runtime locally before handing the
+request to the reviewed control-plane service path from PR-10.
 
 ### 2. Scope of changes
 
 - Add `vercel` to the `serviceBackedWorkerRuntime` selection in
   `build-tools/tools/deployments/deploy-cli.ts` so the CLI client subprocess for protected/shared
   Vercel deploys, previews, retries, rollbacks, and preview cleanups never invokes
-  `prepareDeploymentVaultRuntime` or mints a vault JWT locally, matching the existing kubernetes
+  `prepareDeploymentVaultRuntime` or mints a vault JWT locally, matching the existing Kubernetes
   parity fix.
-- Route Vercel CLI client subprocess execution through the same in-process control-plane service
-  worker harness already used for kubernetes, preserving `local_only` Vercel fixture behavior on the
-  laptop-local path.
-- Add explicit front-door negative coverage for protected/shared Vercel mutation rejecting
-  laptop-local artifact directories and direct local-publish flags, in addition to the existing
-  records-root rejection from PR-10.
+- Treat the existing Vercel protected front-door and control-plane adapter from PR-10 as the service
+  destination; this PR owns the deploy-CLI subprocess handoff gap, not another front-door routing
+  rewrite.
+- Expand the protected/shared Vercel service-only rejection surface to include explicit
+  laptop-local artifact inputs such as `--artifact-dir`; the CLI client may submit an admitted
+  artifact reference or source selector, but must not hand a local filesystem path to the service
+  boundary.
+- Keep Vercel CLI client subprocess execution on the PR-10 service-backed front-door path, while
+  preserving `local_only` Vercel fixture behavior on the laptop-local path.
+- Centralize the provider selection for service-backed worker runtime so protected/shared providers
+  cannot silently fall back to laptop-local secret material handling.
 
 ### 3. External prerequisites
 
@@ -1084,212 +1088,230 @@ service test and the front-door negative tests left open by PR-10.
   `kubernetes.control-plane.service.test.ts` that exercises the deploy CLI client subprocess against
   an in-process Vercel control-plane worker for protected/shared deploy, preview, preview cleanup,
   retry, and rollback.
-- Front-door negative tests proving protected/shared Vercel mutations reject laptop-local artifact
-  directories and direct local-publish flags, complementing the records-root rejection already
-  covered by PR-10.
 - Regression coverage proving the deploy CLI client subprocess never calls
   `prepareDeploymentVaultRuntime` for protected/shared Vercel operations.
+- Front-door negative coverage proving protected/shared Vercel deploy and preview reject explicit
+  laptop-local artifact directories before service submission.
+- Provider-selection coverage proving each protected/shared service-backed provider is explicitly
+  classified and that `local_only` Vercel still uses the local fixture path.
 
 ### 5. Docs to be added or updated
 
 - Update deployment usage docs to call out that protected/shared Vercel mutations always run through
-  the service-backed worker runtime, alongside the equivalent kubernetes statement.
-- Update Vercel troubleshooting docs with the CLI client subprocess service path and the front-door
-  rejection surfaces for laptop-local artifact directories and direct local-publish flags.
+  the service-backed worker runtime, alongside the equivalent Kubernetes statement.
+- Update Vercel troubleshooting docs with the CLI client subprocess service path and the local-only
+  fixture exception.
 
 ### 6. Acceptance criteria
 
 - Protected/shared Vercel mutations through the deploy CLI never construct a deployment vault
   runtime or mint a vault JWT inside the CLI client subprocess.
+- Protected/shared Vercel deploy and preview submissions cannot carry laptop-local artifact
+  directories across the service boundary.
 - The new Vercel control-plane service test passes against the in-process worker for every Vercel
   operation kind covered by PR-10.
-- Protected/shared Vercel front-door negative tests exist for laptop-local artifact directories,
-  records roots, and direct local-publish flags.
+- Provider selection fails closed when a protected/shared service-backed provider is missing from
+  the runtime classification.
 
 ### 7. Risks
 
 - Service-backed worker runtime selection can drift again if a new provider is added without parity
   updates, regressing into laptop-local secret material handling.
 - Vercel control-plane service tests can become slow or flaky if the in-process worker harness is
-  not shared with the existing kubernetes harness.
+  not shared with the existing Kubernetes harness.
 
 ### 8. Mitigations
 
 - Centralize the `serviceBackedWorkerRuntime` selection so adding a provider requires an explicit
   parity decision and add a regression test that fails when a protected/shared provider is missing
   from the set.
-- Reuse the existing in-process control-plane worker harness from the kubernetes service test to
+- Reuse the existing in-process control-plane worker harness from the Kubernetes service test to
   keep the new Vercel test deterministic and bounded.
 
 ### 9. Consequences of not implementing this PR
 
 The deploy CLI client subprocess can still attempt to mint a vault JWT and prepare a deployment
 vault runtime locally for protected/shared Vercel deploys, leaving Vercel one parity step behind
-kubernetes, and PR-10's front-door guarantees remain only partially proven by tests.
+Kubernetes.
 
 ### 10. Downsides for implementing this PR
 
-It adds another control-plane service end-to-end test and more front-door negative tests, slightly
-increasing CLI test surface and runtime.
+It adds another control-plane service end-to-end test and a provider-selection regression gate,
+slightly increasing CLI test surface and runtime.
 
-## PR-14: Vercel control-plane admission, replay, and frozen execution snapshot
+## PR-14: Shared control-plane admission, replay, and frozen execution snapshot
 
 ### 1. Intent
 
-Bring the Vercel control-plane worker into parity with the kubernetes and S3 workers so Vercel
-submissions go through the shared admission and replay engine and so worker execution runs from a
-frozen admitted execution snapshot with secret-contract references rather than an inline secret
-runtime.
+Create the shared provider control-plane admission and replay contract that Vercel, Kubernetes, and
+S3 all still need to adopt, so protected/shared provider submissions go through one admission engine
+and worker execution runs from a frozen admitted execution snapshot with secret-contract references
+rather than provider-local inline admission fields.
 
 ### 2. Scope of changes
 
-- Route Vercel control-plane submissions through `evaluateDeploymentAdmission` instead of writing
-  submission records directly with synthetic `dedupe` and `admission` fields, so lane gating,
-  admitted-selector replay, and admission evidence are computed by the shared engine.
-- Replace the inline `submitVercelDeploy` secret runtime construction in `runVercelOperation` with
-  execution from a frozen admitted execution snapshot that carries secret-contract references, the
-  admitted artifact reference, source run ID, operation kind, and admission evidence.
-- Use admitted-selector replay for Vercel retry, rollback, and preview cleanup so the worker reuses
-  the recorded admitted execution snapshot rather than rebuilding admission state from request
-  inputs.
-- Preserve the existing Vercel artifact admission, smoke, fake API, and record behavior behind the
-  shared admission and replay boundary.
+- Introduce a shared provider control-plane submission preparation path that calls
+  `evaluateDeploymentAdmission` before writing queued submission records for Vercel, Kubernetes, and
+  S3.
+- Migrate the current queue implementations in
+  `build-tools/tools/deployments/vercel-control-plane.ts`,
+  `build-tools/tools/deployments/kubernetes-control-plane.ts`, and
+  `build-tools/tools/deployments/s3-static-control-plane.ts` from raw request snapshots to that
+  shared preparation path.
+- Replace provider-local synthetic `admission` fields with the shared admission evaluation result
+  and preserve that result as part of a frozen admitted execution snapshot.
+- Define a versioned frozen execution snapshot carrying secret-contract references, admitted
+  artifact references, source run IDs, operation kind, provider target identity, and admission
+  evidence.
+- Replace raw `artifactDir` fields in protected/shared provider submit requests with admitted
+  artifact references or reviewed source selectors before the worker snapshot is persisted.
+- Migrate Vercel, Kubernetes, and S3 workers to execute from the frozen admitted execution snapshot
+  instead of reconstructing admission state from raw request inputs.
+- Use admitted-selector replay for retry, rollback, promotion, and preview cleanup where supported,
+  so provider workers reuse recorded admitted snapshots and exact artifact evidence consistently.
+- Preserve existing provider-specific artifact admission, smoke, fake API, Helm/S3/Vercel publisher,
+  and record behavior behind the shared admission and replay boundary.
 
 ### 3. External prerequisites
 
-- No live Vercel account is required.
-- No new secret runtime contracts beyond those already defined for Vercel in PR-3 and PR-10.
+- No live provider account is required.
+- No new secret runtime contracts beyond those already defined for Vercel, Kubernetes, and S3.
 
 ### 4. Tests to be added
 
-- Admission engine tests proving Vercel deploy, preview, preview cleanup, retry, and rollback
-  submissions are admitted, denied, or queued by `evaluateDeploymentAdmission` on the same code path
-  as kubernetes and S3.
-- Frozen execution-snapshot tests proving the Vercel worker executes from the admitted snapshot's
-  secret-contract references and admitted artifact reference, and never reconstructs the secret
+- Admission engine tests proving Vercel, Kubernetes, and S3 deploy-style submissions are admitted,
+  denied, or queued by `evaluateDeploymentAdmission` through the same shared preparation path.
+- Frozen execution-snapshot tests proving each migrated provider worker executes from snapshot
+  secret-contract references and admitted artifact references, and never reconstructs the secret
   runtime from raw request inputs.
-- Replay tests proving Vercel retry, rollback, and preview cleanup resolve the admitted-selector
-  recorded snapshot and reject mismatched admission evidence.
-- Negative tests proving the Vercel control-plane worker rejects submissions whose admission
-  decision did not come from the shared admission engine.
+- Replay tests proving Vercel retry, rollback, and preview cleanup, plus Kubernetes/S3 exact-artifact
+  replay paths, resolve admitted-selector recorded snapshots and reject mismatched admission
+  evidence.
+- Negative tests proving provider control-plane workers reject submissions whose admission decision
+  did not come from the shared admission engine.
 
 ### 5. Docs to be added or updated
 
-- Update deployment design and usage docs to state that Vercel control-plane submissions go through
-  the shared admission engine and execute from frozen admitted execution snapshots.
-- Update Vercel troubleshooting docs with admission-evidence and frozen-snapshot failure modes.
+- Update deployment design and usage docs to state that provider control-plane submissions go
+  through the shared admission engine and execute from frozen admitted execution snapshots.
+- Update Vercel, Kubernetes, and S3 troubleshooting docs with admission-evidence and
+  frozen-snapshot failure modes.
 
 ### 6. Acceptance criteria
 
-- Vercel control-plane submissions never bypass `evaluateDeploymentAdmission` and never synthesize
-  `dedupe` or `admission` fields inline.
-- The Vercel worker executes only from frozen admitted execution snapshots with secret-contract
-  references and admitted artifact references.
-- Vercel retry, rollback, and preview cleanup resolve admitted-selector replay through the same
-  shared engine used by kubernetes and S3.
+- Vercel, Kubernetes, and S3 control-plane submissions never bypass `evaluateDeploymentAdmission`
+  and never synthesize provider-local `admission` fields inline.
+- Vercel, Kubernetes, and S3 workers execute only from frozen admitted execution snapshots with
+  secret-contract references and admitted artifact references.
+- Protected/shared provider snapshots do not persist laptop-local artifact directories as execution
+  inputs.
+- Vercel retry, rollback, and preview cleanup, plus Kubernetes/S3 exact-artifact replay paths,
+  resolve admitted-selector replay through the same shared engine.
 
 ### 7. Risks
 
-- Migrating the existing Vercel worker to admission-engine and frozen-snapshot execution can break
-  recorded fixtures that were captured under the inline path.
+- Migrating existing provider workers to admission-engine and frozen-snapshot execution can break
+  recorded fixtures that were captured under provider-local inline paths.
 - Snapshot shape changes can cause drift between provider workers if the contract is not centrally
   versioned.
 
 ### 8. Mitigations
 
-- Re-record affected Vercel fixtures alongside the migration and add cross-provider tests proving
+- Re-record affected provider fixtures alongside the migration and add cross-provider tests proving
   the admission engine and frozen-snapshot contract are shared.
 - Treat the admitted execution snapshot as a versioned contract owned by the deployment design and
-  test it on the same path used by kubernetes and S3.
+  test it on every migrated provider path.
 
 ### 9. Consequences of not implementing this PR
 
-Vercel control-plane execution remains structurally divergent from the design's frozen admission
+Provider control-plane execution remains structurally divergent from the design's frozen admission
 snapshot and admitted-selector replay model, leaving lane gating, admission evidence, and replay
-guarantees weaker for Vercel than for kubernetes and S3.
+guarantees dependent on provider-local implementations.
 
 ### 10. Downsides for implementing this PR
 
-It requires reworking an already-shipped provider worker and re-recording its fixtures, increasing
+It requires reworking already-shipped provider workers and re-recording fixtures, increasing
 short-term churn and test maintenance.
 
-## PR-15: Vercel submit-layer idempotency dedup against payload fingerprint
+## PR-15: Shared submit-layer idempotency dedup against payload fingerprint
 
 ### 1. Intent
 
-Bring Vercel control-plane submissions into compliance with the design's submit-layer idempotency
-contract so duplicate Vercel deploy, preview, preview cleanup, retry, and rollback requests dedupe
-against a normalized payload fingerprint instead of always recording a synthetic
-`direct:<submissionId>` request fingerprint.
+Bring provider control-plane submissions into compliance with the design's submit-layer idempotency
+contract so duplicate Vercel, Kubernetes, and S3 requests dedupe against normalized payload
+fingerprints instead of always recording synthetic `direct:<submissionId>` request fingerprints.
 
 ### 2. Scope of changes
 
-- Compute a normalized Vercel submission payload fingerprint that includes operation kind, target
+- Compute normalized provider submission payload fingerprints that include operation kind, target
   identity, admitted artifact reference, source run ID, preview cleanup inputs, smoke overrides, and
-  any other replay-relevant fields, on the same contract used by kubernetes and S3.
+  any other replay-relevant fields from the frozen admitted execution snapshot.
+- Reuse the existing submit-layer helpers in
+  `build-tools/tools/deployments/deployment-control-plane-idempotency.ts` instead of introducing a
+  second provider-specific idempotency mechanism.
 - Replace the always-`created` synthetic `dedupe: {mode: "created", requestFingerprint:
-"direct:<submissionId>"}` write with the shared submit-layer idempotency engine that returns
-  `created` on first submit and `duplicate` on payload-fingerprint match.
-- Cover retry, rollback, and preview cleanup with the same submit-layer idempotency contract so
-  repeated requests collapse onto the recorded admitted submission instead of producing duplicate
-  records.
-- Preserve `local_only` Vercel fixture behavior outside the submit-layer idempotency boundary.
+"direct:<submissionId>"}` writes in Vercel, Kubernetes, and S3 with the shared submit-layer
+  idempotency engine that returns `created` on first submit and `duplicate` on payload-fingerprint
+  match.
+- Cover retry, rollback, promotion, and preview cleanup where supported with the same submit-layer
+  idempotency contract so repeated requests collapse onto the recorded admitted submission instead
+  of producing duplicate records.
+- Preserve `local_only` fixture behavior outside the submit-layer idempotency boundary.
 
 ### 3. External prerequisites
 
-- No live Vercel account is required.
-- Depends on PR-14's admission and frozen-snapshot integration so the payload fingerprint can be
+- No live provider account is required.
+- Depends on PR-14's admission and frozen-snapshot integration so payload fingerprints can be
   computed from admitted inputs rather than raw request inputs.
 
 ### 4. Tests to be added
 
-- Submit-layer idempotency tests proving identical Vercel deploy, preview, preview cleanup, retry,
-  and rollback payloads return `duplicate` and reuse the recorded admitted submission.
+- Submit-layer idempotency tests proving identical Vercel, Kubernetes, and S3 payloads return
+  `duplicate` and reuse the recorded admitted submission.
 - Tests proving payload-fingerprint differences across operation kind, target identity, admitted
   artifact reference, source run ID, preview cleanup inputs, and smoke overrides each produce
   distinct submissions.
 - Negative tests proving the synthetic `direct:<submissionId>` request fingerprint is never written
-  by the Vercel control plane.
-- Cross-provider tests proving Vercel, kubernetes, and S3 share the same submit-layer idempotency
+  by migrated provider control planes.
+- Cross-provider tests proving Vercel, Kubernetes, and S3 share the same submit-layer idempotency
   engine and contract.
 
 ### 5. Docs to be added or updated
 
-- Update deployment design and usage docs with the Vercel submit-layer idempotency contract and the
-  fields included in the payload fingerprint.
-- Update Vercel troubleshooting docs with `duplicate` submission outcomes and how to interpret
+- Update deployment design and usage docs with the shared submit-layer idempotency contract and the
+  fields included in provider payload fingerprints.
+- Update provider troubleshooting docs with `duplicate` submission outcomes and how to interpret
   payload-fingerprint mismatches.
 
 ### 6. Acceptance criteria
 
-- Vercel control-plane submissions always dedupe through the shared submit-layer idempotency engine
-  against a normalized payload fingerprint.
-- The synthetic `direct:<submissionId>` request fingerprint is removed from Vercel control-plane
-  writes.
-- Vercel retry, rollback, and preview cleanup honor submit-layer idempotency on the same code path
-  as kubernetes and S3.
+- Vercel, Kubernetes, and S3 control-plane submissions always dedupe through the shared
+  submit-layer idempotency engine against normalized payload fingerprints.
+- The synthetic `direct:<submissionId>` request fingerprint is removed from migrated provider
+  control-plane writes.
+- Retry, rollback, promotion, and preview cleanup honor submit-layer idempotency on the same shared
+  code path where those operation kinds are supported.
 
 ### 7. Risks
 
-- Choosing the wrong fields for the Vercel payload fingerprint can cause false `duplicate` matches
-  or miss true duplicates.
+- Choosing the wrong fields for provider payload fingerprints can cause false `duplicate` matches or
+  miss true duplicates.
 - Adding submit-layer idempotency to retry, rollback, and preview cleanup can interact subtly with
   admitted-selector replay if the two contracts are not aligned.
 
 ### 8. Mitigations
 
-- Derive the Vercel payload fingerprint from the admitted execution snapshot from PR-14 so the field
-  set is bound to the admitted contract.
+- Derive payload fingerprints from the admitted execution snapshot from PR-14 so each field set is
+  bound to the admitted contract.
 - Test submit-layer idempotency and admitted-selector replay together for every Vercel operation
-  kind.
+  kind and for Kubernetes/S3 exact-artifact replay paths.
 
 ### 9. Consequences of not implementing this PR
 
-Vercel control-plane submissions can record duplicate admitted submissions for the same payload and
-do not satisfy the design's submit-layer idempotency contract, leaving Vercel inconsistent with
-kubernetes and S3.
+Provider control-plane submissions can record duplicate admitted submissions for the same payload and
+do not satisfy the design's submit-layer idempotency contract.
 
 ### 10. Downsides for implementing this PR
 
-It introduces another shared contract dependency on the submit-layer idempotency engine and
-requires re-recording Vercel control-plane fixtures whose `dedupe` shape changes.
+It introduces another shared contract dependency on the submit-layer idempotency engine and requires
+re-recording provider control-plane fixtures whose `dedupe` shape changes.
