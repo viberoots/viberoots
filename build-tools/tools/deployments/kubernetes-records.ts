@@ -14,6 +14,7 @@ import {
   type DeploymentRunnerIdentities,
 } from "./deployment-runner-identities.ts";
 import type { KubernetesProvisionerPlanRef } from "./kubernetes-provisioner-plan.ts";
+import type { OpenTofuApplyOutcome } from "./opentofu-apply.ts";
 import { KUBERNETES_PROVIDER } from "./contract.ts";
 import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
 
@@ -56,6 +57,7 @@ export type KubernetesDeployRecord = {
   publisherType: string;
   provisionerType?: string;
   provisionerPlan?: KubernetesProvisionerPlanRef;
+  provisionerApplyOutcome?: OpenTofuApplyOutcome;
   smokeOutcome?: DeploymentSmokeOutcome;
   smokeException?: DeploymentSmokeException;
   smokeError?: string;

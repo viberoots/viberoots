@@ -410,6 +410,17 @@ step instead of editing Keycloak by hand.
 - supports `opentofu-stack` provision-only foundation runs when stack files live
   under the deployment package `opentofu/` directory and the plan is
   non-destructive
+- the OpenTofu reviewed apply path consumes the recorded plan artifact, plan
+  fingerprint, stack config fingerprint, stack identity, and state backend
+  identity; mismatches against admission evidence fail closed and never invoke
+  `tofu apply`
+- OpenTofu provider and backend credentials are resolved exclusively through
+  deployment `secret_requirements` at the `provision` step, never from ambient
+  process environment, and credential values are never written to deployment
+  records (only credential names plus the redacted apply diagnostics surface)
+- routine protected/shared flows reject `delete`, `replace`, or unknown plan
+  actions; reviewed destructive workflows must attach a
+  `destructiveExceptionRef` evidence entry before any destructive plan can apply
 - use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
 
 Scaffold-first examples:

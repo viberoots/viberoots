@@ -122,6 +122,11 @@ Use stable reviewed contract IDs for external dependencies:
 - console-to-web base URL: `config://deployments/console/web_base_url/...`
 - provider tokens for Cloudflare, Vercel, container runtime, DNS, and OpenTofu:
   `secret://deployments/<provider>/...`
+- OpenTofu provider credentials use
+  `opentofu_provider_credentials` at step `provision` with contract id
+  `secret://deployments/opentofu/provider`. Backend credentials follow the same
+  step and contract namespace and must never be sourced from ambient process
+  environment.
 
 Keep each requirement step-specific. Provider publish tokens belong to
 `publish`, provisioning credentials belong to `provision`, preview cleanup

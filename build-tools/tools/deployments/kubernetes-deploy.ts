@@ -5,34 +5,24 @@ import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts
 import type { KubernetesDeployment } from "./contract.ts";
 import { withFailedStep } from "./deployment-failed-step.ts";
 import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
-import {
-  classifySmokeRetry,
-  noPublishAutoRetry,
-  runWithAutomaticRetry,
-} from "./deployment-retry-policy.ts";
+// prettier-ignore
+import { classifySmokeRetry, noPublishAutoRetry, runWithAutomaticRetry } from "./deployment-retry-policy.ts";
 import { executionPolicyWithRetry, retryAuditFrom } from "./deployment-retry-records.ts";
-import {
-  deploymentMetadataFingerprintFor,
-  fingerprintValue,
-} from "./nixos-shared-host-deployment-fingerprint.ts";
+// prettier-ignore
+import { deploymentMetadataFingerprintFor, fingerprintValue } from "./nixos-shared-host-deployment-fingerprint.ts";
 import { admitKubernetesComponentArtifacts } from "./kubernetes-artifacts.ts";
-import {
-  artifactByComponentId,
-  orderedComponentIds,
-  requiredArtifactPaths,
-} from "./kubernetes-deploy-helpers.ts";
+// prettier-ignore
+import { artifactByComponentId, orderedComponentIds, requiredArtifactPaths } from "./kubernetes-deploy-helpers.ts";
 import { resolveInitialKubernetesAdmittedContext } from "./kubernetes-admission.ts";
 import { prepareKubernetesPublisherConfig } from "./kubernetes-config.ts";
 import { publishKubernetesComponent } from "./kubernetes-publisher.ts";
-import {
-  createKubernetesDeployRecord,
-  createKubernetesDeployRunId,
-  writeKubernetesDeployRecord,
-  type KubernetesDeployRecord,
-} from "./kubernetes-records.ts";
+// prettier-ignore
+import { createKubernetesDeployRecord, createKubernetesDeployRunId, writeKubernetesDeployRecord, type KubernetesDeployRecord } from "./kubernetes-records.ts";
 import { writeKubernetesReplaySnapshot } from "./kubernetes-replay.ts";
 import { smokeKubernetesRelease } from "./kubernetes-smoke.ts";
 import { writeKubernetesProvisionerPlan } from "./kubernetes-provisioner-plan.ts";
+// prettier-ignore
+import { maybeRunOpenTofuReviewedApply, type OpenTofuApplyHooks } from "./opentofu-apply-orchestration.ts";
 
 export async function submitKubernetesDeploy(opts: {
   workspaceRoot: string;
@@ -43,6 +33,7 @@ export async function submitKubernetesDeploy(opts: {
   submissionId?: string;
   expectedSourceRevision?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
+  openTofuApply?: OpenTofuApplyHooks;
   smokeConnectOverride?: {
     protocol: "http:" | "https:";
     hostname: string;
@@ -91,6 +82,12 @@ export async function submitKubernetesDeploy(opts: {
       ...(opts.admissionEvidence || {}),
       ...(provisionerPlan ? { provisionerPlanFingerprint: provisionerPlan.fingerprint } : {}),
     },
+  });
+  const provisionerApplyOutcome = await maybeRunOpenTofuReviewedApply({
+    deployment: opts.deployment,
+    admittedContext,
+    provisionerPlan,
+    hooks: opts.openTofuApply,
   });
   const smokeMode = resolveDeploymentSmokeExecutionMode({ deployment: opts.deployment });
   const deploymentMetadataFingerprint = deploymentMetadataFingerprintFor(opts.deployment);
@@ -187,6 +184,7 @@ export async function submitKubernetesDeploy(opts: {
       admittedContext,
       ...(opts.deployment.provisioner ? { provisionerType: opts.deployment.provisioner.type } : {}),
       ...(provisionerPlan ? { provisionerPlan } : {}),
+      ...(provisionerApplyOutcome ? { provisionerApplyOutcome } : {}),
       smokeOutcome: "passed",
       executionPolicy,
       deploymentMetadataFingerprint,
@@ -227,6 +225,7 @@ export async function submitKubernetesDeploy(opts: {
       admittedContext,
       ...(opts.deployment.provisioner ? { provisionerType: opts.deployment.provisioner.type } : {}),
       ...(provisionerPlan ? { provisionerPlan } : {}),
+      ...(provisionerApplyOutcome ? { provisionerApplyOutcome } : {}),
       executionPolicy,
       deploymentMetadataFingerprint,
       ...(providerConfigFingerprint ? { providerConfigFingerprint } : {}),
