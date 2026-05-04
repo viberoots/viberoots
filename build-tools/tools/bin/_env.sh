@@ -95,6 +95,17 @@ exec_in_dev_shell() {
 	local live_root="$1"; shift
 	local fastpath_enabled="${BUCK_DEV_SHELL_FASTPATH:-1}"
 	local zx_init_path="${ZX_INIT:-${live_root}/build-tools/tools/dev/zx-init.mjs}"
+	# Make the zx-init resolver hook (which auto-appends `.ts` to relative imports) reachable
+	# by every `node` subprocess in this dev-shell session, including shebang `zx-wrapper`
+	# invocations spawned from inside `.ts` scripts. Without this, scripts that don't go through
+	# `node_ts` (e.g. tools spawned via `$\`zx-wrapper foo.ts\``) lose the hook and ESM
+	# resolution fails for bare imports like `from "./foo"`.
+	if [[ -f "${zx_init_path}" ]]; then
+		local zx_init_url="file://${zx_init_path}"
+		if [[ "${NODE_OPTIONS:-}" != *"${zx_init_url}"* ]]; then
+			export NODE_OPTIONS="--import=${zx_init_url}${NODE_OPTIONS:+ ${NODE_OPTIONS}}"
+		fi
+	fi
 	local can_bypass_direnv="0"
 	if [[ "${fastpath_enabled}" != "0" ]]; then
 		# Safe fast-path: only bypass direnv when core runtime tools and zx bootstrap are already present.
