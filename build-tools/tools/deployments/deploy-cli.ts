@@ -20,7 +20,11 @@ import {
 } from "./deployment-vault-runtime.ts";
 import { activateDeploymentSecretContext } from "./deployment-secret-context.ts";
 import { assertNoProtectedSharedClientCredentialInputs } from "./deployment-service-client-contract.ts";
-import { isCloudflarePagesDeployment, isNixosSharedHostDeployment } from "./contract.ts";
+import {
+  isCloudflarePagesDeployment,
+  isKubernetesDeployment,
+  isNixosSharedHostDeployment,
+} from "./contract.ts";
 import { runProviderDeployFrontDoor } from "./deploy-cli-provider-dispatch.ts";
 
 function requireFlag(name: string): string {
@@ -112,7 +116,9 @@ export async function runDeployCli(opts: {
   const serviceBackedWorkerRuntime =
     opts.publicFrontDoor &&
     deployment.protectionClass !== "local_only" &&
-    (isNixosSharedHostDeployment(deployment) || isCloudflarePagesDeployment(deployment));
+    (isNixosSharedHostDeployment(deployment) ||
+      isCloudflarePagesDeployment(deployment) ||
+      isKubernetesDeployment(deployment));
   const vaultRuntime = serviceBackedWorkerRuntime
     ? { minted: false }
     : await prepareDeploymentVaultRuntime({

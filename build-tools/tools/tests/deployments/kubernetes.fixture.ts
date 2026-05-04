@@ -64,6 +64,7 @@ export function kubernetesDeploymentFixture(
     ],
     publisher: overrides.publisher || { type: "helm-release", config: "helm/values.yaml" },
     ...(overrides.provisioner ? { provisioner: overrides.provisioner } : {}),
+    ...(overrides.vaultRuntime ? { vaultRuntime: overrides.vaultRuntime } : {}),
     providerTarget,
   };
 }
