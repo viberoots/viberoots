@@ -77,7 +77,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deploy-vault-jwt.test-helpers.ts": False,
     "build-tools/tools/tests/deployments/deploy.admit-only.contract.test.ts": True,
     "build-tools/tools/tests/deployments/deploy.admission-requirements.contract.test.ts": True,
-    "build-tools/tools/tests/deployments/deploy.front-door.contract.test.ts": True,
+    "build-tools/tools/tests/deployments/deploy.front-door.contract.test.ts": True, "build-tools/tools/tests/deployments/deploy.front-door-readiness.test.ts": True,
     "build-tools/tools/tests/deployments/deploy.front-door.control-plane-operator.contract.test.ts": True,
     "build-tools/tools/tests/deployments/deploy.front-door.hosted-status-ux.test.ts": True,
     "build-tools/tools/tests/deployments/deploy.front-door.provider-target-identity.contract.test.ts": True,

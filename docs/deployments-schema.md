@@ -569,7 +569,10 @@ local PR, such as Ragie ACL semantics, live tenant leak checks, WorkOS MCP auth,
 storage grant lifecycle, and Connect metadata/OAuth checks. Evidence must be
 redacted and bound to deployment id, provider target identity, source revision
 or source run id, and an external evidence reference. Raw provider responses,
-tokens, or diagnostic payloads are not admission evidence.
+tokens, or diagnostic payloads are not admission evidence. The repo-level
+deployment front door resolves these gates from Buck deployment targets and
+enforces them through admission; target authors must not rely on helper-only
+validation paths.
 
 Minimum `artifact_attestation_requirements` contract:
 

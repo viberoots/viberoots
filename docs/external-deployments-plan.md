@@ -625,3 +625,74 @@ by the repo's deployment system.
 
 It adds policy and live-environment complexity before all product code exists, and it may require
 operators to provision several external test accounts early.
+
+## PR-9: Front-door readiness and boundary query enforcement
+
+### 1. Intent
+
+Close the remaining integration gap between PR-8's policy helpers and the normal deployment
+front-door path by carrying readiness gates and dependency graph data through cquery extraction.
+
+### 2. Scope of changes
+
+- Include `readiness_gates` in the deployment cquery attributes used by repo/front-door deployment
+  resolution.
+- Ensure `extractDeploymentAdmissionPolicies` receives readiness-gate declarations from real
+  deployment targets and deploy-blocking admission paths.
+- Include dependency graph data needed by `appTargetBoundaryErrors` in the deployment query or add
+  an equivalent real graph lookup before front-door validation runs.
+- Keep the app-to-app boundary check active for real deployment targets, not only synthetic unit
+  test nodes.
+- Preserve existing external requirement profile validation and readiness evidence normalization
+  behavior from PR-8.
+
+### 3. External prerequisites
+
+- No external accounts are required; the work is query/extraction wiring and fixture coverage.
+
+### 4. Tests to be added
+
+- Cquery extraction tests proving real or fixture deployment targets retain `readiness_gates`
+  through `queryDeploymentNodes` into `extractDeploymentAdmissionPolicies`.
+- Front-door validation tests proving a deployment with required readiness gates blocks when
+  matching evidence is absent and passes when valid bound evidence is supplied.
+- Real-query or fixture graph tests proving app-target dependencies are visible to
+  `appTargetBoundaryErrors` during front-door validation.
+- Negative tests proving an app target importing another app target fails through the same
+  front-door path used by deployment validation.
+
+### 5. Docs to be added or updated
+
+- Update deployment schema/admission docs to state that readiness gates and app-boundary checks are
+  enforced by front-door deployment resolution, not only helper-level validation.
+- Update this plan if the query shape changes again.
+
+### 6. Acceptance criteria
+
+- A deployment policy's `readiness_gates` cannot be dropped during normal repo/front-door
+  resolution.
+- App-to-app dependency violations are detected from the real deployment graph used by front-door
+  validation.
+- Tests prove the shipped integration path, not only isolated helper behavior.
+
+### 7. Risks
+
+- Adding graph attributes to deployment queries can make query output larger or expose assumptions
+  about target shapes.
+- Front-door tests can become brittle if they depend on overly specific cquery fixtures.
+
+### 8. Mitigations
+
+- Request only the minimum attributes needed for readiness and boundary enforcement.
+- Prefer small focused fixtures and explicit assertions around the policy data that must survive
+  extraction.
+
+### 9. Consequences of not implementing this PR
+
+Readiness gates and app-boundary checks would exist as helper-level contracts but remain bypassable
+through normal deployment resolution.
+
+### 10. Downsides for implementing this PR
+
+It expands the deployment query contract and adds another front-door integration test surface to
+maintain.

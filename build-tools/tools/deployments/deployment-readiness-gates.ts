@@ -2,6 +2,7 @@
 import type { DeploymentAdmissionBinding } from "./deployment-admission-evidence.ts";
 import type { DeploymentAdmissionOperationKind } from "./deployment-admission-binding.ts";
 import type { DeploymentTarget } from "./contract-types.ts";
+import { providerTargetIdentityFor } from "./deployment-targets.ts";
 import { mcpSourceResponseBoundaryErrors } from "./deployment-boundary-checks.ts";
 
 export type DeploymentReadinessGateType =
@@ -159,9 +160,7 @@ function matchesPolicy(
   if (evidence.name !== policy.name || evidence.type !== policy.type) return false;
   if (evidence.status !== "passed") return false;
   if (evidence.deploymentId !== opts.deployment.deploymentId) return false;
-  if (evidence.providerTargetIdentity !== opts.deployment.providerTarget.deploymentTargetIdentity) {
-    return false;
-  }
+  if (evidence.providerTargetIdentity !== providerTargetIdentityFor(opts.deployment)) return false;
   if (opts.binding.sourceRevision && evidence.sourceRevision !== opts.binding.sourceRevision) {
     return false;
   }

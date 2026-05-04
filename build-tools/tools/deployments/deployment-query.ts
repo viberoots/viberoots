@@ -2,6 +2,7 @@
 import { nodesFromCqueryJson } from "../buck/exporter/cquery/nodes.ts";
 import { normalizeTargetLabel } from "../lib/labels.ts";
 import { componentTargetsFor, extractDeployments, type DeploymentTarget } from "./contract.ts";
+import { DEPLOYMENT_CQUERY_ATTRS } from "./deployment-query-attrs.ts";
 import {
   deploymentBuckEnv,
   deploymentIsolationArgs,
@@ -9,81 +10,6 @@ import {
   queryComponentLabels,
   queryLabelList,
 } from "./deployment-query-helpers.ts";
-
-const DEPLOYMENT_CQUERY_ATTRS = [
-  "name",
-  "rule_type",
-  "provider",
-  "component",
-  "component_kind",
-  "components",
-  "publisher",
-  "publisher_config",
-  "provisioner",
-  "provisioner_config",
-  "protection_class",
-  "lane_policy",
-  "environment_stage",
-  "admission_policy",
-  "rollout_policy",
-  "rollout_steps",
-  "app_name",
-  "container_port",
-  "health_path",
-  "target_group",
-  "provider_target",
-  "vault_runtime",
-  "smoke",
-  "smoke_exception",
-  "smoke_runner_class",
-  "smoke_timeout_budget_ms",
-  "preview",
-  "prerequisites",
-  "secret_requirements",
-  "runtime_config_requirements",
-  "external_requirement_profiles",
-  "release_actions",
-  "target_exceptions",
-  "type",
-  "phase",
-  "run_condition",
-  "abort_behavior",
-  "data_compatibility",
-  "replay_policy",
-  "duplicate_safety",
-  "operation_keys",
-  "required_secret_requirements",
-  "required_runtime_config_requirements",
-  "exception_id",
-  "exception_kind",
-  "affected_deployments",
-  "old_provider_target_identity",
-  "new_provider_target_identity",
-  "shared_lock_scope",
-  "approval_evidence",
-  "effective_at",
-  "expires_at",
-  "completion_signal",
-  "reconciliation_owner",
-  "governance_policy",
-  "defaults",
-  "default_client_profile",
-  "scm_backend",
-  "repository",
-  "branch_protections",
-  "stages",
-  "stage_branches",
-  "allowed_promotion_edges",
-  "artifact_reuse_mode",
-  "promotion_compatibility",
-  "allowed_refs",
-  "required_checks",
-  "required_approvals",
-  "retry_branch_policy",
-  "retry_approval_reuse",
-  "artifact_attestation_mode",
-  "labels",
-];
 
 function relatedLabelsForNodes(
   nodes: ReturnType<typeof nodesFromCqueryJson>,
@@ -127,8 +53,17 @@ export async function queryDeploymentNodes(
   labels: string[],
   opts?: { env?: NodeJS.ProcessEnv },
 ): Promise<ReturnType<typeof nodesFromCqueryJson>> {
+  return queryDeploymentNodesWithAttrs(workspaceRoot, labels, DEPLOYMENT_CQUERY_ATTRS, opts);
+}
+
+export async function queryDeploymentNodesWithAttrs(
+  workspaceRoot: string,
+  labels: string[],
+  attrs: string[],
+  opts?: { env?: NodeJS.ProcessEnv },
+): Promise<ReturnType<typeof nodesFromCqueryJson>> {
   const normalizedLabels = Array.from(new Set(labels.map((label) => normalizeTargetLabel(label))));
-  const attrFlags = DEPLOYMENT_CQUERY_ATTRS.flatMap((attr) => ["--output-attribute", attr]);
+  const attrFlags = Array.from(new Set(attrs)).flatMap((attr) => ["--output-attribute", attr]);
   const query = `set(${normalizedLabels.join(" ")})`;
   const { stdout } = await $({
     cwd: workspaceRoot,

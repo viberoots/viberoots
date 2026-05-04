@@ -73,7 +73,9 @@ deploy --deployment //projects/deployments/pleomino-prod:deploy
 
 For a normal deploy, this is usually enough. The deployment definition tells
 the CLI which app target to build, and the CLI resolves the artifact from that
-target automatically.
+target automatically. The same repo-level front door also enforces declared
+readiness gates and rejects app targets that import other app targets before a
+provider-specific mutation runs.
 
 Use `--artifact-dir <dir>` only when you want to override that default and name a
 specific build output folder as the client-side artifact source.

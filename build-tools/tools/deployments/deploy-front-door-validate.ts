@@ -4,7 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import type { GraphNode } from "../lib/graph.ts";
 import type { DeploymentComponent, DeploymentTarget } from "./contract.ts";
-import { queryDeploymentNodes } from "./deployment-query.ts";
+import { DEPLOYMENT_CQUERY_ATTRS } from "./deployment-query-attrs.ts";
+import { queryDeploymentNodesWithAttrs } from "./deployment-query.ts";
 import { pushAppStoreConnectComponentKindErrors } from "./app-store-connect-capability-validation.ts";
 import { prepareAppStoreConnectPublisherConfig } from "./app-store-connect-config.ts";
 import { pushCloudflareComponentKindErrors } from "./cloudflare-pages-capability-validation.ts";
@@ -42,7 +43,10 @@ async function validationNodeMap(
         .filter(Boolean),
     ),
   );
-  const nodes = await queryDeploymentNodes(workspaceRoot, labels);
+  const nodes = await queryDeploymentNodesWithAttrs(workspaceRoot, labels, [
+    ...DEPLOYMENT_CQUERY_ATTRS,
+    "deps",
+  ]);
   return new Map(nodes.map((node) => [node.name, node]));
 }
 
