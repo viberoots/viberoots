@@ -116,6 +116,8 @@ export async function runProviderDeployFrontDoor(opts: {
       deployment as any,
       flags,
       opts.publicFrontDoor,
+      opts.hasFlag,
+      opts.admissionEvidence,
       opts.smokeConnectOverride,
     );
     return;

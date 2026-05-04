@@ -6,9 +6,15 @@ import type { DeploymentSmokeOutcome } from "./deployment-smoke-policy.ts";
 import { readVersionedJson } from "./deployment-schema-compat.ts";
 import type { VercelDeployment } from "./contract.ts";
 
-export const VERCEL_RECORD_SCHEMA = "vercel-deploy-record@2026-05-02";
+export const VERCEL_RECORD_SCHEMA = "vercel-deploy-record@2026-05-03";
 
-export type VercelOperationKind = "deploy" | "preview" | "preview_cleanup" | "rollback";
+export type VercelOperationKind =
+  | "deploy"
+  | "preview"
+  | "preview_cleanup"
+  | "rollback"
+  | "retry"
+  | "promotion";
 
 export type VercelDeployRecord = {
   schemaVersion: typeof VERCEL_RECORD_SCHEMA;
@@ -23,13 +29,21 @@ export type VercelDeployRecord = {
   artifact?: { identity: string; outputDir?: string };
   sourceRunId?: string;
   parentRunId?: string;
+  releaseLineageId?: string;
+  artifactLineageId?: string;
   publicUrl?: string;
   providerReleaseId?: string;
   aliasAssigned?: boolean;
   smokeOutcome?: DeploymentSmokeOutcome;
   providerConfigFingerprint?: string;
+  replaySnapshotPath?: string;
   error?: string;
-  controlPlane?: { submissionId: string; lockScope: string };
+  controlPlane?: {
+    submissionId?: string;
+    workerId?: string;
+    lockScope: string;
+    admission?: string;
+  };
 };
 
 export function createVercelDeployRunId(prefix = "vercel"): string {
@@ -71,7 +85,10 @@ export async function readVercelDeployRecord(recordPath: string): Promise<Vercel
   return await readVersionedJson(recordPath, {
     kind: "vercel deploy record",
     currentSchemaVersion: VERCEL_RECORD_SCHEMA,
-    migrations: {},
+    migrations: {
+      "vercel-deploy-record@2026-05-02": (raw) =>
+        ({ ...raw, schemaVersion: VERCEL_RECORD_SCHEMA }) as VercelDeployRecord,
+    },
     validateCurrent: (raw): raw is VercelDeployRecord =>
       raw.provider === "vercel" && typeof raw.deployRunId === "string",
   });

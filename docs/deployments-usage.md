@@ -470,6 +470,53 @@ kubernetes_service_deployment(
   operations; protected/shared mutations must route through the reviewed
   control-plane service path
 
+Protected/shared Vercel control-plane examples:
+
+```bash
+# Deploy through the control-plane service
+deploy --deployment //projects/deployments/console-staging:deploy \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+```bash
+# Preview from an earlier accepted run through the control-plane service
+deploy --deployment //projects/deployments/console-staging:deploy \
+  --preview \
+  --source-run-id <deploy-run-id> \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+```bash
+# Preview cleanup through the control-plane service
+deploy --deployment //projects/deployments/console-staging:deploy \
+  --preview-cleanup \
+  --source-run-id <deploy-run-id> \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+```bash
+# Retry an earlier accepted run by replaying the recorded exact artifact
+deploy --deployment //projects/deployments/console-staging:deploy \
+  --publish-only \
+  --source-run-id <deploy-run-id> \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+```bash
+# Rollback to an earlier accepted run on the same canonical live target
+deploy --deployment //projects/deployments/console-staging:deploy \
+  --publish-only \
+  --rollback \
+  --source-run-id <deploy-run-id> \
+  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+```
+
+Protected/shared Vercel mutations reject laptop-local artifact paths,
+laptop-local records roots, and direct local-publish flags. Retry and rollback
+replay the recorded exact prebuilt artifact and never rebuild from current
+branch state. See [Vercel Troubleshooting](/Users/kiltyj/Code/bucknix-fresh/docs/handbook/troubleshooting.md#vercel-control-plane-deployments)
+for service submission, admission, replay, and provider API failure modes.
+
 `app-store-connect`
 
 - good fit for iOS apps

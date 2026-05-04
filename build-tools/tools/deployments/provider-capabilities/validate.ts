@@ -8,8 +8,10 @@ export function validateProviderCapabilityRegistry(
 ): void {
   const errors = Object.entries(registry).flatMap(([provider, capability]) => [
     ...validateCapability(provider, capability),
-    ...((provider === "s3-static" || provider === "kubernetes") &&
-    (capability.provider === "s3-static" || capability.provider === "kubernetes")
+    ...((provider === "s3-static" || provider === "kubernetes" || provider === "vercel") &&
+    (capability.provider === "s3-static" ||
+      capability.provider === "kubernetes" ||
+      capability.provider === "vercel")
       ? validateReviewedRuntimeParity({
           provider: capability.provider,
           capability,

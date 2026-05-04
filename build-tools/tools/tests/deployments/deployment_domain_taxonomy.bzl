@@ -1,7 +1,5 @@
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
-    "build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts": True,
-    "build-tools/tools/tests/deployments/deployment-domain.file-size-lint.test.ts": True,
-    "build-tools/tools/tests/deployments/deployment-domain.taxonomy-drift.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts": True, "build-tools/tools/tests/deployments/deployment-domain.file-size-lint.test.ts": True, "build-tools/tools/tests/deployments/deployment-domain.taxonomy-drift.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-docs.front-door-parity.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.pr89.docs.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-auth-session.pr90.docs.test.ts": True,
@@ -150,6 +148,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/s3-static.publisher.config-drift.test.ts": True,
     "build-tools/tools/tests/deployments/s3-static.validation.test.ts": True,
     "build-tools/tools/tests/deployments/vercel.contract.test.ts": True, "build-tools/tools/tests/deployments/vercel.fixture.ts": False,
+    "build-tools/tools/tests/deployments/vercel.control-plane.helpers.ts": False, "build-tools/tools/tests/deployments/vercel.control-plane.test.ts": True,
     "build-tools/tools/tests/deployments/vercel.front-door.test.ts": True, "build-tools/tools/tests/deployments/vercel.live-publisher.test.ts": True,
     "build-tools/tools/tests/deployments/vercel.local-publisher.test.ts": True, "build-tools/tools/tests/deployments/vercel.validation.test.ts": True,
     "build-tools/tools/tests/deployments/static-webapp-artifact-admission.test.ts": True,

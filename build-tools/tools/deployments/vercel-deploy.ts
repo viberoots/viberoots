@@ -18,6 +18,7 @@ import {
 import { smokeVercelConsole, type VercelSmokeConnectOverride } from "./vercel-smoke.ts";
 import type { VercelApiClient } from "./vercel-api.ts";
 import { cleanupVercelPreview } from "./vercel-publisher.ts";
+import { writeVercelReplaySnapshot } from "./vercel-replay.ts";
 
 type VercelDeployResult = { record: VercelDeployRecord; recordPath: string };
 
@@ -94,6 +95,19 @@ export async function submitVercelDeploy(opts: {
         connectOverride: opts.smokeConnectOverride,
       });
     }
+    const replaySnapshotPath =
+      operationKind === "deploy"
+        ? await writeVercelReplaySnapshot({
+            recordsRoot: opts.recordsRoot,
+            deployRunId: runId,
+            deployment: opts.deployment,
+            artifact: { identity: artifact.identity, outputDir: artifact.outputDir },
+            providerReleaseId: published.providerReleaseId,
+            publicUrl: published.publicUrl,
+            aliasAssigned: published.aliasAssigned,
+            providerConfigFingerprint: published.providerConfigFingerprint,
+          })
+        : undefined;
     const record = createVercelDeployRecord(opts.deployment, {
       deployRunId: runId,
       operationKind,
@@ -101,6 +115,10 @@ export async function submitVercelDeploy(opts: {
       finalOutcome: "succeeded",
       artifact: { identity: artifact.identity, outputDir: artifact.outputDir },
       ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId, parentRunId: opts.sourceRunId } : {}),
+      ...(operationKind === "deploy"
+        ? { releaseLineageId: runId, artifactLineageId: artifact.identity }
+        : {}),
+      ...(replaySnapshotPath ? { replaySnapshotPath } : {}),
       publicUrl: published.publicUrl,
       providerReleaseId: published.providerReleaseId,
       aliasAssigned: published.aliasAssigned,
@@ -149,6 +167,9 @@ export async function submitVercelPreviewCleanup(opts: {
       apiToken: cleanupSecrets.vercel_api_token || "",
       ...(opts.apiClient ? { apiClient: opts.apiClient } : {}),
     });
+    if (!cleanup.cleaned || !cleanup.deploymentId.trim()) {
+      throw new Error("vercel preview cleanup rejected ambiguous cleanup outcome");
+    }
     const record = createVercelDeployRecord(opts.deployment, {
       deployRunId: runId,
       operationKind: "preview_cleanup",

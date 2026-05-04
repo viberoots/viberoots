@@ -11,6 +11,9 @@ import {
   submitVercelPreviewCleanup,
   summarizeVercelResult,
 } from "./vercel-deploy.ts";
+import { submitVercelExactArtifactRun } from "./vercel-exact-run.ts";
+import { resolveVercelReplaySource } from "./vercel-replay.ts";
+import { runProtectedVercelDeployFrontDoor } from "./vercel-protected-front-door.ts";
 
 export async function runVercelDeployFrontDoor(opts: {
   workspaceRoot: string;
@@ -22,14 +25,37 @@ export async function runVercelDeployFrontDoor(opts: {
   rollback: boolean;
   sourceRunId: string;
   artifactDirFlag: string;
+  admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
+  hasFlag?: (flag: string) => boolean;
 }) {
-  if (opts.rollback && !opts.publishOnly)
+  if (opts.rollback && !opts.publishOnly) {
     throw new Error("vercel rollback requires --publish-only");
-  if (opts.requireServiceForProtectedShared && opts.deployment.protectionClass !== "local_only") {
-    throw new Error(
-      "protected/shared Vercel mutations must use the reviewed control-plane service",
+  }
+  const controlPlaneUrl =
+    getFlagStr("control-plane-url", "").trim() ||
+    String(process.env.BNX_DEPLOY_CONTROL_PLANE_URL || "").trim();
+  if (
+    opts.deployment.protectionClass !== "local_only" &&
+    (opts.requireServiceForProtectedShared || !!controlPlaneUrl)
+  ) {
+    printDeployJson(
+      await runProtectedVercelDeployFrontDoor({
+        workspaceRoot: opts.workspaceRoot,
+        deployment: opts.deployment,
+        publishOnly: opts.publishOnly,
+        preview: opts.preview,
+        previewCleanup: opts.previewCleanup,
+        rollback: opts.rollback,
+        sourceRunId: opts.sourceRunId,
+        controlPlaneUrl,
+        controlPlaneToken: getFlagStr("control-plane-token", "").trim() || undefined,
+        admissionEvidence: opts.admissionEvidence,
+        smokeConnectOverride: opts.smokeConnectOverride,
+        hasFlag: opts.hasFlag || (() => false),
+      }),
     );
+    return;
   }
   const recordsRoot = path.resolve(
     getFlagStr(
@@ -46,6 +72,48 @@ export async function runVercelDeployFrontDoor(opts: {
     printDeployJson(summarizeDeploymentResult(summarizeVercelResult(result)));
     return;
   }
+  if (opts.publishOnly) {
+    if (!opts.sourceRunId) {
+      throw new Error(
+        opts.rollback
+          ? "vercel rollback requires --source-run-id"
+          : "vercel --publish-only requires --source-run-id",
+      );
+    }
+    if (opts.artifactDirFlag) {
+      throw new Error(
+        "vercel --publish-only must not use --artifact-dir; replay the admitted exact artifact with --source-run-id",
+      );
+    }
+    const source = await resolveVercelReplaySource({ recordsRoot, deployRunId: opts.sourceRunId });
+    if (
+      opts.rollback &&
+      source.replaySnapshot.deployment.deploymentId !== opts.deployment.deploymentId
+    ) {
+      throw new Error(
+        `vercel rollback source run must belong to ${opts.deployment.deploymentId}, got ${source.replaySnapshot.deployment.deploymentId}`,
+      );
+    }
+    const operationKind = opts.rollback
+      ? "rollback"
+      : source.replaySnapshot.deployment.deploymentId === opts.deployment.deploymentId
+        ? "retry"
+        : "promotion";
+    const result = await submitVercelExactArtifactRun({
+      deployment: opts.deployment,
+      recordsRoot,
+      operationKind,
+      replaySnapshot: source.replaySnapshot,
+      parentRunId: source.record.deployRunId,
+      releaseLineageId: source.record.releaseLineageId || source.record.deployRunId,
+      artifactLineageId: source.record.artifactLineageId || source.replaySnapshot.artifact.identity,
+      ...(opts.smokeConnectOverride
+        ? { smokeConnectOverride: opts.smokeConnectOverride as any }
+        : {}),
+    });
+    printDeployJson(summarizeDeploymentResult(summarizeVercelResult(result)));
+    return;
+  }
   const artifactDir =
     opts.artifactDirFlag || (await resolveArtifactDirForCli(opts.workspaceRoot, opts.deployment));
   const result = await submitVercelDeploy({
@@ -53,13 +121,13 @@ export async function runVercelDeployFrontDoor(opts: {
     deployment: opts.deployment,
     recordsRoot,
     artifactDir,
-    operationKind: opts.preview ? "preview" : opts.rollback ? "rollback" : "deploy",
+    operationKind: opts.preview ? "preview" : "deploy",
     ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
     ...(opts.smokeConnectOverride
       ? { smokeConnectOverride: opts.smokeConnectOverride as any }
       : {}),
   });
-  printDeployJson(summarizeDeploymentResult(result));
+  printDeployJson(summarizeDeploymentResult(summarizeVercelResult(result)));
 }
 
 export async function runVercelDeployFrontDoorForCli(
@@ -67,6 +135,8 @@ export async function runVercelDeployFrontDoorForCli(
   deployment: VercelDeployment,
   flags: DeployCliReadonlyFlags,
   publicFrontDoor: boolean,
+  hasFlag?: (flag: string) => boolean,
+  admissionEvidence?: unknown,
   smokeConnectOverride?: unknown,
 ) {
   await runVercelDeployFrontDoor({
@@ -79,6 +149,8 @@ export async function runVercelDeployFrontDoorForCli(
     rollback: flags.rollback,
     sourceRunId: flags.sourceRunId,
     artifactDirFlag: flags.artifactDirFlag,
+    ...(hasFlag ? { hasFlag } : {}),
+    ...(admissionEvidence ? { admissionEvidence } : {}),
     ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
   });
 }

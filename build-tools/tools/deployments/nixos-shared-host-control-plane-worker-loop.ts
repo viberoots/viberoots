@@ -13,14 +13,15 @@ import {
   persistMaterializedSubmission,
   removeMirrorFile,
 } from "./nixos-shared-host-control-plane-backend-materialize.ts";
-import { executeCloudflarePagesBackendSubmission } from "./cloudflare-pages-control-plane-backend-run.ts";
-import { executeKubernetesControlPlaneSubmission } from "./kubernetes-control-plane.ts";
+import {
+  dispatchProviderControlPlaneSubmission,
+  executeCloudflarePagesBackendSubmission,
+} from "./nixos-shared-host-control-plane-worker-dispatch.ts";
 import { executeSubmittedNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-submit-helpers.ts";
 import { reconcileNixosSharedHostRecoveredSubmission } from "./nixos-shared-host-recovery.ts";
 import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
 import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-contract.ts";
 import { nixosSharedHostLockScopes } from "./nixos-shared-host-components.ts";
-import { executeS3StaticControlPlaneSubmission } from "./s3-static-control-plane.ts";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -99,8 +100,8 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
       });
       return true;
     }
-    if (snapshot?.deployment?.provider === "s3-static") {
-      await executeS3StaticControlPlaneSubmission({
+    if (
+      await dispatchProviderControlPlaneSubmission(String(snapshot?.deployment?.provider || ""), {
         workspaceRoot: opts.workspaceRoot,
         recordsRoot: opts.recordsRoot,
         backend,
@@ -109,20 +110,8 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
         executionSnapshotPath: materialized.executionSnapshotPath,
         executionSnapshotRef: materialized.executionSnapshotRef,
         workerId: opts.workerId,
-      });
-      return true;
-    }
-    if (snapshot?.deployment?.provider === "kubernetes") {
-      await executeKubernetesControlPlaneSubmission({
-        workspaceRoot: opts.workspaceRoot,
-        recordsRoot: opts.recordsRoot,
-        backend,
-        submissionPath: materialized.submissionPath,
-        submissionRef: materialized.submissionRef,
-        executionSnapshotPath: materialized.executionSnapshotPath,
-        executionSnapshotRef: materialized.executionSnapshotRef,
-        workerId: opts.workerId,
-      });
+      })
+    ) {
       return true;
     }
     if (["running", "cancelling"].includes(claimed.lifecycleState)) {

@@ -11,18 +11,25 @@ import {
   queueS3StaticControlPlaneSubmission,
   type S3StaticControlPlaneSubmitRequest,
 } from "./s3-static-control-plane.ts";
+import {
+  VERCEL_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
+  queueVercelControlPlaneSubmission,
+  type VercelControlPlaneSubmitRequest,
+} from "./vercel-control-plane.ts";
 import { assertNoProtectedSharedClientIdentityFields } from "./deployment-service-client-contract.ts";
 
 export type DeploymentProviderServiceSubmitRequest =
   | S3StaticControlPlaneSubmitRequest
-  | KubernetesControlPlaneSubmitRequest;
+  | KubernetesControlPlaneSubmitRequest
+  | VercelControlPlaneSubmitRequest;
 
 export function isDeploymentProviderServiceSubmitRequest(request: {
   schemaVersion?: string;
 }): request is DeploymentProviderServiceSubmitRequest {
   return (
     request.schemaVersion === S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA ||
-    request.schemaVersion === KUBERNETES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
+    request.schemaVersion === KUBERNETES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA ||
+    request.schemaVersion === VERCEL_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
   );
 }
 
@@ -38,17 +45,26 @@ export async function queueDeploymentProviderControlPlaneSubmission(
     deployment: request.deployment,
     request,
   });
-  return request.schemaVersion === S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
-    ? await queueS3StaticControlPlaneSubmission({
-        workspaceRoot: opts.workspaceRoot,
-        recordsRoot: opts.paths.recordsRoot,
-        backend: opts.backend,
-        request,
-      })
-    : await queueKubernetesControlPlaneSubmission({
-        workspaceRoot: opts.workspaceRoot,
-        recordsRoot: opts.paths.recordsRoot,
-        backend: opts.backend,
-        request,
-      });
+  if (request.schemaVersion === S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA) {
+    return await queueS3StaticControlPlaneSubmission({
+      workspaceRoot: opts.workspaceRoot,
+      recordsRoot: opts.paths.recordsRoot,
+      backend: opts.backend,
+      request,
+    });
+  }
+  if (request.schemaVersion === VERCEL_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA) {
+    return await queueVercelControlPlaneSubmission({
+      workspaceRoot: opts.workspaceRoot,
+      recordsRoot: opts.paths.recordsRoot,
+      backend: opts.backend,
+      request,
+    });
+  }
+  return await queueKubernetesControlPlaneSubmission({
+    workspaceRoot: opts.workspaceRoot,
+    recordsRoot: opts.paths.recordsRoot,
+    backend: opts.backend,
+    request,
+  });
 }
