@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { failStaticDeployWithRecord } from "./nixos-shared-host-static-deploy-progressive.ts";
-import { writeNixosSharedHostSuccessRecord } from "./nixos-shared-host-provision-record.ts";
+import { failStaticDeployWithRecord } from "./nixos-shared-host-static-deploy-progressive";
+import { writeNixosSharedHostSuccessRecord } from "./nixos-shared-host-provision-record";
 
 export async function failNixosSharedHostStaticDeploy(
   opts: Parameters<typeof failStaticDeployWithRecord>[0],

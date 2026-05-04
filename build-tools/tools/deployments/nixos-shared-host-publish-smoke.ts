@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostDeploymentComponent } from "./contract.ts";
-import type { NixosSharedHostPublishedSmokeInput } from "./nixos-shared-host-publish-runtime.ts";
-import { smokeNixosSharedHostSsrWebapp } from "./nixos-shared-host-ssr-smoke.ts";
-import { smokeNixosSharedHostStaticWebapp } from "./nixos-shared-host-static-smoke.ts";
+import type { NixosSharedHostDeploymentComponent } from "./contract";
+import type { NixosSharedHostPublishedSmokeInput } from "./nixos-shared-host-publish-runtime";
+import { smokeNixosSharedHostSsrWebapp } from "./nixos-shared-host-ssr-smoke";
+import { smokeNixosSharedHostStaticWebapp } from "./nixos-shared-host-static-smoke";
 
 export async function smokeNixosSharedHostComponent(opts: {
   component: NixosSharedHostDeploymentComponent;

@@ -2,8 +2,8 @@ import "zx/globals";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { runNodeWithZx } from "../../lib/node-run.ts";
-import { resolveToolPath } from "../../lib/tool-paths.ts";
+import { runNodeWithZx } from "../../lib/node-run";
+import { resolveToolPath } from "../../lib/tool-paths";
 
 function parsePositiveInt(s: string | undefined): number | null {
   const n = Number(String(s || "").trim());

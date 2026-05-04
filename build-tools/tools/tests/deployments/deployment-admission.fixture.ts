@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "../../deployments/contract.ts";
+import type { DeploymentTarget } from "../../deployments/contract";
 import {
   createDeploymentAdmissionBinding,
   requiredCheckSubjectsFor,
   type DeploymentAdmissionOperationKind,
-} from "../../deployments/deployment-admission-binding.ts";
-import type { DeploymentAdmissionEvidence } from "../../deployments/deployment-admission-evidence.ts";
-import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
+} from "../../deployments/deployment-admission-binding";
+import type { DeploymentAdmissionEvidence } from "../../deployments/deployment-admission-evidence";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 
 type EvidenceOpts = {
   deployment: DeploymentTarget;

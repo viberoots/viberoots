@@ -1,22 +1,22 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
-import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
+import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts";
+import type { NixosSharedHostDeployment } from "./contract";
 import type {
   DeploymentAdmissionEvidence,
   DeploymentPrincipal,
-} from "./deployment-admission-evidence.ts";
-import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract.ts";
+} from "./deployment-admission-evidence";
+import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract";
 import type {
   DeploymentArtifactBindingProof,
   DeploymentExpectedArtifactIdentities,
-} from "./deployment-artifact-binding.ts";
+} from "./deployment-artifact-binding";
 import type {
   NixosSharedHostControlPlaneOperationKind,
   NixosSharedHostPublishBehavior,
   NixosSharedHostSmokeConnectOverride,
-} from "./nixos-shared-host-control-plane-contract.ts";
-import type { NixosSharedHostControlPlaneSourceSelection } from "./nixos-shared-host-control-plane-snapshot.ts";
+} from "./nixos-shared-host-control-plane-contract";
+import type { NixosSharedHostControlPlaneSourceSelection } from "./nixos-shared-host-control-plane-snapshot";
 
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA =
   "nixos-shared-host-control-plane-submit-request@1";

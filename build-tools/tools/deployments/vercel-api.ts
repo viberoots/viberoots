@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint.ts";
+import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint";
 
 export type VercelApiDeployRequest = {
   team: string;

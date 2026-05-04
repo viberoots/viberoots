@@ -1,7 +1,7 @@
 import path from "node:path";
 import * as fsp from "node:fs/promises";
-import { getArgvTokens } from "../../lib/cli.ts";
-import { normalizeDevBuildTargetArgs } from "../dev-build/target-args.ts";
+import { getArgvTokens } from "../../lib/cli";
+import { normalizeDevBuildTargetArgs } from "../dev-build/target-args";
 
 export type VerifyConsole = "auto" | "super" | "simple";
 export type VerifySelectorMode = "default" | "project-closure";

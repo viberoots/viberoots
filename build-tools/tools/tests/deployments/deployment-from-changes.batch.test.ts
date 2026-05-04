@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { runDeploymentBatchFromChanges } from "../../deployments/deployment-from-changes-run.ts";
-import type { DeploymentFromChangesPlan } from "../../deployments/deployment-from-changes-selection.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import { runDeploymentBatchFromChanges } from "../../deployments/deployment-from-changes-run";
+import type { DeploymentFromChangesPlan } from "../../deployments/deployment-from-changes-selection";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 import {
   nixosSharedHostDeploymentFixture,
   nixosSharedHostLanePolicyFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 
 function planForBatch(): DeploymentFromChangesPlan {
   const lanePolicy = nixosSharedHostLanePolicyFixture();

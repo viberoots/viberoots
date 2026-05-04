@@ -4,7 +4,7 @@ import { test } from "node:test";
 import fs from "fs-extra";
 import path from "node:path";
 import { readGraph } from "../../lib/graph";
-import { normalizeTargetLabel } from "../../lib/labels.ts";
+import { normalizeTargetLabel } from "../../lib/labels";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 function normalizeLabelList(xs: unknown): string[] {

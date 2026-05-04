@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
-import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
-import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract.ts";
-import { resolveNixosSharedHostPublishOnlySubmission } from "./nixos-shared-host-publish-only.ts";
-import { resolveNixosSharedHostProvisionOnlySubmission } from "./nixos-shared-host-provision-only.ts";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
+import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract";
+import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract";
+import { resolveNixosSharedHostPublishOnlySubmission } from "./nixos-shared-host-publish-only";
+import { resolveNixosSharedHostProvisionOnlySubmission } from "./nixos-shared-host-provision-only";
 
 export async function resolveServiceSubmitRequest(
   request: NixosSharedHostControlPlaneSubmitRequest,

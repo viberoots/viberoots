@@ -1,37 +1,37 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { requireCloudflarePagesControlPlaneAuthority } from "./cloudflare-pages-control-plane-contract.ts";
-import { prepareCloudflarePagesWranglerConfig } from "./cloudflare-pages-config.ts";
-import { provisionCloudflarePagesTarget } from "./cloudflare-pages-provision.ts";
-import { publishCloudflarePagesStaticWebapp } from "./cloudflare-pages-publisher.ts";
+import { requireCloudflarePagesControlPlaneAuthority } from "./cloudflare-pages-control-plane-contract";
+import { prepareCloudflarePagesWranglerConfig } from "./cloudflare-pages-config";
+import { provisionCloudflarePagesTarget } from "./cloudflare-pages-provision";
+import { publishCloudflarePagesStaticWebapp } from "./cloudflare-pages-publisher";
 import {
   createCloudflarePagesDeployRecord,
   createCloudflarePagesDeployRunId,
   type CloudflarePagesDeployRecord,
   writeCloudflarePagesDeployRecord,
-} from "./cloudflare-pages-records.ts";
-import { writeCloudflarePagesReplaySnapshot } from "./cloudflare-pages-replay.ts";
+} from "./cloudflare-pages-records";
+import { writeCloudflarePagesReplaySnapshot } from "./cloudflare-pages-replay";
 import {
   effectiveCloudflarePagesSmokeTimeoutMs,
   maxCloudflarePagesCustomDomainSmokeRetries,
   shouldUseCloudflarePagesCustomDomainSmokeBudget,
-} from "./cloudflare-pages-smoke-retries.ts";
-import { smokeCloudflarePagesStaticWebapp } from "./cloudflare-pages-static-smoke.ts";
-import { withFailedStep } from "./deployment-failed-step.ts";
-import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
+} from "./cloudflare-pages-smoke-retries";
+import { smokeCloudflarePagesStaticWebapp } from "./cloudflare-pages-static-smoke";
+import { withFailedStep } from "./deployment-failed-step";
+import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy";
 import {
   classifySmokeRetry,
   noPublishAutoRetry,
   runWithAutomaticRetry,
-} from "./deployment-retry-policy.ts";
-import { executionPolicyWithRetry, retryAuditFrom } from "./deployment-retry-records.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
-import { requireAdmittedStaticWebappArtifactPath } from "./static-webapp-artifacts.ts";
+} from "./deployment-retry-policy";
+import { executionPolicyWithRetry, retryAuditFrom } from "./deployment-retry-records";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
+import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
+import { requireAdmittedStaticWebappArtifactPath } from "./static-webapp-artifacts";
 import type {
   CloudflarePagesStaticDeployOptions,
   CloudflarePagesStaticSmokeRecord,
-} from "./cloudflare-pages-static-deploy-options.ts";
+} from "./cloudflare-pages-static-deploy-options";
 
 export async function runCloudflarePagesStaticDeploy(
   opts: CloudflarePagesStaticDeployOptions,

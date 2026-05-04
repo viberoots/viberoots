@@ -1,22 +1,22 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
-import { artifactDirFromBuiltOutPath } from "./deployment-component-artifact-dirs.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
+import { buildSelectedOutPath } from "../dev/run-runnable-graph";
+import { artifactDirFromBuiltOutPath } from "./deployment-component-artifact-dirs";
+import type { CloudflarePagesDeployment } from "./contract";
 import {
   createStaticWebappArtifactBundleBytes,
   digestStaticWebappArtifactBundleBytes,
   materializeStaticWebappArtifactBundle,
-} from "./static-webapp-artifact-bundle.ts";
+} from "./static-webapp-artifact-bundle";
 import {
   admitStaticWebappArtifact,
   readAdmittedStaticWebappArtifact,
   requireAdmittedStaticWebappArtifactPath,
   type AdmittedStaticWebappArtifact,
-} from "./static-webapp-artifacts.ts";
-import { admitStaticWebappUploadSession } from "./static-webapp-upload-sessions.ts";
-import { resolveDeploymentGitCommit } from "./deployment-git-ref.ts";
+} from "./static-webapp-artifacts";
+import { admitStaticWebappUploadSession } from "./static-webapp-upload-sessions";
+import { resolveDeploymentGitCommit } from "./deployment-git-ref";
 
 export type CloudflarePagesArtifactInput =
   | {

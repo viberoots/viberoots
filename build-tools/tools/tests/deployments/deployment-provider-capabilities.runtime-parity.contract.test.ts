@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER } from "../../deployments/deployment-provider-capabilities.ts";
-import { reviewedRuntimeContractFor } from "../../deployments/provider-capabilities/runtime-contract.ts";
-import { assertReviewedRuntimeParity } from "../../deployments/provider-capabilities/runtime-parity.ts";
-import { validateProviderCapabilityRegistry } from "../../deployments/provider-capabilities/validate.ts";
+import { REVIEWED_PROVIDER_CAPABILITIES_BY_PROVIDER } from "../../deployments/deployment-provider-capabilities";
+import { reviewedRuntimeContractFor } from "../../deployments/provider-capabilities/runtime-contract";
+import { assertReviewedRuntimeParity } from "../../deployments/provider-capabilities/runtime-parity";
+import { validateProviderCapabilityRegistry } from "../../deployments/provider-capabilities/validate";
 
 test("runtime parity guardrail fails closed when reviewed runtime posture is missing from the registry", () => {
   const badRegistry = {

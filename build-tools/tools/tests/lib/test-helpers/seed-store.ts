@@ -1,6 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { copyTree, probeCopyFileCloneSupportFrom } from "../../../lib/copy-tree.ts";
+import { copyTree, probeCopyFileCloneSupportFrom } from "../../../lib/copy-tree";
 import "./worker-init";
 
 type TimeAsync = <T>(label: string, fn: () => Promise<T>) => Promise<T>;

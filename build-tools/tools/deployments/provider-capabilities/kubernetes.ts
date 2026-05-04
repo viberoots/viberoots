@@ -2,10 +2,10 @@
 import {
   SERVICE_COMPONENT_KIND,
   THIRD_PARTY_SERVICE_COMPONENT_KIND,
-} from "../deployment-component-kinds.ts";
-import { KUBERNETES_PROVIDER } from "../deployment-provider-targets.ts";
-import type { DeploymentProviderCapability } from "./types.ts";
-import { bullet } from "./types.ts";
+} from "../deployment-component-kinds";
+import { KUBERNETES_PROVIDER } from "../deployment-provider-targets";
+import type { DeploymentProviderCapability } from "./types";
+import { bullet } from "./types";
 
 export const KUBERNETES_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
   provider: KUBERNETES_PROVIDER,

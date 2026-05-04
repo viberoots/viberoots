@@ -8,15 +8,15 @@ import {
   prepareRemoteExecFixture,
   requirePleominoDevCheck,
   remoteExecEnv,
-} from "./nixos-shared-host.deploy.remote-exec.helpers.ts";
+} from "./nixos-shared-host.deploy.remote-exec.helpers";
 import {
   installReviewedPleominoTargets,
   jenkinsExecEnv,
   writeArtifact,
   writeJenkinsAuthFiles,
-} from "./nixos-shared-host.jenkins.fixture.ts";
-import { installFakeRemoteTransport } from "./nixos-shared-host.remote-transport.fake.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "./nixos-shared-host.jenkins.fixture";
+import { installFakeRemoteTransport } from "./nixos-shared-host.remote-transport.fake";
+import { runInTemp } from "../lib/test-helpers";
 
 test("remote profile deploy surface keeps missing admission guidance discoverable", async () => {
   await runInTemp("nixos-shared-host-remote-admit-discoverability", async (tmp, $) => {

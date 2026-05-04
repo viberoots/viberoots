@@ -1,6 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runNodeWithZx } from "../../lib/node-run.ts";
+import { runNodeWithZx } from "../../lib/node-run";
 
 type ModuleContractsPaths = {
   wasmManifestPath: string;

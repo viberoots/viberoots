@@ -1,22 +1,22 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
+import { runInTemp } from "../lib/test-helpers";
+import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers";
 import {
   installClientProfile,
   prepareRemoteExecFixture,
   remoteExecEnv,
   REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
-} from "./nixos-shared-host.deploy.remote-exec.helpers.ts";
+} from "./nixos-shared-host.deploy.remote-exec.helpers";
 import {
   completePendingAuthSession,
   configRootFor,
   CONTROL_PLANE_TOKEN,
   enableInteractivePkceVaultRuntime,
-} from "./deployment-admin-keycloak.remote-profile.pr98.helpers.ts";
+} from "./deployment-admin-keycloak.remote-profile.pr98.helpers";
 
 test("remote profile grant-user reviewed auth errors", async (t) => {
   await runInTemp("deploy-admin-keycloak-pr98-errors", async (tmp, $) => {

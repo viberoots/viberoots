@@ -2,16 +2,16 @@
 import type {
   NixosSharedHostControlPlaneSnapshot,
   NixosSharedHostControlPlaneSubmission,
-} from "./nixos-shared-host-control-plane-contract.ts";
+} from "./nixos-shared-host-control-plane-contract";
 import type {
   DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneServiceInstance,
   DeploymentControlPlaneRequestDedupe,
-} from "./deployment-control-plane-contract.ts";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
-import { pendingApprovalSummaryFor } from "./deployment-control-plane-approval.ts";
-import { createNixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-submission.ts";
+} from "./deployment-control-plane-contract";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
+import { pendingApprovalSummaryFor } from "./deployment-control-plane-approval";
+import { createNixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-submission";
 
 export function createAdmissionFailureSubmission(opts: {
   error: unknown;

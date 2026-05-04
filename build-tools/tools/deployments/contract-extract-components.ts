@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../lib/graph.ts";
-import { normalizeTargetLabel } from "../lib/labels.ts";
-import type { DeploymentRolloutPolicy } from "./deployment-rollout.ts";
-import { rolloutPolicyOmissionInPolicy } from "./deployment-provider-capabilities.ts";
+import type { GraphNode } from "../lib/graph";
+import { normalizeTargetLabel } from "../lib/labels";
+import type { DeploymentRolloutPolicy } from "./deployment-rollout";
+import { rolloutPolicyOmissionInPolicy } from "./deployment-provider-capabilities";
 import {
   deploymentError,
   pushRolloutPolicyFieldErrors,
   readLabel,
   readString,
   readStringRecordList,
-} from "./contract-extract-shared.ts";
+} from "./contract-extract-shared";
 
 const SHARED_NONPROD = "shared_nonprod";
 

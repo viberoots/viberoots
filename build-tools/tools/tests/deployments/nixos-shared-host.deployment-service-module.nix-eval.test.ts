@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { runInTemp } from "../lib/test-helpers";
 
 test("shared-host deployment service module routes hosted HTTPS to a private service bind", async () => {
   await runInTemp("shared-host-deployment-service-module-eval", async (tmp, $) => {

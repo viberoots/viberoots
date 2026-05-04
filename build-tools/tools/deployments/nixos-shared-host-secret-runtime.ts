@@ -1,16 +1,16 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentRequirementStep } from "./deployment-requirements.ts";
-import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
-import type { NixosSharedHostConfig } from "./nixos-shared-host.ts";
+import type { DeploymentRequirementStep } from "./deployment-requirements";
+import type { DeploymentReleaseAction } from "./deployment-release-actions";
+import type { NixosSharedHostConfig } from "./nixos-shared-host";
 import {
   assertNixosSharedHostReleaseActionPhaseReplayAllowed,
   hasRunnableNixosSharedHostReleaseActionPhase,
   type NixosSharedHostReleaseActionExecutionPath,
-} from "./nixos-shared-host-release-actions.ts";
-import { withFailedStep } from "./nixos-shared-host-deploy-failure.ts";
-import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
-import { smokeNixosSharedHostPublishedComponents } from "./nixos-shared-host-publish-components.ts";
-import { materializeNixosSharedHostRuntime } from "./nixos-shared-host-runtime.ts";
+} from "./nixos-shared-host-release-actions";
+import { withFailedStep } from "./nixos-shared-host-deploy-failure";
+import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy";
+import { smokeNixosSharedHostPublishedComponents } from "./nixos-shared-host-publish-components";
+import { materializeNixosSharedHostRuntime } from "./nixos-shared-host-runtime";
 
 type SecretRuntime = {
   enterStep(step: DeploymentRequirementStep): Promise<Record<string, string>>;

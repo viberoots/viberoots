@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { buildPkgIndexes, reachableImports } from "./golist.ts";
-import type { Batch, GoListByBatch, GoPkg, Node } from "./types.ts";
+import { buildPkgIndexes, reachableImports } from "./golist";
+import type { Batch, GoListByBatch, GoPkg, Node } from "./types";
 
 export function effectiveModuleKey(p: GoPkg): string | null {
   const m = p.Module;

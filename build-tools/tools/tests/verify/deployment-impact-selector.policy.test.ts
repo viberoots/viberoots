@@ -4,7 +4,7 @@ import { test } from "node:test";
 import {
   isDeploymentProjectPath,
   resolveDeploymentImpactSelection,
-} from "../../lib/deployment-impact-selector.ts";
+} from "../../lib/deployment-impact-selector";
 
 const deploymentTargetLabels = ["//projects/deployments/pleomino-dev:deploy"];
 

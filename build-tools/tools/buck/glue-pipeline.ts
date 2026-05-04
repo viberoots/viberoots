@@ -2,8 +2,8 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
-import { runNodeWithZx } from "../lib/node-run.ts";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { runNodeWithZx } from "../lib/node-run";
 
 type RunGluePipelineOptions = {
   graphPath?: string;
@@ -54,7 +54,7 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
   // Step 1: ensure graph exists (idempotent)
   if (verbose) console.error(`[glue-pipeline] ensureGraph → ${graphPath}`);
   {
-    const mod = await import("../patch/glue.ts");
+    const mod = await import("../patch/glue");
     await mod.ensureGraph();
   }
 

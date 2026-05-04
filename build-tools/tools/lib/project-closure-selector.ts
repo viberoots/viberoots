@@ -1,6 +1,6 @@
 import path from "node:path";
-import { DEFAULT_GRAPH_PATH } from "./graph-const.ts";
-import { readGraph } from "./graph.ts";
+import { DEFAULT_GRAPH_PATH } from "./graph-const";
+import { readGraph } from "./graph";
 import {
   buildProjectGraph,
   computeProjectClosure,
@@ -8,7 +8,7 @@ import {
   projectFromPackagePath,
   toProjectTargets,
   toSortedUnique,
-} from "./project-graph.ts";
+} from "./project-graph";
 
 export type ProjectClosureSelectorDiagnostics = {
   mode: "project-closure";

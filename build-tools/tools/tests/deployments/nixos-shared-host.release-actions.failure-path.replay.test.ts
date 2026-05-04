@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runNixosSharedHostReleaseActionPhase } from "../../deployments/nixos-shared-host-release-actions.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { deploymentReleaseActionFixture } from "./deployment-metadata.fixture.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import { runNixosSharedHostReleaseActionPhase } from "../../deployments/nixos-shared-host-release-actions";
+import { runInTemp } from "../lib/test-helpers";
+import { deploymentReleaseActionFixture } from "./deployment-metadata.fixture";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 async function markerNames(recordsRoot: string, deployRunId: string): Promise<string[]> {
   return (await fsp.readdir(path.join(recordsRoot, "release-actions", deployRunId))).sort();

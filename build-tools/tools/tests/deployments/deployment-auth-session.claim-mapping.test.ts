@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { authorizationForOidcPrincipal } from "../../deployments/deployment-auth-session-principal.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import { authorizationForOidcPrincipal } from "../../deployments/deployment-auth-session-principal";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 function deployment() {
   return nixosSharedHostDeploymentFixture({

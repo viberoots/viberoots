@@ -1,20 +1,20 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
+import type { DeploymentTarget } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
 import type {
   DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneRunAction,
-} from "./deployment-control-plane-contract.ts";
+} from "./deployment-control-plane-contract";
 import {
   authorizeControlPlaneAdmissionReport,
   authorizeControlPlaneRunAction,
-} from "./deployment-control-plane-authz.ts";
-import { DeploymentUnauthorizedError } from "./deployment-control-plane-errors.ts";
+} from "./deployment-control-plane-authz";
+import { DeploymentUnauthorizedError } from "./deployment-control-plane-errors";
 import {
   consumeDeploymentAuthSessionAuthorization,
   readDeploymentAuthSessionAuthorization,
-} from "./deployment-auth-session-service.ts";
+} from "./deployment-auth-session-service";
 
 type ClientAuthFields = {
   requestedBy?: unknown;

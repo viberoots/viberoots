@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { parseWasmModuleManifest } from "../scaffolding/webapp-module-manifests.ts";
+import { parseWasmModuleManifest } from "../scaffolding/webapp-module-manifests";
 
 function pathFromRuntimeDestination(baseDir: string, runtimeDestination: string): string {
   const pathSegments = runtimeDestination.split("/").filter(Boolean);

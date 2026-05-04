@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { cleanupCloudflarePagesPreview } from "./cloudflare-pages-preview-cleanup.ts";
-import { createBackendPreviewCleanupRecord } from "./cloudflare-pages-control-plane-backend-records.ts";
-import { writeCloudflarePagesDeployRecord } from "./cloudflare-pages-records.ts";
-import { requireCloudflarePagesApiTokenForStep } from "./cloudflare-pages-secret-steps.ts";
+import { cleanupCloudflarePagesPreview } from "./cloudflare-pages-preview-cleanup";
+import { createBackendPreviewCleanupRecord } from "./cloudflare-pages-control-plane-backend-records";
+import { writeCloudflarePagesDeployRecord } from "./cloudflare-pages-records";
+import { requireCloudflarePagesApiTokenForStep } from "./cloudflare-pages-secret-steps";
 
 export async function executeCloudflarePagesBackendPreviewCleanup(opts: {
   recordsRoot: string;

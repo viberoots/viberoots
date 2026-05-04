@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { languageClassificationEntry } from "../../buck/exporter/lang/classification-registry.ts";
-import { isRuleType, validateLanguageClassification } from "../../buck/exporter/lang/helpers.ts";
-import type { Node } from "../../buck/exporter/types.ts";
+import { languageClassificationEntry } from "../../buck/exporter/lang/classification-registry";
+import { isRuleType, validateLanguageClassification } from "../../buck/exporter/lang/helpers";
+import type { Node } from "../../buck/exporter/types";
 
 function findingsFor(nodes: Node[], entryName: "go" | "cpp" | "node" | "python"): string[] {
   const entry = languageClassificationEntry(entryName);

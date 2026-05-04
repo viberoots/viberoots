@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { prebuildDiagnosticsRequireMaterialize } from "../../dev/dev-build/materialize-policy.ts";
+import { prebuildDiagnosticsRequireMaterialize } from "../../dev/dev-build/materialize-policy";
 
 test("materialize policy requires full path when diagnostics are missing", () => {
   assert.equal(prebuildDiagnosticsRequireMaterialize(null, 5000), true);

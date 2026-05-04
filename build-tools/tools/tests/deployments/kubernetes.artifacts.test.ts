@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { admitKubernetesComponentArtifacts } from "../../deployments/kubernetes-artifacts.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { writeImageDigest, writeServiceArtifact } from "./kubernetes.service-artifact.fixture.ts";
+import { admitKubernetesComponentArtifacts } from "../../deployments/kubernetes-artifacts";
+import { runInTemp } from "../lib/test-helpers";
+import { writeImageDigest, writeServiceArtifact } from "./kubernetes.service-artifact.fixture";
 
 test("kubernetes admits reviewed node service artifacts and image digests", async () => {
   await runInTemp("kubernetes-artifact-admission", async (tmp) => {

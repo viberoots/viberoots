@@ -3,28 +3,28 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { resolveDeploymentFromTarget } from "../../deployments/deployment-query.ts";
-import { listDeploymentsForCli } from "../../deployments/deploy-front-door.ts";
+import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
+import { listDeploymentsForCli } from "../../deployments/deploy-front-door";
 import {
   cloudflarePagesDeploymentFixture,
   installCloudflarePagesTargets,
-} from "./cloudflare-pages.fixture.ts";
+} from "./cloudflare-pages.fixture";
 import {
   writeTempCloudflareValidationWorkspace,
   writeTempListedDeploymentWorkspace,
-} from "./deploy.front-door.fixture.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
-import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
-import { installS3StaticTargets, s3StaticDeploymentFixture } from "./s3-static.fixture.ts";
-import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
-import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
+} from "./deploy.front-door.fixture";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
+import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture";
+import { installS3StaticTargets, s3StaticDeploymentFixture } from "./s3-static.fixture";
+import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
+import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
 import {
   readRecord,
   startControlPlaneHarness,
   withEnvOverrides,
-} from "./nixos-shared-host.control-plane.helpers.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "./nixos-shared-host.control-plane.helpers";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { runInTemp } from "../lib/test-helpers";
 
 async function writeDeploymentJson(filePath: string, deployment: unknown) {
   await fsp.writeFile(filePath, JSON.stringify(deployment, null, 2) + "\n", "utf8");

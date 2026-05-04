@@ -2,17 +2,17 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy.ts";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
+import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
+import { runInTemp } from "../lib/test-helpers";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import {
   ensureNixosSharedHostStageBranch,
   installNixosSharedHostTargets,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers.ts";
+} from "./nixos-shared-host.fixture";
+import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 
 async function prepareSameHostFixture(tmp: string, $: any) {
   const deployment = nixosSharedHostDeploymentFixture({

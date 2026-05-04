@@ -4,8 +4,8 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { mintDeployVaultJwt, runDeployVaultJwtCli } from "../../deployments/deploy-vault-jwt.ts";
-import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers.ts";
+import { mintDeployVaultJwt, runDeployVaultJwtCli } from "../../deployments/deploy-vault-jwt";
+import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers";
 
 async function rejectsWith(serverOpts: Parameters<typeof startFakeOidcServer>[0], message: RegExp) {
   const server = await startFakeOidcServer(serverOpts);

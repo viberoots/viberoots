@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import fg from "fast-glob";
-import { getFlagBool } from "../lib/cli.ts";
+import { getFlagBool } from "../lib/cli";
 
 type FindingType = "filename" | "symbol" | "string_literal" | "target_reference" | "doc_reference";
 

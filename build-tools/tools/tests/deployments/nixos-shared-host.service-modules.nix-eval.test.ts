@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { runInTemp } from "../lib/test-helpers";
 
 test("shared-host service modules do not hardcode a public deployment domain", async () => {
   const moduleDir = path.join(process.cwd(), "build-tools", "tools", "nix");

@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { ensureNixStoreToolPathSync, resolveToolPathSync } from "../../lib/tool-paths.ts";
+import { ensureNixStoreToolPathSync, resolveToolPathSync } from "../../lib/tool-paths";
 
 test("resolveToolPathSync prefers nix store binaries before host PATH entries", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "tool-paths-"));

@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import type { VercelDeployment } from "./contract.ts";
-import type { AdmittedVercelPrebuiltArtifact } from "./vercel-artifacts.ts";
-import { requireAdmittedVercelArtifactPath } from "./vercel-artifacts.ts";
-import { createFakeVercelApiClient, type VercelApiClient } from "./vercel-api.ts";
-import { prepareVercelPublisherConfig } from "./vercel-config.ts";
+import type { VercelDeployment } from "./contract";
+import type { AdmittedVercelPrebuiltArtifact } from "./vercel-artifacts";
+import { requireAdmittedVercelArtifactPath } from "./vercel-artifacts";
+import { createFakeVercelApiClient, type VercelApiClient } from "./vercel-api";
+import { prepareVercelPublisherConfig } from "./vercel-config";
 
 export type VercelPublishResult = {
   providerReleaseId: string;

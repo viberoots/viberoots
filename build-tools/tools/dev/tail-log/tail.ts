@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import process from "node:process";
-import { resolvePid } from "./resolve.ts";
-import type { Resolution } from "./resolve.ts";
+import { resolvePid } from "./resolve";
+import type { Resolution } from "./resolve";
 
 export async function followLatestTail(
   resolveLatest: () => Promise<Resolution>,

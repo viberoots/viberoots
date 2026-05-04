@@ -1,19 +1,19 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentAdmissionPolicy, DeploymentLanePolicy } from "./deployment-policy.ts";
-import type { DeploymentComponentKind } from "./deployment-component-kinds.ts";
-import type { DeploymentRolloutPolicy } from "./deployment-rollout.ts";
-import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
-import type { DeploymentRequirement } from "./deployment-requirements.ts";
-import type { ExternalDeploymentRequirementProfile } from "./external-deployment-requirements.ts";
-import type { DeploymentSmokePolicy } from "./deployment-smoke-policy.ts";
-import type { DeploymentTargetException } from "./deployment-target-exceptions.ts";
-import type { DeploymentVaultRuntimeConfig } from "./deployment-vault-runtime-types.ts";
-import type { OpenTofuProvisionerMetadata } from "./opentofu-stack.ts";
+import type { DeploymentAdmissionPolicy, DeploymentLanePolicy } from "./deployment-policy";
+import type { DeploymentComponentKind } from "./deployment-component-kinds";
+import type { DeploymentRolloutPolicy } from "./deployment-rollout";
+import type { DeploymentReleaseAction } from "./deployment-release-actions";
+import type { DeploymentRequirement } from "./deployment-requirements";
+import type { ExternalDeploymentRequirementProfile } from "./external-deployment-requirements";
+import type { DeploymentSmokePolicy } from "./deployment-smoke-policy";
+import type { DeploymentTargetException } from "./deployment-target-exceptions";
+import type { DeploymentVaultRuntimeConfig } from "./deployment-vault-runtime-types";
+import type { OpenTofuProvisionerMetadata } from "./opentofu-stack";
 import {
   MOBILE_APP_COMPONENT_KIND,
   SSR_WEBAPP_COMPONENT_KIND,
   STATIC_WEBAPP_COMPONENT_KIND,
-} from "./deployment-component-kinds.ts";
+} from "./deployment-component-kinds";
 import {
   APP_STORE_CONNECT_PROVIDER,
   CLOUDFLARE_PAGES_PROVIDER,
@@ -27,8 +27,8 @@ import {
   type KubernetesProviderTarget,
   type NixosSharedHostProviderTarget,
   type S3StaticProviderTarget,
-} from "./deployment-provider-targets.ts";
-import type { VercelDeployment } from "./vercel-contract-types.ts";
+} from "./deployment-provider-targets";
+import type { VercelDeployment } from "./vercel-contract-types";
 
 export const STATIC_WEBAPP_COMPONENT = "static-webapp";
 export const SSR_WEBAPP_COMPONENT = "ssr-webapp";
@@ -53,12 +53,12 @@ export {
   type KubernetesProviderTarget,
   type NixosSharedHostProviderTarget,
   type S3StaticProviderTarget,
-} from "./deployment-provider-targets.ts";
+} from "./deployment-provider-targets";
 export {
   VERCEL_PROVIDER,
   deriveVercelProviderTarget,
   type VercelProviderTarget,
-} from "./vercel-provider-target.ts";
+} from "./vercel-provider-target";
 
 export type DeploymentPrerequisiteMode = "ordering_only" | "health_gated";
 
@@ -219,8 +219,8 @@ export type DeploymentTarget =
   | GooglePlayDeployment
   | VercelDeployment;
 
-export type { VercelDeployment } from "./vercel-contract-types.ts";
-export * from "./deployment-contract-helpers.ts";
+export type { VercelDeployment } from "./vercel-contract-types";
+export * from "./deployment-contract-helpers";
 
 export function hasNixosSharedHostSsrRuntimeContract(
   component: NixosSharedHostDeploymentComponent,

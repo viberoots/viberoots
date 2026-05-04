@@ -1,20 +1,20 @@
 #!/usr/bin/env zx-wrapper
-import { runCloudflarePagesStaticDeploy } from "./cloudflare-pages-static-deploy.ts";
-import { lockWaitAbortReasonForSubmission } from "./deployment-control-plane-queue.ts";
+import { runCloudflarePagesStaticDeploy } from "./cloudflare-pages-static-deploy";
+import { lockWaitAbortReasonForSubmission } from "./deployment-control-plane-queue";
 import {
   acquireBackendControlPlaneLock,
   writeBackendDeployRecordDoc,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
-import { removeMirrorFile } from "./nixos-shared-host-control-plane-backend-materialize.ts";
-import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
-import { sanitizedBackendRecord } from "./cloudflare-pages-control-plane-backend-records.ts";
+} from "./nixos-shared-host-control-plane-backend";
+import { removeMirrorFile } from "./nixos-shared-host-control-plane-backend-materialize";
+import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store";
+import { sanitizedBackendRecord } from "./cloudflare-pages-control-plane-backend-records";
 // prettier-ignore
-import { persistCloudflareBackendStatus, type CloudflareBackendSubmissionLike } from "./cloudflare-pages-control-plane-backend-status.ts";
-import { executeCloudflarePagesBackendPreviewCleanup } from "./cloudflare-pages-control-plane-backend-preview-cleanup.ts";
-import { prepareWorkerDeploymentVaultRuntime } from "./deployment-vault-runtime-worker.ts";
-import { activateDeploymentSecretContext } from "./deployment-secret-context.ts";
-import { cleanupDeploymentVaultRuntime } from "./deployment-vault-runtime.ts";
+import { persistCloudflareBackendStatus, type CloudflareBackendSubmissionLike } from "./cloudflare-pages-control-plane-backend-status";
+import { executeCloudflarePagesBackendPreviewCleanup } from "./cloudflare-pages-control-plane-backend-preview-cleanup";
+import { prepareWorkerDeploymentVaultRuntime } from "./deployment-vault-runtime-worker";
+import { activateDeploymentSecretContext } from "./deployment-secret-context";
+import { cleanupDeploymentVaultRuntime } from "./deployment-vault-runtime";
 import {
   cloudflareBackendTimeouts,
   persistCloudflareBackendStep,
@@ -23,8 +23,8 @@ import {
   withStepTimeout,
   writeCloudflareBackendFailureRecord,
   type CloudflareBackendExecutionStep,
-} from "./cloudflare-pages-control-plane-backend-execution.ts";
-import { executeCloudflarePagesBackendTargetTransition } from "./cloudflare-pages-control-plane-backend-transition.ts";
+} from "./cloudflare-pages-control-plane-backend-execution";
+import { executeCloudflarePagesBackendTargetTransition } from "./cloudflare-pages-control-plane-backend-transition";
 
 export async function executeCloudflarePagesBackendSubmission(opts: {
   workspaceRoot: string;

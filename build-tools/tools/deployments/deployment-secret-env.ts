@@ -6,13 +6,13 @@ import {
   VAULT_JWT_FILE_ENV,
   VAULT_JWT_ROLE_ENV,
   VAULT_TOKEN_ENV,
-} from "./deployment-secret-vault-credentials.ts";
+} from "./deployment-secret-vault-credentials";
 import {
   DEFAULT_DEPLOYMENT_CLIENT_SECRET_ENV,
   DEFAULT_DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV,
   DEPLOYMENT_CLIENT_SECRET_ENV_ENV,
   DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV_ENV,
-} from "./deployment-vault-runtime.ts";
+} from "./deployment-vault-runtime";
 
 const SECRET_ENV_NAMES = new Set([
   VAULT_ADDR_ENV,

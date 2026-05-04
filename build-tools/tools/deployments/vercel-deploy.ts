@@ -1,24 +1,24 @@
 #!/usr/bin/env zx-wrapper
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
-import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
-import type { DeploymentExecutionResult } from "./deployment-execution.ts";
-import type { VercelDeployment } from "./contract.ts";
+import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
+import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy";
+import type { DeploymentExecutionResult } from "./deployment-execution";
+import type { VercelDeployment } from "./contract";
 import {
   admitVercelPrebuiltArtifact,
   type AdmittedVercelPrebuiltArtifact,
-} from "./vercel-artifacts.ts";
-import { publishVercelPrebuilt } from "./vercel-publisher.ts";
+} from "./vercel-artifacts";
+import { publishVercelPrebuilt } from "./vercel-publisher";
 import {
   createVercelDeployRecord,
   createVercelDeployRunId,
   writeVercelDeployRecord,
   type VercelDeployRecord,
   type VercelOperationKind,
-} from "./vercel-records.ts";
-import { smokeVercelConsole, type VercelSmokeConnectOverride } from "./vercel-smoke.ts";
-import type { VercelApiClient } from "./vercel-api.ts";
-import { cleanupVercelPreview } from "./vercel-publisher.ts";
-import { writeVercelReplaySnapshot } from "./vercel-replay.ts";
+} from "./vercel-records";
+import { smokeVercelConsole, type VercelSmokeConnectOverride } from "./vercel-smoke";
+import type { VercelApiClient } from "./vercel-api";
+import { cleanupVercelPreview } from "./vercel-publisher";
+import { writeVercelReplaySnapshot } from "./vercel-replay";
 
 type VercelDeployResult = { record: VercelDeployRecord; recordPath: string };
 

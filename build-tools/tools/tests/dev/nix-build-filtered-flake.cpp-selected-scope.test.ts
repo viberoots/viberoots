@@ -9,7 +9,7 @@ import {
   graphNodesFromJson,
   selectedCppSnapshotRelPaths,
   selectedCppSnapshotRsyncSources,
-} from "../../dev/nix-build-filtered-flake-lib.ts";
+} from "../../dev/nix-build-filtered-flake-lib";
 
 test("selected cpp filtered-flake snapshots follow the target package closure", () => {
   const graph = [

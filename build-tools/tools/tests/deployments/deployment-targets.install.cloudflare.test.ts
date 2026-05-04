@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { runInTemp } from "../lib/test-helpers";
 import {
   cloudflarePagesDeploymentFixture,
   installCloudflarePagesTargets,
-} from "./cloudflare-pages.fixture.ts";
+} from "./cloudflare-pages.fixture";
 
 test("Cloudflare target install preserves reviewed vault runtime metadata", async () => {
   await runInTemp("deployment-targets-install-cloudflare-vault-runtime", async (tmp) => {

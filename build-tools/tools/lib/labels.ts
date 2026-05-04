@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { isSupportedImporterLabel } from "./importers.ts";
-import { normalizeNixAttr, providerNameForImporter, providerNameForNixAttr } from "./providers.ts";
+import { isSupportedImporterLabel } from "./importers";
+import { normalizeNixAttr, providerNameForImporter, providerNameForNixAttr } from "./providers";
 
 function fqProviderLabel(name: string): string {
   return `//third_party/providers:${name}`;

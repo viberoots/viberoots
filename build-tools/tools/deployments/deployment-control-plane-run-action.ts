@@ -1,31 +1,31 @@
 #!/usr/bin/env zx-wrapper
 import { randomUUID } from "node:crypto";
-import { defaultRequestedBy, type DeploymentPrincipal } from "./deployment-admission-evidence.ts";
+import { defaultRequestedBy, type DeploymentPrincipal } from "./deployment-admission-evidence";
 import {
   DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA,
   type DeploymentControlPlaneAuthorization,
   type DeploymentControlPlaneApprovalGrantRequest,
   type DeploymentControlPlaneRunAction,
-} from "./deployment-control-plane-contract.ts";
-import { approvePendingSubmission } from "./deployment-control-plane-approve-action.ts";
+} from "./deployment-control-plane-contract";
+import { approvePendingSubmission } from "./deployment-control-plane-approve-action";
 import {
   resolveRunActionIdempotency,
   fingerprintControlPlanePayload,
-} from "./deployment-control-plane-idempotency.ts";
+} from "./deployment-control-plane-idempotency";
 import {
   runActionResponseFromSubmission,
   statusFromSubmission,
-} from "./deployment-control-plane-status.ts";
+} from "./deployment-control-plane-status";
 import {
   abortPausedProgressiveRun,
   resumePausedProgressiveRun,
-} from "./deployment-control-plane-progressive-run-action.ts";
+} from "./deployment-control-plane-progressive-run-action";
 import {
   readControlPlaneJson,
   runActionRequestPathFor,
   writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
-import { cleanupReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot.ts";
+} from "./nixos-shared-host-control-plane-store";
+import { cleanupReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot";
 type SubmissionRecord = {
   submissionId: string;
   executionSnapshotPath: string;

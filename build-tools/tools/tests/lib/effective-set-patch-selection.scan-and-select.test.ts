@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "./test-helpers.ts";
+import { runInTemp } from "./test-helpers";
 import {
   scanFlatPatchDirToLowercaseKeyToPatchPathMap,
   selectPatchPathsForEffectiveSet,
-} from "../../lib/effective-set-patch-selection.ts";
+} from "../../lib/effective-set-patch-selection";
 
 test("effective set patch selection: scan builds a lowercase key map and selection is stable/deduped", async () => {
   await runInTemp("effective-set-patch-selection", async (tmp, _$) => {

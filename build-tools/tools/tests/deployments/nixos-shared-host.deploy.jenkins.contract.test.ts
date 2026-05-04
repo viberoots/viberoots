@@ -2,13 +2,13 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { runInTemp } from "../lib/test-helpers";
 import {
   installClientProfile,
   installReviewedPleominoTargets,
   writeArtifact,
   writeJenkinsAuthFiles,
-} from "./nixos-shared-host.jenkins.fixture.ts";
+} from "./nixos-shared-host.jenkins.fixture";
 
 test("jenkins wrapper contract", async (t) => {
   await runInTemp("nixos-shared-host-jenkins-contract", async (tmp, $) => {

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cwdIsInsideTempRepo, cwdPrefixesForTempRepo } from "./buck-daemon-reaper-utils.ts";
+import { cwdIsInsideTempRepo, cwdPrefixesForTempRepo } from "./buck-daemon-reaper-utils";
 
 test("buck-daemon-reaper-utils: handles /private<->/var temp path aliasing safely", () => {
   const tmp = "/var/folders/aa/bb/T/test-repo-123";

@@ -3,13 +3,13 @@ import path from "node:path";
 import {
   resolvePromotionAppStoreConnectAdmittedContext,
   resolveSourceRunAppStoreConnectAdmittedContext,
-} from "./app-store-connect-admission.ts";
-import { prepareAppStoreConnectPublisherConfig } from "./app-store-connect-config.ts";
-import type { AdmittedMobileAppArtifact } from "./app-store-connect-artifacts.ts";
-import type { AppStoreConnectDeployment } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import { publishRecordedAppStoreConnectArtifact } from "./app-store-connect-deploy.ts";
+} from "./app-store-connect-admission";
+import { prepareAppStoreConnectPublisherConfig } from "./app-store-connect-config";
+import type { AdmittedMobileAppArtifact } from "./app-store-connect-artifacts";
+import type { AppStoreConnectDeployment } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import { publishRecordedAppStoreConnectArtifact } from "./app-store-connect-deploy";
 
 type SourceRecordLike = { deployRunId: string; deploymentId: string; admittedContext?: any };
 

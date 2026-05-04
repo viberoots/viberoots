@@ -4,7 +4,7 @@ import { test } from "node:test";
 import {
   createInstallManifestV1,
   parseInstallManifest,
-} from "../../deployments/nixos-shared-host-install-contract.ts";
+} from "../../deployments/nixos-shared-host-install-contract";
 
 test("nixos-shared-host install manifest parses current schema", () => {
   const manifest = createInstallManifestV1({

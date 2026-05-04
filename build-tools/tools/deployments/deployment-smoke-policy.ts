@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../lib/graph.ts";
+import type { GraphNode } from "../lib/graph";
 import type {
   DeploymentComponentKind,
   DeploymentDefaultSmokeClass,
-} from "./deployment-component-kinds.ts";
-import type { DeploymentTarget } from "./contract-types.ts";
+} from "./deployment-component-kinds";
+import type { DeploymentTarget } from "./contract-types";
 import {
   DEPLOYMENT_SMOKE_CLASSES,
   resolveDeploymentSmokeBudget,
   type DeploymentSmokeBudget,
-} from "./deployment-smoke-budget.ts";
+} from "./deployment-smoke-budget";
 
 export type DeploymentSmokeException = {
   owner: string;

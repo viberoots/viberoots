@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { KubernetesDeployment } from "./contract.ts";
-import { scrubDeploymentSecretEnv } from "./deployment-secret-env.ts";
+import type { KubernetesDeployment } from "./contract";
+import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
 
 function commandError(stdout: string, stderr: string): Error {
   return new Error([stderr.trim(), stdout.trim()].filter(Boolean)[0] || "helm release failed");

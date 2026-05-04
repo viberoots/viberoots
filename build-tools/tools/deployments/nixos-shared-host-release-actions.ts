@@ -4,8 +4,8 @@ import path from "node:path";
 import type {
   DeploymentReleaseAction,
   DeploymentReleaseActionReplayContext,
-} from "./deployment-release-actions.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
+} from "./deployment-release-actions";
+import type { NixosSharedHostDeployment } from "./contract";
 
 const RELEASE_ACTION_RESULT_DIR = "release-actions";
 export type NixosSharedHostReleaseActionExecutionPath = "success" | "failure";

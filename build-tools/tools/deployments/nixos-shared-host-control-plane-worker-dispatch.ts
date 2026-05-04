@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { executeCloudflarePagesBackendSubmission } from "./cloudflare-pages-control-plane-backend-run.ts";
-import { executeKubernetesControlPlaneSubmission } from "./kubernetes-control-plane.ts";
-import { executeS3StaticControlPlaneSubmission } from "./s3-static-control-plane.ts";
-import { executeVercelControlPlaneSubmission } from "./vercel-control-plane.ts";
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
+import { executeCloudflarePagesBackendSubmission } from "./cloudflare-pages-control-plane-backend-run";
+import { executeKubernetesControlPlaneSubmission } from "./kubernetes-control-plane";
+import { executeS3StaticControlPlaneSubmission } from "./s3-static-control-plane";
+import { executeVercelControlPlaneSubmission } from "./vercel-control-plane";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
 
 type ProviderDispatchInputs = {
   workspaceRoot: string;

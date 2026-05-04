@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { deploymentError } from "./contract-extract-shared.ts";
+import { deploymentError } from "./contract-extract-shared";
 
 const SERVICE_KIND_VALUES = new Set(["web", "worker", ""]);
 const INGRESS_MODE_VALUES = new Set(["public", "private", "none", ""]);

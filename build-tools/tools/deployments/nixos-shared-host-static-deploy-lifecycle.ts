@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
+import type { DeploymentReleaseAction } from "./deployment-release-actions";
 import {
   rethrowAfterNixosSharedHostReleasePhaseFailureWithSecrets,
   runNixosSharedHostReleasePhaseWithSecrets,
   smokeNixosSharedHostPublishedComponentsWithSecrets,
-} from "./nixos-shared-host-secret-runtime.ts";
-import { runStaticDeployProgressivePhases } from "./nixos-shared-host-static-deploy-progressive.ts";
+} from "./nixos-shared-host-secret-runtime";
+import { runStaticDeployProgressivePhases } from "./nixos-shared-host-static-deploy-progressive";
 
 export async function runNixosSharedHostStaticDeployLifecycle(opts: {
   secretRuntime: {

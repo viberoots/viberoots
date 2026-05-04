@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
-import { deploymentSecretFixturePath } from "./deployment-secret-fixture.ts";
-import { activateDeploymentSecretContext } from "./deployment-secret-context.ts";
+import type { DeploymentTarget } from "./contract";
+import { deploymentSecretFixturePath } from "./deployment-secret-fixture";
+import { activateDeploymentSecretContext } from "./deployment-secret-context";
 import {
   cleanupDeploymentVaultRuntime,
   prepareDeploymentVaultRuntime,
   type PreparedDeploymentVaultRuntime,
-} from "./deployment-vault-runtime.ts";
-import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan.ts";
+} from "./deployment-vault-runtime";
+import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan";
 
 export type DeploymentWorkerVaultRuntimeMetadata = {
   addr: string;

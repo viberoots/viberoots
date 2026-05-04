@@ -2,7 +2,7 @@ import "./worker-init";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { resolveToolPath } from "../../../lib/tool-paths.ts";
+import { resolveToolPath } from "../../../lib/tool-paths";
 
 export async function buckIsolationDirsForRepo(repoRoot: string): Promise<string[]> {
   const dirs: string[] = [];

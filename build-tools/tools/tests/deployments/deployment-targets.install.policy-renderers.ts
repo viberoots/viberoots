@@ -1,11 +1,11 @@
-import type { DeploymentTargetException } from "../../deployments/contract.ts";
-import type { DeploymentReleaseAction } from "../../deployments/deployment-release-actions.ts";
+import type { DeploymentTargetException } from "../../deployments/contract";
+import type { DeploymentReleaseAction } from "../../deployments/deployment-release-actions";
 import type {
   DeploymentAdmissionPolicy,
   DeploymentLanePolicy,
-} from "../../deployments/deployment-policy.ts";
-import { labelName } from "./deployment-targets.install.fragments.ts";
-import { renderStringList, renderStringRecordList } from "./deployment-targets.install.render.ts";
+} from "../../deployments/deployment-policy";
+import { labelName } from "./deployment-targets.install.fragments";
+import { renderStringList, renderStringRecordList } from "./deployment-targets.install.render";
 
 export function renderPromotionCompatibility(policy: DeploymentLanePolicy): string | undefined {
   const edges = policy.promotionCompatibility?.crossProviderPromotionEdges;

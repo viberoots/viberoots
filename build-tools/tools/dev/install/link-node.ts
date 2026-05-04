@@ -2,20 +2,20 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagBool } from "../../lib/cli.ts";
-import { writeIfChanged } from "../../lib/fs-helpers.ts";
-import { resolveImporterDir } from "../../lib/lockfiles.ts";
-import { gcWaitConfig, nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock.ts";
-import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command.ts";
-import { pathExists, repoRoot } from "../../lib/repo.ts";
-import { makeFilteredFlakeRef } from "../update-pnpm-hash/lockfile.ts";
-import { flakeRefForImporter, sanitizeName } from "./common.ts";
+import { getFlagBool } from "../../lib/cli";
+import { writeIfChanged } from "../../lib/fs-helpers";
+import { resolveImporterDir } from "../../lib/lockfiles";
+import { gcWaitConfig, nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock";
+import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command";
+import { pathExists, repoRoot } from "../../lib/repo";
+import { makeFilteredFlakeRef } from "../update-pnpm-hash/lockfile";
+import { flakeRefForImporter, sanitizeName } from "./common";
 import {
   ensureNodeModulesGcRoot,
   failOnCompetingBuilds,
   recoverOutPathFromExistingSymlink,
   withHeartbeat,
-} from "./link-node-helpers.ts";
+} from "./link-node-helpers";
 
 export async function relinkNodeModules(force: boolean) {
   const root = repoRoot();

@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentProviderCapability, ProviderCapabilityBullet } from "./types.ts";
+import type { DeploymentProviderCapability, ProviderCapabilityBullet } from "./types";
 import {
   reviewedRuntimeContractFor,
   reviewedRuntimeParityExpectationsFromContract,
   type CapabilitySection,
   type ReviewedRuntimeContract,
   type ReviewedRuntimeContractProvider,
-} from "./runtime-contract.ts";
+} from "./runtime-contract";
 
 function flattenBulletTexts(bullets: ProviderCapabilityBullet[] | undefined): string[] {
   return (bullets || []).flatMap((entry) => [

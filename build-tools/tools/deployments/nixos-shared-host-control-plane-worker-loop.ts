@@ -5,23 +5,23 @@ import {
   writeBackendDeployRecordDoc,
   writeBackendSubmissionDoc,
   startBackendSubmissionClaimLease,
-} from "./nixos-shared-host-control-plane-backend.ts";
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
+} from "./nixos-shared-host-control-plane-backend";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
 import {
   materializeBackendControlPlaneFiles,
   persistMaterializedSnapshot,
   persistMaterializedSubmission,
   removeMirrorFile,
-} from "./nixos-shared-host-control-plane-backend-materialize.ts";
+} from "./nixos-shared-host-control-plane-backend-materialize";
 import {
   dispatchProviderControlPlaneSubmission,
   executeCloudflarePagesBackendSubmission,
-} from "./nixos-shared-host-control-plane-worker-dispatch.ts";
-import { executeSubmittedNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-submit-helpers.ts";
-import { reconcileNixosSharedHostRecoveredSubmission } from "./nixos-shared-host-recovery.ts";
-import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
-import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-contract.ts";
-import { nixosSharedHostLockScopes } from "./nixos-shared-host-components.ts";
+} from "./nixos-shared-host-control-plane-worker-dispatch";
+import { executeSubmittedNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-submit-helpers";
+import { reconcileNixosSharedHostRecoveredSubmission } from "./nixos-shared-host-recovery";
+import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store";
+import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-contract";
+import { nixosSharedHostLockScopes } from "./nixos-shared-host-components";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));

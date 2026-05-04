@@ -4,8 +4,8 @@ import { test } from "node:test";
 import {
   statusFromSubmission,
   submitResponseFromSubmission,
-} from "../../deployments/deployment-control-plane-status.ts";
-import { formatDeploymentControlPlaneStatusText } from "../../deployments/deployment-control-plane-status-format.ts";
+} from "../../deployments/deployment-control-plane-status";
+import { formatDeploymentControlPlaneStatusText } from "../../deployments/deployment-control-plane-status-format";
 
 test("control-plane submit and status responses preserve public service-instance diagnostics", () => {
   const submission = {

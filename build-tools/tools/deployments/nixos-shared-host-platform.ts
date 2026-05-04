@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { NIXOS_SHARED_HOST_PROVIDER, type NixosSharedHostDeployment } from "./contract.ts";
+import { NIXOS_SHARED_HOST_PROVIDER, type NixosSharedHostDeployment } from "./contract";
 
 export type NixosSharedHostPlatformState = {
   version: 1;

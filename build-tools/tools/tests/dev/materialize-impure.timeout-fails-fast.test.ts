@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { maybePrintImpureMaterializedBins } from "../../dev/dev-build/materialize-impure.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { maybePrintImpureMaterializedBins } from "../../dev/dev-build/materialize-impure";
+import { runInTemp } from "../lib/test-helpers";
 
 test("materialize impure fails fast when nix build exceeds timeout", async () => {
   await runInTemp("materialize-impure-timeout", async (tmp) => {

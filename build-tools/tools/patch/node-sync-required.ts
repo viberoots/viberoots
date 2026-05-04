@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { readImporterArg } from "../lib/cli.ts";
-import { resolveImporterDir } from "../lib/lockfiles.ts";
-import { runNodeWithZx } from "../lib/node-run.ts";
+import { readImporterArg } from "../lib/cli";
+import { resolveImporterDir } from "../lib/lockfiles";
+import { runNodeWithZx } from "../lib/node-run";
 import { repoRoot } from "./lib/apply";
 
 export async function runNodeSyncRequired(args: string[]): Promise<void> {

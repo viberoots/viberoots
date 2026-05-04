@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { S3StaticDeployment } from "./contract.ts";
-import { smokeNixosSharedHostStaticWebapp } from "./nixos-shared-host-static-smoke.ts";
+import type { S3StaticDeployment } from "./contract";
+import { smokeNixosSharedHostStaticWebapp } from "./nixos-shared-host-static-smoke";
 
 export async function smokeS3StaticWebapp(opts: {
   deployment: S3StaticDeployment;

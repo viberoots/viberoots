@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { normalizeTargetLabel } from "./labels.ts";
-import { resolveServerWasmContractArtifact } from "./runnable-wasm-artifacts.ts";
-import { SSR_FRAMEWORKS } from "./runnable-contracts.ts";
+import { normalizeTargetLabel } from "./labels";
+import { resolveServerWasmContractArtifact } from "./runnable-wasm-artifacts";
+import { SSR_FRAMEWORKS } from "./runnable-contracts";
 
 export type RunnableExec = {
   argv: string[];

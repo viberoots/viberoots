@@ -2,11 +2,11 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { copyTree } from "../lib/copy-tree.ts";
+import { copyTree } from "../lib/copy-tree";
 import {
   resiliencePolicyForProtectionClass,
   type ProtectedDeploymentClass,
-} from "./deployment-control-plane-resilience-policy.ts";
+} from "./deployment-control-plane-resilience-policy";
 
 export const DEPLOYMENT_CONTROL_PLANE_RESILIENCE_STATUS_SCHEMA =
   "deployment-control-plane-resilience-status@1";

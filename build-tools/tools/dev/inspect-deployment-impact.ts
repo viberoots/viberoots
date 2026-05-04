@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import process from "node:process";
-import { collectChangedPaths } from "../lib/build-system-test-scope.ts";
-import { getFlagList, getFlagStr } from "../lib/cli.ts";
-import { resolveDeploymentImpactSelection } from "../lib/deployment-impact-selector.ts";
+import { collectChangedPaths } from "../lib/build-system-test-scope";
+import { getFlagList, getFlagStr } from "../lib/cli";
+import { resolveDeploymentImpactSelection } from "../lib/deployment-impact-selector";
 
 async function main() {
   const root = getFlagStr("root", process.cwd());

@@ -1,7 +1,7 @@
-import { collectChangedPaths, isBuildSystemPath } from "./build-system-test-scope.ts";
-import { TEMPLATE_TAXONOMY } from "../scaffolding/scaf/templates/generated/template-taxonomy.generated.ts";
-import { queryTargetsForTemplateLabel } from "./template-test-selector-query.ts";
-import { readTemplateOwnedTestIndex, targetLabelFromScript } from "./template-owned-tests.ts";
+import { collectChangedPaths, isBuildSystemPath } from "./build-system-test-scope";
+import { TEMPLATE_TAXONOMY } from "../scaffolding/scaf/templates/generated/template-taxonomy.generated";
+import { queryTargetsForTemplateLabel } from "./template-test-selector-query";
+import { readTemplateOwnedTestIndex, targetLabelFromScript } from "./template-owned-tests";
 
 export type TemplateTestSelectorMode = "template-only" | "mixed" | "no-template-impact";
 

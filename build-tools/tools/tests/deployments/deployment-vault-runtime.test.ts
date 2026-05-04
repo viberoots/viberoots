@@ -8,17 +8,17 @@ import {
   cleanupDeploymentVaultRuntime,
   DEFAULT_DEPLOYMENT_CLIENT_SECRET_ENV,
   prepareDeploymentVaultRuntime,
-} from "../../deployments/deployment-vault-runtime.ts";
+} from "../../deployments/deployment-vault-runtime";
 import {
   prepareWorkerDeploymentVaultRuntime,
   workerVaultRuntimeMetadata,
-} from "../../deployments/deployment-vault-runtime-worker.ts";
-import { decodeJwtPayload } from "../../deployments/deploy-vault-jwt-claims.ts";
+} from "../../deployments/deployment-vault-runtime-worker";
+import { decodeJwtPayload } from "../../deployments/deploy-vault-jwt-claims";
 import {
   cloudflarePagesApiTokenRequirements,
   cloudflarePagesDeploymentFixture,
-} from "./cloudflare-pages.fixture.ts";
-import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers.ts";
+} from "./cloudflare-pages.fixture";
+import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers";
 
 test("deployment Vault runtime mints a fresh JWT from deployment-derived claims", async () => {
   const server = await startFakeOidcServer({

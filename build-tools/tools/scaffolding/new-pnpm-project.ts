@@ -1,11 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import "zx/globals";
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
-import {
-  liveRepoScaffoldGuardMessage,
-  shouldRefuseLiveRepoScaffold,
-} from "./scaf/live-repo-guard.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli";
+import { liveRepoScaffoldGuardMessage, shouldRefuseLiveRepoScaffold } from "./scaf/live-repo-guard";
 
 function usage(): void {
   console.log(

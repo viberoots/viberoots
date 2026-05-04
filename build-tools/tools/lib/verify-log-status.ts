@@ -1,6 +1,6 @@
-export type { VerifyStatus, VerifyStatusSource } from "./verify-log-status/types.ts";
-export { stripAnsiAndCrs } from "./verify-log-status/types.ts";
-export { parseFinalSummary } from "./verify-log-status/summary.ts";
-export { deriveInProgressCounts } from "./verify-log-status/derived.ts";
-export { computeVerifyStatusFromLogText } from "./verify-log-status/compute.ts";
-export { formatVerifyStatusJsonLine, formatVerifyStatusText } from "./verify-log-status/format.ts";
+export type { VerifyStatus, VerifyStatusSource } from "./verify-log-status/types";
+export { stripAnsiAndCrs } from "./verify-log-status/types";
+export { parseFinalSummary } from "./verify-log-status/summary";
+export { deriveInProgressCounts } from "./verify-log-status/derived";
+export { computeVerifyStatusFromLogText } from "./verify-log-status/compute";
+export { formatVerifyStatusJsonLine, formatVerifyStatusText } from "./verify-log-status/format";

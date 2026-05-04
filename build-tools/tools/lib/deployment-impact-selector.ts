@@ -1,7 +1,7 @@
-import { isBuildSystemPath, isIgnoredBuildSystemScopePath } from "./build-system-test-scope.ts";
-import { classifyReviewedBuildSystemVerifyPath } from "./deployment-verify-scope.ts";
-import { packagePathFromLabel } from "./labels.ts";
-import { normalizeRepoPath, projectFromRepoPath, toSortedUnique } from "./project-graph.ts";
+import { isBuildSystemPath, isIgnoredBuildSystemScopePath } from "./build-system-test-scope";
+import { classifyReviewedBuildSystemVerifyPath } from "./deployment-verify-scope";
+import { packagePathFromLabel } from "./labels";
+import { normalizeRepoPath, projectFromRepoPath, toSortedUnique } from "./project-graph";
 
 export type DeploymentImpactMode =
   | "deployment-only"

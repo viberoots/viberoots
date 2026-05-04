@@ -2,8 +2,8 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { attachGoModuleLabels } from "../../buck/exporter/labeler.ts";
-import type { Batch, GoListByBatch, GoPkg, Node } from "../../buck/exporter/types.ts";
+import { attachGoModuleLabels } from "../../buck/exporter/labeler";
+import type { Batch, GoListByBatch, GoPkg, Node } from "../../buck/exporter/types";
 
 test("go labeler derives module:* labels from explicit go list results (no global cache)", async () => {
   (globalThis as any).__GO_LIST_CACHE = {

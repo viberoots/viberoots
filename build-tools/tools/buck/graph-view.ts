@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { readCompositeGraph } from "../lib/graph-view.ts";
-import { getFlagStr } from "../lib/cli.ts";
+import { readCompositeGraph } from "../lib/graph-view";
+import { getFlagStr } from "../lib/cli";
 
 type Args = {
   graph?: string;

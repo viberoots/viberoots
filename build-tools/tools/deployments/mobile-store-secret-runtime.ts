@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
-import { classifySmokeRetry, runWithAutomaticRetry } from "./deployment-retry-policy.ts";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy";
+import { classifySmokeRetry, runWithAutomaticRetry } from "./deployment-retry-policy";
 
 type SecretRuntime = { enterStep(step: "smoke"): Promise<Record<string, string>> };
 

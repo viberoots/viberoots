@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagStr } from "../lib/cli.ts";
+import { getFlagStr } from "../lib/cli";
 import {
   applyNixosSharedHostScopedDeployments,
   reconcileNixosSharedHostPlatformState,
   removeNixosSharedHostPlatformDeployment,
-} from "./nixos-shared-host-platform.ts";
+} from "./nixos-shared-host-platform";
 import {
   readNixosSharedHostDeploymentsDocument,
   readNixosSharedHostPlatformStateOrEmpty,
   writeJsonDocument,
-} from "./nixos-shared-host-io.ts";
+} from "./nixos-shared-host-io";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();

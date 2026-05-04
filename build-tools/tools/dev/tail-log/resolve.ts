@@ -2,8 +2,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { spawn } from "node:child_process";
-import { resolveToolPath } from "../../lib/tool-paths.ts";
-import { workspaceRoot } from "./paths.ts";
+import { resolveToolPath } from "../../lib/tool-paths";
+import { workspaceRoot } from "./paths";
 
 function lockPidPath(root: string): string {
   return path.join(root, "buck-out", "tmp", "verify-lock", "pid");

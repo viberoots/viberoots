@@ -2,7 +2,7 @@ import path from "node:path";
 
 import * as fsp from "node:fs/promises";
 
-import { exists } from "../fs.ts";
+import { exists } from "../fs";
 
 export async function recordSource(dest: string, language: string, template: string) {
   const answers = path.join(dest, ".copier-answers.yml");

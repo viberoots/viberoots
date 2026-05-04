@@ -6,7 +6,7 @@ import {
   LOCKFILE_BASENAMES_BY_LANG,
   defaultLockfileBasenameForLang,
   lockfileBasenamesForLang,
-} from "./lockfile-contracts.ts";
+} from "./lockfile-contracts";
 
 export { LOCKFILE_BASENAMES_BY_LANG, defaultLockfileBasenameForLang, lockfileBasenamesForLang };
 

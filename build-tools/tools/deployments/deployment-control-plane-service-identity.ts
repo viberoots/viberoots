@@ -3,10 +3,10 @@ import { execFile } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { DeploymentControlPlaneServiceInstance } from "./deployment-control-plane-contract.ts";
-import { CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "./cloudflare-pages-control-plane-api-contract.ts";
-import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "./nixos-shared-host-control-plane-api-contract.ts";
-import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract.ts";
+import type { DeploymentControlPlaneServiceInstance } from "./deployment-control-plane-contract";
+import { CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "./cloudflare-pages-control-plane-api-contract";
+import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "./nixos-shared-host-control-plane-api-contract";
+import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract";
 
 const execFileAsync = promisify(execFile);
 

@@ -1,1 +1,1 @@
-export { ensureGraph, runGlue } from "../patch/glue.ts";
+export { ensureGraph, runGlue } from "../patch/glue";

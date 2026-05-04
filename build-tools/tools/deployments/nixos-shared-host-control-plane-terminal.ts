@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { createNixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-submission.ts";
+import { createNixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-submission";
 import type {
   NixosSharedHostControlPlaneSnapshot,
   NixosSharedHostControlPlaneSubmission,
-} from "./nixos-shared-host-control-plane-contract.ts";
+} from "./nixos-shared-host-control-plane-contract";
 
 export function createWaitTerminalSubmission(
   snapshot: NixosSharedHostControlPlaneSnapshot,

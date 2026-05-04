@@ -2,7 +2,7 @@
 import http from "node:http";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { KubernetesDeployment } from "../../deployments/contract.ts";
+import type { KubernetesDeployment } from "../../deployments/contract";
 
 export async function startKubernetesPublicServer(opts: {
   deployment: KubernetesDeployment;

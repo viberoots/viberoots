@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "./lib/test-helpers";
-import { providerNameForImporter } from "../lib/providers.ts";
+import { providerNameForImporter } from "../lib/providers";
 
 test("auto-map includes importer-scoped provider for a repo-root pnpm-lock.yaml importer '.'", async () => {
   await runInTemp("auto-map-node-root-importer-dot-wire", async (tmp, $) => {

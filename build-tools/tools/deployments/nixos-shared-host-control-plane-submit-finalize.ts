@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { reconcileNixosSharedHostRecoveredSubmission } from "./nixos-shared-host-recovery.ts";
-import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-contract.ts";
+import { reconcileNixosSharedHostRecoveredSubmission } from "./nixos-shared-host-recovery";
+import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-contract";
 
 export async function recoverControlPlaneSubmission(opts: {
   submissionPath: string;

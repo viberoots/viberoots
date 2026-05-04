@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
-import { queryBackend } from "./nixos-shared-host-control-plane-backend-db.ts";
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db.ts";
+import { queryBackend } from "./nixos-shared-host-control-plane-backend-db";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db";
 
 type ClaimedQueueRow = {
   submissionId: string;

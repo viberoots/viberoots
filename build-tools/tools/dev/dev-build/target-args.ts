@@ -1,4 +1,4 @@
-import { resolveSelectedTargetLabel } from "../target-label-resolver.ts";
+import { resolveSelectedTargetLabel } from "../target-label-resolver";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 

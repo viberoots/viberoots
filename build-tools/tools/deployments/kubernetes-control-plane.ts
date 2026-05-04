@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import fs from "node:fs/promises";
-import type { KubernetesDeployment } from "./contract.ts";
-import { terminalSubmissionFromAdmissionFailure } from "./deployment-provider-control-plane-admission-failure.ts";
-import { assertCrossDeploymentExactPromotionEligible } from "./deployment-provider-promotion.ts";
+import type { KubernetesDeployment } from "./contract";
+import { terminalSubmissionFromAdmissionFailure } from "./deployment-provider-control-plane-admission-failure";
+import { assertCrossDeploymentExactPromotionEligible } from "./deployment-provider-promotion";
 import {
   enqueueBackendSubmission,
   writeBackendDeployRecordDoc,
@@ -10,17 +10,17 @@ import {
   writeBackendSubmissionDoc,
   acquireBackendControlPlaneLock,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
+} from "./nixos-shared-host-control-plane-backend";
 import {
   executionSnapshotPathFor,
   submissionPathFor,
   writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
-import { submitResponseFromSubmission } from "./deployment-control-plane-status.ts";
-import { submitKubernetesDeploy } from "./kubernetes-deploy.ts";
-import { submitKubernetesExactArtifactRun } from "./kubernetes-exact-run.ts";
-import { submitKubernetesProvisionOnly } from "./kubernetes-provision-only.ts";
-import { resolveKubernetesReplaySource } from "./kubernetes-replay.ts";
+} from "./nixos-shared-host-control-plane-store";
+import { submitResponseFromSubmission } from "./deployment-control-plane-status";
+import { submitKubernetesDeploy } from "./kubernetes-deploy";
+import { submitKubernetesExactArtifactRun } from "./kubernetes-exact-run";
+import { submitKubernetesProvisionOnly } from "./kubernetes-provision-only";
+import { resolveKubernetesReplaySource } from "./kubernetes-replay";
 
 export const KUBERNETES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA =
   "kubernetes-control-plane-submit-request@1";

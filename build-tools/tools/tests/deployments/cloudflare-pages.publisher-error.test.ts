@@ -4,7 +4,7 @@ import { test } from "node:test";
 import {
   cloudflarePagesProviderPublicUrl,
   summarizeWranglerPagesDeployError,
-} from "../../deployments/cloudflare-pages-publisher.ts";
+} from "../../deployments/cloudflare-pages-publisher";
 
 test("cloudflare-pages provider URL fallback ignores custom domains", () => {
   assert.equal(

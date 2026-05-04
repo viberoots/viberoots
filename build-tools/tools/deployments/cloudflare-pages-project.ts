@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { CloudflarePagesDeployment } from "./contract.ts";
+import type { CloudflarePagesDeployment } from "./contract";
 
 type CloudflareEnvelope<T> = {
   success?: boolean;

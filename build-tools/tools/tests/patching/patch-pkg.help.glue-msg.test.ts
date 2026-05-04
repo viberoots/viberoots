@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { patchPkgUsageNotes } from "../../lib/lang-contracts.ts";
+import { patchPkgUsageNotes } from "../../lib/lang-contracts";
 import { runInTemp } from "../lib/test-helpers";
 
 test("patch-pkg usage mentions Node and Python glue behavior consistently", async () => {

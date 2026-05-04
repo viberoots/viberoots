@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import type { DeploymentAuthAction } from "./deployment-auth-groups.ts";
-import { writeJsonDocument } from "./nixos-shared-host-io.ts";
+import type { DeploymentAuthAction } from "./deployment-auth-groups";
+import { writeJsonDocument } from "./nixos-shared-host-io";
 
 export const DEPLOYMENT_KEYCLOAK_MEMBERSHIP_REALM = "deployments";
 

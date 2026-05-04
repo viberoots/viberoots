@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { mtimeSafe } from "./scan.ts";
+import { mtimeSafe } from "./scan";
 
 export function logList(name: string, files: string[], limit = 5) {
   const top = files.slice(0, limit);

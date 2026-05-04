@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
 import path from "node:path";
-import { maybeAssumeUnchanged } from "../../lib/fs-helpers.ts";
+import { maybeAssumeUnchanged } from "../../lib/fs-helpers";
 import { runInTemp } from "../lib/test-helpers";
 
 test("maybeAssumeUnchanged: no-throw outside a git work tree", async () => {

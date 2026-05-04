@@ -3,14 +3,14 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { readAppStoreConnectDeployRecord } from "../../deployments/app-store-connect-records.ts";
-import { resolveAppStoreConnectReplaySource } from "../../deployments/app-store-connect-replay.ts";
-import { resolveCloudflarePagesReplaySource } from "../../deployments/cloudflare-pages-replay.ts";
-import { resolveGooglePlayReplaySource } from "../../deployments/google-play-replay.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { appStoreConnectDeploymentFixture } from "./app-store-connect.fixture.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
-import { googlePlayDeploymentFixture } from "./google-play.fixture.ts";
+import { readAppStoreConnectDeployRecord } from "../../deployments/app-store-connect-records";
+import { resolveAppStoreConnectReplaySource } from "../../deployments/app-store-connect-replay";
+import { resolveCloudflarePagesReplaySource } from "../../deployments/cloudflare-pages-replay";
+import { resolveGooglePlayReplaySource } from "../../deployments/google-play-replay";
+import { runInTemp } from "../lib/test-helpers";
+import { appStoreConnectDeploymentFixture } from "./app-store-connect.fixture";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
+import { googlePlayDeploymentFixture } from "./google-play.fixture";
 
 async function writeJson(filePath: string, value: unknown) {
   await fsp.mkdir(path.dirname(filePath), { recursive: true });

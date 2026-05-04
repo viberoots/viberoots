@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { resolveNestedBuckIsolation } from "../../lib/buck-command-env.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { resolveNestedBuckIsolation } from "../../lib/buck-command-env";
+import { runInTemp } from "../lib/test-helpers";
 
 function buckEnv(): NodeJS.ProcessEnv {
   return {

@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint.ts";
-import type { VercelDeployment } from "./contract-types.ts";
+import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint";
+import type { VercelDeployment } from "./contract-types";
 
 export type VercelLocalPublishResult = {
   providerReleaseId: string;

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import http from "node:http";
 import https from "node:https";
-import type { VercelDeployment } from "./contract.ts";
+import type { VercelDeployment } from "./contract";
 
 export type VercelSmokeConnectOverride = {
   protocol: "http:" | "https:";

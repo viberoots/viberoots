@@ -6,12 +6,12 @@ import {
   publishCredentialContractRefs,
   resolveKubernetesPublishCredentials,
   validateKubernetesPublishRequirementsDeclared,
-} from "../../deployments/kubernetes-publish-credentials.ts";
-import { kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
+} from "../../deployments/kubernetes-publish-credentials";
+import { kubernetesDeploymentFixture } from "./kubernetes.fixture";
 import {
   REVIEWED_KUBERNETES_PUBLISH_CONTRACT,
   reviewedKubernetesPublishRequirements,
-} from "./kubernetes.publish-credentials.fixture.ts";
+} from "./kubernetes.publish-credentials.fixture";
 
 function fakeRuntime(values: Record<string, string>) {
   const calls: string[] = [];

@@ -4,9 +4,9 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { reviewedDeployAdminGroupName } from "../../deployments/deployment-admin-keycloak-auth.ts";
-import { grantDeploymentAdminKeycloakUser } from "../../deployments/deployment-admin-keycloak.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import { reviewedDeployAdminGroupName } from "../../deployments/deployment-admin-keycloak-auth";
+import { grantDeploymentAdminKeycloakUser } from "../../deployments/deployment-admin-keycloak";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 
 async function withTempDir<T>(name: string, fn: (tmp: string) => Promise<T>): Promise<T> {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), `${name}-`));

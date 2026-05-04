@@ -2,11 +2,11 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { grantsFor } from "../../deployments/deployment-control-plane-authz.ts";
-import { submitCloudflarePagesTargetTransition } from "../../deployments/cloudflare-pages-target-transition.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
-import { deploymentTargetExceptionFixture } from "./deployment-metadata.fixture.ts";
+import { grantsFor } from "../../deployments/deployment-control-plane-authz";
+import { submitCloudflarePagesTargetTransition } from "../../deployments/cloudflare-pages-target-transition";
+import { runInTemp } from "../lib/test-helpers";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
+import { deploymentTargetExceptionFixture } from "./deployment-metadata.fixture";
 
 function approvalEvidence(recordRef: string, deploymentId: string, targetIdentity: string) {
   return {

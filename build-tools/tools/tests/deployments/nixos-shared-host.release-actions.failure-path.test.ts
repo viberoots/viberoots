@@ -6,19 +6,19 @@ import { test } from "node:test";
 import {
   localHarnessControlPlaneDatabaseUrl,
   syncBackendDeployRecord,
-} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
-import { submitNixosSharedHostPublishOnlyRun } from "../../deployments/nixos-shared-host-publish-only.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
-import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+} from "../../deployments/nixos-shared-host-control-plane-backend";
+import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
+import { submitNixosSharedHostPublishOnlyRun } from "../../deployments/nixos-shared-host-publish-only";
+import { runInTemp } from "../lib/test-helpers";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 import {
   readLatestRunRecord,
   releaseActionDeployment,
   releaseActionMarkers,
-} from "./nixos-shared-host.release-actions.helpers.ts";
+} from "./nixos-shared-host.release-actions.helpers";
 
 test("nixos-shared-host success path skips failure_only release actions", async () => {
   await runInTemp("nixos-shared-host-release-actions-success-path", async (tmp, $) => {

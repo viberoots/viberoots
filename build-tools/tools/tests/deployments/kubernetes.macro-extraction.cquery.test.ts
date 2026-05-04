@@ -3,14 +3,14 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { nodesFromCqueryJson } from "../../buck/exporter/cquery/nodes.ts";
-import { extractKubernetesDeployments } from "../../deployments/contract.ts";
-import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers.ts";
-import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture.ts";
+import { nodesFromCqueryJson } from "../../buck/exporter/cquery/nodes";
+import { extractKubernetesDeployments } from "../../deployments/contract";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
+import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture";
 import {
   kubernetesAdmissionPolicyNodeFixture,
   kubernetesLanePolicyNodeFixture,
-} from "./kubernetes.fixture.ts";
+} from "./kubernetes.fixture";
 
 const ATTRS =
   "name,provider,component,component_kind,publisher,publisher_config,protection_class,lane_policy,environment_stage,admission_policy,provider_target,components,prerequisites,secret_requirements,runtime_config_requirements,governance_policy,defaults,default_client_profile,scm_backend,repository,branch_protections,stages,stage_branches,allowed_promotion_edges,promotion_compatibility,allowed_refs,required_checks,labels".split(

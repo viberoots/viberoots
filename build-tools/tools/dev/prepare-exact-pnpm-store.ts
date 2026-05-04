@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { readImporterArg } from "../lib/cli.ts";
-import { prepareExactPnpmStore } from "./update-pnpm-hash/lockfile.ts";
+import { readImporterArg } from "../lib/cli";
+import { prepareExactPnpmStore } from "./update-pnpm-hash/lockfile";
 
 function parseImporterArg(): string {
   const value = readImporterArg("").trim();

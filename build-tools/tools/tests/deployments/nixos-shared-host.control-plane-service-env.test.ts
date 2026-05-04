@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { resolveControlPlaneServiceToken } from "../../deployments/nixos-shared-host-control-plane-service.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
+import { runInTemp } from "../lib/test-helpers";
+import { resolveControlPlaneServiceToken } from "../../deployments/nixos-shared-host-control-plane-service";
 
 test("control-plane service token falls back to BNX_DEPLOY_CONTROL_PLANE_TOKEN", () => {
   assert.equal(

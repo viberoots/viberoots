@@ -4,15 +4,15 @@ import {
   STATIC_WEBAPP_COMPONENT,
   deriveS3StaticProviderTarget,
   type S3StaticDeployment,
-} from "../../deployments/contract.ts";
-import type { GraphNode } from "../../lib/graph.ts";
+} from "../../deployments/contract";
+import type { GraphNode } from "../../lib/graph";
 import {
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostLanePolicyFixture,
   nixosSharedHostLanePolicyNodeFixture,
-} from "./nixos-shared-host.fixture.ts";
-export { installS3StaticTargets } from "./deployment-targets.install.helpers.ts";
+} from "./nixos-shared-host.fixture";
+export { installS3StaticTargets } from "./deployment-targets.install.helpers";
 
 export function s3StaticDeploymentFixture(
   overrides: Partial<S3StaticDeployment> = {},

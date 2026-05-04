@@ -4,7 +4,7 @@ import { test } from "node:test";
 import {
   computeVerifyStatusFromLogText,
   formatVerifyStatusText,
-} from "../../lib/verify-log-status.ts";
+} from "../../lib/verify-log-status";
 
 test("verify-log-status: aggregates completed pass counts with current pass progress", () => {
   const log = [

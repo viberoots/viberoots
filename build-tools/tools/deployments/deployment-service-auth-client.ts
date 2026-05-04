@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
-import { launchBrowser } from "./deployment-browser-launch.ts";
+import type { DeploymentTarget } from "./contract";
+import { launchBrowser } from "./deployment-browser-launch";
 import {
   createDeploymentAuthLoginViaService,
   waitForDeploymentAuthSessionViaService,
-} from "./nixos-shared-host-control-plane-client.ts";
-import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan.ts";
-import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
+} from "./nixos-shared-host-control-plane-client";
+import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan";
+import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs";
 
 function authBlockingMissing(missing: string[]): string[] {
   return missing.filter(

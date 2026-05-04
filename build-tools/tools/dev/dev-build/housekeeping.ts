@@ -1,7 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { resolveToolPathSync } from "../../lib/tool-paths.ts";
-import { nodeBin, zxNodeBase } from "./paths.ts";
+import { resolveToolPathSync } from "../../lib/tool-paths";
+import { nodeBin, zxNodeBase } from "./paths";
 
 async function getDiskStats(root: string): Promise<{ freePct: number; freeBytes: number }> {
   try {

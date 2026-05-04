@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { resolveDeploymentGitCommit } from "../../deployments/deployment-git-ref.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { resolveDeploymentGitCommit } from "../../deployments/deployment-git-ref";
+import { runInTemp } from "../lib/test-helpers";
 
 test("deployment git commit resolution fetches missing reviewed source revisions", async () => {
   await runInTemp("deployment-git-ref-fetch-source", async (tmp) => {

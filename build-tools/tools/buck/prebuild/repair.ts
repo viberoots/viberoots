@@ -2,8 +2,8 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runNodeWithZx } from "../../lib/node-run.ts";
-import { runGlue } from "../glue-run.ts";
+import { runNodeWithZx } from "../../lib/node-run";
+import { runGlue } from "../glue-run";
 
 async function ensureProviderIndexArtifacts(): Promise<void> {
   const idxPath = path.join(process.cwd(), "third_party", "providers", "provider_index.bzl");

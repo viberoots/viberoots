@@ -6,9 +6,9 @@ import {
   defaultMaxRetriesForStep,
   noPublishAutoRetry,
   runWithAutomaticRetry,
-} from "../../deployments/deployment-retry-policy.ts";
-import { resolveDeploymentSmokeBudget } from "../../deployments/deployment-smoke-budget.ts";
-import { maxCloudflarePagesCustomDomainSmokeRetries } from "../../deployments/cloudflare-pages-smoke-retries.ts";
+} from "../../deployments/deployment-retry-policy";
+import { resolveDeploymentSmokeBudget } from "../../deployments/deployment-smoke-budget";
+import { maxCloudflarePagesCustomDomainSmokeRetries } from "../../deployments/cloudflare-pages-smoke-retries";
 
 test("lifecycle retry policy keeps validate, build, resolve, and provision on a fail-first path", () => {
   assert.equal(defaultMaxRetriesForStep("validate"), 0);

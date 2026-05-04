@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "./test-helpers";
-import { runNodeWithZx } from "../../lib/node-run.ts";
+import { runNodeWithZx } from "../../lib/node-run";
 
 test("node-run loads zx-init, forwards args, and propagates exit codes", async () => {
   await runInTemp("node-run-helper", async (tmp) => {

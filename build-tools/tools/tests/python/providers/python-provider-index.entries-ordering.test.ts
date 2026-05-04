@@ -18,7 +18,7 @@ test("readPythonProviderIndexEntries returns stable, ordered provider entries", 
 
     // Invoke readPythonProviderIndexEntries inside the temp repo process
     const { stdout } = await $({ stdio: "pipe" })`node -e ${`
-        import { readPythonProviderIndexEntries } from './build-tools/tools/buck/providers/python.ts';
+        import { readPythonProviderIndexEntries } from './build-tools/tools/buck/providers/python';
         const rows = await readPythonProviderIndexEntries();
         console.log(JSON.stringify(rows));
       `.trim()}`;

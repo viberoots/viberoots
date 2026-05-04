@@ -3,23 +3,23 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { submitKubernetesDeploy } from "../../deployments/kubernetes-deploy.ts";
-import { submitKubernetesExactArtifactRun } from "../../deployments/kubernetes-exact-run.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
-import { installFakeKubernetesHelm } from "./kubernetes.fake-helm.ts";
-import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
+import { submitKubernetesDeploy } from "../../deployments/kubernetes-deploy";
+import { submitKubernetesExactArtifactRun } from "../../deployments/kubernetes-exact-run";
+import { runInTemp } from "../lib/test-helpers";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
+import { installFakeKubernetesHelm } from "./kubernetes.fake-helm";
+import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture";
 import {
   REVIEWED_KUBERNETES_PUBLISH_CONTRACT,
   fakeKubernetesPublishSecretRuntime,
   reviewedKubernetesPublishRequirements,
   setKubernetesPublishSecretFixtureEnv,
   writeKubernetesPublishSecretFixture,
-} from "./kubernetes.publish-credentials.fixture.ts";
-import { startKubernetesPublicServer } from "./kubernetes.public-server.ts";
-import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+} from "./kubernetes.publish-credentials.fixture";
+import { startKubernetesPublicServer } from "./kubernetes.public-server";
+import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
 
 async function writeHelmValues(root: string, deploymentId: string, content: string): Promise<void> {
   const configPath = path.join(

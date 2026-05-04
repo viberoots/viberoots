@@ -4,9 +4,9 @@ import {
   KUBERNETES_PROVIDER,
   targetName,
   type KubernetesDeployment,
-} from "./contract-types.ts";
-import { deriveKubernetesProviderTarget } from "./deployment-provider-targets.ts";
-import { readPrimaryDeploymentComponent } from "./contract-extract-components.ts";
+} from "./contract-types";
+import { deriveKubernetesProviderTarget } from "./deployment-provider-targets";
+import { readPrimaryDeploymentComponent } from "./contract-extract-components";
 import {
   deploymentError,
   pushTokenFieldErrors,
@@ -18,20 +18,20 @@ import {
   readString,
   readStringRecord,
   type DeploymentExtractionContext,
-} from "./contract-extract-shared.ts";
-import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata.ts";
-import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
-import { resolveDeploymentMetadataRefs } from "./deployment-extract-metadata.ts";
-import { pushKubernetesComponentKindErrors } from "./kubernetes-capability-validation.ts";
-import { pushKubernetesRolloutErrors } from "./kubernetes-rollout-validation.ts";
-import { pushKubernetesServicePostureErrors } from "./kubernetes-service-posture.ts";
-import { readDeploymentRequirements } from "./deployment-requirements.ts";
-import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
+} from "./contract-extract-shared";
+import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata";
+import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding";
+import { resolveDeploymentMetadataRefs } from "./deployment-extract-metadata";
+import { pushKubernetesComponentKindErrors } from "./kubernetes-capability-validation";
+import { pushKubernetesRolloutErrors } from "./kubernetes-rollout-validation";
+import { pushKubernetesServicePostureErrors } from "./kubernetes-service-posture";
+import { readDeploymentRequirements } from "./deployment-requirements";
+import { pushSmokePolicyErrors } from "./deployment-smoke-policy";
 import {
   readOpenTofuProvisionerMetadata,
   REVIEWED_STACK_PROVISIONERS,
-} from "./opentofu-stack-extract.ts";
-import { pushDuplicateProviderTargetIdentityErrors } from "./provider-target-identity-errors.ts";
+} from "./opentofu-stack-extract";
+import { pushDuplicateProviderTargetIdentityErrors } from "./provider-target-identity-errors";
 const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/;
 const VALID_PROTECTION_CLASSES = new Set(["local_only", "shared_nonprod", "production_facing"]);
 

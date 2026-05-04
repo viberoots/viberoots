@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import { resolveInitialKubernetesAdmittedContext } from "./kubernetes-admission.ts";
-import type { KubernetesDeployment } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
-import { createKubernetesDeployRecord, writeKubernetesDeployRecord } from "./kubernetes-records.ts";
-import { writeKubernetesProvisionerPlan } from "./kubernetes-provisioner-plan.ts";
+import { resolveInitialKubernetesAdmittedContext } from "./kubernetes-admission";
+import type { KubernetesDeployment } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
+import { createKubernetesDeployRecord, writeKubernetesDeployRecord } from "./kubernetes-records";
+import { writeKubernetesProvisionerPlan } from "./kubernetes-provisioner-plan";
 import {
   maybeRunOpenTofuReviewedApply,
   type OpenTofuApplyHooks,
-} from "./opentofu-apply-orchestration.ts";
+} from "./opentofu-apply-orchestration";
 
 export async function submitKubernetesProvisionOnly(opts: {
   workspaceRoot: string;

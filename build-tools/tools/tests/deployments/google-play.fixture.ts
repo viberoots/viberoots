@@ -3,14 +3,14 @@ import {
   GOOGLE_PLAY_PROVIDER,
   MOBILE_APP_COMPONENT_KIND,
   type GooglePlayDeployment,
-} from "../../deployments/contract.ts";
-import type { GraphNode } from "../../lib/graph.ts";
+} from "../../deployments/contract";
+import type { GraphNode } from "../../lib/graph";
 import {
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostLanePolicyFixture,
   nixosSharedHostLanePolicyNodeFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 
 export function googlePlayDeploymentFixture(
   overrides: Partial<GooglePlayDeployment> = {},

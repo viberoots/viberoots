@@ -1,6 +1,6 @@
 import process from "node:process";
-import { activeNixGcProcesses } from "./preflight.ts";
-import { appendVerifyLogLine } from "./process-control.ts";
+import { activeNixGcProcesses } from "./preflight";
+import { appendVerifyLogLine } from "./process-control";
 
 export async function recordNixGcPreflight(logFile: string | null): Promise<void> {
   const nixGc = await activeNixGcProcesses();

@@ -5,14 +5,14 @@ import {
   groupVerifyPassesForExecution,
   resourceLimitedStartDelaySeconds,
   verifyPassIsolationDir,
-} from "./verify-pass-scheduling.ts";
-import { killBuckIsolation } from "./process-control.ts";
-import { startVerifySafetyRails, summarizeVerifySafetyRailsTelemetry } from "./safety-rails.ts";
+} from "./verify-pass-scheduling";
+import { killBuckIsolation } from "./process-control";
+import { startVerifySafetyRails, summarizeVerifySafetyRailsTelemetry } from "./safety-rails";
 import {
   assertVerifyTargetPlanNotEmpty,
   resolveVerifyTargetPlan,
   summarizeVerifyTargetPlan,
-} from "./target-passes.ts";
+} from "./target-passes";
 
 async function appendVerifyPassLog(file: string | null, line: string): Promise<void> {
   if (!file) return;

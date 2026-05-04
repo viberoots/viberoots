@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan.ts";
+import type { DeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan";
 
 export const DEPLOYMENT_AUTH_MATRIX_SCHEMA = "deployment-auth-matrix@1";
 

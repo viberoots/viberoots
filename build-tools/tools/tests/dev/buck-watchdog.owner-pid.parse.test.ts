@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
-import { ownerPidForIsolation } from "../../dev/buck-watchdog-lib.ts";
+import { ownerPidForIsolation } from "../../dev/buck-watchdog-lib";
 
 test("ownerPidForIsolation parses only pid-owned isolations", () => {
   assert.equal(ownerPidForIsolation("v-123"), 123);

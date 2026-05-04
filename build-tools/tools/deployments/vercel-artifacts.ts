@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { artifactIdentityForVercelNextOutput } from "../vercel/next-artifact.ts";
+import { artifactIdentityForVercelNextOutput } from "../vercel/next-artifact";
 
 export type AdmittedVercelPrebuiltArtifact = {
   identity: string;

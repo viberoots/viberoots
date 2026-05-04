@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { resolveToolPathSync } from "../lib/tool-paths";
-import { ownerPidForIsolation } from "./buck-watchdog-lib.ts";
+import { ownerPidForIsolation } from "./buck-watchdog-lib";
 
 export function shouldRemoveDeadOwnedBuckIsolationDir(
   name: string,

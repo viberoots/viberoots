@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { publishKubernetesComponent } from "../../deployments/kubernetes-publisher.ts";
-import { kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { publishKubernetesComponent } from "../../deployments/kubernetes-publisher";
+import { kubernetesDeploymentFixture } from "./kubernetes.fixture";
+import { runInTemp } from "../lib/test-helpers";
 
 const HELM_RECORDER = `#!/usr/bin/env node
 import fs from "node:fs";

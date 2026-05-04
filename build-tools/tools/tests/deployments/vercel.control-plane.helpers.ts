@@ -3,8 +3,8 @@ import * as fsp from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "../../deployments/deployment-secret-fixture.ts";
-import { vercelDeploymentFixture } from "./vercel.fixture.ts";
+import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "../../deployments/deployment-secret-fixture";
+import { vercelDeploymentFixture } from "./vercel.fixture";
 
 export async function withVercelSmokeServer<T>(
   fn: (override: { protocol: "http:"; hostname: string; port: number }) => Promise<T>,

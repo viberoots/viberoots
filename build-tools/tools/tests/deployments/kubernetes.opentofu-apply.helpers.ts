@@ -4,8 +4,8 @@ import path from "node:path";
 import {
   OPENTOFU_STACK_PROVISIONER,
   type OpenTofuProvisionerMetadata,
-} from "../../deployments/opentofu-stack.ts";
-import type { OpenTofuApplyAdapter } from "../../deployments/opentofu-apply.ts";
+} from "../../deployments/opentofu-stack";
+import type { OpenTofuApplyAdapter } from "../../deployments/opentofu-apply";
 
 export const PLAN_FINGERPRINT = "sha256:plan";
 export const STACK_CONFIG_FINGERPRINT = "sha256:stack-config";

@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { packagePathFromLabel } from "../lib/labels.ts";
-import type { S3StaticDeployment } from "./contract.ts";
-import { scrubDeploymentSecretEnv } from "./deployment-secret-env.ts";
+import { packagePathFromLabel } from "../lib/labels";
+import type { S3StaticDeployment } from "./contract";
+import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
 
 function awsBin(): string {
   return process.env.BNX_S3_STATIC_AWS_BIN?.trim() || "aws";

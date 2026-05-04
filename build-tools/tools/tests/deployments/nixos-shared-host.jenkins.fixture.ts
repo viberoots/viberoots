@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { NixosSharedHostDeployment } from "../../deployments/contract.ts";
-import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy.ts";
-import { resolveDeploymentFromTarget } from "../../deployments/deployment-query.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
-import { createNixosSharedHostInstallFixture } from "./nixos-shared-host.install.fixture.ts";
+import type { NixosSharedHostDeployment } from "../../deployments/contract";
+import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy";
+import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
+import { createNixosSharedHostInstallFixture } from "./nixos-shared-host.install.fixture";
 
 export const REVIEWED_PLEOMINO_DEPLOYMENT_LABEL = "//projects/deployments/pleomino-dev:deploy";
 

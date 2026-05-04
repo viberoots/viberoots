@@ -4,8 +4,8 @@ import path from "node:path";
 import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
   stageTempRepoPaths,
-} from "../../lib/test-helpers/git-stage.ts";
-import { esbuildPackageName } from "./wasm-watch.ts";
+} from "../../lib/test-helpers/git-stage";
+import { esbuildPackageName } from "./wasm-watch";
 
 export async function ensureNodeModulesForDevApp(opts: {
   tmp: string;

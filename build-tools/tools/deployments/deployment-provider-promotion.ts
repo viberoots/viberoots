@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
-import { requiredDeploymentStageBranch } from "./contract.ts";
+import type { DeploymentTarget } from "./contract";
+import { requiredDeploymentStageBranch } from "./contract";
 import {
   exactArtifactPromotionErrors,
   promotionCompatibilityErrors,
   sourcePromotionRevision,
-} from "./deployment-promotion-compatibility.ts";
-import { resolveDeploymentGitCommit } from "./deployment-git-ref.ts";
+} from "./deployment-promotion-compatibility";
+import { resolveDeploymentGitCommit } from "./deployment-git-ref";
 
 export async function assertCrossDeploymentExactPromotionEligible(opts: {
   workspaceRoot: string;

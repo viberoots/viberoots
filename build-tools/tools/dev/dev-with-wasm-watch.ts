@@ -3,8 +3,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { getFlagStr } from "../lib/cli.ts";
-import { syncModuleContractsForApp } from "./sync-module-contracts-core.ts";
+import { getFlagStr } from "../lib/cli";
+import { syncModuleContractsForApp } from "./sync-module-contracts-core";
 
 function required(name: string, value: string): string {
   const v = String(value || "").trim();

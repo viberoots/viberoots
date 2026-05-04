@@ -1,21 +1,21 @@
 #!/usr/bin/env zx-wrapper
-import { resolveSourceRunCloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
-import type { CloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-contract.ts";
-import { CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA } from "./cloudflare-pages-control-plane-contract.ts";
-import { createCloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-snapshot.ts";
+import { resolveSourceRunCloudflarePagesAdmittedContext } from "./cloudflare-pages-admission";
+import type { CloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-contract";
+import { CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA } from "./cloudflare-pages-control-plane-contract";
+import { createCloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-snapshot";
 import {
   resolveCloudflarePagesArtifactForSubmission,
   vaultRuntimeForCloudflareDeployment,
-} from "./cloudflare-pages-control-plane-backend-support.ts";
-import type { ResolvedCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit.ts";
+} from "./cloudflare-pages-control-plane-backend-support";
+import type { ResolvedCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit";
 import {
   cloudflarePagesPreviewIdentitySelector,
   deriveCloudflarePagesPreviewTarget,
-} from "./cloudflare-pages-preview.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
-import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution.ts";
-import { targetTransitionSnapshot } from "./cloudflare-pages-control-plane-backend-transition-snapshot.ts";
+} from "./cloudflare-pages-preview";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
+import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution";
+import { targetTransitionSnapshot } from "./cloudflare-pages-control-plane-backend-transition-snapshot";
 // prettier-ignore
 export type CloudflarePagesBackendSnapshot = CloudflarePagesControlPlaneSnapshot | Record<string, unknown>;
 async function previewSnapshot(

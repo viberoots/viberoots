@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { resolveToolPathSync } from "../../lib/tool-paths.ts";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 
 export function getExtraStatusLines(isTty: boolean): string {
   const commands = getProcessCommands();

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagStr } from "../lib/cli.ts";
+import { getFlagStr } from "../lib/cli";
 
 function valueOrEmpty(input: string): string {
   return String(input || "").trim();

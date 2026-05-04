@@ -27,7 +27,7 @@ test("readNodeProviderIndexEntries returns stable, ordered provider entries", as
     // Invoke readNodeProviderIndexEntries inside the temp repo process so git ls-files
     // and dynamic import('yaml') resolve correctly relative to the temp CWD.
     const { stdout } = await $({ stdio: "pipe" })`node -e ${`
-        import { readNodeProviderIndexEntries } from './build-tools/tools/buck/providers/node.ts';
+        import { readNodeProviderIndexEntries } from './build-tools/tools/buck/providers/node';
         const rows = await readNodeProviderIndexEntries();
         console.log(JSON.stringify(rows));
       `.trim()}`;

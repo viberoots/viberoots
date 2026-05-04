@@ -1,4 +1,4 @@
-import { type ManagedCommandActivity } from "../../lib/managed-command.ts";
+import { type ManagedCommandActivity } from "../../lib/managed-command";
 
 export function newManagedCommandActivity(): ManagedCommandActivity {
   return {

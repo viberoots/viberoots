@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { VercelDeployment } from "./contract.ts";
-import { readVersionedJson } from "./deployment-schema-compat.ts";
-import { readVercelDeployRecord } from "./vercel-records.ts";
+import type { VercelDeployment } from "./contract";
+import { readVersionedJson } from "./deployment-schema-compat";
+import { readVercelDeployRecord } from "./vercel-records";
 
 export const VERCEL_REPLAY_SNAPSHOT_SCHEMA = "vercel-replay-snapshot@1";
 

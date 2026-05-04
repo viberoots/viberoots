@@ -4,10 +4,10 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { prepareVercelPublisherConfig } from "../../deployments/vercel-config.ts";
-import type { GraphNode } from "../../lib/graph.ts";
-import { extractVercelDeployments } from "../../deployments/contract.ts";
-import { vercelDeploymentFixture, vercelPolicyNodes } from "./vercel.fixture.ts";
+import { prepareVercelPublisherConfig } from "../../deployments/vercel-config";
+import type { GraphNode } from "../../lib/graph";
+import { extractVercelDeployments } from "../../deployments/contract";
+import { vercelDeploymentFixture, vercelPolicyNodes } from "./vercel.fixture";
 
 function node(overrides: Partial<GraphNode> = {}): GraphNode {
   return {

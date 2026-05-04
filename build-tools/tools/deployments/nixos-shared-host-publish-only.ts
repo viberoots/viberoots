@@ -1,25 +1,25 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostDeployment } from "./contract.ts";
+import type { NixosSharedHostDeployment } from "./contract";
 import {
   resolveCrossDeploymentPromotionSelection,
   resolveCrossDeploymentPromotionSourceSelection,
   resolveDeploymentPromotionSource,
-} from "./deployment-promotion.ts";
+} from "./deployment-promotion";
 import {
   type NixosSharedHostControlPlanePaths,
   type NixosSharedHostSmokeConnectOverride,
-} from "./nixos-shared-host-control-plane-contract.ts";
+} from "./nixos-shared-host-control-plane-contract";
 import type {
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneRequestDedupe,
-} from "./deployment-control-plane-contract.ts";
-import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
+} from "./deployment-control-plane-contract";
+import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane";
 import {
   requireNixosSharedHostReplayComponentState,
   resolveNixosSharedHostReplaySelection,
   type NixosSharedHostReplaySnapshot,
-} from "./nixos-shared-host-replay.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
+} from "./nixos-shared-host-replay";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
 
 type PublishOnlyRunOpts = {
   workspaceRoot: string;

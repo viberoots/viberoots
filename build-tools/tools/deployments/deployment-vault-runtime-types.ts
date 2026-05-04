@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentCredentialSource } from "./deployment-credential-source-selection.ts";
-import type { DeploymentPkceCallbackProfileInput } from "./deployment-pkce-callback-profile.ts";
+import type { DeploymentCredentialSource } from "./deployment-credential-source-selection";
+import type { DeploymentPkceCallbackProfileInput } from "./deployment-pkce-callback-profile";
 
 export type DeploymentVaultRuntimeConfig = {
   addr?: string;

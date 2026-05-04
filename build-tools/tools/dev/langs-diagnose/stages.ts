@@ -1,5 +1,5 @@
 import type { Capabilities } from "./types";
-import { findPnpmLockfiles } from "../../lib/lockfiles.ts";
+import { findPnpmLockfiles } from "../../lib/lockfiles";
 
 export async function computeStages(
   enabled: string[],

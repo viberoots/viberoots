@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { findRepoRoot } from "../../lib/repo.ts";
+import { findRepoRoot } from "../../lib/repo";
 import { runInTemp } from "./test-helpers";
 
 test("findRepoRoot prefers WORKSPACE_ROOT when temp-workspace commands run under a nested repo path", async () => {

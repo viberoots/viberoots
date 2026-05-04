@@ -1,25 +1,25 @@
 #!/usr/bin/env zx-wrapper
-import { invalidatingTargetException } from "./deployment-target-exceptions.ts";
+import { invalidatingTargetException } from "./deployment-target-exceptions";
 import {
   readBackendLatestDeployRecordEnvelopeByDeploymentId,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
+} from "./nixos-shared-host-control-plane-backend";
 import {
   assertNixosSharedHostReleaseActionPhaseReplayAllowed,
   rollbackCompatibilityErrors,
-} from "./nixos-shared-host-release-actions.ts";
-import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
+} from "./nixos-shared-host-release-actions";
+import type { DeploymentReleaseAction } from "./deployment-release-actions";
+import type { NixosSharedHostDeployment } from "./contract";
+import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components";
 import {
   nixosSharedHostRunnerIdentities,
   runnerIdentityCompatibilityErrors,
-} from "./nixos-shared-host-provenance.ts";
+} from "./nixos-shared-host-provenance";
 import {
   readNixosSharedHostReplaySnapshot,
   type NixosSharedHostReplaySnapshot,
-} from "./nixos-shared-host-replay.ts";
-import { type NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
+} from "./nixos-shared-host-replay";
+import { type NixosSharedHostDeployRecord } from "./nixos-shared-host-records";
 
 function replayMismatch(field: string, expected: string, actual: string): string {
   return `${field} mismatch: current=${expected} source=${actual}`;

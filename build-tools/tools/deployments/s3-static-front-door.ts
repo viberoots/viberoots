@@ -1,16 +1,16 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
-import type { S3StaticDeployment } from "./contract.ts";
-import { assertCrossDeploymentExactPromotionEligible } from "./deployment-provider-promotion.ts";
-import { resolveArtifactDirForCli } from "./deployment-cli-resolve.ts";
-import { summarizeDeploymentResult } from "./deployment-execution.ts";
-import { printDeployJson } from "./deploy-front-door.ts";
-import { submitS3StaticDeploy } from "./s3-static-deploy.ts";
-import { submitS3StaticExactArtifactRun } from "./s3-static-exact-run.ts";
-import { submitS3StaticProvisionOnly } from "./s3-static-provision-only.ts";
-import { runProtectedS3StaticDeployFrontDoor } from "./s3-static-protected-front-door.ts";
-import { resolveS3StaticReplaySource } from "./s3-static-replay.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli";
+import type { S3StaticDeployment } from "./contract";
+import { assertCrossDeploymentExactPromotionEligible } from "./deployment-provider-promotion";
+import { resolveArtifactDirForCli } from "./deployment-cli-resolve";
+import { summarizeDeploymentResult } from "./deployment-execution";
+import { printDeployJson } from "./deploy-front-door";
+import { submitS3StaticDeploy } from "./s3-static-deploy";
+import { submitS3StaticExactArtifactRun } from "./s3-static-exact-run";
+import { submitS3StaticProvisionOnly } from "./s3-static-provision-only";
+import { runProtectedS3StaticDeployFrontDoor } from "./s3-static-protected-front-door";
+import { resolveS3StaticReplaySource } from "./s3-static-replay";
 
 export async function runS3StaticDeployFrontDoor(opts: {
   workspaceRoot: string;

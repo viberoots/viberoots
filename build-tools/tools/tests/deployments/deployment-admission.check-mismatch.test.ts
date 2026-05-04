@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator.ts";
-import { admissionEvalBase, admittedContextFixture } from "./deployment-admission.test-helpers.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator";
+import { admissionEvalBase, admittedContextFixture } from "./deployment-admission.test-helpers";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 test("admission explains when a passed check is bound to a different deploy commit", async () => {
   const deployment = nixosSharedHostDeploymentFixture({

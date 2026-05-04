@@ -1,22 +1,22 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
-import { runNodeWithZx } from "../lib/node-run.ts";
-import { findRepoRoot } from "../lib/repo.ts";
-import { scrubDeploymentSecretEnv } from "./deployment-secret-env.ts";
+import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli";
+import { runNodeWithZx } from "../lib/node-run";
+import { findRepoRoot } from "../lib/repo";
+import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
 import {
   REMOTE_SSH_IDENTITY_FILE_ENV,
   REMOTE_SSH_KNOWN_HOSTS_FILE_ENV,
-} from "./nixos-shared-host-remote-ssh.ts";
+} from "./nixos-shared-host-remote-ssh";
 import {
   JENKINS_DEPLOY_SCHEMA_VERSION,
   JenkinsDeployError,
   type JenkinsContext,
   createJenkinsEnvelope,
-} from "./nixos-shared-host-jenkins-contract.ts";
-import type { NixosSharedHostRemoteDeploySummary } from "./nixos-shared-host-remote-execution.ts";
-import type { NixosSharedHostRemotePlan } from "./nixos-shared-host-remote-target.ts";
+} from "./nixos-shared-host-jenkins-contract";
+import type { NixosSharedHostRemoteDeploySummary } from "./nixos-shared-host-remote-execution";
+import type { NixosSharedHostRemotePlan } from "./nixos-shared-host-remote-target";
 
 const UNSUPPORTED_FLAGS = [
   "deployment-json",

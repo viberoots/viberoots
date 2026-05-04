@@ -5,8 +5,8 @@ import {
   NIXOS_SHARED_HOST_CLIENT_SCHEMA_V1,
   NIXOS_SHARED_HOST_INSTALL_TOOL,
   type NixosSharedHostClientManifest,
-} from "./nixos-shared-host-install-contract.ts";
-import type { ClientInput } from "./nixos-shared-host-install-dev-machine.ts";
+} from "./nixos-shared-host-install-contract";
+import type { ClientInput } from "./nixos-shared-host-install-dev-machine";
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;

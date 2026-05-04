@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import fsp from "node:fs/promises";
 import path from "node:path";
-import type { DeploymentProviderCapability } from "./deployment-provider-capabilities.ts";
-import { REVIEWED_PROVIDER_CAPABILITIES } from "./deployment-provider-capabilities.ts";
+import type { DeploymentProviderCapability } from "./deployment-provider-capabilities";
+import { REVIEWED_PROVIDER_CAPABILITIES } from "./deployment-provider-capabilities";
 
 export const DEPLOYMENTS_DESIGN_DOC_PATH = "docs/deployments-design.md";
 export const GENERATED_IDENTITY_SUMMARY_START =

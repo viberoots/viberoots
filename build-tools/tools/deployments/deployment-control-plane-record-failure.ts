@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
+import { redactDeploymentAuthText } from "./deployment-auth-redaction";
 
 function nonEmpty(value: unknown): string {
   return typeof value === "string" && value.trim() ? value.trim() : "";

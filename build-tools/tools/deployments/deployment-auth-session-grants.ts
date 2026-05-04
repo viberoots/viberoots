@@ -1,16 +1,16 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
-import type { JwtClaims } from "./deploy-vault-jwt-claims.ts";
+import type { DeploymentTarget } from "./contract";
+import type { JwtClaims } from "./deploy-vault-jwt-claims";
 import {
   deploymentAuthProjectSlug,
   reviewedAutomationGroupName,
   reviewedHumanGroupName,
-} from "./deployment-auth-groups.ts";
-import { projectScopeValueFor } from "./deployment-control-plane-authorization-shared.ts";
+} from "./deployment-auth-groups";
+import { projectScopeValueFor } from "./deployment-control-plane-authorization-shared";
 import type {
   DeploymentControlPlaneGrant,
   DeploymentControlPlaneRole,
-} from "./deployment-control-plane-contract.ts";
+} from "./deployment-control-plane-contract";
 
 function claimText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";

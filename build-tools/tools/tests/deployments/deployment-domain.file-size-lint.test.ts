@@ -7,12 +7,12 @@ import { spawn } from "node:child_process";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { test } from "node:test";
-import { resolveSourceFileSizeExceptionPaths } from "../../dev/file-size-lint-exceptions.ts";
-import { SOURCE_FILES_SCOPE, findFileSizeOffenders } from "../../dev/file-size-lint.ts";
+import { resolveSourceFileSizeExceptionPaths } from "../../dev/file-size-lint-exceptions";
+import { SOURCE_FILES_SCOPE, findFileSizeOffenders } from "../../dev/file-size-lint";
 import {
   isReviewedDeploymentOwnedBuildSystemPath,
   REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS,
-} from "../../lib/deployment-verify-scope.ts";
+} from "../../lib/deployment-verify-scope";
 
 async function withTempRoot<T>(fn: (root: string) => Promise<T>): Promise<T> {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "deployment-file-size-"));

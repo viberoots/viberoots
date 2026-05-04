@@ -7,7 +7,7 @@ import { test } from "node:test";
 import {
   ensureDistStaticPwaPrecache,
   listStaticPwaPrecacheAssetUrls,
-} from "../../lib/static-pwa-precache.ts";
+} from "../../lib/static-pwa-precache";
 
 async function withTempDir<T>(prefix: string, fn: (dir: string) => Promise<T>): Promise<T> {
   const dir = await fsp.mkdtemp(path.join(os.tmpdir(), prefix));

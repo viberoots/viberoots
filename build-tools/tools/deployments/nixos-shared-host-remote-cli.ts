@@ -1,22 +1,19 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { buildSelectedOutPath } from "../dev/run-runnable-graph.ts";
-import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import {
-  defaultManagedRoot,
-  normalizeHostLogicalPath,
-} from "./nixos-shared-host-install-contract.ts";
-import { runNixosSharedHostRemoteDeploy } from "./nixos-shared-host-remote-execution.ts";
+import { buildSelectedOutPath } from "../dev/run-runnable-graph";
+import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli";
+import type { NixosSharedHostDeployment } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { defaultManagedRoot, normalizeHostLogicalPath } from "./nixos-shared-host-install-contract";
+import { runNixosSharedHostRemoteDeploy } from "./nixos-shared-host-remote-execution";
 import {
   createNixosSharedHostRemotePlan,
   type NixosSharedHostRemoteHostApplyMode,
   type NixosSharedHostRemotePlan,
-} from "./nixos-shared-host-remote-target.ts";
-import type { ClientInput } from "./nixos-shared-host-install-dev-machine.ts";
-import { requireServiceTokenFromEnv } from "./nixos-shared-host-service-client-config.ts";
-import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
+} from "./nixos-shared-host-remote-target";
+import type { ClientInput } from "./nixos-shared-host-install-dev-machine";
+import { requireServiceTokenFromEnv } from "./nixos-shared-host-service-client-config";
+import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs";
 
 type RemoteOverrides = Partial<ClientInput>;
 

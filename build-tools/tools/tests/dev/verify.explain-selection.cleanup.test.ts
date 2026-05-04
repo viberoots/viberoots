@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { VerifyScopeDecision } from "../../dev/verify/requested-scope.ts";
-import { runExplainSelection } from "../../dev/verify/explain-selection.ts";
+import type { VerifyScopeDecision } from "../../dev/verify/requested-scope";
+import { runExplainSelection } from "../../dev/verify/explain-selection";
 
 function selectionFixture(): VerifyScopeDecision {
   return {

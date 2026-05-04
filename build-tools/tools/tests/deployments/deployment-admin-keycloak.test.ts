@@ -7,14 +7,14 @@ import { test } from "node:test";
 import {
   reviewedDeployAdminGroupName,
   type DeploymentKeycloakAdminScope,
-} from "../../deployments/deployment-admin-keycloak-auth.ts";
+} from "../../deployments/deployment-admin-keycloak-auth";
 import {
   buildDeploymentAdminKeycloakPlan,
   grantDeploymentAdminKeycloakUser,
   syncDeploymentAdminKeycloakRealm,
-} from "../../deployments/deployment-admin-keycloak.ts";
-import { reviewedHumanGroupName } from "../../deployments/deployment-auth-groups.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+} from "../../deployments/deployment-admin-keycloak";
+import { reviewedHumanGroupName } from "../../deployments/deployment-auth-groups";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 
 async function withTempDir<T>(name: string, fn: (tmp: string) => Promise<T>): Promise<T> {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), `${name}-`));

@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
+import type { DeploymentTarget } from "./contract";
 
 function appStoreTrackRank(track: string): number {
   return (

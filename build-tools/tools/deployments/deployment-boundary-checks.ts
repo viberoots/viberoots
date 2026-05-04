@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { normalizeTargetLabel } from "../lib/labels.ts";
-import type { GraphNode } from "../lib/graph.ts";
+import { normalizeTargetLabel } from "../lib/labels";
+import type { GraphNode } from "../lib/graph";
 
 const FORBIDDEN_SOURCE_RESPONSE_FIELDS = new Set([
   "forensicFields",

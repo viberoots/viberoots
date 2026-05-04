@@ -5,9 +5,9 @@ import {
   deploymentIdFromLabel,
   targetName,
   type GooglePlayDeployment,
-} from "./contract-types.ts";
-import { deriveGooglePlayProviderTarget } from "./deployment-provider-targets.ts";
-import { readPrimaryDeploymentComponent } from "./contract-extract-components.ts";
+} from "./contract-types";
+import { deriveGooglePlayProviderTarget } from "./deployment-provider-targets";
+import { readPrimaryDeploymentComponent } from "./contract-extract-components";
 import {
   deploymentError,
   pushTokenFieldErrors,
@@ -19,22 +19,22 @@ import {
   readString,
   readStringRecord,
   type DeploymentExtractionContext,
-} from "./contract-extract-shared.ts";
-import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata.ts";
-import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
+} from "./contract-extract-shared";
+import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata";
+import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding";
 import {
   resolveDeploymentMetadataRefs,
   validateExplicitDeploymentRequirements,
-} from "./deployment-extract-metadata.ts";
-import { readDeploymentRequirements } from "./deployment-requirements.ts";
-import { pushGooglePlayComponentKindErrors } from "./google-play-capability-validation.ts";
-import { pushGooglePlayRolloutErrors } from "./google-play-rollout-validation.ts";
+} from "./deployment-extract-metadata";
+import { readDeploymentRequirements } from "./deployment-requirements";
+import { pushGooglePlayComponentKindErrors } from "./google-play-capability-validation";
+import { pushGooglePlayRolloutErrors } from "./google-play-rollout-validation";
 import {
   MOBILE_STORE_TARGET_TOKEN_RE,
   pushDuplicateProviderTargetIdentityErrors,
   pushMobileStoreProtectionClassError,
-} from "./mobile-store-extract-helpers.ts";
-import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
+} from "./mobile-store-extract-helpers";
+import { pushSmokePolicyErrors } from "./deployment-smoke-policy";
 
 const VALID_TRACKS = new Set(["internal", "alpha", "beta", "production"]);
 const VALID_SIGNING_MODELS = new Set(["play-app-signing"]);

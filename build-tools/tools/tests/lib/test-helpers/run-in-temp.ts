@@ -21,9 +21,9 @@ import {
   nixEvalTempDirOutsideWorkspace,
   pinnedNixpkgsPackageExpr,
   pinnedNixpkgsOutPathExpr,
-} from "../../../lib/pinned-nixpkgs.ts";
-import { externalPnpmStateDirs } from "../../../lib/pnpm-state-paths.ts";
-import { stableBuckIsolation } from "../../../lib/buck-command-env.ts";
+} from "../../../lib/pinned-nixpkgs";
+import { externalPnpmStateDirs } from "../../../lib/pnpm-state-paths";
+import { stableBuckIsolation } from "../../../lib/buck-command-env";
 
 const LOCAL_FIXTURE_SERVICE_ENV = "BNX_DEPLOY_LOCAL_FIXTURE_SERVICE";
 

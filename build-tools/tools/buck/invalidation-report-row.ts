@@ -1,12 +1,12 @@
 import * as fsp from "node:fs/promises";
-import { isProviderPackageNode } from "../lib/graph-utils.ts";
-import { packagePathFromLabel, parseLockfileLabel, normalizeTargetLabel } from "../lib/labels.ts";
+import { isProviderPackageNode } from "../lib/graph-utils";
+import { packagePathFromLabel, parseLockfileLabel, normalizeTargetLabel } from "../lib/labels";
 import {
   patchInvalidationStrategyForLang,
   type PatchScope,
   type ProviderModel,
-} from "../lib/lang-contracts.ts";
-import type { InvalidationRow } from "./invalidation-report-lib.ts";
+} from "../lib/lang-contracts";
+import type { InvalidationRow } from "./invalidation-report-lib";
 
 type AutoMap = Record<string, string[]>;
 

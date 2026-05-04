@@ -3,29 +3,29 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { providerCapabilityFor } from "../../deployments/deployment-provider-capabilities.ts";
-import { reviewedRuntimeContractFor } from "../../deployments/provider-capabilities/runtime-contract.ts";
-import { assertReviewedRuntimeParity } from "../../deployments/provider-capabilities/runtime-parity.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
+import { providerCapabilityFor } from "../../deployments/deployment-provider-capabilities";
+import { reviewedRuntimeContractFor } from "../../deployments/provider-capabilities/runtime-contract";
+import { assertReviewedRuntimeParity } from "../../deployments/provider-capabilities/runtime-parity";
+import { runInTemp } from "../lib/test-helpers";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import {
   startControlPlaneHarness,
   withEnvOverrides,
-} from "./nixos-shared-host.control-plane.helpers.ts";
+} from "./nixos-shared-host.control-plane.helpers";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostLanePolicyFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { installHarnessClientProfile } from "./nixos-shared-host.remote-exec.install.helpers.ts";
-import { installFakeKubernetesHelm } from "./kubernetes.fake-helm.ts";
-import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
-import { startKubernetesPublicServer } from "./kubernetes.public-server.ts";
-import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture.ts";
-import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "../../deployments/deployment-secret-fixture.ts";
+} from "./nixos-shared-host.fixture";
+import { installHarnessClientProfile } from "./nixos-shared-host.remote-exec.install.helpers";
+import { installFakeKubernetesHelm } from "./kubernetes.fake-helm";
+import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture";
+import { startKubernetesPublicServer } from "./kubernetes.public-server";
+import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture";
+import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "../../deployments/deployment-secret-fixture";
 import {
   reviewedKubernetesPublishRequirements,
   writeKubernetesPublishSecretFixture,
-} from "./kubernetes.publish-credentials.fixture.ts";
+} from "./kubernetes.publish-credentials.fixture";
 
 async function writeValues(root: string, deploymentId: string) {
   const configPath = path.join(

@@ -1,22 +1,22 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
-import { summarizeDeploymentResult } from "./deployment-execution.ts";
+import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli";
+import { summarizeDeploymentResult } from "./deployment-execution";
 import {
   resolveArtifactDirForCli,
   resolveComponentArtifactDirsForCli,
-} from "./deployment-cli-resolve.ts";
-import { printDeployJson } from "./deploy-front-door.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components.ts";
-import { maybeHandleNixosSharedHostBootstrapCli } from "./nixos-shared-host-bootstrap-cli.ts";
-import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane.ts";
-import { runProtectedNixosSharedHostDeployFrontDoor } from "./nixos-shared-host-protected-front-door.ts";
+} from "./deployment-cli-resolve";
+import { printDeployJson } from "./deploy-front-door";
+import type { NixosSharedHostDeployment } from "./contract";
+import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components";
+import { maybeHandleNixosSharedHostBootstrapCli } from "./nixos-shared-host-bootstrap-cli";
+import { submitNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane";
+import { runProtectedNixosSharedHostDeployFrontDoor } from "./nixos-shared-host-protected-front-door";
 import {
   runNixosSharedHostProvisionOnlyFrontDoor,
   runNixosSharedHostPublishOnlyFrontDoor,
-} from "./nixos-shared-host-direct-source-front-door.ts";
-import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
+} from "./nixos-shared-host-direct-source-front-door";
+import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs";
 
 export async function runNixosSharedHostDeployFrontDoor(opts: {
   workspaceRoot: string;

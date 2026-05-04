@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { repoRoot } from "./repo.ts";
+import { repoRoot } from "./repo";
 
 type ToolchainPaths = {
   go?: { bin?: string; root?: string };

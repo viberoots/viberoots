@@ -1,5 +1,5 @@
-import { normalizeBuckTestLabel } from "./derived.ts";
-import { parseLineFromBuckLogForMatching } from "./parsing.ts";
+import { normalizeBuckTestLabel } from "./derived";
+import { parseLineFromBuckLogForMatching } from "./parsing";
 
 export type PassBegin = {
   idx: number;

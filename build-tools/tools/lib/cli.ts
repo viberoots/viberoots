@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { getArgvTokens } from "./argv.ts";
+import { getArgvTokens } from "./argv";
 /**
  * Minimal, consistent CLI flag helpers for zx scripts.
  * Precedence for all helpers:
@@ -247,4 +247,4 @@ export {
   readFlagFromTokens,
   readFlagStrFromTokens,
   removeKnownFlags,
-} from "./argv.ts";
+} from "./argv";

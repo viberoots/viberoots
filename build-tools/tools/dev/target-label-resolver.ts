@@ -1,7 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
-import { normalizeTargetLabel } from "../lib/labels.ts";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { normalizeTargetLabel } from "../lib/labels";
 
 type GraphNodeLike = {
   name?: string;

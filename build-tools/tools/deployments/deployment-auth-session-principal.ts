@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
-import type { JwtClaims } from "./deploy-vault-jwt-claims.ts";
-import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
-import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract.ts";
-import { oidcGrantsForDeployment } from "./deployment-auth-session-grants.ts";
-import type { DeploymentTarget } from "./contract.ts";
-import { grantsFor } from "./deployment-control-plane-authz.ts";
+import type { JwtClaims } from "./deploy-vault-jwt-claims";
+import type { DeploymentPrincipal } from "./deployment-admission-evidence";
+import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract";
+import { oidcGrantsForDeployment } from "./deployment-auth-session-grants";
+import type { DeploymentTarget } from "./contract";
+import { grantsFor } from "./deployment-control-plane-authz";
 
 function claimText(claim: unknown): string {
   return typeof claim === "string" ? claim.trim() : "";

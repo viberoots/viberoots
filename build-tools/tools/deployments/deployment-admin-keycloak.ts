@@ -1,28 +1,28 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import type { DeploymentTarget } from "./contract.ts";
-import { printDeployJson } from "./deploy-front-door.ts";
+import type { DeploymentTarget } from "./contract";
+import { printDeployJson } from "./deploy-front-door";
 import {
   authorizeDeploymentKeycloakAdmin,
   reviewedDeployAdminGroupsByCapability,
-} from "./deployment-admin-keycloak-auth.ts";
+} from "./deployment-admin-keycloak-auth";
 import {
   DEPLOYMENT_KEYCLOAK_MEMBERSHIP_REALM,
   grantUserInMembershipRealm,
   readDeploymentKeycloakMembershipRealm,
   writeDeploymentKeycloakMembershipRealm,
-} from "./deployment-admin-keycloak-membership.ts";
+} from "./deployment-admin-keycloak-membership";
 import {
   reviewedDeploymentAdminMembershipFileExample,
   reviewedDeploymentAdminRealmFileExample,
-} from "./deployment-admin-keycloak-artifacts.ts";
+} from "./deployment-admin-keycloak-artifacts";
 import {
   deploymentAuthActionRole,
   type DeploymentAuthAction,
   reviewedHumanGroupName,
-} from "./deployment-auth-groups.ts";
-import { buildDeploymentAuthKeycloakRealmImport } from "./deployment-auth-keycloak-realm.ts";
-import { writeJsonDocument } from "./nixos-shared-host-io.ts";
+} from "./deployment-auth-groups";
+import { buildDeploymentAuthKeycloakRealmImport } from "./deployment-auth-keycloak-realm";
+import { writeJsonDocument } from "./nixos-shared-host-io";
 
 export const DEPLOYMENT_ADMIN_KEYCLOAK_PLAN_SCHEMA = "deploy-admin-identity-plan@1";
 export const DEPLOYMENT_ADMIN_KEYCLOAK_SYNC_SCHEMA = "deploy-admin-identity-sync@1";

@@ -4,12 +4,12 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { resolveDeploymentsFromChanges } from "../../deployments/deployment-from-changes-selection.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import { resolveDeploymentsFromChanges } from "../../deployments/deployment-from-changes-selection";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 import {
   nixosSharedHostDeploymentFixture,
   nixosSharedHostLanePolicyFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 
 async function writeGraph(root: string, nodes: unknown[]) {
   const graphPath = path.join(root, "build-tools", "tools", "buck", "graph.json");

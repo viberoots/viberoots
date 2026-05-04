@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { inferRunnableFromOutPath, parseRunnableManifest } from "../../lib/runnables.ts";
+import { inferRunnableFromOutPath, parseRunnableManifest } from "../../lib/runnables";
 
 test("parseRunnableManifest keeps backward compatibility for bins-only entries", () => {
   const legacy = JSON.stringify([

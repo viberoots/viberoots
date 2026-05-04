@@ -1,26 +1,26 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli";
 import {
   admitNixosSharedHostComponentArtifacts,
   compositeNixosSharedHostArtifactIdentity,
-} from "./nixos-shared-host-component-artifacts.ts";
-import { grantsFor } from "./deployment-control-plane-authz.ts";
-import { summarizeDeploymentResult } from "./deployment-execution.ts";
-import { parseComponentArtifactDirs } from "./deployment-component-artifact-dirs.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
+} from "./nixos-shared-host-component-artifacts";
+import { grantsFor } from "./deployment-control-plane-authz";
+import { summarizeDeploymentResult } from "./deployment-execution";
+import { parseComponentArtifactDirs } from "./deployment-component-artifact-dirs";
+import type { NixosSharedHostDeployment } from "./contract";
 import {
   isMultiComponentNixosSharedHostDeployment,
   primaryNixosSharedHostComponent,
-} from "./nixos-shared-host-components.ts";
+} from "./nixos-shared-host-components";
 import {
   reconcileNixosSharedHostBootstrapRecord,
   runNixosSharedHostBootstrapDeploy,
-} from "./nixos-shared-host-bootstrap.ts";
+} from "./nixos-shared-host-bootstrap";
 import type {
   NixosSharedHostControlPlanePaths,
   NixosSharedHostSmokeConnectOverride,
-} from "./nixos-shared-host-control-plane-contract.ts";
+} from "./nixos-shared-host-control-plane-contract";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();

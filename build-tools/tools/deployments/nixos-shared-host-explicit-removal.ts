@@ -2,21 +2,18 @@
 import {
   requireNixosSharedHostControlPlaneAuthority,
   type NixosSharedHostMutationAuthority,
-} from "./nixos-shared-host-control-plane-contract.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import {
-  readNixosSharedHostPlatformStateOrEmpty,
-  writeJsonDocument,
-} from "./nixos-shared-host-io.ts";
-import { removeNixosSharedHostPlatformDeployment } from "./nixos-shared-host-platform.ts";
+} from "./nixos-shared-host-control-plane-contract";
+import type { NixosSharedHostDeployment } from "./contract";
+import { readNixosSharedHostPlatformStateOrEmpty, writeJsonDocument } from "./nixos-shared-host-io";
+import { removeNixosSharedHostPlatformDeployment } from "./nixos-shared-host-platform";
 import {
   createNixosSharedHostDeployRecord,
   createNixosSharedHostDeployRunId,
   type NixosSharedHostDeployRecord,
   writeNixosSharedHostDeployRecord,
-} from "./nixos-shared-host-records.ts";
-import { materializeNixosSharedHostRuntime } from "./nixos-shared-host-runtime.ts";
-import { renderNixosSharedHostConfig } from "./nixos-shared-host.ts";
+} from "./nixos-shared-host-records";
+import { materializeNixosSharedHostRuntime } from "./nixos-shared-host-runtime";
+import { renderNixosSharedHostConfig } from "./nixos-shared-host";
 
 export async function runNixosSharedHostExplicitRemoval(opts: {
   deployment: NixosSharedHostDeployment;
@@ -27,7 +24,7 @@ export async function runNixosSharedHostExplicitRemoval(opts: {
   deployBatchId?: string;
   hostConfigPath?: string;
   authority?: NixosSharedHostMutationAuthority;
-  provisionerPlan?: import("./nixos-shared-host-provisioner-plan.ts").NixosSharedHostProvisionerPlanRef;
+  provisionerPlan?: import("./nixos-shared-host-provisioner-plan").NixosSharedHostProvisionerPlanRef;
 }): Promise<{ record: NixosSharedHostDeployRecord; recordPath: string }> {
   const authority = requireNixosSharedHostControlPlaneAuthority(opts.deployment, opts.authority);
   const runId = opts.deployRunId || createNixosSharedHostDeployRunId("remove");

@@ -2,8 +2,8 @@
 import {
   REMOTE_SSH_IDENTITY_FILE_ENV,
   REMOTE_SSH_KNOWN_HOSTS_FILE_ENV,
-} from "../../deployments/nixos-shared-host-remote-ssh.ts";
-import type { NixosSharedHostRemotePlan } from "../../deployments/nixos-shared-host-remote-target.ts";
+} from "../../deployments/nixos-shared-host-remote-ssh";
+import type { NixosSharedHostRemotePlan } from "../../deployments/nixos-shared-host-remote-target";
 
 export const remoteSshCommandAssemblyPlan: NixosSharedHostRemotePlan = {
   planMode: true,

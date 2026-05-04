@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
-import { printDeployJson } from "./deploy-front-door.ts";
-import { resolveArtifactDirForCli } from "./deployment-cli-resolve.ts";
-import { summarizeDeploymentResult } from "./deployment-execution.ts";
-import type { GooglePlayDeployment } from "./contract.ts";
-import { invalidatingTargetException } from "./deployment-target-exceptions.ts";
-import { resolveCrossDeploymentPromotionSelection } from "./deployment-promotion.ts";
-import { resolveGooglePlayReplaySource } from "./google-play-replay.ts";
-import { submitGooglePlayDeploy } from "./google-play-deploy.ts";
-import { submitGooglePlayExactArtifactRun } from "./google-play-exact-run.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli";
+import { printDeployJson } from "./deploy-front-door";
+import { resolveArtifactDirForCli } from "./deployment-cli-resolve";
+import { summarizeDeploymentResult } from "./deployment-execution";
+import type { GooglePlayDeployment } from "./contract";
+import { invalidatingTargetException } from "./deployment-target-exceptions";
+import { resolveCrossDeploymentPromotionSelection } from "./deployment-promotion";
+import { resolveGooglePlayReplaySource } from "./google-play-replay";
+import { submitGooglePlayDeploy } from "./google-play-deploy";
+import { submitGooglePlayExactArtifactRun } from "./google-play-exact-run";
 
 function sameDeploymentRollbackErrors(
   current: GooglePlayDeployment,

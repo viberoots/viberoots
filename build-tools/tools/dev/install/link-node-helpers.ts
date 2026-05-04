@@ -2,10 +2,10 @@ import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { activeNixGcPids } from "../../lib/nix-gc-lock.ts";
-import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command.ts";
-import { pathExists } from "../../lib/repo.ts";
-import { resolveToolPathSync } from "../../lib/tool-paths.ts";
+import { activeNixGcPids } from "../../lib/nix-gc-lock";
+import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command";
+import { pathExists } from "../../lib/repo";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 
 export async function withHeartbeat<T>(
   label: string,

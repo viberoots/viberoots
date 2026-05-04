@@ -4,33 +4,33 @@ import type {
   CloudflarePagesControlPlaneSnapshot,
   CloudflarePagesPublishBehavior,
   CloudflarePagesSmokeConnectOverride,
-} from "./cloudflare-pages-control-plane-contract.ts";
+} from "./cloudflare-pages-control-plane-contract";
 import {
   createCloudflarePagesSubmissionId,
   withCloudflarePagesControlPlaneRun,
-} from "./cloudflare-pages-control-plane-shared.ts";
+} from "./cloudflare-pages-control-plane-shared";
 import {
   createCloudflarePagesControlPlaneSnapshot,
   type CloudflarePagesPromotionSourceSelection,
-} from "./cloudflare-pages-control-plane-snapshot.ts";
-import { runCloudflarePagesStaticDeploy } from "./cloudflare-pages-static-deploy.ts";
-import type { CloudflarePagesDeployRecord } from "./cloudflare-pages-records.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import type { DeploymentRunRecordLike } from "./deployment-admission-records.ts";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+} from "./cloudflare-pages-control-plane-snapshot";
+import { runCloudflarePagesStaticDeploy } from "./cloudflare-pages-static-deploy";
+import type { CloudflarePagesDeployRecord } from "./cloudflare-pages-records";
+import type { CloudflarePagesDeployment } from "./contract";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import type { DeploymentRunRecordLike } from "./deployment-admission-records";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 import type {
   DeploymentControlPlaneAuthorizationDecision,
   DeploymentControlPlaneRequestDedupe,
-} from "./deployment-control-plane-contract.ts";
+} from "./deployment-control-plane-contract";
 import {
   executionSnapshotPathFor,
   readControlPlaneJson,
   submissionPathFor,
   writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
-import { type AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
+} from "./nixos-shared-host-control-plane-store";
+import { type AdmittedStaticWebappArtifact } from "./static-webapp-artifacts";
 
 type SubmitOpts = {
   workspaceRoot: string;

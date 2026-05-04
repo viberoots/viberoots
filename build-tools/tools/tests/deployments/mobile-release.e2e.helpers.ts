@@ -1,13 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type {
-  AppStoreConnectDeployment,
-  GooglePlayDeployment,
-} from "../../deployments/contract.ts";
-import type { DeploymentRolloutPolicy } from "../../deployments/deployment-rollout.ts";
-import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture.ts";
-import { nixosSharedHostLanePolicyFixture } from "./nixos-shared-host.fixture.ts";
+import type { AppStoreConnectDeployment, GooglePlayDeployment } from "../../deployments/contract";
+import type { DeploymentRolloutPolicy } from "../../deployments/deployment-rollout";
+import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture";
+import { nixosSharedHostLanePolicyFixture } from "./nixos-shared-host.fixture";
 
 type MobileDeployment = AppStoreConnectDeployment | GooglePlayDeployment;
 

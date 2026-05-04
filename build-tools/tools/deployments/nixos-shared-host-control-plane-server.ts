@@ -1,29 +1,29 @@
 #!/usr/bin/env zx-wrapper
 import http from "node:http";
 import { URL } from "node:url";
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
-import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
+import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract";
 import {
   handleControlPlaneRunAction,
   handleControlPlaneSubmit,
   type ServiceRunActionRequest,
-} from "./nixos-shared-host-control-plane-service-api.ts";
-import { handleControlPlaneArtifactChallenge } from "./nixos-shared-host-control-plane-service-challenge.ts";
+} from "./nixos-shared-host-control-plane-service-api";
+import { handleControlPlaneArtifactChallenge } from "./nixos-shared-host-control-plane-service-challenge";
 import {
   readControlPlaneRecord,
   readControlPlaneStatus,
-} from "./nixos-shared-host-control-plane-service-read.ts";
+} from "./nixos-shared-host-control-plane-service-read";
 import {
   createDeploymentAuthLoginSession,
   handleDeploymentAuthCallback,
   readPublicDeploymentAuthSession,
-} from "./deployment-auth-session-service.ts";
-import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
-import { createStaticWebappUploadSession } from "./static-webapp-upload-sessions.ts";
+} from "./deployment-auth-session-service";
+import { redactDeploymentAuthText } from "./deployment-auth-redaction";
+import { createStaticWebappUploadSession } from "./static-webapp-upload-sessions";
 import {
   assertReviewedServiceTokenConfigured,
   requestHasReviewedBearerToken,
-} from "./nixos-shared-host-control-plane-service-auth.ts";
+} from "./nixos-shared-host-control-plane-service-auth";
 
 const MAX_REQUEST_BODY_BYTES = 60 * 1024 * 1024;
 

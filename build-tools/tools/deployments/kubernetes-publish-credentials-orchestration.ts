@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
-import type { KubernetesDeployment } from "./contract.ts";
-import type { KubernetesAdmittedContext } from "./kubernetes-admission.ts";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
+import type { KubernetesDeployment } from "./contract";
+import type { KubernetesAdmittedContext } from "./kubernetes-admission";
+import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
 import {
   publishCredentialContractRefs,
   requiresKubernetesPublishCredentialReview,
   resolveKubernetesPublishCredentials,
   type KubernetesPublishCredentials,
-} from "./kubernetes-publish-credentials.ts";
+} from "./kubernetes-publish-credentials";
 
 export type KubernetesPublishCredentialsHooks = {
   secretRuntimeFactory?: (opts: {

@@ -1,14 +1,14 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../../lib/graph.ts";
+import type { GraphNode } from "../../lib/graph";
 import {
   DEPLOYMENT_RELEASE_ACTION_RULE,
   type DeploymentReleaseAction,
-} from "../../deployments/deployment-release-actions.ts";
-import type { DeploymentRequirement } from "../../deployments/deployment-requirements.ts";
+} from "../../deployments/deployment-release-actions";
+import type { DeploymentRequirement } from "../../deployments/deployment-requirements";
 import {
   DEPLOYMENT_TARGET_EXCEPTION_RULE,
   type DeploymentTargetException,
-} from "../../deployments/deployment-target-exceptions.ts";
+} from "../../deployments/deployment-target-exceptions";
 
 export function deploymentRequirementFixture(
   overrides: Partial<DeploymentRequirement> = {},

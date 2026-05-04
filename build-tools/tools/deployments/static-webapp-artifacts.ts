@@ -2,9 +2,9 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { copyTree } from "../lib/copy-tree.ts";
-import { sanitizeName } from "../lib/sanitize.ts";
-import { inspectStaticWebappArtifactDir } from "./static-webapp-artifact-bundle.ts";
+import { copyTree } from "../lib/copy-tree";
+import { sanitizeName } from "../lib/sanitize";
+import { inspectStaticWebappArtifactDir } from "./static-webapp-artifact-bundle";
 
 export const STATIC_WEBAPP_ARTIFACT_PROVENANCE_SCHEMA = "static-webapp-artifact-provenance@1";
 

@@ -2,9 +2,9 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { DeploymentSmokeOutcome } from "./deployment-smoke-policy.ts";
-import { readVersionedJson } from "./deployment-schema-compat.ts";
-import type { VercelDeployment } from "./contract.ts";
+import type { DeploymentSmokeOutcome } from "./deployment-smoke-policy";
+import { readVersionedJson } from "./deployment-schema-compat";
+import type { VercelDeployment } from "./contract";
 
 export const VERCEL_RECORD_SCHEMA = "vercel-deploy-record@2026-05-03";
 

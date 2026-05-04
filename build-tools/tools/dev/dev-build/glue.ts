@@ -1,10 +1,10 @@
 import * as fsp from "node:fs/promises";
 import crypto from "node:crypto";
 import path from "node:path";
-import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
-import { readCompositeGraph } from "../../lib/graph-view.ts";
-import { runGomod2nixGenerate, runGomod2nixScanAll } from "../install/gomod2nix.ts";
-import { nodeBin, zxNodeBase } from "./paths.ts";
+import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
+import { readCompositeGraph } from "../../lib/graph-view";
+import { runGomod2nixGenerate, runGomod2nixScanAll } from "../install/gomod2nix";
+import { nodeBin, zxNodeBase } from "./paths";
 
 export async function cleanDevBuildWorkspace(root: string): Promise<void> {
   await $({

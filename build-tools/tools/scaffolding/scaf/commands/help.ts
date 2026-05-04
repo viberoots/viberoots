@@ -1,12 +1,12 @@
-import type { ScafFlags } from "../types.ts";
+import type { ScafFlags } from "../types";
 
 import path from "node:path";
 
-import { readTemplateMeta } from "../templates/meta.ts";
-import { normalizeTemplateName } from "../templates/names.ts";
-import { canonicalTemplateLanguage, isCanonicalTypeScriptTemplate } from "../templates/taxonomy.ts";
-import { readCopierVariables } from "../templates/variables.ts";
-import { usage } from "../usage.ts";
+import { readTemplateMeta } from "../templates/meta";
+import { normalizeTemplateName } from "../templates/names";
+import { canonicalTemplateLanguage, isCanonicalTypeScriptTemplate } from "../templates/taxonomy";
+import { readCopierVariables } from "../templates/variables";
+import { usage } from "../usage";
 
 function printJsonOrLines(flags: ScafFlags, payload: unknown, lines: string[]) {
   if (flags["json"] === "true") {

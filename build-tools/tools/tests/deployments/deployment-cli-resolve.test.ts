@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveDeploymentForCli } from "../../deployments/deployment-cli-resolve.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture.ts";
+import { resolveDeploymentForCli } from "../../deployments/deployment-cli-resolve";
+import { runInTemp } from "../lib/test-helpers";
+import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture";
 
 async function withArgv<T>(args: string[], fn: () => Promise<T>): Promise<T> {
   const oldGlobal = (globalThis as { argv?: unknown }).argv;

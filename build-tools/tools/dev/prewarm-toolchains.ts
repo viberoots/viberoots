@@ -14,7 +14,7 @@
  *   PREWARM_LIST_ONLY=1 → print JSON list of attributes and exit 0 (no `nix` calls)
  *   PREWARM_VERBOSE=1   → print progress details
  */
-import { withExclusiveInstallLock } from "./install/lock.ts";
+import { withExclusiveInstallLock } from "./install/lock";
 
 type BuildResult = { attr: string; ok: boolean; skipped: boolean; output?: string };
 

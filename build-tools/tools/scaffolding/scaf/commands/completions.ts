@@ -1,5 +1,5 @@
-import { readTemplateMeta } from "../templates/meta.ts";
-import { discoverScaffolds } from "../scaffolds/discover.ts";
+import { readTemplateMeta } from "../templates/meta";
+import { discoverScaffolds } from "../scaffolds/discover";
 
 export async function cmdCompletions(args: string[]) {
   const [shell] = args;

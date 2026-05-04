@@ -3,8 +3,8 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import nodeAdapter from "../../buck/exporter/lang/node.ts";
-import pythonAdapter from "../../buck/exporter/lang/python.ts";
+import nodeAdapter from "../../buck/exporter/lang/node";
+import pythonAdapter from "../../buck/exporter/lang/python";
 import { runInTemp } from "../lib/test-helpers";
 
 function mustFind(nodes: Array<{ name: string; labels?: string[] }>, name: string) {

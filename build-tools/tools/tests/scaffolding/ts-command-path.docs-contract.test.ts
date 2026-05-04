@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
-import { CANONICAL_TS_TEMPLATE_IDS } from "../../scaffolding/scaf/templates/taxonomy.ts";
+import { CANONICAL_TS_TEMPLATE_IDS } from "../../scaffolding/scaf/templates/taxonomy";
 
 const DOCS_WITH_REQUIRED_TS_EXAMPLES: Array<{ path: string; requiredFragments: string[] }> = [
   {

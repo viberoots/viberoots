@@ -2,20 +2,20 @@
 import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import { promisify } from "node:util";
-import { getFlagList, getFlagStr, hasFlag } from "../lib/cli.ts";
-import type { DeploymentTarget } from "./contract.ts";
+import { getFlagList, getFlagStr, hasFlag } from "../lib/cli";
+import type { DeploymentTarget } from "./contract";
 import {
   admitSubjectMismatchMessage,
   missingAdmitValueMessage,
   resolveDeploymentRequiredCheckSubject,
-} from "./deployment-admission-requirements.ts";
-import { isCiSession } from "./deployment-credential-source-selection.ts";
+} from "./deployment-admission-requirements";
+import { isCiSession } from "./deployment-credential-source-selection";
 import {
   normalizeAdmissionEvidence,
   type DeploymentAdmissionEvidence,
   type DeploymentCheckEvidence,
   type DeploymentCheckReportingKind,
-} from "./deployment-admission-evidence.ts";
+} from "./deployment-admission-evidence";
 
 const execFileAsync = promisify(execFile);
 

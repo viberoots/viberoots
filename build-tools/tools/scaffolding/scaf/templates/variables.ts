@@ -2,7 +2,7 @@ import path from "node:path";
 
 import * as fsp from "node:fs/promises";
 
-import { exists } from "../fs.ts";
+import { exists } from "../fs";
 
 export async function readCopierVariables(templateDir: string): Promise<string[]> {
   const cfgs = ["copier.yaml", "copier.yml", ".copier-answers.yml"];

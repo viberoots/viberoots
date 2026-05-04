@@ -26,7 +26,7 @@ version = "23.2.0"
 
     // Runner: call syncAllProviders() without narrowing so detection must enable Python
     const runner = `#!/usr/bin/env zx-wrapper
-import { syncAllProviders } from "./build-tools/tools/buck/providers/index.ts";
+import { syncAllProviders } from "./build-tools/tools/buck/providers/index";
 await syncAllProviders();
 `;
     const runnerPath = path.join(tmp, "run-sync.mjs");

@@ -2,24 +2,24 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { getFlagBool, getFlagStr, getPositionals } from "../lib/cli.ts";
-import { stripAnsiAndCrs } from "../lib/verify-log-status/types.ts";
+import { getFlagBool, getFlagStr, getPositionals } from "../lib/cli";
+import { stripAnsiAndCrs } from "../lib/verify-log-status/types";
 import {
   findLastFullSuiteWindowStart,
   parseVerifyBeginEpochSec,
   parseBuck2ExitMarker,
-} from "../lib/verify-log-status/parsing.ts";
+} from "../lib/verify-log-status/parsing";
 import {
   collectVerifyTimingStats,
   type TargetTimingBreakdown,
   type TimingBucket,
-} from "./analyze-verify-timing-helpers.ts";
+} from "./analyze-verify-timing-helpers";
 import {
   collectPhaseTimings,
   collectResourceSummaries,
   type VerifyPhaseTiming,
   type VerifyResourceSummary,
-} from "./analyze-verify-log-extras.ts";
+} from "./analyze-verify-log-extras";
 
 export type VerifyTimingAnalysis = {
   logPath: string;

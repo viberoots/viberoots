@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { sanitizeName } from "../lib/sanitize.ts";
-import { toPosixPath } from "../lib/posix-path.ts";
+import { sanitizeName } from "../lib/sanitize";
+import { toPosixPath } from "../lib/posix-path";
 
 export type AssetStageMetadata = {
   wasmModuleRoots: string[];

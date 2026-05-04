@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 // build-tools/tools/dev/startup-check.ts — verifies required tools and Nix features; prints fallbacks
 import * as fsp from "node:fs/promises";
-import { isNixStorePath, resolvePreferredCmdPath } from "./startup-check/cmd-paths.ts";
-import { DEV_OVERRIDE_LANGS, devOverrideEnvNameForLang } from "../lib/dev-override-envs.ts";
+import { isNixStorePath, resolvePreferredCmdPath } from "./startup-check/cmd-paths";
+import { DEV_OVERRIDE_LANGS, devOverrideEnvNameForLang } from "../lib/dev-override-envs";
 
 async function which(cmd: string) {
   try {

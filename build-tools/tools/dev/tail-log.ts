@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import process from "node:process";
-import { getArgvTokens } from "../lib/cli.ts";
-import { parseTailLogArgs } from "./tail-log/args.ts";
-import { resolveLatest, pidAlive } from "./tail-log/resolve.ts";
-import { renderStatusWatchLoop, runStatusOnce } from "./tail-log/status.ts";
-import { followLatestTail, tailPidLog } from "./tail-log/tail.ts";
+import { getArgvTokens } from "../lib/cli";
+import { parseTailLogArgs } from "./tail-log/args";
+import { resolveLatest, pidAlive } from "./tail-log/resolve";
+import { renderStatusWatchLoop, runStatusOnce } from "./tail-log/status";
+import { followLatestTail, tailPidLog } from "./tail-log/tail";
 
 async function main() {
   const args = parseTailLogArgs(getArgvTokens());

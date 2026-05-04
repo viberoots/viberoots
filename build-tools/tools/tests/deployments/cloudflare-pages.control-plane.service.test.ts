@@ -2,35 +2,35 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { runInTemp } from "../lib/test-helpers";
 import {
   cloudflarePagesApiTokenRequirements,
   cloudflarePagesDeploymentFixture,
   cloudflarePagesPreviewFixture,
   installCloudflarePagesTargets,
-} from "./cloudflare-pages.fixture.ts";
-import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
-import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server.ts";
-import { deriveCloudflarePagesPreviewTarget } from "../../deployments/cloudflare-pages-preview.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
+} from "./cloudflare-pages.fixture";
+import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
+import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
+import { deriveCloudflarePagesPreviewTarget } from "../../deployments/cloudflare-pages-preview";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import {
   readBackendSnapshot,
   readRecord,
   startControlPlaneHarness,
   withEnvOverrides,
-} from "./nixos-shared-host.control-plane.helpers.ts";
+} from "./nixos-shared-host.control-plane.helpers";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostLanePolicyFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { installHarnessClientProfile } from "./nixos-shared-host.remote-exec.install.helpers.ts";
-import { fakeJwt } from "./deploy-vault-jwt.test-helpers.ts";
-import { startFakeVaultServer } from "./vault.test-server.ts";
+} from "./nixos-shared-host.fixture";
+import { installHarnessClientProfile } from "./nixos-shared-host.remote-exec.install.helpers";
+import { fakeJwt } from "./deploy-vault-jwt.test-helpers";
+import { startFakeVaultServer } from "./vault.test-server";
 import {
   fakeCloudflareOverrides,
   writeCloudflareServiceArtifact,
   writeWranglerConfig,
-} from "./cloudflare-pages.service-flow.helpers.ts";
+} from "./cloudflare-pages.service-flow.helpers";
 
 test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollback through the control-plane service", async () => {
   await runInTemp("cloudflare-pages-public-service-flow", async (tmp, $) => {

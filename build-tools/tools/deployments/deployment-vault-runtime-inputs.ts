@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagStr } from "../lib/cli.ts";
+import { getFlagStr } from "../lib/cli";
 import {
   normalizeCredentialSource,
   normalizeLoginBrowserMode,
   type DeploymentCredentialSource,
   type LoginBrowserMode,
-} from "./deployment-credential-source-selection.ts";
-import type { DeploymentPkceCallbackProfileInput } from "./deployment-pkce-callback-profile.ts";
+} from "./deployment-credential-source-selection";
+import type { DeploymentPkceCallbackProfileInput } from "./deployment-pkce-callback-profile";
 
 export type DeploymentVaultRuntimeInputs = {
   issuerUrl?: string | undefined;

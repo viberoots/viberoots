@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { importerScopedProviderContractForLang } from "../../lib/lang-contracts.ts";
+import { importerScopedProviderContractForLang } from "../../lib/lang-contracts";
 
 test("lang-contracts: importer-scoped provider contract is explicit for Node vs Python", () => {
   assert.deepEqual(importerScopedProviderContractForLang("node"), {

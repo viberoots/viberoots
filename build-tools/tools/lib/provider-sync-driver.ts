@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { computeImporterLabel, isSupportedImporterLabel } from "./importers.ts";
-import { writeImporterProvidersByLang, type ImporterProvider } from "./provider-writer.ts";
-import { toPosixPath, uniqSorted } from "./posix-path.ts";
-import { selectPatchPathsForEffectiveSet } from "./effective-set-patch-selection.ts";
-import type { ImporterPatchInclusionPolicy } from "./lang-contracts.ts";
+import { computeImporterLabel, isSupportedImporterLabel } from "./importers";
+import { writeImporterProvidersByLang, type ImporterProvider } from "./provider-writer";
+import { toPosixPath, uniqSorted } from "./posix-path";
+import { selectPatchPathsForEffectiveSet } from "./effective-set-patch-selection";
+import type { ImporterPatchInclusionPolicy } from "./lang-contracts";
 
 export type ParseEffectiveSetFn = (
   lockfilePath: string,

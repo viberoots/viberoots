@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
-import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
-import type { DeploymentCredentialSource } from "./deployment-credential-source-selection.ts";
-import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract.ts";
+import type { DeploymentTarget } from "./contract";
+import type { DeploymentPrincipal } from "./deployment-admission-evidence";
+import type { DeploymentCredentialSource } from "./deployment-credential-source-selection";
+import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract";
 
 export const DEPLOYMENT_AUTH_LOGIN_REQUEST_SCHEMA = "deployment-auth-login-request@1";
 export const DEPLOYMENT_AUTH_LOGIN_RESPONSE_SCHEMA = "deployment-auth-login-response@1";

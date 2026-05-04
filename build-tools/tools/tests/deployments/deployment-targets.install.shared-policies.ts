@@ -1,20 +1,20 @@
 import type {
   ReviewedDeployment,
   TargetsFileFragment,
-} from "./deployment-targets.install.fragments.ts";
+} from "./deployment-targets.install.fragments";
 import {
   appendTargetsFragment,
   labelDir,
   labelName,
   uniqueBy,
-} from "./deployment-targets.install.fragments.ts";
-import { renderStringList } from "./deployment-targets.install.render.ts";
+} from "./deployment-targets.install.fragments";
+import { renderStringList } from "./deployment-targets.install.render";
 import {
   renderAdmissionPolicy,
   renderPromotionCompatibility,
   renderReleaseAction,
   renderTargetException,
-} from "./deployment-targets.install.policy-renderers.ts";
+} from "./deployment-targets.install.policy-renderers";
 
 export function synchronizeGovernanceChecks(deployments: ReviewedDeployment[]): void {
   for (const deployment of deployments) {

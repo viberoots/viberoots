@@ -4,15 +4,15 @@ import {
   SSR_WEBAPP_COMPONENT,
   VERCEL_PROVIDER,
   type VercelDeployment,
-} from "../../deployments/contract.ts";
-import type { GraphNode } from "../../lib/graph.ts";
+} from "../../deployments/contract";
+import type { GraphNode } from "../../lib/graph";
 import {
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostLanePolicyFixture,
   nixosSharedHostLanePolicyNodeFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture.ts";
+} from "./nixos-shared-host.fixture";
+import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture";
 
 export function vercelDeploymentFixture(
   overrides: Partial<VercelDeployment> = {},

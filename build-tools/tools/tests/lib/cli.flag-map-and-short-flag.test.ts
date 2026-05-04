@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hasShortFlag, parseFlagMap, removeKnownFlags } from "../../lib/cli.ts";
+import { hasShortFlag, parseFlagMap, removeKnownFlags } from "../../lib/cli";
 
 test("cli helpers: parseFlagMap supports --key=value and presence flags, preserves positionals", () => {
   const oldArgv = process.argv.slice();

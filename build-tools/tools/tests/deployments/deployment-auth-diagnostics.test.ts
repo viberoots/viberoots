@@ -2,25 +2,25 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
-import { resolveDeploymentFromTarget } from "../../deployments/deployment-query.ts";
+import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
 import {
   buildDeploymentAuthActionSummary,
   buildDeploymentAuthGroupSummary,
   buildDeploymentAuthKeycloakRealm,
-} from "../../deployments/deployment-auth-readonly.ts";
+} from "../../deployments/deployment-auth-readonly";
 import {
   buildDeploymentAuthDoctor as buildDoctor,
   buildDeploymentAuthLoginInstructions as buildLoginInstructions,
   buildDeploymentVaultRoleExplanation as buildVaultRole,
-} from "../../deployments/deployment-auth-diagnostics.ts";
-import { deploymentAuthFailureDiagnostic } from "../../deployments/deployment-auth-failure-diagnostics.ts";
+} from "../../deployments/deployment-auth-diagnostics";
+import { deploymentAuthFailureDiagnostic } from "../../deployments/deployment-auth-failure-diagnostics";
 import {
   DEPLOYMENT_AUTH_REDACTION,
   redactDeploymentAuthJson,
   redactDeploymentAuthText,
-} from "../../deployments/deployment-auth-redaction.ts";
-import { renderDeploymentJenkinsHelp } from "../../deployments/deployment-auth-matrix.ts";
-import { resolveDeploymentVaultRuntimePlan } from "../../deployments/deployment-vault-runtime-plan.ts";
+} from "../../deployments/deployment-auth-redaction";
+import { renderDeploymentJenkinsHelp } from "../../deployments/deployment-auth-matrix";
+import { resolveDeploymentVaultRuntimePlan } from "../../deployments/deployment-vault-runtime-plan";
 
 const DEPLOYMENT = "//projects/deployments/pleomino-staging:deploy";
 

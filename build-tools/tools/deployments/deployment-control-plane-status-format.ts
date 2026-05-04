@@ -2,8 +2,8 @@
 import type {
   DeploymentControlPlaneArtifactStatus,
   DeploymentControlPlaneStatus,
-} from "./deployment-control-plane-contract.ts";
-import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
+} from "./deployment-control-plane-contract";
+import { redactDeploymentAuthText } from "./deployment-auth-redaction";
 
 function phaseMessage(status: DeploymentControlPlaneStatus): string {
   if (status.lifecycleState === "pending_approval") return "pending approval";

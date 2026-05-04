@@ -3,23 +3,23 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
 import {
   NIXOS_SHARED_HOST_REPLAY_SNAPSHOT_SCHEMA,
   resolveNixosSharedHostReplaySource,
-} from "../../deployments/nixos-shared-host-replay.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
+} from "../../deployments/nixos-shared-host-replay";
+import { runInTemp } from "../lib/test-helpers";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { writeSsrArtifact } from "./nixos-shared-host.control-plane.helpers.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+} from "./nixos-shared-host.fixture";
+import { writeSsrArtifact } from "./nixos-shared-host.control-plane.helpers";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 import {
   submitReplaySourceRun,
   writeReplayArtifact,
-} from "./nixos-shared-host.replay.rollback-eligibility.helpers.ts";
+} from "./nixos-shared-host.replay.rollback-eligibility.helpers";
 
 test("nixos-shared-host replay snapshots preserve exact artifact refs and admitted deployment inputs", async () => {
   await runInTemp("nixos-shared-host-replay-contract", async (tmp, $) => {

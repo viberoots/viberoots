@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fs from "node:fs";
 import path from "node:path";
-import { logList, mtimeSafe } from "./report.ts";
+import { logList, mtimeSafe } from "./report";
 
 export type Mode = "ci" | "local";
 

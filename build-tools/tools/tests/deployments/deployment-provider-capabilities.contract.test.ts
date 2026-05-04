@@ -11,19 +11,19 @@ import {
   providerCapabilityFor,
   providerDeclaresReleaseActionType,
   rolloutPolicyOmissionInPolicy,
-} from "../../deployments/deployment-provider-capabilities.ts";
+} from "../../deployments/deployment-provider-capabilities";
 import {
   DEPLOYMENTS_DESIGN_DOC_PATH,
   assertDeploymentsDesignDocParity,
   renderDeploymentsDesignDoc,
-} from "../../deployments/design-summary-doc.ts";
+} from "../../deployments/design-summary-doc";
 import {
   PROVIDER_CAPABILITIES_DOC_PATH,
   assertProviderCapabilitiesDocParity,
   renderProviderCapabilitiesDoc,
-} from "../../deployments/provider-capabilities/doc.ts";
-import { assertDeployTextUsesReviewedSelector } from "../../deployments/provider-capabilities/front-door-contract.ts";
-import { validateProviderCapabilityRegistry } from "../../deployments/provider-capabilities/validate.ts";
+} from "../../deployments/provider-capabilities/doc";
+import { assertDeployTextUsesReviewedSelector } from "../../deployments/provider-capabilities/front-door-contract";
+import { validateProviderCapabilityRegistry } from "../../deployments/provider-capabilities/validate";
 
 test("reviewed provider registry is complete and deterministic", () => {
   assert.deepEqual(REVIEWED_PROVIDER_IDS, [

@@ -2,26 +2,26 @@
 import {
   resolveCloudflarePagesAdmittedSecretReferences,
   type CloudflarePagesAdmittedContext,
-} from "./cloudflare-pages-admission.ts";
-import type { CloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-contract.ts";
+} from "./cloudflare-pages-admission";
+import type { CloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-contract";
 import {
   createCloudflarePagesDeployRecord,
   createCloudflarePagesDeployRunId,
   writeCloudflarePagesDeployRecord,
   type CloudflarePagesDeployRecord,
-} from "./cloudflare-pages-records.ts";
-import type { CloudflarePagesStaticDeployStep } from "./cloudflare-pages-static-deploy-options.ts";
+} from "./cloudflare-pages-records";
+import type { CloudflarePagesStaticDeployStep } from "./cloudflare-pages-static-deploy-options";
 import {
   persistCloudflareBackendStatus,
   type CloudflareBackendSubmissionLike,
-} from "./cloudflare-pages-control-plane-backend-status.ts";
-import type { DeploymentSecretContext } from "./deployment-secret-context.ts";
-import { revalidateControlPlaneAdmission } from "./deployment-control-plane-revalidation.ts";
+} from "./cloudflare-pages-control-plane-backend-status";
+import type { DeploymentSecretContext } from "./deployment-secret-context";
+import { revalidateControlPlaneAdmission } from "./deployment-control-plane-revalidation";
 import {
   writeBackendSnapshotDoc,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
-import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
+} from "./nixos-shared-host-control-plane-backend";
+import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store";
 
 export type CloudflareBackendExecutionStep =
   | "vault"

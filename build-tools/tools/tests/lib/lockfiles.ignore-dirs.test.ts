@@ -3,7 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { findPnpmLockfiles } from "../../lib/lockfiles.ts";
+import { findPnpmLockfiles } from "../../lib/lockfiles";
 
 test("lockfiles: ignores standard directories", async () => {
   await runInTemp("lockfiles-ignores", async (tmp, $) => {

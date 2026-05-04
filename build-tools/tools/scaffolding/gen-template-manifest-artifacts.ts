@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagBool } from "../lib/cli.ts";
-import { writeIfChanged } from "../lib/fs-helpers.ts";
+import { getFlagBool } from "../lib/cli";
+import { writeIfChanged } from "../lib/fs-helpers";
 import {
   GENERATED_ADAPTER_BZL_PATH,
   GENERATED_RESOLVER_JSON_PATH,
@@ -10,7 +10,7 @@ import {
   renderGeneratedTaxonomyTs,
   renderResolverJson,
   renderTemplateTaxonomyAdapterBzl,
-} from "./template-manifest.ts";
+} from "./template-manifest";
 
 type RenderedOutput = {
   path: string;

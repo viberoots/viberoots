@@ -4,7 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { withScopedEnv } from "../lib/test-helpers/scoped-env.ts";
+import { withScopedEnv } from "../lib/test-helpers/scoped-env";
 
 test("provider-writer: deterministic output and managed section sync", async () => {
   await runInTemp("provider-writer-determinism", async (tmp, $) => {

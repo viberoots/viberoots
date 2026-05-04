@@ -1,14 +1,14 @@
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
-import { normalizeTargetLabel, parseLockfileLabel } from "../lib/labels.ts";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { normalizeTargetLabel, parseLockfileLabel } from "../lib/labels";
 import {
   findRunnableEntryForTarget,
   readRunnableManifest,
   type RunnableManifestEntry,
-} from "../lib/runnables.ts";
-export { resolveRunnableTargetLabel } from "./target-label-resolver.ts";
+} from "../lib/runnables";
+export { resolveRunnableTargetLabel } from "./target-label-resolver";
 
 export function parseArgs(argv: string[]): {
   mode: "prod" | "dev";

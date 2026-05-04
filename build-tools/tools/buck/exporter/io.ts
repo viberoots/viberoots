@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagStr } from "../../lib/cli.ts";
-import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
-import { getImporterRootsContract } from "../../lib/importer-roots.ts";
-import type { Node } from "./types.ts";
+import { getFlagStr } from "../../lib/cli";
+import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
+import { getImporterRootsContract } from "../../lib/importer-roots";
+import type { Node } from "./types";
 
 export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[]> {
   const flags = attrs.flatMap((a) => ["--output-attribute", a]);
@@ -143,7 +143,7 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
 
       const labs = new Set<string>(labelsArr || []);
       // Normalize label: drop cell prefix and any config suffix to ensure stable keys
-      const { normalizeTargetLabel } = await import("../../lib/labels.ts");
+      const { normalizeTargetLabel } = await import("../../lib/labels");
       const clean = normalizeTargetLabel(label);
       const cleanDeps = deps ? deps.map((d) => normalizeTargetLabel(d)) : undefined;
       const n: any = {
@@ -186,7 +186,7 @@ export async function readSimulatedNodes(path: string): Promise<Node[]> {
 }
 
 export async function writeIfChangedJSON(file: string, data: any) {
-  const { writeIfChanged } = await import("../../lib/fs-helpers.ts");
+  const { writeIfChanged } = await import("../../lib/fs-helpers");
   const txt = JSON.stringify(data, null, 2) + "\n";
   // Avoid stomping a previously non-empty graph with an empty list due to
   // transient query conditions. If the existing file has non-empty content

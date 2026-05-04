@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagStr } from "../lib/cli.ts";
-import { writeIfChanged } from "../lib/fs-helpers.ts";
-import { readCompositeGraph } from "../lib/graph-view.ts";
-import { isWorkspaceImporterPath } from "../lib/importers.ts";
-import { normalizeTargetLabel, parseLockfileLabel } from "../lib/labels.ts";
-import { collectDeps, listImporters } from "../lib/node-deps-enforcement-core.ts";
-import { repoRoot } from "../lib/repo.ts";
+import { getFlagStr } from "../lib/cli";
+import { writeIfChanged } from "../lib/fs-helpers";
+import { readCompositeGraph } from "../lib/graph-view";
+import { isWorkspaceImporterPath } from "../lib/importers";
+import { normalizeTargetLabel, parseLockfileLabel } from "../lib/labels";
+import { collectDeps, listImporters } from "../lib/node-deps-enforcement-core";
+import { repoRoot } from "../lib/repo";
 
 type GraphNode = { name?: string; labels?: string[]; rule_type?: string };
 

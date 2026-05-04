@@ -2,9 +2,9 @@
 import {
   normalizeLaneGovernanceSnapshot,
   verifyLaneGovernanceSnapshot,
-} from "./deployment-admission-governance.ts";
-import { fetchGithubLaneGovernanceSnapshot } from "./deployment-lane-governance-github.ts";
-import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution.ts";
+} from "./deployment-admission-governance";
+import { fetchGithubLaneGovernanceSnapshot } from "./deployment-lane-governance-github";
+import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution";
 
 const GITHUB_FIXTURE_ENV = "BNX_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON";
 

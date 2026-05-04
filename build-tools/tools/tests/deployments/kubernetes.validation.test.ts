@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { GraphNode } from "../../lib/graph.ts";
-import { extractKubernetesDeployments } from "../../deployments/contract.ts";
+import type { GraphNode } from "../../lib/graph";
+import { extractKubernetesDeployments } from "../../deployments/contract";
 import {
   kubernetesAdmissionPolicyNodeFixture,
   kubernetesLanePolicyNodeFixture,
-} from "./kubernetes.fixture.ts";
-import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture.ts";
+} from "./kubernetes.fixture";
+import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture";
 
 function serviceComponent(label: string): GraphNode {
   return { name: label, labels: ["kind:app"] };

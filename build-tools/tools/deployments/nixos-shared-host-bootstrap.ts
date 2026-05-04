@@ -1,26 +1,26 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { authorizeControlPlaneBootstrap } from "./deployment-control-plane-authz.ts";
-import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract.ts";
-import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
+import { authorizeControlPlaneBootstrap } from "./deployment-control-plane-authz";
+import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract";
+import type { DeploymentPrincipal } from "./deployment-admission-evidence";
 import {
   type NixosSharedHostBootstrapAuthority,
   type NixosSharedHostBootstrapMode,
   type NixosSharedHostControlPlanePaths,
   type NixosSharedHostPublishBehavior,
   type NixosSharedHostSmokeConnectOverride,
-} from "./nixos-shared-host-control-plane-contract.ts";
-import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
+} from "./nixos-shared-host-control-plane-contract";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts";
 import {
   deployRecordPathFor,
   type NixosSharedHostDeployRecord,
   createNixosSharedHostDeployRunId,
   readNixosSharedHostDeployRecord,
-} from "./nixos-shared-host-records.ts";
-import { runNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy.ts";
-import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
-import { providerTargetIdentityFor, type NixosSharedHostDeployment } from "./contract.ts";
+} from "./nixos-shared-host-records";
+import { runNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy";
+import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store";
+import { providerTargetIdentityFor, type NixosSharedHostDeployment } from "./contract";
 
 const BOOTSTRAP_SNAPSHOT_SCHEMA = "nixos-shared-host-bootstrap-snapshot@1";
 const BOOTSTRAP_RECONCILIATION_SCHEMA = "nixos-shared-host-bootstrap-reconciliation@1";

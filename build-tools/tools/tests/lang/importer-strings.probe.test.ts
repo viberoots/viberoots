@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { sanitizeName } from "../../lib/sanitize";
-import { buckCommandEnv, isBuckDaemonInitTransient } from "../../lib/buck-command-env.ts";
+import { buckCommandEnv, isBuckDaemonInitTransient } from "../../lib/buck-command-env";
 
 type Case = {
   target: string;

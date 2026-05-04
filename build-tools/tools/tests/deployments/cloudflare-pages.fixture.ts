@@ -5,17 +5,17 @@ import {
   STATIC_WEBAPP_COMPONENT,
   type DeploymentPreviewPolicy,
   type CloudflarePagesDeployment,
-} from "../../deployments/contract.ts";
-import type { GraphNode } from "../../lib/graph.ts";
-import type { DeploymentRequirement } from "../../deployments/deployment-requirements.ts";
-import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture.ts";
+} from "../../deployments/contract";
+import type { GraphNode } from "../../lib/graph";
+import type { DeploymentRequirement } from "../../deployments/deployment-requirements";
+import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture";
 import {
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostLanePolicyFixture,
   nixosSharedHostLanePolicyNodeFixture,
-} from "./nixos-shared-host.fixture.ts";
-export { installCloudflarePagesTargets } from "./deployment-targets.install.helpers.ts";
+} from "./nixos-shared-host.fixture";
+export { installCloudflarePagesTargets } from "./deployment-targets.install.helpers";
 
 export function cloudflarePagesPreviewFixture(
   overrides: Partial<DeploymentPreviewPolicy> = {},

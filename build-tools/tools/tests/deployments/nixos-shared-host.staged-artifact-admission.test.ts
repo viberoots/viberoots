@@ -4,8 +4,8 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { admitNixosSharedHostArtifact } from "../../deployments/nixos-shared-host-artifacts.ts";
-import { stagedUploadCompleteMarkerPath } from "../../deployments/nixos-shared-host-staged-artifact.ts";
+import { admitNixosSharedHostArtifact } from "../../deployments/nixos-shared-host-artifacts";
+import { stagedUploadCompleteMarkerPath } from "../../deployments/nixos-shared-host-staged-artifact";
 
 async function writeFinalizedArtifact(stagingRoot: string, name: string): Promise<string> {
   const artifactDir = path.join(stagingRoot, name);

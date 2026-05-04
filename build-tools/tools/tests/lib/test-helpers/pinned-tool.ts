@@ -1,10 +1,10 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { resolveToolPathSync } from "../../../lib/tool-paths.ts";
+import { resolveToolPathSync } from "../../../lib/tool-paths";
 import {
   nixEvalTempDirOutsideWorkspace,
   pinnedNixpkgsPackageExpr,
-} from "../../../lib/pinned-nixpkgs.ts";
+} from "../../../lib/pinned-nixpkgs";
 
 const pinnedToolCache = new Map<string, Promise<string>>();
 

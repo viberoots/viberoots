@@ -1,19 +1,19 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagList, getFlagStr, getPositionals } from "../lib/cli.ts";
-import { resolveAllDeployments } from "./deployment-query.ts";
-import { resolveDeploymentForCli } from "./deployment-cli-resolve.ts";
+import { getFlagList, getFlagStr, getPositionals } from "../lib/cli";
+import { resolveAllDeployments } from "./deployment-query";
+import { resolveDeploymentForCli } from "./deployment-cli-resolve";
 import {
   buildDeploymentAdminKeycloakPlan,
   grantDeploymentAdminKeycloakUser,
   printDeploymentAdminKeycloakResult,
   syncDeploymentAdminKeycloakRealm,
-} from "./deployment-admin-keycloak.ts";
-import { handleDeploymentAdminVaultCli } from "./deployment-admin-vault-cli.ts";
+} from "./deployment-admin-keycloak";
+import { handleDeploymentAdminVaultCli } from "./deployment-admin-vault-cli";
 import {
   hasDeploymentAdminKeycloakRemoteProfileFlags,
   runDeploymentAdminKeycloakRemoteProfile,
-} from "./deployment-admin-keycloak-remote.ts";
-import type { DeploymentAuthAction } from "./deployment-auth-groups.ts";
+} from "./deployment-admin-keycloak-remote";
+import type { DeploymentAuthAction } from "./deployment-auth-groups";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();

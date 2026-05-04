@@ -1,17 +1,17 @@
 #!/usr/bin/env zx-wrapper
-import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-control-plane.ts";
+import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-control-plane";
 import {
   submitCloudflarePagesPreviewCleanup,
   submitCloudflarePagesPreviewDeploy,
-} from "./cloudflare-pages-preview-control-plane.ts";
-import { normalizeCloudflarePagesPreviewCleanupReason } from "./cloudflare-pages-preview.ts";
+} from "./cloudflare-pages-preview-control-plane";
+import { normalizeCloudflarePagesPreviewCleanupReason } from "./cloudflare-pages-preview";
 import {
   resolveCloudflarePagesPromotionSelection,
   submitCloudflarePagesRebuildPerStagePromotion,
-} from "./cloudflare-pages-promotion.ts";
-import { submitCloudflarePagesRollback } from "./cloudflare-pages-rollback.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
+} from "./cloudflare-pages-promotion";
+import { submitCloudflarePagesRollback } from "./cloudflare-pages-rollback";
+import type { CloudflarePagesDeployment } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
 
 export async function runCloudflarePagesCli(opts: {
   workspaceRoot: string;

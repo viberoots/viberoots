@@ -2,12 +2,12 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { ensureNixStoreToolPathSync } from "../../lib/tool-paths.ts";
-import { sharedExactPnpmStateRoot } from "../../lib/pnpm-state-paths.ts";
-import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard.ts";
-import { runExactStoreCommand } from "./exact-store-command.ts";
-import { importExactStoreIntoNixStore } from "./exact-store-import.ts";
-import { cleanupLocalWorkspaceMarker, ensureLocalWorkspaceMarker } from "./lockfile-shared.ts";
+import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
+import { sharedExactPnpmStateRoot } from "../../lib/pnpm-state-paths";
+import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard";
+import { runExactStoreCommand } from "./exact-store-command";
+import { importExactStoreIntoNixStore } from "./exact-store-import";
+import { cleanupLocalWorkspaceMarker, ensureLocalWorkspaceMarker } from "./lockfile-shared";
 
 const EXACT_STORE_CACHE_VERSION = 3;
 

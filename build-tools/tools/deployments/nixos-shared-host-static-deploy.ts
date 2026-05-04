@@ -3,34 +3,34 @@ import {
   requireNixosSharedHostControlPlaneAuthority,
   type NixosSharedHostSmokeConnectOverride,
   type NixosSharedHostMutationAuthority,
-} from "./nixos-shared-host-control-plane-contract.ts";
-import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
-import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
+} from "./nixos-shared-host-control-plane-contract";
+import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts";
 import {
   requireNixosSharedHostAdmittedArtifactPath,
   type NixosSharedHostAdmittedArtifact,
-} from "./nixos-shared-host-artifacts.ts";
-import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
-import type { NixosSharedHostGateEvaluator } from "./nixos-shared-host-progressive-execution.ts";
-import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
+} from "./nixos-shared-host-artifacts";
+import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results";
+import type { NixosSharedHostDeployment } from "./contract";
+import type { DeploymentReleaseAction } from "./deployment-release-actions";
+import type { NixosSharedHostGateEvaluator } from "./nixos-shared-host-progressive-execution";
+import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout";
 import {
   createNixosSharedHostDeployRunId,
   type NixosSharedHostDeployRecord,
-} from "./nixos-shared-host-records.ts";
-import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
-import { writeNixosSharedHostProvisionOnlyRecord } from "./nixos-shared-host-provision-record.ts";
-import { createNixosSharedHostReleasePhaseRunner } from "./nixos-shared-host-release-phase.ts";
-import { writeNixosSharedHostReplayComponentResults } from "./nixos-shared-host-replay.ts";
-import { materializeNixosSharedHostRuntimeWithSecrets } from "./nixos-shared-host-secret-runtime.ts";
-import { prepareNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy-setup.ts";
-import { runNixosSharedHostStaticDeployLifecycle } from "./nixos-shared-host-static-deploy-lifecycle.ts";
+} from "./nixos-shared-host-records";
+import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan";
+import { writeNixosSharedHostProvisionOnlyRecord } from "./nixos-shared-host-provision-record";
+import { createNixosSharedHostReleasePhaseRunner } from "./nixos-shared-host-release-phase";
+import { writeNixosSharedHostReplayComponentResults } from "./nixos-shared-host-replay";
+import { materializeNixosSharedHostRuntimeWithSecrets } from "./nixos-shared-host-secret-runtime";
+import { prepareNixosSharedHostStaticDeploy } from "./nixos-shared-host-static-deploy-setup";
+import { runNixosSharedHostStaticDeployLifecycle } from "./nixos-shared-host-static-deploy-lifecycle";
 import {
   failNixosSharedHostStaticDeploy,
   writeSuccessfulNixosSharedHostStaticDeployRecord,
-} from "./nixos-shared-host-static-deploy-failure.ts";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
+} from "./nixos-shared-host-static-deploy-failure";
+import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
 
 type StaticOperationKind = "deploy" | "promotion" | "provision_only" | "retry" | "rollback";
 type StaticPublishBehavior = "deploy" | "publish-only" | "provision-only";

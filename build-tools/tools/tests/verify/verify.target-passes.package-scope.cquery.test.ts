@@ -8,8 +8,8 @@ import {
   VERIFY_ISOLATED_LABEL,
   VERIFY_RESOURCE_LIMITED_LABEL,
   VERIFY_RESOURCE_LIMITED_THREADS,
-} from "../../dev/verify/target-passes.ts";
-import { inheritedBuckIsolation } from "../lib/test-helpers.ts";
+} from "../../dev/verify/target-passes";
+import { inheritedBuckIsolation } from "../lib/test-helpers";
 
 test("verify target pass loading expands package scopes before isolating labeled targets", () => {
   const targets = loadVerifyTargetLabels({

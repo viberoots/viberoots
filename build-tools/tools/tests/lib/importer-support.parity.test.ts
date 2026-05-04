@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { getImporterRootsContract } from "../../lib/importer-roots.ts";
+import { getImporterRootsContract } from "../../lib/importer-roots";
 import { isSupportedImporterLabel } from "../../lib/importers";
 import { runInTemp } from "../lib/test-helpers";
 

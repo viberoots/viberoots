@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { SSR_WEBAPP_COMPONENT_KIND } from "../deployment-component-kinds.ts";
-import { VERCEL_PROVIDER } from "../vercel-provider-target.ts";
-import type { DeploymentProviderCapability } from "./types.ts";
-import { bullet } from "./types.ts";
+import { SSR_WEBAPP_COMPONENT_KIND } from "../deployment-component-kinds";
+import { VERCEL_PROVIDER } from "../vercel-provider-target";
+import type { DeploymentProviderCapability } from "./types";
+import { bullet } from "./types";
 
 export const VERCEL_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
   provider: VERCEL_PROVIDER,

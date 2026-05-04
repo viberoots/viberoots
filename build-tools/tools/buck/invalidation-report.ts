@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
-import { generateInvalidationReport } from "./invalidation-report-lib.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli";
+import { generateInvalidationReport } from "./invalidation-report-lib";
 
 async function main(): Promise<void> {
   await generateInvalidationReport({

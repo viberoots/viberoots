@@ -8,7 +8,7 @@ import net from "node:net";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { after, test } from "node:test";
-import { terminateChildTree } from "../lib/process-tree.ts";
+import { terminateChildTree } from "../lib/process-tree";
 import { runInTemp } from "../lib/test-helpers";
 
 const TEST_TIMEOUT_MS =

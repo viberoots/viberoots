@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getFlagStr } from "../lib/cli.ts";
-import { findRepoRoot } from "../lib/repo.ts";
-import { startNixosSharedHostControlPlaneWorkerLoop } from "./nixos-shared-host-control-plane-worker-loop.ts";
+import { getFlagStr } from "../lib/cli";
+import { findRepoRoot } from "../lib/repo";
+import { startNixosSharedHostControlPlaneWorkerLoop } from "./nixos-shared-host-control-plane-worker-loop";
 
 async function main() {
   const workspaceRoot = await findRepoRoot(process.cwd());

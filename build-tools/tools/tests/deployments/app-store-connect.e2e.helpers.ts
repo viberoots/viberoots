@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { AppStoreConnectDeployment } from "../../deployments/contract.ts";
+import type { AppStoreConnectDeployment } from "../../deployments/contract";
 import {
   installMobileSharedTargets,
   labelName,
   writePublisherConfig,
-} from "./mobile-release.e2e.helpers.ts";
+} from "./mobile-release.e2e.helpers";
 
 export async function writeAppStoreConnectConfig(
   workspaceRoot: string,

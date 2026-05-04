@@ -5,7 +5,7 @@ import {
   resolveNestedBuckIsolation,
   stableBuckIsolation,
   workspaceRootForBuckEnv,
-} from "../../lib/buck-command-env.ts";
+} from "../../lib/buck-command-env";
 
 test("buck command env helpers derive stable nested isolations from the workspace root", () => {
   const env = {

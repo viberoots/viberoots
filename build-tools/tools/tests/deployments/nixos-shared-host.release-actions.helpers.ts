@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { deploymentReleaseActionFixture } from "./deployment-metadata.fixture.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import { deploymentReleaseActionFixture } from "./deployment-metadata.fixture";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 export async function releaseActionMarkers(
   recordsRoot: string,

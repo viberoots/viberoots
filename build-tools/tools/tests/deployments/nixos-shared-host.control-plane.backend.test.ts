@@ -14,21 +14,21 @@ import {
   syncBackendDeployRecord,
   syncBackendSnapshot,
   syncBackendSubmission,
-} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { readControlPlaneStatus } from "../../deployments/nixos-shared-host-control-plane-service-api.ts";
-import { readDeploymentControlPlaneStatus } from "../../deployments/deployment-control-plane-read.ts";
-import { reconcileNixosSharedHostRecoveredSubmission } from "../../deployments/nixos-shared-host-recovery.ts";
+} from "../../deployments/nixos-shared-host-control-plane-backend";
+import { readControlPlaneStatus } from "../../deployments/nixos-shared-host-control-plane-service-api";
+import { readDeploymentControlPlaneStatus } from "../../deployments/deployment-control-plane-read";
+import { reconcileNixosSharedHostRecoveredSubmission } from "../../deployments/nixos-shared-host-recovery";
 import {
   createNixosSharedHostDeployRecord,
   writeNixosSharedHostDeployRecord,
-} from "../../deployments/nixos-shared-host-records.ts";
-import { writeControlPlaneJson } from "../../deployments/nixos-shared-host-control-plane-store.ts";
+} from "../../deployments/nixos-shared-host-records";
+import { writeControlPlaneJson } from "../../deployments/nixos-shared-host-control-plane-store";
 import {
   readQueueClaimExpiry,
   waitForClaimRenewal,
-} from "./nixos-shared-host.control-plane.backend.helpers.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "./nixos-shared-host.control-plane.backend.helpers";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
+import { runInTemp } from "../lib/test-helpers";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));

@@ -1,19 +1,19 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
-import type { KubernetesDeployment } from "./contract.ts";
-import { assertCrossDeploymentExactPromotionEligible } from "./deployment-provider-promotion.ts";
-import { summarizeDeploymentResult } from "./deployment-execution.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli";
+import type { KubernetesDeployment } from "./contract";
+import { assertCrossDeploymentExactPromotionEligible } from "./deployment-provider-promotion";
+import { summarizeDeploymentResult } from "./deployment-execution";
 import {
   resolveArtifactDirForCli,
   resolveComponentArtifactDirsForCli,
-} from "./deployment-cli-resolve.ts";
-import { printDeployJson } from "./deploy-front-door.ts";
-import { submitKubernetesDeploy } from "./kubernetes-deploy.ts";
-import { submitKubernetesExactArtifactRun } from "./kubernetes-exact-run.ts";
-import { submitKubernetesProvisionOnly } from "./kubernetes-provision-only.ts";
-import { runProtectedKubernetesDeployFrontDoor } from "./kubernetes-protected-front-door.ts";
-import { resolveKubernetesReplaySource } from "./kubernetes-replay.ts";
+} from "./deployment-cli-resolve";
+import { printDeployJson } from "./deploy-front-door";
+import { submitKubernetesDeploy } from "./kubernetes-deploy";
+import { submitKubernetesExactArtifactRun } from "./kubernetes-exact-run";
+import { submitKubernetesProvisionOnly } from "./kubernetes-provision-only";
+import { runProtectedKubernetesDeployFrontDoor } from "./kubernetes-protected-front-door";
+import { resolveKubernetesReplaySource } from "./kubernetes-replay";
 
 export async function runKubernetesDeployFrontDoor(opts: {
   workspaceRoot: string;

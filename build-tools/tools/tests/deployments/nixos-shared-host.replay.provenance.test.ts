@@ -6,19 +6,19 @@ import { test } from "node:test";
 import {
   localHarnessControlPlaneDatabaseUrl,
   syncBackendDeployRecord,
-} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
+} from "../../deployments/nixos-shared-host-control-plane-backend";
 import {
   readNixosSharedHostReplaySnapshot,
   resolveNixosSharedHostReplaySelection,
-} from "../../deployments/nixos-shared-host-replay.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
+} from "../../deployments/nixos-shared-host-replay";
+import { runInTemp } from "../lib/test-helpers";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
-import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
+} from "./nixos-shared-host.fixture";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
+import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
 
 async function writeArtifact(root: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });

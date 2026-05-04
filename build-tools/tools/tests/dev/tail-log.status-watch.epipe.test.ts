@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resolveToolPathSync } from "../../lib/tool-paths.ts";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 
 test("tail-log status watch: piping JSON output does not crash on EPIPE", async () => {
   // `build-tools/tools/bin/s` defaults to watch mode; piping to `head` closes stdout and used to crash with EPIPE.

@@ -2,8 +2,8 @@ import type {
   CloudflarePagesDeployment,
   DeploymentRequirement,
   NixosSharedHostDeployment,
-} from "../../deployments/contract.ts";
-import type { ReviewedDeployment } from "./deployment-targets.install.fragments.ts";
+} from "../../deployments/contract";
+import type { ReviewedDeployment } from "./deployment-targets.install.fragments";
 
 export function renderStringList(values: string[]): string {
   return `[${values.map((value) => JSON.stringify(value)).join(", ")}]`;

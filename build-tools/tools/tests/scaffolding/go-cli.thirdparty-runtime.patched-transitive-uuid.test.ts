@@ -3,7 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { test } from "node:test";
-import { resolvePinnedTestToolPath } from "../lib/test-helpers/pinned-tool.ts";
+import { resolvePinnedTestToolPath } from "../lib/test-helpers/pinned-tool";
 import { runInTemp } from "../lib/test-helpers";
 
 // Ensure Node is on PATH inside zx_test sandboxes that may not have dev shell

@@ -2,13 +2,13 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-control-plane-contract.ts";
+import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-control-plane-contract";
 import {
   applyNixosSharedHostScopedDeployments,
   removeNixosSharedHostPlatformDeployment,
   type NixosSharedHostPlatformState,
-} from "./nixos-shared-host-platform.ts";
-import { readNixosSharedHostPlatformStateOrEmpty } from "./nixos-shared-host-io.ts";
+} from "./nixos-shared-host-platform";
+import { readNixosSharedHostPlatformStateOrEmpty } from "./nixos-shared-host-io";
 
 export const NIXOS_SHARED_HOST_PROVISIONER_PLAN_SCHEMA = "nixos-shared-host-provisioner-plan@1";
 

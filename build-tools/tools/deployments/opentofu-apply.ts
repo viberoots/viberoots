@@ -3,14 +3,14 @@ import * as fsp from "node:fs/promises";
 import {
   redactOperatorText,
   type DeploymentOperatorVisiblePayload,
-} from "./deployment-control-plane-redaction.ts";
+} from "./deployment-control-plane-redaction";
 import {
   classifyOpenTofuPlan,
   OPENTOFU_STACK_PROVISIONER,
   type OpenTofuPlanSummary,
   type OpenTofuProvisionerMetadata,
-} from "./opentofu-stack.ts";
-import type { KubernetesProvisionerPlanRef } from "./kubernetes-provisioner-plan.ts";
+} from "./opentofu-stack";
+import type { KubernetesProvisionerPlanRef } from "./kubernetes-provisioner-plan";
 
 export const OPENTOFU_APPLY_OUTCOME_SCHEMA = "opentofu-apply-outcome@1";
 

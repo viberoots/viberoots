@@ -1,5 +1,5 @@
-import { withHeartbeat } from "./heartbeat.ts";
-import { makeFilteredFlakeRef } from "./filtered-flake.ts";
+import { withHeartbeat } from "./heartbeat";
+import { makeFilteredFlakeRef } from "./filtered-flake";
 
 export async function withPnpmStoreBuildFlakeRef<T>(
   opts: { repoRoot: string; importer: string; baseFlakeRef: string },

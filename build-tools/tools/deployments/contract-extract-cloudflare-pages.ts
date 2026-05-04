@@ -6,8 +6,8 @@ import {
   STATIC_WEBAPP_COMPONENT,
   targetName,
   type CloudflarePagesDeployment,
-} from "./contract-types.ts";
-import { readPrimaryDeploymentComponent } from "./contract-extract-components.ts";
+} from "./contract-types";
+import { readPrimaryDeploymentComponent } from "./contract-extract-components";
 import {
   deploymentError,
   readSmokePolicy,
@@ -21,20 +21,20 @@ import {
   readString,
   readStringRecord,
   type DeploymentExtractionContext,
-} from "./contract-extract-shared.ts";
-import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata.ts";
-import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
-import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
+} from "./contract-extract-shared";
+import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata";
+import { pushSmokePolicyErrors } from "./deployment-smoke-policy";
+import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding";
 import {
   resolveDeploymentMetadataRefs,
   validateExplicitDeploymentRequirements,
-} from "./deployment-extract-metadata.ts";
-import { readDeploymentRequirements } from "./deployment-requirements.ts";
-import { pushCloudflareComponentKindErrors } from "./cloudflare-pages-capability-validation.ts";
+} from "./deployment-extract-metadata";
+import { readDeploymentRequirements } from "./deployment-requirements";
+import { pushCloudflareComponentKindErrors } from "./cloudflare-pages-capability-validation";
 import {
   pushCloudflarePreviewErrors,
   pushDuplicateCloudflareTargetIdentityErrors,
-} from "./cloudflare-pages-extract-helpers.ts";
+} from "./cloudflare-pages-extract-helpers";
 
 const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/;
 const SHARED_NONPROD = "shared_nonprod";

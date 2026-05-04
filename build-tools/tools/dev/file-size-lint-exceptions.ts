@@ -1,7 +1,7 @@
 import path from "node:path";
 import * as fsp from "node:fs/promises";
 import fg from "fast-glob";
-import { normalizeRepoPath } from "../lib/project-graph.ts";
+import { normalizeRepoPath } from "../lib/project-graph";
 
 export const METHODOLOGY_EXCEPTIONS_FILENAME = "methodology-exceptions.json";
 export const PROJECT_METHODOLOGY_EXCEPTIONS_FILENAME = METHODOLOGY_EXCEPTIONS_FILENAME;

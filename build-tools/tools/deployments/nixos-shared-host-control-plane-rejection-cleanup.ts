@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
-import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
-import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract.ts";
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
-import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
+import { redactDeploymentAuthText } from "./deployment-auth-redaction";
+import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
+import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract";
 import {
   cleanupRejectedStagedArtifacts,
   type StagedArtifactCleanupReason,
-} from "./nixos-shared-host-staged-artifact-cleanup.ts";
+} from "./nixos-shared-host-staged-artifact-cleanup";
 
 function rejectedCleanupRefs(
   request: NixosSharedHostControlPlaneSubmitRequest,

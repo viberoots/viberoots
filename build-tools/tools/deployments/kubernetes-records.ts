@@ -2,21 +2,18 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { KubernetesAdmittedContext } from "./kubernetes-admission.ts";
-import type { KubernetesDeployment } from "./contract.ts";
-import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
-import type {
-  DeploymentSmokeException,
-  DeploymentSmokeOutcome,
-} from "./deployment-smoke-policy.ts";
+import type { KubernetesAdmittedContext } from "./kubernetes-admission";
+import type { KubernetesDeployment } from "./contract";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy";
+import type { DeploymentSmokeException, DeploymentSmokeOutcome } from "./deployment-smoke-policy";
 import {
   kubernetesRunnerIdentities,
   type DeploymentRunnerIdentities,
-} from "./deployment-runner-identities.ts";
-import type { KubernetesProvisionerPlanRef } from "./kubernetes-provisioner-plan.ts";
-import type { OpenTofuApplyOutcome } from "./opentofu-apply.ts";
-import { KUBERNETES_PROVIDER } from "./contract.ts";
-import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
+} from "./deployment-runner-identities";
+import type { KubernetesProvisionerPlanRef } from "./kubernetes-provisioner-plan";
+import type { OpenTofuApplyOutcome } from "./opentofu-apply";
+import { KUBERNETES_PROVIDER } from "./contract";
+import { operatorErrorFields } from "./deployment-control-plane-redaction";
 
 export const KUBERNETES_RECORD_SCHEMA = "deploy-record@2026-04-10";
 

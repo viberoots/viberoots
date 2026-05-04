@@ -4,12 +4,12 @@ import { test } from "node:test";
 import {
   cloudflarePagesPreviewFixture,
   cloudflarePagesDeploymentFixture,
-} from "./cloudflare-pages.fixture.ts";
+} from "./cloudflare-pages.fixture";
 import {
   deriveCloudflarePagesPreviewTarget,
   cloudflarePagesPreviewIdentitySelector,
-} from "../../deployments/cloudflare-pages-preview.ts";
-import { createCloudflarePagesDeployRecord } from "../../deployments/cloudflare-pages-records.ts";
+} from "../../deployments/cloudflare-pages-preview";
+import { createCloudflarePagesDeployRecord } from "../../deployments/cloudflare-pages-records";
 
 test("cloudflare-pages preview records preserve both live and effective preview target identities", () => {
   const deployment = cloudflarePagesDeploymentFixture({

@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { promotionCompatibilityErrors } from "../../deployments/deployment-promotion-compatibility.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import type { promotionCompatibilityErrors } from "../../deployments/deployment-promotion-compatibility";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 
 type PromotionSource = Parameters<typeof promotionCompatibilityErrors>[1];
 

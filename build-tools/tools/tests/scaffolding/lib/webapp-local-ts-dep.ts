@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runInTemp } from "../../lib/test-helpers/run-in-temp.ts";
+import { runInTemp } from "../../lib/test-helpers/run-in-temp";
 import {
   evaluateRenderedAppText,
   extractImportedUrl,
@@ -13,14 +13,14 @@ import {
   stopServer,
   toAbsoluteModuleUrl,
   waitForHttpOk,
-} from "./webapp-static-hmr.ts";
+} from "./webapp-static-hmr";
 import {
   assertNoProcessRestart,
   assertWorkspaceLinkedDependency,
   esbuildPackageName,
   waitForValue,
   writeAndBumpMtime,
-} from "./wasm-watch.ts";
+} from "./wasm-watch";
 
 export async function runWebappLocalTsDependencyTest(options: {
   appName: string;

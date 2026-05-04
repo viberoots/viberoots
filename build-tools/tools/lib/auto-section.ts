@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { writeIfChanged } from "./fs-helpers.ts";
+import { writeIfChanged } from "./fs-helpers";
 
 export type EnsureAutoSectionOptions = {
   file: string;

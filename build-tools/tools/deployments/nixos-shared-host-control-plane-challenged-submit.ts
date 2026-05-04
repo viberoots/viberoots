@@ -1,27 +1,27 @@
 #!/usr/bin/env zx-wrapper
-import { acceptChallengedArtifactSubmission } from "./deployment-artifact-submit-transaction.ts";
-import { readReusableChallengedArtifactSubmission } from "./deployment-artifact-submit-idempotency.ts";
+import { acceptChallengedArtifactSubmission } from "./deployment-artifact-submit-transaction";
+import { readReusableChallengedArtifactSubmission } from "./deployment-artifact-submit-idempotency";
 import {
   deploymentServicePrincipalForToken,
   verifyDeploymentArtifactChallenge,
-} from "./deployment-artifact-challenges.ts";
-import { submitResponseFromSubmission } from "./deployment-control-plane-status.ts";
-import type { DeploymentControlPlaneServiceInstance } from "./deployment-control-plane-contract.ts";
-import { prepareBackendNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-backend-prepare.ts";
-import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution.ts";
-import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract.ts";
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
+} from "./deployment-artifact-challenges";
+import { submitResponseFromSubmission } from "./deployment-control-plane-status";
+import type { DeploymentControlPlaneServiceInstance } from "./deployment-control-plane-contract";
+import { prepareBackendNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-backend-prepare";
+import type { DeploymentControlPlaneAuthorizationDecision } from "./deployment-control-plane-contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution";
+import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
 import type {
   NixosSharedHostControlPlanePaths,
   NixosSharedHostControlPlaneSubmission,
-} from "./nixos-shared-host-control-plane-contract.ts";
-import { cleanupThenRethrowRejectedNixosSubmit } from "./nixos-shared-host-control-plane-rejection-cleanup.ts";
+} from "./nixos-shared-host-control-plane-contract";
+import { cleanupThenRethrowRejectedNixosSubmit } from "./nixos-shared-host-control-plane-rejection-cleanup";
 import {
   assertProtectedSharedArtifactIdentityFields,
   finalizedStagedArtifactReference,
-} from "./nixos-shared-host-artifact-submit-request.ts";
+} from "./nixos-shared-host-artifact-submit-request";
 
 type Boundary = {
   requestedBy?: NixosSharedHostControlPlaneSubmission["requestedBy"];

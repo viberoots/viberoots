@@ -4,7 +4,7 @@ import { test } from "node:test";
 import {
   analyzeVerifyTimingFromLogText,
   formatVerifyTimingAnalysisText,
-} from "../../dev/analyze-verify-timing.ts";
+} from "../../dev/analyze-verify-timing";
 
 test("analyze-verify-timing: aggregates buckets, parses durations, and computes parallelism", () => {
   const log = [

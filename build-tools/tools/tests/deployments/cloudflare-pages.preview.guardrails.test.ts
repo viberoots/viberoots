@@ -5,8 +5,8 @@ import {
   cloudflarePagesPreviewFixture,
   cloudflarePagesDeploymentFixture,
   installCloudflarePagesTargets,
-} from "./cloudflare-pages.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "./cloudflare-pages.fixture";
+import { runInTemp } from "../lib/test-helpers";
 
 test("cloudflare-pages preview requires --source-run-id for shared/protected previews", async () => {
   await runInTemp("cloudflare-pages-preview-source-run-guard", async (tmp, $) => {

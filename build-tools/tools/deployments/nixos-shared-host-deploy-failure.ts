@@ -2,7 +2,7 @@
 import type {
   NixosSharedHostFailedStep,
   NixosSharedHostFinalOutcome,
-} from "./nixos-shared-host-records.ts";
+} from "./nixos-shared-host-records";
 
 const FAILED_STEPS = new Set<NixosSharedHostFailedStep>([
   "provision",

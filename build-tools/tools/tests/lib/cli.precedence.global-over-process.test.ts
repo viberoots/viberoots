@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { getFlagStr } from "../../lib/cli.ts";
+import { getFlagStr } from "../../lib/cli";
 
 test("cli helpers: precedence argv object over process.argv over default", () => {
   const oldGlobal = (globalThis as any).argv;

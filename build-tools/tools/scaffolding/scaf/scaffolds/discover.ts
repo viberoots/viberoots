@@ -2,7 +2,7 @@ import path from "node:path";
 
 import * as fsp from "node:fs/promises";
 
-import { walk } from "../walk.ts";
+import { walk } from "../walk";
 
 export type DiscoveredScaffold = {
   path: string;

@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostClientManifest } from "./nixos-shared-host-install-contract.ts";
-import { validateProtectedSharedServiceTransport } from "./deployment-service-transport-policy.ts";
+import type { NixosSharedHostClientManifest } from "./nixos-shared-host-install-contract";
+import { validateProtectedSharedServiceTransport } from "./deployment-service-transport-policy";
 
 export type NixosSharedHostServiceClientPlan = {
   mode: "control-plane-service";

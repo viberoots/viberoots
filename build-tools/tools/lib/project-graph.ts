@@ -1,4 +1,4 @@
-import { packagePathFromLabel } from "./labels.ts";
+import { packagePathFromLabel } from "./labels";
 
 type GraphNodeLike = {
   name?: string;

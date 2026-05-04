@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import { resolveCloudflarePagesArtifactInput } from "./cloudflare-pages-artifact-input.ts";
-import type { ResolvedCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit.ts";
-import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker.ts";
+import { resolveCloudflarePagesArtifactInput } from "./cloudflare-pages-artifact-input";
+import type { ResolvedCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit";
+import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker";
 
 export function vaultRuntimeForCloudflareDeployment(
   deployment: ResolvedCloudflarePagesServiceSubmitRequest["request"]["deployment"],

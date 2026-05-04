@@ -14,8 +14,8 @@ try {
   } catch {}
 }
 import path from "node:path";
-import { getFlagBool, getFlagStr, getPositionals } from "../lib/cli.ts";
-import { patchInvalidationStrategyForLang, patchPkgUsageNotes } from "../lib/lang-contracts.ts";
+import { getFlagBool, getFlagStr, getPositionals } from "../lib/cli";
+import { patchInvalidationStrategyForLang, patchPkgUsageNotes } from "../lib/lang-contracts";
 
 type SubcommandName = "start" | "apply" | "reset" | "session" | "remove" | "sync-required" | "help";
 

@@ -3,7 +3,7 @@ import {
   NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMISSION_SCHEMA,
   type NixosSharedHostControlPlaneSnapshot,
   type NixosSharedHostControlPlaneSubmission,
-} from "./nixos-shared-host-control-plane-contract.ts";
+} from "./nixos-shared-host-control-plane-contract";
 
 export function createNixosSharedHostControlPlaneSubmission(
   snapshot: NixosSharedHostControlPlaneSnapshot,

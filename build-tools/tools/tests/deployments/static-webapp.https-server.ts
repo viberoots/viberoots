@@ -4,11 +4,8 @@ import * as fsp from "node:fs/promises";
 import https from "node:https";
 import path from "node:path";
 import { promisify } from "node:util";
-import {
-  nixEvalTempDirOutsideWorkspace,
-  pinnedNixpkgsPackageExpr,
-} from "../../lib/pinned-nixpkgs.ts";
-import { pickFreePort } from "../scaffolding/lib/webapp-static-hmr.ts";
+import { nixEvalTempDirOutsideWorkspace, pinnedNixpkgsPackageExpr } from "../../lib/pinned-nixpkgs";
+import { pickFreePort } from "../scaffolding/lib/webapp-static-hmr";
 
 const execFileAsync = promisify(execFile);
 let cachedOpenSslPath: Promise<string> | null = null;

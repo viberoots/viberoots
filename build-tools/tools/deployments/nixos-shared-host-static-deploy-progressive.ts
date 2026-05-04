@@ -1,23 +1,23 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
-import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
-import type { NixosSharedHostSmokeConnectOverride } from "./nixos-shared-host-control-plane-contract.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
-import type { NixosSharedHostGateEvaluator } from "./nixos-shared-host-progressive-execution.ts";
-import { runNixosSharedHostProgressiveExecution } from "./nixos-shared-host-progressive-execution.ts";
-import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
-import { primaryNixosSharedHostComponent } from "./nixos-shared-host-components.ts";
-import { withFailedStep } from "./nixos-shared-host-deploy-failure.ts";
-import { publishNixosSharedHostArtifacts } from "./nixos-shared-host-publish-components.ts";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts";
+import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results";
+import type { NixosSharedHostSmokeConnectOverride } from "./nixos-shared-host-control-plane-contract";
+import type { NixosSharedHostDeployment } from "./contract";
+import type { DeploymentReleaseAction } from "./deployment-release-actions";
+import type { NixosSharedHostGateEvaluator } from "./nixos-shared-host-progressive-execution";
+import { runNixosSharedHostProgressiveExecution } from "./nixos-shared-host-progressive-execution";
+import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout";
+import { primaryNixosSharedHostComponent } from "./nixos-shared-host-components";
+import { withFailedStep } from "./nixos-shared-host-deploy-failure";
+import { publishNixosSharedHostArtifacts } from "./nixos-shared-host-publish-components";
 import {
   createNixosSharedHostDeployRecord,
   type NixosSharedHostDeployRecord,
   writeNixosSharedHostDeployRecord,
-} from "./nixos-shared-host-records.ts";
-import { staticDeployRecordFields } from "./nixos-shared-host-static-deploy-records.ts";
-import { writeNixosSharedHostReplayComponentResults } from "./nixos-shared-host-replay.ts";
-import type { NixosSharedHostConfig } from "./nixos-shared-host.ts";
+} from "./nixos-shared-host-records";
+import { staticDeployRecordFields } from "./nixos-shared-host-static-deploy-records";
+import { writeNixosSharedHostReplayComponentResults } from "./nixos-shared-host-replay";
+import type { NixosSharedHostConfig } from "./nixos-shared-host";
 
 type StaticDeployProgressiveOpts = {
   deployment: NixosSharedHostDeployment;
@@ -149,11 +149,11 @@ export async function failStaticDeployWithRecord(opts: {
       progressiveRollout,
     );
   }
-  const failedStep = (await import("./nixos-shared-host-deploy-failure.ts")).failedStepFromError(
+  const failedStep = (await import("./nixos-shared-host-deploy-failure")).failedStepFromError(
     opts.error,
   );
   const finalOutcome = (
-    await import("./nixos-shared-host-deploy-failure.ts")
+    await import("./nixos-shared-host-deploy-failure")
   ).finalOutcomeForFailedStep(failedStep);
   const message = opts.error instanceof Error ? opts.error.message : String(opts.error);
   const record = createNixosSharedHostDeployRecord(opts.deployment, {

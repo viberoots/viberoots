@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
-import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
+import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission";
 import type {
   CloudflarePagesControlPlaneWorkerAuthority,
   CloudflarePagesPublishMode,
-} from "./cloudflare-pages-control-plane-contract.ts";
-import type { CloudflarePagesPreviewIdentitySelector } from "./cloudflare-pages-preview.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
-import type { CloudflarePagesOperationKind } from "./cloudflare-pages-records.ts";
-import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts.ts";
+} from "./cloudflare-pages-control-plane-contract";
+import type { CloudflarePagesPreviewIdentitySelector } from "./cloudflare-pages-preview";
+import type { CloudflarePagesDeployment } from "./contract";
+import type { CloudflarePagesOperationKind } from "./cloudflare-pages-records";
+import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts";
 
 export type CloudflarePagesStaticDeployStep = "publish" | "smoke";
 

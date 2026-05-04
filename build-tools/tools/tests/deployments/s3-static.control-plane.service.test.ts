@@ -3,23 +3,23 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { providerCapabilityFor } from "../../deployments/deployment-provider-capabilities.ts";
-import { reviewedRuntimeContractFor } from "../../deployments/provider-capabilities/runtime-contract.ts";
-import { assertReviewedRuntimeParity } from "../../deployments/provider-capabilities/runtime-parity.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
+import { providerCapabilityFor } from "../../deployments/deployment-provider-capabilities";
+import { reviewedRuntimeContractFor } from "../../deployments/provider-capabilities/runtime-contract";
+import { assertReviewedRuntimeParity } from "../../deployments/provider-capabilities/runtime-parity";
+import { runInTemp } from "../lib/test-helpers";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import {
   startControlPlaneHarness,
   withEnvOverrides,
-} from "./nixos-shared-host.control-plane.helpers.ts";
+} from "./nixos-shared-host.control-plane.helpers";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostLanePolicyFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { installHarnessClientProfile } from "./nixos-shared-host.remote-exec.install.helpers.ts";
-import { installFakeS3StaticAwsCli } from "./s3-static.fake-aws.ts";
-import { installS3StaticTargets, s3StaticDeploymentFixture } from "./s3-static.fixture.ts";
-import { startS3StaticPublicServer } from "./s3-static.public-server.ts";
+} from "./nixos-shared-host.fixture";
+import { installHarnessClientProfile } from "./nixos-shared-host.remote-exec.install.helpers";
+import { installFakeS3StaticAwsCli } from "./s3-static.fake-aws";
+import { installS3StaticTargets, s3StaticDeploymentFixture } from "./s3-static.fixture";
+import { startS3StaticPublicServer } from "./s3-static.public-server";
 
 async function writeArtifact(root: string, html: string) {
   await fsp.mkdir(root, { recursive: true });

@@ -2,7 +2,7 @@
 import type {
   DeploymentControlPlaneRunActionRejectionCode,
   DeploymentControlPlaneSubmitRejectionCode,
-} from "./deployment-control-plane-contract.ts";
+} from "./deployment-control-plane-contract";
 
 export type DeploymentAdmissionFailureCode =
   | "approval_required"

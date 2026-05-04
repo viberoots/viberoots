@@ -116,12 +116,12 @@ const HEAVY_RUNTIME_EXPECTATIONS: InstallGuardrailExpectation[] = [
 const DEP_EDIT_EXPECTATIONS: InstallGuardrailExpectation[] = [
   {
     file: "build-tools/tools/tests/scaffolding/webapp-static.dev-hmr.local-ts-dep.test.ts",
-    required: ['from "./lib/webapp-local-ts-dep.ts"'],
+    required: ['from "./lib/webapp-local-ts-dep"'],
     forbidden: [],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-static-pwa.dev-hmr.local-ts-dep.test.ts",
-    required: ['from "./lib/webapp-local-ts-dep.ts"'],
+    required: ['from "./lib/webapp-local-ts-dep"'],
     forbidden: [],
   },
   {

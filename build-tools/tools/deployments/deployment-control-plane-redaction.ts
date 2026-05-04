@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint.ts";
+import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint";
 
 export type DeploymentOperatorPayloadClass =
   | "display_safe"

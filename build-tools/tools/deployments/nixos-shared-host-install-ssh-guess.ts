@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { guessFromSshConfig } from "./nixos-shared-host-install-ssh-config.ts";
+import { guessFromSshConfig } from "./nixos-shared-host-install-ssh-config";
 
 type InstallClientSshAuthInput = {
   destination: string;

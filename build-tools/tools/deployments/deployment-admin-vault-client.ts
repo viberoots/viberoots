@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentAdminVaultDesiredState } from "./deployment-admin-vault.ts";
+import type { DeploymentAdminVaultDesiredState } from "./deployment-admin-vault";
 
 export type DeploymentAdminVaultLiveState = {
   config?: Record<string, unknown> | undefined;

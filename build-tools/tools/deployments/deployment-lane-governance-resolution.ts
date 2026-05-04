@@ -2,9 +2,9 @@
 import {
   evaluateLaneGovernanceFact,
   type DeploymentLaneGovernanceFact,
-} from "./deployment-admission-governance.ts";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
-import type { DeploymentLanePolicy } from "./deployment-policy.ts";
+} from "./deployment-admission-governance";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
+import type { DeploymentLanePolicy } from "./deployment-policy";
 
 export type DeploymentLaneGovernanceTarget = {
   lanePolicyRef: string;

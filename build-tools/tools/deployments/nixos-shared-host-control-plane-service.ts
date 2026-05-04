@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { getFlagStr } from "../lib/cli.ts";
-import { findRepoRoot } from "../lib/repo.ts";
-import { startNixosSharedHostControlPlaneServer } from "./nixos-shared-host-control-plane-server.ts";
+import { getFlagStr } from "../lib/cli";
+import { findRepoRoot } from "../lib/repo";
+import { startNixosSharedHostControlPlaneServer } from "./nixos-shared-host-control-plane-server";
 
 export function resolveControlPlaneServiceToken(opts: {
   tokenFlag: string;

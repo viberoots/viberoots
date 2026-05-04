@@ -6,7 +6,7 @@ import { test } from "node:test";
 import {
   CANONICAL_TS_TEMPLATE_IDS,
   assertCanonicalTemplateIdsUnique,
-} from "../../scaffolding/scaf/templates/taxonomy.ts";
+} from "../../scaffolding/scaf/templates/taxonomy";
 
 const EXPECTED_TS_TEMPLATE_IDS = [
   "ts/lib",

@@ -1,8 +1,8 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getImporterRootsContract } from "./importer-roots.ts";
-import { normalizeTargetLabel } from "./labels.ts";
-import { toPosixPath, uniqSorted } from "./posix-path.ts";
+import { getImporterRootsContract } from "./importer-roots";
+import { normalizeTargetLabel } from "./labels";
+import { toPosixPath, uniqSorted } from "./posix-path";
 
 export type WorkspaceMap = Record<string, string>;
 

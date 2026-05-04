@@ -1,19 +1,19 @@
 #!/usr/bin/env zx-wrapper
-import { providerTargetIdentityFor } from "../../deployments/contract.ts";
+import { providerTargetIdentityFor } from "../../deployments/contract";
 import {
   artifactBindingEnvelope,
   createArtifactBindingProof,
   expectedNixosSharedHostArtifactIdentities,
-} from "../../deployments/deployment-artifact-binding.ts";
-import { deploymentServicePrincipalForToken } from "../../deployments/deployment-artifact-challenges.ts";
-import type { DeploymentControlPlaneRole } from "../../deployments/deployment-control-plane-contract.ts";
+} from "../../deployments/deployment-artifact-binding";
+import { deploymentServicePrincipalForToken } from "../../deployments/deployment-artifact-challenges";
+import type { DeploymentControlPlaneRole } from "../../deployments/deployment-control-plane-contract";
 import {
   DEPLOYMENT_AUTH_SESSION_RECORD_SCHEMA,
   type DeploymentAuthSessionRecord,
-} from "../../deployments/deployment-auth-session-types.ts";
-import { writeDeploymentAuthSession } from "../../deployments/deployment-auth-session-store.ts";
-import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+} from "../../deployments/deployment-auth-session-types";
+import { writeDeploymentAuthSession } from "../../deployments/deployment-auth-session-store";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 export function authRequiredDeployment(overrides = {}) {
   return {

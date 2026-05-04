@@ -1,5 +1,5 @@
-import type { ScafFlags } from "./types.ts";
-import { parseFlagMap } from "../../lib/cli.ts";
+import type { ScafFlags } from "./types";
+import { parseFlagMap } from "../../lib/cli";
 
 export function parseScafArgv(raw: string[]): { positionals: string[]; flags: ScafFlags } {
   const { positionals, flags } = parseFlagMap(raw);

@@ -1,20 +1,20 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagStr } from "../lib/cli.ts";
-import { repoRoot } from "../lib/repo.ts";
+import { getFlagStr } from "../lib/cli";
+import { repoRoot } from "../lib/repo";
 import {
   computeFingerprintMap,
   copyAtomically,
   mapsEqual,
   runBuildStep,
   type Fingerprint,
-} from "./watch-wasm-producer-ops.ts";
+} from "./watch-wasm-producer-ops";
 import {
   normalizeSubscription,
   type CoordinatorLease,
   type CoordinatorTask,
-} from "./wasm-watch-coordinator-types.ts";
+} from "./wasm-watch-coordinator-types";
 
 function sorted(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));

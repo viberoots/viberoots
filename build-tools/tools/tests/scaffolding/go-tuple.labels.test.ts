@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { buckCommandEnv, isBuckDaemonInitTransient } from "../../lib/buck-command-env.ts";
+import { buckCommandEnv, isBuckDaemonInitTransient } from "../../lib/buck-command-env";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("nix_go_library stamps gotags and goenv tuple labels deterministically", async () => {

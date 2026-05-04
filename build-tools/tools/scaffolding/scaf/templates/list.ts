@@ -1,4 +1,4 @@
-import type { TemplateMetaRow } from "./meta.ts";
+import type { TemplateMetaRow } from "./meta";
 
 export function printTemplateList(metas: TemplateMetaRow[], json: boolean) {
   if (json) {

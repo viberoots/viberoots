@@ -1,5 +1,5 @@
 import path from "node:path";
-import { runNodeWithZx } from "./node-run.ts";
+import { runNodeWithZx } from "./node-run";
 
 const ZX_INIT = path.join("build-tools", "tools", "dev", "zx-init.mjs");
 const ENFORCE_SCRIPT = path.join("build-tools", "tools", "buck", "enforce-node-deps.ts");

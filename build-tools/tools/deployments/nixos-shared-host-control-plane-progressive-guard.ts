@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
-import { ensureNoActiveProgressiveRunInBackend } from "./nixos-shared-host-control-plane-backend-submit.ts";
-import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-contract.ts";
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db.ts";
-import { progressiveRolloutIsActive } from "./nixos-shared-host-progressive-rollout.ts";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
+import { ensureNoActiveProgressiveRunInBackend } from "./nixos-shared-host-control-plane-backend-submit";
+import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-contract";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db";
+import { progressiveRolloutIsActive } from "./nixos-shared-host-progressive-rollout";
 
 function submissionsDir(recordsRoot: string) {
   return path.join(path.resolve(recordsRoot), "control-plane", "submissions");

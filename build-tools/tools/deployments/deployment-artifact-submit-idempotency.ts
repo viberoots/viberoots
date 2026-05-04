@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
-import { DeploymentIdempotencyConflictError } from "./deployment-control-plane-errors.ts";
+import { DeploymentIdempotencyConflictError } from "./deployment-control-plane-errors";
 import {
   decodeBackendJson,
   withBackendClient,
   type BackendQueryable,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend-db.ts";
-import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-contract.ts";
+} from "./nixos-shared-host-control-plane-backend-db";
+import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-contract";
 
 export function keyHash(value: string): string {
   return crypto.createHash("sha256").update(value).digest("hex");

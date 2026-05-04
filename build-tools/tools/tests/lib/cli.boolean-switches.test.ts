@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { getFlagBool } from "../../lib/cli.ts";
+import { getFlagBool } from "../../lib/cli";
 
 test("cli helpers: boolean switches and equals-form booleans", () => {
   const oldGlobal = (globalThis as any).argv;

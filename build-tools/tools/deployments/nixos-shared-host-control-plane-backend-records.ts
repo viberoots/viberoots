@@ -3,8 +3,8 @@ import {
   decodeBackendJson,
   queryBackend,
   readJson,
-} from "./nixos-shared-host-control-plane-backend-db.ts";
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db.ts";
+} from "./nixos-shared-host-control-plane-backend-db";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db";
 
 type DeployRecordDoc = {
   deployRunId: string;

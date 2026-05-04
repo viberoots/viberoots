@@ -8,7 +8,7 @@ import {
   readTemplateManifest,
   renderGeneratedTaxonomyTs,
   renderTemplateTaxonomyAdapterBzl,
-} from "../../scaffolding/template-manifest.ts";
+} from "../../scaffolding/template-manifest";
 
 test("parity: generated taxonomy adapter is fresh from canonical manifest", async () => {
   const manifest = await readTemplateManifest();

@@ -1,9 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import {
-  discoverOidc,
-  postFormJson,
-  validateOidcToken,
-} from "./deployment-credential-source-oidc.ts";
+import { discoverOidc, postFormJson, validateOidcToken } from "./deployment-credential-source-oidc";
 
 export type DeviceLoginOptions = {
   issuer: string;

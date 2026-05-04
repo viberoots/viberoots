@@ -1,11 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import type { Node } from "../types.ts";
-import {
-  findNearestPnpmLockForPackage,
-  findNearestUvLockForPackage,
-} from "../../../lib/importers.ts";
-import { parseLockfileLabel } from "../../../lib/labels.ts";
-import { lockfileLabels } from "./importer-lockfile-labels.ts";
+import type { Node } from "../types";
+import { findNearestPnpmLockForPackage, findNearestUvLockForPackage } from "../../../lib/importers";
+import { parseLockfileLabel } from "../../../lib/labels";
+import { lockfileLabels } from "./importer-lockfile-labels";
 
 export type ImporterScopedAdapterLanguage = "node" | "python";
 

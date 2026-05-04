@@ -1,22 +1,22 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend.ts";
-import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract.ts";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
+import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract";
 import {
   KUBERNETES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
   queueKubernetesControlPlaneSubmission,
   type KubernetesControlPlaneSubmitRequest,
-} from "./kubernetes-control-plane.ts";
+} from "./kubernetes-control-plane";
 import {
   S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
   queueS3StaticControlPlaneSubmission,
   type S3StaticControlPlaneSubmitRequest,
-} from "./s3-static-control-plane.ts";
+} from "./s3-static-control-plane";
 import {
   VERCEL_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
   queueVercelControlPlaneSubmission,
   type VercelControlPlaneSubmitRequest,
-} from "./vercel-control-plane.ts";
-import { assertNoProtectedSharedClientIdentityFields } from "./deployment-service-client-contract.ts";
+} from "./vercel-control-plane";
+import { assertNoProtectedSharedClientIdentityFields } from "./deployment-service-client-contract";
 
 export type DeploymentProviderServiceSubmitRequest =
   | S3StaticControlPlaneSubmitRequest

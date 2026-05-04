@@ -3,8 +3,8 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { withScopedEnv } from "../lib/test-helpers/scoped-env.ts";
-import { ensureGraph } from "../../buck/glue-run.ts";
+import { withScopedEnv } from "../lib/test-helpers/scoped-env";
+import { ensureGraph } from "../../buck/glue-run";
 
 test("ensureGraph writes once; second call is a no-op", async () => {
   await runInTemp("ensure-graph-idempotent", async (tmp) => {

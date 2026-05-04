@@ -14,7 +14,7 @@ test("sync-providers exports renamed helpers and they behave as expected (dry-ru
       "#!/usr/bin/env zx-wrapper",
       "import fs from 'fs-extra';",
       "globalThis.argv = { emitIndex: false, 'emit-index': false };",
-      "const mod = await import('../buck/sync-providers.ts');",
+      "const mod = await import('../buck/sync-providers');",
       "const a = mod.targetLangRequested('');",
       "const b = mod.targetLangRequested('node');",
       "const c = mod.emitIndexRequested();",

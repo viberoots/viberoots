@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
-import { progressiveRolloutIsActive } from "./nixos-shared-host-progressive-rollout.ts";
-import { decodeBackendJson, queryBackend } from "./nixos-shared-host-control-plane-backend-db.ts";
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db.ts";
+import { progressiveRolloutIsActive } from "./nixos-shared-host-progressive-rollout";
+import { decodeBackendJson, queryBackend } from "./nixos-shared-host-control-plane-backend-db";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db";
 import type {
   NixosSharedHostControlPlaneSnapshot,
   NixosSharedHostControlPlaneSubmission,
-} from "./nixos-shared-host-control-plane-contract.ts";
-import { writeBackendSubmissionDoc } from "./nixos-shared-host-control-plane-backend-state.ts";
+} from "./nixos-shared-host-control-plane-contract";
+import { writeBackendSubmissionDoc } from "./nixos-shared-host-control-plane-backend-state";
 
 type SupersedableRow = {
   submission_path?: string;

@@ -2,9 +2,9 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { sanitizeName } from "../lib/sanitize.ts";
-import { throwLockAbort } from "./deployment-control-plane-lock-abort.ts";
-import { assertNoBreakGlassFreeze } from "./nixos-shared-host-break-glass-freeze.ts";
+import { sanitizeName } from "../lib/sanitize";
+import { throwLockAbort } from "./deployment-control-plane-lock-abort";
+import { assertNoBreakGlassFreeze } from "./nixos-shared-host-break-glass-freeze";
 
 type LockOwner = {
   pid: number;

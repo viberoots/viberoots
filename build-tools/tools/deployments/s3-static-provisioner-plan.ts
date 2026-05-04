@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { S3StaticDeployment } from "./contract.ts";
-import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint.ts";
+import type { S3StaticDeployment } from "./contract";
+import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint";
 
 export const S3_STATIC_PROVISIONER_PLAN_SCHEMA = "s3-static-provisioner-plan@1";
 

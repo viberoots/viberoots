@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import type { CloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-contract.ts";
-import { createCloudflarePagesDeployRunId } from "./cloudflare-pages-records.ts";
+import type { CloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-contract";
+import { createCloudflarePagesDeployRunId } from "./cloudflare-pages-records";
 import {
   writeTransitionRecord,
   type CloudflarePagesTargetTransitionRecord,
-} from "./cloudflare-pages-target-transition-records.ts";
-import type { CloudflareBackendSubmissionLike } from "./cloudflare-pages-control-plane-backend-status.ts";
+} from "./cloudflare-pages-target-transition-records";
+import type { CloudflareBackendSubmissionLike } from "./cloudflare-pages-control-plane-backend-status";
 
 export async function executeCloudflarePagesBackendTargetTransition(opts: {
   recordsRoot: string;

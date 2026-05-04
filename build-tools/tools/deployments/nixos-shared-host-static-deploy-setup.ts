@@ -1,19 +1,16 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
-import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
-import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
-import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
-import { primaryNixosSharedHostComponent } from "./nixos-shared-host-components.ts";
-import { withFailedStep } from "./nixos-shared-host-deploy-failure.ts";
-import {
-  readNixosSharedHostPlatformStateOrEmpty,
-  writeJsonDocument,
-} from "./nixos-shared-host-io.ts";
-import { applyNixosSharedHostScopedDeployments } from "./nixos-shared-host-platform.ts";
-import { captureStaticDeployReplaySnapshot } from "./nixos-shared-host-static-deploy-records.ts";
-import { renderNixosSharedHostConfig } from "./nixos-shared-host.ts";
+import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts";
+import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts";
+import type { NixosSharedHostDeployment } from "./contract";
+import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout";
+import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan";
+import { primaryNixosSharedHostComponent } from "./nixos-shared-host-components";
+import { withFailedStep } from "./nixos-shared-host-deploy-failure";
+import { readNixosSharedHostPlatformStateOrEmpty, writeJsonDocument } from "./nixos-shared-host-io";
+import { applyNixosSharedHostScopedDeployments } from "./nixos-shared-host-platform";
+import { captureStaticDeployReplaySnapshot } from "./nixos-shared-host-static-deploy-records";
+import { renderNixosSharedHostConfig } from "./nixos-shared-host";
 
 export async function prepareNixosSharedHostStaticDeploy(opts: {
   deployment: NixosSharedHostDeployment;

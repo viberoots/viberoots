@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { formatDiskUsageFromDfOutput } from "../../dev/tail-log/status-helpers.ts";
+import { formatDiskUsageFromDfOutput } from "../../dev/tail-log/status-helpers";
 
 test("tail-log status helpers: parses portable df -kP output", () => {
   const out = [

@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { packagePathFromLabel } from "../lib/labels.ts";
-import type { S3StaticDeployment } from "./contract.ts";
-import { parseJsoncObject } from "./cloudflare-pages-config.ts";
-import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint.ts";
+import { packagePathFromLabel } from "../lib/labels";
+import type { S3StaticDeployment } from "./contract";
+import { parseJsoncObject } from "./cloudflare-pages-config";
+import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint";
 
 export function resolveS3StaticPublisherConfigPath(
   workspaceRoot: string,

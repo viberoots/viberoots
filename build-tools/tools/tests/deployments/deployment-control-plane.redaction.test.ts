@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
-import { createCloudflarePagesDeployRecord } from "../../deployments/cloudflare-pages-records.ts";
-import { readDeploymentControlPlaneObservability } from "../../deployments/deployment-control-plane-observability.ts";
-import { createNixosSharedHostDeployRecord } from "../../deployments/nixos-shared-host-records.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
+import { createCloudflarePagesDeployRecord } from "../../deployments/cloudflare-pages-records";
+import { readDeploymentControlPlaneObservability } from "../../deployments/deployment-control-plane-observability";
+import { createNixosSharedHostDeployRecord } from "../../deployments/nixos-shared-host-records";
+import { runInTemp } from "../lib/test-helpers";
 
 async function writeJson(filePath: string, value: unknown) {
   await fsp.mkdir(path.dirname(filePath), { recursive: true });

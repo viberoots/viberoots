@@ -3,7 +3,7 @@ import fsSync from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import type { ScaffoldingLanguage } from "./lang-contracts";
-import { findImporterLockfiles } from "./importers.ts";
+import { findImporterLockfiles } from "./importers";
 
 type ManifestLang = Partial<ScaffoldingLanguage> & { id: string };
 type ManifestObj =

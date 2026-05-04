@@ -1,4 +1,4 @@
-import { parseLineFromBuckLogForMatching } from "../lib/verify-log-status/parsing.ts";
+import { parseLineFromBuckLogForMatching } from "../lib/verify-log-status/parsing";
 
 type TimingBucketAgg = { msTotal: number; count: number };
 

@@ -4,11 +4,11 @@ import path from "node:path";
 import {
   OPENTOFU_STACK_PROVISIONER,
   type OpenTofuProvisionerMetadata,
-} from "../../deployments/opentofu-stack.ts";
+} from "../../deployments/opentofu-stack";
 import type {
   OpenTofuApplyAdapter,
   OpenTofuApplyAdapterResult,
-} from "../../deployments/opentofu-apply.ts";
+} from "../../deployments/opentofu-apply";
 
 export const INTEGRATION_SECRET_VALUE = "vault:secret/opentofu/integration";
 

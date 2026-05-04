@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { normalizeTargetLabel, packagePathFromLabel } from "../../../lib/labels.ts";
-import type { Node } from "../types.ts";
+import { normalizeTargetLabel, packagePathFromLabel } from "../../../lib/labels";
+import type { Node } from "../types";
 
 function uniqSorted(xs: string[]): string[] {
   return Array.from(new Set((xs || []).filter(Boolean))).sort((a, b) => a.localeCompare(b));

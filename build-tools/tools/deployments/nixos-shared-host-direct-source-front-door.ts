@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostDeployment } from "./contract.ts";
+import type { NixosSharedHostDeployment } from "./contract";
 import type {
   NixosSharedHostControlPlanePaths,
   NixosSharedHostSmokeConnectOverride,
-} from "./nixos-shared-host-control-plane-contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { submitNixosSharedHostPublishOnlyRun } from "./nixos-shared-host-publish-only.ts";
-import { submitNixosSharedHostProvisionOnlyRun } from "./nixos-shared-host-provision-only.ts";
+} from "./nixos-shared-host-control-plane-contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { submitNixosSharedHostPublishOnlyRun } from "./nixos-shared-host-publish-only";
+import { submitNixosSharedHostProvisionOnlyRun } from "./nixos-shared-host-provision-only";
 
 type SharedSourceFrontDoorOpts = {
   workspaceRoot: string;

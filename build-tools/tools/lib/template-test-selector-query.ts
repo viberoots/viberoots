@@ -4,7 +4,7 @@ import {
   buckCommandEnv,
   isBuckDaemonInitTransient,
   resolveNestedBuckIsolation,
-} from "./buck-command-env.ts";
+} from "./buck-command-env";
 
 const CONFIG_SUFFIX = /\s+\([^)]*\)$/;
 

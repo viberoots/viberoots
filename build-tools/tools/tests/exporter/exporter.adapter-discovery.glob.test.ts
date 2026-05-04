@@ -22,7 +22,7 @@ test("exporter discovers adapters by glob and ignores non-existent", async () =>
     // Create a simple adapter file adapter.ts exporting { adapter }
     const toy = [
       "#!/usr/bin/env zx-wrapper",
-      "import type { Adapter } from '../types.ts';",
+      "import type { Adapter } from '../types';",
       "export const adapter: Adapter = {",
       "  name: 'toy',",
       "  isNode(n: any) { return Array.isArray(n.labels) && n.labels.includes('lang:toy'); },",

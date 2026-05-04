@@ -4,8 +4,8 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { test } from "node:test";
-import { resolveProjectClosureSelection } from "../../lib/project-closure-selector.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { resolveProjectClosureSelection } from "../../lib/project-closure-selector";
+import { runInTemp } from "../lib/test-helpers";
 
 type GraphNode = {
   name: string;

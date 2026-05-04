@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buckCommandEnv, resolveNestedBuckIsolation } from "../../lib/buck-command-env.ts";
+import { buckCommandEnv, resolveNestedBuckIsolation } from "../../lib/buck-command-env";
 import {
   TEMPLATE_SAFETY_FLOOR_TARGETS,
   resolveTemplateTestSelection,
-} from "../../lib/template-test-selector.ts";
+} from "../../lib/template-test-selector";
 
 const CONFIG_SUFFIX = /\s+\([^)]*\)$/;
 const { isolationDir: templateSelectorIsolation, ownsIsolation: ownsTemplateSelectorIsolation } =

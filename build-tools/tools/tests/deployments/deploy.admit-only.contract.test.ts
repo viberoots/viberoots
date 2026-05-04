@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture";
+import { runInTemp } from "../lib/test-helpers";
 
 test("deploy --admit-only prints scoped admission evidence without deploying", async () => {
   await runInTemp("deploy-admit-only-evidence", async (tmp, $) => {

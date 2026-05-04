@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { runVerify } from "./verify/run-verify.ts";
+import { runVerify } from "./verify/run-verify";
 
 runVerify().catch((e) => {
   console.error(String((e as any)?.stack || e));

@@ -2,9 +2,9 @@ import path from "node:path";
 import process from "node:process";
 import * as fsp from "node:fs/promises";
 import "zx/globals";
-import { collectChangedPaths } from "../../lib/build-system-test-scope.ts";
-import { runNodeWithZx } from "../../lib/node-run.ts";
-import { resolveToolPath } from "../../lib/tool-paths.ts";
+import { collectChangedPaths } from "../../lib/build-system-test-scope";
+import { runNodeWithZx } from "../../lib/node-run";
+import { resolveToolPath } from "../../lib/tool-paths";
 
 async function runVerifyFileSizePreflight(root: string, zxInitPath: string): Promise<void> {
   const script = path.resolve(root, "build-tools/tools/dev/file-size-lint.ts");

@@ -1,18 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { promotionCompatibilityErrors } from "../../deployments/deployment-promotion-compatibility.ts";
-import { appStoreConnectDeploymentFixture } from "./app-store-connect.fixture.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
-import {
-  sourceFixture,
-  sourceForDeployment,
-} from "./deployment-promotion-compatibility.helpers.ts";
-import { googlePlayDeploymentFixture } from "./google-play.fixture.ts";
+import { promotionCompatibilityErrors } from "../../deployments/deployment-promotion-compatibility";
+import { appStoreConnectDeploymentFixture } from "./app-store-connect.fixture";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
+import { sourceFixture, sourceForDeployment } from "./deployment-promotion-compatibility.helpers";
+import { googlePlayDeploymentFixture } from "./google-play.fixture";
 import {
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 
 test("promotion compatibility rejects provider and publisher drift", () => {
   const target = nixosSharedHostDeploymentFixture({

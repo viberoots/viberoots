@@ -7,8 +7,8 @@ test("provider-names uses shortHash from providers.ts (no local duplicate)", asy
   const src = await readFile("build-tools/tools/lib/provider-names.ts", "utf8");
   assert.match(
     src,
-    /from\s+["']\.\/short-hash\.ts["']/,
-    "expected provider-names.ts to import from ./short-hash.ts",
+    /from\s+["']\.\/short-hash["']/,
+    "expected provider-names.ts to import from ./short-hash",
   );
   assert.ok(
     !/function\s+shortHash\s*\(/.test(src),

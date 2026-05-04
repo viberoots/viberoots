@@ -1,24 +1,24 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagList, getFlagStr, hasFlag } from "../lib/cli.ts";
-import type { DeploymentTarget } from "./contract.ts";
+import { getFlagList, getFlagStr, hasFlag } from "../lib/cli";
+import type { DeploymentTarget } from "./contract";
 import {
   authorizeDeploymentKeycloakAdmin,
   reviewedDeployAdminGroupsByCapability,
   type DeploymentKeycloakAdminRole,
-} from "./deployment-admin-keycloak-auth.ts";
-import { reviewedPrincipalEmailRequirementMessage } from "./deployment-auth-session-reviewed-identity.ts";
+} from "./deployment-admin-keycloak-auth";
+import { reviewedPrincipalEmailRequirementMessage } from "./deployment-auth-session-reviewed-identity";
 import {
   reviewedRemoteKeycloakGrantUserCommand,
   reviewedRemoteKeycloakSyncCommand,
   type DeploymentAuthAction,
-} from "./deployment-auth-groups.ts";
+} from "./deployment-auth-groups";
 import {
   createAndWaitForServiceOwnedAuthSession,
   shouldUseServiceOwnedInteractiveAuth,
-} from "./deployment-service-auth-client.ts";
-import { readDeploymentAuthSessionViaService } from "./nixos-shared-host-control-plane-client.ts";
-import type { NixosSharedHostRemotePlan } from "./nixos-shared-host-remote-target.ts";
-import { requireServiceTokenFromEnv } from "./nixos-shared-host-service-client-config.ts";
+} from "./deployment-service-auth-client";
+import { readDeploymentAuthSessionViaService } from "./nixos-shared-host-control-plane-client";
+import type { NixosSharedHostRemotePlan } from "./nixos-shared-host-remote-target";
+import { requireServiceTokenFromEnv } from "./nixos-shared-host-service-client-config";
 
 type InputSource = "explicit" | "session";
 

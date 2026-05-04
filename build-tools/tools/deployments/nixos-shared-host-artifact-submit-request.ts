@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract.ts";
+import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract";
 
 export function finalizedStagedArtifactReference(
   request: Pick<

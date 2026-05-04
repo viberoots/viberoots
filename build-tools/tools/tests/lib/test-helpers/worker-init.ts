@@ -1,4 +1,4 @@
-import "../../../lib/ensure-zx-globals.ts";
+import "../../../lib/ensure-zx-globals";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 

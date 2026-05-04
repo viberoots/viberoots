@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import type { Adapter, Batch, Node } from "../types.ts";
-import { classificationRegistryEntry } from "./classification-registry.ts";
-import { validateLanguageClassification } from "./helpers.ts";
+import type { Adapter, Batch, Node } from "../types";
+import { classificationRegistryEntry } from "./classification-registry";
+import { validateLanguageClassification } from "./helpers";
 
 function isCppNode(n: Node): boolean {
   if ((n.rule_type || "").startsWith("cxx_")) return true;

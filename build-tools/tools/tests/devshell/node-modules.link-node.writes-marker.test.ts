@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runNodeWithZx } from "../../lib/node-run.ts";
+import { runNodeWithZx } from "../../lib/node-run";
 import { runInTemp } from "../lib/test-helpers/run-in-temp";
 
 async function writeExecutable(file: string, data: string) {

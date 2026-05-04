@@ -3,11 +3,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import "zx/globals";
-import { writeIfChanged } from "../../lib/fs-helpers.ts";
-import { runManagedCommand } from "../../lib/managed-command.ts";
-import { shouldStageSeed, stageSeedStore } from "./seed-staging.ts";
-import { isNonBuildSystemOnlyVerifyTargets } from "./target-scope.ts";
-import { pidAlive } from "./seed-utils.ts";
+import { writeIfChanged } from "../../lib/fs-helpers";
+import { runManagedCommand } from "../../lib/managed-command";
+import { shouldStageSeed, stageSeedStore } from "./seed-staging";
+import { isNonBuildSystemOnlyVerifyTargets } from "./target-scope";
+import { pidAlive } from "./seed-utils";
 
 type SeedInfo = {
   seedKey: string;

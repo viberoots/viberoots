@@ -3,18 +3,18 @@ import path from "node:path";
 import {
   resolvePromotionKubernetesAdmittedContext,
   resolveSourceRunKubernetesAdmittedContext,
-} from "./kubernetes-admission.ts";
-import { prepareKubernetesPublisherConfig } from "./kubernetes-config.ts";
-import type { KubernetesDeployment } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
-import { publishKubernetesComponent } from "./kubernetes-publisher.ts";
-import { createKubernetesDeployRecord, writeKubernetesDeployRecord } from "./kubernetes-records.ts";
-import { writeKubernetesReplaySnapshot } from "./kubernetes-replay.ts";
-import { smokeKubernetesRelease } from "./kubernetes-smoke.ts";
+} from "./kubernetes-admission";
+import { prepareKubernetesPublisherConfig } from "./kubernetes-config";
+import type { KubernetesDeployment } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
+import { publishKubernetesComponent } from "./kubernetes-publisher";
+import { createKubernetesDeployRecord, writeKubernetesDeployRecord } from "./kubernetes-records";
+import { writeKubernetesReplaySnapshot } from "./kubernetes-replay";
+import { smokeKubernetesRelease } from "./kubernetes-smoke";
 // prettier-ignore
-import { publisherCredentialFields, resolveKubernetesPublishCredentialsForDeployment, type KubernetesPublishCredentialsHooks } from "./kubernetes-publish-credentials-orchestration.ts";
+import { publisherCredentialFields, resolveKubernetesPublishCredentialsForDeployment, type KubernetesPublishCredentialsHooks } from "./kubernetes-publish-credentials-orchestration";
 
 type SourceRecordLike = { deployRunId: string; deploymentId: string; admittedContext?: any };
 

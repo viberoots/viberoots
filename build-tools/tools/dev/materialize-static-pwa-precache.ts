@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getFlagList, getFlagStr } from "../lib/cli.ts";
+import { getFlagList, getFlagStr } from "../lib/cli";
 import {
   ensureDistStaticPwaPrecache,
   STATIC_PWA_CACHE_VERSION_PLACEHOLDER,
   STATIC_PWA_PRECACHED_ASSETS_PLACEHOLDER,
-} from "../lib/static-pwa-precache.ts";
+} from "../lib/static-pwa-precache";
 
 const clientDir = getFlagStr("client-dir").trim();
 if (clientDir === "") {

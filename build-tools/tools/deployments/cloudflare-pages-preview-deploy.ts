@@ -1,23 +1,23 @@
 #!/usr/bin/env zx-wrapper
-import { resolveSourceRunCloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
+import { resolveSourceRunCloudflarePagesAdmittedContext } from "./cloudflare-pages-admission";
 import {
   CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA,
   type CloudflarePagesControlPlaneSnapshot,
   type CloudflarePagesSmokeConnectOverride,
-} from "./cloudflare-pages-control-plane-contract.ts";
+} from "./cloudflare-pages-control-plane-contract";
 import {
   createCloudflarePagesSubmissionId,
   withCloudflarePagesControlPlaneRun,
-} from "./cloudflare-pages-control-plane-shared.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
+} from "./cloudflare-pages-control-plane-shared";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
 import {
   deriveCloudflarePagesPreviewTarget,
   cloudflarePagesPreviewIdentitySelector,
-} from "./cloudflare-pages-preview.ts";
-import { resolveCloudflarePagesPreviewSelection } from "./cloudflare-pages-preview-source.ts";
-import { runCloudflarePagesStaticDeploy } from "./cloudflare-pages-static-deploy.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
+} from "./cloudflare-pages-preview";
+import { resolveCloudflarePagesPreviewSelection } from "./cloudflare-pages-preview-source";
+import { runCloudflarePagesStaticDeploy } from "./cloudflare-pages-static-deploy";
+import type { CloudflarePagesDeployment } from "./contract";
 
 export async function submitCloudflarePagesPreviewDeploy(opts: {
   workspaceRoot: string;

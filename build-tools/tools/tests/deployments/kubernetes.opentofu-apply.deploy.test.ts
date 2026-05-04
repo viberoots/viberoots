@@ -3,28 +3,28 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { submitKubernetesDeploy } from "../../deployments/kubernetes-deploy.ts";
-import { OPENTOFU_STACK_PROVISIONER } from "../../deployments/opentofu-stack.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
-import { installFakeKubernetesHelm } from "./kubernetes.fake-helm.ts";
-import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
+import { submitKubernetesDeploy } from "../../deployments/kubernetes-deploy";
+import { OPENTOFU_STACK_PROVISIONER } from "../../deployments/opentofu-stack";
+import { runInTemp } from "../lib/test-helpers";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
+import { installFakeKubernetesHelm } from "./kubernetes.fake-helm";
+import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture";
 import {
   fakeKubernetesPublishSecretRuntime,
   reviewedKubernetesPublishRequirements,
   setKubernetesPublishSecretFixtureEnv,
   writeKubernetesPublishSecretFixture,
-} from "./kubernetes.publish-credentials.fixture.ts";
-import { startKubernetesPublicServer } from "./kubernetes.public-server.ts";
-import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+} from "./kubernetes.publish-credentials.fixture";
+import { startKubernetesPublicServer } from "./kubernetes.public-server";
+import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
 import {
   INTEGRATION_SECRET_VALUE,
   fakeProvisionSecretRuntime,
   openTofuProvisioner,
   recordingApplyAdapter,
   writeOpenTofuStackFixture,
-} from "./kubernetes.opentofu-apply.integration.helpers.ts";
+} from "./kubernetes.opentofu-apply.integration.helpers";
 
 async function writeHelmValues(root: string, deploymentId: string, content: string): Promise<void> {
   const configPath = path.join(

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostDeploymentComponent } from "./contract.ts";
-import type { DeploymentSmokeOutcome } from "./deployment-smoke-policy.ts";
-import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
+import type { NixosSharedHostDeploymentComponent } from "./contract";
+import type { DeploymentSmokeOutcome } from "./deployment-smoke-policy";
+import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts";
 
 export type NixosSharedHostComponentPublishState = {
   finalOutcome: "succeeded" | "publish_failed" | "not_started";

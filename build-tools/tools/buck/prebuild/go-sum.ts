@@ -1,6 +1,6 @@
 import path from "node:path";
-import { runNodeWithZx } from "../../lib/node-run.ts";
-import { findGoImporterMissingSum } from "./presence.ts";
+import { runNodeWithZx } from "../../lib/node-run";
+import { findGoImporterMissingSum } from "./presence";
 
 type Mode = "ci" | "local";
 

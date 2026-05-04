@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { effectiveSetForImporter } from "../../lib/pnpm-lock.ts";
-import type { PNPMDoc } from "../../lib/pnpm-lock.ts";
+import { effectiveSetForImporter } from "../../lib/pnpm-lock";
+import type { PNPMDoc } from "../../lib/pnpm-lock";
 
 test("pnpm-lock: effective set includes resolved peers", async () => {
   const doc: PNPMDoc = {

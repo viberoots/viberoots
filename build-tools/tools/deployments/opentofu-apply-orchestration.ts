@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import type { KubernetesDeployment } from "./contract.ts";
-import type { KubernetesAdmittedContext } from "./kubernetes-admission.ts";
-import type { KubernetesProvisionerPlanRef } from "./kubernetes-provisioner-plan.ts";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
+import type { KubernetesDeployment } from "./contract";
+import type { KubernetesAdmittedContext } from "./kubernetes-admission";
+import type { KubernetesProvisionerPlanRef } from "./kubernetes-provisioner-plan";
+import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
 import {
   isOpenTofuProvisioner,
   runOpenTofuReviewedApply,
   type OpenTofuApplyAdapter,
   type OpenTofuApplyEvidence,
   type OpenTofuApplyOutcome,
-} from "./opentofu-apply.ts";
+} from "./opentofu-apply";
 
 export type OpenTofuApplyHooks = {
   adapter?: OpenTofuApplyAdapter;

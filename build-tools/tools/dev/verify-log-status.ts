@@ -2,12 +2,12 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli";
 import {
   computeVerifyStatusFromLogText,
   formatVerifyStatusJsonLine,
   formatVerifyStatusText,
-} from "../lib/verify-log-status.ts";
+} from "../lib/verify-log-status";
 
 function parseIntOpt(s: string | undefined): number | undefined {
   const t = (s || "").trim();

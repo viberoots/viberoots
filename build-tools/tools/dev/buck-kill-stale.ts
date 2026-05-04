@@ -4,8 +4,8 @@
 //   node build-tools/tools/dev/buck-kill-stale.ts --list
 //   node build-tools/tools/dev/buck-kill-stale.ts --kill --include exporter- --dry-run
 //   node build-tools/tools/dev/buck-kill-stale.ts --kill --include '^zxtest-' --yes
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
-import { resolveToolPathSync } from "../lib/tool-paths.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli";
+import { resolveToolPathSync } from "../lib/tool-paths";
 
 type Args = {
   list?: boolean;

@@ -1,8 +1,8 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { withExclusiveInstallLock } from "../install/lock.ts";
-import { updateNodeModulesHashesJson } from "./hashes-json.ts";
+import { withExclusiveInstallLock } from "../install/lock";
+import { updateNodeModulesHashesJson } from "./hashes-json";
 
 export type PnpmStoreVerifiedMarker = {
   importer: string;

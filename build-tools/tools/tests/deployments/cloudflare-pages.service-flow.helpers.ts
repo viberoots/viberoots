@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler.ts";
+import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
 
 export async function writeCloudflareServiceArtifact(root: string, html: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });

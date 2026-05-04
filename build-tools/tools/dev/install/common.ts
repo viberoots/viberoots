@@ -1,6 +1,6 @@
-import { getImporterRootsContract } from "../../lib/importer-roots.ts";
-import { resolveImporterDir } from "../../lib/lockfiles.ts";
-import { sanitizeName as sanitizeNameContract } from "../../lib/sanitize.ts";
+import { getImporterRootsContract } from "../../lib/importer-roots";
+import { resolveImporterDir } from "../../lib/lockfiles";
+import { sanitizeName as sanitizeNameContract } from "../../lib/sanitize";
 import path from "node:path";
 
 // Must mirror build-tools/tools/nix/templates-common.nix sanitizeName

@@ -3,10 +3,10 @@ import * as fsp from "node:fs/promises";
 import { spawn } from "node:child_process";
 import http from "node:http";
 import path from "node:path";
-import type { NixosSharedHostDeployment } from "../../deployments/contract.ts";
-import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime.ts";
-import { startStaticWebappHttpsServer } from "./static-webapp.https-server.ts";
-import { pickFreePort } from "../scaffolding/lib/webapp-static-hmr.ts";
+import type { NixosSharedHostDeployment } from "../../deployments/contract";
+import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime";
+import { startStaticWebappHttpsServer } from "./static-webapp.https-server";
+import { pickFreePort } from "../scaffolding/lib/webapp-static-hmr";
 
 async function waitForHttpReady(opts: {
   port: number;

@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { normalizeDevBuildTargetArgs } from "../../dev/dev-build/target-args.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { normalizeDevBuildTargetArgs } from "../../dev/dev-build/target-args";
+import { runInTemp } from "../lib/test-helpers";
 
 test("dev-build normalizes path-like target args for build/test/run", async () => {
   await runInTemp("dev-build-target-args-normalize", async (tmp) => {

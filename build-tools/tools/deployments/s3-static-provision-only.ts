@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import { resolveInitialS3StaticAdmittedContext } from "./s3-static-admission.ts";
-import type { S3StaticDeployment } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
-import { createS3StaticDeployRecord, writeS3StaticDeployRecord } from "./s3-static-records.ts";
-import { writeS3StaticProvisionerPlan } from "./s3-static-provisioner-plan.ts";
+import { resolveInitialS3StaticAdmittedContext } from "./s3-static-admission";
+import type { S3StaticDeployment } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
+import { createS3StaticDeployRecord, writeS3StaticDeployRecord } from "./s3-static-records";
+import { writeS3StaticProvisionerPlan } from "./s3-static-provisioner-plan";
 
 export async function submitS3StaticProvisionOnly(opts: {
   workspaceRoot: string;

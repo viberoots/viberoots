@@ -4,7 +4,7 @@ import {
   buckCommandEnv,
   isBuckDaemonInitTransient,
   resolveNestedBuckIsolation,
-} from "../../lib/buck-command-env.ts";
+} from "../../lib/buck-command-env";
 
 const SAFETY_FLOOR_TARGETS = [
   "//:scaffolding_smoke_lib_readme",

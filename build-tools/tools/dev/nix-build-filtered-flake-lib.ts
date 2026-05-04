@@ -1,4 +1,4 @@
-import { normalizeTargetLabel, packagePathFromLabel } from "../lib/labels.ts";
+import { normalizeTargetLabel, packagePathFromLabel } from "../lib/labels";
 
 type GraphNodeRecord = Record<string, unknown>;
 

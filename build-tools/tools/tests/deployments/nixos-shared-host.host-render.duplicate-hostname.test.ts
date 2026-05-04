@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { renderNixosSharedHostConfig } from "../../deployments/nixos-shared-host.ts";
-import { createNixosSharedHostPlatformState } from "../../deployments/nixos-shared-host-platform.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+import { renderNixosSharedHostConfig } from "../../deployments/nixos-shared-host";
+import { createNixosSharedHostPlatformState } from "../../deployments/nixos-shared-host-platform";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 test("nixos-shared-host rendering fails closed on duplicate hostnames", () => {
   const state = createNixosSharedHostPlatformState([

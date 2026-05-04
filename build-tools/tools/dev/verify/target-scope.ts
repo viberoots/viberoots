@@ -1,5 +1,5 @@
-import { packagePathFromLabel } from "../../lib/labels.ts";
-import { isNonBuildSystemScopeRoot } from "../../lib/non-build-system-scope.ts";
+import { packagePathFromLabel } from "../../lib/labels";
+import { isNonBuildSystemScopeRoot } from "../../lib/non-build-system-scope";
 
 function normalizeTarget(raw: string): string {
   return String(raw || "").trim();

@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { createNixosSharedHostInstallFixture } from "./nixos-shared-host.install.fixture.ts";
+import { createNixosSharedHostInstallFixture } from "./nixos-shared-host.install.fixture";
 
 test("nixos-shared-host server install supports managed-dropin on plain /etc/nixos roots", async () => {
   await runInTemp("nixos-shared-host-host-install-plain", async (tmp, $) => {

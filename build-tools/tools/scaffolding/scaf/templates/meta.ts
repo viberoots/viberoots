@@ -2,10 +2,10 @@ import path from "node:path";
 
 import * as fsp from "node:fs/promises";
 
-import { exists } from "../fs.ts";
-import { isLanguageEnabled } from "../language-enablement.ts";
-import { canonicalTemplateIdsForLanguage, TEMPLATE_TAXONOMY } from "./taxonomy.ts";
-import { readCopierVariables } from "./variables.ts";
+import { exists } from "../fs";
+import { isLanguageEnabled } from "../language-enablement";
+import { canonicalTemplateIdsForLanguage, TEMPLATE_TAXONOMY } from "./taxonomy";
+import { readCopierVariables } from "./variables";
 
 export type TemplateMetaRow = {
   language: string;

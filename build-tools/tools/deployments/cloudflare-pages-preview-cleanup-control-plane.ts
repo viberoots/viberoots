@@ -1,31 +1,31 @@
 #!/usr/bin/env zx-wrapper
-import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission.ts";
-import { cleanupCloudflarePagesPreview } from "./cloudflare-pages-preview-cleanup.ts";
+import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission";
+import { cleanupCloudflarePagesPreview } from "./cloudflare-pages-preview-cleanup";
 import {
   CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA,
   type CloudflarePagesControlPlaneSnapshot,
-} from "./cloudflare-pages-control-plane-contract.ts";
+} from "./cloudflare-pages-control-plane-contract";
 import {
   createCloudflarePagesSubmissionId,
   withCloudflarePagesControlPlaneRun,
-} from "./cloudflare-pages-control-plane-shared.ts";
+} from "./cloudflare-pages-control-plane-shared";
 import {
   deriveCloudflarePagesPreviewTarget,
   cloudflarePagesPreviewIdentitySelector,
   type CloudflarePagesPreviewCleanupReason,
-} from "./cloudflare-pages-preview.ts";
+} from "./cloudflare-pages-preview";
 import {
   findLatestCloudflarePagesPreviewRecord,
   resolveCloudflarePagesPreviewSelection,
-} from "./cloudflare-pages-preview-source.ts";
+} from "./cloudflare-pages-preview-source";
 import {
   createCloudflarePagesDeployRecord,
   createCloudflarePagesDeployRunId,
   writeCloudflarePagesDeployRecord,
-} from "./cloudflare-pages-records.ts";
-import { requireCloudflarePagesApiTokenForStep } from "./cloudflare-pages-secret-steps.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
+} from "./cloudflare-pages-records";
+import { requireCloudflarePagesApiTokenForStep } from "./cloudflare-pages-secret-steps";
+import type { CloudflarePagesDeployment } from "./contract";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
 
 function previewCleanupRecord(opts: {
   deployment: CloudflarePagesDeployment;

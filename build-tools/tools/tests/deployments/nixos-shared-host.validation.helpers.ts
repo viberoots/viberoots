@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../../lib/graph.ts";
-import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture.ts";
+import type { GraphNode } from "../../lib/graph";
+import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture";
 import {
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostLanePolicyNodeFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 
 export function staticWebappComponent(label: string): GraphNode {
   return {

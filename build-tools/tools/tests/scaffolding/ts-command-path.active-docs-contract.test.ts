@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { CANONICAL_TS_TEMPLATE_IDS } from "../../scaffolding/scaf/templates/taxonomy.ts";
+import { CANONICAL_TS_TEMPLATE_IDS } from "../../scaffolding/scaf/templates/taxonomy";
 import {
   ACTIVE_DOC_COMMAND_CONTRACT,
   ARCHIVAL_DOC_COMMAND_CONTRACT,
   allClassifiedDocPaths,
-} from "./doc-command-contract.inventory.ts";
+} from "./doc-command-contract.inventory";
 
 const DOC_SCOPE_ROOTS = [
   "docs/handbook",

@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { validateDeploymentRequirements } from "../../deployments/deployment-requirements.ts";
-import { deploymentRequirementFixture } from "./deployment-metadata.fixture.ts";
+import { validateDeploymentRequirements } from "../../deployments/deployment-requirements";
+import { deploymentRequirementFixture } from "./deployment-metadata.fixture";
 
 function errorsFor(requirements: ReturnType<typeof deploymentRequirementFixture>[]) {
   const errors: string[] = [];

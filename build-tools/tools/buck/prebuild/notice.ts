@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { DEV_OVERRIDE_LANGS, devOverrideEnvNameForLang } from "../../lib/dev-override-envs.ts";
+import { DEV_OVERRIDE_LANGS, devOverrideEnvNameForLang } from "../../lib/dev-override-envs";
 
 export type Mode = "ci" | "local";
 

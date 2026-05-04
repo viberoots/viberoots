@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostDeployment, NixosSharedHostDeploymentComponent } from "./contract.ts";
+import type { NixosSharedHostDeployment, NixosSharedHostDeploymentComponent } from "./contract";
 
 function uniqueSorted(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean))).sort();

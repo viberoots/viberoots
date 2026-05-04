@@ -6,10 +6,10 @@ import { test } from "node:test";
 import {
   DEPLOYMENT_DOMAIN_LABEL,
   REVIEWED_DEPLOYMENT_TEST_AREA,
-} from "../../lib/deployment-verify-scope.ts";
-import { VERIFY_RESOURCE_LIMITED_LABEL } from "../../dev/verify/target-passes.ts";
-import { resolveNestedBuckIsolation } from "../../lib/buck-command-env.ts";
-import { normalizeTargetLabel } from "../../lib/labels.ts";
+} from "../../lib/deployment-verify-scope";
+import { VERIFY_RESOURCE_LIMITED_LABEL } from "../../dev/verify/target-passes";
+import { resolveNestedBuckIsolation } from "../../lib/buck-command-env";
+import { normalizeTargetLabel } from "../../lib/labels";
 
 const RESOURCE_LIMITED_EXEMPT_TEMP_REPO_SCRIPTS = new Set([
   "build-tools/tools/tests/deployments/app-store-connect.e2e.test.ts",

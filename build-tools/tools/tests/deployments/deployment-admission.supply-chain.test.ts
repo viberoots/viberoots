@@ -1,17 +1,17 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator.ts";
-import { extractDeploymentAdmissionPolicies } from "../../deployments/deployment-policy.ts";
+import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator";
+import { extractDeploymentAdmissionPolicies } from "../../deployments/deployment-policy";
 import {
   admissionBindingFixture,
   deploymentAdmissionEvidenceFixture,
-} from "./deployment-admission.fixture.ts";
-import { admissionEvalBase, admittedContextFixture } from "./deployment-admission.test-helpers.ts";
+} from "./deployment-admission.fixture";
+import { admissionEvalBase, admittedContextFixture } from "./deployment-admission.test-helpers";
 import {
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 
 test("admission policy extraction preserves attestation, SBOM, and supply-chain policy fields", () => {
   const { policies, errors } = extractDeploymentAdmissionPolicies([

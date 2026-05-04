@@ -1,19 +1,19 @@
 #!/usr/bin/env zx-wrapper
 import http from "node:http";
-import { launchBrowser } from "./deployment-browser-launch.ts";
+import { launchBrowser } from "./deployment-browser-launch";
 import {
   authorizationUrl,
   discoverOidc,
   exchangePkceCodeForToken,
   randomSecret,
   validateOidcToken,
-} from "./deployment-credential-source-oidc.ts";
+} from "./deployment-credential-source-oidc";
 import {
   normalizeDeploymentPkceCallbackProfile,
   urlHost,
   type DeploymentPkceCallbackProfile,
   type DeploymentPkceCallbackProfileInput,
-} from "./deployment-pkce-callback-profile.ts";
+} from "./deployment-pkce-callback-profile";
 
 export type PkceLoginOptions = {
   issuer: string;

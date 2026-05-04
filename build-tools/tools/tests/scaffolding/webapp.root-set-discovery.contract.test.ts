@@ -4,13 +4,13 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { test } from "node:test";
-import { sanitizeName } from "../../lib/sanitize.ts";
+import { sanitizeName } from "../../lib/sanitize";
 import {
   parseTsModuleManifest,
   parseWasmModuleManifest,
-} from "../../scaffolding/webapp-module-manifests.ts";
-import { resolveModuleContractsPaths } from "../../dev/module-contract-paths.ts";
-import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core.ts";
+} from "../../scaffolding/webapp-module-manifests";
+import { resolveModuleContractsPaths } from "../../dev/module-contract-paths";
+import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core";
 import { runInTemp } from "../lib/test-helpers";
 
 test("PR-6 root-set discovery picks up new module files without TARGETS edits", async () => {

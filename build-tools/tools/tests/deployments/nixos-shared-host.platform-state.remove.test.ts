@@ -4,8 +4,8 @@ import { test } from "node:test";
 import {
   createNixosSharedHostPlatformState,
   removeNixosSharedHostPlatformDeployment,
-} from "../../deployments/nixos-shared-host-platform.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+} from "../../deployments/nixos-shared-host-platform";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 test("nixos-shared-host platform state explicit removal deletes only the named deployment", () => {
   const current = createNixosSharedHostPlatformState([

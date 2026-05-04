@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { runInTemp } from "../lib/test-helpers";
 import {
   prepareRemoteExecFixture,
   remoteExecEnv,
   REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
-} from "./nixos-shared-host.deploy.remote-exec.helpers.ts";
+} from "./nixos-shared-host.deploy.remote-exec.helpers";
 
 test("remote deploy rejects legacy host-apply mutation flags in service-only mode", async () => {
   await runInTemp("nixos-shared-host-remote-host-apply-rejected", async (tmp, $) => {

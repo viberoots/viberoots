@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli.ts";
-import { SOURCE_FILES_SCOPE, type FileSizeScope } from "./file-size-lint-scopes.ts";
+import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli";
+import { SOURCE_FILES_SCOPE, type FileSizeScope } from "./file-size-lint-scopes";
 
 export type FileSizeLintOptions = {
   root: string;

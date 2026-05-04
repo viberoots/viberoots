@@ -10,21 +10,21 @@ import {
   type KubernetesDeployment,
   type NixosSharedHostDeployment,
   type S3StaticDeployment,
-} from "../../deployments/contract.ts";
+} from "../../deployments/contract";
 import {
   DEPLOYMENT_LANE_GOVERNANCE_RULE,
   type DeploymentLaneGovernance,
   type DeploymentScmBackend,
-} from "../../deployments/deployment-lane-governance.ts";
-import { resolveDeploymentFromTarget } from "../../deployments/deployment-query.ts";
-import type { DeploymentAdmissionEvidence } from "../../deployments/deployment-admission-evidence.ts";
-import type { GraphNode } from "../../lib/graph.ts";
+} from "../../deployments/deployment-lane-governance";
+import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
+import type { DeploymentAdmissionEvidence } from "../../deployments/deployment-admission-evidence";
+import type { GraphNode } from "../../lib/graph";
 import {
   installCloudflarePagesTargets,
   installKubernetesTargets,
   installNixosSharedHostTargets,
   installS3StaticTargets,
-} from "./deployment-targets.install.helpers.ts";
+} from "./deployment-targets.install.helpers";
 
 export function nixosSharedHostLaneGovernanceFixture(
   overrides: Partial<DeploymentLaneGovernance> = {},

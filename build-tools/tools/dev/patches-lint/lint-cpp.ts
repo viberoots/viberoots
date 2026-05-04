@@ -1,10 +1,10 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { decodeNixAttrFromPatchPrefix, normalizeNixAttr } from "../../lib/providers.ts";
-import { validateFlatDir } from "../../lib/provider-sync.ts";
-import type { PatchesLintConfig, Violation } from "./types.ts";
-import { isKeeperOrDotfile, isPatchFile, pathExists } from "./fs.ts";
-import { countErrors, reportViolations } from "./report.ts";
+import { decodeNixAttrFromPatchPrefix, normalizeNixAttr } from "../../lib/providers";
+import { validateFlatDir } from "../../lib/provider-sync";
+import type { PatchesLintConfig, Violation } from "./types";
+import { isKeeperOrDotfile, isPatchFile, pathExists } from "./fs";
+import { countErrors, reportViolations } from "./report";
 
 function validateCppPatchFilename(cfg: PatchesLintConfig, file: string, violations: Violation[]) {
   if (isKeeperOrDotfile(file)) return;

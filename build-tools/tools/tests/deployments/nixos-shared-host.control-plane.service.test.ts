@@ -3,21 +3,21 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy.ts";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
-import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop.ts";
-import { resolveDeploymentFromTarget } from "../../deployments/deployment-query.ts";
-import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture.ts";
+import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
+import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop";
+import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
+import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture";
 import {
   reviewedLaneAdmissionEvidenceFixture,
   writeReviewedLaneAdmissionEvidenceJson,
-} from "./deployment-lane-governance.fixture.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+} from "./deployment-lane-governance.fixture";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 import {
   postCancelRunAction,
   readRecord,
@@ -26,8 +26,8 @@ import {
   submitServiceRequest,
   waitFor,
   writeDemoArtifact,
-} from "./nixos-shared-host.control-plane.helpers.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "./nixos-shared-host.control-plane.helpers";
+import { runInTemp } from "../lib/test-helpers";
 
 test("control-plane service persists queued submissions across restart and a separate worker later executes them", async () => {
   await runInTemp("nixos-shared-host-control-plane-service-queue", async (tmp, $) => {

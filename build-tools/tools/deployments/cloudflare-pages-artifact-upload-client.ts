@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import { createStaticWebappArtifactBundleBytes } from "./static-webapp-artifact-bundle.ts";
-import type { CloudflarePagesArtifactInput } from "./cloudflare-pages-artifact-input.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
+import { createStaticWebappArtifactBundleBytes } from "./static-webapp-artifact-bundle";
+import type { CloudflarePagesArtifactInput } from "./cloudflare-pages-artifact-input";
+import type { CloudflarePagesDeployment } from "./contract";
 
 type UploadResponse = {
   uploadSessionId: string;

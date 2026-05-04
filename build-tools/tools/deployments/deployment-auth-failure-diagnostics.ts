@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
+import { redactDeploymentAuthText } from "./deployment-auth-redaction";
 
 export type DeploymentAuthFailureCategory =
   | "idp_discovery_unavailable"

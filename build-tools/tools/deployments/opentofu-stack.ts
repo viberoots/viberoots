@@ -2,7 +2,7 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { DeploymentTarget } from "./contract-types.ts";
+import type { DeploymentTarget } from "./contract-types";
 
 export const OPENTOFU_STACK_PROVISIONER = "opentofu-stack";
 

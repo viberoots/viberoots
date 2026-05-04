@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import type { NixosSharedHostConfigTopology } from "./nixos-shared-host-install-contract.ts";
+import type { NixosSharedHostConfigTopology } from "./nixos-shared-host-install-contract";
 
 const START_MARKER = "# BEGIN deployment-host managed block";
 const END_MARKER = "# END deployment-host managed block";

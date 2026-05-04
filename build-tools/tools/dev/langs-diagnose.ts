@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli";
 import { runMain } from "../lib/cli-wrap";
 import type { DiagnoseOutput } from "./langs-diagnose/types";
 import { detectEnabledAndMissing } from "./langs-diagnose/enabled";
@@ -8,7 +8,7 @@ import { readManifest } from "./langs-diagnose/manifest";
 import { detectPlannerPlugins } from "./langs-diagnose/planner-plugins";
 import { computeStages } from "./langs-diagnose/stages";
 import { printHuman } from "./langs-diagnose/print-human";
-import { patchInvalidationStrategyForLang } from "../lib/lang-contracts.ts";
+import { patchInvalidationStrategyForLang } from "../lib/lang-contracts";
 
 async function main() {
   const asJson = getFlagBool("json");

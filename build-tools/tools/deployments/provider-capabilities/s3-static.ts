@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { STATIC_WEBAPP_COMPONENT_KIND } from "../deployment-component-kinds.ts";
-import { S3_STATIC_PROVIDER } from "../deployment-provider-targets.ts";
-import type { DeploymentProviderCapability } from "./types.ts";
-import { bullet } from "./types.ts";
+import { STATIC_WEBAPP_COMPONENT_KIND } from "../deployment-component-kinds";
+import { S3_STATIC_PROVIDER } from "../deployment-provider-targets";
+import type { DeploymentProviderCapability } from "./types";
+import { bullet } from "./types";
 
 export const S3_STATIC_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
   provider: S3_STATIC_PROVIDER,

@@ -1,16 +1,16 @@
 #!/usr/bin/env zx-wrapper
-import { sanitizeName } from "../lib/sanitize.ts";
-import { providerTargetIdentityFor, type DeploymentTarget } from "./contract.ts";
+import { sanitizeName } from "../lib/sanitize";
+import { providerTargetIdentityFor, type DeploymentTarget } from "./contract";
 import {
   buildVaultSecretTemplatesDocument,
   type TargetScope,
-} from "./deployment-vault-secret-templates.ts";
+} from "./deployment-vault-secret-templates";
 export {
   buildVaultSecretTemplatesDocument,
   DEPLOYMENT_VAULT_SECRET_TEMPLATES_SCHEMA,
   renderVaultSecretTemplatesDocument,
-} from "./deployment-vault-secret-templates.ts";
-export type { VaultSecretTemplateFormat } from "./deployment-vault-secret-templates.ts";
+} from "./deployment-vault-secret-templates";
+export type { VaultSecretTemplateFormat } from "./deployment-vault-secret-templates";
 
 export const DEPLOYMENT_VAULT_BOOTSTRAP_SCHEMA = "deployment-vault-bootstrap@1";
 

@@ -1,19 +1,19 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagList, getFlagStr, getPositionals } from "../lib/cli.ts";
-import { printDeployJson } from "./deploy-front-door.ts";
-import { resolveDeploymentForCli } from "./deployment-cli-resolve.ts";
-import { readDeploymentVaultRuntimeInputsFromFlags } from "./deployment-vault-runtime-inputs.ts";
-import { deploymentAuthMatrix, renderDeploymentJenkinsHelp } from "./deployment-auth-matrix.ts";
-import { redactDeploymentAuthJson, redactDeploymentAuthText } from "./deployment-auth-redaction.ts";
-import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan.ts";
-import type { DeploymentTarget } from "./contract.ts";
-import { resolveDeploymentPkceCallbackProfile } from "./deployment-pkce-callback-profile.ts";
+import { getFlagList, getFlagStr, getPositionals } from "../lib/cli";
+import { printDeployJson } from "./deploy-front-door";
+import { resolveDeploymentForCli } from "./deployment-cli-resolve";
+import { readDeploymentVaultRuntimeInputsFromFlags } from "./deployment-vault-runtime-inputs";
+import { deploymentAuthMatrix, renderDeploymentJenkinsHelp } from "./deployment-auth-matrix";
+import { redactDeploymentAuthJson, redactDeploymentAuthText } from "./deployment-auth-redaction";
+import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan";
+import type { DeploymentTarget } from "./contract";
+import { resolveDeploymentPkceCallbackProfile } from "./deployment-pkce-callback-profile";
 import {
   buildDeploymentAuthActionSummary,
   buildDeploymentAuthGroupSummary,
   buildDeploymentAuthKeycloakRealm,
-} from "./deployment-auth-readonly.ts";
-import { resolveAllDeployments } from "./deployment-query.ts";
+} from "./deployment-auth-readonly";
+import { resolveAllDeployments } from "./deployment-query";
 
 export const DEPLOYMENT_AUTH_DOCTOR_SCHEMA = "deployment-auth-doctor@1";
 export const DEPLOYMENT_AUTH_EXPLAIN_VAULT_ROLE_SCHEMA = "deployment-auth-vault-role@1";

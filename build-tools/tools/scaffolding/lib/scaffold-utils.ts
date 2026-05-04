@@ -5,4 +5,4 @@ export {
   recopyUsingRecordedSource,
   scaffoldOrUpdate,
   seedAnswersViaCopier,
-} from "./scaffold-utils/copier.ts";
+} from "./scaffold-utils/copier";

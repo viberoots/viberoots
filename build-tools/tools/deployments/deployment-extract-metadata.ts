@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../lib/graph.ts";
-import { readStringArray } from "./deployment-graph-readers.ts";
+import type { GraphNode } from "../lib/graph";
+import { readStringArray } from "./deployment-graph-readers";
 import {
   type DeploymentRequirement,
   validateDeploymentRequirements,
-} from "./deployment-requirements.ts";
+} from "./deployment-requirements";
 import {
   isExternalRequirementProfile,
   validateExternalRequirementProfiles,
   type ExternalDeploymentRequirementProfile,
-} from "./external-deployment-requirements.ts";
+} from "./external-deployment-requirements";
 
 function deploymentExtractionError(label: string, message: string): string {
   return `${label}: ${message}`;

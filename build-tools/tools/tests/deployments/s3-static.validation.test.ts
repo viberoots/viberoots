@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { GraphNode } from "../../lib/graph.ts";
-import { extractS3StaticDeployments } from "../../deployments/contract.ts";
-import { REVIEWED_NON_STATIC_COMPONENT_KINDS } from "../../deployments/deployment-provider-capabilities.ts";
+import type { GraphNode } from "../../lib/graph";
+import { extractS3StaticDeployments } from "../../deployments/contract";
+import { REVIEWED_NON_STATIC_COMPONENT_KINDS } from "../../deployments/deployment-provider-capabilities";
 import {
   s3StaticAdmissionPolicyNodeFixture,
   s3StaticLanePolicyNodeFixture,
-} from "./s3-static.fixture.ts";
+} from "./s3-static.fixture";
 
 function staticWebappComponent(label: string): GraphNode {
   return { name: label, labels: ["kind:app", "webapp:pwa"] };

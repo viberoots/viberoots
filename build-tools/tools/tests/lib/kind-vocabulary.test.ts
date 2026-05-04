@@ -6,7 +6,7 @@ import {
   ALLOWED_KIND_VALUES,
   isAllowedKindLabel,
   isAllowedKindValue,
-} from "../../lib/kind-vocabulary.ts";
+} from "../../lib/kind-vocabulary";
 
 test("kind vocabulary (TS): accepts allowed kinds used in the repo", () => {
   for (const k of ALLOWED_KIND_VALUES) {

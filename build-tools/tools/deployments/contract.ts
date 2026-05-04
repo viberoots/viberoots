@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../lib/graph.ts";
-import { createDeploymentExtractionContext, uniqueErrors } from "./contract-extract-shared.ts";
-import { extractAppStoreConnectDeploymentsFromContext } from "./contract-extract-app-store-connect.ts";
-import { extractCloudflarePagesDeploymentsFromContext } from "./contract-extract-cloudflare-pages.ts";
-import { extractGooglePlayDeploymentsFromContext } from "./contract-extract-google-play.ts";
-import { extractKubernetesDeploymentsFromContext } from "./contract-extract-kubernetes.ts";
-import { extractNixosSharedHostDeploymentsFromContext } from "./contract-extract-nixos-shared-host.ts";
-import { extractS3StaticDeploymentsFromContext } from "./contract-extract-s3-static.ts";
-import { extractVercelDeploymentsFromContext } from "./contract-extract-vercel.ts";
+import type { GraphNode } from "../lib/graph";
+import { createDeploymentExtractionContext, uniqueErrors } from "./contract-extract-shared";
+import { extractAppStoreConnectDeploymentsFromContext } from "./contract-extract-app-store-connect";
+import { extractCloudflarePagesDeploymentsFromContext } from "./contract-extract-cloudflare-pages";
+import { extractGooglePlayDeploymentsFromContext } from "./contract-extract-google-play";
+import { extractKubernetesDeploymentsFromContext } from "./contract-extract-kubernetes";
+import { extractNixosSharedHostDeploymentsFromContext } from "./contract-extract-nixos-shared-host";
+import { extractS3StaticDeploymentsFromContext } from "./contract-extract-s3-static";
+import { extractVercelDeploymentsFromContext } from "./contract-extract-vercel";
 
 export function extractNixosSharedHostDeployments(nodes: GraphNode[]) {
   const context = createDeploymentExtractionContext(nodes);
@@ -65,16 +65,16 @@ export function extractVercelDeployments(nodes: GraphNode[]) {
   };
 }
 
-export * from "./contract-types.ts";
-export * from "./contract-extract.ts";
-export * from "./contract-extract-cloudflare-pages.ts";
-export * from "./contract-extract-app-store-connect.ts";
-export * from "./contract-extract-google-play.ts";
-export * from "./contract-extract-kubernetes.ts";
-export * from "./contract-extract-nixos-shared-host.ts";
-export * from "./contract-extract-s3-static.ts";
-export * from "./contract-extract-vercel.ts";
-export * from "./deployment-targets.ts";
-export * from "./deployment-provider-targets.ts";
-export * from "./deployment-readiness-gates.ts";
-export * from "./external-deployment-requirements.ts";
+export * from "./contract-types";
+export * from "./contract-extract";
+export * from "./contract-extract-cloudflare-pages";
+export * from "./contract-extract-app-store-connect";
+export * from "./contract-extract-google-play";
+export * from "./contract-extract-kubernetes";
+export * from "./contract-extract-nixos-shared-host";
+export * from "./contract-extract-s3-static";
+export * from "./contract-extract-vercel";
+export * from "./deployment-targets";
+export * from "./deployment-provider-targets";
+export * from "./deployment-readiness-gates";
+export * from "./external-deployment-requirements";

@@ -1,7 +1,7 @@
 import path from "node:path";
 
-import { runManagedCommand } from "../../lib/managed-command.ts";
-import { runNodeWithZx } from "../../lib/node-run.ts";
+import { runManagedCommand } from "../../lib/managed-command";
+import { runNodeWithZx } from "../../lib/node-run";
 
 function repoRoot(): string {
   return path.resolve(process.env.WORKSPACE_ROOT || process.env.BUCK_TEST_SRC || process.cwd());

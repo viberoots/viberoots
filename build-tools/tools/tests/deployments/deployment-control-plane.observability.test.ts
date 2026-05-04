@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { readDeploymentControlPlaneObservability } from "../../deployments/deployment-control-plane-observability.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { readDeploymentControlPlaneObservability } from "../../deployments/deployment-control-plane-observability";
+import { runInTemp } from "../lib/test-helpers";
 
 async function writeJson(filePath: string, value: unknown) {
   await fsp.mkdir(path.dirname(filePath), { recursive: true });

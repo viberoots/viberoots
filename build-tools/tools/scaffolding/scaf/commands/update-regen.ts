@@ -1,20 +1,20 @@
-import type { ScafFlags } from "../types.ts";
+import type { ScafFlags } from "../types";
 
 import path from "node:path";
 
 import * as fsp from "node:fs/promises";
 
-import { ensureImporterLockfileFresh } from "../../../dev/update-pnpm-hash/lockfile.ts";
+import { ensureImporterLockfileFresh } from "../../../dev/update-pnpm-hash/lockfile";
 import {
   copierRecopyOrUpdate,
   copierUpdate,
   recopyUsingRecordedSource,
-} from "../../lib/scaffold-utils.ts";
-import { confirmOrExit } from "../confirm.ts";
-import { readRegenInfo } from "../copier/regen-info.ts";
-import { runCopierCopy } from "../copier/copy.ts";
-import { runPostSteps } from "../copier/post-steps.ts";
-import { discoverScaffolds } from "../scaffolds/discover.ts";
+} from "../../lib/scaffold-utils";
+import { confirmOrExit } from "../confirm";
+import { readRegenInfo } from "../copier/regen-info";
+import { runCopierCopy } from "../copier/copy";
+import { runPostSteps } from "../copier/post-steps";
+import { discoverScaffolds } from "../scaffolds/discover";
 
 function parseYamlScalar(raw: string): string {
   const v = String(raw || "").trim();

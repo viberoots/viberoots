@@ -1,4 +1,4 @@
-import { readFlagBoolFromTokens, removeKnownFlags } from "../../lib/cli.ts";
+import { readFlagBoolFromTokens, removeKnownFlags } from "../../lib/cli";
 
 export type DevBuildArgs = {
   subcmd: string;

@@ -4,13 +4,13 @@ import {
   type DeploymentSecretAdmittedReference,
   type DeploymentSecretContractBinding,
   type DeploymentSecretReference,
-} from "./deployment-secretspec.ts";
-import type { DeploymentSecretMaterial } from "./deployment-secret-runtime.ts";
+} from "./deployment-secretspec";
+import type { DeploymentSecretMaterial } from "./deployment-secret-runtime";
 import {
   resolveVaultClientCredential,
   type VaultCredentialConfig,
-} from "./deployment-secret-vault-credentials.ts";
-import { requireVaultContractPath, vaultApiPath } from "./deployment-secret-vault-paths.ts";
+} from "./deployment-secret-vault-credentials";
+import { requireVaultContractPath, vaultApiPath } from "./deployment-secret-vault-paths";
 
 async function vaultRequest<T>(
   path: string,

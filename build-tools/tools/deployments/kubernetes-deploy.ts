@@ -1,31 +1,31 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator.ts";
-import type { KubernetesDeployment } from "./contract.ts";
-import { withFailedStep } from "./deployment-failed-step.ts";
-import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import type { KubernetesDeployment } from "./contract";
+import { withFailedStep } from "./deployment-failed-step";
+import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy";
 // prettier-ignore
-import { classifySmokeRetry, noPublishAutoRetry, runWithAutomaticRetry } from "./deployment-retry-policy.ts";
-import { executionPolicyWithRetry, retryAuditFrom } from "./deployment-retry-records.ts";
+import { classifySmokeRetry, noPublishAutoRetry, runWithAutomaticRetry } from "./deployment-retry-policy";
+import { executionPolicyWithRetry, retryAuditFrom } from "./deployment-retry-records";
 // prettier-ignore
-import { deploymentMetadataFingerprintFor, fingerprintValue } from "./nixos-shared-host-deployment-fingerprint.ts";
-import { admitKubernetesComponentArtifacts } from "./kubernetes-artifacts.ts";
+import { deploymentMetadataFingerprintFor, fingerprintValue } from "./nixos-shared-host-deployment-fingerprint";
+import { admitKubernetesComponentArtifacts } from "./kubernetes-artifacts";
 // prettier-ignore
-import { artifactByComponentId, orderedComponentIds, requiredArtifactPaths } from "./kubernetes-deploy-helpers.ts";
-import { resolveInitialKubernetesAdmittedContext } from "./kubernetes-admission.ts";
-import { prepareKubernetesPublisherConfig } from "./kubernetes-config.ts";
-import { publishKubernetesComponent } from "./kubernetes-publisher.ts";
+import { artifactByComponentId, orderedComponentIds, requiredArtifactPaths } from "./kubernetes-deploy-helpers";
+import { resolveInitialKubernetesAdmittedContext } from "./kubernetes-admission";
+import { prepareKubernetesPublisherConfig } from "./kubernetes-config";
+import { publishKubernetesComponent } from "./kubernetes-publisher";
 // prettier-ignore
-import { publisherCredentialFields, resolveKubernetesPublishCredentialsForDeployment, type KubernetesPublishCredentialsHooks } from "./kubernetes-publish-credentials-orchestration.ts";
+import { publisherCredentialFields, resolveKubernetesPublishCredentialsForDeployment, type KubernetesPublishCredentialsHooks } from "./kubernetes-publish-credentials-orchestration";
 // prettier-ignore
-import { createKubernetesDeployRecord, createKubernetesDeployRunId, writeKubernetesDeployRecord, type KubernetesDeployRecord } from "./kubernetes-records.ts";
-import { createKubernetesDeployFailureRecord } from "./kubernetes-deploy-records.ts";
-import { writeKubernetesReplaySnapshot } from "./kubernetes-replay.ts";
-import { smokeKubernetesRelease } from "./kubernetes-smoke.ts";
-import { writeKubernetesProvisionerPlan } from "./kubernetes-provisioner-plan.ts";
+import { createKubernetesDeployRecord, createKubernetesDeployRunId, writeKubernetesDeployRecord, type KubernetesDeployRecord } from "./kubernetes-records";
+import { createKubernetesDeployFailureRecord } from "./kubernetes-deploy-records";
+import { writeKubernetesReplaySnapshot } from "./kubernetes-replay";
+import { smokeKubernetesRelease } from "./kubernetes-smoke";
+import { writeKubernetesProvisionerPlan } from "./kubernetes-provisioner-plan";
 // prettier-ignore
-import { maybeRunOpenTofuReviewedApply, type OpenTofuApplyHooks } from "./opentofu-apply-orchestration.ts";
+import { maybeRunOpenTofuReviewedApply, type OpenTofuApplyHooks } from "./opentofu-apply-orchestration";
 
 export async function submitKubernetesDeploy(opts: {
   workspaceRoot: string;

@@ -1,22 +1,22 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../lib/graph.ts";
-import type { DeploymentPrerequisiteMode, DeploymentTarget } from "./contract-types.ts";
+import type { GraphNode } from "../lib/graph";
+import type { DeploymentPrerequisiteMode, DeploymentTarget } from "./contract-types";
 import {
   createDeploymentExtractionContext,
   deploymentError,
   uniqueErrors,
-} from "./contract-extract-shared.ts";
-import { extractCloudflarePagesDeploymentsFromContext } from "./contract-extract-cloudflare-pages.ts";
-import { extractAppStoreConnectDeploymentsFromContext } from "./contract-extract-app-store-connect.ts";
-import { extractGooglePlayDeploymentsFromContext } from "./contract-extract-google-play.ts";
-import { extractKubernetesDeploymentsFromContext } from "./contract-extract-kubernetes.ts";
-import { extractNixosSharedHostDeploymentsFromContext } from "./contract-extract-nixos-shared-host.ts";
-import { extractS3StaticDeploymentsFromContext } from "./contract-extract-s3-static.ts";
-import { extractVercelDeploymentsFromContext } from "./contract-extract-vercel.ts";
+} from "./contract-extract-shared";
+import { extractCloudflarePagesDeploymentsFromContext } from "./contract-extract-cloudflare-pages";
+import { extractAppStoreConnectDeploymentsFromContext } from "./contract-extract-app-store-connect";
+import { extractGooglePlayDeploymentsFromContext } from "./contract-extract-google-play";
+import { extractKubernetesDeploymentsFromContext } from "./contract-extract-kubernetes";
+import { extractNixosSharedHostDeploymentsFromContext } from "./contract-extract-nixos-shared-host";
+import { extractS3StaticDeploymentsFromContext } from "./contract-extract-s3-static";
+import { extractVercelDeploymentsFromContext } from "./contract-extract-vercel";
 import {
   readExternalRequirementProfiles,
   validateExternalDeploymentRequirementProfiles,
-} from "./deployment-extract-metadata.ts";
+} from "./deployment-extract-metadata";
 
 const DEPLOYMENT_PREREQUISITE_MODES = new Set<DeploymentPrerequisiteMode>([
   "ordering_only",

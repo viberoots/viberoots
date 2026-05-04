@@ -1,29 +1,29 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { readVersionedJson } from "./deployment-schema-compat.ts";
+import { readVersionedJson } from "./deployment-schema-compat";
 import {
   compositeNixosSharedHostArtifactIdentity,
   type NixosSharedHostResolvedComponentArtifact,
-} from "./nixos-shared-host-component-artifacts.ts";
-import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
-import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
-import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
+} from "./nixos-shared-host-component-artifacts";
+import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts";
+import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results";
+import type { NixosSharedHostDeployment } from "./contract";
+import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
+import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components";
 import {
   nixosSharedHostRunnerIdentities,
   recordedReleaseActionPlan,
   type NixosSharedHostRecordedReleaseAction,
   type NixosSharedHostRunnerIdentities,
-} from "./nixos-shared-host-provenance.ts";
-import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
-import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
+} from "./nixos-shared-host-provenance";
+import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout";
+import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan";
 import {
   nixosSharedHostPublishInputArtifactIdentity,
   type NixosSharedHostPublishInput,
-} from "./nixos-shared-host-publish-input.ts";
+} from "./nixos-shared-host-publish-input";
 
 export const NIXOS_SHARED_HOST_REPLAY_SNAPSHOT_SCHEMA = "nixos-shared-host-replay-snapshot@3";
 

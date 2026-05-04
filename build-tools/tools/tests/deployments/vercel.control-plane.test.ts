@@ -7,15 +7,15 @@ import { test } from "node:test";
 import {
   VERCEL_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
   type VercelControlPlaneSubmitRequest,
-} from "../../deployments/vercel-control-plane.ts";
+} from "../../deployments/vercel-control-plane";
 import {
   isDeploymentProviderServiceSubmitRequest,
   type DeploymentProviderServiceSubmitRequest,
-} from "../../deployments/deployment-provider-control-plane-submit.ts";
-import { submitVercelDeploy, submitVercelPreviewCleanup } from "../../deployments/vercel-deploy.ts";
-import { submitVercelExactArtifactRun } from "../../deployments/vercel-exact-run.ts";
-import { resolveVercelReplaySource } from "../../deployments/vercel-replay.ts";
-import { vercelDeploymentFixture } from "./vercel.fixture.ts";
+} from "../../deployments/deployment-provider-control-plane-submit";
+import { submitVercelDeploy, submitVercelPreviewCleanup } from "../../deployments/vercel-deploy";
+import { submitVercelExactArtifactRun } from "../../deployments/vercel-exact-run";
+import { resolveVercelReplaySource } from "../../deployments/vercel-replay";
+import { vercelDeploymentFixture } from "./vercel.fixture";
 import {
   deploymentWithVercelCleanupSecret,
   deploymentWithVercelSecret,
@@ -23,7 +23,7 @@ import {
   withVercelSmokeServer,
   writeVercelArtifact,
   writeVercelPublisherConfig,
-} from "./vercel.control-plane.helpers.ts";
+} from "./vercel.control-plane.helpers";
 
 const PUBLISH_AND_SMOKE_TOKEN = {
   "vercel/api-token": {

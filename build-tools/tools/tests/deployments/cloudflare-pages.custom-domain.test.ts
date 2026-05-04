@@ -2,8 +2,8 @@
 import assert from "node:assert/strict";
 import http from "node:http";
 import { test } from "node:test";
-import { ensureCloudflarePagesCustomDomain } from "../../deployments/cloudflare-pages-custom-domain.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import { ensureCloudflarePagesCustomDomain } from "../../deployments/cloudflare-pages-custom-domain";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 
 async function withFakeCloudflareApi<T>(
   run: (opts: {

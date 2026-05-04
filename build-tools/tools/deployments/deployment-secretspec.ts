@@ -1,8 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type {
-  DeploymentRequirement,
-  DeploymentRequirementStep,
-} from "./deployment-requirements.ts";
+import type { DeploymentRequirement, DeploymentRequirementStep } from "./deployment-requirements";
 
 export type DeploymentSecretBackendKind = "vault";
 export type DeploymentSecretRefreshMode = "renew" | "reacquire" | "none";

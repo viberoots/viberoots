@@ -1,16 +1,16 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
-import type { NixosSharedHostDeploymentComponent } from "./contract.ts";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts";
+import type { NixosSharedHostDeploymentComponent } from "./contract";
 import {
   baseNixosSharedHostComponentResult,
   withNixosSharedHostPublishState,
-} from "./nixos-shared-host-component-results.ts";
-import { nixosSharedHostContainerRoot } from "./nixos-shared-host-runtime.ts";
+} from "./nixos-shared-host-component-results";
+import { nixosSharedHostContainerRoot } from "./nixos-shared-host-runtime";
 import {
   publishNixosSharedHostStaticWebapp,
   resolveNixosSharedHostStaticWebappLiveState,
-} from "./nixos-shared-host-static-publisher.ts";
-import type { NixosSharedHostConfig } from "./nixos-shared-host.ts";
+} from "./nixos-shared-host-static-publisher";
+import type { NixosSharedHostConfig } from "./nixos-shared-host";
 
 function renderedContainer(
   rendered: NixosSharedHostConfig,

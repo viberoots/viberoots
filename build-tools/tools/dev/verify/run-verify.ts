@@ -2,30 +2,30 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import "zx/globals";
-import { repoRoot } from "../dev-build/paths.ts";
-import { ensureBuckPreludeConfig } from "../dev-build/prelude.ts";
-import { runStartupCheck } from "../dev-build/startup.ts";
-import { parseVerifyArgs } from "./args.ts";
-import { cleanupOrphanBuckDaemons } from "./buck-orphan-cleanup.ts";
-import { runMergedCoverageReport, setupCoverage } from "./coverage.ts";
-import { runExplainSelection } from "./explain-selection.ts";
+import { repoRoot } from "../dev-build/paths";
+import { ensureBuckPreludeConfig } from "../dev-build/prelude";
+import { runStartupCheck } from "../dev-build/startup";
+import { parseVerifyArgs } from "./args";
+import { cleanupOrphanBuckDaemons } from "./buck-orphan-cleanup";
+import { runMergedCoverageReport, setupCoverage } from "./coverage";
+import { runExplainSelection } from "./explain-selection";
 import {
   enforceVerifyDiskGate,
   runVerifyHousekeeping,
   shouldRunNixStoreOptimizeForRequestedTargets,
   verifyTargetFreeGiBDefault,
-} from "./housekeeping.ts";
-import { runVerifyLintPreflight } from "./lint-preflight.ts";
-import { acquireVerifyLock } from "./lock.ts";
-import { ensureVerifyPinnedNixpkgs } from "./nix-env.ts";
-import { recordNixGcPreflight } from "./nix-gc-preflight.ts";
-import { createVerifyPhaseTimer } from "./phase-timing.ts";
-import { logVerifyRevision } from "./preflight.ts";
-import { prewarmVerifyOnce } from "./prewarm.ts";
-import { cleanupVerifyLegacyPnpmState } from "./pnpm-state.ts";
-import { resolveRequestedVerifyScope } from "./requested-scope.ts";
-import { summarizeVerifyScopeDecision } from "./selection-output.ts";
-import { createRegisteredStateCleaner } from "./registered-state-cleanup.ts";
+} from "./housekeeping";
+import { runVerifyLintPreflight } from "./lint-preflight";
+import { acquireVerifyLock } from "./lock";
+import { ensureVerifyPinnedNixpkgs } from "./nix-env";
+import { recordNixGcPreflight } from "./nix-gc-preflight";
+import { createVerifyPhaseTimer } from "./phase-timing";
+import { logVerifyRevision } from "./preflight";
+import { prewarmVerifyOnce } from "./prewarm";
+import { cleanupVerifyLegacyPnpmState } from "./pnpm-state";
+import { resolveRequestedVerifyScope } from "./requested-scope";
+import { summarizeVerifyScopeDecision } from "./selection-output";
+import { createRegisteredStateCleaner } from "./registered-state-cleanup";
 import {
   appendVerifyLogLine,
   killBuckIsolation,
@@ -33,16 +33,13 @@ import {
   startBuckDaemonReaper,
   startBuckWatchdog,
   writeVerifyIsoMarker,
-} from "./process-control.ts";
-import { prepareVerifySeed, shouldPrepareVerifySeedForRequestedTargets } from "./seed.ts";
-import { isNonBuildSystemOnlyVerifyTargets } from "./target-scope.ts";
-import {
-  maybeWriteVerifyTimingSummary,
-  runTemplateManifestCheck,
-} from "./template-manifest-check.ts";
-import { ensureRepoLocalTmpRoot } from "./tmp-root.ts";
-import { runVerifyBuckPasses } from "./verify-passes.ts";
-import { computeZxTestNodeModulesOut } from "./zx-node-modules.ts";
+} from "./process-control";
+import { prepareVerifySeed, shouldPrepareVerifySeedForRequestedTargets } from "./seed";
+import { isNonBuildSystemOnlyVerifyTargets } from "./target-scope";
+import { maybeWriteVerifyTimingSummary, runTemplateManifestCheck } from "./template-manifest-check";
+import { ensureRepoLocalTmpRoot } from "./tmp-root";
+import { runVerifyBuckPasses } from "./verify-passes";
+import { computeZxTestNodeModulesOut } from "./zx-node-modules";
 
 export async function runVerify(): Promise<void> {
   const phaseTimer = createVerifyPhaseTimer({ appendLine: appendVerifyLogLine });

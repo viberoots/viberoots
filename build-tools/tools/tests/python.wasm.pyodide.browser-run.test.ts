@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
-import { runInTemp } from "./lib/test-helpers.ts";
+import { runInTemp } from "./lib/test-helpers";
 
 test("python wasm (pyodide): build-and-run prints pyodide banner", async () => {
   await runInTemp("py-wasm-pyodide-build-run", async (tmp, $) => {

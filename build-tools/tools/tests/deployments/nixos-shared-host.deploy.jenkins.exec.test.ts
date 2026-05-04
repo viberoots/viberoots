@@ -3,14 +3,14 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
-import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop.ts";
-import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
-import { installFakeRemoteTransport } from "./nixos-shared-host.remote-transport.fake.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
+import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop";
+import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime";
+import { runInTemp } from "../lib/test-helpers";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { installFakeRemoteTransport } from "./nixos-shared-host.remote-transport.fake";
 import {
   installClientProfile,
   installReviewedPleominoTargets,
@@ -20,8 +20,8 @@ import {
   writeArtifact,
   writeReviewedPleominoAdmissionEvidence,
   writeJenkinsAuthFiles,
-} from "./nixos-shared-host.jenkins.fixture.ts";
-import { readBackendSnapshot } from "./nixos-shared-host.control-plane.helpers.ts";
+} from "./nixos-shared-host.jenkins.fixture";
+import { readBackendSnapshot } from "./nixos-shared-host.control-plane.helpers";
 
 const CONTROL_PLANE_TOKEN = "test-control-plane-token";
 

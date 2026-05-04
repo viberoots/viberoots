@@ -1,14 +1,14 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { GooglePlayDeployment } from "../../deployments/contract.ts";
+import type { GooglePlayDeployment } from "../../deployments/contract";
 import {
   installMobileSharedTargets,
   labelDir,
   labelName,
   renderRolloutPolicyLines,
   writePublisherConfig,
-} from "./mobile-release.e2e.helpers.ts";
+} from "./mobile-release.e2e.helpers";
 
 export async function writeGooglePlayConfig(
   workspaceRoot: string,

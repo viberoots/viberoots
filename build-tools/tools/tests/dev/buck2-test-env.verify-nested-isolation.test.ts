@@ -4,7 +4,7 @@ import { test } from "node:test";
 import {
   buildVerifyTestEnvArgs,
   previewVerifyNestedBuckIsolation,
-} from "../../dev/verify/buck2-test-env.ts";
+} from "../../dev/verify/buck2-test-env";
 
 test("verify child env reuses a shared nested buck isolation per pass", () => {
   const shared = previewVerifyNestedBuckIsolation("v-123", "shared");

@@ -1,18 +1,19 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { ensureGraph } from "../buck/glue-run.ts";
-import { allDevOverrideEnvNames } from "../lib/dev-override-envs.ts";
-import { getImporterRootsContract } from "../lib/importer-roots.ts";
-import { sanitizeAttrNameFromLabel } from "../lib/labels.ts";
-import { runNodeWithZx } from "../lib/node-run.ts";
-import { findRepoRoot, pathExists } from "../lib/repo.ts";
-import { getArgvTokens } from "../lib/cli.ts";
-import { withScopedEnv } from "../lib/scoped-env.ts";
-import { untrackedRequiresImpureForTargets } from "./dev-build/untracked.ts";
-import { stripAnsi, targetPackageFromLabel } from "./build-selected-helpers.ts";
-import { makeFilteredFlakeRef } from "./filtered-flake.ts";
-import { resolveSelectedTargetLabel } from "./target-label-resolver.ts";
+import { runNixBuildWithTransientRetry } from "./build-selected-nix-retry";
+import { ensureGraph } from "../buck/glue-run";
+import { allDevOverrideEnvNames } from "../lib/dev-override-envs";
+import { getImporterRootsContract } from "../lib/importer-roots";
+import { sanitizeAttrNameFromLabel } from "../lib/labels";
+import { runNodeWithZx } from "../lib/node-run";
+import { findRepoRoot, pathExists } from "../lib/repo";
+import { getArgvTokens } from "../lib/cli";
+import { withScopedEnv } from "../lib/scoped-env";
+import { untrackedRequiresImpureForTargets } from "./dev-build/untracked";
+import { stripAnsi, targetPackageFromLabel } from "./build-selected-helpers";
+import { makeFilteredFlakeRef } from "./filtered-flake";
+import { resolveSelectedTargetLabel } from "./target-label-resolver";
 function parseSourceMode(argv: string[]): {
   sourceMode: "auto" | "git" | "path";
   sourceError?: string;
@@ -199,24 +200,27 @@ async function main() {
     sourceMode: parsedSource.sourceMode,
   });
   const nixTrace = exporterDebug === "1" ? "--show-trace" : "";
-  const { stdout, exitCode } = await (async () => {
-    try {
-      if (nixTrace) {
-        return await $({
-          env: sanitizedEnv,
-          reject: false,
-          nothrow: true,
-        })`nix build --impure --no-write-lock-file --option eval-cache false --accept-flake-config --print-out-paths ${nixTrace} ${flakeSource.flakeRef}`;
-      }
+  const runOnce = async () => {
+    if (nixTrace) {
       return await $({
         env: sanitizedEnv,
         reject: false,
         nothrow: true,
-      })`nix build --impure --no-write-lock-file --option eval-cache false --accept-flake-config --print-out-paths ${flakeSource.flakeRef}`;
-    } finally {
-      await flakeSource.cleanup?.();
+      })`nix build --impure --no-write-lock-file --option eval-cache false --accept-flake-config --print-out-paths ${nixTrace} ${flakeSource.flakeRef}`;
     }
-  })();
+    return await $({
+      env: sanitizedEnv,
+      reject: false,
+      nothrow: true,
+    })`nix build --impure --no-write-lock-file --option eval-cache false --accept-flake-config --print-out-paths ${flakeSource.flakeRef}`;
+  };
+  let attempt: any;
+  try {
+    attempt = await runNixBuildWithTransientRetry({ runOnce });
+  } finally {
+    await flakeSource.cleanup?.();
+  }
+  const { stdout, exitCode } = attempt;
   if (exitCode !== 0) {
     console.error(
       "[build-selected] nix build failed.\n" +

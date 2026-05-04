@@ -2,19 +2,19 @@
 import type {
   NixosSharedHostDeploymentComponent,
   NixosSharedHostSsrRuntimeContract,
-} from "./contract.ts";
-import { hasNixosSharedHostSsrRuntimeContract } from "./contract.ts";
-import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
+} from "./contract";
+import { hasNixosSharedHostSsrRuntimeContract } from "./contract";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts";
 import {
   publishNixosSharedHostSsrWebapp,
   resolveNixosSharedHostSsrWebappLiveState,
-} from "./nixos-shared-host-ssr-publisher.ts";
+} from "./nixos-shared-host-ssr-publisher";
 import {
   publishNixosSharedHostStaticWebapp,
   resolveNixosSharedHostStaticWebappLiveState,
-} from "./nixos-shared-host-static-publisher.ts";
-import type { NixosSharedHostConfig } from "./nixos-shared-host.ts";
-import { nixosSharedHostContainerRoot } from "./nixos-shared-host-runtime.ts";
+} from "./nixos-shared-host-static-publisher";
+import type { NixosSharedHostConfig } from "./nixos-shared-host";
+import { nixosSharedHostContainerRoot } from "./nixos-shared-host-runtime";
 
 export type NixosSharedHostPublishedSmokeInput =
   | { kind: "static-webapp"; indexPath: string }

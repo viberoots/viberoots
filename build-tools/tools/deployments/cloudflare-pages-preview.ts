@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { createHash } from "node:crypto";
-import { sanitizeName } from "../lib/sanitize.ts";
-import type { CloudflarePagesDeployment, CloudflarePagesProviderTarget } from "./contract.ts";
+import { sanitizeName } from "../lib/sanitize";
+import type { CloudflarePagesDeployment, CloudflarePagesProviderTarget } from "./contract";
 
 export type CloudflarePagesPreviewIdentitySelector = {
   kind: "source_run";

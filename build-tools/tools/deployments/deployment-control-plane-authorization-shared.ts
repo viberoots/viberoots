@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import type { DeploymentTarget } from "./contract.ts";
+import type { DeploymentTarget } from "./contract";
 import type {
   DeploymentControlPlaneAuthorization,
   DeploymentControlPlaneRole,
   DeploymentControlPlaneScope,
-} from "./deployment-control-plane-contract.ts";
-import { packagePathFromLabel } from "../lib/labels.ts";
+} from "./deployment-control-plane-contract";
+import { packagePathFromLabel } from "../lib/labels";
 
 function projectScopeValueForLabel(label: string): string {
   const packageName = path.posix.basename(packagePathFromLabel(label));

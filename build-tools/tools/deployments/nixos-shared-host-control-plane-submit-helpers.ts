@@ -1,27 +1,27 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostGateEvaluator } from "./nixos-shared-host-progressive-execution.ts";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
-import { revalidateControlPlaneAdmission } from "./deployment-control-plane-revalidation.ts";
+import type { NixosSharedHostGateEvaluator } from "./nixos-shared-host-progressive-execution";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
+import { revalidateControlPlaneAdmission } from "./deployment-control-plane-revalidation";
 import type {
   NixosSharedHostControlPlaneSnapshot,
   NixosSharedHostControlPlaneSubmission,
-} from "./nixos-shared-host-control-plane-contract.ts";
-import { createNixosSharedHostWorkerId } from "./nixos-shared-host-control-plane-snapshot-helpers.ts";
+} from "./nixos-shared-host-control-plane-contract";
+import { createNixosSharedHostWorkerId } from "./nixos-shared-host-control-plane-snapshot-helpers";
 import {
   acquireNixosSharedHostControlPlaneLocks,
   runNixosSharedHostControlPlaneWorker,
-} from "./nixos-shared-host-control-plane-execution.ts";
-import { lockWaitAbortReasonForSubmission } from "./deployment-control-plane-queue.ts";
+} from "./nixos-shared-host-control-plane-execution";
+import { lockWaitAbortReasonForSubmission } from "./deployment-control-plane-queue";
 import {
   readControlPlaneJson,
   writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
+} from "./nixos-shared-host-control-plane-store";
 import {
   finalizeSubmissionFromRecordedError,
   recoverControlPlaneSubmission,
-} from "./nixos-shared-host-control-plane-submit-finalize.ts";
-import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records.ts";
-import { cleanupReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot.ts";
+} from "./nixos-shared-host-control-plane-submit-finalize";
+import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records";
+import { cleanupReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot";
 
 export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
   submission: NixosSharedHostControlPlaneSubmission;

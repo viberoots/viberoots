@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentProviderCapability } from "./types.ts";
+import type { DeploymentProviderCapability } from "./types";
 
 const DEPLOY_CODE_SNIPPET = /`(deploy [^`]*)`/g;
 const ALLOWED_NON_SELECTOR_COMMAND = /^deploy --(?:help|list)\b/;

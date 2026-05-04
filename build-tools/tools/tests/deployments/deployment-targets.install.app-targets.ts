@@ -1,13 +1,13 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { ReviewedDeployment } from "./deployment-targets.install.fragments.ts";
+import type { ReviewedDeployment } from "./deployment-targets.install.fragments";
 import {
   ensureParentDir,
   labelDir,
   labelName,
   uniqueBy,
-} from "./deployment-targets.install.fragments.ts";
-import { renderStringList } from "./deployment-targets.install.render.ts";
+} from "./deployment-targets.install.fragments";
+import { renderStringList } from "./deployment-targets.install.render";
 
 export async function installAppTargetsForDeployments(
   workspaceRoot: string,

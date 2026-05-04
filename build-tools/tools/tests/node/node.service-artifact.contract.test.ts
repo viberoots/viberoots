@@ -8,7 +8,7 @@ import {
   artifactIdentityForNodeServiceDir,
   createNodeServiceArtifact,
   loadServiceRuntimeContract,
-} from "../../node/service-artifact.ts";
+} from "../../node/service-artifact";
 
 async function withTemp<T>(prefix: string, fn: (tmp: string) => Promise<T>): Promise<T> {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), `${prefix}-`));

@@ -1,22 +1,22 @@
 #!/usr/bin/env zx-wrapper
-import type { CloudflarePagesControlPlaneSubmitRequest } from "./cloudflare-pages-control-plane-api-contract.ts";
-import type { CloudflarePagesArtifactInput } from "./cloudflare-pages-artifact-input.ts";
-import type { CloudflarePagesSmokeConnectOverride } from "./cloudflare-pages-control-plane-contract.ts";
+import type { CloudflarePagesControlPlaneSubmitRequest } from "./cloudflare-pages-control-plane-api-contract";
+import type { CloudflarePagesArtifactInput } from "./cloudflare-pages-artifact-input";
+import type { CloudflarePagesSmokeConnectOverride } from "./cloudflare-pages-control-plane-contract";
 import {
   findLatestCloudflarePagesPreviewRecord,
   resolveCloudflarePagesPreviewSelection,
-} from "./cloudflare-pages-preview-source.ts";
+} from "./cloudflare-pages-preview-source";
 import {
   resolveCloudflarePagesPromotionSelection,
   resolveCloudflarePagesPromotionSourceSelection,
-} from "./cloudflare-pages-promotion.ts";
-import { resolveCloudflarePagesRollbackSelection } from "./cloudflare-pages-rollback.ts";
+} from "./cloudflare-pages-promotion";
+import { resolveCloudflarePagesRollbackSelection } from "./cloudflare-pages-rollback";
 import {
   requireTargetException,
   validateTransitionRequest,
   type CloudflarePagesTargetTransitionOperationKind,
-} from "./cloudflare-pages-target-transition.ts";
-import type { DeploymentTargetException } from "./deployment-target-exceptions.ts";
+} from "./cloudflare-pages-target-transition";
+import type { DeploymentTargetException } from "./deployment-target-exceptions";
 
 type RequestCommon = {
   request: CloudflarePagesControlPlaneSubmitRequest;

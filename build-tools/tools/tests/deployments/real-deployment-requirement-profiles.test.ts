@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { extractDeployments } from "../../deployments/contract.ts";
+import { extractDeployments } from "../../deployments/contract";
 import {
   queryDeploymentNodes,
   resolveDeploymentFromTarget,
-} from "../../deployments/deployment-query.ts";
-import type { GraphNode } from "../../lib/graph.ts";
+} from "../../deployments/deployment-query";
+import type { GraphNode } from "../../lib/graph";
 
 const STAGING = "//projects/deployments/pleomino-staging:deploy";
 const PROD = "//projects/deployments/pleomino-prod:deploy";

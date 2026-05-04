@@ -1,6 +1,6 @@
-import { appendVerifyLogLine } from "./process-control.ts";
-import { isNixGcCommand } from "../../lib/nix-gc-lock.ts";
-import { resolveToolPath } from "../../lib/tool-paths.ts";
+import { appendVerifyLogLine } from "./process-control";
+import { isNixGcCommand } from "../../lib/nix-gc-lock";
+import { resolveToolPath } from "../../lib/tool-paths";
 
 export async function activeNixGcProcesses(): Promise<Array<{ pid: number; command: string }>> {
   const psPath = await resolveToolPath("ps");

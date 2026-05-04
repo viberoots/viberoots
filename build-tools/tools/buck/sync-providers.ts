@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { syncAllProviders } from "./providers/index.ts";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const.ts";
-import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
-import { runGluePipeline } from "./glue-pipeline.ts";
+import { syncAllProviders } from "./providers/index";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli";
+import { runGluePipeline } from "./glue-pipeline";
 
 function dbgEnabled(): boolean {
   try {

@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import path from "node:path";
-import { exists } from "./test-helpers.ts";
-import { inferRunnableFromOutPath } from "../../lib/runnables.ts";
+import { exists } from "./test-helpers";
+import { inferRunnableFromOutPath } from "../../lib/runnables";
 
 type SsrAdapterConformanceOpts = {
   label: string;

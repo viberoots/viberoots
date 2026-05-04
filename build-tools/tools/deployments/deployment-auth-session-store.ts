@@ -4,8 +4,8 @@ import path from "node:path";
 import {
   DEPLOYMENT_AUTH_SESSION_RECORD_SCHEMA,
   type DeploymentAuthSessionRecord,
-} from "./deployment-auth-session-types.ts";
-import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store.ts";
+} from "./deployment-auth-session-types";
+import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store";
 
 function authSessionDir(recordsRoot: string): string {
   return path.join(recordsRoot, "control-plane", "auth-sessions");

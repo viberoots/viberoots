@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import path from "node:path";
-import { submitDeploymentControlPlaneRunAction } from "../../deployments/deployment-control-plane-run-action.ts";
-import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
+import { submitDeploymentControlPlaneRunAction } from "../../deployments/deployment-control-plane-run-action";
+import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
-import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers.ts";
+} from "./nixos-shared-host.fixture";
+import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 
 export async function pendingApprovalRun(
   tmp: string,

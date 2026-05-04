@@ -7,7 +7,7 @@ import { exists, runInTemp } from "../lib/test-helpers";
 import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
   stageTempRepoPaths,
-} from "../lib/test-helpers/git-stage.ts";
+} from "../lib/test-helpers/git-stage";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;

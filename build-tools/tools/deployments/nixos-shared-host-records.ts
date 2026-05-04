@@ -2,35 +2,32 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
-import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results.ts";
-import type { NixosSharedHostMutationAuthority } from "./nixos-shared-host-control-plane-contract.ts";
-import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
-import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
-import { readVersionedJson } from "./deployment-schema-compat.ts";
+import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission";
+import type { NixosSharedHostComponentResult } from "./nixos-shared-host-component-results";
+import type { NixosSharedHostMutationAuthority } from "./nixos-shared-host-control-plane-contract";
+import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout";
+import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan";
+import { readVersionedJson } from "./deployment-schema-compat";
 import {
   isCurrentNixosSharedHostDeployRecord,
   NIXOS_SHARED_HOST_RECORD_MIGRATIONS,
   type NixosSharedHostRecordOutcome,
-} from "./nixos-shared-host-record-compat.ts";
+} from "./nixos-shared-host-record-compat";
 import {
   nixosSharedHostRunnerIdentities,
   type NixosSharedHostRunnerIdentities,
-} from "./nixos-shared-host-provenance.ts";
+} from "./nixos-shared-host-provenance";
 import {
   NIXOS_SHARED_HOST_PROVIDER,
   SSR_WEBAPP_COMPONENT,
   type NixosSharedHostDeployment,
   type NixosSharedHostProviderTarget,
-} from "./contract.ts";
-import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
-import type {
-  DeploymentSmokeException,
-  DeploymentSmokeOutcome,
-} from "./deployment-smoke-policy.ts";
-import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
-import { recordAuthorityFields } from "./nixos-shared-host-record-authority.ts";
-import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
+} from "./contract";
+import type { DeploymentPrincipal } from "./deployment-admission-evidence";
+import type { DeploymentSmokeException, DeploymentSmokeOutcome } from "./deployment-smoke-policy";
+import { operatorErrorFields } from "./deployment-control-plane-redaction";
+import { recordAuthorityFields } from "./nixos-shared-host-record-authority";
+import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components";
 export const NIXOS_SHARED_HOST_RECORD_SCHEMA = "deploy-record@2026-04-10";
 export type NixosSharedHostOperationKind =
   | "deploy"

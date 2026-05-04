@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fs from "node:fs/promises";
-import type { VercelDeployment } from "./contract.ts";
-import { terminalSubmissionFromAdmissionFailure } from "./deployment-provider-control-plane-admission-failure.ts";
+import type { VercelDeployment } from "./contract";
+import { terminalSubmissionFromAdmissionFailure } from "./deployment-provider-control-plane-admission-failure";
 import {
   enqueueBackendSubmission,
   writeBackendDeployRecordDoc,
@@ -9,16 +9,16 @@ import {
   writeBackendSubmissionDoc,
   acquireBackendControlPlaneLock,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
+} from "./nixos-shared-host-control-plane-backend";
 import {
   executionSnapshotPathFor,
   submissionPathFor,
   writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store.ts";
-import { submitResponseFromSubmission } from "./deployment-control-plane-status.ts";
-import { submitVercelDeploy, submitVercelPreviewCleanup } from "./vercel-deploy.ts";
-import { submitVercelExactArtifactRun } from "./vercel-exact-run.ts";
-import { resolveVercelReplaySource } from "./vercel-replay.ts";
+} from "./nixos-shared-host-control-plane-store";
+import { submitResponseFromSubmission } from "./deployment-control-plane-status";
+import { submitVercelDeploy, submitVercelPreviewCleanup } from "./vercel-deploy";
+import { submitVercelExactArtifactRun } from "./vercel-exact-run";
+import { resolveVercelReplaySource } from "./vercel-replay";
 
 export const VERCEL_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA = "vercel-control-plane-submit-request@1";
 

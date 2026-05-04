@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { resolveProjectImpactSelection } from "../../lib/project-impact-selector.ts";
+import { runInTemp } from "../lib/test-helpers";
+import { resolveProjectImpactSelection } from "../../lib/project-impact-selector";
 
 type GraphNode = {
   name: string;

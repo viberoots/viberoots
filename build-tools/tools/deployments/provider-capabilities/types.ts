@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentComponentKind } from "../deployment-component-kinds.ts";
-import type { DeploymentRolloutMode } from "../deployment-rollout.ts";
+import type { DeploymentComponentKind } from "../deployment-component-kinds";
+import type { DeploymentRolloutMode } from "../deployment-rollout";
 
 export type ProviderCapabilityBullet = {
   text: string;

@@ -8,7 +8,7 @@ import type {
   NixosSharedHostDeployment,
   S3StaticDeployment,
   VercelDeployment,
-} from "./contract-types.ts";
+} from "./contract-types";
 import {
   APP_STORE_CONNECT_PROVIDER,
   CLOUDFLARE_PAGES_PROVIDER,
@@ -17,7 +17,7 @@ import {
   NIXOS_SHARED_HOST_PROVIDER,
   S3_STATIC_PROVIDER,
   VERCEL_PROVIDER,
-} from "./contract-types.ts";
+} from "./contract-types";
 
 export function isNixosSharedHostDeployment(
   deployment: DeploymentTarget,

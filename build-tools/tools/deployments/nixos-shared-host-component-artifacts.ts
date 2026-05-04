@@ -2,9 +2,9 @@
 import {
   admitNixosSharedHostArtifact,
   type NixosSharedHostAdmittedArtifact,
-} from "./nixos-shared-host-artifacts.ts";
-import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
+} from "./nixos-shared-host-artifacts";
+import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint";
+import type { NixosSharedHostDeployment } from "./contract";
 
 export type NixosSharedHostResolvedComponentArtifact = {
   componentId: string;

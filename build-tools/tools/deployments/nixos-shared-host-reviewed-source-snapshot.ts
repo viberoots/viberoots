@@ -2,10 +2,10 @@
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { shSingleQuote } from "../lib/shell-quote.ts";
-import type { DeploymentTarget } from "./contract.ts";
-import { requiredDeploymentStageBranch } from "./contract.ts";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors.ts";
+import { shSingleQuote } from "../lib/shell-quote";
+import type { DeploymentTarget } from "./contract";
+import { requiredDeploymentStageBranch } from "./contract";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 
 const GITHUB_KNOWN_HOSTS = [
   "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl",

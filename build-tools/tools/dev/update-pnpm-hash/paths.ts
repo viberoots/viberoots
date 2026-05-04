@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { sanitizeName } from "../install/common.ts";
-import { getImporterRootsContract } from "../../lib/importer-roots.ts";
+import { sanitizeName } from "../install/common";
+import { getImporterRootsContract } from "../../lib/importer-roots";
 
 export function safeRealpath(p: string): string {
   try {

@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import process from "node:process";
 import timers from "node:timers";
-import { getArgvTokens, removeKnownFlags } from "../lib/cli.ts";
-import { runManagedCommand, type ManagedCommandActivity } from "../lib/managed-command.ts";
+import { getArgvTokens, removeKnownFlags } from "../lib/cli";
+import { runManagedCommand, type ManagedCommandActivity } from "../lib/managed-command";
 
 type Options = {
   prefix: string;

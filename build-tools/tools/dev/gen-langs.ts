@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fsp from "node:fs/promises";
 import path from "node:path";
-import { findRepoRoot } from "../lib/repo.ts";
+import { findRepoRoot } from "../lib/repo";
 
 type Capabilities = Record<string, boolean>;
 type Lang = {

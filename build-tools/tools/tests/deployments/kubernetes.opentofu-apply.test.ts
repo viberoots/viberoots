@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import type { OpenTofuProvisionerMetadata } from "../../deployments/opentofu-stack.ts";
+import type { OpenTofuProvisionerMetadata } from "../../deployments/opentofu-stack";
 import {
   OpenTofuApplyMismatchError,
   runOpenTofuReviewedApply,
-} from "../../deployments/opentofu-apply.ts";
+} from "../../deployments/opentofu-apply";
 import {
   PLAN_FINGERPRINT,
   STACK_CONFIG_FINGERPRINT,
@@ -16,7 +16,7 @@ import {
   recordingAdapter,
   setupArtifact,
   writePlanArtifact,
-} from "./kubernetes.opentofu-apply.helpers.ts";
+} from "./kubernetes.opentofu-apply.helpers";
 
 async function tempDir(t: any): Promise<string> {
   const tmp = await fsp.mkdtemp(path.join(process.cwd(), ".opentofu-apply-"));

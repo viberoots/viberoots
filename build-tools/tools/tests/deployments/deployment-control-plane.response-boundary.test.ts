@@ -5,7 +5,7 @@ import {
   runActionResponseFromSubmission,
   statusFromSubmission,
   submitResponseFromSubmission,
-} from "../../deployments/deployment-control-plane-status.ts";
+} from "../../deployments/deployment-control-plane-status";
 
 function submissionWithLeakedApprovalPath() {
   return {

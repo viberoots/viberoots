@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import path from "node:path";
 import { test } from "node:test";
-import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy.ts";
-import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy";
+import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture";
+import { runInTemp } from "../lib/test-helpers";
 
 const deploymentLabel = "//sandbox/deployments/demo-dev:deploy";
 

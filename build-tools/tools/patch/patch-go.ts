@@ -13,7 +13,7 @@ import {
   resetWorkspaceWorkflow,
   startWorkspaceWorkflow,
 } from "./lib/workspace-workflow";
-import { devOverrideEnvNameForLang } from "../lib/dev-override-envs.ts";
+import { devOverrideEnvNameForLang } from "../lib/dev-override-envs";
 
 const dbg = createDbg("patch-go");
 

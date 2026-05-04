@@ -6,7 +6,7 @@ import { test } from "node:test";
 import {
   OpenTofuApplyMismatchError,
   runOpenTofuReviewedApply,
-} from "../../deployments/opentofu-apply.ts";
+} from "../../deployments/opentofu-apply";
 import {
   PLAN_FINGERPRINT,
   fakeSecretRuntime,
@@ -15,7 +15,7 @@ import {
   setupArtifact,
   throwingSecretRuntime,
   writePlanArtifact,
-} from "./kubernetes.opentofu-apply.helpers.ts";
+} from "./kubernetes.opentofu-apply.helpers";
 
 async function tempDir(t: any): Promise<string> {
   const tmp = await fsp.mkdtemp(path.join(process.cwd(), ".opentofu-apply-guard-"));

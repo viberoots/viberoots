@@ -4,8 +4,8 @@ import path from "node:path";
 import {
   admitNixosSharedHostComponentArtifacts,
   compositeNixosSharedHostArtifactIdentity,
-} from "../../deployments/nixos-shared-host-component-artifacts.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
+} from "../../deployments/nixos-shared-host-component-artifacts";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 export async function writeBootstrapArtifact(root: string, body: string) {
   await fsp.mkdir(root, { recursive: true });

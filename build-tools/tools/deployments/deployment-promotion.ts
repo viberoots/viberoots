@@ -1,30 +1,30 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
-import { requiredDeploymentStageBranch } from "./contract.ts";
+import type { DeploymentTarget } from "./contract";
+import { requiredDeploymentStageBranch } from "./contract";
 import {
   resolveDeploymentPromotionSource,
   resolveDeploymentPromotionSourceRecordPath,
   type NixosSharedHostReplaySnapshot,
-} from "./deployment-promotion-source.ts";
-import { normalizeSingleComponentArtifactInput } from "./nixos-shared-host-single-component-artifact-input.ts";
+} from "./deployment-promotion-source";
+import { normalizeSingleComponentArtifactInput } from "./nixos-shared-host-single-component-artifact-input";
 import {
   exactArtifactPromotionErrors,
   promotionCompatibilityErrors,
   sourcePromotionRevision,
-} from "./deployment-promotion-compatibility.ts";
+} from "./deployment-promotion-compatibility";
 import type {
   CrossDeploymentPromotionSelection,
   CrossDeploymentPromotionSourceSelection,
   DeploymentPromotionSource,
-} from "./deployment-promotion-types.ts";
-import { resolveDeploymentGitCommit } from "./deployment-git-ref.ts";
+} from "./deployment-promotion-types";
+import { resolveDeploymentGitCommit } from "./deployment-git-ref";
 export type {
   CrossDeploymentPromotionSelection,
   CrossDeploymentPromotionSourceSelection,
   DeploymentPromotionSource,
-} from "./deployment-promotion-types.ts";
-export { resolveDeploymentPromotionSource } from "./deployment-promotion-source.ts";
-export { resolveDeploymentPromotionSourceRecordPath } from "./deployment-promotion-source.ts";
+} from "./deployment-promotion-types";
+export { resolveDeploymentPromotionSource } from "./deployment-promotion-source";
+export { resolveDeploymentPromotionSourceRecordPath } from "./deployment-promotion-source";
 
 async function eligibilityErrors(
   workspaceRoot: string,

@@ -1,12 +1,12 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const.ts";
-import { resolveToolPath } from "../../lib/tool-paths.ts";
+import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
+import { resolveToolPath } from "../../lib/tool-paths";
 import {
   formatRunnableLine,
   inferRunnableFromOutPath,
   parseRunnableManifest,
-} from "../../lib/runnables.ts";
+} from "../../lib/runnables";
 
 function materializeTimeoutSec(defaultSec: number): number {
   const raw = String(process.env.BNX_MATERIALIZE_TIMEOUT_SEC || "").trim();

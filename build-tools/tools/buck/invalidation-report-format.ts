@@ -1,4 +1,4 @@
-import type { InvalidationRow, ProviderIndexEntryExt } from "./invalidation-report-lib.ts";
+import type { InvalidationRow, ProviderIndexEntryExt } from "./invalidation-report-lib";
 
 export function formatTextRow(
   row: InvalidationRow,

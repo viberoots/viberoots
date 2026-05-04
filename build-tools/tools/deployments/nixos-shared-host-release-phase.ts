@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
-import { withFailedStep } from "./nixos-shared-host-deploy-failure.ts";
+import type { NixosSharedHostDeployment } from "./contract";
+import type { DeploymentReleaseAction } from "./deployment-release-actions";
+import { withFailedStep } from "./nixos-shared-host-deploy-failure";
 import {
   runNixosSharedHostReleaseActionPhase,
   type NixosSharedHostReleaseActionExecutionPath,
-} from "./nixos-shared-host-release-actions.ts";
+} from "./nixos-shared-host-release-actions";
 
 export function createNixosSharedHostReleasePhaseRunner(opts: {
   recordsRoot: string;

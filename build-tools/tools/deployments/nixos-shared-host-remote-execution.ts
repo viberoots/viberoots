@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
+import type { NixosSharedHostDeployment } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs";
 import {
   buildRemoteArtifactStageArgvWithFallback,
   buildRemoteCleanupScript,
@@ -10,26 +10,26 @@ import {
   buildRemoteStageFinalizeScript,
   buildRemoteStagePrepareScript,
   type NixosSharedHostRemoteSmokeConnectOverride,
-} from "./nixos-shared-host-remote-shell.ts";
+} from "./nixos-shared-host-remote-shell";
 import {
   createNixosSharedHostRemoteArtifactPath,
   type NixosSharedHostRemotePlan,
-} from "./nixos-shared-host-remote-target.ts";
-import { createNixosSharedHostDeployRunId } from "./nixos-shared-host-records.ts";
-import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door.ts";
+} from "./nixos-shared-host-remote-target";
+import { createNixosSharedHostDeployRunId } from "./nixos-shared-host-records";
+import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door";
 import {
   commandFailure,
   remoteServiceSubmissionError,
   requireServiceRecord,
   runCommand,
-} from "./nixos-shared-host-remote-execution-transport.ts";
+} from "./nixos-shared-host-remote-execution-transport";
 import {
   createAndWaitForServiceOwnedAuthSession,
   shouldUseServiceOwnedInteractiveAuth,
-} from "./deployment-service-auth-client.ts";
-import { requireServiceTokenFromEnv } from "./nixos-shared-host-service-client-config.ts";
-import { expectedNixosSharedHostArtifactIdentities } from "./deployment-artifact-binding.ts";
-import { stagedUploadTempPath } from "./nixos-shared-host-staged-artifact.ts";
+} from "./deployment-service-auth-client";
+import { requireServiceTokenFromEnv } from "./nixos-shared-host-service-client-config";
+import { expectedNixosSharedHostArtifactIdentities } from "./deployment-artifact-binding";
+import { stagedUploadTempPath } from "./nixos-shared-host-staged-artifact";
 
 export type NixosSharedHostRemoteDeploySummary = {
   executionMode: "remote-profile";

@@ -1,10 +1,10 @@
-import type { ScafContext, ScafFlags } from "../types.ts";
+import type { ScafContext, ScafFlags } from "../types";
 
 import path from "node:path";
 
 import * as fsp from "node:fs/promises";
 
-import { exists } from "../fs.ts";
+import { exists } from "../fs";
 
 function ensureSuffix(name: string, suffix: string): string {
   return name.endsWith(suffix) ? name : name + suffix;

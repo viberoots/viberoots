@@ -1,5 +1,5 @@
-import type { KubernetesDeployment } from "./contract.ts";
-import type { AdmittedKubernetesComponentArtifact } from "./kubernetes-artifacts.ts";
+import type { KubernetesDeployment } from "./contract";
+import type { AdmittedKubernetesComponentArtifact } from "./kubernetes-artifacts";
 
 export function requiredArtifactPaths(
   deployment: KubernetesDeployment,

@@ -2,10 +2,10 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { copyTree } from "../lib/copy-tree.ts";
-import { sanitizeName } from "../lib/sanitize.ts";
-import { inspectStaticWebappArtifactDir } from "./static-webapp-artifact-bundle.ts";
-import { assertFinalizedStagedArtifactPath } from "./nixos-shared-host-staged-artifact.ts";
+import { copyTree } from "../lib/copy-tree";
+import { sanitizeName } from "../lib/sanitize";
+import { inspectStaticWebappArtifactDir } from "./static-webapp-artifact-bundle";
+import { assertFinalizedStagedArtifactPath } from "./nixos-shared-host-staged-artifact";
 
 export const NIXOS_SHARED_HOST_ARTIFACT_PROVENANCE_SCHEMA =
   "nixos-shared-host-artifact-provenance@2";

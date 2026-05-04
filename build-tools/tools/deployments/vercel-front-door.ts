@@ -1,19 +1,19 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getFlagStr } from "../lib/cli.ts";
-import type { VercelDeployment } from "./contract.ts";
-import { resolveArtifactDirForCli } from "./deployment-cli-resolve.ts";
-import type { DeployCliReadonlyFlags } from "./deploy-cli-readonly.ts";
-import { printDeployJson } from "./deploy-front-door.ts";
-import { summarizeDeploymentResult } from "./deployment-execution.ts";
+import { getFlagStr } from "../lib/cli";
+import type { VercelDeployment } from "./contract";
+import { resolveArtifactDirForCli } from "./deployment-cli-resolve";
+import type { DeployCliReadonlyFlags } from "./deploy-cli-readonly";
+import { printDeployJson } from "./deploy-front-door";
+import { summarizeDeploymentResult } from "./deployment-execution";
 import {
   submitVercelDeploy,
   submitVercelPreviewCleanup,
   summarizeVercelResult,
-} from "./vercel-deploy.ts";
-import { submitVercelExactArtifactRun } from "./vercel-exact-run.ts";
-import { resolveVercelReplaySource } from "./vercel-replay.ts";
-import { runProtectedVercelDeployFrontDoor } from "./vercel-protected-front-door.ts";
+} from "./vercel-deploy";
+import { submitVercelExactArtifactRun } from "./vercel-exact-run";
+import { resolveVercelReplaySource } from "./vercel-replay";
+import { runProtectedVercelDeployFrontDoor } from "./vercel-protected-front-door";
 
 export async function runVercelDeployFrontDoor(opts: {
   workspaceRoot: string;

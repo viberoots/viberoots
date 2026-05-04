@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { normalizeTargetLabel } from "./labels.ts";
+import { normalizeTargetLabel } from "./labels";
 
 /**
  * Classify whether a Buck node name refers to a provider-package node,

@@ -5,7 +5,7 @@ import {
   CONTROL_PLANE_SUBMISSION_TIMEOUT_MS,
   createNixosSharedHostArtifactChallengeViaService,
   submitNixosSharedHostControlPlaneViaService,
-} from "../../deployments/nixos-shared-host-control-plane-client.ts";
+} from "../../deployments/nixos-shared-host-control-plane-client";
 
 test("control-plane client default submit wait covers long smoke budgets", () => {
   assert.equal(CONTROL_PLANE_SUBMISSION_TIMEOUT_MS, 10 * 60 * 1000);

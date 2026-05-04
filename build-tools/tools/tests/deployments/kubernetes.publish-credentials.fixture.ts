@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "../../deployments/deployment-secret-fixture.ts";
-import type { DeploymentRequirement } from "../../deployments/deployment-requirements.ts";
-import type { KubernetesPublishCredentialsHooks } from "../../deployments/kubernetes-publish-credentials-orchestration.ts";
+import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "../../deployments/deployment-secret-fixture";
+import type { DeploymentRequirement } from "../../deployments/deployment-requirements";
+import type { KubernetesPublishCredentialsHooks } from "../../deployments/kubernetes-publish-credentials-orchestration";
 
 export const REVIEWED_KUBERNETES_PUBLISH_CONTRACT =
   "vault:secret/kubernetes/shared-observability/publish-kubeconfig";

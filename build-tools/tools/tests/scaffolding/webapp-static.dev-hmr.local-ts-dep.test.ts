@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { after, test } from "node:test";
-import { runWebappLocalTsDependencyTest } from "./lib/webapp-local-ts-dep.ts";
+import { runWebappLocalTsDependencyTest } from "./lib/webapp-local-ts-dep";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;

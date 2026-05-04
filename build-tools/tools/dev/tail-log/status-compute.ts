@@ -1,5 +1,5 @@
 import fsp from "node:fs/promises";
-import { computeVerifyStatusFromLogText } from "../../lib/verify-log-status.ts";
+import { computeVerifyStatusFromLogText } from "../../lib/verify-log-status";
 
 export function emptyNdjson(pid: number, error: string): string {
   return JSON.stringify({

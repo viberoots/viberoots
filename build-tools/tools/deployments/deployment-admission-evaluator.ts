@@ -1,35 +1,35 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
+import type { DeploymentTarget } from "./contract";
 import {
   requireBuiltInExecutionBoundary,
   requiredApprovalFacts,
-} from "./deployment-admission-approvals.ts";
+} from "./deployment-admission-approvals";
 import {
   createDeploymentAdmissionBinding,
   type DeploymentAdmissionOperationKind,
-} from "./deployment-admission-binding.ts";
+} from "./deployment-admission-binding";
 import {
   defaultRequestedBy,
   type DeploymentAdmissionEvidence,
   type DeploymentAdmissionPolicyEvaluation,
-} from "./deployment-admission-evidence.ts";
-import { type DeploymentRunRecordLike } from "./deployment-admission-records.ts";
+} from "./deployment-admission-evidence";
+import { type DeploymentRunRecordLike } from "./deployment-admission-records";
 import {
   prerequisiteFacts,
   requiredCheckFacts,
   sourceRevisionFor,
   type AdmittedContextLike,
-} from "./deployment-admission-facts.ts";
+} from "./deployment-admission-facts";
 import {
   resolveLaneGovernanceFact,
   type DeploymentLaneGovernanceResolver,
-} from "./deployment-lane-governance-resolution.ts";
+} from "./deployment-lane-governance-resolution";
 import {
   evaluateAttestationPolicy,
   evaluateSbomPolicy,
   evaluateSupplyChainGatePolicies,
-} from "./deployment-admission-supply-chain-evaluator.ts";
-import { evaluateReadinessGatePolicies } from "./deployment-readiness-gates.ts";
+} from "./deployment-admission-supply-chain-evaluator";
+import { evaluateReadinessGatePolicies } from "./deployment-readiness-gates";
 
 export async function evaluateDeploymentAdmission(opts: {
   workspaceRoot: string;

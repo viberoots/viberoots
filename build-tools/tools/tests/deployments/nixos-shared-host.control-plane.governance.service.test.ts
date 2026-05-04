@@ -2,20 +2,16 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy.ts";
-import { resolveDeploymentFromTarget } from "../../deployments/deployment-query.ts";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
-import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop.ts";
-import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture.ts";
-import {
-  readRecord,
-  waitFor,
-  writeDemoArtifact,
-} from "./nixos-shared-host.control-plane.helpers.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy";
+import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
+import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop";
+import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture";
+import { readRecord, waitFor, writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
+import { runInTemp } from "../lib/test-helpers";
 
 async function deployWithChecks(opts: {
   tmp: string;

@@ -2,7 +2,7 @@
 export {
   localHarnessControlPlaneDatabaseUrl,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend-db.ts";
+} from "./nixos-shared-host-control-plane-backend-db";
 export {
   enqueueBackendSubmission,
   readBackendSnapshotBySubmissionId,
@@ -14,11 +14,11 @@ export {
   syncBackendSubmission,
   writeBackendSnapshotDoc,
   writeBackendSubmissionDoc,
-} from "./nixos-shared-host-control-plane-backend-state.ts";
+} from "./nixos-shared-host-control-plane-backend-state";
 export {
   claimBackendQueuedSubmission,
   startBackendSubmissionClaimLease,
-} from "./nixos-shared-host-control-plane-backend-queue.ts";
+} from "./nixos-shared-host-control-plane-backend-queue";
 export {
   readBackendDeployRecordByDeployRunId,
   readBackendDeployRecordBySubmissionId,
@@ -28,9 +28,9 @@ export {
   readBackendDeployRecordEnvelopeBySubmissionId,
   syncBackendDeployRecord,
   writeBackendDeployRecordDoc,
-} from "./nixos-shared-host-control-plane-backend-records.ts";
+} from "./nixos-shared-host-control-plane-backend-records";
 export {
   acquireBackendControlPlaneLock,
   resolveBackendIdempotency,
   syncBackendRunAction,
-} from "./nixos-shared-host-control-plane-backend-locks.ts";
+} from "./nixos-shared-host-control-plane-backend-locks";

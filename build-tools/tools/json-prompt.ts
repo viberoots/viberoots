@@ -1,7 +1,7 @@
 import { stdin as input, stdout as output } from "node:process";
 import readline from "node:readline/promises";
 
-import { getArgvTokens } from "./lib/cli.ts";
+import { getArgvTokens } from "./lib/cli";
 import {
   completeJsonPromptObject,
   extractPromptRuleSource,
@@ -11,7 +11,7 @@ import {
   parsePromptRuleSet,
   shouldEmitNothingForRawInput,
   type JsonPromptOutputMode,
-} from "./json-prompt-lib.ts";
+} from "./json-prompt-lib";
 
 const USAGE = `Usage:
   json-prompt <json-object> [options]

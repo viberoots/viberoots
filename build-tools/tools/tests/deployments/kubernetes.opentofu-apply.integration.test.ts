@@ -3,19 +3,19 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { submitKubernetesProvisionOnly } from "../../deployments/kubernetes-provision-only.ts";
-import { OPENTOFU_STACK_PROVISIONER } from "../../deployments/opentofu-stack.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
+import { submitKubernetesProvisionOnly } from "../../deployments/kubernetes-provision-only";
+import { OPENTOFU_STACK_PROVISIONER } from "../../deployments/opentofu-stack";
+import { runInTemp } from "../lib/test-helpers";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
   INTEGRATION_SECRET_VALUE,
   fakeProvisionSecretRuntime,
   openTofuProvisioner,
   recordingApplyAdapter,
   writeOpenTofuStackFixture,
-} from "./kubernetes.opentofu-apply.integration.helpers.ts";
-import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+} from "./kubernetes.opentofu-apply.integration.helpers";
+import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
 
 test("kubernetes provision-only records OpenTofu apply success outcome and redacts secret values", async () => {
   await runInTemp("kubernetes-opentofu-provision-only-success", async (tmp, $) => {

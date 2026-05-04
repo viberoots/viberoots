@@ -1,15 +1,15 @@
 import path from "node:path";
-import { getFlagStr, hasFlag } from "../lib/cli.ts";
-import type { DeploymentTarget } from "./contract.ts";
+import { getFlagStr, hasFlag } from "../lib/cli";
+import type { DeploymentTarget } from "./contract";
 import {
   readNixosSharedHostControlPlaneRecordViaService,
   readNixosSharedHostControlPlaneStatusViaService,
-} from "./nixos-shared-host-control-plane-client.ts";
-import { readNixosSharedHostClientProfile } from "./nixos-shared-host-install-dev-machine.ts";
+} from "./nixos-shared-host-control-plane-client";
+import { readNixosSharedHostClientProfile } from "./nixos-shared-host-install-dev-machine";
 import {
   resolveServiceClientFromFlags,
   resolveServiceClientFromManifest,
-} from "./nixos-shared-host-service-client-config.ts";
+} from "./nixos-shared-host-service-client-config";
 
 export type RunSelector = { submissionId?: string; deployRunId?: string };
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runManagedCommand } from "../lib/managed-command.ts";
-import { syncModuleContractsForApp } from "./sync-module-contracts-core.ts";
+import { runManagedCommand } from "../lib/managed-command";
+import { syncModuleContractsForApp } from "./sync-module-contracts-core";
 import {
   specsFromWasmManifest,
   type WasmModuleSpec,
   validateTsManifestProbes,
-} from "./wasm-watch-manifest.ts";
+} from "./wasm-watch-manifest";
 
 export type Fingerprint = { mtimeMs: number; size: number };
 

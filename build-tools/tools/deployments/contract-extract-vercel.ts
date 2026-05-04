@@ -6,8 +6,8 @@ import {
   targetName,
   VERCEL_PROVIDER,
   type VercelDeployment,
-} from "./contract-types.ts";
-import { readPrimaryDeploymentComponent } from "./contract-extract-components.ts";
+} from "./contract-types";
+import { readPrimaryDeploymentComponent } from "./contract-extract-components";
 import {
   deploymentError,
   duplicateValueEntries,
@@ -20,18 +20,18 @@ import {
   readString,
   readStringRecord,
   type DeploymentExtractionContext,
-} from "./contract-extract-shared.ts";
-import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
+} from "./contract-extract-shared";
+import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding";
 import {
   readExternalRequirementProfiles,
   resolveDeploymentMetadataRefs,
   validateExternalDeploymentRequirementProfiles,
   validateExplicitDeploymentRequirements,
-} from "./deployment-extract-metadata.ts";
-import { readDeploymentRequirements } from "./deployment-requirements.ts";
-import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
-import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata.ts";
-import { pushVercelComponentKindErrors } from "./vercel-capability-validation.ts";
+} from "./deployment-extract-metadata";
+import { readDeploymentRequirements } from "./deployment-requirements";
+import { pushSmokePolicyErrors } from "./deployment-smoke-policy";
+import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata";
+import { pushVercelComponentKindErrors } from "./vercel-capability-validation";
 
 const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/;
 const SHARED_NONPROD = "shared_nonprod";

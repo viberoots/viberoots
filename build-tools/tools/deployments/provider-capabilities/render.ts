@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentProviderCapability, ProviderCapabilityBullet } from "./types.ts";
+import type { DeploymentProviderCapability, ProviderCapabilityBullet } from "./types";
 
 function renderBullets(bullets: ProviderCapabilityBullet[], indent = 0): string[] {
   return bullets.flatMap((entry) => {

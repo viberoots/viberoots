@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { packagePathFromLabel } from "../lib/labels.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
-import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint.ts";
+import { packagePathFromLabel } from "../lib/labels";
+import type { CloudflarePagesDeployment } from "./contract";
+import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint";
 
 export function stripJsonComments(raw: string): string {
   let out = "";

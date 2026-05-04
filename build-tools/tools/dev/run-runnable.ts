@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getArgvTokens } from "../lib/cli.ts";
-import { findRepoRoot } from "../lib/repo.ts";
-import { inferRunnableFromOutPath, type RunnableManifestEntry } from "../lib/runnables.ts";
-import { validateSsrRunnableContract } from "../lib/runnable-contracts.ts";
+import { getArgvTokens } from "../lib/cli";
+import { findRepoRoot } from "../lib/repo";
+import { inferRunnableFromOutPath, type RunnableManifestEntry } from "../lib/runnables";
+import { validateSsrRunnableContract } from "../lib/runnable-contracts";
 import {
   parseArgs,
   importerForTarget,
@@ -11,8 +11,8 @@ import {
   runnableHintsForTarget,
   readManifestEntry,
   runCommand,
-} from "./run-runnable-core.ts";
-import { buildRunnableManifest, buildSelectedOutPath } from "./run-runnable-graph.ts";
+} from "./run-runnable-core";
+import { buildRunnableManifest, buildSelectedOutPath } from "./run-runnable-graph";
 
 function commandCwdForSpec(
   spec: { argv: string[]; cwd?: string },

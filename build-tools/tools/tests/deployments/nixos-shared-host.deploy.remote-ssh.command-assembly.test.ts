@@ -13,19 +13,19 @@ import {
   buildRemoteSshArgvWithFallback,
   buildRemoteStageFinalizeScript,
   buildRemoteStagePrepareScript,
-} from "../../deployments/nixos-shared-host-remote-shell.ts";
+} from "../../deployments/nixos-shared-host-remote-shell";
 import {
   REMOTE_SSH_IDENTITY_FILE_ENV,
   REMOTE_SSH_KNOWN_HOSTS_FILE_ENV,
-} from "../../deployments/nixos-shared-host-remote-ssh.ts";
+} from "../../deployments/nixos-shared-host-remote-ssh";
 import {
   createNixosSharedHostRemoteArtifactPath,
   type NixosSharedHostRemotePlan,
-} from "../../deployments/nixos-shared-host-remote-target.ts";
+} from "../../deployments/nixos-shared-host-remote-target";
 import {
   remoteSshCommandAssemblyPlan as plan,
   withReviewedSshEnv,
-} from "./nixos-shared-host.remote-ssh.command-assembly.fixture.ts";
+} from "./nixos-shared-host.remote-ssh.command-assembly.fixture";
 
 test("remote SSH transport assembles reviewed preflight, staging, deploy, and cleanup commands", () => {
   withReviewedSshEnv(() => {

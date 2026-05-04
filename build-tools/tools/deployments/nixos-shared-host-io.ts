@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { NixosSharedHostDeployment } from "./contract.ts";
+import type { NixosSharedHostDeployment } from "./contract";
 import {
   emptyNixosSharedHostPlatformState,
   type NixosSharedHostPlatformState,
   validateNixosSharedHostPlatformState,
-} from "./nixos-shared-host-platform.ts";
+} from "./nixos-shared-host-platform";
 
 type NixosSharedHostDeploymentsDocument = {
   version: 1;

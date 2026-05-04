@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
-import { sanitizeName } from "../lib/sanitize.ts";
-import { queryBackend, readJson } from "./nixos-shared-host-control-plane-backend-db.ts";
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db.ts";
+import { sanitizeName } from "../lib/sanitize";
+import { queryBackend, readJson } from "./nixos-shared-host-control-plane-backend-db";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db";
 
 type LockAbortReason = "cancelled" | "superseded" | "no_longer_admitted";
 

@@ -1,14 +1,14 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { writeIfChanged } from "../lib/fs-helpers.ts";
-import { readCompositeGraph, type ProviderIndexEntry } from "../lib/graph-view.ts";
-import type { PatchScope, ProviderModel } from "../lib/lang-contracts.ts";
-import { formatTextRow } from "./invalidation-report-format.ts";
+import { writeIfChanged } from "../lib/fs-helpers";
+import { readCompositeGraph, type ProviderIndexEntry } from "../lib/graph-view";
+import type { PatchScope, ProviderModel } from "../lib/lang-contracts";
+import { formatTextRow } from "./invalidation-report-format";
 import {
   computeInvalidationRow,
   readAutoMap,
   type InvalidationReportNode,
-} from "./invalidation-report-row.ts";
+} from "./invalidation-report-row";
 
 export type ProviderIndexEntryExt = ProviderIndexEntry & {
   patch_scope?: PatchScope;

@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { publishVercelPrebuiltLocal } from "../../deployments/vercel-local-publisher.ts";
-import { vercelDeploymentFixture } from "./vercel.fixture.ts";
+import { publishVercelPrebuiltLocal } from "../../deployments/vercel-local-publisher";
+import { vercelDeploymentFixture } from "./vercel.fixture";
 
 test("local Vercel publisher records deterministic output from admitted artifact identity", () => {
   const deployment = vercelDeploymentFixture();

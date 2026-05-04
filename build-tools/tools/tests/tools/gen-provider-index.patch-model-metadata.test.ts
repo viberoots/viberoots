@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { providerNameForImporter } from "../../lib/providers.ts";
+import { providerNameForImporter } from "../../lib/providers";
 import { runInTemp } from "../lib/test-helpers";
 
 test("gen-provider-index: provider_index.json includes patch model metadata (additive)", async () => {

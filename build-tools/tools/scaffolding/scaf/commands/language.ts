@@ -1,14 +1,14 @@
-import type { ScafFlags } from "../types.ts";
+import type { ScafFlags } from "../types";
 
 import path from "node:path";
 
 import * as fsp from "node:fs/promises";
 
-import { confirmOrExit } from "../confirm.ts";
-import { runScafNodeTool } from "../command-runner.ts";
-import { exists } from "../fs.ts";
-import { formatScaffoldPaths } from "./new-helpers.ts";
-import { cmdNew } from "./new.ts";
+import { confirmOrExit } from "../confirm";
+import { runScafNodeTool } from "../command-runner";
+import { exists } from "../fs";
+import { formatScaffoldPaths } from "./new-helpers";
+import { cmdNew } from "./new";
 
 function languageKitFormatTargets(id: string): string[] {
   return [

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { getFlagList } from "../../lib/cli.ts";
+import { getFlagList } from "../../lib/cli";
 
 test("cli helpers: list parsing from string and array", () => {
   const oldGlobal = (globalThis as any).argv;

@@ -3,14 +3,14 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { extractNixosSharedHostDeployments } from "../../deployments/contract.ts";
+import { extractNixosSharedHostDeployments } from "../../deployments/contract";
 import {
   ensureParentDir,
   runDeploymentCquery,
   writeSharedLaneTargets,
   writeStaticWebappTarget,
-} from "./nixos-shared-host.extraction.from-targets.helpers.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "./nixos-shared-host.extraction.from-targets.helpers";
+import { runInTemp } from "../lib/test-helpers";
 
 test("nixos-shared-host deployment extraction reads canonical metadata from TARGETS via cquery", async () => {
   await runInTemp("deployment-cquery-extraction", async (tmp, _$) => {

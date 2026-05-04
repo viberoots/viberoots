@@ -16,9 +16,9 @@ import { runSession } from "./lib/session";
 import { resolveNixpkg } from "./cpp/resolve";
 import { ensureOriginAndWorkspace } from "./cpp/extract";
 import { doApply, doRemove } from "./cpp/apply";
-import { echoSnippetRequested } from "../lib/cli.ts";
+import { echoSnippetRequested } from "../lib/cli";
 import { requirePositional } from "./lib/args";
-import { devOverrideEnvNameForLang } from "../lib/dev-override-envs.ts";
+import { devOverrideEnvNameForLang } from "../lib/dev-override-envs";
 
 const dbg = createDbg("patch-cpp");
 

@@ -3,9 +3,9 @@ import path from "node:path";
 import type {
   CloudflarePagesDeployment,
   CloudflarePagesProviderTarget,
-} from "../../deployments/contract.ts";
-import { cloudflarePagesPublishedPath } from "../../deployments/cloudflare-pages-preview.ts";
-import { startStaticWebappHttpsServer } from "./static-webapp.https-server.ts";
+} from "../../deployments/contract";
+import { cloudflarePagesPublishedPath } from "../../deployments/cloudflare-pages-preview";
+import { startStaticWebappHttpsServer } from "./static-webapp.https-server";
 
 export async function startCloudflarePagesPublicServer(opts: {
   deployment: CloudflarePagesDeployment;

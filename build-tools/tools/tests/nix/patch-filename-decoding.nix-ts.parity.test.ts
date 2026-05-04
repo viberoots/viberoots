@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import test from "node:test";
 import assert from "node:assert/strict";
-import { decodeNameVersionFromPatch } from "../../lib/providers.ts";
+import { decodeNameVersionFromPatch } from "../../lib/providers";
 
 function normalizePythonVersionSegment(v: string): string {
   return String(v || "").split("-")[0] || "";

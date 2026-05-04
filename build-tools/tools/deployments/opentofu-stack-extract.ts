@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import { packagePathFromLabel } from "../lib/labels.ts";
-import { deploymentError } from "./contract-extract-shared.ts";
-import { OPENTOFU_STACK_PROVISIONER, type OpenTofuProvisionerMetadata } from "./opentofu-stack.ts";
+import { packagePathFromLabel } from "../lib/labels";
+import { deploymentError } from "./contract-extract-shared";
+import { OPENTOFU_STACK_PROVISIONER, type OpenTofuProvisionerMetadata } from "./opentofu-stack";
 
 export const REVIEWED_STACK_PROVISIONERS = new Set([
   "terraform-stack",

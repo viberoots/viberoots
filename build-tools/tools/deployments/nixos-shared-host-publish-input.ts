@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
-import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts";
+import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts";
 
 export type NixosSharedHostPublishInput =
   | {

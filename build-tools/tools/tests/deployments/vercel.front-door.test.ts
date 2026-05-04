@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { runVercelDeployFrontDoor } from "../../deployments/vercel-front-door.ts";
-import { vercelDeploymentFixture } from "./vercel.fixture.ts";
+import { runVercelDeployFrontDoor } from "../../deployments/vercel-front-door";
+import { vercelDeploymentFixture } from "./vercel.fixture";
 
 test("public front door requires a control-plane URL for protected/shared Vercel mutation", async () => {
   await assert.rejects(

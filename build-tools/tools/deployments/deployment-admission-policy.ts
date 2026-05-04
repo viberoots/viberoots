@@ -1,27 +1,27 @@
 #!/usr/bin/env zx-wrapper
-import { normalizeTargetLabel } from "../lib/labels.ts";
-import type { GraphNode } from "../lib/graph.ts";
-import { readString, readStringArray } from "./deployment-graph-readers.ts";
+import { normalizeTargetLabel } from "../lib/labels";
+import type { GraphNode } from "../lib/graph";
+import { readString, readStringArray } from "./deployment-graph-readers";
 import {
   readAttestationPolicy,
   readSbomPolicy,
   readSupplyChainGatePolicies,
-} from "./deployment-admission-supply-chain.ts";
+} from "./deployment-admission-supply-chain";
 import {
   admissionPolicyExtensionFingerprintPart,
   validateAdmissionPolicyExtensions,
-} from "./deployment-policy-admission-extensions.ts";
-import { fingerprintPolicy } from "./deployment-policy-fingerprint.ts";
+} from "./deployment-policy-admission-extensions";
+import { fingerprintPolicy } from "./deployment-policy-fingerprint";
 import {
   readReadinessGatePolicies,
   validateReadinessGatePolicies,
-} from "./deployment-readiness-gates.ts";
+} from "./deployment-readiness-gates";
 import {
   type ArtifactAttestationMode,
   type DeploymentAdmissionPolicy,
   type RetryApprovalReuse,
   type RetryBranchPolicy,
-} from "./deployment-policy.ts";
+} from "./deployment-policy";
 
 const DEPLOYMENT_ADMISSION_POLICY_RULE = "deployment_admission_policy";
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { getFlagStr, hasFlag } from "../lib/cli.ts";
+import { getFlagStr, hasFlag } from "../lib/cli";
 import {
   nixosSharedHostReplayArtifactIdentity,
   resolveNixosSharedHostReplaySource,
-} from "./nixos-shared-host-replay.ts";
+} from "./nixos-shared-host-replay";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();

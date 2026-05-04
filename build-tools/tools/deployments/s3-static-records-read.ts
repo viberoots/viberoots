@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { readVersionedJson } from "./deployment-schema-compat.ts";
-import { S3_STATIC_RECORD_SCHEMA, type S3StaticDeployRecord } from "./s3-static-records.ts";
+import { readVersionedJson } from "./deployment-schema-compat";
+import { S3_STATIC_RECORD_SCHEMA, type S3StaticDeployRecord } from "./s3-static-records";
 
 export async function readS3StaticDeployRecord(recordPath: string): Promise<S3StaticDeployRecord> {
   return await readVersionedJson(recordPath, {

@@ -1,17 +1,17 @@
 #!/usr/bin/env zx-wrapper
 import os from "node:os";
-import { sanitizeName } from "../lib/sanitize.ts";
-import type { DeploymentTarget } from "./contract.ts";
-import { deploymentSecretFixturePath } from "./deployment-secret-fixture.ts";
-import { VAULT_ADDR_ENV, VAULT_JWT_ROLE_ENV } from "./deployment-secret-vault-credentials.ts";
+import { sanitizeName } from "../lib/sanitize";
+import type { DeploymentTarget } from "./contract";
+import { deploymentSecretFixturePath } from "./deployment-secret-fixture";
+import { VAULT_ADDR_ENV, VAULT_JWT_ROLE_ENV } from "./deployment-secret-vault-credentials";
 import {
   isJenkinsSession,
   normalizeCredentialSource,
   selectDeploymentCredentialSource,
   type CredentialSourceSelection,
   type DeploymentCredentialSource,
-} from "./deployment-credential-source-selection.ts";
-import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
+} from "./deployment-credential-source-selection";
+import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs";
 
 export const VAULT_OIDC_ISSUER_ENV = "BNX_VAULT_OIDC_ISSUER";
 export const VAULT_AUDIENCE_ENV = "BNX_VAULT_AUDIENCE";

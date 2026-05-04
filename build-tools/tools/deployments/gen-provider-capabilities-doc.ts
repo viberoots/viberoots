@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagBool } from "../lib/cli.ts";
+import { getFlagBool } from "../lib/cli";
 import {
   assertProviderCapabilitiesDocParity,
   readProviderCapabilitiesDoc,
   renderProviderCapabilitiesDoc,
   writeProviderCapabilitiesDoc,
-} from "./provider-capabilities/doc.ts";
+} from "./provider-capabilities/doc";
 
 async function main() {
   const current = await readProviderCapabilitiesDoc();

@@ -11,8 +11,8 @@
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagStr, hasFlag } from "../lib/cli.ts";
-import { sanitizeName } from "../lib/sanitize.ts";
+import { getFlagStr, hasFlag } from "../lib/cli";
+import { sanitizeName } from "../lib/sanitize";
 
 // No search/fallbacks: the caller must set FLK_ROOT or WORKSPACE_ROOT to a flake root.
 

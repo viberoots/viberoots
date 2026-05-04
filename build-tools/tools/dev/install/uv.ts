@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
-import { findUvLockfiles } from "../../lib/lockfiles.ts";
+import { findUvLockfiles } from "../../lib/lockfiles";
 
 async function sha256File(file: string): Promise<string> {
   try {

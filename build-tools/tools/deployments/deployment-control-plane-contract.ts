@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentPrincipal } from "./deployment-admission-evidence.ts";
-import type { DeploymentArtifactBindingProvenance } from "./deployment-artifact-binding.ts";
-import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout.ts";
-import type { DeploymentTarget } from "./contract.ts";
+import type { DeploymentPrincipal } from "./deployment-admission-evidence";
+import type { DeploymentArtifactBindingProvenance } from "./deployment-artifact-binding";
+import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout";
+import type { DeploymentTarget } from "./contract";
 
 export const DEPLOYMENT_EXTRACTED_METADATA_SCHEMA = "deployment-extracted-metadata@1";
 export const DEPLOYMENT_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA =

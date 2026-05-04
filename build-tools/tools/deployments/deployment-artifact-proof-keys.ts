@@ -2,7 +2,7 @@
 import {
   DEPLOYMENT_ARTIFACT_BINDING_ALGORITHM,
   type DeploymentArtifactChallengeRequest,
-} from "./deployment-artifact-binding.ts";
+} from "./deployment-artifact-binding";
 
 export type DeploymentArtifactProofKeyStatus = "active" | "disabled" | "unreviewed";
 

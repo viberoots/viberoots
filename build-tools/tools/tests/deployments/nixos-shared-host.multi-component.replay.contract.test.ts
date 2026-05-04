@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { requireNixosSharedHostReplayComponentState } from "../../deployments/nixos-shared-host-replay.ts";
-import { multiComponentDeployment } from "./nixos-shared-host.multi-component.fixture.ts";
+import { requireNixosSharedHostReplayComponentState } from "../../deployments/nixos-shared-host-replay";
+import { multiComponentDeployment } from "./nixos-shared-host.multi-component.fixture";
 
 function componentArtifacts() {
   return [

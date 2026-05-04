@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { formatVerifyStatusText } from "../../lib/verify-log-status.ts";
-import type { VerifyStatus } from "../../lib/verify-log-status.ts";
+import { formatVerifyStatusText } from "../../lib/verify-log-status";
+import type { VerifyStatus } from "../../lib/verify-log-status";
 
 test("verify-log-status: formatVerifyStatusText renders multiline (not one-line summary)", () => {
   const st: VerifyStatus = {

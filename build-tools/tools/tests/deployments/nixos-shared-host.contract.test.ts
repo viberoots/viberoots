@@ -1,16 +1,16 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { GraphNode } from "../../lib/graph.ts";
+import type { GraphNode } from "../../lib/graph";
 import {
   deriveNixosSharedHostProviderTarget,
   extractNixosSharedHostDeployments,
-} from "../../deployments/contract.ts";
-import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture.ts";
+} from "../../deployments/contract";
+import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture";
 import {
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostLanePolicyNodeFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 
 function staticWebappComponent(label: string): GraphNode {
   return {

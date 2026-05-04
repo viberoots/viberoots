@@ -1,12 +1,12 @@
-import type { ScafFlags } from "../types.ts";
+import type { ScafFlags } from "../types";
 
 import path from "node:path";
 
 import * as fsp from "node:fs/promises";
 
-import { confirmOrExit } from "../confirm.ts";
-import { exists } from "../fs.ts";
-import { usage } from "../usage.ts";
+import { confirmOrExit } from "../confirm";
+import { exists } from "../fs";
+import { usage } from "../usage";
 
 export async function cmdMove(args: string[], flags: ScafFlags) {
   const [oldPath, newPath] = args;

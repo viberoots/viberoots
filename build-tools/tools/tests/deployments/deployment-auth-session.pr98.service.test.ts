@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
 import {
   createDeploymentAuthLoginViaService,
   readDeploymentAuthSessionViaService,
-} from "../../deployments/nixos-shared-host-control-plane-client.ts";
-import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers.ts";
-import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
+} from "../../deployments/nixos-shared-host-control-plane-client";
+import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers";
+import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
+import { runInTemp } from "../lib/test-helpers";
 
 async function callback(url: string, loginUrl: string) {
   const login = new URL(loginUrl);

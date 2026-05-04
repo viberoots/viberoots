@@ -3,23 +3,23 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { inspectNixosSharedHostAdmission } from "../../deployments/nixos-shared-host-admission-inspect.ts";
-import { inspectNixosSharedHostReplay } from "../../deployments/nixos-shared-host-replay-inspect.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { inspectNixosSharedHostAdmission } from "../../deployments/nixos-shared-host-admission-inspect";
+import { inspectNixosSharedHostReplay } from "../../deployments/nixos-shared-host-replay-inspect";
+import { runInTemp } from "../lib/test-helpers";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 import {
   readBackendSnapshot,
   readRecord,
   startControlPlaneHarness,
   writeDemoArtifact,
   writeSsrArtifact,
-} from "./nixos-shared-host.control-plane.helpers.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+} from "./nixos-shared-host.control-plane.helpers";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
 test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow end to end", async () => {
   await runInTemp("nixos-shared-host-e2e", async (tmp, $) => {

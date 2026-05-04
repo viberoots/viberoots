@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { NixosSharedHostConfig } from "./nixos-shared-host.ts";
+import type { NixosSharedHostConfig } from "./nixos-shared-host";
 
 function containerRoot(hostRoot: string, containerName: string): string {
   return path.join(hostRoot, "containers", containerName);

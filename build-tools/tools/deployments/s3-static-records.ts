@@ -2,20 +2,17 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import type { S3StaticAdmittedContext } from "./s3-static-admission.ts";
-import type { S3StaticDeployment } from "./contract.ts";
-import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
-import type {
-  DeploymentSmokeException,
-  DeploymentSmokeOutcome,
-} from "./deployment-smoke-policy.ts";
+import type { S3StaticAdmittedContext } from "./s3-static-admission";
+import type { S3StaticDeployment } from "./contract";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy";
+import type { DeploymentSmokeException, DeploymentSmokeOutcome } from "./deployment-smoke-policy";
 import {
   s3StaticRunnerIdentities,
   type DeploymentRunnerIdentities,
-} from "./deployment-runner-identities.ts";
-import type { S3StaticProvisionerPlanRef } from "./s3-static-provisioner-plan.ts";
-import { S3_STATIC_PROVIDER } from "./contract.ts";
-import { operatorErrorFields } from "./deployment-control-plane-redaction.ts";
+} from "./deployment-runner-identities";
+import type { S3StaticProvisionerPlanRef } from "./s3-static-provisioner-plan";
+import { S3_STATIC_PROVIDER } from "./contract";
+import { operatorErrorFields } from "./deployment-control-plane-redaction";
 
 export const S3_STATIC_RECORD_SCHEMA = "deploy-record@2026-04-09";
 

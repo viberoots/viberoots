@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { runInTemp } from "../lib/test-helpers";
 
 test("shared-host identity provider module forwards reviewed realm files to Keycloak", async () => {
   await runInTemp("shared-host-identity-provider-realm-files-eval", async (tmp, $) => {

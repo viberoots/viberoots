@@ -2,7 +2,7 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { sanitizeName } from "../lib/sanitize.ts";
+import { sanitizeName } from "../lib/sanitize";
 
 export const GOOGLE_PLAY_ARTIFACT_PROVENANCE_SCHEMA = "google-play-artifact-provenance@1";
 

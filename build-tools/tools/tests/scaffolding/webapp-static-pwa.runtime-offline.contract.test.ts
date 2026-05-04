@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { after, test } from "node:test";
-import { resolveModuleContractsPaths } from "../../dev/module-contract-paths.ts";
-import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core.ts";
-import { assertStaticPwaServiceWorkerReady } from "../../lib/static-pwa-precache.ts";
-import { runInTemp } from "../lib/test-helpers/run-in-temp.ts";
-import { createStaticPwaServiceWorkerHarness } from "./lib/static-pwa-service-worker.ts";
+import { resolveModuleContractsPaths } from "../../dev/module-contract-paths";
+import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core";
+import { assertStaticPwaServiceWorkerReady } from "../../lib/static-pwa-precache";
+import { runInTemp } from "../lib/test-helpers/run-in-temp";
+import { createStaticPwaServiceWorkerHarness } from "./lib/static-pwa-service-worker";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;

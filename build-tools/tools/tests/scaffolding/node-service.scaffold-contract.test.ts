@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers.ts";
+import { runInTemp } from "../lib/test-helpers";
 
 process.env.TEST_NEED_DEV_ENV = "1";
 process.env.NIX_PNPM_ALLOW_GENERATE = "1";

@@ -3,7 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { providerNameForImporter } from "../../lib/providers.ts";
+import { providerNameForImporter } from "../../lib/providers";
 
 test("prebuild-guard: coverage falls back to TARGETS.*.auto for Python importer providers", async () => {
   await runInTemp("prebuild-coverage-python-fallback", async (tmp, $) => {

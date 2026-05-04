@@ -1,8 +1,8 @@
 import path from "node:path";
-import { lintFlatPatchDir } from "./flat-patch-dir-lint.ts";
-import { pathExists } from "./fs.ts";
-import { countErrors, reportViolations } from "./report.ts";
-import type { PatchesLintConfig } from "./types.ts";
+import { lintFlatPatchDir } from "./flat-patch-dir-lint";
+import { pathExists } from "./fs";
+import { countErrors, reportViolations } from "./report";
+import type { PatchesLintConfig } from "./types";
 
 export async function lintGo(cfg: PatchesLintConfig): Promise<number> {
   const dir = path.join("patches", "go");

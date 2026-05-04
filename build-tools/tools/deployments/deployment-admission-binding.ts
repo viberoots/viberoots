@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
-import type { DeploymentTarget } from "./contract.ts";
-import { providerTargetIdentityFor } from "./contract.ts";
-import type { DeploymentAdmissionBinding } from "./deployment-admission-evidence.ts";
+import type { DeploymentTarget } from "./contract";
+import { providerTargetIdentityFor } from "./contract";
+import type { DeploymentAdmissionBinding } from "./deployment-admission-evidence";
 
 export type DeploymentAdmissionOperationKind =
   | "deploy"

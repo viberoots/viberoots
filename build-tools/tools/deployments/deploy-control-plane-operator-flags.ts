@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagBool } from "../lib/cli.ts";
+import { getFlagBool } from "../lib/cli";
 
 export type DeployControlPlaneOperatorAction =
   | "status"

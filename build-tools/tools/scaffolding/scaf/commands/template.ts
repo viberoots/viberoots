@@ -2,8 +2,8 @@ import path from "node:path";
 
 import * as fsp from "node:fs/promises";
 
-import { exists } from "../fs.ts";
-import { usage } from "../usage.ts";
+import { exists } from "../fs";
+import { usage } from "../usage";
 
 export async function cmdTemplate(args: string[]) {
   const [language, tmpl] = args;

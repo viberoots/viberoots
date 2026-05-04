@@ -1,7 +1,7 @@
 import process from "node:process";
-import { runManagedCommand } from "../../lib/managed-command.ts";
-import { newManagedCommandActivity } from "./activity.ts";
-import { withHeartbeat } from "./heartbeat.ts";
+import { runManagedCommand } from "../../lib/managed-command";
+import { newManagedCommandActivity } from "./activity";
+import { withHeartbeat } from "./heartbeat";
 
 export async function runExactStoreCommand(opts: {
   command?: string;

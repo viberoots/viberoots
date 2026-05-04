@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
-import { providerTargetIdentityFor } from "./contract.ts";
-import { defaultRequestedBy } from "./deployment-admission-evidence.ts";
-import { deploymentAuthMissingGrantHint } from "./deployment-auth-groups.ts";
+import type { DeploymentTarget } from "./contract";
+import { providerTargetIdentityFor } from "./contract";
+import { defaultRequestedBy } from "./deployment-admission-evidence";
+import { deploymentAuthMissingGrantHint } from "./deployment-auth-groups";
 import {
   type DeploymentControlPlaneAuthorization,
   type DeploymentControlPlaneAuthorizationDecision,
@@ -10,13 +10,13 @@ import {
   type DeploymentControlPlaneRole,
   type DeploymentControlPlaneRunAction,
   type DeploymentControlPlaneScope,
-} from "./deployment-control-plane-contract.ts";
-import { DeploymentUnauthorizedError } from "./deployment-control-plane-errors.ts";
+} from "./deployment-control-plane-contract";
+import { DeploymentUnauthorizedError } from "./deployment-control-plane-errors";
 import {
   normalizeAuthorizationSnapshot,
   projectScopeValueFor,
-} from "./deployment-control-plane-authorization-shared.ts";
-export { normalizeAuthorizationSnapshot } from "./deployment-control-plane-authorization-shared.ts";
+} from "./deployment-control-plane-authorization-shared";
+export { normalizeAuthorizationSnapshot } from "./deployment-control-plane-authorization-shared";
 
 function defaultScopeForRole(
   deployment: DeploymentTarget,

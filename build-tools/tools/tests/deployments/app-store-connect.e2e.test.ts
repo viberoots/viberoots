@@ -2,18 +2,18 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { readAppStoreConnectDeployRecord } from "../../deployments/app-store-connect-records.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { appStoreConnectDeploymentFixture } from "./app-store-connect.fixture.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
+import { readAppStoreConnectDeployRecord } from "../../deployments/app-store-connect-records";
+import { runInTemp } from "../lib/test-helpers";
+import { appStoreConnectDeploymentFixture } from "./app-store-connect.fixture";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import {
   appStoreConnectFakeEnv,
   installAppStoreConnectTargets,
   writeAppStoreConnectConfig,
-} from "./app-store-connect.e2e.helpers.ts";
-import { mobileReviewedLanePolicy, writeMobileArtifact } from "./mobile-release.e2e.helpers.ts";
-import { writeDeploymentJson } from "./nixos-shared-host.reuse.e2e.helpers.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+} from "./app-store-connect.e2e.helpers";
+import { mobileReviewedLanePolicy, writeMobileArtifact } from "./mobile-release.e2e.helpers";
+import { writeDeploymentJson } from "./nixos-shared-host.reuse.e2e.helpers";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
 
 test("app-store-connect deploy and promotion preserve release-health evidence", async () => {
   await runInTemp("app-store-connect-promotion", async (tmp, $) => {

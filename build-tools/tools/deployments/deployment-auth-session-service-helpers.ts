@@ -2,8 +2,8 @@
 import {
   normalizeDeploymentPkceCallbackProfile,
   urlHost,
-} from "./deployment-pkce-callback-profile.ts";
-import type { DeploymentAuthLoginRequest } from "./deployment-auth-session-types.ts";
+} from "./deployment-pkce-callback-profile";
+import type { DeploymentAuthLoginRequest } from "./deployment-auth-session-types";
 
 export function authBlockingMissing(missing: string[]): string[] {
   return missing.filter(

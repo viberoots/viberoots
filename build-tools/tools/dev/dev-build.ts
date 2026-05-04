@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { runDevBuild } from "./dev-build/run-dev-build.ts";
+import { runDevBuild } from "./dev-build/run-dev-build";
 
 runDevBuild().catch((e) => {
   console.error(e);

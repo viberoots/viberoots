@@ -1,20 +1,17 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { readVersionedJson } from "./deployment-schema-compat.ts";
-import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention.ts";
+import { readVersionedJson } from "./deployment-schema-compat";
+import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention";
 import {
   kubernetesRunnerIdentities,
   runnerIdentityCompatibilityErrors,
   type DeploymentRunnerIdentities,
-} from "./deployment-runner-identities.ts";
-import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint.ts";
-import {
-  readKubernetesDeployRecord,
-  type KubernetesDeployRecord,
-} from "./kubernetes-records-read.ts";
-import type { KubernetesAdmittedContext } from "./kubernetes-admission.ts";
-import type { KubernetesDeployment } from "./contract.ts";
+} from "./deployment-runner-identities";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
+import { readKubernetesDeployRecord, type KubernetesDeployRecord } from "./kubernetes-records-read";
+import type { KubernetesAdmittedContext } from "./kubernetes-admission";
+import type { KubernetesDeployment } from "./contract";
 
 export const KUBERNETES_REPLAY_SNAPSHOT_SCHEMA = "kubernetes-replay-snapshot@1";
 

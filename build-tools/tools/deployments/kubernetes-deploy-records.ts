@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
-import type { KubernetesDeployment } from "./contract.ts";
-import type { KubernetesAdmittedContext } from "./kubernetes-admission.ts";
-import type { AdmittedKubernetesComponentArtifact } from "./kubernetes-artifacts.ts";
-import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy.ts";
-import type { KubernetesProvisionerPlanRef } from "./kubernetes-provisioner-plan.ts";
-import type { OpenTofuApplyOutcome } from "./opentofu-apply.ts";
-import { createKubernetesDeployRecord, type KubernetesDeployRecord } from "./kubernetes-records.ts";
-import { publisherCredentialFields } from "./kubernetes-publish-credentials-orchestration.ts";
-import type { KubernetesPublishCredentials } from "./kubernetes-publish-credentials.ts";
+import type { KubernetesDeployment } from "./contract";
+import type { KubernetesAdmittedContext } from "./kubernetes-admission";
+import type { AdmittedKubernetesComponentArtifact } from "./kubernetes-artifacts";
+import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy";
+import type { KubernetesProvisionerPlanRef } from "./kubernetes-provisioner-plan";
+import type { OpenTofuApplyOutcome } from "./opentofu-apply";
+import { createKubernetesDeployRecord, type KubernetesDeployRecord } from "./kubernetes-records";
+import { publisherCredentialFields } from "./kubernetes-publish-credentials-orchestration";
+import type { KubernetesPublishCredentials } from "./kubernetes-publish-credentials";
 
 function failedStep(error: unknown): "publish" | "smoke" {
   return (error as { failedStep?: string } | null)?.failedStep === "smoke" ? "smoke" : "publish";

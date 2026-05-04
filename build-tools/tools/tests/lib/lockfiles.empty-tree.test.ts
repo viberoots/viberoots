@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { findPnpmLockfiles } from "../../lib/lockfiles.ts";
+import { findPnpmLockfiles } from "../../lib/lockfiles";
 
 test("lockfiles: empty tree returns []", async () => {
   await runInTemp("lockfiles-empty", async (tmp, _$) => {

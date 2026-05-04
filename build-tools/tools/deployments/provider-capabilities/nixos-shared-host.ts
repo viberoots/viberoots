@@ -2,8 +2,8 @@
 import {
   SSR_WEBAPP_COMPONENT_KIND,
   STATIC_WEBAPP_COMPONENT_KIND,
-} from "../deployment-component-kinds.ts";
-import { NIXOS_SHARED_HOST_PROVIDER } from "../deployment-provider-targets.ts";
+} from "../deployment-component-kinds";
+import { NIXOS_SHARED_HOST_PROVIDER } from "../deployment-provider-targets";
 import {
   NIXOS_SHARED_HOST_BUILT_IN_PUBLISHER_FACTS,
   NIXOS_SHARED_HOST_IMMUTABLE_REUSE_OPERATOR_FLOWS,
@@ -11,9 +11,9 @@ import {
   NIXOS_SHARED_HOST_PROVISIONER_SUPPORT,
   NIXOS_SHARED_HOST_REPLAY_SNAPSHOT_BASELINE,
   NIXOS_SHARED_HOST_RETRY_IDEMPOTENCY,
-} from "./nixos-shared-host-details.ts";
-import type { DeploymentProviderCapability } from "./types.ts";
-import { bullet } from "./types.ts";
+} from "./nixos-shared-host-details";
+import type { DeploymentProviderCapability } from "./types";
+import { bullet } from "./types";
 
 export const NIXOS_SHARED_HOST_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
   provider: NIXOS_SHARED_HOST_PROVIDER,

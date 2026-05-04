@@ -1,18 +1,18 @@
 #!/usr/bin/env zx-wrapper
-import type { VercelDeployment } from "./contract.ts";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers.ts";
-import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy.ts";
-import type { VercelApiClient } from "./vercel-api.ts";
-import { createFakeVercelApiClient } from "./vercel-api.ts";
+import type { VercelDeployment } from "./contract";
+import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
+import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy";
+import type { VercelApiClient } from "./vercel-api";
+import { createFakeVercelApiClient } from "./vercel-api";
 import {
   createVercelDeployRecord,
   createVercelDeployRunId,
   writeVercelDeployRecord,
   type VercelDeployRecord,
   type VercelOperationKind,
-} from "./vercel-records.ts";
-import { writeVercelReplaySnapshot, type VercelReplaySnapshot } from "./vercel-replay.ts";
-import { smokeVercelConsole, type VercelSmokeConnectOverride } from "./vercel-smoke.ts";
+} from "./vercel-records";
+import { writeVercelReplaySnapshot, type VercelReplaySnapshot } from "./vercel-replay";
+import { smokeVercelConsole, type VercelSmokeConnectOverride } from "./vercel-smoke";
 
 type ExactArtifactRunOperation = "retry" | "rollback" | "promotion";
 

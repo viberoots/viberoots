@@ -1,14 +1,14 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
-import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission.ts";
-import type { NixosSharedHostMutationAuthority } from "./nixos-shared-host-control-plane-contract.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan.ts";
+import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts";
+import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission";
+import type { NixosSharedHostMutationAuthority } from "./nixos-shared-host-control-plane-contract";
+import type { NixosSharedHostDeployment } from "./contract";
+import type { NixosSharedHostProvisionerPlanRef } from "./nixos-shared-host-provisioner-plan";
 import {
   createNixosSharedHostDeployRecord,
   writeNixosSharedHostDeployRecord,
-} from "./nixos-shared-host-records.ts";
-import { staticDeployRecordFields } from "./nixos-shared-host-static-deploy-records.ts";
+} from "./nixos-shared-host-records";
+import { staticDeployRecordFields } from "./nixos-shared-host-static-deploy-records";
 
 export async function writeNixosSharedHostProvisionOnlyRecord(opts: {
   deployment: NixosSharedHostDeployment;

@@ -1,6 +1,6 @@
 import path from "node:path";
-import { readGraph } from "./graph.ts";
-import { DEFAULT_GRAPH_PATH } from "./graph-const.ts";
+import { readGraph } from "./graph";
+import { DEFAULT_GRAPH_PATH } from "./graph-const";
 import {
   buildProjectGraph,
   collectChangedProjects,
@@ -8,7 +8,7 @@ import {
   normalizeRepoPath,
   toProjectTargets,
   toSortedUnique,
-} from "./project-graph.ts";
+} from "./project-graph";
 
 export type ProjectImpactSelectorMode =
   | "project-impact"

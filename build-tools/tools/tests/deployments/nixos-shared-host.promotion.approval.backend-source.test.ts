@@ -3,26 +3,23 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { submitDeploymentControlPlaneRunAction } from "../../deployments/deployment-control-plane-run-action.ts";
+import { submitDeploymentControlPlaneRunAction } from "../../deployments/deployment-control-plane-run-action";
 import {
   localHarnessControlPlaneDatabaseUrl,
   syncBackendDeployRecord,
-} from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
-import { submitNixosSharedHostPublishOnlyRun } from "../../deployments/nixos-shared-host-publish-only.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
+} from "../../deployments/nixos-shared-host-control-plane-backend";
+import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
+import { submitNixosSharedHostPublishOnlyRun } from "../../deployments/nixos-shared-host-publish-only";
+import { runInTemp } from "../lib/test-helpers";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostDeploymentFixture,
   nixosSharedHostLanePolicyFixture,
-} from "./nixos-shared-host.fixture.ts";
-import {
-  smokeConnectOverride,
-  writeDemoArtifact,
-} from "./nixos-shared-host.control-plane.helpers.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+} from "./nixos-shared-host.fixture";
+import { smokeConnectOverride, writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
 function promotionLanePolicy() {
   return nixosSharedHostLanePolicyFixture({

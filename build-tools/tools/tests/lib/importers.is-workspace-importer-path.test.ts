@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { getImporterRootsContract } from "../../lib/importer-roots.ts";
-import { isWorkspaceImporterPath } from "../../lib/importers.ts";
+import { getImporterRootsContract } from "../../lib/importer-roots";
+import { isWorkspaceImporterPath } from "../../lib/importers";
 
 test("isWorkspaceImporterPath matches the importer-roots contract workspace roots only", async () => {
   const { workspaceRoots } = getImporterRootsContract();

@@ -1,15 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentTarget } from "./contract.ts";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence.ts";
-import { DeploymentUnauthorizedError } from "./deployment-control-plane-errors.ts";
-import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "./deployment-secret-fixture.ts";
+import type { DeploymentTarget } from "./contract";
+import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { DeploymentUnauthorizedError } from "./deployment-control-plane-errors";
+import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "./deployment-secret-fixture";
 import {
   VAULT_AUTH_METHOD_ENV,
   VAULT_JWT_ENV,
   VAULT_JWT_FILE_ENV,
   VAULT_TOKEN_ENV,
-} from "./deployment-secret-vault-credentials.ts";
-import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs.ts";
+} from "./deployment-secret-vault-credentials";
+import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs";
 
 type ClientIdentityFields = {
   requestedBy?: unknown;

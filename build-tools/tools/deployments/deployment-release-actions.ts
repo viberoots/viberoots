@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../lib/graph.ts";
-import { normalizeTargetLabel } from "../lib/labels.ts";
+import type { GraphNode } from "../lib/graph";
+import { normalizeTargetLabel } from "../lib/labels";
 
 export const DEPLOYMENT_RELEASE_ACTION_RULE = "deployment_release_action";
 export const DEPLOYMENT_RELEASE_ACTION_PHASES = new Set([

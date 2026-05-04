@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
-import { normalizeTargetLabel } from "../lib/labels.ts";
-import type { GraphNode } from "../lib/graph.ts";
+import { normalizeTargetLabel } from "../lib/labels";
+import type { GraphNode } from "../lib/graph";
 
 export const DEPLOYMENT_LANE_GOVERNANCE_RULE = "deployment_lane_governance";
 

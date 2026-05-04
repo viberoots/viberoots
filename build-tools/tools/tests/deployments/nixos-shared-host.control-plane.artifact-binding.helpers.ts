@@ -3,12 +3,12 @@ import {
   artifactBindingEnvelope,
   createArtifactBindingProof,
   expectedNixosSharedHostArtifactIdentities,
-} from "../../deployments/deployment-artifact-binding.ts";
-import { deploymentServicePrincipalForToken } from "../../deployments/deployment-artifact-challenges.ts";
-import { serviceSubmissionAdmissionEvidence } from "../../deployments/deployment-service-client-contract.ts";
-import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../deployments/nixos-shared-host-control-plane-api-contract.ts";
-import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-shared-host-control-plane-snapshot.ts";
-import { readJson } from "./nixos-shared-host.control-plane.helpers.ts";
+} from "../../deployments/deployment-artifact-binding";
+import { deploymentServicePrincipalForToken } from "../../deployments/deployment-artifact-challenges";
+import { serviceSubmissionAdmissionEvidence } from "../../deployments/deployment-service-client-contract";
+import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../deployments/nixos-shared-host-control-plane-api-contract";
+import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-shared-host-control-plane-snapshot";
+import { readJson } from "./nixos-shared-host.control-plane.helpers";
 
 export async function submitServiceRequest(opts: {
   url: string;

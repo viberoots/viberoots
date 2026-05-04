@@ -5,11 +5,11 @@ import {
   buildRemoteDeployAdminKeycloakGrantUserScript,
   buildRemoteDeployAdminKeycloakSyncScript,
   buildRemoteSshArgv,
-} from "../../deployments/nixos-shared-host-remote-shell.ts";
+} from "../../deployments/nixos-shared-host-remote-shell";
 import {
   remoteSshCommandAssemblyPlan as plan,
   withReviewedSshEnv,
-} from "./nixos-shared-host.remote-ssh.command-assembly.fixture.ts";
+} from "./nixos-shared-host.remote-ssh.command-assembly.fixture";
 
 test("remote SSH transport assembles reviewed deploy admin identity sync commands", () => {
   withReviewedSshEnv(() => {

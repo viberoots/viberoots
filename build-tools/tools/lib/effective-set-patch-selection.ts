@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import { scanFlatPatchDir } from "./provider-sync.ts";
-import { toPosixPath, uniqSorted } from "./posix-path.ts";
+import { scanFlatPatchDir } from "./provider-sync";
+import { toPosixPath, uniqSorted } from "./posix-path";
 
 export type ScanToKeyMapOpts = {
   patchDir: string;

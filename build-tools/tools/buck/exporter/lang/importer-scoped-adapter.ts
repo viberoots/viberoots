@@ -1,16 +1,16 @@
 #!/usr/bin/env zx-wrapper
-import type { Adapter, Batch, Node } from "../types.ts";
-import { packageDirFromTargetName } from "../batch.ts";
-import type { LanguageClassificationOptions } from "./helpers.ts";
-import { validateLanguageClassification } from "./helpers.ts";
-import type { ImporterScopedAdapterRegistryEntry } from "./importer-scoped-registry.ts";
+import type { Adapter, Batch, Node } from "../types";
+import { packageDirFromTargetName } from "../batch";
+import type { LanguageClassificationOptions } from "./helpers";
+import { validateLanguageClassification } from "./helpers";
+import type { ImporterScopedAdapterRegistryEntry } from "./importer-scoped-registry";
 import {
   attachImporterLockfileLabelsIfMacroStamped,
   hasKindLabel,
   lockfileLabels,
   validateAutoAttachImporterSupport,
   validateImporterLockfileLabels,
-} from "./importer-lockfile-labels.ts";
+} from "./importer-lockfile-labels";
 
 export type ImporterScopedAdapterSharedOptions = {
   adapterName: string;

@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture.ts";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture.ts";
-import { installS3StaticTargets, s3StaticDeploymentFixture } from "./s3-static.fixture.ts";
-import { installFakeS3StaticAwsCli } from "./s3-static.fake-aws.ts";
-import { startS3StaticPublicServer } from "./s3-static.public-server.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
+import { runInTemp } from "../lib/test-helpers";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
+import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
+import { installS3StaticTargets, s3StaticDeploymentFixture } from "./s3-static.fixture";
+import { installFakeS3StaticAwsCli } from "./s3-static.fake-aws";
+import { startS3StaticPublicServer } from "./s3-static.public-server";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });
@@ -106,7 +106,7 @@ test("s3-static fails closed on ambiguous publish results", async () => {
     try {
       await assert.rejects(
         async () =>
-          await import("../../deployments/s3-static-deploy.ts").then(({ submitS3StaticDeploy }) =>
+          await import("../../deployments/s3-static-deploy").then(({ submitS3StaticDeploy }) =>
             submitS3StaticDeploy({
               workspaceRoot: tmp,
               deployment,

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import { packagePathFromLabel } from "../lib/labels.ts";
-import { toSortedUnique } from "../lib/project-graph.ts";
-import { componentTargetsFor, type DeploymentTarget } from "./contract.ts";
+import { packagePathFromLabel } from "../lib/labels";
+import { toSortedUnique } from "../lib/project-graph";
+import { componentTargetsFor, type DeploymentTarget } from "./contract";
 
 function cleanRepoPath(value: string): string {
   return String(value || "")

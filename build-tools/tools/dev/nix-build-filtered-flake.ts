@@ -1,14 +1,14 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagBool, getFlagStr } from "../lib/cli.ts";
+import { getFlagBool, getFlagStr } from "../lib/cli";
 import {
   computeSelectedCppPackageClosure,
   FILTERED_FLAKE_RSYNC_EXCLUDES,
   graphNodesFromJson,
   selectedCppSnapshotRsyncSources,
   selectedCppSnapshotRelPaths,
-} from "./nix-build-filtered-flake-lib.ts";
+} from "./nix-build-filtered-flake-lib";
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {

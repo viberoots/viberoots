@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
-import { getFlagBool } from "../lib/cli.ts";
+import { getFlagBool } from "../lib/cli";
 import {
   assertDeploymentsDesignDocParity,
   readDeploymentsDesignDoc,
   renderDeploymentsDesignDoc,
   writeDeploymentsDesignDoc,
-} from "./design-summary-doc.ts";
+} from "./design-summary-doc";
 
 async function main() {
   const current = await readDeploymentsDesignDoc();

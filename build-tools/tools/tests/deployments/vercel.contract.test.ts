@@ -1,12 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { GraphNode } from "../../lib/graph.ts";
-import {
-  deriveVercelProviderTarget,
-  extractVercelDeployments,
-} from "../../deployments/contract.ts";
-import { vercelPolicyNodes } from "./vercel.fixture.ts";
+import type { GraphNode } from "../../lib/graph";
+import { deriveVercelProviderTarget, extractVercelDeployments } from "../../deployments/contract";
+import { vercelPolicyNodes } from "./vercel.fixture";
 
 function ssrComponent(label: string): GraphNode {
   return { name: label, labels: ["kind:app", "webapp:ssr"] };

@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { normalizeTargetLabel } from "../lib/labels.ts";
-import { repoRoot } from "../lib/repo.ts";
-import { sanitizeName } from "../lib/sanitize.ts";
-import { toPosixPath } from "../lib/posix-path.ts";
+import { normalizeTargetLabel } from "../lib/labels";
+import { repoRoot } from "../lib/repo";
+import { sanitizeName } from "../lib/sanitize";
+import { toPosixPath } from "../lib/posix-path";
 
 export type ModuleContractsPaths = {
   repoRoot: string;

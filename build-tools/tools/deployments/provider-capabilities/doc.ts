@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import fsp from "node:fs/promises";
 import path from "node:path";
-import { REVIEWED_PROVIDER_CAPABILITIES } from "./registry.ts";
-import { renderProviderCapabilityEntries } from "./render.ts";
+import { REVIEWED_PROVIDER_CAPABILITIES } from "./registry";
+import { renderProviderCapabilityEntries } from "./render";
 
 export const PROVIDER_CAPABILITIES_DOC_PATH = "docs/deployment-provider-capabilities.md";
 export const GENERATED_PROVIDER_CAPABILITIES_START =

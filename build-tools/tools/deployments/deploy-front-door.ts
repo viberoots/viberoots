@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { packagePathFromLabel } from "../lib/labels.ts";
-import { providerTargetIdentityFor, type DeploymentTarget } from "./contract.ts";
-import { deploymentAdmissionRequirementsForCli } from "./deployment-admission-requirements.ts";
-import { resolveAllDeployments } from "./deployment-query.ts";
+import { packagePathFromLabel } from "../lib/labels";
+import { providerTargetIdentityFor, type DeploymentTarget } from "./contract";
+import { deploymentAdmissionRequirementsForCli } from "./deployment-admission-requirements";
+import { resolveAllDeployments } from "./deployment-query";
 
 export const DEPLOY_LIST_SCHEMA = "deploy-list@1";
 export const DEPLOY_VALIDATE_SCHEMA = "deploy-validate@1";
@@ -58,7 +58,7 @@ export async function validateDeploymentForCli(
   workspaceRoot: string,
   deployment: DeploymentTarget,
 ) {
-  const { validateRepoFrontDoorDeployment } = await import("./deploy-front-door-validate.ts");
+  const { validateRepoFrontDoorDeployment } = await import("./deploy-front-door-validate");
   await requireProviderNativeConfig(workspaceRoot, deployment);
   await validateRepoFrontDoorDeployment(workspaceRoot, deployment);
   return {

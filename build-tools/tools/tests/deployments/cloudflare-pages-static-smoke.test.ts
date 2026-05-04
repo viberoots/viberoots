@@ -5,8 +5,8 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { smokeCloudflarePagesStaticWebapp } from "../../deployments/cloudflare-pages-static-smoke.ts";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture.ts";
+import { smokeCloudflarePagesStaticWebapp } from "../../deployments/cloudflare-pages-static-smoke";
+import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 
 test("cloudflare-pages custom domain smoke explains Cloudflare 522 routing failures", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "cloudflare-pages-smoke-"));

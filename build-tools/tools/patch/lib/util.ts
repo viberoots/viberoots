@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { pathExists as repoPathExists } from "../../lib/repo.ts";
+import { pathExists as repoPathExists } from "../../lib/repo";
 
 // Re-export shared helper to avoid duplication across modules
 export const pathExists = repoPathExists;

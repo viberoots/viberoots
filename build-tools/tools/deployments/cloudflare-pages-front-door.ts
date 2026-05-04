@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli.ts";
-import type { CloudflarePagesDeployment } from "./contract.ts";
-import { printDeployJson } from "./deploy-front-door.ts";
-import { runCloudflarePagesCli } from "./cloudflare-pages-cli.ts";
-import { summarizeDeploymentResult } from "./deployment-execution.ts";
-import { resolveArtifactDirForCli } from "./deployment-cli-resolve.ts";
-import { runProtectedCloudflarePagesDeployFrontDoor } from "./cloudflare-pages-protected-front-door.ts";
-import { submitCloudflarePagesTargetTransition } from "./cloudflare-pages-target-transition.ts";
+import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli";
+import type { CloudflarePagesDeployment } from "./contract";
+import { printDeployJson } from "./deploy-front-door";
+import { runCloudflarePagesCli } from "./cloudflare-pages-cli";
+import { summarizeDeploymentResult } from "./deployment-execution";
+import { resolveArtifactDirForCli } from "./deployment-cli-resolve";
+import { runProtectedCloudflarePagesDeployFrontDoor } from "./cloudflare-pages-protected-front-door";
+import { submitCloudflarePagesTargetTransition } from "./cloudflare-pages-target-transition";
 
 export async function runCloudflareDeployFrontDoor(opts: {
   workspaceRoot: string;

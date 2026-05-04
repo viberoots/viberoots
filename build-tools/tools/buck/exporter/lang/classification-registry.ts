@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import type { Node } from "../types.ts";
-import { hasLabel, isRuleType, type LanguageClassificationOptions } from "./helpers.ts";
-import { importerScopedAdapterRegistryEntry } from "./importer-scoped-registry.ts";
+import type { Node } from "../types";
+import { hasLabel, isRuleType, type LanguageClassificationOptions } from "./helpers";
+import { importerScopedAdapterRegistryEntry } from "./importer-scoped-registry";
 
 export type LanguageClassificationKey = "go" | "cpp" | "node" | "python";
 

@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { DEPLOYMENT_SECRET_FIXTURE_SCHEMA } from "../../deployments/deployment-secret-fixture.ts";
-import { requireCloudflarePagesApiTokenForStep } from "../../deployments/cloudflare-pages-secret-steps.ts";
-import type { CloudflarePagesAdmittedContext } from "../../deployments/cloudflare-pages-admission.ts";
-import { cloudflarePagesApiTokenRequirements } from "./cloudflare-pages.fixture.ts";
+import { DEPLOYMENT_SECRET_FIXTURE_SCHEMA } from "../../deployments/deployment-secret-fixture";
+import { requireCloudflarePagesApiTokenForStep } from "../../deployments/cloudflare-pages-secret-steps";
+import type { CloudflarePagesAdmittedContext } from "../../deployments/cloudflare-pages-admission";
+import { cloudflarePagesApiTokenRequirements } from "./cloudflare-pages.fixture";
 
 const targetScope = "cloudflare-pages:web-platform-staging/pleomino-staging-pages";
 

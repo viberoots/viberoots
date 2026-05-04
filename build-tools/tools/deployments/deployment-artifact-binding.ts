@@ -1,18 +1,18 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
 import path from "node:path";
-import type { NixosSharedHostDeployment } from "./contract.ts";
+import type { NixosSharedHostDeployment } from "./contract";
 import {
   artifactIdentityForNixosSharedHostDir,
   type NixosSharedHostAdmittedArtifact,
-} from "./nixos-shared-host-artifacts.ts";
+} from "./nixos-shared-host-artifacts";
 import {
   compositeNixosSharedHostArtifactIdentity,
   type NixosSharedHostResolvedComponentArtifact,
-} from "./nixos-shared-host-component-artifacts.ts";
-import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components.ts";
-import type { NixosSharedHostControlPlaneOperationKind } from "./nixos-shared-host-control-plane-contract.ts";
-import type { NixosSharedHostControlPlaneSourceSelection } from "./nixos-shared-host-control-plane-snapshot.ts";
+} from "./nixos-shared-host-component-artifacts";
+import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components";
+import type { NixosSharedHostControlPlaneOperationKind } from "./nixos-shared-host-control-plane-contract";
+import type { NixosSharedHostControlPlaneSourceSelection } from "./nixos-shared-host-control-plane-snapshot";
 
 export const DEPLOYMENT_ARTIFACT_BINDING_PROOF_SCHEMA = "deployment-artifact-binding-proof@1";
 export const DEPLOYMENT_ARTIFACT_CHALLENGE_SCHEMA = "deployment-artifact-challenge@1";

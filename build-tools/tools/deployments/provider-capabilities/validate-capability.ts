@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import { DEPLOYMENT_ROLLOUT_MODES } from "../deployment-rollout.ts";
-import { validateCapabilityFrontDoorContract } from "./front-door-contract.ts";
-import type { DeploymentProviderCapability, ProviderCapabilityBullet } from "./types.ts";
+import { DEPLOYMENT_ROLLOUT_MODES } from "../deployment-rollout";
+import { validateCapabilityFrontDoorContract } from "./front-door-contract";
+import type { DeploymentProviderCapability, ProviderCapabilityBullet } from "./types";
 
 function pushWhenEmpty(
   errors: string[],

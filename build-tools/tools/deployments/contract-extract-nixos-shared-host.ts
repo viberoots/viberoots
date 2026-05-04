@@ -6,12 +6,12 @@ import {
   STATIC_WEBAPP_COMPONENT,
   targetName,
   type NixosSharedHostDeployment,
-} from "./contract-types.ts";
+} from "./contract-types";
 import {
   pushDuplicateNixosSharedHostAppNameErrors,
   readRawNixosSharedHostComponents,
   rolloutPolicyErrorsForNixosSharedHost,
-} from "./contract-extract-components.ts";
+} from "./contract-extract-components";
 import {
   deploymentError,
   readLabel,
@@ -22,24 +22,24 @@ import {
   readSmokePolicy,
   readString,
   type DeploymentExtractionContext,
-} from "./contract-extract-shared.ts";
-import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata.ts";
-import { readBootstrapPolicy } from "./deployment-bootstrap-policy.ts";
+} from "./contract-extract-shared";
+import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata";
+import { readBootstrapPolicy } from "./deployment-bootstrap-policy";
 import {
   readExternalRequirementProfiles,
   resolveDeploymentMetadataRefs,
   validateExternalDeploymentRequirementProfiles,
   validateExplicitDeploymentRequirements,
-} from "./deployment-extract-metadata.ts";
-import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding.ts";
-import { readDeploymentRequirements } from "./deployment-requirements.ts";
+} from "./deployment-extract-metadata";
+import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding";
+import { readDeploymentRequirements } from "./deployment-requirements";
 import {
   nixosSharedHostPromotionCompatibilityErrors,
   pushNixosSharedHostReleaseActionErrors,
   resolveNixosSharedHostComponents,
-} from "./nixos-shared-host-extract-helpers.ts";
-import type { DeploymentBootstrapPolicy } from "./contract-types.ts";
-import { pushSmokePolicyErrors } from "./deployment-smoke-policy.ts";
+} from "./nixos-shared-host-extract-helpers";
+import type { DeploymentBootstrapPolicy } from "./contract-types";
+import { pushSmokePolicyErrors } from "./deployment-smoke-policy";
 
 const SHARED_NONPROD = "shared_nonprod";
 

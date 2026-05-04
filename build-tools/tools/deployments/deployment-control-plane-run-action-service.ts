@@ -1,24 +1,24 @@
 #!/usr/bin/env zx-wrapper
-import { submitDeploymentControlPlaneRunAction } from "./deployment-control-plane-run-action.ts";
-import { resolveRunActionAuthorizationBoundary } from "./deployment-service-authorization-boundary.ts";
+import { submitDeploymentControlPlaneRunAction } from "./deployment-control-plane-run-action";
+import { resolveRunActionAuthorizationBoundary } from "./deployment-service-authorization-boundary";
 import {
   enqueueBackendSubmission,
   readBackendSubmissionEnvelopeByDeployRunId,
   readBackendSubmissionEnvelopeBySubmissionId,
   syncBackendRunAction,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
+} from "./nixos-shared-host-control-plane-backend";
 import {
   materializeBackendControlPlaneFiles,
   persistMaterializedSnapshot,
   persistMaterializedSubmission,
-} from "./nixos-shared-host-control-plane-backend-materialize.ts";
-import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-control-plane-contract.ts";
+} from "./nixos-shared-host-control-plane-backend-materialize";
+import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-control-plane-contract";
 import {
   readControlPlaneJson,
   runActionRequestPathFor,
-} from "./nixos-shared-host-control-plane-store.ts";
-import type { ServiceRunActionRequest } from "./nixos-shared-host-control-plane-service-api.ts";
+} from "./nixos-shared-host-control-plane-store";
+import type { ServiceRunActionRequest } from "./nixos-shared-host-control-plane-service-api";
 
 export async function handleControlPlaneRunActionService(
   request: ServiceRunActionRequest,

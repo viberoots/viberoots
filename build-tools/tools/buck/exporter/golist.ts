@@ -2,8 +2,8 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { requireGoToolchainBin } from "../../lib/toolchain-paths.ts";
-import type { GoPkg, Tuple } from "./types.ts";
+import { requireGoToolchainBin } from "../../lib/toolchain-paths";
+import type { GoPkg, Tuple } from "./types";
 
 export let cacheHits = 0;
 export let cacheMisses = 0;

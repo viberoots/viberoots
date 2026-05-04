@@ -4,12 +4,12 @@ import path from "node:path";
 import {
   readBackendLatestDeployRecordEnvelopeByDeploymentId,
   type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend.ts";
+} from "./nixos-shared-host-control-plane-backend";
 import type {
   DeploymentAdmissionApprovalFact,
   DeploymentAdmissionCheckFact,
   DeploymentAdmissionPolicyEvaluation,
-} from "./deployment-admission-evidence.ts";
+} from "./deployment-admission-evidence";
 
 export type DeploymentRunRecordLike = {
   deployRunId: string;

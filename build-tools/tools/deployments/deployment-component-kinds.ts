@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { GraphNode } from "../lib/graph.ts";
+import type { GraphNode } from "../lib/graph";
 
 export const STATIC_WEBAPP_COMPONENT_KIND = "static-webapp";
 export const SSR_WEBAPP_COMPONENT_KIND = "ssr-webapp";

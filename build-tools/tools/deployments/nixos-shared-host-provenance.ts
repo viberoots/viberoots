@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import type { DeploymentReleaseAction } from "./deployment-release-actions.ts";
-import { SSR_WEBAPP_COMPONENT } from "./contract.ts";
+import type { NixosSharedHostDeployment } from "./contract";
+import type { DeploymentReleaseAction } from "./deployment-release-actions";
+import { SSR_WEBAPP_COMPONENT } from "./contract";
 
 export const NIXOS_SHARED_HOST_RELEASE_ACTION_RUNNER_IDENTITY =
   "nixos-shared-host-release-actions@1";

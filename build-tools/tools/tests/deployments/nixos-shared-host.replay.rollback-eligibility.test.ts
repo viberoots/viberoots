@@ -2,12 +2,12 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend.ts";
-import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane.ts";
-import { runInTemp } from "../lib/test-helpers.ts";
-import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture.ts";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture.ts";
-import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server.ts";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
+import { runInTemp } from "../lib/test-helpers";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
+import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 import {
   replayDeploymentFixture,
   replayPaths,
@@ -17,7 +17,7 @@ import {
   submitReplaySourceRun,
   syncReplayRunId,
   writeReplayArtifact,
-} from "./nixos-shared-host.replay.rollback-eligibility.helpers.ts";
+} from "./nixos-shared-host.replay.rollback-eligibility.helpers";
 
 test("rollback rejects a successful retry source while retry reuse stays available", async () => {
   await runInTemp("nixos-shared-host-replay-retry-source", async (tmp, $) => {

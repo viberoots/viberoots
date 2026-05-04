@@ -3,15 +3,15 @@ import {
   KUBERNETES_PROVIDER,
   deriveKubernetesProviderTarget,
   type KubernetesDeployment,
-} from "../../deployments/contract.ts";
-import type { GraphNode } from "../../lib/graph.ts";
+} from "../../deployments/contract";
+import type { GraphNode } from "../../lib/graph";
 import {
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostLanePolicyFixture,
   nixosSharedHostLanePolicyNodeFixture,
-} from "./nixos-shared-host.fixture.ts";
-export { installKubernetesTargets } from "./deployment-targets.install.helpers.ts";
+} from "./nixos-shared-host.fixture";
+export { installKubernetesTargets } from "./deployment-targets.install.helpers";
 
 export function kubernetesDeploymentFixture(
   overrides: Partial<KubernetesDeployment> = {},

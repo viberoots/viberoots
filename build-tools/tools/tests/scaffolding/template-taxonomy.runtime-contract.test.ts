@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { canonicalTemplateIdsForLanguage } from "../../scaffolding/scaf/templates/taxonomy.ts";
+import { canonicalTemplateIdsForLanguage } from "../../scaffolding/scaf/templates/taxonomy";
 import { runInTemp } from "../lib/test-helpers";
 
 function sortedUnique(values: readonly string[]): string[] {

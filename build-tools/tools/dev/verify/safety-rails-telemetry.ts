@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
-import { resolveToolPath } from "../../lib/tool-paths.ts";
+import { resolveToolPath } from "../../lib/tool-paths";
 
 export type ProcessCounts = {
   total: number;

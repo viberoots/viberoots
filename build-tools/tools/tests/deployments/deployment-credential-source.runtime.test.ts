@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveCredentialSourceVaultJwt } from "../../deployments/deployment-credential-source-runtime.ts";
-import { decodeJwtPayload } from "../../deployments/deploy-vault-jwt-claims.ts";
-import { scrubDeploymentSecretEnv } from "../../deployments/deployment-secret-env.ts";
-import { fakeJwt, startFakeOidcServer } from "./deploy-vault-jwt.test-helpers.ts";
+import { resolveCredentialSourceVaultJwt } from "../../deployments/deployment-credential-source-runtime";
+import { decodeJwtPayload } from "../../deployments/deploy-vault-jwt-claims";
+import { scrubDeploymentSecretEnv } from "../../deployments/deployment-secret-env";
+import { fakeJwt, startFakeOidcServer } from "./deploy-vault-jwt.test-helpers";
 
 function runtimeBase(issuerUrl: string, env: NodeJS.ProcessEnv) {
   return {

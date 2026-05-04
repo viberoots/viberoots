@@ -4,11 +4,11 @@ import {
   hasNixosSharedHostSsrRuntimeContract,
   type NixosSharedHostDeployment,
   type NixosSharedHostDeploymentComponent,
-} from "./contract.ts";
+} from "./contract";
 import {
   type NixosSharedHostPlatformState,
   validateNixosSharedHostPlatformState,
-} from "./nixos-shared-host-platform.ts";
+} from "./nixos-shared-host-platform";
 
 export type NixosSharedHostContainer = {
   containerName: string;

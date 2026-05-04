@@ -3,14 +3,14 @@ import {
   APP_STORE_CONNECT_PROVIDER,
   MOBILE_APP_COMPONENT_KIND,
   type AppStoreConnectDeployment,
-} from "../../deployments/contract.ts";
-import type { GraphNode } from "../../lib/graph.ts";
+} from "../../deployments/contract";
+import type { GraphNode } from "../../lib/graph";
 import {
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostAdmissionPolicyNodeFixture,
   nixosSharedHostLanePolicyFixture,
   nixosSharedHostLanePolicyNodeFixture,
-} from "./nixos-shared-host.fixture.ts";
+} from "./nixos-shared-host.fixture";
 
 export function appStoreConnectDeploymentFixture(
   overrides: Partial<AppStoreConnectDeployment> = {},

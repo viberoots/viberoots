@@ -1,6 +1,6 @@
 import process from "node:process";
-import type { VerifyScopeDecision } from "./requested-scope.ts";
-import type { VerifyTargetExpansionSummary } from "./target-passes.ts";
+import type { VerifyScopeDecision } from "./requested-scope";
+import type { VerifyTargetExpansionSummary } from "./target-passes";
 
 export function printVerifySelection(
   decision: VerifyScopeDecision,

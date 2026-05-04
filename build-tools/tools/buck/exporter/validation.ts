@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { Adapter, Node } from "./types.ts";
+import type { Adapter, Node } from "./types";
 
 export type ValidationMode = "warn" | "error";
 

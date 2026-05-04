@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { packagePathFromLabel } from "../lib/labels.ts";
-import type { DeploymentLanePolicy } from "./deployment-policy.ts";
+import { packagePathFromLabel } from "../lib/labels";
+import type { DeploymentLanePolicy } from "./deployment-policy";
 
 function packageBaseName(label: string): string {
   return path.posix.basename(packagePathFromLabel(label));

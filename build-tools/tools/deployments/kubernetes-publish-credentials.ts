@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import type { KubernetesDeployment } from "./contract.ts";
-import { isProtectedDeploymentClass } from "./deployment-control-plane-resilience-policy.ts";
-import type { DeploymentRequirement } from "./deployment-requirements.ts";
+import type { KubernetesDeployment } from "./contract";
+import { isProtectedDeploymentClass } from "./deployment-control-plane-resilience-policy";
+import type { DeploymentRequirement } from "./deployment-requirements";
 
 export type KubernetesPublishCredentialsRejectionReason =
   | "missing"

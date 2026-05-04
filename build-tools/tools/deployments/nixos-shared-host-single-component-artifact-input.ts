@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts.ts";
-import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts.ts";
-import type { NixosSharedHostDeployment } from "./contract.ts";
-import { primaryNixosSharedHostComponent } from "./nixos-shared-host-components.ts";
+import type { NixosSharedHostResolvedComponentArtifact } from "./nixos-shared-host-component-artifacts";
+import type { NixosSharedHostAdmittedArtifact } from "./nixos-shared-host-artifacts";
+import type { NixosSharedHostDeployment } from "./contract";
+import { primaryNixosSharedHostComponent } from "./nixos-shared-host-components";
 
 export function normalizeSingleComponentArtifactInput(opts: {
   deployment: NixosSharedHostDeployment;

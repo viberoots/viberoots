@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { Node } from "../types.ts";
+import type { Node } from "../types";
 
 /**
  * Return true when the node's labels contain the provided label.

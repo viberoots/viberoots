@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { GraphNode } from "../../lib/graph.ts";
-import { extractAppStoreConnectDeployments } from "../../deployments/contract.ts";
+import type { GraphNode } from "../../lib/graph";
+import { extractAppStoreConnectDeployments } from "../../deployments/contract";
 import {
   appStoreConnectAdmissionPolicyNodeFixture,
   appStoreConnectDeploymentNodeFixture,
   appStoreConnectLanePolicyNodeFixture,
-} from "./app-store-connect.fixture.ts";
+} from "./app-store-connect.fixture";
 
 function componentNode(label: string): GraphNode {
   return { name: label, labels: ["kind:app"] };

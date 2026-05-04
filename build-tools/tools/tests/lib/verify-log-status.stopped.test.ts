@@ -5,7 +5,7 @@ import {
   computeVerifyStatusFromLogText,
   formatVerifyStatusJsonLine,
   formatVerifyStatusText,
-} from "../../lib/verify-log-status.ts";
+} from "../../lib/verify-log-status";
 
 test("verify-log-status: stopped historical logs freeze elapsed instead of ticking", () => {
   const saved = Date.now;

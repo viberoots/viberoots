@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { withExclusiveInstallLock } from "../../dev/install/lock.ts";
+import { withExclusiveInstallLock } from "../../dev/install/lock";
 
 test("install lock propagates fn errors without retry loop", async () => {
   const key = `lock-propagates-fn-errors-${Date.now()}-${process.pid}`;

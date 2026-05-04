@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { resolveToolPath } from "../../lib/tool-paths.ts";
+import { resolveToolPath } from "../../lib/tool-paths";
 
 async function pidStartSignature(pid: number): Promise<string> {
   try {

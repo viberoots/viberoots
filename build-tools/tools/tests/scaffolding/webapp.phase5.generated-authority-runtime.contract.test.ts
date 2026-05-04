@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { resolveModuleContractsPaths } from "../../dev/module-contract-paths.ts";
-import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core.ts";
-import { parseWasmModuleManifest } from "../../scaffolding/webapp-module-manifests.ts";
+import { resolveModuleContractsPaths } from "../../dev/module-contract-paths";
+import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core";
+import { parseWasmModuleManifest } from "../../scaffolding/webapp-module-manifests";
 import { runInTemp } from "../lib/test-helpers";
 import { runNodeEval } from "./lib/module-runtime-eval";
 
