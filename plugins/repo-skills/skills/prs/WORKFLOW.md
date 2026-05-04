@@ -129,13 +129,16 @@ For each PR number, in order:
 
 While implementation subagents are waiting on focused or full-suite validation, wait quietly. Do not ask them for periodic status updates and do not relay "still running" messages to the user. Conserve tokens and report only when a validation run completes, fails, needs action, or produces evidence needed for PR advancement.
 
-Do not treat the start of a validation run as completion. A subagent must observe the run finish before reporting. Concretely, before a subagent ends its turn with full-suite or focused validation evidence, it must either (a) capture the literal `Tests finished:` summary line from the run's log (with pass/fail/fatal/skip counts), or (b) observe a non-zero/zero exit from the `test` skill itself. The subagent's report must include:
+Do not treat the start of a validation run as completion. A subagent must wait for the test process to exit before reporting. The reliable completion signal is the `test` skill / `i && b && v` invocation returning a final exit code — not a string in the log. The repo's verify pipeline writes `Tests finished:` once per phase (e.g. shared, then resource-limited), so a single occurrence does not mean the run is done; only process exit does. Run validation in the foreground, or poll the running PID and wait for it to exit, before producing evidence.
+
+The subagent's report must include:
 
 - the absolute log path,
-- the verbatim `Tests finished:` summary line, and
-- total elapsed time in seconds.
+- the final exit code of the test invocation,
+- the per-phase `Tests finished:` summary lines from the log (so the totals are auditable), and
+- total elapsed time in seconds, measured from invocation start to process exit.
 
-If any of those three are missing from a subagent's report, the parent must not advance — re-spawn the subagent (or continue it) with explicit instructions to wait synchronously for the run to finish and to attach the missing evidence.
+If any of those are missing from a subagent's report, the parent must not advance — re-spawn the subagent (or continue it) with explicit instructions to wait synchronously for the run to finish and to attach the missing evidence.
 
 Use a subagent prompt shaped like this, adjusted only for the repo path, PR number, plan document, and push permission:
 
@@ -146,7 +149,7 @@ You are not alone in the codebase. Preserve user changes, do not revert unrelate
 
 Use the `pr` skill for PR <pr-number> from <plan-document> in pre-full-suite review mode.
 
-Stay quiet while tests or full-suite validation are running, but DO NOT end your turn until the run has finished. Do not treat the start of a run as completion. Wait synchronously until the test process exits and the log contains a literal `Tests finished:` summary line. Do not send periodic status updates, progress pings, or "still running" messages. Report only when validation completes, fails, needs action, or produces evidence needed for review, timing, or commit authorization. Every focused or full-suite report must include the absolute log path, the verbatim `Tests finished:` summary line, and the total elapsed time in seconds.
+Stay quiet while tests or full-suite validation are running, but DO NOT end your turn until the test process has exited. Do not treat the start of a run as completion, and do not treat a `Tests finished:` line as completion — that line is emitted once per phase (shared, then resource-limited), so multiple occurrences are normal and a single occurrence does not mean the run is done. The only reliable completion signal is the `test` / `i && b && v` invocation returning a final exit code. Run validation in the foreground or poll the test PID and wait for it to exit before reporting. Do not send periodic status updates, progress pings, or "still running" messages. Report only when validation completes (exit code observed), fails, needs action, or produces evidence needed for review, timing, or commit authorization. Every focused or full-suite report must include the absolute log path, the final exit code, the per-phase `Tests finished:` summary lines from the log, and the total elapsed time in seconds.
 
 Because this is a `$prs` run, stop before the time-consuming full-suite validation. After self-review and focused validation pass, report ready-for-review evidence and wait for `$prs` to run a separate scope-review subagent.
 
@@ -217,9 +220,9 @@ If the scope review fails, do not authorize full-suite validation or a commit. S
 Advance to the next PR only when the current PR subagent reports all of these:
 
 - Self-review passed.
-- Focused validation passed through the `test` skill, with evidence including the log path, the verbatim `Tests finished:` summary line, and total elapsed seconds.
+- Focused validation passed through the `test` skill, with evidence including the log path, the final exit code, the per-phase `Tests finished:` summary lines, and total elapsed seconds.
 - A separate scope-review subagent passed the implementation against the PR description in the plan document before full-suite validation ran.
-- Full-suite validation passed through the `test` skill, with evidence including the log path, the verbatim `Tests finished:` summary line, and total elapsed seconds. A subagent report that only states the run "started" or "is running" is not advancement evidence — re-spawn or continue the subagent to wait for completion before advancing.
+- Full-suite validation passed through the `test` skill, with evidence including the log path, the final exit code, the per-phase `Tests finished:` summary lines, and total elapsed seconds. A subagent report that only states the run "started" or "is running" is not advancement evidence — re-spawn or continue the subagent to wait for the test process to exit before advancing. Do not accept a single `Tests finished:` line as completion; it is per-phase, not per-run.
 - Full-suite execution time did not significantly regress compared with the most recent recorded successful run, or no previous successful timing was recorded.
 - Any validation failures were investigated and fixed.
 - A conventional commit was created successfully through the `cc` skill.
