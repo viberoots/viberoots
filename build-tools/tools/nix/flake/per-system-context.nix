@@ -13,33 +13,7 @@ let
       [ gomod2nix.overlays.default ] ++ cppOverlays;
   };
 
-  zx-wrapper = pkgs.writeShellScriptBin "zx-wrapper" ''
-    set -euo pipefail
-    # Locate the repo's zx-init.mjs resolver hook (which auto-appends `.ts` to relative imports).
-    # Honor an explicit ZX_INIT env var first; otherwise walk up from PWD looking for
-    # build-tools/tools/dev/zx-init.mjs in the surrounding source tree (also handles temp
-    # scaffolding workspaces that copy the repo into a tmpdir).
-    _zx_init_import=()
-    if [ -n "''${ZX_INIT:-}" ] && [ -f "''${ZX_INIT}" ]; then
-      _zx_init_import=(--import="''${ZX_INIT}")
-    else
-      _search="''${PWD}"
-      while [ "$_search" != "/" ] && [ -n "$_search" ]; do
-        if [ -f "$_search/build-tools/tools/dev/zx-init.mjs" ]; then
-          _zx_init_import=(--import="$_search/build-tools/tools/dev/zx-init.mjs")
-          break
-        fi
-        _search="$(dirname "$_search")"
-      done
-    fi
-    exec ${pkgs.nodejs_22}/bin/node \
-      --experimental-strip-types \
-      --experimental-top-level-await \
-      --disable-warning=ExperimentalWarning \
-      --import="${pkgs.nodePackages.zx}/lib/node_modules/zx/build/globals.js" \
-      "''${_zx_init_import[@]}" \
-      "$@"
-  '';
+  zx-wrapper = import ../lib/zx-wrapper.nix { inherit pkgs; };
 
   devshell = import ../devshell.nix { inherit pkgs; buck2Input = buck2; };
 
